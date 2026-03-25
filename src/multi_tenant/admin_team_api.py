@@ -742,31 +742,44 @@ async def update_team_member(
                 detail="escalation_categories can only be set for the 'escalation_agent' role.",
             )
 
-    # Build patch operations from provided fields
+    # Build updates — split encrypted fields from safe-to-patch fields.
+    # SPEC-1843: encrypted fields (display_name, email) must use
+    # read-modify-write via update_encrypted_fields(), not patch().
     now = datetime.now(timezone.utc).isoformat()
-    operations: list[dict[str, Any]] = [
+    patch_operations: list[dict[str, Any]] = [
         {"op": "set", "path": "/updated_at", "value": now},
     ]
+    encrypted_updates: dict[str, Any] = {}
 
     if request.display_name is not None:
-        operations.append({"op": "set", "path": "/display_name", "value": request.display_name})
+        encrypted_updates["display_name"] = request.display_name
     if request.role is not None:
-        operations.append({"op": "set", "path": "/role", "value": request.role})
+        patch_operations.append({"op": "set", "path": "/role", "value": request.role})
         # Clear escalation_categories when changing away from escalation_agent
         if request.role != "escalation_agent" and request.escalation_categories is None:
-            operations.append({"op": "set", "path": "/escalation_categories", "value": []})
+            patch_operations.append({"op": "set", "path": "/escalation_categories", "value": []})
     if request.escalation_categories is not None:
-        operations.append({"op": "set", "path": "/escalation_categories", "value": request.escalation_categories})
+        patch_operations.append({"op": "set", "path": "/escalation_categories", "value": request.escalation_categories})
     if request.max_concurrent_conversations is not None:
-        operations.append({"op": "set", "path": "/max_concurrent_conversations", "value": request.max_concurrent_conversations})
+        patch_operations.append({"op": "set", "path": "/max_concurrent_conversations", "value": request.max_concurrent_conversations})
     if request.is_active is not None:
-        operations.append({"op": "set", "path": "/is_active", "value": request.is_active})
+        patch_operations.append({"op": "set", "path": "/is_active", "value": request.is_active})
 
+    # Patch non-encrypted fields
     await repo.patch(
         tenant_id=ctx.tenant_id,
         document_id=member_id,
-        operations=operations,
+        operations=patch_operations,
     )
+
+    # Update encrypted fields via read-modify-write
+    if encrypted_updates:
+        encrypted_updates["updated_at"] = now
+        await repo.update_encrypted_fields(
+            tenant_id=ctx.tenant_id,
+            document_id=member_id,
+            field_updates=encrypted_updates,
+        )
 
     # Build response from existing + updates
     updated = {**existing}

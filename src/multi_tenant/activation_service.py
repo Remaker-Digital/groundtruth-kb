@@ -1149,15 +1149,14 @@ class ActivationService:
                 # so the tenant stays in "Pending" (draft exists, mandatory
                 # fields empty).  We clear user-editable fields back to
                 # defaults while keeping the document structure.
+                #
+                # SPEC-1843: Split into non-encrypted (safe for patch) and
+                # encrypted (must use read-modify-write) field groups.
                 reset_ops = [
-                    # Merchant-configurable fields — reset to empty
-                    # (must match seed_tenant.py Phase 3 defaults)
+                    # Non-encrypted merchant-configurable fields
                     {"op": "set", "path": "/brand_name", "value": ""},
                     {"op": "set", "path": "/brand_voice", "value": ""},
                     {"op": "set", "path": "/brand_tagline", "value": ""},
-                    {"op": "set", "path": "/custom_instructions", "value": ""},
-                    {"op": "set", "path": "/return_policy", "value": ""},
-                    {"op": "set", "path": "/shipping_info", "value": ""},
                     {"op": "set", "path": "/escalation_keywords", "value": []},
                     {"op": "set", "path": "/escalation_email", "value": None},
                     {"op": "set", "path": "/greeting_message", "value": None},
@@ -1178,6 +1177,18 @@ class ActivationService:
                     tenant_id=tenant_id,
                     document_id=draft["id"],
                     operations=reset_ops,
+                )
+
+                # Reset encrypted fields via read-modify-write
+                encrypted_resets = {
+                    "custom_instructions": "",
+                    "return_policy": "",
+                    "shipping_info": "",
+                }
+                await self._prefs_repo.update_encrypted_fields(
+                    tenant_id=tenant_id,
+                    document_id=draft["id"],
+                    field_updates=encrypted_resets,
                 )
                 logger.info(
                     "Reset draft to initial state for tenant=%s (never activated)",

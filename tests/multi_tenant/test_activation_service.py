@@ -1474,7 +1474,7 @@ class TestDiscardDraft:
 
         assert result is True
 
-        # Verify draft was reset (not discarded) — brand_name cleared
+        # Verify draft was reset (not discarded) — non-encrypted fields via patch
         prefs_repo.patch.assert_awaited_once()
         patch_call = prefs_repo.patch.call_args
         doc_id = patch_call.kwargs.get("document_id", patch_call[1].get("document_id", ""))
@@ -1484,12 +1484,9 @@ class TestDiscardDraft:
         op_map = {op["path"]: op["value"] for op in ops}
         # Should reset fields, NOT set config_state to discarded
         assert "/config_state" not in op_map
-        # All merchant-configurable fields must match seed_tenant.py defaults
+        # Non-encrypted merchant-configurable fields in patch operations
         assert op_map.get("/brand_name") == ""
         assert op_map.get("/brand_voice") == ""
-        assert op_map.get("/custom_instructions") == ""
-        assert op_map.get("/return_policy") == ""
-        assert op_map.get("/shipping_info") == ""
         assert op_map.get("/escalation_keywords") == []
         assert op_map.get("/escalation_email") is None
         assert op_map.get("/greeting_message") is None
@@ -1500,6 +1497,15 @@ class TestDiscardDraft:
         assert op_map.get("/widget_greeting_message") is None
         assert op_map.get("/activated_at") is None
         assert op_map.get("/activated_by") is None
+
+        # SPEC-1843: Encrypted fields (custom_instructions, return_policy,
+        # shipping_info) must be reset via update_encrypted_fields, not patch.
+        prefs_repo.update_encrypted_fields.assert_awaited_once()
+        enc_call = prefs_repo.update_encrypted_fields.call_args
+        enc_updates = enc_call.kwargs.get("field_updates", enc_call[1].get("field_updates", {}))
+        assert enc_updates.get("custom_instructions") == ""
+        assert enc_updates.get("return_policy") == ""
+        assert enc_updates.get("shipping_info") == ""
 
     @pytest.mark.asyncio
     async def test_discard_no_draft(self):

@@ -986,30 +986,33 @@ async def update_knowledge_entry(
             detail=f"Knowledge entry {entry_id} not found",
         )
 
-    # Build patch operations from provided fields
+    # Build updates — split encrypted fields from safe-to-patch fields.
+    # SPEC-1843: encrypted fields (title, content, description, source_text)
+    # must use read-modify-write via update_encrypted_fields(), not patch().
     now = datetime.now(timezone.utc).isoformat()
-    operations: list[dict[str, Any]] = [
+    patch_operations: list[dict[str, Any]] = [
         {"op": "set", "path": "/updated_at", "value": now},
     ]
+    encrypted_updates: dict[str, Any] = {}
 
     if request.entry_type is not None:
-        operations.append({"op": "set", "path": "/entry_type", "value": request.entry_type})
+        patch_operations.append({"op": "set", "path": "/entry_type", "value": request.entry_type})
     if request.title is not None:
-        operations.append({"op": "set", "path": "/title", "value": request.title})
+        encrypted_updates["title"] = request.title
     if request.content is not None:
-        operations.append({"op": "set", "path": "/content", "value": request.content})
+        encrypted_updates["content"] = request.content
     if request.metadata is not None:
-        operations.append({"op": "set", "path": "/metadata", "value": request.metadata})
+        patch_operations.append({"op": "set", "path": "/metadata", "value": request.metadata})
     if request.tags is not None:
-        operations.append({"op": "set", "path": "/tags", "value": request.tags})
+        patch_operations.append({"op": "set", "path": "/tags", "value": request.tags})
     if request.language is not None:
-        operations.append({"op": "set", "path": "/language", "value": request.language})
+        patch_operations.append({"op": "set", "path": "/language", "value": request.language})
     if request.is_active is not None:
-        operations.append({"op": "set", "path": "/is_active", "value": request.is_active})
+        patch_operations.append({"op": "set", "path": "/is_active", "value": request.is_active})
     if request.category is not None:
-        operations.append({"op": "set", "path": "/category", "value": request.category})
+        patch_operations.append({"op": "set", "path": "/category", "value": request.category})
     if request.status is not None:
-        operations.append({"op": "set", "path": "/status", "value": request.status})
+        patch_operations.append({"op": "set", "path": "/status", "value": request.status})
 
     # Archive lifecycle: automatically sync is_active with status transitions
     old_status = existing.get("status")
@@ -1022,16 +1025,26 @@ async def update_knowledge_entry(
 
     if archiving:
         # Deactivate on archive so RAG pipeline no longer retrieves this entry
-        operations.append({"op": "set", "path": "/is_active", "value": False})
+        patch_operations.append({"op": "set", "path": "/is_active", "value": False})
     elif unarchiving:
         # Reactivate when moving out of archived status
-        operations.append({"op": "set", "path": "/is_active", "value": True})
+        patch_operations.append({"op": "set", "path": "/is_active", "value": True})
 
+    # Patch non-encrypted fields
     await repo.patch(
         tenant_id=ctx.tenant_id,
         document_id=entry_id,
-        operations=operations,
+        operations=patch_operations,
     )
+
+    # Update encrypted fields via read-modify-write
+    if encrypted_updates:
+        encrypted_updates["updated_at"] = now
+        await repo.update_encrypted_fields(
+            tenant_id=ctx.tenant_id,
+            document_id=entry_id,
+            field_updates=encrypted_updates,
+        )
 
     # Archive lifecycle: remove vector embedding so archived content
     # cannot be retrieved by semantic search
