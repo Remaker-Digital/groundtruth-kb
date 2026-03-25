@@ -8,6 +8,20 @@ description: Understand your AI agent's performance with real-time analytics, in
 
 The Analytics Dashboard gives you a real-time view of your AI agent's performance, customer engagement trends, and areas for improvement.
 
+![Analytics dashboard showing usage, topics, and knowledge gaps](/img/admin/analytics-dashboard.png)
+
+## Analytics-to-action loop
+
+```mermaid
+flowchart LR
+    A[Review metrics and trends] --> B[Identify weak areas]
+    B --> C[Inspect conversations and traces]
+    C --> D[Update KB or configuration]
+    D --> E[Activate changes]
+    E --> F[Measure impact in dashboard]
+    F --> A
+```
+
 ## Key Metrics
 
 ### Total Conversations

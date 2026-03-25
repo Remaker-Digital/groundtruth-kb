@@ -8,6 +8,8 @@ description: Configure when the AI agent routes conversations to human agents â€
 
 Escalation is the process of routing a conversation from the AI agent to a human agent. These settings control when and how escalation happens.
 
+![Escalated conversation workflow in the inbox](/img/admin/conversation-inbox.png)
+
 ## How escalation works
 
 The escalation detection agent evaluates every customer message for signals that a human is needed. It considers:
@@ -18,6 +20,23 @@ The escalation detection agent evaluates every customer message for signals that
 4. **Sentiment signals** â€” Is the customer expressing frustration, anger, or urgency? (automatic, not configurable)
 
 If any of these conditions trigger, the conversation is escalated.
+
+```mermaid
+flowchart TB
+    M[Customer message] --> C[Evaluate confidence]
+    M --> K[Check escalation keywords]
+    M --> T[Check turn limit]
+    M --> S[Check sentiment signals]
+    C --> D{Any trigger hit?}
+    K --> D
+    T --> D
+    S --> D
+    D -- No --> R[AI continues response]
+    D -- Yes --> E[Escalate conversation]
+    E --> A[Assign by category and workload]
+    A --> N[Send escalation email notifications]
+    A --> I[Show in Inbox as Escalated]
+```
 
 ---
 

@@ -19,6 +19,19 @@ Agent Red integrates with external platforms to access customer data, process pa
 | Google Analytics | Professional+ | Conversation event tracking | Available |
 | Custom Integration | Enterprise | Custom API connectors | Available |
 
+## Integration workflow map
+
+```mermaid
+flowchart LR
+    A[Enable integration] --> B[Store credentials securely]
+    B --> C[Test connection]
+    C --> D{Connection healthy?}
+    D -- No --> E[Fix config and retest]
+    D -- Yes --> F[Activate integration in production]
+    F --> G[Monitor health and events]
+    G --> H[Adjust or deactivate as needed]
+```
+
 ## Enabling and disabling integrations
 
 1. Navigate to **Integrations** in the admin console.

@@ -10,6 +10,19 @@ Team management lets you invite colleagues to the Agent Red admin console and co
 
 ![Team management page showing team members, roles, and escalation assignments](/img/admin/team-members.png)
 
+## Team operations workflow
+
+```mermaid
+flowchart LR
+    A[Invite team member] --> B[Assign role]
+    B --> C{Escalation agent?}
+    C -- Yes --> D[Assign escalation categories]
+    C -- No --> E[Grant role-based access]
+    D --> E
+    E --> F[Monitor workload and access]
+    F --> G[Adjust roles, status, or assignments]
+```
+
 ## Roles
 
 Agent Red uses four roles. Each role determines which pages a team member can access and whether they can make changes.

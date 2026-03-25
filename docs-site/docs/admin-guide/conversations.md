@@ -8,6 +8,23 @@ description: Monitor, filter, and manage customer conversations in real time fro
 
 The Inbox provides a real-time view of all customer conversations, with tools to filter, assign, escalate, and resolve them.
 
+![Conversation Inbox showing active and escalated conversations](/img/admin/conversation-inbox.png)
+
+## Inbox workflow map
+
+```mermaid
+flowchart LR
+    N[New customer message] --> A[AI processes conversation]
+    A --> B{Needs human?}
+    B -- No --> C[Remain Active]
+    B -- Yes --> D[Escalate and assign]
+    D --> E[Human resolution]
+    E --> F[Mark Resolved]
+    F --> G[Archive when complete]
+    C --> H[Auto-resolve or manual resolve]
+    H --> G
+```
+
 ## Conversation List
 
 The left panel shows all conversations, sorted by most recent activity. Each entry displays:

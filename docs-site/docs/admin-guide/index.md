@@ -44,6 +44,7 @@ Configuration changes use a two-phase commit model. When you save a setting, it 
 | [Customer memory](./customer-memory.md) | Conversation history, pattern learning, model training, data retention |
 | [Widget appearance](./widget-appearance.md) | Colors, position, launcher, dark mode, mobile behavior |
 | [Widget behavior](./widget-behavior.md) | Auto-open, offline mode, pre-chat forms, rating, sound |
+| [Widget installation](./widget-installation.md) | Embed code, platform-specific setup, and verification steps |
 | [Custom instructions](./custom-instructions.md) | Advanced: direct system prompt injection for specific behaviors |
 | [Quick action prompts](./quick-actions.md) | Pre-defined prompt buttons in the widget greeting area |
 | [Knowledge base management](./knowledge-base-management.md) | Creating, editing, uploading, and organizing knowledge articles |
@@ -54,6 +55,7 @@ Configuration changes use a two-phase commit model. When you save a setting, it 
 | [Analytics](./analytics.md) | Conversation volume, intent breakdown, resolution rates, first-contact resolution |
 | [Data retention](./data-retention.md) | Retention periods, PII scrubbing, consent, automatic deletion |
 | [MFA & security](./mfa-security.md) | Two-factor authentication, magic link login, backup codes |
+| [Provider console](./provider-console.md) | Platform-level operations workspace for tenant oversight, incidents, and deployments |
 
 ## Settings that affect AI prompts
 

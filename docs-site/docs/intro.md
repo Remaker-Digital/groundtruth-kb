@@ -22,7 +22,7 @@ import ThemedImage from '@theme/ThemedImage';
   </p>
 </div>
 
-Agent Red is an AI-powered customer service platform that automates support conversations across your e-commerce channels. Built on a proven open-source foundation with six specialized AI agents, Agent Red delivers accurate, context-aware responses at scale.
+Agent Red is an AI-powered customer service platform that automates support conversations across your e-commerce channels. Built on a proven open-source foundation with a multi-agent AI pipeline, Agent Red delivers accurate, context-aware responses at scale.
 
 ## What you'll find here
 
@@ -36,7 +36,7 @@ Agent Red is an AI-powered customer service platform that automates support conv
 
 | Capability | Description |
 |------------|-------------|
-| **Intent classification** | Routes customer queries across 17 intent categories |
+| **Intent classification** | Routes customer queries across 18 intent categories (17 customer-facing plus 1 admin-only route) |
 | **Knowledge retrieval** | Searches products, FAQs, and policies using hybrid vector + keyword search |
 | **Response generation** | Crafts personalized, brand-consistent replies powered by GPT-4o |
 | **Escalation detection** | Identifies conversations requiring human intervention |

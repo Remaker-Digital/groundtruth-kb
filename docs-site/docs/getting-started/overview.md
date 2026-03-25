@@ -6,7 +6,7 @@ description: What Agent Red Customer Experience does, how the six-agent AI pipel
 
 # Platform Overview
 
-Agent Red Customer Experience automates customer support for e-commerce businesses using a pipeline of six specialized AI agents. Each agent handles a distinct responsibility — from classifying the customer's intent to generating a response and validating it for safety — so that conversations are resolved accurately without human intervention.
+Agent Red Customer Experience automates customer support for e-commerce businesses using a pipeline of six specialized AI agents. Each agent handles a distinct responsibility — from classifying the customer's intent to generating a response and validating it for safety — so that routine conversations are resolved accurately with minimal human intervention.
 
 ![Agent Red admin dashboard](/img/admin/dashboard.png)
 
@@ -28,7 +28,7 @@ flowchart LR
     B --> J[Analytics]
 ```
 
-1. **Intent Classification** — Determines what the customer needs (order status, return request, product question, and others) across 17 supported intent categories using GPT-4o-mini.
+1. **Intent Classification** — Determines what the customer needs (order status, return request, product question, and others) across 18 total intent categories (17 customer-facing plus an admin-assistance route for admin-authenticated traffic) using GPT-4o-mini.
 2. **Knowledge Retrieval** — Searches your product catalog, FAQ database, and policy documents using hybrid semantic vector + keyword search to find relevant context.
 3. **Response Generation** — Composes a natural-language reply using the retrieved context and conversation history, personalized to your brand voice.
 4. **Critic / Supervisor** — Validates the response for factual accuracy, policy compliance, and content safety before it reaches the customer.

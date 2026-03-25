@@ -51,74 +51,38 @@ sequenceDiagram
 
 **1. API Gateway receives the message.** The customer's message arrives over HTTPS. The API Gateway authenticates the request using the tenant's API key, attaches tenant context, and forwards the message into the agent pipeline.
 
-**2. Intent Classifier determines the customer's need.** The classifier analyzes the message text and assigns one of 17 intent categories using GPT-4o-mini. The classified intent determines which knowledge sources the retrieval agent searches and how the response generator frames its reply.
+**2. Intent Classifier determines the customer's need.** The classifier analyzes the message text and assigns one of 18 intent categories using GPT-4o-mini. Seventeen are customer-facing intents, and one (`admin_assistance`) is reserved for admin-authenticated flows. The classified intent determines which knowledge sources the retrieval agent searches and how the response generator frames its reply.
 
 ```mermaid
 flowchart TB
-    ROOT((17 Intent<br/>Categories))
+    ROOT((18 Intent Classes))
 
-    ORD[Orders]
-    RET[Returns]
-    PRD[Products]
-    ACC[Account]
-    SUP[Support]
+    subgraph CF["Customer-facing intents (17)"]
+        C1[general_inquiry]
+        C2[product_question]
+        C3[order_status]
+        C4[return_request]
+        C5[exchange_request]
+        C6[refund_request]
+        C7[shipping_inquiry]
+        C8[pricing_question]
+        C9[availability_check]
+        C10[complaint]
+        C11[feedback]
+        C12[account_issue]
+        C13[payment_issue]
+        C14[subscription_question]
+        C15[technical_support]
+        C16[greeting]
+        C17[escalation]
+    end
 
-    ROOT --- ORD
-    ROOT --- RET
-    ROOT --- PRD
-    ROOT --- ACC
-    ROOT --- SUP
+    subgraph AO["Admin-only intent"]
+        A1[admin_assistance]
+    end
 
-    ORD --- O1[Order Status]
-    ORD --- O2[Order Modification]
-    ORD --- O3[Order Cancellation]
-    ORD --- O4[Shipping & Delivery]
-
-    RET --- R1[Return Request]
-    RET --- R2[Refund Status]
-    RET --- R3[Exchange]
-
-    PRD --- P1[Product Information]
-    PRD --- P2[Product Availability]
-    PRD --- P3[Product Recommendation]
-    PRD --- P4[Pricing]
-
-    ACC --- A1[Account Management]
-    ACC --- A2[Password Reset]
-    ACC --- A3[Payment Issues]
-
-    SUP --- S1[Technical Support]
-    SUP --- S2[General Inquiry]
-    SUP --- S3[Complaint]
-
-    style ROOT fill:#DC2626,color:#fff,stroke:#DC2626
-    style ORD fill:#1D4ED8,color:#fff,stroke:#1D4ED8
-    style RET fill:#7C3AED,color:#fff,stroke:#7C3AED
-    style PRD fill:#B45309,color:#fff,stroke:#B45309
-    style ACC fill:#047857,color:#fff,stroke:#047857
-    style SUP fill:#BE185D,color:#fff,stroke:#BE185D
-
-    style O1 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
-    style O2 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
-    style O3 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
-    style O4 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
-
-    style R1 fill:#EDE9FE,color:#3B1F6E,stroke:#C4B5FD
-    style R2 fill:#EDE9FE,color:#3B1F6E,stroke:#C4B5FD
-    style R3 fill:#EDE9FE,color:#3B1F6E,stroke:#C4B5FD
-
-    style P1 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
-    style P2 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
-    style P3 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
-    style P4 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
-
-    style A1 fill:#D1FAE5,color:#064E3B,stroke:#6EE7B7
-    style A2 fill:#D1FAE5,color:#064E3B,stroke:#6EE7B7
-    style A3 fill:#D1FAE5,color:#064E3B,stroke:#6EE7B7
-
-    style S1 fill:#FCE7F3,color:#831843,stroke:#F9A8D4
-    style S2 fill:#FCE7F3,color:#831843,stroke:#F9A8D4
-    style S3 fill:#FCE7F3,color:#831843,stroke:#F9A8D4
+    ROOT --> CF
+    ROOT --> AO
 ```
 
 **3. Escalation Detection runs in parallel.** While the main pipeline processes the message, the escalation agent independently evaluates whether the conversation requires a human. It assesses customer sentiment, issue complexity, account value, and conversation history. If escalation triggers, the system routes the conversation to a human agent in your help desk (Zendesk, or another connected platform) and notifies the customer that a person is taking over.
@@ -262,7 +226,7 @@ If the primary hybrid search is unavailable (for example, if the embedding API i
 - Handles multi-turn context (remembers what was discussed earlier in the conversation)
 - Personalizes the response using the customer's profile, prior interactions, and learned preferences
 
-Response generation accounts for approximately 94.5% of per-conversation AI cost because it uses the more capable GPT-4o model.
+Response generation is usually the largest portion of per-conversation AI cost because it uses the more capable GPT-4o model.
 
 **6. Critic / Supervisor validates before delivery.** The critic agent is the final gate before the customer sees a response. It checks:
 
