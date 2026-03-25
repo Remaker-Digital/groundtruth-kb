@@ -56,7 +56,7 @@ from locust.exception import StopUser
 
 API_KEY = os.getenv("LOAD_TEST_API_KEY", "")
 WIDGET_KEY = os.getenv("LOAD_TEST_WIDGET_KEY", "")
-TENANT_ID = os.getenv("LOAD_TEST_TENANT_ID", "load-test-tenant")
+TENANT_ID = os.getenv("LOAD_TEST_TENANT_ID", "remaker-digital-001")
 
 # SPEC-1845: Fail fast if required credentials are not provided.
 # Running load tests with missing keys produces only 401 errors — waste of time.
@@ -268,7 +268,7 @@ class AdminDashboardTasks(TaskSet):
     def get_usage_dashboard(self) -> None:
         """GET /api/dashboard/usage — usage overview."""
         with self.client.get(
-            "/api/dashboard/usage",
+            f"/api/dashboard/usage?tenant={TENANT_ID}",
             headers=_api_headers(),
             name="/api/dashboard/usage",
             catch_response=True,
@@ -282,7 +282,7 @@ class AdminDashboardTasks(TaskSet):
     def get_daily_volume(self) -> None:
         """GET /api/dashboard/usage/daily — daily conversation volume."""
         with self.client.get(
-            "/api/dashboard/usage/daily",
+            f"/api/dashboard/usage/daily?tenant={TENANT_ID}",
             headers=_api_headers(),
             name="/api/dashboard/usage/daily",
             catch_response=True,
@@ -294,7 +294,7 @@ class AdminDashboardTasks(TaskSet):
     def list_conversations(self) -> None:
         """GET /api/admin/conversations — conversation inbox."""
         with self.client.get(
-            "/api/admin/conversations?offset=0&limit=20",
+            f"/api/admin/conversations?tenant={TENANT_ID}&offset=0&limit=20",
             headers=_api_headers(),
             name="/api/admin/conversations [list]",
             catch_response=True,
@@ -306,7 +306,7 @@ class AdminDashboardTasks(TaskSet):
     def list_knowledge_base(self) -> None:
         """GET /api/admin/knowledge — knowledge base articles."""
         with self.client.get(
-            "/api/admin/knowledge",
+            f"/api/admin/knowledge?tenant={TENANT_ID}",
             headers=_api_headers(),
             name="/api/admin/knowledge [list]",
             catch_response=True,
@@ -318,7 +318,7 @@ class AdminDashboardTasks(TaskSet):
     def get_analytics_summary(self) -> None:
         """GET /api/analytics/summary — analytics overview."""
         with self.client.get(
-            "/api/analytics/summary",
+            f"/api/analytics/summary?tenant={TENANT_ID}",
             headers=_api_headers(),
             name="/api/analytics/summary",
             catch_response=True,
@@ -330,7 +330,7 @@ class AdminDashboardTasks(TaskSet):
     def get_intent_breakdown(self) -> None:
         """GET /api/analytics/intents — intent classification breakdown."""
         with self.client.get(
-            "/api/analytics/intents",
+            f"/api/analytics/intents?tenant={TENANT_ID}",
             headers=_api_headers(),
             name="/api/analytics/intents",
             catch_response=True,
@@ -342,7 +342,7 @@ class AdminDashboardTasks(TaskSet):
     def get_config(self) -> None:
         """GET /api/config — tenant configuration."""
         with self.client.get(
-            "/api/config",
+            f"/api/config?tenant={TENANT_ID}",
             headers=_api_headers(),
             name="/api/config [get]",
             catch_response=True,
@@ -354,7 +354,7 @@ class AdminDashboardTasks(TaskSet):
     def list_team_members(self) -> None:
         """GET /api/admin/team — team member list."""
         with self.client.get(
-            "/api/admin/team",
+            f"/api/admin/team?tenant={TENANT_ID}",
             headers=_api_headers(),
             name="/api/admin/team [list]",
             catch_response=True,
@@ -366,7 +366,7 @@ class AdminDashboardTasks(TaskSet):
     def get_audit_log(self) -> None:
         """GET /api/audit — recent audit events."""
         with self.client.get(
-            "/api/audit?limit=20",
+            f"/api/audit?tenant={TENANT_ID}&limit=20",
             headers=_api_headers(),
             name="/api/audit [recent]",
             catch_response=True,

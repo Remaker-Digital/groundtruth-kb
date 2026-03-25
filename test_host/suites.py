@@ -173,6 +173,9 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         pytest_args=[
             "tests/e2e_live/",
             "--timeout=120",
+            # Bail after 100 failures so we capture partial results before
+            # OOM kills the entire suite (273 classes × Chromium in 4 GB).
+            "--maxfail=100",
             "-q",
         ],
         timeout_s=3600,
