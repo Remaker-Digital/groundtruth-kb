@@ -60,7 +60,6 @@ NAV_GROUPS = {
     ],
     "Operations": [
         ("Deployments", "/deployments"),
-        ("Queue Health", "/queues"),
         ("Integrations", "/integrations"),
         ("Status Page", "/status"),
         ("Alerts", "/alerts"),
@@ -69,6 +68,15 @@ NAV_GROUPS = {
         ("Pipeline Observatory", "/pipeline"),
         ("Contact Messages", "/contact-messages"),
         ("Service Messages", "/service-messages"),
+    ],
+    "Control Plane": [
+        ("Entitlements", "/entitlements"),
+        ("Rate Limits", "/rate-limits"),
+        ("Blocklists", "/blocklists"),
+        ("Alert Thresholds", "/alert-thresholds"),
+        ("Notifications", "/notification-channels"),
+        ("Test Execution", "/test-execution"),
+        ("Maintenance", "/maintenance"),
     ],
     "Compliance & Security": [
         ("Compliance", "/compliance"),
@@ -79,6 +87,7 @@ NAV_GROUPS = {
         ("Abuse Detection", "/abuse"),
     ],
     "Account": [
+        ("User Management", "/users"),
         ("MFA Settings", "/mfa"),
     ],
 }
@@ -224,9 +233,9 @@ def shared_deployment_history_page(shared_provider_page: Page) -> Page:
 
 
 @pytest.fixture(scope="class")
-def shared_queue_health_page(shared_provider_page: Page) -> Page:
-    """Class-scoped Queue Health."""
-    return _navigate_provider_to(shared_provider_page, "Queue Health", "Queue")
+def shared_entitlements_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Entitlements (Control Plane)."""
+    return _navigate_provider_to(shared_provider_page, "Entitlements", "Entitlement")
 
 
 @pytest.fixture(scope="class")
@@ -377,9 +386,9 @@ def live_deployment_history_page(live_provider_page: Page) -> Page:
 
 
 @pytest.fixture()
-def live_queue_health_page(live_provider_page: Page) -> Page:
-    """Provider console — Queue Health."""
-    return _navigate_provider_to(live_provider_page, "Queue Health", "Queue")
+def live_entitlements_page(live_provider_page: Page) -> Page:
+    """Provider console — Entitlements (Control Plane)."""
+    return _navigate_provider_to(live_provider_page, "Entitlements", "Entitlement")
 
 
 @pytest.fixture()

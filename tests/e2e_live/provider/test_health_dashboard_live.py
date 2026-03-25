@@ -290,20 +290,19 @@ class TestSystemHealthCards:
             f"Dashboard must have at least 4 health cards, found {cards.count()}"
         )
 
-    def test_nats_card(self, shared_health_dashboard_page: Page):
-        """NATS health card is present."""
+    def test_cosmos_db_card(self, shared_health_dashboard_page: Page):
+        """Cosmos DB health card is present."""
         if _is_rate_limited(shared_health_dashboard_page):
-            pytest.skip("Rate limited — cannot verify NATS card")
+            pytest.skip("Rate limited — cannot verify Cosmos DB card")
         text = _main_text(shared_health_dashboard_page).lower()
-        assert "nats" in text, "Dashboard must show NATS health card"
+        assert "cosmos" in text, "Dashboard must show Cosmos DB health card"
 
-    def test_nats_status_detail(self, shared_health_dashboard_page: Page):
-        """NATS card shows status detail (Connected/Disconnected/Not Deployed)."""
+    def test_redis_card(self, shared_health_dashboard_page: Page):
+        """Redis health card is present."""
         if _is_rate_limited(shared_health_dashboard_page):
-            pytest.skip("Rate limited — cannot verify NATS status")
+            pytest.skip("Rate limited — cannot verify Redis card")
         text = _main_text(shared_health_dashboard_page).lower()
-        has_status = any(s in text for s in ["connected", "disconnected", "not deployed"])
-        assert has_status, "NATS card must show Connected, Disconnected, or Not Deployed"
+        assert "redis" in text, "Dashboard must show Redis health card"
 
     def test_key_vault_card(self, shared_health_dashboard_page: Page):
         """Key Vault health card is present."""
@@ -329,20 +328,21 @@ class TestSystemHealthCards:
             "Dashboard must show API version (e.g., v1.68.0)"
         )
 
-    def test_circuit_breakers_card(self, shared_health_dashboard_page: Page):
-        """Circuit Breakers card is present."""
+    def test_cosmos_db_status(self, shared_health_dashboard_page: Page):
+        """Cosmos DB card shows Connected or Unavailable status."""
         if _is_rate_limited(shared_health_dashboard_page):
-            pytest.skip("Rate limited — cannot verify circuit breakers")
+            pytest.skip("Rate limited — cannot verify Cosmos DB status")
         text = _main_text(shared_health_dashboard_page).lower()
-        assert "circuit breaker" in text, "Dashboard must show Circuit Breakers card"
+        has_status = "connected" in text or "unavailable" in text
+        assert has_status, "Cosmos DB card must show Connected or Unavailable"
 
-    def test_circuit_breakers_status(self, shared_health_dashboard_page: Page):
-        """Circuit Breakers shows Operational or Unknown status."""
+    def test_redis_status(self, shared_health_dashboard_page: Page):
+        """Redis card shows Connected or Unavailable status."""
         if _is_rate_limited(shared_health_dashboard_page):
-            pytest.skip("Rate limited — cannot verify circuit breaker status")
+            pytest.skip("Rate limited — cannot verify Redis status")
         text = _main_text(shared_health_dashboard_page).lower()
-        has_status = "operational" in text or "unknown" in text
-        assert has_status, "Circuit Breakers must show Operational or Unknown"
+        has_status = "connected" in text or "unavailable" in text
+        assert has_status, "Redis card must show Connected or Unavailable"
 
     def test_status_dot_indicators(self, shared_health_dashboard_page: Page):
         """Health cards have colored status dot indicators (8px circles)."""
@@ -363,7 +363,7 @@ class TestSystemHealthCards:
             pytest.skip("Rate limited — cannot verify card labels")
         text = _main_text(shared_health_dashboard_page)
         # Check for uppercase labels
-        for label in ["NATS", "KEY VAULT", "API VERSION", "CIRCUIT BREAKERS"]:
+        for label in ["API VERSION", "COSMOS DB", "REDIS", "KEY VAULT"]:
             assert label in text, (
                 f"Health card label '{label}' should appear uppercase"
             )

@@ -94,71 +94,10 @@ class TestDeploymentHistoryTimeline:
 
 
 # ===========================================================================
-# 2. QUEUE HEALTH
+# 2. QUEUE HEALTH — REMOVED
+# Queue Health page was removed from ProviderLayout.tsx (no NATS transport).
+# Tests removed per GOV-14 (UI element changes require matching test updates).
 # ===========================================================================
-
-
-class TestQueueHealthTitle:
-    """QueueHealth page title and NATS state."""
-
-    def test_page_title(self, shared_queue_health_page: Page):
-        """Page shows 'Queue Health' title."""
-        text = _main_text(shared_queue_health_page)
-        assert "queue health" in text.lower()
-
-    def test_nats_not_deployed_or_data(self, shared_queue_health_page: Page):
-        """Shows either NATS data or 'Not Deployed' message."""
-        if _is_rate_limited(shared_queue_health_page):
-            pytest.skip("Rate limited")
-        text = _main_text(shared_queue_health_page).lower()
-        has_data = "total tenants" in text or "total messages" in text
-        has_not_deployed = "not deployed" in text
-        assert has_data or has_not_deployed, (
-            "Must show NATS data or 'Not Deployed' state"
-        )
-
-
-class TestQueueHealthCards:
-    """Summary cards: Total Tenants, Total Messages, Total Bytes."""
-
-    def test_summary_cards_present(self, shared_queue_health_page: Page):
-        """When NATS is deployed, 3 summary cards are shown."""
-        if _is_rate_limited(shared_queue_health_page):
-            pytest.skip("Rate limited")
-        text = _main_text(shared_queue_health_page).lower()
-        if "not deployed" in text:
-            return  # NATS not deployed
-        labels = ["total tenants", "total messages", "total bytes"]
-        found = sum(1 for l in labels if l in text)
-        assert found >= 2, f"Expected 3 summary cards, found {found}/3"
-
-
-class TestQueueHealthTable:
-    """Per-tenant queue table with health badges."""
-
-    def test_table_columns(self, shared_queue_health_page: Page):
-        """Table has Tenant ID, Stream, Messages, Bytes, Consumers, Health."""
-        if _is_rate_limited(shared_queue_health_page):
-            pytest.skip("Rate limited")
-        text = _main_text(shared_queue_health_page).lower()
-        if "not deployed" in text:
-            return
-        thead = shared_queue_health_page.locator("main table thead")
-        if thead.count() == 0:
-            return
-        header_text = thead.first.inner_text(timeout=5_000).lower()
-        for col in ["tenant", "stream", "messages", "health"]:
-            assert col in header_text, f"Column '{col}' missing"
-
-    def test_health_badges(self, shared_queue_health_page: Page):
-        """Rows show Healthy/Elevated/Critical health badges."""
-        if _is_rate_limited(shared_queue_health_page):
-            pytest.skip("Rate limited")
-        text = _main_text(shared_queue_health_page).lower()
-        if "not deployed" in text or "no queue data" in text:
-            return
-        badges = shared_queue_health_page.locator("main table tbody [class*='badge' i]")
-        assert badges.count() > 0, "Table rows must have health badges"
 
 
 # ===========================================================================
