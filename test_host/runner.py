@@ -260,19 +260,25 @@ class TestRunner:
                 except (ProcessLookupError, OSError):
                     logger.debug("Process group already dead for suite %s (expected)", config.name)
 
-            # Wait for stream_task with a safety timeout.  If any orphaned
-            # child still holds the pipe, we don't hang the composite loop.
+            # Close the stdout transport to unblock readline().
+            # asyncio.wait_for/cancel CANNOT interrupt a readline() blocked
+            # on a pipe fd still held by zombie xdist workers — the task
+            # won't yield until data arrives or the fd closes.  Closing
+            # the transport forces readline() to return b'' immediately.
+            if self._process.stdout:
+                self._process.stdout.feed_eof()
+
+            # Wait for stream_task with a safety timeout.
             try:
-                await asyncio.wait_for(stream_task, timeout=10.0)
+                await asyncio.wait_for(stream_task, timeout=5.0)
             except asyncio.TimeoutError:
                 stream_task.cancel()
                 try:
-                    await stream_task  # Allow cancellation to propagate
+                    await stream_task
                 except asyncio.CancelledError:
                     pass
                 logger.warning(
-                    "stdout stream for %s did not close within 10s — "
-                    "likely orphaned xdist workers; cancelled",
+                    "stdout stream for %s did not close within 5s after feed_eof — cancelled",
                     config.name,
                 )
             self.cosmos.update_stdout("".join(stdout_chunks))
