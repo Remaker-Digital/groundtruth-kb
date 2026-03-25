@@ -56,7 +56,20 @@ class _DekCacheEntry:
 
 # tenant_id → _DekCacheEntry
 _dek_cache: dict[str, _DekCacheEntry] = {}
-_dek_lock = asyncio.Lock()
+_dek_lock: asyncio.Lock | None = None
+
+
+def _get_dek_lock() -> asyncio.Lock:
+    """Return the DEK cache lock, creating it lazily inside the active event loop.
+
+    asyncio.Lock() must be created within an active event loop — creating it
+    at module import time (before any loop exists) causes hangs when
+    pytest-asyncio creates its own loop for e2e_live/load/fuzzing suites.
+    """
+    global _dek_lock
+    if _dek_lock is None:
+        _dek_lock = asyncio.Lock()
+    return _dek_lock
 
 
 async def _fetch_tenant_dek(tenant_id: str) -> _DekCacheEntry | None:
@@ -289,7 +302,7 @@ class TenantScopedRepository:
             return entry
 
         # Slow path: acquire lock, double-check, fetch if needed
-        async with _dek_lock:
+        async with _get_dek_lock():
             # Double-check after acquiring lock
             entry = _dek_cache.get(tenant_id)
             if entry is not None and not entry.is_expired:

@@ -114,6 +114,13 @@ class TestRunner:
                 logger.warning("Unknown sub-suite %s in composite %s", suite_name, config.name)
                 continue
 
+            logger.info(
+                "Starting sub-suite %s (%d/%d) in composite %s",
+                suite_name,
+                config.composite_suites.index(suite_name) + 1,
+                len(config.composite_suites),
+                config.name,
+            )
             self.cosmos.set_phase(suite_name)
 
             if sub_config.requires_locust:
@@ -124,6 +131,7 @@ class TestRunner:
                 logger.info("Skipping %s (no pytest args and not locust)", suite_name)
 
             self.cosmos.complete_phase(suite_name)
+            logger.info("Completed sub-suite %s", suite_name)
 
         self.cosmos.finalize()
         return self._summary()
@@ -224,7 +232,28 @@ class TestRunner:
                     "".join(stdout_chunks) + f"\n\nTIMEOUT after {config.timeout_s}s"
                 )
 
-            await stream_task
+            # Kill the entire process group to ensure xdist workers don't
+            # keep stdout open.  start_new_session=True means the subprocess
+            # has its own process group — we SIGKILL it here to guarantee
+            # the pipe is fully closed before we await the stream task.
+            if hasattr(os, "killpg"):  # Linux/macOS only (always true in container)
+                try:
+                    pgid = os.getpgid(self._process.pid)
+                    os.killpg(pgid, signal.SIGKILL)
+                except (ProcessLookupError, OSError):
+                    pass  # Already dead — expected
+
+            # Wait for stream_task with a safety timeout.  If any orphaned
+            # child still holds the pipe, we don't hang the composite loop.
+            try:
+                await asyncio.wait_for(stream_task, timeout=10.0)
+            except asyncio.TimeoutError:
+                stream_task.cancel()
+                logger.warning(
+                    "stdout stream for %s did not close within 10s — "
+                    "likely orphaned xdist workers; cancelled",
+                    config.name,
+                )
             self.cosmos.update_stdout("".join(stdout_chunks))
 
             # Parse JSON report
