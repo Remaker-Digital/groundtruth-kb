@@ -245,7 +245,7 @@ class AuditLogRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
-            enable_cross_partition_query=True,
+            # cross-partition is automatic when partition_key is omitted (azure-cosmos >=4.9)
         ):
             items.append(item)
 
@@ -283,7 +283,7 @@ class AuditLogRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
-            enable_cross_partition_query=True,
+            # cross-partition is automatic when partition_key is omitted (azure-cosmos >=4.9)
         ):
             return item  # COUNT returns a single integer value
 
@@ -378,7 +378,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
         items: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.is_active = true",
-            enable_cross_partition_query=True,
+            # cross-partition is automatic when partition_key is omitted (azure-cosmos >=4.9)
         ):
             items.append(item)
         return items
@@ -395,7 +395,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
                 "c.section, c.tags, c.content_hash, c.is_active "
                 "FROM c WHERE c.is_active = true"
             ),
-            enable_cross_partition_query=True,
+            # cross-partition is automatic when partition_key is omitted (azure-cosmos >=4.9)
         ):
             items.append(item)
         return items
@@ -463,7 +463,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
-            enable_cross_partition_query=True,
+            # cross-partition is automatic when partition_key is omitted (azure-cosmos >=4.9)
         ):
             items.append(item)
             if len(items) >= top_k:
@@ -474,7 +474,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
         """Count all active documentation entries."""
         async for item in self._container.query_items(
             query="SELECT VALUE COUNT(1) FROM c WHERE c.is_active = true",
-            enable_cross_partition_query=True,
+            # cross-partition is automatic when partition_key is omitted (azure-cosmos >=4.9)
         ):
             return item
         return 0
