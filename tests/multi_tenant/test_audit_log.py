@@ -47,6 +47,15 @@ from tests.conftest import (
 _NOW = datetime.now(timezone.utc)
 
 
+def _url(path: str, tenant_id: str = STARTER_TENANT_ID, **params: str) -> str:
+    """Build audit API URL with SPEC-1644 tenant parameter."""
+    qs = f"tenant={tenant_id}"
+    for k, v in params.items():
+        qs += f"&{k}={v}"
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{qs}"
+
+
 def _make_audit_event(
     event_id: str = "evt-001",
     tenant_id: str = STARTER_TENANT_ID,
@@ -139,7 +148,7 @@ class TestAuditQueryEndpoint:
             mock_repo.query_by_tenant = AsyncMock(return_value=events[:3])
 
             resp = app_client.get(
-                "/api/audit?offset=0&limit=3",
+                _url("/api/audit?offset=0&limit=3"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -161,7 +170,7 @@ class TestAuditQueryEndpoint:
             mock_repo.query_by_tenant = AsyncMock(return_value=events)
 
             resp = app_client.get(
-                f"/api/audit?event_type={AuditEventType.DATA_EXPORTED.value}",
+                _url(f"/api/audit?event_type={AuditEventType.DATA_EXPORTED.value}"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -182,7 +191,7 @@ class TestAuditQueryEndpoint:
             mock_repo.query_by_tenant = AsyncMock(return_value=events)
 
             resp = app_client.get(
-                "/api/audit",
+                _url("/api/audit"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -204,7 +213,7 @@ class TestAuditQueryEndpoint:
             mock_repo.query_by_tenant = AsyncMock(return_value=events)
 
             resp = app_client.get(
-                f"/api/audit?date_from={date_from}&date_to={date_to}",
+                _url(f"/api/audit?date_from={date_from}&date_to={date_to}"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -224,7 +233,7 @@ class TestAuditQueryEndpoint:
             mock_repo.query_by_tenant = AsyncMock(return_value=events)
 
             resp = app_client.get(
-                "/api/audit",
+                _url("/api/audit"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -302,7 +311,7 @@ class TestPagination:
             mock_repo.query_by_tenant = AsyncMock(return_value=events[5:10])
 
             resp = app_client.get(
-                "/api/audit?offset=5&limit=5",
+                _url("/api/audit?offset=5&limit=5"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -332,7 +341,7 @@ class TestCsvExport:
             mock_repo.query_by_tenant = AsyncMock(return_value=events)
 
             resp = app_client.get(
-                "/api/audit/export",
+                _url("/api/audit/export"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -361,7 +370,7 @@ class TestCsvExport:
             mock_repo.query_by_tenant = AsyncMock(return_value=[])
 
             resp = app_client.get(
-                "/api/audit/export",
+                _url("/api/audit/export"),
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
 
@@ -385,7 +394,7 @@ class TestErrorHandling:
             "src.multi_tenant.admin_audit_api._audit_repo"
         ) as mock_repo:
             resp = app_client.get(
-                "/api/audit?event_type=INVALID_TYPE",
+                _url("/api/audit?event_type=INVALID_TYPE", tenant_id=PROFESSIONAL_TENANT_ID),
                 headers=auth_headers_api_key(TEST_API_KEY_PROFESSIONAL),
             )
 
@@ -398,7 +407,7 @@ class TestErrorHandling:
             "src.multi_tenant.admin_audit_api._audit_repo"
         ) as mock_repo:
             resp = app_client.get(
-                "/api/audit/export?event_type=BOGUS",
+                _url("/api/audit/export?event_type=BOGUS", tenant_id=PROFESSIONAL_TENANT_ID),
                 headers=auth_headers_api_key(TEST_API_KEY_PROFESSIONAL),
             )
 
@@ -410,7 +419,7 @@ class TestErrorHandling:
             "src.multi_tenant.admin_audit_api._audit_repo", None,
         ):
             resp = app_client.get(
-                "/api/audit",
+                _url("/api/audit", tenant_id=PROFESSIONAL_TENANT_ID),
                 headers=auth_headers_api_key(TEST_API_KEY_PROFESSIONAL),
             )
 
@@ -427,7 +436,7 @@ class TestErrorHandling:
             )
 
             resp = app_client.get(
-                "/api/audit",
+                _url("/api/audit", tenant_id=PROFESSIONAL_TENANT_ID),
                 headers=auth_headers_api_key(TEST_API_KEY_PROFESSIONAL),
             )
 
@@ -445,7 +454,7 @@ class TestErrorHandling:
             mock_repo.query_by_tenant = AsyncMock(return_value=events)
 
             resp = app_client.get(
-                "/api/audit?customer_id=cust-specific",
+                _url("/api/audit?customer_id=cust-specific", tenant_id=PROFESSIONAL_TENANT_ID),
                 headers=auth_headers_api_key(TEST_API_KEY_PROFESSIONAL),
             )
 

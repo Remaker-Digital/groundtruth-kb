@@ -342,43 +342,47 @@ class TestTier1ChatPipeline:
 
 
 class TestTier1AdminAPI:
-    """T1-07 through T1-12: Admin API functionality."""
+    """T1-07 through T1-12: Tenant-scoped admin API functionality.
+
+    SPEC-1644: Tenant API keys (ar_live_*) + ?tenant= required for
+    tenant-scoped endpoints. SPA keys cannot access /api/admin/*.
+    """
 
     @pytest.mark.tier1
-    def test_t1_07_dashboard_usage(self, client, admin_headers):
+    def test_t1_07_dashboard_usage(self, client, tenant_admin_headers, tenant_id):
         """Dashboard usage endpoint should return data."""
-        r = client.get("/api/dashboard/usage", headers=admin_headers)
+        r = client.get(f"/api/dashboard/usage?tenant={tenant_id}", headers=tenant_admin_headers)
         assert r.status_code in (200, 429, 503), \
             f"Dashboard usage returned {r.status_code}"
 
     @pytest.mark.tier1
-    def test_t1_08_knowledge_base_list(self, client, admin_headers):
+    def test_t1_08_knowledge_base_list(self, client, tenant_admin_headers, tenant_id):
         """Knowledge base list should be accessible."""
-        r = client.get("/api/admin/knowledge", headers=admin_headers)
+        r = client.get(f"/api/admin/knowledge?tenant={tenant_id}", headers=tenant_admin_headers)
         assert r.status_code in (200, 429, 503)
 
     @pytest.mark.tier1
-    def test_t1_09_conversation_inbox(self, client, admin_headers):
+    def test_t1_09_conversation_inbox(self, client, tenant_admin_headers, tenant_id):
         """Conversation inbox should be accessible."""
-        r = client.get("/api/admin/conversations", headers=admin_headers)
+        r = client.get(f"/api/admin/conversations?tenant={tenant_id}", headers=tenant_admin_headers)
         assert r.status_code in (200, 429, 503)
 
     @pytest.mark.tier1
-    def test_t1_10_analytics_summary(self, client, admin_headers):
+    def test_t1_10_analytics_summary(self, client, tenant_admin_headers, tenant_id):
         """Analytics summary should be accessible."""
-        r = client.get("/api/analytics/summary", headers=admin_headers)
+        r = client.get(f"/api/analytics/summary?tenant={tenant_id}", headers=tenant_admin_headers)
         assert r.status_code in (200, 429, 503)
 
     @pytest.mark.tier1
-    def test_t1_11_tenant_config(self, client, admin_headers):
+    def test_t1_11_tenant_config(self, client, tenant_admin_headers, tenant_id):
         """Tenant config should be readable."""
-        r = client.get("/api/config", headers=admin_headers)
+        r = client.get(f"/api/config?tenant={tenant_id}", headers=tenant_admin_headers)
         assert r.status_code in (200, 429, 503)
 
     @pytest.mark.tier1
-    def test_t1_12_audit_log(self, client, admin_headers):
+    def test_t1_12_audit_log(self, client, tenant_admin_headers, tenant_id):
         """Audit log should be queryable."""
-        r = client.get("/api/audit", headers=admin_headers)
+        r = client.get(f"/api/audit?tenant={tenant_id}", headers=tenant_admin_headers)
         assert r.status_code in (200, 429, 503)
 
 

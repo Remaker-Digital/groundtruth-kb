@@ -47,6 +47,12 @@ WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY") or os.environ.get("WIDGET_KEY"
 # API key for admin operations (optional — some tests skip without it)
 API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY") or os.environ.get("AGENTRED_API_KEY", "")
 
+# Tenant API key for tenant-scoped admin endpoints (SPEC-1644 compliance).
+# These endpoints require ?tenant= AND a tenant-scoped key (ar_live_*).
+# SPA keys (ar_spa_*) authenticate but have no tenant role → 401 on /api/admin/*.
+TENANT_KEY = os.environ.get("STAGING_REMAKER_TENANT_KEY", "")
+TENANT_ID = os.environ.get("STAGING_TENANT_ID", "remaker-digital-001")
+
 
 @pytest.fixture(scope="session")
 def prod_url():
@@ -100,10 +106,34 @@ def api_key():
 
 @pytest.fixture(scope="session")
 def admin_headers(api_key):
-    """Headers for admin API calls."""
+    """Headers for SPA platform admin API calls (/api/superadmin/*)."""
     if not api_key:
-        pytest.skip("AGENTRED_API_KEY not set — skipping admin API tests")
+        pytest.skip("SUPERADMIN_PREVIEW_API_KEY not set — skipping admin API tests")
     return {"X-API-Key": api_key}
+
+
+@pytest.fixture(scope="session")
+def tenant_key():
+    """Tenant API key for tenant-scoped admin endpoints."""
+    return TENANT_KEY
+
+
+@pytest.fixture(scope="session")
+def tenant_admin_headers(tenant_key):
+    """Headers for tenant-scoped admin API calls (/api/admin/*, /api/dashboard/*).
+
+    SPEC-1644: Tenant keys (ar_live_*) require ?tenant= in the URL.
+    SPA keys cannot access tenant-scoped endpoints.
+    """
+    if not tenant_key:
+        pytest.skip("STAGING_REMAKER_TENANT_KEY not set — skipping tenant admin tests")
+    return {"X-API-Key": tenant_key}
+
+
+@pytest.fixture(scope="session")
+def tenant_id():
+    """Tenant ID for SPEC-1644 ?tenant= URL parameter."""
+    return TENANT_ID
 
 
 @pytest.fixture(scope="session")
