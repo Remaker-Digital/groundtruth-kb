@@ -79,12 +79,14 @@ SPA_API_URL = PROD_URL
 
 # API key for the target tenant — used to authenticate the admin SPA.
 # Priority: env override > .env.local keys.
-# S183: Cleaned stale fallbacks. SUPERADMIN_PREVIEW_API_KEY is the canonical
-# key set by both .env.local and the --self-provision pipeline flow.
-# STAGING_REMAKER_USER_KEY is the .env.local name for the staging user key.
+# The standalone SPA is a TENANT admin console — it needs a tenant key
+# (ar_live_*) or per-user key (ar_user_*) that carries admin role.
+# SPA platform keys (ar_spa_*) have no tenant role and get 401 on
+# /api/admin/* endpoints.  Priority: tenant key > user key > SPA key.
 LIVE_API_KEY = (
-    os.environ.get("SUPERADMIN_PREVIEW_API_KEY")
+    os.environ.get("STAGING_REMAKER_TENANT_KEY")
     or os.environ.get("STAGING_REMAKER_USER_KEY")
+    or os.environ.get("SUPERADMIN_PREVIEW_API_KEY")
     or ""
 )
 

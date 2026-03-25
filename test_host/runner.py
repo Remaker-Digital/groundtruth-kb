@@ -583,9 +583,12 @@ class TestRunner:
             if val:
                 env["LOAD_TEST_WIDGET_KEY"] = val
 
-        # Alias for E2E Playwright tests
+        # Alias for E2E Playwright tests.
+        # The standalone SPA is a TENANT admin console — it needs a tenant
+        # key (ar_live_*) that carries admin role, NOT an SPA platform key
+        # (ar_spa_*) which has no tenant role and gets 401 on /api/admin/*.
         if "STAGING_REMAKER_USER_KEY" not in env:
-            val = env.get("SUPERADMIN_PREVIEW_API_KEY", "")
+            val = env.get("STAGING_REMAKER_TENANT_KEY", "")
             if val:
                 env["STAGING_REMAKER_USER_KEY"] = val
 
