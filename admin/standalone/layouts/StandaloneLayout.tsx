@@ -15,7 +15,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQueryPreservingNavigate } from '../hooks/useQueryPreservingNavigate';
 import {
@@ -196,6 +196,14 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const [contactMessage, setContactMessage] = useState('');
   const [contactSending, setContactSending] = useState(false);
 
+  // ---- Tenant ID from URL (SPEC-1644) ------------------------------------
+  // API keys cannot identify tenants — every API call MUST include ?tenant=
+  // so the middleware can scope partition lookups.  The tenant slug lives in
+  // the page URL and is stable for the lifetime of the session.
+  const urlTenantId = useMemo(() => {
+    return new URL(window.location.href).searchParams.get('tenant') || '';
+  }, []);
+
   // ---- Authenticated fetch -----------------------------------------------
 
   const apiFetch = useCallback(
@@ -207,7 +215,15 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         headers.set('X-API-Key', resolvedAuth.value);
       }
 
-      const resp = await fetch(`${API_BASE_URL}${path}`, {
+      // SPEC-1644: Append ?tenant= to every API call so the middleware can
+      // scope partition lookups.  Handles both bare paths (/api/foo) and
+      // paths that already contain query parameters (/api/foo?bar=1).
+      let url = `${API_BASE_URL}${path}`;
+      if (urlTenantId && !url.includes('tenant=')) {
+        url += url.includes('?') ? `&tenant=${urlTenantId}` : `?tenant=${urlTenantId}`;
+      }
+
+      const resp = await fetch(url, {
         ...init,
         headers,
       });
@@ -217,7 +233,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       }
       return resp;
     },
-    [resolvedAuth.type, resolvedAuth.value, onLogout],
+    [resolvedAuth.type, resolvedAuth.value, onLogout, urlTenantId],
   );
 
   // ---- Notification handler (Mantine notifications) ----------------------
