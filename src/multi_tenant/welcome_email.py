@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 _WELCOME_EMAIL_BODY = """
 <h2 style="margin:0 0 16px;color:#111827;font-size:20px">Welcome to Agent Red</h2>
 <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px">
-  Your account is ready. Sign in to your admin dashboard to get started.
+  Your account is ready. Click the button below to sign in to your admin dashboard.
 </p>
 
 <div style="background:#fff7ed;border:1px solid #fed7aa;padding:16px;margin:16px 0;text-align:center">
@@ -44,19 +44,13 @@ _WELCOME_EMAIL_BODY = """
     Sign in to Dashboard
   </a>
   <p style="margin:8px 0 0;color:#9a3412;font-size:12px">
-    {admin_login_url}
+    This link expires in 15 minutes. Request a new one from the sign-in page.
   </p>
 </div>
 
-<p style="color:#374151;font-size:14px;line-height:1.6;margin:16px 0">
-  Your API key and widget key are available from your admin dashboard
-  after signing in. Keys are never sent via email for your security.
-</p>
-
 <h3 style="margin:24px 0 12px;color:#111827;font-size:16px">Next Steps</h3>
 <ol style="color:#374151;font-size:14px;line-height:1.8;margin:0;padding-left:20px">
-  <li>Sign in to your <a href="{admin_login_url}" style="color:#ff3621;font-weight:600">Admin Dashboard</a></li>
-  <li>Find your API key and widget key on the Account page</li>
+  <li>Click <a href="{admin_login_url}" style="color:#ff3621;font-weight:600">Sign in to Dashboard</a> above</li>
   <li>Configure your brand name, voice, and AI agent personality</li>
   <li>Add your widget key to your website to start chatting with customers</li>
   <li>Invite team members to handle escalated conversations</li>

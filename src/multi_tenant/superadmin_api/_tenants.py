@@ -8,6 +8,7 @@ Endpoints are registered on the shared router from _monolith.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -658,8 +659,36 @@ async def resend_welcome_email(
             "Set a notification_email or customer_email first.",
         )
 
-    # Send the welcome email (without raw keys — they're hashed and irrecoverable)
+    # Generate a magic link so the recipient can click through to sign in
+    # directly (SPEC-0429: magic link is primary auth method).
     from src.multi_tenant.welcome_email import send_welcome_email
+
+    magic_link_url: str | None = None
+    try:
+        import secrets as _secrets
+        from src.multi_tenant.repositories import VerificationTokenRepository
+
+        token_repo = VerificationTokenRepository()
+        token_id = _secrets.token_urlsafe(32)
+        sign_in_code = f"{_secrets.randbelow(1_000_000):06d}"
+        await token_repo.create_token(
+            token_id=token_id,
+            token_type="magic_link",
+            tenant_id=tenant_id,
+            email=email_addr,
+            ttl=900,  # 15 minutes
+            sign_in_code=sign_in_code,
+        )
+        fqdn = os.environ.get("CONTAINER_APP_FQDN", "")
+        if fqdn:
+            scheme = "https" if not fqdn.startswith("http") else ""
+            prefix = f"{scheme}://{fqdn}" if scheme else fqdn
+            magic_link_url = (
+                f"{prefix}/admin/standalone/verify-magic-link"
+                f"?token={token_id}&tenant={tenant_id}"
+            )
+    except Exception:
+        logger.warning("Could not generate magic link for welcome email: tenant=%s", tenant_id[:8])
 
     tier_name = tenant.get("tier", "unknown")
     if hasattr(tier_name, "value"):
@@ -669,9 +698,8 @@ async def resend_welcome_email(
         sent = await send_welcome_email(
             to_email=email_addr,
             tenant_id=tenant_id,
-            superadmin_key="(use your existing key — not shown for security)",
-            widget_key="(use your existing key — not shown for security)",
             tier=tier_name,
+            admin_login_url=magic_link_url,
         )
     except RuntimeError as exc:
         # Rate-limit (429) or ACS HTTP error — return actionable message
