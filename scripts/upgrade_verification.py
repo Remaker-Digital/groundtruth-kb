@@ -56,7 +56,7 @@ ENVIRONMENTS = {
     "production": {
         "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-api-gateway",
-        "tenant_id": "remaker-digital-001",
+        "tenant_id": "test-customer-001",
         "api_key": _os.environ.get("PRODUCTION_REMAKER_TENANT_KEY", "") or _os.environ.get("PRODUCTION_TENANT_API_KEY", ""),
         "widget_key": _os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or _os.environ.get("PRODUCTION_TENANT_WIDGET_KEY", ""),
         "spa_api_key": _os.environ.get("PRODUCTION_SPA_KEY", "") or _os.environ.get("PRODUCTION_SPA_API_KEY", ""),
@@ -149,10 +149,17 @@ def widget_call(fqdn: str, widget_key: str, timeout: int = 30) -> tuple[int, dic
 # ---------------------------------------------------------------------------
 # Phase A: Pre-deployment snapshot
 # ---------------------------------------------------------------------------
+def _tenant_scoped_path(path: str, tenant_id: str) -> str:
+    """Append ?tenant= to a path for SPEC-1644 partition-scoped auth."""
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}tenant={tenant_id}"
+
+
 def phase_a(env: dict) -> dict:
     """Capture pre-deployment state."""
     fqdn = env["fqdn"]
     key = env["api_key"]
+    tid = env["tenant_id"]
     snapshot = {}
 
     print("Phase A: Pre-Deployment Snapshot")
@@ -165,13 +172,14 @@ def phase_a(env: dict) -> dict:
     print(f"  A.1  version:            {version} (HTTP {status})")
 
     # A.2 — tenant config state (from /api/config → state field)
-    status, data, _ = api_call(fqdn, "/api/config", key)
+    # SPEC-1644: Tenant-scoped endpoints require ?tenant= parameter
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/config", tid), key)
     cfg_state = data.get("state", "?") if isinstance(data, dict) else f"HTTP {status}"
     snapshot["A2_status"] = cfg_state
     print(f"  A.2  tenant status:      {cfg_state}")
 
     # A.3 — activation status
-    status, data, _ = api_call(fqdn, "/api/config/activation-status", key)
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/config/activation-status", tid), key)
     if isinstance(data, dict):
         snapshot["A3_activation"] = {
             "is_active": data.get("is_active"),
@@ -184,13 +192,13 @@ def phase_a(env: dict) -> dict:
     print(f"  A.3  activation:         {snapshot['A3_activation']}")
 
     # A.4 — conversation count (camelCase: totalCount)
-    status, data, _ = api_call(fqdn, "/api/admin/conversations?limit=1", key)
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/admin/conversations?limit=1", tid), key)
     total = data.get("totalCount", data.get("total_count", "?")) if isinstance(data, dict) else f"HTTP {status}"
     snapshot["A4_conversation_count"] = total
     print(f"  A.4  conversations:      {total}")
 
     # A.5 — analytics summary (may need date params; capture HTTP status)
-    status, data, _ = api_call(fqdn, "/api/admin/analytics/summary", key)
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/admin/analytics/summary", tid), key)
     if isinstance(data, dict) and "detail" not in data:
         breakdown = data.get("status_breakdown", data.get("statusBreakdown", {}))
     else:
@@ -199,13 +207,13 @@ def phase_a(env: dict) -> dict:
     print(f"  A.5  status breakdown:   {breakdown}")
 
     # A.6 — KB article count (camelCase: totalCount)
-    status, data, _ = api_call(fqdn, "/api/admin/knowledge?limit=1", key)
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/admin/knowledge?limit=1", tid), key)
     kb_count = data.get("totalCount", data.get("total_count", "?")) if isinstance(data, dict) else f"HTTP {status}"
     snapshot["A6_kb_count"] = kb_count
     print(f"  A.6  KB articles:        {kb_count}")
 
     # A.7 + A.8 — team members (dict with members key)
-    status, data, _ = api_call(fqdn, "/api/admin/team", key)
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/admin/team", tid), key)
     members = data.get("members", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
     snapshot["A7_team_count"] = len(members)
     snapshot["A8_team_members"] = [{"displayName": m.get("displayName", m.get("name", "?")), "role": m.get("role", "?")} for m in members]
@@ -214,12 +222,12 @@ def phase_a(env: dict) -> dict:
         print(f"       - {m['displayName']}: {m['role']}")
 
     # A.9 — draft config (HTTP status only)
-    status, data, _ = api_call(fqdn, "/api/config?state=draft", key)
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/config?state=draft", tid), key)
     snapshot["A9_draft_status"] = status
     print(f"  A.9  draft config:       HTTP {status}")
 
     # A.10 — active config top-level keys
-    status, data, _ = api_call(fqdn, "/api/config", key)
+    status, data, _ = api_call(fqdn, _tenant_scoped_path("/api/config", tid), key)
     if isinstance(data, dict):
         snapshot["A10_config_keys"] = sorted(data.keys())
     else:
@@ -277,13 +285,17 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     expected_bare = new_version.lstrip("v")
     check("C.1", "Version updated", ver == expected_bare, f"expected={expected_bare}, got={ver}")
 
+    # Helper: tenant-scoped path for SPEC-1644
+    def tp(path: str) -> str:
+        return _tenant_scoped_path(path, tid)
+
     # C.2 Tenant status unchanged (state field)
-    s, d, _ = api_call(fqdn, "/api/config", key)
+    s, d, _ = api_call(fqdn, tp("/api/config"), key)
     st = d.get("state", "?") if isinstance(d, dict) else f"HTTP {s}"
     check("C.2", "Tenant status unchanged", st == snapshot.get("A2_status"), f"{st} vs {snapshot.get('A2_status')}")
 
     # C.3 Configuration state unchanged
-    s, d, _ = api_call(fqdn, "/api/config/activation-status", key)
+    s, d, _ = api_call(fqdn, tp("/api/config/activation-status"), key)
     if isinstance(d, dict):
         a3 = snapshot.get("A3_activation", {})
         # S164: Removed has_pending_changes from comparison — E2E tests
@@ -298,7 +310,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
         check("C.3", "Configuration state unchanged", False, f"HTTP {s}")
 
     # C.4 Conversation count not decreased (growth OK, loss = data corruption)
-    s, d, _ = api_call(fqdn, "/api/admin/conversations?limit=1", key)
+    s, d, _ = api_call(fqdn, tp("/api/admin/conversations?limit=1"), key)
     tc = d.get("totalCount", d.get("total_count", -1)) if isinstance(d, dict) else -1
     snap_count = snapshot.get("A4_conversation_count", -1)
     count_ok = isinstance(tc, int) and isinstance(snap_count, int) and tc >= snap_count
@@ -306,7 +318,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
           f"{tc} vs {snap_count} (growth OK)")
 
     # C.5 Status breakdown unchanged
-    s, d, _ = api_call(fqdn, "/api/admin/analytics/summary", key)
+    s, d, _ = api_call(fqdn, tp("/api/admin/analytics/summary"), key)
     if isinstance(d, dict) and "detail" not in d:
         bd = d.get("status_breakdown", d.get("statusBreakdown", {}))
     else:
@@ -315,13 +327,13 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
           f"{bd}")
 
     # C.6 KB count unchanged (camelCase: totalCount)
-    s, d, _ = api_call(fqdn, "/api/admin/knowledge?limit=1", key)
+    s, d, _ = api_call(fqdn, tp("/api/admin/knowledge?limit=1"), key)
     kc = d.get("totalCount", d.get("total_count", -1)) if isinstance(d, dict) else -1
     check("C.6", "KB article count unchanged", kc == snapshot.get("A6_kb_count"),
           f"{kc} vs {snapshot.get('A6_kb_count')}")
 
     # C.7 Team member count unchanged
-    s, d, _ = api_call(fqdn, "/api/admin/team", key)
+    s, d, _ = api_call(fqdn, tp("/api/admin/team"), key)
     members = d.get("members", []) if isinstance(d, dict) else (d if isinstance(d, list) else [])
     check("C.7", "Team member count unchanged", len(members) == snapshot.get("A7_team_count"),
           f"{len(members)} vs {snapshot.get('A7_team_count')}")
@@ -332,12 +344,12 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.8", "Team members unchanged", current == expected)
 
     # C.9 Draft config status unchanged
-    s, d, _ = api_call(fqdn, "/api/config?state=draft", key)
+    s, d, _ = api_call(fqdn, tp("/api/config?state=draft"), key)
     check("C.9", "Draft config unchanged", s == snapshot.get("A9_draft_status"),
           f"HTTP {s} vs {snapshot.get('A9_draft_status')}")
 
     # C.10 Active config keys unchanged
-    s, d, _ = api_call(fqdn, "/api/config", key)
+    s, d, _ = api_call(fqdn, tp("/api/config"), key)
     if isinstance(d, dict):
         current_keys = sorted(d.keys())
     else:
@@ -351,7 +363,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
           f"HTTP {s}")
 
     # C.12 API key still authenticates
-    s, d, _ = api_call(fqdn, "/api/config", key)
+    s, d, _ = api_call(fqdn, tp("/api/config"), key)
     check("C.12", "API key authenticates", s == 200, f"HTTP {s}")
 
     # C.13 Regression tests — not verifiable remotely
@@ -390,11 +402,11 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.20", "Magic link request", s == 200, f"HTTP {s}")
 
     # C.21 Analytics period filtering
-    s, d, _ = api_call(fqdn, "/api/analytics/summary?since=2026-01-01&until=2026-12-31", key)
+    s, d, _ = api_call(fqdn, tp("/api/analytics/summary?since=2026-01-01&until=2026-12-31"), key)
     check("C.21", "Analytics filtering", s == 200, f"HTTP {s}")
 
     # C.22 Archive endpoint
-    s, d, _ = api_call(fqdn, "/api/admin/conversations/fake-id-000/archive", key, method="POST")
+    s, d, _ = api_call(fqdn, tp("/api/admin/conversations/fake-id-000/archive"), key, method="POST")
     check("C.22", "Archive endpoint", s in (200, 404), f"HTTP {s}")
 
     # C.23 Support diagnostics
@@ -416,35 +428,35 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.26", "Avatar upload", False, "NOT PROVEN — requires multipart file upload")
 
     # C.27 Tier listing
-    s, d, _ = api_call(fqdn, "/api/billing/tiers", key)
+    s, d, _ = api_call(fqdn, tp("/api/billing/tiers"), key)
     has_tier = isinstance(d, dict) and "current_tier" in d
     check("C.27", "Tier listing", s == 200 and has_tier, f"HTTP {s}")
 
     # C.28 Add-on listing
-    s, d, _ = api_call(fqdn, "/api/billing/addons", key)
+    s, d, _ = api_call(fqdn, tp("/api/billing/addons"), key)
     has_addons = isinstance(d, dict) and isinstance(d.get("addons"), list) and d.get("total", 0) >= 4
     check("C.28", "Add-on listing", s == 200 and has_addons,
           f"HTTP {s}, total={d.get('total') if isinstance(d, dict) else '?'}")
 
     # C.29 Memory stats
-    s, d, _ = api_call(fqdn, "/api/admin/memory/stats", key)
+    s, d, _ = api_call(fqdn, tp("/api/admin/memory/stats"), key)
     has_fields = isinstance(d, dict) and "total_vectors" in d and "memory_enabled" in d
     check("C.29", "Memory stats", s == 200 and has_fields, f"HTTP {s}")
 
     # C.30 Config locking (503 accepted — service may not initialise on staging cold start)
-    s, d, _ = api_call(fqdn, "/api/admin/config/lock/status", key)
+    s, d, _ = api_call(fqdn, tp("/api/admin/config/lock/status"), key)
     has_etag = isinstance(d, dict) and "etag" in d
     ok = (s == 200 and has_etag) or s == 503
     check("C.30", "Config locking", ok, f"HTTP {s}" + (" (503 accepted: cold start)" if s == 503 else ""))
 
     # C.31 FCR metric
-    s, d, _ = api_call(fqdn, "/api/analytics/summary", key)
+    s, d, _ = api_call(fqdn, tp("/api/analytics/summary"), key)
     # FCR may be null for staging (no resolved conversations); API uses camelCase
     has_key = isinstance(d, dict) and ("fcrRate" in d or "fcr_rate" in d)
     check("C.31", "FCR metric", s == 200 and has_key, f"HTTP {s}")
 
     # C.32 Tier upgrade preview
-    s, d, _ = api_call(fqdn, "/api/billing/upgrade/preview?target_tier=professional", key)
+    s, d, _ = api_call(fqdn, tp("/api/billing/upgrade/preview?target_tier=professional"), key)
     valid = (s == 200 and isinstance(d, dict) and "direction" in d) or s == 400
     check("C.32", "Tier upgrade preview", valid, f"HTTP {s}")
 

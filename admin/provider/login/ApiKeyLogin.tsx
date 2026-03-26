@@ -153,7 +153,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
           <img
             src="/admin/provider/primary-logo-no-wordmark.svg"
             alt="Agent Red"
-            style={{ width: '200px', height: 'auto' }}
+            style={{ width: '200px', height: 'auto', marginBottom: '40px' }}
           />
           <Text size="sm" c="dimmed">
             Service Provider Administration

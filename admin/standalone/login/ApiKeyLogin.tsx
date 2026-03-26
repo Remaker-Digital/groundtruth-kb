@@ -95,7 +95,9 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
       setError(null);
 
       try {
-        const resp = await fetch(`${API_BASE_URL}/api/tenants/auth/validate-key`, {
+        // SPEC-1644: Middleware requires ?tenant= in the URL for partition-scoped
+        // auth — the POST body is not visible to the middleware layer.
+        const resp = await fetch(`${API_BASE_URL}/api/tenants/auth/validate-key?tenant=${encodeURIComponent(tenantId)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -293,7 +295,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
       <img
         src="/admin/standalone/primary-logo-no-wordmark.svg"
         alt="Agent Red"
-        style={{ width: '200px', height: 'auto' }}
+        style={{ width: '200px', height: 'auto', marginBottom: '40px' }}
       />
       <Text size="sm" c="dimmed">
         Customer Experience Admin
