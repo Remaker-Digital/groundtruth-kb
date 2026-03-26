@@ -146,6 +146,46 @@ def widget_call(fqdn: str, widget_key: str, timeout: int = 30) -> tuple[int, dic
         return 0, str(e)
 
 
+def widget_api_call(fqdn: str, widget_key: str, path: str,
+                    method: str = "GET", body: dict | None = None,
+                    timeout: int = 30) -> tuple[int, dict | str, dict]:
+    """Make an API call authenticated with a widget key (X-Widget-Key header).
+
+    Returns (status_code, response_body, response_headers).
+    """
+    url = f"https://{fqdn}{path}"
+    headers = {
+        "Accept": "application/json",
+        "X-Widget-Key": widget_key,
+    }
+    data = None
+    if body:
+        data = json.dumps(body).encode()
+        headers["Content-Type"] = "application/json"
+    if method == "POST" and not body:
+        data = b"{}"
+        headers["Content-Type"] = "application/json"
+
+    req = Request(url, data=data, headers=headers, method=method)
+    try:
+        with urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode()
+            resp_headers = {k.lower(): v for k, v in resp.getheaders()}
+            try:
+                return resp.status, json.loads(raw), resp_headers
+            except json.JSONDecodeError:
+                return resp.status, raw, resp_headers
+    except HTTPError as e:
+        raw = e.read().decode() if e.fp else ""
+        resp_headers = {k.lower(): v for k, v in e.headers.items()} if e.headers else {}
+        try:
+            return e.code, json.loads(raw), resp_headers
+        except (json.JSONDecodeError, Exception):
+            return e.code, raw, resp_headers
+    except URLError as e:
+        return 0, str(e), {}
+
+
 # ---------------------------------------------------------------------------
 # Phase A: Pre-deployment snapshot
 # ---------------------------------------------------------------------------
@@ -246,7 +286,7 @@ def phase_a(env: dict) -> dict:
 # Phase C: Post-deployment verification
 # ---------------------------------------------------------------------------
 def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
-    """Run all 36 assertions. Returns list of {id, description, status, detail}."""
+    """Run all 41 assertions. Returns list of {id, description, status, detail}."""
     fqdn = env["fqdn"]
     key = env["api_key"]
     spa_key = env.get("spa_api_key", "") or key  # SPA key for superadmin; fallback to tenant key
@@ -362,28 +402,6 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.11", "Widget key still valid", s in (200, 201),
           f"HTTP {s}")
 
-    # C.11b Widget key authenticates for config (admin widget health)
-    # The widget embedded in the admin UI fetches /api/config using the
-    # widget key. If widget_key_hash is missing from the tenant document,
-    # this returns 401 and the admin widget silently fails to load.
-    if wk:
-        wk_config_url = f"https://{fqdn}/api/config?page_type=all"
-        wk_req = Request(wk_config_url, headers={
-            "Accept": "application/json",
-            "X-Widget-Key": wk,
-        })
-        try:
-            with urlopen(wk_req, timeout=30) as wr:
-                wk_status = wr.status
-        except HTTPError as we:
-            wk_status = we.code
-        except Exception:
-            wk_status = 0
-        check("C.11b", "Widget config auth (admin widget)", wk_status == 200,
-              f"HTTP {wk_status}" + (" — widget_key_hash likely missing from tenant doc" if wk_status == 401 else ""))
-    else:
-        check("C.11b", "Widget config auth (admin widget)", False, "No widget key configured")
-
     # C.12 API key still authenticates
     s, d, _ = api_call(fqdn, tp("/api/config"), key)
     check("C.12", "API key authenticates", s == 200, f"HTTP {s}")
@@ -490,6 +508,85 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
 
     # C.35 Critic rule integrity — not verifiable remotely
     check("C.35", "Critic rule integrity", False, "NOT PROVEN — requires local Python")
+
+    # -----------------------------------------------------------------------
+    # Widget End-to-End Readiness (C.36 – C.41)
+    # These checks verify the full widget lifecycle from the perspective of
+    # a storefront visitor: auth → config → conversation → message → AI response.
+    # -----------------------------------------------------------------------
+
+    print("\n  --- Widget End-to-End Readiness ---")
+
+    # C.36 Widget JS bundle served
+    s36, _, _ = api_call(fqdn, "/widget.js")
+    check("C.36", "Widget JS bundle served", s36 == 200, f"HTTP {s36}")
+
+    # C.37 Widget key authenticates for config (admin widget prerequisite)
+    # The admin-embedded widget calls GET /api/config with X-Widget-Key.
+    # If widget_key_hash is missing from tenant doc, this returns 401.
+    s37, d37, _ = widget_api_call(fqdn, wk, "/api/config?page_type=all") if wk else (0, "", {})
+    wk_config_ok = s37 == 200 and isinstance(d37, dict) and "config" in d37
+    check("C.37", "Widget config auth (admin widget)", wk_config_ok,
+          f"HTTP {s37}" + (" — widget_key_hash likely missing from tenant doc" if s37 == 401 else ""))
+
+    # C.38 Widget creates conversation (storefront visitor flow)
+    conv_id = None
+    s38, d38, _ = widget_api_call(fqdn, wk, "/api/chat/conversations",
+                                   method="POST", body={"message": "health check"}) if wk else (0, "", {})
+    if isinstance(d38, dict):
+        conv_id = d38.get("conversation_id")
+    check("C.38", "Widget creates conversation", s38 in (200, 201) and bool(conv_id),
+          f"HTTP {s38}, conv={conv_id[:12] + '...' if conv_id else 'none'}")
+
+    # C.39 Widget sends message
+    msg_id = None
+    if conv_id and wk:
+        s39, d39, _ = widget_api_call(fqdn, wk, "/api/chat/message",
+                                       method="POST",
+                                       body={"conversation_id": conv_id,
+                                             "content": "What can you help me with?"})
+        if isinstance(d39, dict):
+            msg_id = d39.get("message_id")
+        check("C.39", "Widget sends message", s39 == 200 and bool(msg_id),
+              f"HTTP {s39}, msg_id={msg_id[:12] + '...' if msg_id else 'none'}")
+    else:
+        check("C.39", "Widget sends message", False,
+              "Skipped — no conversation from C.38")
+
+    # C.40 AI response received (poll conversation history)
+    # The AI pipeline processes the message asynchronously. Poll the
+    # conversation state up to 30s waiting for an assistant message.
+    ai_responded = False
+    ai_detail = "no conversation"
+    if conv_id and wk:
+        ai_detail = "timeout — no AI response within 30s"
+        for attempt in range(6):  # 6 attempts × 5s = 30s max
+            if attempt > 0:
+                time.sleep(5)
+            s40, d40, _ = widget_api_call(
+                fqdn, wk, f"/api/chat/conversations/{conv_id}", timeout=10)
+            if s40 == 200 and isinstance(d40, dict):
+                messages = d40.get("messages", [])
+                for m in messages:
+                    role = m.get("role", "")
+                    content = m.get("content", "")
+                    if role == "assistant" and len(content) > 5:
+                        ai_responded = True
+                        ai_detail = f"got {len(content)} chars after {(attempt + 1) * 5}s"
+                        break
+            if ai_responded:
+                break
+    check("C.40", "AI response received", ai_responded, ai_detail)
+
+    # C.41 Conversation cleanup (end the test conversation)
+    if conv_id and wk:
+        s41, _, _ = widget_api_call(fqdn, wk,
+                                     f"/api/chat/conversations/{conv_id}/end",
+                                     method="POST")
+        check("C.41", "Test conversation ended", s41 in (200, 204, 404),
+              f"HTTP {s41}")
+    else:
+        check("C.41", "Test conversation ended", False, "Skipped — no conversation")
 
     print("=" * 60)
     passed = sum(1 for r in results if r["status"] == "PASS")
