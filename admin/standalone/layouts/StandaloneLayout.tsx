@@ -310,13 +310,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             brandName: data.brand_name || undefined,
           });
 
-          // SPEC-1617: Normalize the tenant slug in the URL.
-          // Prefer shop domain (already unique, e.g. "blanco-9939"); fall
-          // back to brand name slugified; last resort use tenant_id.
-          const slug =
-            (data.shopify_shop_domain || '').replace(/\.myshopify\.com$/i, '') ||
-            (data.brand_name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') ||
-            data.tenant_id || '';
+          // SPEC-1644: The URL ?tenant= parameter MUST be the real tenant ID.
+          // Shop domains and brand names are display labels only — using them
+          // as URL slugs breaks partition-scoped API key auth when the user
+          // bookmarks the URL or the session expires.
+          const slug = data.tenant_id || '';
           if (slug) {
             const url = new URL(window.location.href);
             if (url.searchParams.get('tenant') !== slug) {
