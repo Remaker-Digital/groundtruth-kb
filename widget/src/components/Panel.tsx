@@ -178,8 +178,9 @@ export const Panel: FunctionComponent<PanelProps> = ({
       preChatData: preChatData || null,
     });
 
-    // Connect SSE for streaming
-    connectSSE(conversationId);
+    // SSE is NOT connected here — the stream endpoint returns 400 when no
+    // customer message exists yet. handleSend() connects SSE after the
+    // first message is sent (line ~241), which is the correct sequence.
   }, []);
 
   const connectSSE = useCallback((conversationId: string) => {
