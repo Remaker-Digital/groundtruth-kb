@@ -296,7 +296,7 @@ class TestTenantLookup:
     def test_cp11_tenant_lookup_returns_200(self, client, headers):
         """CP-11: /api/tenant/lookup returns HTTP 200."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/tenant/lookup", headers=headers
+            client, "get", f"/api/tenants/lookup?tenant={TENANT_ID}", headers=headers
         )
         # lookup might need a query param, or may return 200 with found=false
         assert r.status_code in (200, 404), f"Expected 200/404, got {r.status_code}"
@@ -304,7 +304,7 @@ class TestTenantLookup:
     def test_cp12_tenant_lookup_has_brand_name_field(self, client, headers):
         """CP-12: Tenant lookup response includes brand_name field (S103 regression)."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/tenant/lookup", headers=headers
+            client, "get", f"/api/tenants/lookup?tenant={TENANT_ID}", headers=headers
         )
         if r.status_code == 200:
             data = r.json()
@@ -317,7 +317,7 @@ class TestTenantLookup:
     def test_cp13_tenant_lookup_has_tier(self, client, headers):
         """CP-13: Tenant lookup response includes tier."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/tenant/lookup", headers=headers
+            client, "get", f"/api/tenants/lookup?tenant={TENANT_ID}", headers=headers
         )
         if r.status_code == 200:
             data = r.json()
@@ -326,7 +326,7 @@ class TestTenantLookup:
     def test_cp14_tenant_lookup_has_status(self, client, headers):
         """CP-14: Tenant lookup response includes status."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/tenant/lookup", headers=headers
+            client, "get", f"/api/tenants/lookup?tenant={TENANT_ID}", headers=headers
         )
         if r.status_code == 200:
             data = r.json()

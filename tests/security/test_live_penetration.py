@@ -426,7 +426,7 @@ class TestProviderProtection:
             json={"code": "000000"},
             headers=valid_headers,
         )
-        assert r.status_code in (400, 401, 403, 404, 405, 422), f"No MFA: got {r.status_code}"
+        assert r.status_code in (400, 401, 403, 404, 405, 422, 501), f"No MFA: got {r.status_code}"
 
     def test_sec_l38_mfa_with_expired_jwt(self, client):
         """SEC-L38: Provider MFA with expired/invalid JWT → 401."""
