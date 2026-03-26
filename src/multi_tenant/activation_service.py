@@ -532,15 +532,40 @@ class ActivationService:
         if target is None:
             return  # No config doc at all — validation will catch this
 
-        if target.get("widget_key"):
-            return  # Already has a widget key
+        from src.multi_tenant.auth import generate_widget_key, hash_widget_key
+
+        existing_key = target.get("widget_key")
+
+        if existing_key:
+            # Key exists in preferences — ensure the tenant doc hash is in sync.
+            # This repairs cases where the key was provisioned but the hash
+            # write failed or was lost during migration.
+            if self._tenant_repo:
+                try:
+                    tenant_doc = await self._tenant_repo.read(tenant_id, tenant_id)
+                    if tenant_doc and not tenant_doc.get("widget_key_hash"):
+                        key_hash = hash_widget_key(existing_key)
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        await self._tenant_repo.patch(
+                            tenant_id,
+                            tenant_id,
+                            operations=[
+                                {"op": "set", "path": "/widget_key_hash", "value": key_hash},
+                                {"op": "set", "path": "/updated_at", "value": now_iso},
+                            ],
+                        )
+                        logger.info(
+                            "Repaired missing widget_key_hash on tenant doc: tenant=%s",
+                            tenant_id[:8],
+                        )
+                except Exception:
+                    logger.debug("Widget key hash repair check failed", exc_info=True)
+            return
 
         logger.info(
             "Auto-provisioning widget key for tenant=%s (missing from %s config)",
             tenant_id[:8], target.get("config_state", "unknown"),
         )
-
-        from src.multi_tenant.auth import generate_widget_key, hash_widget_key
 
         raw_key = generate_widget_key(tenant_id)
         key_hash = hash_widget_key(raw_key)

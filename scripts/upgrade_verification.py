@@ -246,7 +246,7 @@ def phase_a(env: dict) -> dict:
 # Phase C: Post-deployment verification
 # ---------------------------------------------------------------------------
 def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
-    """Run all 35 assertions. Returns list of {id, description, status, detail}."""
+    """Run all 36 assertions. Returns list of {id, description, status, detail}."""
     fqdn = env["fqdn"]
     key = env["api_key"]
     spa_key = env.get("spa_api_key", "") or key  # SPA key for superadmin; fallback to tenant key
@@ -357,10 +357,32 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.10", "Active config unchanged", current_keys == snapshot.get("A10_config_keys", []),
           f"{len(current_keys)} keys vs {len(snapshot.get('A10_config_keys', []))}")
 
-    # C.11 Widget key still valid
+    # C.11 Widget key still valid (chat endpoint)
     s, d = widget_call(fqdn, wk)
     check("C.11", "Widget key still valid", s in (200, 201),
           f"HTTP {s}")
+
+    # C.11b Widget key authenticates for config (admin widget health)
+    # The widget embedded in the admin UI fetches /api/config using the
+    # widget key. If widget_key_hash is missing from the tenant document,
+    # this returns 401 and the admin widget silently fails to load.
+    if wk:
+        wk_config_url = f"https://{fqdn}/api/config?page_type=all"
+        wk_req = Request(wk_config_url, headers={
+            "Accept": "application/json",
+            "X-Widget-Key": wk,
+        })
+        try:
+            with urlopen(wk_req, timeout=30) as wr:
+                wk_status = wr.status
+        except HTTPError as we:
+            wk_status = we.code
+        except Exception:
+            wk_status = 0
+        check("C.11b", "Widget config auth (admin widget)", wk_status == 200,
+              f"HTTP {wk_status}" + (" — widget_key_hash likely missing from tenant doc" if wk_status == 401 else ""))
+    else:
+        check("C.11b", "Widget config auth (admin widget)", False, "No widget key configured")
 
     # C.12 API key still authenticates
     s, d, _ = api_call(fqdn, tp("/api/config"), key)
