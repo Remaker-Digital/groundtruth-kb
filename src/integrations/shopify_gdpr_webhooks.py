@@ -54,12 +54,14 @@ _SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET", "")
 _export_service: Any | None = None
 _deletion_service: Any | None = None
 _tenant_repo: Any | None = None
+_domain_index_repo: Any | None = None
 
 
 def configure_shopify_gdpr_services(
     export_service: Any | None = None,
     deletion_service: Any | None = None,
     tenant_repo: Any | None = None,
+    domain_index_repo: Any | None = None,
 ) -> None:
     """Wire the Shopify GDPR webhooks to their backing services.
 
@@ -67,10 +69,11 @@ def configure_shopify_gdpr_services(
     Services are optional — if not wired, endpoints still accept
     webhooks (returning 200) but log a warning about missing services.
     """
-    global _export_service, _deletion_service, _tenant_repo
+    global _export_service, _deletion_service, _tenant_repo, _domain_index_repo
     _export_service = export_service
     _deletion_service = deletion_service
     _tenant_repo = tenant_repo
+    _domain_index_repo = domain_index_repo
     logger.info("Shopify GDPR webhook services configured")
 
 
@@ -149,27 +152,39 @@ async def _verify_webhook_request(request: Request) -> dict[str, Any]:
 async def _resolve_tenant_id(shop_domain: str) -> str | None:
     """Resolve a Shopify shop domain to a tenant_id.
 
-    Uses the TenantRepository.find_by_shopify_domain() lookup if available.
+    Uses the DomainIndexRepository for O(1) point-read lookup (no
+    cross-partition query).  Falls back to TenantRepository if
+    domain index is not configured.
 
     Returns:
         The tenant_id, or None if the shop is not recognised.
     """
-    if _tenant_repo is None:
-        logger.warning(
-            "TenantRepository not configured — cannot resolve shop %s to tenant",
-            shop_domain,
-        )
-        return None
+    # Prefer domain index — single-partition point read
+    if _domain_index_repo is not None:
+        try:
+            tenant_id = await _domain_index_repo.lookup(shop_domain)
+            if tenant_id is not None:
+                return tenant_id
+        except Exception:
+            logger.exception(
+                "Domain index lookup failed for shop=%s, trying fallback",
+                shop_domain,
+            )
 
-    try:
-        tenant_doc = await _tenant_repo.find_by_shopify_domain(shop_domain)
-        if tenant_doc is not None:
-            return tenant_doc.get("id") or tenant_doc.get("tenant_id")
-    except Exception:
-        logger.exception(
-            "Error resolving shop domain to tenant: shop=%s", shop_domain,
-        )
+    # Fallback to cross-partition query (legacy path)
+    if _tenant_repo is not None:
+        try:
+            tenant_doc = await _tenant_repo.find_by_shopify_domain(shop_domain)
+            if tenant_doc is not None:
+                return tenant_doc.get("id") or tenant_doc.get("tenant_id")
+        except Exception:
+            logger.exception(
+                "Error resolving shop domain to tenant: shop=%s", shop_domain,
+            )
 
+    logger.warning(
+        "Cannot resolve shop %s to tenant — no repo configured", shop_domain,
+    )
     return None
 
 

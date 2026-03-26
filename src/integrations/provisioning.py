@@ -58,6 +58,7 @@ logger = logging.getLogger(__name__)
 
 _tenant_repo = None
 _team_repo = None
+_domain_index_repo = None
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +176,11 @@ class ValidateKeyResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def configure_provisioning_repo(tenant_repo: Any, team_repo: Any = None) -> None:
+def configure_provisioning_repo(
+    tenant_repo: Any,
+    team_repo: Any = None,
+    domain_index_repo: Any = None,
+) -> None:
     """Wire Cosmos DB repositories as the primary persistence layer.
 
     Called from lifecycle.py startup to enable all provisioning operations
@@ -184,11 +189,14 @@ def configure_provisioning_repo(tenant_repo: Any, team_repo: Any = None) -> None
     Args:
         tenant_repo: TenantRepository for tenant CRUD and lookups.
         team_repo: TeamMemberRepository for per-user API key lookups.
+        domain_index_repo: DomainIndexRepository for SPEC-1644 index.
     """
-    global _tenant_repo, _team_repo  # noqa: PLW0603
+    global _tenant_repo, _team_repo, _domain_index_repo  # noqa: PLW0603
     _tenant_repo = tenant_repo
     _team_repo = team_repo
-    logger.info("Provisioning repos configured (team_repo=%s)", "yes" if team_repo else "no")
+    _domain_index_repo = domain_index_repo
+    logger.info("Provisioning repos configured (team_repo=%s, domain_index=%s)",
+                "yes" if team_repo else "no", "yes" if domain_index_repo else "no")
 
 
 # ---------------------------------------------------------------------------
@@ -246,15 +254,20 @@ async def _lookup_tenant(
         except Exception:
             doc = None
 
-    if doc is None and stripe_customer_id:
+    # SPEC-1644: Use domain index for O(1) lookups — no cross-partition queries.
+    if doc is None and stripe_customer_id and _domain_index_repo:
         try:
-            doc = await _tenant_repo.find_by_stripe_customer_id(stripe_customer_id)
+            resolved_id = await _domain_index_repo.lookup(stripe_customer_id)
+            if resolved_id:
+                doc = await _tenant_repo.read(resolved_id, resolved_id)
         except Exception:
             doc = None
 
-    if doc is None and shopify_shop_domain:
+    if doc is None and shopify_shop_domain and _domain_index_repo:
         try:
-            doc = await _tenant_repo.find_by_shopify_domain(shopify_shop_domain)
+            resolved_id = await _domain_index_repo.lookup(shopify_shop_domain)
+            if resolved_id:
+                doc = await _tenant_repo.read(resolved_id, resolved_id)
         except Exception:
             doc = None
 
@@ -362,14 +375,19 @@ async def provision_tenant(
 
     # Check if tenant already exists for this channel identifier
     existing_doc: dict[str, Any] | None = None
-    if billing_channel == BillingChannel.STRIPE and stripe_customer_id:
+    # SPEC-1644: Use domain index for duplicate detection — no cross-partition queries.
+    if billing_channel == BillingChannel.STRIPE and stripe_customer_id and _domain_index_repo:
         try:
-            existing_doc = await _tenant_repo.find_by_stripe_customer_id(stripe_customer_id)
+            resolved_id = await _domain_index_repo.lookup(stripe_customer_id)
+            if resolved_id:
+                existing_doc = await _tenant_repo.read(resolved_id, resolved_id)
         except Exception:
             existing_doc = None
-    elif billing_channel == BillingChannel.SHOPIFY and shopify_shop_domain:
+    elif billing_channel == BillingChannel.SHOPIFY and shopify_shop_domain and _domain_index_repo:
         try:
-            existing_doc = await _tenant_repo.find_by_shopify_domain(shopify_shop_domain)
+            resolved_id = await _domain_index_repo.lookup(shopify_shop_domain)
+            if resolved_id:
+                existing_doc = await _tenant_repo.read(resolved_id, resolved_id)
         except Exception:
             existing_doc = None
 
@@ -439,6 +457,13 @@ async def provision_tenant(
     )
 
     await _tenant_repo.upsert(tenant_id, doc)
+
+    # SPEC-1644: Write domain index entries for O(1) lookups
+    if _domain_index_repo:
+        if shopify_shop_domain:
+            await _domain_index_repo.upsert(shopify_shop_domain, tenant_id, "shopify")
+        if stripe_customer_id:
+            await _domain_index_repo.upsert(stripe_customer_id, tenant_id, "stripe")
 
     # SPEC-1843 / WI-1628: Create per-tenant DEK for envelope encryption
     await _provision_tenant_dek(tenant_id)

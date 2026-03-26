@@ -323,8 +323,27 @@ async def _startup_tenant_resolution() -> None:
             )
             return None
 
+        # SPEC-1644: Domain index for O(1) lookups (no cross-partition queries)
+        from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+        domain_index_repo = DomainIndexRepository()
+
+        async def resolve_by_shop_domain(shop_domain: str) -> dict | None:
+            """Resolve shop domain using domain index (O(1) point read).
+
+            Falls back to cross-partition query if domain index miss.
+            """
+            # Try domain index first — single-partition point read
+            try:
+                tid = await domain_index_repo.lookup(shop_domain)
+                if tid:
+                    return await tenant_repo.read(tid, tid)
+            except Exception:
+                pass
+            # Fallback: cross-partition query (legacy, will be removed)
+            return await tenant_repo.find_by_shopify_domain(shop_domain)
+
         configure_tenant_resolution(
-            resolve_by_shop_domain=tenant_repo.find_by_shopify_domain,
+            resolve_by_shop_domain=resolve_by_shop_domain,
             resolve_by_api_key_hash=_deprecated_api_key_lookup,
             resolve_by_widget_key_hash=tenant_repo.find_by_widget_key_hash,
             resolve_by_user_api_key_hash=resolve_user_api_key,
@@ -335,8 +354,11 @@ async def _startup_tenant_resolution() -> None:
         )
         # Wire Cosmos DB as the primary persistence layer for provisioning
         from src.integrations.provisioning import configure_provisioning_repo
-        configure_provisioning_repo(tenant_repo, team_repo=team_repo)
-        logger.info("Tenant resolution configured (Cosmos DB-backed, quad auth)")
+        configure_provisioning_repo(
+            tenant_repo, team_repo=team_repo,
+            domain_index_repo=domain_index_repo,
+        )
+        logger.info("Tenant resolution configured (Cosmos DB-backed, quad auth, domain index)")
     except Exception as exc:
         logger.warning(
             "Tenant resolution configuration failed — auth middleware will "
@@ -937,10 +959,12 @@ async def _startup_admin_gdpr_services() -> None:
         # Also wire the same services into the Shopify GDPR webhooks (WI #35)
         from src.integrations.shopify_gdpr_webhooks import configure_shopify_gdpr_services  # noqa: E402
 
+        from src.multi_tenant.repositories.domain_index import DomainIndexRepository
         configure_shopify_gdpr_services(
             export_service=export_service,
             deletion_service=deletion_service,
             tenant_repo=tenant_repo,
+            domain_index_repo=DomainIndexRepository(),
         )
         logger.info("Shopify GDPR webhooks initialized (3 endpoints)")
     except Exception:

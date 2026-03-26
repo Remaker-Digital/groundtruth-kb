@@ -84,6 +84,9 @@ COLLECTION_INTEGRATION_EVENTS = "integration_events"
 COLLECTION_NORMALIZED_TICKETS = "normalized_tickets"
 COLLECTION_NORMALIZED_CONTACTS = "normalized_contacts"
 
+# Domain → tenant_id index (SPEC-1644: eliminates cross-partition queries)
+COLLECTION_DOMAIN_INDEX = "domain_index"
+
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
     COLLECTION_CONVERSATIONS,
@@ -111,6 +114,7 @@ ALL_COLLECTIONS = [
     COLLECTION_INTEGRATION_EVENTS,
     COLLECTION_NORMALIZED_TICKETS,
     COLLECTION_NORMALIZED_CONTACTS,
+    COLLECTION_DOMAIN_INDEX,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -2350,6 +2354,20 @@ def get_collection_configs() -> list[CollectionConfig]:
             name=COLLECTION_NORMALIZED_CONTACTS,
             partition_key="/tenant_id",
             unique_keys=[["/tenant_id", "/external_id", "/source"]],
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": '/"_etag"/?'}],
+            },
+        ),
+        # 26. domain_index — SPEC-1644: shop domain / Stripe ID → tenant_id
+        # Partition key is /domain so lookups are single-partition point reads.
+        # Eliminates all cross-partition queries from the codebase.
+        CollectionConfig(
+            name=COLLECTION_DOMAIN_INDEX,
+            partition_key="/domain",
+            unique_keys=[["/domain"]],
             indexing_policy={
                 "automatic": True,
                 "indexingMode": "consistent",
