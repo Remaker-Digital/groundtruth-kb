@@ -137,7 +137,7 @@ class TestBackwardCompatibility:
             sla_trends,
             queue_depth,
             compliance_summary,
-            secret_posture,
+            secret_health,  # Renamed from secret_posture (SPEC-1843)
             integration_health,
         )
 

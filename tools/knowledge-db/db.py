@@ -413,6 +413,27 @@ class KnowledgeDB:
             conn.execute("UPDATE specifications SET type = 'protected_behavior' WHERE id LIKE 'PB-%'")
             conn.commit()
 
+        # Migration 2: Backfill architecture_decision and design_constraint types (GOV-20 Phase 1)
+        conn.execute("UPDATE specifications SET type = 'architecture_decision' WHERE id LIKE 'ADR-%' AND type = 'requirement'")
+        conn.execute("UPDATE specifications SET type = 'design_constraint' WHERE id LIKE 'DCL-%' AND type = 'requirement'")
+        conn.commit()
+
+    @staticmethod
+    def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
+        """Auto-detect spec type from ID prefix when declared as default 'requirement'."""
+        if declared_type != "requirement":
+            return declared_type
+        prefix_map = {
+            "GOV-": "governance",
+            "PB-": "protected_behavior",
+            "ADR-": "architecture_decision",
+            "DCL-": "design_constraint",
+        }
+        for prefix, spec_type in prefix_map.items():
+            if spec_id.startswith(prefix):
+                return spec_type
+        return declared_type
+
     def close(self) -> None:
         if self._conn:
             self._conn.close()
@@ -448,8 +469,12 @@ class KnowledgeDB:
         """Insert a new version of a specification.
 
         Args:
-            type: Specification type — 'requirement', 'governance', or 'protected_behavior'.
+            type: Specification type — 'requirement', 'governance', 'protected_behavior',
+                  'architecture_decision', or 'design_constraint'.
+                  Auto-detected from ID prefix (GOV-*, PB-*, ADR-*, DCL-*) when left
+                  as default 'requirement'.
         """
+        type = self._auto_detect_spec_type(id, type)
         version = self._next_spec_version(id)
         assertions_json = json.dumps(assertions) if assertions else None
         tags_json = json.dumps(tags) if tags else None
@@ -488,7 +513,9 @@ class KnowledgeDB:
         section = fields.get("section", current["section"])
         handle = fields.get("handle", current["handle"])
         status = fields.get("status", current["status"])
-        spec_type = fields.get("type", current.get("type", "requirement"))
+        spec_type = self._auto_detect_spec_type(
+            id, fields.get("type", current.get("type", "requirement"))
+        )
 
         # Tags and assertions: use 'is not _UNSET' to allow explicit [] or None
         raw_tags = fields.get("tags", _UNSET)
@@ -539,10 +566,14 @@ class KnowledgeDB:
         handle: str | None = None,
         tag: str | None = None,
         search: str | None = None,
+        type: str | None = None,
     ) -> list[dict[str, Any]]:
         """List current specifications with optional filters."""
         query = "SELECT * FROM current_specifications WHERE 1=1"
         params: list[Any] = []
+        if type:
+            query += " AND type = ?"
+            params.append(type)
         if status:
             query += " AND status = ?"
             params.append(status)
@@ -930,6 +961,69 @@ class KnowledgeDB:
         query += " ORDER BY id"
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # GOV-20: Architecture Decision Governance helpers
+    # ------------------------------------------------------------------
+
+    def list_design_constraints(self, *, status: str | None = None) -> list[dict[str, Any]]:
+        """List all current design constraint specs (DCL-*)."""
+        return self.list_specs(type="design_constraint", status=status)
+
+    def validate_dcl_constraints(self, dcl_id: str | None = None) -> list[dict[str, Any]]:
+        """Validate design constraint assertions against the codebase.
+
+        If dcl_id is provided, validates only that constraint.
+        Otherwise validates all implemented/verified DCL-* specs with assertions.
+
+        Returns list of {dcl_id, title, passed, results: [...]} dicts.
+        """
+        import importlib
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).parent))
+        assertions_mod = importlib.import_module("assertions")
+
+        if dcl_id:
+            specs = [self.get_spec(dcl_id)]
+            if not specs[0]:
+                return [{"dcl_id": dcl_id, "error": f"DCL {dcl_id} not found"}]
+        else:
+            specs = self.list_design_constraints(status="implemented")
+            specs += self.list_design_constraints(status="verified")
+
+        results = []
+        for spec in specs:
+            if not spec or not spec.get("assertions"):
+                continue
+            assertion_list = json.loads(spec["assertions"]) if isinstance(spec["assertions"], str) else spec["assertions"]
+            spec_results = []
+            all_passed = True
+            for assertion in assertion_list:
+                r = assertions_mod.run_single_assertion(assertion)
+                spec_results.append(r)
+                if not r.get("passed") and not r.get("skipped"):
+                    all_passed = False
+            results.append({
+                "dcl_id": spec["id"],
+                "title": spec["title"],
+                "passed": all_passed,
+                "results": spec_results,
+            })
+        return results
+
+    def list_implementation_proposals(self, *, wi_id: str | None = None) -> list[dict[str, Any]]:
+        """List IPR-* documents (implementation proposals). Optionally filter by WI reference."""
+        docs = self.list_documents(category="implementation_proposal")
+        if wi_id:
+            docs = [d for d in docs if wi_id in (d.get("content") or "")]
+        return docs
+
+    def list_constraint_verifications(self, *, wi_id: str | None = None) -> list[dict[str, Any]]:
+        """List CVR-* documents (constraint verifications). Optionally filter by WI reference."""
+        docs = self.list_documents(category="constraint_verification")
+        if wi_id:
+            docs = [d for d in docs if wi_id in (d.get("content") or "")]
+        return docs
 
     # ------------------------------------------------------------------
     # Test Coverage

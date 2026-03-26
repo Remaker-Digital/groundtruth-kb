@@ -266,6 +266,15 @@ class MockContainerProxy:
         self.items.append(body)
         return body
 
+    async def replace_item(self, item: str, body: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        """Replace an existing item by ID (used by read-modify-write patterns)."""
+        self.items = [
+            doc for doc in self.items
+            if doc.get("id") != (body.get("id") or item)
+        ]
+        self.items.append(body)
+        return body
+
     async def read_item(self, item: str, partition_key: str, **kwargs: Any) -> dict[str, Any]:
         for doc in self.items:
             if doc.get("id") == item:

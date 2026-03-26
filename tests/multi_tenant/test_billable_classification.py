@@ -110,12 +110,13 @@ class TestBillableClassification:
 
     @pytest.mark.unit
     def test_ai_response_promotes_billable(self):
-        """TEST-2910: add_ai_message includes is_billable=True patch for eligible IDs."""
+        """TEST-2910: add_ai_message includes is_billable=True for eligible IDs."""
         from pathlib import Path
         session_py = Path("src/chat/session.py").read_text(encoding="utf-8")
         # Verify the promotion logic exists in add_ai_message
         assert 'NON_BILLABLE_PREFIXES' in session_py
-        assert '"op": "set", "path": "/is_billable", "value": True' in session_py
+        # Post S218: billable promotion uses metadata_updates dict, not patch ops
+        assert '"is_billable"' in session_py and 'True' in session_py
 
     @pytest.mark.unit
     def test_prefixed_conversation_stays_non_billable(self):

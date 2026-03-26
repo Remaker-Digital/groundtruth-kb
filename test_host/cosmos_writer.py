@@ -152,6 +152,28 @@ class CosmosWriter:
         self._state.duration_s = round((ended - started).total_seconds(), 2)
         self._upsert(force=True)
 
+    def _build_check_window(self, max_checks: int = 500) -> list[dict]:
+        """Build a check window that prioritizes failures over passes.
+
+        Keeps ALL failed/error/skip checks and fills remaining slots with
+        the most recent passing checks.  This prevents early-phase failures
+        from being evicted by later heavy-suite passes.
+        """
+        all_checks = self._state.checks
+        if len(all_checks) <= max_checks:
+            return list(all_checks)
+
+        # Partition: non-pass checks are always kept
+        non_pass = [c for c in all_checks if c.get("status") != "pass"]
+        passes = [c for c in all_checks if c.get("status") == "pass"]
+
+        remaining_slots = max(0, max_checks - len(non_pass))
+        # Keep most recent passes (from later phases)
+        recent_passes = passes[-remaining_slots:] if remaining_slots > 0 else []
+
+        # Merge: non-pass first (preserves discovery order), then recent passes
+        return non_pass + recent_passes
+
     def _upsert(self, force: bool = False) -> None:
         """Upsert the run document to Cosmos."""
         now = time.monotonic()
@@ -182,14 +204,13 @@ class CosmosWriter:
                 "phases_completed": self._state.phases_completed,
                 "phases_total": self._state.phases_total,
                 "phases_run": self._state.phases_completed,  # Compat with existing SPA
-                "failures": self._state.failures[-100:],  # Cap at 100 failures
-                # Only persist the last 500 checks in the run document to stay
-                # under the Cosmos 2 MB document size limit (~130 bytes/check).
-                # Full check history is available via the in-memory state until
-                # the run completes.  The SPA uses "checks" for the detail view
-                # and counters (passed/failed) for the summary — counters are
-                # always accurate regardless of truncation.
-                "checks": self._state.checks[-500:],
+                "failures": self._state.failures,  # All failures — always preserved
+                # Persist up to 500 checks, but PRIORITIZE failures: keep ALL
+                # failed/error checks and fill remaining slots with recent passes.
+                # This ensures fast-suite failures aren't evicted by later
+                # heavy-suite passes (the original [-500:] eviction lost early
+                # failures when e2e_live added 272+ checks).
+                "checks": self._build_check_window(500),
                 "checks_total": len(self._state.checks),
                 "checks_truncated": len(self._state.checks) > 500,
                 "stdout_tail": self._state.stdout_tail,

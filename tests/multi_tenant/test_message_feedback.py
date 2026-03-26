@@ -72,6 +72,7 @@ class TestMessageFeedbackEndpoint:
         session.get_conversation = AsyncMock()
         session._conversation_repo = MagicMock()
         session._conversation_repo.patch = AsyncMock()
+        session._conversation_repo.update_message_metadata = AsyncMock()
         return session
 
     @pytest.fixture
@@ -144,14 +145,14 @@ class TestMessageFeedbackEndpoint:
         assert result.message_id == "msg-2"
         assert result.accepted is True
 
-        # Verify Cosmos patch was called
-        mock_session._conversation_repo.patch.assert_called_once()
-        patch_args = mock_session._conversation_repo.patch.call_args
-        assert patch_args[0][0] == "test-tenant-001"
-        assert patch_args[0][1] == "conv-123"
-        operations = patch_args[0][2]
-        assert operations[0]["op"] == "set"
-        assert "/messages/1/metadata" in operations[0]["path"]
+        # Verify update_message_metadata was called (S218: patch → read-modify-write)
+        mock_session._conversation_repo.update_message_metadata.assert_called_once()
+        call_args = mock_session._conversation_repo.update_message_metadata.call_args
+        assert call_args[0][0] == "test-tenant-001"
+        assert call_args[0][1] == "conv-123"
+        assert call_args[0][2] == 1  # target_idx (msg-2 is at index 1)
+        metadata = call_args[0][3]
+        assert metadata["feedback_rating"] == "positive"
 
     @pytest.mark.asyncio
     async def test_negative_feedback_with_comment(
@@ -172,9 +173,9 @@ class TestMessageFeedbackEndpoint:
             )
 
         assert result.rating == "negative"
-        # Verify comment was included in the patch
-        operations = mock_session._conversation_repo.patch.call_args[0][2]
-        metadata = operations[0]["value"]
+        # Verify comment was included in the metadata update (S218: patch → read-modify-write)
+        call_args = mock_session._conversation_repo.update_message_metadata.call_args
+        metadata = call_args[0][3]
         assert metadata["feedback_rating"] == "negative"
         assert metadata["feedback_comment"] == "Inaccurate"
 

@@ -219,12 +219,18 @@ class TestConversationLifecycle:
 
     @pytest.mark.unit
     async def test_append_message(self, mock_cosmos):
-        """append_message appends a message and increments count."""
-        _inject_raw_doc(mock_cosmos, _make_conv_doc("conv-1", message_count=2))
+        """append_message appends a message via read-modify-write."""
+        # Build doc with 2 actual messages (S218: read-modify-write counts len(messages))
+        doc = _make_conv_doc("conv-1", message_count=2)
+        doc["messages"] = [
+            {"role": "customer", "content": "Hi"},
+            {"role": "ai", "content": "Hello!"},
+        ]
+        _inject_raw_doc(mock_cosmos, doc)
         repo = ConversationRepository()
-        message = {"role": "customer", "content": "Hello"}
+        message = {"role": "customer", "content": "Follow up"}
         result = await repo.append_message(_TENANT, "conv-1", message)
-        assert result["message_count"] == 3  # incremented by 1
+        assert result["message_count"] == 3  # 2 existing + 1 appended
         assert "last_activity_at" in result
 
     @pytest.mark.unit

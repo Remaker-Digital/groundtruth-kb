@@ -92,6 +92,20 @@ All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
 | 17 | Quality first | Prioritize quality over effort; software engineering excellence |
 | 18 | Assertion quality | Meaningfulness over coverage; no rubber-stamp assertions |
 | 19 | Outside-in testing | Tests exercise surfaces and behaviors; internals are supplemental |
+| 20 | Architecture decisions | ADR/DCL/IPR/CVR advisory pilot for cross-cutting decisions |
+
+### Architecture Decision Workflow (GOV-20)
+
+Cross-cutting decisions use four artifact types stored in KB:
+
+| Artifact | ID Prefix | KB Storage | Purpose |
+|----------|-----------|------------|---------|
+| ADR | ADR-* | spec (`type=architecture_decision`) | Decision + context + failed approaches + alternatives + consequences |
+| DCL | DCL-* | spec (`type=design_constraint`) | Machine-checkable constraint derived from ADR (assertions field) |
+| IPR | IPR-* | document (`category=implementation_proposal`) | Pre-implementation proof: WI reviewed against ADR/DCL |
+| CVR | CVR-* | document (`category=constraint_verification`) | Post-implementation proof of DCL compliance |
+
+**Phase 1 (advisory pilot):** Before implementing a WI that touches architecture-tagged specs or cross-cutting concerns: (1) check for relevant ADRs/DCLs via `db.list_specs(type=...)`, (2) create IPR document linking WI to ADR/DCL refs, (3) implement, (4) create CVR document proving DCL compliance. DCL assertions run at session start (informational, not blocking).
 
 ### Owner Input Classification Rule (GOV-09)
 
