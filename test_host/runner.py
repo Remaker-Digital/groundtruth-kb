@@ -122,13 +122,37 @@ class TestRunner:
             )
             self.cosmos.set_phase(suite_name)
 
+            # S220: Hard timeout per sub-suite = configured timeout + 30s.
+            # Catches edge cases where _run_pytest's internal timeout fires
+            # but stream cleanup hangs indefinitely.
+            hard_timeout = (sub_config.timeout_s or 300) + 30
             try:
                 if sub_config.requires_locust:
-                    await self._run_locust(sub_config)
+                    await asyncio.wait_for(self._run_locust(sub_config), timeout=hard_timeout)
                 elif sub_config.pytest_args:
-                    await self._run_pytest(sub_config)
+                    await asyncio.wait_for(self._run_pytest(sub_config), timeout=hard_timeout)
                 else:
                     logger.info("Skipping %s (no pytest args and not locust)", suite_name)
+            except asyncio.TimeoutError:
+                logger.error(
+                    "HARD TIMEOUT: sub-suite %s exceeded %ds — force-continuing composite",
+                    suite_name, hard_timeout,
+                )
+                # Force-kill any lingering subprocess
+                if self._process and self._process.returncode is None:
+                    self._process.kill()
+                    try:
+                        await asyncio.wait_for(self._process.wait(), timeout=5)
+                    except asyncio.TimeoutError:
+                        pass
+                self.cosmos.add_results([
+                    TestResult(
+                        name=f"{suite_name}_hard_timeout",
+                        category=suite_name,
+                        status="error",
+                        detail=f"Hard timeout after {hard_timeout}s — suite did not complete cleanup",
+                    )
+                ])
             except Exception as exc:
                 # Isolate sub-suite failures so the composite loop continues.
                 # Without this, a single exception (Cosmos write, JSON parse,
@@ -197,7 +221,11 @@ class TestRunner:
                 cmd.append("--maxfail=10")
 
         env = self._build_env(config)
-        logger.info("Running pytest: %s", " ".join(cmd))
+        # S220: hard overall timeout = config timeout + 30s safety margin.
+        # This catches edge cases where the subprocess timeout fires but
+        # stream_task cleanup hangs.  Logs the watchdog trigger for debugging.
+        hard_timeout = config.timeout_s + 30
+        logger.info("Running pytest: %s (timeout=%ds, hard=%ds)", " ".join(cmd), config.timeout_s, hard_timeout)
 
         try:
             # Using create_subprocess_exec (not shell=True) to prevent injection.

@@ -22,7 +22,11 @@ from dataclasses import dataclass, field
 # ---------------------------------------------------------------------------
 PARALLELIZABLE_SUITES = frozenset({
     "unit", "core", "integration", "agents", "security",
-    "regression", "widget", "ops", "property",
+    "regression", "ops", "property",
+    # S220: widget removed — 723 source-inspection tests run in <1s without
+    # xdist. xdist adds worker-spawning overhead and the composite was
+    # stalling during widget phase (workers holding stdout pipe open after
+    # killpg). Not worth parallelizing for sub-second tests.
 })
 
 

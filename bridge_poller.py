@@ -51,16 +51,24 @@ class _FileLock:
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._fh = open(self.path, "a+")
+        # Open in r+b (or create with w+b) so we can seek to byte 0 for locking.
+        # msvcrt.locking needs at least 1 byte in the file to lock.
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            self.path.write_bytes(b"\x00")
+        self._fh = open(self.path, "r+b")
+        self._fh.seek(0)
         try:
             msvcrt.locking(self._fh.fileno(), msvcrt.LK_NBLCK, 1)
-        except OSError:
+        except (OSError, PermissionError):
+            self._fh.close()
+            self._fh = None
             raise RuntimeError(f"bridge poller lock busy: {self.path}")
         return self
 
     def __exit__(self, *_args):
         if self._fh:
             try:
+                self._fh.seek(0)
                 msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
             except OSError:
                 pass

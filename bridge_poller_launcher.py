@@ -89,17 +89,26 @@ def _start_detached(
         py = str(Path(sys.executable).resolve())
         script = str((project_dir / "bridge_poller.py").resolve())
 
+        # Build argument string (not array) so paths with spaces are preserved.
+        # Start-Process -ArgumentList as a single string passes it to python.exe
+        # as-is, avoiding PowerShell's array-to-command-line re-splitting.
+        arg_parts = [
+            f'"{script}"',
+            "--agent", agent,
+            "--timeout-seconds", str(timeout_seconds),
+            "--poll-interval-ms", str(poll_interval_ms),
+            "--limit", str(limit),
+        ]
+        if auto_actions:
+            arg_parts.append("--auto-actions")
+        arg_string = " ".join(arg_parts)
+
         def _q(value: str) -> str:
             return value.replace("'", "''")
 
         ps = (
             f"$p = Start-Process -FilePath '{_q(py)}' "
-            f"-ArgumentList @('{_q(script)}','--agent','{_q(agent)}',"
-            f"'--timeout-seconds','{timeout_seconds}',"
-            f"'--poll-interval-ms','{poll_interval_ms}',"
-            f"'--limit','{limit}'"
-            + (",'--auto-actions'" if auto_actions else "")
-            + ") "
+            f"-ArgumentList '{_q(arg_string)}' "
             "-WindowStyle Hidden -PassThru; "
             "Write-Output $p.Id"
         )
