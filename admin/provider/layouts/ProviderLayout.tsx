@@ -141,6 +141,23 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
   const navigate = useNavigate();
   const [productVersion, setProductVersion] = useState<string | null>(null);
 
+  // SPEC-1644 / SPEC-1667: Provider console MUST use an ar_spa_plat_* key.
+  // SPA keys are exempt from the ?tenant= requirement because the provider
+  // console is platform-wide and not scoped to a single tenant.  Non-SPA
+  // keys (ar_user_*, ar_live_*, etc.) will fail with 401 on every call
+  // because the middleware requires ?tenant= which the provider has no way
+  // to supply.  Warn loudly if a non-SPA key slips through.
+  useEffect(() => {
+    if (apiKey && !apiKey.startsWith('ar_spa_')) {
+      console.error(
+        '[ProviderLayout] WARNING: API key does not have ar_spa_ prefix. ' +
+        'The provider console requires a platform SPA key (ar_spa_plat_*). ' +
+        'Non-SPA keys will fail with 401 on all /api/superadmin/* endpoints. ' +
+        `Current prefix: ${apiKey.slice(0, 8)}...`
+      );
+    }
+  }, [apiKey]);
+
   // Authenticated fetch wrapper
   const apiFetch = useCallback(
     async (path: string, init?: RequestInit): Promise<Response> => {

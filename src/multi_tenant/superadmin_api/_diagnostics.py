@@ -1071,6 +1071,9 @@ async def get_test_run_status(run_id: str) -> PipelineRunStatusResponse:
         duration_s=value.get("duration_s"),
         failures=value.get("failures", []),
         phases_run=value.get("phases_run", []),
+        phases_completed=value.get("phases_completed", []),
+        current_phase=value.get("current_phase", ""),
+        phases_total=value.get("phases_total", 0),
         checks=value.get("checks", []),
     )
 
