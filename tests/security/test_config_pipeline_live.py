@@ -38,18 +38,23 @@ PROD_URL = os.environ.get(
     "",  # SPEC-0058: No hardcoded FQDNs
 )
 
-# Superadmin API key — try env, then fallback to upgrade_verification.py ENVIRONMENTS
-API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
-if not API_KEY:
-    try:
-        from scripts.upgrade_verification import ENVIRONMENTS
-
-        _prod = ENVIRONMENTS.get("production", {})
-        API_KEY = _prod.get("api_key", "")
-    except ImportError:
-        pass
+# SPEC-1644: Config endpoints are tenant-scoped — they need a tenant key
+# with ?tenant= param, NOT the SPA platform key (which resolves to __platform__
+# and has no tenant config to return).
+# Priority: tenant key > user key > SPA key (fallback).
+TENANT_KEY = (
+    os.environ.get("STAGING_REMAKER_TENANT_KEY")
+    or os.environ.get("STAGING_REMAKER_USER_KEY")
+    or os.environ.get("SUPERADMIN_PREVIEW_API_KEY")
+    or ""
+)
+TENANT_ID = os.environ.get("LIVE_TENANT_ID", "remaker-digital-001")
 
 WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
+
+# SPEC-1644: All tenant-scoped endpoints need ?tenant= in the URL
+_CONFIG_URL = f"/api/config?tenant={TENANT_ID}"
+_DRAFT_URL = f"/api/config?state=draft&tenant={TENANT_ID}"
 
 
 def _check_production_reachable() -> bool:
@@ -92,34 +97,39 @@ def client():
 
 @pytest.fixture(scope="session")
 def headers(client):
-    if not API_KEY:
-        pytest.skip("SUPERADMIN_PREVIEW_API_KEY not set")
-    # Validate the key actually authenticates against the target.
-    # Prevents false failures when .env.local has a staging key but
-    # PROD_URL points at production (or vice versa).
+    """Tenant-scoped API key headers for config endpoints (SPEC-1644)."""
+    if not TENANT_KEY:
+        pytest.skip("No tenant key available (STAGING_REMAKER_TENANT_KEY not set)")
+    # Validate the key authenticates for the target tenant
     try:
-        r = client.get("/api/config", headers={"X-API-Key": API_KEY})
+        r = client.get(
+            f"/api/config?tenant={TENANT_ID}",
+            headers={"X-API-Key": TENANT_KEY},
+        )
         if r.status_code == 401:
             pytest.skip(
-                f"API key does not authenticate on {PROD_URL} "
-                "(key/environment mismatch — set PROD_URL to match the key)"
+                f"Tenant key does not authenticate on {PROD_URL} "
+                f"for tenant={TENANT_ID} (key/environment mismatch)"
             )
     except Exception:
         pass
-    return {"X-API-Key": API_KEY}
+    return {"X-API-Key": TENANT_KEY}
 
 
 @pytest.fixture(scope="session")
 def widget_headers(client):
     if not WIDGET_KEY:
         pytest.skip("PREVIEW_WIDGET_KEY not set")
-    # Validate the widget key actually authenticates against the target.
+    # Widget keys also need ?tenant= post-SPEC-1644
     try:
-        r = client.get("/api/config", headers={"X-Widget-Key": WIDGET_KEY})
+        r = client.get(
+            f"/api/config?tenant={TENANT_ID}",
+            headers={"X-Widget-Key": WIDGET_KEY},
+        )
         if r.status_code == 401:
             pytest.skip(
                 f"Widget key does not authenticate on {PROD_URL} "
-                "(key/environment mismatch — set PROD_URL to match the key)"
+                f"for tenant={TENANT_ID} (key/environment mismatch)"
             )
     except Exception:
         pass
@@ -158,18 +168,18 @@ class TestActiveConfigFields:
 
     def test_cp01_config_returns_200(self, client, headers):
         """CP-01: /api/config returns HTTP 200."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         assert r.status_code == 200, f"Expected 200, got {r.status_code}"
 
     def test_cp02_config_has_config_key(self, client, headers):
         """CP-02: Config response has a 'config' key with nested fields."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         data = r.json()
         assert "config" in data, f"Missing 'config' key. Top-level keys: {list(data.keys())}"
 
     def test_cp03_widget_fields_present_in_config(self, client, headers):
         """CP-03: All required widget fields are present in the active config."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         data = r.json()
         config = data.get("config", {})
 
@@ -181,7 +191,7 @@ class TestActiveConfigFields:
 
     def test_cp04_gradient_enabled_is_boolean(self, client, headers):
         """CP-04: widget_header_gradient_enabled is a boolean (S103 regression)."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         config = r.json().get("config", {})
         val = config.get("widget_header_gradient_enabled")
         assert isinstance(val, bool), (
@@ -190,7 +200,7 @@ class TestActiveConfigFields:
 
     def test_cp05_primary_color_is_string(self, client, headers):
         """CP-05: widget_primary_color is a non-empty string."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         config = r.json().get("config", {})
         val = config.get("widget_primary_color")
         assert isinstance(val, str) and len(val) > 0, (
@@ -210,7 +220,7 @@ class TestDraftConfigIntegrity:
     def test_cp06_draft_returns_200(self, client, headers):
         """CP-06: /api/config/draft returns HTTP 200."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config/draft", headers=headers
+            client, "get", f"/api/config/draft?tenant={TENANT_ID}", headers=headers
         )
         assert r.status_code == 200, f"Expected 200, got {r.status_code}"
 
@@ -222,7 +232,7 @@ class TestDraftConfigIntegrity:
         like 'has_pending_changes', 'active_version', and 'changed_fields'.
         """
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config/draft", headers=headers
+            client, "get", f"/api/config/draft?tenant={TENANT_ID}", headers=headers
         )
         data = r.json()
         has_config = any(
@@ -233,7 +243,7 @@ class TestDraftConfigIntegrity:
 
     def test_cp08_draft_preserves_brand_name(self, client, headers):
         """CP-08: brand_name field exists in config (S103 regression)."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         config = r.json().get("config", {})
         # brand_name should be in the config keys (may be null/empty for unconfigured)
         assert "brand_name" in config, (
@@ -248,7 +258,7 @@ class TestDraftConfigIntegrity:
         fields live in active_config.  We check both locations.
         """
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config/draft", headers=headers
+            client, "get", f"/api/config/draft?tenant={TENANT_ID}", headers=headers
         )
         data = r.json()
         # Widget fields are in active_config (or draft_config if pending changes)
@@ -266,7 +276,7 @@ class TestDraftConfigIntegrity:
 
     def test_cp10_config_version_present(self, client, headers):
         """CP-10: Config response includes a version number."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         data = r.json()
         version = data.get("version")
         assert version is not None, (
@@ -381,7 +391,7 @@ class TestWidgetFacingConfig:
     def test_cp19_widget_config_returns_200(self, client, widget_headers):
         """CP-19: /api/config with widget key returns HTTP 200."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config", headers=widget_headers
+            client, "get", _CONFIG_URL, headers=widget_headers
         )
         assert r.status_code == 200, (
             f"Widget config expected 200, got {r.status_code}"
@@ -390,7 +400,7 @@ class TestWidgetFacingConfig:
     def test_cp20_widget_config_has_config_section(self, client, widget_headers):
         """CP-20: Widget config response has a 'config' key."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config", headers=widget_headers
+            client, "get", _CONFIG_URL, headers=widget_headers
         )
         assert r.status_code == 200
         data = r.json()
@@ -401,7 +411,7 @@ class TestWidgetFacingConfig:
     def test_cp21_widget_config_has_primary_color(self, client, widget_headers):
         """CP-21: Widget config includes widget_primary_color."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config", headers=widget_headers
+            client, "get", _CONFIG_URL, headers=widget_headers
         )
         assert r.status_code == 200
         config = r.json().get("config", {})
@@ -419,7 +429,7 @@ class TestWidgetFacingConfig:
         response.
         """
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config", headers=widget_headers
+            client, "get", _CONFIG_URL, headers=widget_headers
         )
         assert r.status_code == 200
         config = r.json().get("config", {})
@@ -431,7 +441,7 @@ class TestWidgetFacingConfig:
     def test_cp23_widget_config_has_position(self, client, widget_headers):
         """CP-23: Widget config includes widget_position."""
         r = _request_with_rate_limit_retry(
-            client, "get", "/api/config", headers=widget_headers
+            client, "get", _CONFIG_URL, headers=widget_headers
         )
         assert r.status_code == 200
         config = r.json().get("config", {})
@@ -452,13 +462,13 @@ class TestVersionHealth:
 
     def test_cp24_version_header_present(self, client, headers):
         """CP-24: X-Product-Version header is returned."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         version = r.headers.get("X-Product-Version", "")
         assert version, "Missing X-Product-Version header"
 
     def test_cp25_version_is_semver(self, client, headers):
         """CP-25: Version follows semver format (major.minor.patch)."""
-        r = _request_with_rate_limit_retry(client, "get", "/api/config", headers=headers)
+        r = _request_with_rate_limit_retry(client, "get", _CONFIG_URL, headers=headers)
         version = r.headers.get("X-Product-Version", "")
         parts = version.split(".")
         assert len(parts) == 3, f"Version not semver: {version}"

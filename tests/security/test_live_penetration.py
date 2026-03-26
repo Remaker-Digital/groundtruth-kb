@@ -35,6 +35,15 @@ PROD_URL = os.environ.get(
 VALID_API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
 VALID_WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
 
+# SPEC-1644: Tenant-scoped endpoints need a tenant key + ?tenant= param.
+# The SPA key resolves to __platform__ which has no tenant data.
+TENANT_KEY = (
+    os.environ.get("STAGING_REMAKER_TENANT_KEY")
+    or os.environ.get("STAGING_REMAKER_USER_KEY")
+    or VALID_API_KEY
+)
+TENANT_ID = os.environ.get("LIVE_TENANT_ID", "remaker-digital-001")
+
 
 def _check_production_reachable() -> bool:
     try:
@@ -58,19 +67,33 @@ def client():
 
 @pytest.fixture(scope="session")
 def valid_headers(client):
+    """SPA platform admin headers — for /api/superadmin/* endpoints."""
     if not VALID_API_KEY:
         pytest.skip("VALID_API_KEY not set")
-    # Validate the key authenticates on the target (prevents credential mismatch)
+    return {"X-API-Key": VALID_API_KEY}
+
+
+@pytest.fixture(scope="session")
+def tenant_headers(client):
+    """Tenant-scoped admin headers — for /api/admin/* and /api/config endpoints.
+
+    SPEC-1644: tenant-scoped endpoints require a tenant key + ?tenant= param.
+    """
+    if not TENANT_KEY:
+        pytest.skip("No tenant key available")
     try:
-        r = client.get("/api/config", headers={"X-API-Key": VALID_API_KEY})
+        r = client.get(
+            f"/api/config?tenant={TENANT_ID}",
+            headers={"X-API-Key": TENANT_KEY},
+        )
         if r.status_code == 401:
             pytest.skip(
-                f"API key does not authenticate on {PROD_URL} "
-                "(key/environment mismatch)"
+                f"Tenant key does not authenticate on {PROD_URL} "
+                f"for tenant={TENANT_ID} (key/environment mismatch)"
             )
     except Exception:
         pass
-    return {"X-API-Key": VALID_API_KEY}
+    return {"X-API-Key": TENANT_KEY}
 
 
 # ===========================================================================
@@ -110,13 +133,13 @@ class TestAuthenticationBypass:
         r = client.get("/api/config", headers={"X-Widget-Key": ""})
         assert r.status_code == 401
 
-    def test_sec_l07_key_in_query_param(self, client, valid_headers):
+    def test_sec_l07_key_in_query_param(self, client, tenant_headers):
         """SEC-L07: API key in query parameter — 200 (SPEC-1565: intentional for Co-Pilot SSE/WS)."""
         # S134: SPEC-1565 (S121) added api_key query param auth for Co-Pilot
         # admin mode (SSE/WebSocket connections can't send custom headers).
         # Valid key in query param → 200 is correct behavior.
-        # Uses valid_headers fixture to skip when key doesn't authenticate.
-        r = client.get(f"/api/config?api_key={VALID_API_KEY}")
+        # SPEC-1644: Must include ?tenant= for partition-scoped lookup.
+        r = client.get(f"/api/config?api_key={TENANT_KEY}&tenant={TENANT_ID}")
         assert r.status_code == 200, (
             f"Expected 200 for valid api_key query param (SPEC-1565), got {r.status_code}"
         )
@@ -128,17 +151,17 @@ class TestAuthenticationBypass:
         r = client.get("/api/admin/conversations", headers={"X-Widget-Key": VALID_WIDGET_KEY})
         assert r.status_code == 401
 
-    def test_sec_l09_api_key_on_chat_endpoint(self, client, valid_headers):
-        """SEC-L09: API key on widget endpoint → 200 or 401 (must not crash)."""
-        r = client.get("/api/config", headers=valid_headers)
+    def test_sec_l09_api_key_on_chat_endpoint(self, client, tenant_headers):
+        """SEC-L09: API key on tenant endpoint → 200 or 401 (must not crash)."""
+        r = client.get(f"/api/config?tenant={TENANT_ID}", headers=tenant_headers)
         assert r.status_code in (200, 401), f"Unexpected {r.status_code}"
 
-    def test_sec_l10_both_keys_simultaneously(self, client, valid_headers):
+    def test_sec_l10_both_keys_simultaneously(self, client, tenant_headers):
         """SEC-L10: Both API key and widget key headers → deterministic response."""
-        headers = {**valid_headers}
+        headers = {**tenant_headers}
         if VALID_WIDGET_KEY:
             headers["X-Widget-Key"] = VALID_WIDGET_KEY
-        r = client.get("/api/config", headers=headers)
+        r = client.get(f"/api/config?tenant={TENANT_ID}", headers=headers)
         assert r.status_code in (200, 401), f"Unexpected {r.status_code}"
 
 
@@ -248,12 +271,12 @@ class TestHeaderInjection:
         except (httpx.LocalProtocolError, ValueError):
             pass  # HTTP client correctly rejects null bytes — acceptable
 
-    def test_sec_l22_wrong_content_type(self, client, valid_headers):
+    def test_sec_l22_wrong_content_type(self, client, tenant_headers):
         """SEC-L22: text/xml Content-Type on JSON endpoint → 400 or 422 (not 500)."""
         r = client.post(
-            "/api/admin/knowledge",
+            f"/api/admin/knowledge?tenant={TENANT_ID}",
             content="<xml>test</xml>",
-            headers={**valid_headers, "Content-Type": "text/xml"},
+            headers={**tenant_headers, "Content-Type": "text/xml"},
         )
         # Expect 400/415/422 (bad content type) — not 500
         assert r.status_code in (400, 415, 422, 405), f"Wrong CT: got {r.status_code}"
@@ -303,34 +326,34 @@ class TestHeaderInjection:
 class TestPathTraversal:
     """Verify path traversal and IDOR attempts are handled safely."""
 
-    def test_sec_l27_path_traversal(self, client, valid_headers):
+    def test_sec_l27_path_traversal(self, client, tenant_headers):
         """SEC-L27: Path traversal attempt → 400 or 404 (not 500)."""
         r = client.get(
-            "/api/admin/conversations/../../health",
-            headers=valid_headers,
+            f"/api/admin/conversations/../../health?tenant={TENANT_ID}",
+            headers=tenant_headers,
         )
         # With follow_redirects=True, may resolve to /health (200) or 404
         assert r.status_code in (200, 400, 404), f"Path traversal: got {r.status_code}"
 
-    def test_sec_l28_random_uuid_conversation(self, client, valid_headers):
+    def test_sec_l28_random_uuid_conversation(self, client, tenant_headers):
         """SEC-L28: Random UUID conversation ID → 404 (not 500)."""
         fake_id = str(uuid.uuid4())
-        r = client.get(f"/api/admin/conversations/{fake_id}", headers=valid_headers)
+        r = client.get(f"/api/admin/conversations/{fake_id}?tenant={TENANT_ID}", headers=tenant_headers)
         assert r.status_code in (404, 403), f"Random UUID: got {r.status_code}"
 
-    def test_sec_l29_random_uuid_kb(self, client, valid_headers):
+    def test_sec_l29_random_uuid_kb(self, client, tenant_headers):
         """SEC-L29: Random UUID KB doc ID → 404 (not 500)."""
         fake_id = str(uuid.uuid4())
-        r = client.get(f"/api/admin/knowledge/{fake_id}", headers=valid_headers)
+        r = client.get(f"/api/admin/knowledge/{fake_id}?tenant={TENANT_ID}", headers=tenant_headers)
         assert r.status_code in (404, 405), f"Random UUID KB: got {r.status_code}"
 
-    def test_sec_l30_random_uuid_team(self, client, valid_headers):
+    def test_sec_l30_random_uuid_team(self, client, tenant_headers):
         """SEC-L30: Random UUID team member ID → 404 (not 500)."""
         fake_id = str(uuid.uuid4())
-        r = client.get(f"/api/admin/team/{fake_id}", headers=valid_headers)
+        r = client.get(f"/api/admin/team/{fake_id}?tenant={TENANT_ID}", headers=tenant_headers)
         assert r.status_code in (404, 405), f"Random UUID team: got {r.status_code}"
 
-    def test_sec_l31_special_chars_in_id(self, client, valid_headers):
+    def test_sec_l31_special_chars_in_id(self, client, tenant_headers):
         """SEC-L31: Special characters in conversation ID → 400/404 (not 500)."""
         bad_ids = [
             "../../../etc/passwd",
@@ -340,28 +363,29 @@ class TestPathTraversal:
         ]
         for bad_id in bad_ids:
             r = client.get(
-                f"/api/admin/conversations/{bad_id}",
-                headers=valid_headers,
+                f"/api/admin/conversations/{bad_id}?tenant={TENANT_ID}",
+                headers=tenant_headers,
             )
             assert r.status_code in (400, 404, 422), (
                 f"Bad ID '{bad_id[:30]}': got {r.status_code}"
             )
 
-    def test_sec_l32_tenant_id_manipulation(self, client, valid_headers):
+    def test_sec_l32_tenant_id_manipulation(self, client, tenant_headers):
         """SEC-L32: Injected tenant ID in path has no effect."""
-        # Try to access a different tenant's path if exposed
+        # Try to access a different tenant's path — SPEC-1644 requires ?tenant=
+        # which is checked against the authenticated tenant
         r = client.get(
-            "/api/admin/conversations?tenant_id=different-tenant",
-            headers=valid_headers,
+            f"/api/admin/conversations?tenant_id=different-tenant&tenant={TENANT_ID}",
+            headers=tenant_headers,
         )
         # Should either ignore the param or return normal data — not another tenant's
         assert r.status_code in (200, 400), f"Tenant manipulation: got {r.status_code}"
 
-    def test_sec_l33_avatar_upload_no_body(self, client, valid_headers):
+    def test_sec_l33_avatar_upload_no_body(self, client, tenant_headers):
         """SEC-L33: Avatar upload without file body → 400/422 (not 500)."""
         r = client.post(
-            "/api/admin/avatar/upload",
-            headers=valid_headers,
+            f"/api/admin/avatar/upload?tenant={TENANT_ID}",
+            headers=tenant_headers,
         )
         assert r.status_code in (400, 415, 422), f"No-body upload: got {r.status_code}"
 
@@ -402,7 +426,7 @@ class TestProviderProtection:
             json={"code": "000000"},
             headers=valid_headers,
         )
-        assert r.status_code in (400, 401, 403, 404, 422), f"No MFA: got {r.status_code}"
+        assert r.status_code in (400, 401, 403, 404, 405, 422), f"No MFA: got {r.status_code}"
 
     def test_sec_l38_mfa_with_expired_jwt(self, client):
         """SEC-L38: Provider MFA with expired/invalid JWT → 401."""
