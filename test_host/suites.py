@@ -198,9 +198,9 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
             "--timeout=30",
             "-q",
         ],
-        timeout_s=300,
+        timeout_s=60,  # S220: 723 source-inspection tests run in <1s; 60s generous
         estimated_tests=60,
-        estimated_duration_s=120,
+        estimated_duration_s=5,
     ),
     "load": SuiteConfig(
         name="load",
@@ -271,11 +271,14 @@ SUITE_CONFIGS["full"] = SuiteConfig(
         "security",
         "regression",
         "ops",
-        "widget",
+        # S220: widget moved after heavy suites — 723 source-inspection
+        # tests that don't need deployed services.  Prevents container
+        # stalls from blocking e2e_live/load/fuzzing/property.
         "e2e_live",
         "load",
         "fuzzing",
         "property",
+        "widget",
     ],
     estimated_tests=7100,
     estimated_duration_s=3000,
