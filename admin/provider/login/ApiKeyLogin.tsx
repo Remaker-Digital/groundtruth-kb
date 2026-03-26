@@ -13,7 +13,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
   Anchor,
@@ -44,6 +44,19 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
   const [apiKey, setApiKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Dark mode detection — swap logo variant for readability on dark backgrounds
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document === 'undefined') return true;
+    return document.documentElement.getAttribute('data-mantine-color-scheme') !== 'light';
+  });
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-mantine-color-scheme') !== 'light');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mantine-color-scheme'] });
+    return () => observer.disconnect();
+  }, []);
 
   // SPEC-1678: Recovery state
   const [showRecovery, setShowRecovery] = useState(false);
@@ -151,7 +164,9 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
       >
         <Stack align="center" gap="xs" mb="xl">
           <img
-            src="/admin/provider/primary-logo-no-wordmark.svg"
+            src={isDark
+              ? '/admin/provider/primary-logo-no-wordmark-dark.svg'
+              : '/admin/provider/primary-logo-no-wordmark-light.svg'}
             alt="Agent Red"
             style={{ width: '200px', height: 'auto', marginBottom: '40px' }}
           />

@@ -12,7 +12,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Anchor,
   Box,
@@ -46,6 +46,19 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
   onMagicLinkLogin,
   verifyError,
 }) => {
+  // Dark mode detection — swap logo variant for readability on dark backgrounds
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document === 'undefined') return true;
+    return document.documentElement.getAttribute('data-mantine-color-scheme') !== 'light';
+  });
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-mantine-color-scheme') !== 'light');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mantine-color-scheme'] });
+    return () => observer.disconnect();
+  }, []);
+
   // SPEC-0429: Magic link is primary when tenant context is available.
   // Cache tenant ID once at mount — avoids re-reading URL at submit time
   // (SPA routing or history changes could strip query params between mount and submit).
@@ -290,10 +303,14 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
     styles: { root: { border: `1px solid ${tokens.border}` } },
   };
 
+  const logoSrc = isDark
+    ? '/admin/standalone/primary-logo-no-wordmark-dark.svg'
+    : '/admin/standalone/primary-logo-no-wordmark-light.svg';
+
   const brandBlock = (
     <Stack align="center" gap="xs" mb="xl">
       <img
-        src="/admin/standalone/primary-logo-no-wordmark.svg"
+        src={logoSrc}
         alt="Agent Red"
         style={{ width: '200px', height: 'auto', marginBottom: '40px' }}
       />
