@@ -19,6 +19,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load .env.local for Cosmos credentials
+from scripts._env import load_env_local
+load_env_local()
+
+# Suppress verbose Azure SDK logging
+import logging
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+logging.getLogger("azure.cosmos").setLevel(logging.WARNING)
+
 
 async def main(env: str, dry_run: bool) -> None:
     # Set environment before any imports
@@ -27,12 +36,16 @@ async def main(env: str, dry_run: bool) -> None:
     else:
         os.environ.setdefault("COSMOS_DATABASE_NAME", "agentred-staging")
 
-    from src.multi_tenant.cosmos_client import get_cosmos_manager
-    from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+    from azure.cosmos.aio import CosmosClient
 
-    manager = get_cosmos_manager()
-    tenants_container = manager.get_container("tenants")
-    domain_index = DomainIndexRepository()
+    endpoint = os.environ["COSMOS_DB_ENDPOINT"]
+    key = os.environ["COSMOS_DB_KEY"]
+    db_name = os.environ.get("COSMOS_DATABASE_NAME", "agentred-staging" if env == "staging" else "agentred")
+
+    client = CosmosClient(endpoint, key)
+    database = client.get_database_client(db_name)
+    tenants_container = database.get_container_client("tenants")
+    domain_index_container = database.get_container_client("domain_index")
 
     # Query ALL tenants (not just active — deactivated tenants in grace period
     # still need index entries for reactivation lookups)
@@ -50,9 +63,20 @@ async def main(env: str, dry_run: bool) -> None:
 
     print(f"Found {len(items)} tenants.\n")
 
+    async def lookup(domain: str) -> str | None:
+        try:
+            item = await domain_index_container.read_item(item=domain, partition_key=domain)
+            return item.get("tenant_id")
+        except Exception:
+            return None
+
+    async def upsert(domain: str, tid: str, dtype: str) -> None:
+        await domain_index_container.upsert_item({
+            "id": domain, "domain": domain, "tenant_id": tid, "domain_type": dtype,
+        })
+
     created = 0
     skipped = 0
-    errors = 0
 
     for tenant in items:
         tenant_id = tenant.get("tenant_id", tenant.get("id", "?"))
@@ -62,42 +86,44 @@ async def main(env: str, dry_run: bool) -> None:
 
         # Shopify domain index
         if shop_domain and ".myshopify.com" in shop_domain:
-            existing = await domain_index.lookup(shop_domain)
+            existing = await lookup(shop_domain)
             if existing == tenant_id:
                 print(f"  [SKIP] {shop_domain} -> {tenant_id} (already indexed)")
                 skipped += 1
             elif existing:
                 print(f"  [WARN] {shop_domain} -> {existing} (indexed to DIFFERENT tenant, expected {tenant_id})")
                 if not dry_run:
-                    await domain_index.upsert(shop_domain, tenant_id, "shopify")
+                    await upsert(shop_domain, tenant_id, "shopify")
                     print(f"         [FIXED] Re-indexed to {tenant_id}")
                 created += 1
             else:
                 print(f"  [ADD]  {shop_domain} -> {tenant_id} (status={status})")
                 if not dry_run:
-                    await domain_index.upsert(shop_domain, tenant_id, "shopify")
+                    await upsert(shop_domain, tenant_id, "shopify")
                 created += 1
 
         # Stripe customer ID index
         if stripe_id and stripe_id.startswith("cus_"):
-            existing = await domain_index.lookup(stripe_id)
+            existing = await lookup(stripe_id)
             if existing == tenant_id:
                 print(f"  [SKIP] {stripe_id} -> {tenant_id} (already indexed)")
                 skipped += 1
             elif existing:
                 print(f"  [WARN] {stripe_id} -> {existing} (indexed to DIFFERENT tenant, expected {tenant_id})")
                 if not dry_run:
-                    await domain_index.upsert(stripe_id, tenant_id, "stripe")
+                    await upsert(stripe_id, tenant_id, "stripe")
                     print(f"         [FIXED] Re-indexed to {tenant_id}")
                 created += 1
             else:
                 print(f"  [ADD]  {stripe_id} -> {tenant_id} (status={status})")
                 if not dry_run:
-                    await domain_index.upsert(stripe_id, tenant_id, "stripe")
+                    await upsert(stripe_id, tenant_id, "stripe")
                 created += 1
 
+    await client.close()
+
     print()
-    print(f"Results: {created} created/fixed, {skipped} skipped, {errors} errors")
+    print(f"Results: {created} created/fixed, {skipped} skipped")
     if dry_run:
         print("(Dry run — no changes written)")
 
