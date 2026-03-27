@@ -209,7 +209,14 @@ def run_spec_assertions(
             "skipped": True,
         }
 
-    results = [run_single_assertion(a) for a in assertions]
+    results = [
+        run_single_assertion(a) if isinstance(a, dict) else {
+            "type": "text", "description": str(a)[:120],
+            "passed": True, "detail": "Non-machine assertion (plain text) — skipped",
+            "skipped": True,
+        }
+        for a in assertions
+    ]
 
     # Only machine-checkable assertions determine overall_passed
     machine_results = [r for r in results if not r.get("skipped")]
