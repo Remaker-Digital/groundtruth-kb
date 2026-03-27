@@ -40,8 +40,9 @@ class AnalyticsMixin:
     ) -> None:
         """Send analytics event asynchronously (non-blocking).
 
-        Routes via transport → HTTP → in-process (SPEC-1536).
+        Routes via transport → HTTP → silent drop (ADR-001/ADR-002/DCL-002).
         Analytics is fire-and-forget — failures never block the pipeline.
+        No in-process fallback (Phase 2A).
         """
         try:
             analytics_data = {
@@ -92,10 +93,11 @@ class AnalyticsMixin:
                     )
                     return
                 except Exception:
-                    logger.debug("HTTP analytics dispatch failed — falling back to in-process")
-
-            # Priority 3: In-process agent (fallback)
-            await self._an_agent.process(analytics_data, {})
+                    logger.warning(
+                        "Analytics dispatch exhausted all tiers for conv=%s "
+                        "(transport + HTTP failed). Silent drop — fire-and-forget.",
+                        conversation_id,
+                    )
         except Exception:
             # Analytics is fire-and-forget — never block the pipeline
             logger.debug(

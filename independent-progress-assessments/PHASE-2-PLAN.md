@@ -1,160 +1,166 @@
-# Phase 2 Plan: Runtime Topology Implementation
+# Phase 2 Plan: Runtime Topology Implementation (Revised)
 
 **Date:** 2026-03-27
 **Author:** Prime Builder (Opus 4.6)
 **Session:** S223
 **Source:** Codex Recovery Plan (INSIGHTS-2026-03-27-01-00.md), Phase 1 GO (INSIGHTS-2026-03-27-09-37.md)
 **Governing decisions:** ADR-001 (dispatch by physical possibility), ADR-002 (per-agent containers)
-**Status:** DRAFT — sent to Codex for advisory review
+**Status:** REVISED v2 per Codex re-review (INSIGHTS-2026-03-27-11-16.md) — 503 semantics corrected for critic/escalation
 
 ---
 
 ## Scope
 
-Phase 2 deploys the 6 mandatory agents (per ADR-002) in dedicated containers and wires the canonical dispatch path (per ADR-001). No new test suites (Phase 3). No performance work (Phase 4).
+Phase 2 achieves a fully canonical runtime topology: all 6 mandatory agents in dedicated containers, all in-process fallbacks removed from the canonical pipeline, SLIM and NATS deployed or verified as transport dependencies, and dispatch by physical possibility proven end-to-end. No new test suites (Phase 3). No performance work (Phase 4).
 
 ## Pre-Conditions (Phase 1 Deliverables — All Met)
 
-- ADR-001 implemented: SLIM → NATS → HTTP → 503, all environments
+- ADR-001 implemented: SLIM -> NATS -> HTTP -> 503, all environments
 - ADR-002 implemented: 6 agents + widget path defined
-- DCL-002 enforced: no in-process dispatch in canonical path
+- DCL-002 enforced: no in-process dispatch in canonical path (IC/KR/RG done in Phase 0; analytics/critic/escalation still need Phase 2 work)
 - DCL-003 enforced: no phantom test evidence
 - Transport specs reference ADRs
 - DOC-MCP-EXCEPTIONS backfilled with strict schema
 - IPR-001 links Phase 2 WIs to governing ADRs/DCLs
 
-## Existing Foundation (Already Built)
+## Codex Advisory Findings Addressed
+
+| # | Finding | Resolution |
+|---|---------|------------|
+| P1.1 | Analytics/Critic/Escalation still have in-process fallbacks | Added 2A: remove all in-process canonical fallbacks |
+| P1.2 | Plan contradicts itself about stub agents | Rewritten 2B as verification/integration, not stub completion |
+| P1.3 | SLIM deferral violates ADR-001 | Added 2C: SLIM+NATS as explicit dependencies |
+| P2.1 | Directory not rich enough for protocol-aware routing | Narrowed 2E claims to topic discovery + env-based HTTP |
+| P2.2 | Verification criteria too narrow | Expanded to 12 criteria covering all 6 agents + tier selection |
+
+## Existing Foundation
 
 | Component | Status | Path |
 |-----------|--------|------|
-| Agent base protocol (AgentRedBaseAgent) | Implemented | src/agents/base.py |
-| Container app factory (create_agent_app) | Implemented | src/agents/containers/agent_app.py |
-| Generic agent Dockerfile (ARG AGENT_MODULE) | Implemented | src/agents/containers/Dockerfile |
-| Intent Classifier agent | Fully implemented | src/agents/intent_classifier.py + containers/intent_classifier_app.py |
-| Knowledge Retrieval agent | Fully implemented | src/agents/knowledge_retrieval.py + containers/knowledge_retrieval_app.py |
-| Response Generator agent (+ SSE streaming) | Fully implemented | src/agents/response_generator.py + containers/response_generator_app.py |
-| Escalation Handler agent | Fully implemented (Azure OpenAI context analysis) | src/agents/escalation_handler.py + containers/escalation_handler_app.py |
-| Analytics Collector agent | Fully implemented (structured stage logging) | src/agents/analytics_collector.py + containers/analytics_collector_app.py |
-| Critic Supervisor agent | Fully implemented (fail-closed with CriticVerdict) | src/agents/critic_supervisor.py + containers/critic_supervisor_app.py |
-| Co-Pilot agent (deferred from Phase 2) | Implemented | src/agents/co_pilot.py + containers/co_pilot_app.py |
-| AGNTCY SDK integration (SLIM/NATS/HTTP) | Implemented | src/multi_tenant/agntcy_sdk_integration.py |
-| Dispatch mixin (3-tier + 503) | Implemented | src/chat/pipeline/agent_dispatch.py |
-| Terraform environment | Exists | infrastructure/terraform/main.tf |
+| Agent base protocol | Implemented | src/agents/base.py |
+| Container app factory | Implemented | src/agents/containers/agent_app.py |
+| Generic agent Dockerfile | Implemented | src/agents/containers/Dockerfile |
+| All 6 agents | Fully implemented | src/agents/*.py + containers/*_app.py |
+| SLIM server app | Exists | src/agents/containers/slim_server_app.py |
+| AGNTCY SDK (SLIM/NATS/HTTP) | Implemented | src/multi_tenant/agntcy_sdk_integration.py |
+| Dispatch mixin (IC/KR/RG: 3-tier + 503) | Implemented | src/chat/pipeline/agent_dispatch.py |
+| Terraform (all 9 containers incl SLIM+NATS) | Defined | infrastructure/terraform/main.tf |
+| GitHub Actions agent build | Created (S223) | .github/workflows/build-agent-containers.yml |
 
 ## Phase 2 Deliverables
 
-### 2A: Verify Agent Implementations — ALREADY COMPLETE
+### 2A: Remove In-Process Canonical Fallbacks (Analytics, Critic, Escalation)
 
-All 6 agents are fully implemented (not stubs as initially reported):
-- **Escalation Handler:** Azure OpenAI GPT-4o-mini context analysis, urgency/category/reason extraction
-- **Analytics Collector:** Structured per-stage logging with tenant/conversation/intent metrics
-- **Critic Supervisor:** Fail-closed gate with CriticVerdict/CriticBlockReason enums, immutable system prompt, KB-aware false-positive prevention
+**Problem:** Phase 0 removed in-process fallback from IC/KR/RG dispatch but did NOT touch analytics, critic, or escalation. These three still terminate at in-process agent calls when transport+HTTP fail.
 
-No implementation work needed for 2A.
+**Files to modify:**
+- `src/chat/pipeline/analytics.py` lines 95-98: Remove `await self._an_agent.process(analytics_data, {})` in-process fallback. Replace with silent drop + warning log. Analytics is fire-and-forget — pipeline must never fail because analytics is unavailable.
+- `src/chat/pipeline/critic_escalation.py` lines 81-89: Remove `_validate_with_critic_direct()` in-process path. Preserve fail-closed safe-response semantics: when transport+HTTP both fail, return `(False, SAFE_FALLBACK_MESSAGE, CriticResult(block_reason=UNAVAILABLE))`. NOT a raw 503.
+- `src/chat/pipeline/critic_escalation.py` lines 309-323: Remove `_call_escalation_handler_direct()` in-process fallback. Preserve exception-to-default behavior in `_handle_escalation()`: when transport+HTTP both fail, proceed with default escalation handling (reason="transport_unavailable", urgency="medium"). NOT a raw 503.
 
-### 2B: Build Pipeline for 7 Images
+**Three distinct failure behaviors (NOT uniform 503):**
 
-Update scripts/build.py to build 7 images:
-1. `api-gateway` (existing)
-2. `agent-intent-classifier`
-3. `agent-knowledge-retrieval`
-4. `agent-response-generator`
-5. `agent-escalation-handler`
-6. `agent-analytics-collector`
-7. `agent-critic-supervisor`
+| Agent | In-process removal | Failure behavior when transport+HTTP exhausted |
+|-------|-------------------|-----------------------------------------------|
+| IC/KR/RG | Already done (Phase 0) | 503 via `_require_transport_or_fail()` — correct, pipeline cannot proceed without these |
+| Analytics | Phase 2 | Silent drop + warning log — fire-and-forget, never blocks pipeline |
+| Critic | Phase 2 | Fail-closed safe response — blocks the AI response with safe fallback message, does NOT 503 the request |
+| Escalation | Phase 2 | Exception-to-default — proceeds with default escalation context, does NOT 503 the request |
 
-Each agent image uses src/agents/containers/Dockerfile with `--build-arg AGENT_MODULE=<name>_app`.
+### 2B: Verify Agent Implementations + Integration Hardening
 
-GitHub Actions workflow updates: add per-agent build jobs (can run in parallel).
+All 6 agents are fully implemented (confirmed S223). This step is NOT stub completion — it is:
+- Verify each agent's container app starts and responds to /health
+- Verify each agent's A2A process() endpoint handles the expected payload
+- Verify container app factory wiring (configure_fn, extra_routes_fn)
+- No new agent code unless integration testing reveals gaps
 
-### 2C: Terraform Container App Definitions
+### 2C: SLIM + NATS as Explicit Runtime Dependencies
 
-Add 6 container app resources to infrastructure/terraform/main.tf:
+**Per ADR-001 and Codex finding P1.3:** SLIM and NATS must be explicit Phase 2 dependencies, not deferred.
 
-| Container App | Replicas | CPU/Mem | Ingress | Scaling |
-|--------------|----------|---------|---------|---------|
-| agent-red-ic | min 2 | 1 CPU / 2 GB | Internal | NATS queue depth |
-| agent-red-kr | min 2 | 1 CPU / 2 GB | Internal | NATS queue depth |
-| agent-red-rg | min 2 | 2 CPU / 4 GB | Internal | NATS queue depth |
-| agent-red-critic | min 2 | 1 CPU / 2 GB | Internal | NATS queue depth |
-| agent-red-escalation | min 2 | 0.5 CPU / 1 GB | Internal | HTTP concurrent requests |
-| agent-red-analytics | min 1 | 0.5 CPU / 1 GB | Internal | NATS queue depth |
+**NATS:** Terraform already defines `nats` container (nats:2.10-alpine, port 4222, min 2 replicas). Phase 2 must verify NATS is deployed in staging or deploy it.
 
-All containers share: NATS_URL, COSMOS_DB_ENDPOINT, AZURE_KEYVAULT_URL, AZURE_OPENAI_ENDPOINT (where applicable).
+**SLIM:** Terraform already defines `slim-gateway` container. `slim_server_app.py` exists. Phase 2 must:
+1. Build SLIM server image (add to build pipeline)
+2. Deploy to staging
+3. Verify SLIM transport is selected as Tier 1 when reachable
+4. If SLIM cannot be deployed (external dependency, relay service), document physical impossibility per DOC-MCP-EXCEPTIONS
 
-Internal ingress only — agents are not publicly accessible. Gateway routes to them via SLIM/NATS/HTTP.
+**Build pipeline addition:** Add SLIM server to GitHub Actions workflow or separate workflow.
 
-### 2D: Agent Directory Registration
+### 2D: Build + Deploy Pipeline for All Containers
 
-Wire SPEC-1789 agent directory:
-- Each agent container registers its agent card on startup via create_agent_app() (already stubbed)
-- Agent cards declare: agent_type, supported protocols (SLIM, NATS, HTTP), endpoint URLs
-- Gateway resolves agent locations from directory at dispatch time
-- Fallback: environment variables (AGENT_IC_URL, etc.) for static configuration
+**Build (7+ images):**
+- api-gateway (existing)
+- 6 agent containers (created S223: build-agent-containers.yml)
+- SLIM server (new — add to build pipeline)
+- NATS uses public image (nats:2.10-alpine, no build needed)
 
-### 2E: Gateway Dispatch Wiring
+**Deploy (scripts/deploy.py):**
+- Deploy gateway + 6 agents + SLIM in dependency order
+- Health-check each container after deploy
+- NATS deployed via Terraform (not deploy.py)
 
-Update src/chat/pipeline/agent_dispatch.py and constants.py:
-- Resolve container URLs from agent directory (2D) or env vars
-- HTTP fallback URLs point to internal container app DNS names
-- Transport tier logging: log attempted tier, selected tier, reason for fallback on every dispatch
-- Widget-origin request tracing: pass X-Widget-Origin header through dispatch chain
+### 2E: Dispatch Wiring + Agent Resolution
 
-### 2F: Deploy Pipeline Updates
+**Per Codex finding P2.1:** Directory is currently good for topic discovery, not full endpoint/protocol routing. Phase 2 uses:
+- **Topic resolution:** AGNTCY Directory for A2A topic discovery (existing)
+- **HTTP endpoint resolution:** Environment variables (AGENT_*_URL) with Container Apps internal DNS defaults (updated S223 in constants.py)
+- **Transport tier selection:** Existing SDK logic — SLIM if configured+reachable, else NATS if configured+reachable, else HTTP
 
-Update scripts/deploy.py:
-- Deploy 7 images (gateway + 6 agents) in dependency order
-- Health-check each agent container after deploy
-- Rollback capability: if any agent fails health check, revert that container
+Phase 2 does NOT claim full protocol-aware directory routing. That is deferred.
 
----
+**Transport tier logging:** Already in place (span attributes, _warn_http_failure_mode). Verify all 6 agent dispatch paths log tier selection.
 
-## Implementation Sequence
+### 2F: Widget Path Verification
 
-1. **2A** — Complete stub agents (Escalation, Analytics, Critic)
-2. **2B** — Build pipeline for 7 images (build.py + GitHub Actions)
-3. **2C** — Terraform container definitions (main.tf)
-4. **2D** — Agent directory registration (agent cards)
-5. **2E** — Gateway dispatch wiring (resolve from directory/env)
-6. **2F** — Deploy pipeline updates (deploy.py)
-7. **Staging deploy** — Deploy all 7 containers to staging
-8. **Smoke test** — Verify transport connectivity between gateway and each agent
+Widget traffic must traverse the canonical containerized agent system:
+- Widget HTTP/WebSocket -> Gateway -> IC (container) -> KR (container) -> RG (container) -> Critic (container) -> response
+- X-Widget-Origin header propagated through dispatch chain
+- Streaming responses (RG) work over the selected transport tier
 
-## Verification Criteria
+## Implementation Sequence (Revised per Codex)
+
+1. **2A** — Remove in-process canonical fallbacks (analytics/critic/escalation)
+2. **2C** — Verify/deploy SLIM + NATS in staging
+3. **2D** — Build pipeline: add SLIM image, verify all 7 agent images build
+4. **2B** — Verify agent container health + A2A integration
+5. **2E** — Dispatch wiring: verify tier selection, env-based HTTP routing
+6. **2F** — Widget path end-to-end verification
+7. **Staging deploy** — Deploy all containers
+8. **Smoke test** — Verify transport connectivity and tier selection
+
+## Verification Criteria (Expanded per Codex)
 
 Phase 2 is complete when:
 
 1. All 6 agent containers deployed to staging and healthy (/health returns 200)
 2. Gateway /ready returns 200 (transport active)
-3. Gateway can dispatch to IC, KR, RG via at least one transport tier (NATS or HTTP)
-4. Critic gate functions (RG output reviewed before delivery)
-5. Escalation handler receives escalation requests
-6. Analytics collector receives conversation events
-7. Transport tier logged on every dispatch
-8. DCL compliance: 3/3 passing
-9. Transport governance: 0 violations
+3. **No in-process fallback exists in analytics, critic, or escalation canonical paths**
+4. Gateway dispatches to IC, KR, RG via transport (SLIM or NATS, not just HTTP)
+5. Gateway dispatches to Critic, Escalation, Analytics via transport or HTTP (no in-process)
+6. **SLIM selected as Tier 1 when SLIM endpoint is configured and reachable**
+7. **NATS selected as Tier 2 when SLIM unavailable but NATS reachable**
+8. **HTTP used only as Tier 3 when higher tiers exhausted**
+9. Critic gate functions (fail-closed: RG output blocked when critic unavailable)
+10. **RG streaming works over the selected transport tier**
+11. **Widget-origin traffic traced through containerized agent pipeline**
+12. DCL compliance: 3/3 passing, transport governance: 0 violations
 
 ## Files Expected to Change
 
-**Agent implementations:**
-- src/agents/escalation_handler.py (complete stub)
-- src/agents/analytics_collector.py (complete stub)
-- src/agents/critic_supervisor.py (complete stub)
+**In-process removal (2A):**
+- src/chat/pipeline/analytics.py (remove in-process fallback)
+- src/chat/pipeline/critic_escalation.py (remove in-process fallback for critic + escalation)
 
-**Build & deploy:**
-- scripts/build.py (7 images)
-- scripts/deploy.py (7 containers)
-- .github/workflows/ (per-agent build jobs)
+**Build + deploy (2C-2D):**
+- .github/workflows/build-agent-containers.yml (add SLIM if needed)
+- scripts/build.py (SLIM image)
+- scripts/deploy.py (agent container deployment loop)
 
-**Infrastructure:**
-- infrastructure/terraform/main.tf (6 new container apps)
-- infrastructure/terraform/variables.tf (agent-specific vars)
-
-**Dispatch:**
-- src/chat/pipeline/agent_dispatch.py (directory resolution, tier logging)
-- src/chat/pipeline/constants.py (container URLs)
-
-**No changes to:** tools/knowledge-db/db.py, .claude/hooks/, knowledge.db (Phase 2 is runtime, not governance)
+**Dispatch (2E):**
+- src/chat/pipeline/agent_dispatch.py (verify tier logging for all 6 agents)
 
 ## What Phase 2 Does NOT Do
 
@@ -162,8 +168,10 @@ Phase 2 is complete when:
 - No performance benchmarks (Phase 4)
 - No production deploy (Phase 5)
 - No co-pilot container (deferred per owner decision)
-- No SLIM server deployment (requires SLIM relay infrastructure; NATS + HTTP are sufficient for initial topology)
+- No full protocol-aware directory routing (narrowed per Codex P2.1)
 
 ---
+
+*Revised per Codex advisory INSIGHTS-2026-03-27-10-52.md. All 5 findings incorporated.*
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

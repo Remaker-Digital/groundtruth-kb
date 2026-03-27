@@ -58,18 +58,18 @@ class CriticEscalationMixin:
     ) -> tuple[bool, str, Any]:
         """Validate the generated response via the Critic (fail-closed).
 
-        Priority order:
-        1. CriticPolicy (HTTP to AGNTCY container) — if configured
-        2. Direct Azure OpenAI GPT-4o-mini validation — if OpenAI client available
-        3. Fail-closed fallback — no unvalidated responses delivered
+        ADR-001/ADR-002/DCL-002: No in-process fallback in canonical path.
+        Routes via CriticPolicy (transport/HTTP to container) or fail-closed.
 
-        The direct Azure OpenAI path (option 2) implements the same
-        fail-closed semantics: if the model says "reject" or if the
-        call fails, the response is blocked.
+        Priority order:
+        1. CriticPolicy (transport/HTTP to AGNTCY container) — if configured
+        2. Fail-closed fallback — no unvalidated responses delivered
+
+        Phase 2A: Removed in-process _validate_with_critic_direct() path.
         """
         from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult, CriticVerdict
 
-        # Option 1: Use CriticPolicy if configured (HTTP to AGNTCY containers)
+        # Option 1: Use CriticPolicy if configured (transport/HTTP to AGNTCY containers)
         if self._critic:
             return await self._critic.require_critic_approval(
                 tenant_id=tenant_id,
@@ -78,17 +78,12 @@ class CriticEscalationMixin:
                 customer_message=customer_message,
             )
 
-        # Option 2: Direct Azure OpenAI validation (WI #207)
-        # Always fall through to direct validation when CriticPolicy (Option 1)
-        # is unavailable, regardless of USE_AGENT_CONTAINERS setting.
-        if self._openai_client:
-            return await self._validate_with_critic_direct(
-                tenant_id, conversation_id, response_text,
-                customer_message, budget,
-                knowledge_titles=knowledge_titles,
-            )
-
-        # Option 3: Fail-closed — no Critic available
+        # Option 2: Fail-closed — Critic container unavailable
+        logger.warning(
+            "Critic unavailable for conv=%s — fail-closed safe response. "
+            "ADR-001/DCL-002: no in-process fallback.",
+            conversation_id,
+        )
         fallback_result = CriticResult(
             approved=False,
             verdict=None,
@@ -306,7 +301,12 @@ class CriticEscalationMixin:
         message: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Route escalation via transport → HTTP → in-process (SPEC-1536)."""
+        """Route escalation via transport → HTTP → default context (ADR-001/DCL-002).
+
+        No in-process fallback (Phase 2A). When transport+HTTP both fail,
+        returns a default escalation context instead of 503 — the pipeline
+        still hands off to a human agent with basic context.
+        """
         if self._transport_available():
             try:
                 return await self._call_via_transport(
@@ -319,8 +319,19 @@ class CriticEscalationMixin:
             try:
                 return await self._call_escalation_handler_http(message, system_prompt)
             except Exception as exc:
-                logger.warning("HTTP ESC call failed, falling back to in-process: %s", exc)
-        return await self._call_escalation_handler_direct(message, system_prompt)
+                logger.warning("HTTP ESC call failed: %s", exc)
+        # ADR-001/DCL-002: No in-process fallback. Return default escalation context.
+        logger.warning(
+            "Escalation handler unavailable — all tiers exhausted. "
+            "Returning default escalation context. ADR-001/DCL-002: no in-process fallback."
+        )
+        return {
+            "reason": "Customer requested human agent",
+            "urgency": "medium",
+            "context_summary": "Escalation handler unavailable — transport exhausted",
+            "category": "general_inquiry",
+            "model": "default",
+        }
 
     async def _call_escalation_handler_direct(
         self,
