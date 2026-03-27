@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 20069,
-    "total_files": 431
+    "total_assertions": 20134,
+    "total_files": 435
   },
   "baselines": {
     "tests/agents/plugins/test_domain_agents.py": 65,
@@ -396,6 +396,10 @@
     "tests/test_host/test_spa_contract.py": 30,
     "tests/test_host/test_suites.py": 35,
     "tests/test_multi_tenant_isolation_e2e.py": 13,
+    "tests/transport/test_containerized_e2e.py": 10,
+    "tests/transport/test_environment_parity.py": 18,
+    "tests/transport/test_transport_contracts.py": 28,
+    "tests/transport/test_transport_smoke.py": 9,
     "tests/unit/test_addon_checkout.py": 18,
     "tests/unit/test_admin_conversation_api.py": 68,
     "tests/unit/test_admin_knowledge_api.py": 92,
