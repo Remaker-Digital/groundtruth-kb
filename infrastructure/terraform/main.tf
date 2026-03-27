@@ -233,7 +233,7 @@ locals {
 
     nats = {
       image        = "nats:2.10-alpine"
-      port         = 4222
+      port         = 8080  # WebSocket port — Container Apps HTTP ingress requires HTTP/WS, not raw TCP
       cpu          = 0.5
       memory       = "1Gi"
       min_replicas = 2

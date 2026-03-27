@@ -73,15 +73,15 @@ variable "container_apps_subnet_id" {
 # ---------------------------------------------------------------------------
 
 variable "nats_url" {
-  description = "NATS JetStream URL (internal Container App FQDN)"
+  description = "NATS JetStream URL via WebSocket (Container Apps HTTP ingress requires WS, not raw TCP)"
   type        = string
-  default     = "nats://agent-red-nats.internal:4222"
+  default     = "ws://agent-red-nats.internal:8080"
 }
 
 variable "slim_endpoint" {
-  description = "SLIM routing service endpoint (internal Container App FQDN)"
+  description = "SLIM routing service endpoint (Container Apps HTTPS ingress, port 443)"
   type        = string
-  default     = "http://agent-red-slim.internal:8443"
+  default     = "agent-red-slim.internal:443"
 }
 
 variable "nats_monitoring_endpoint" {

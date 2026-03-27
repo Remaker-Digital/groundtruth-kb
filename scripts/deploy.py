@@ -221,6 +221,62 @@ def get_deployed_image(app_name: str) -> str | None:
     return None
 
 
+def verify_container_health(app_name: str) -> dict:
+    """Query the latest revision health for a container app.
+
+    Returns dict with image, healthState, runningState for evidence.
+    """
+    cmd = (
+        f"az containerapp revision list --name {app_name} "
+        f"--resource-group {RESOURCE_GROUP} "
+        f'--query "sort_by(@, &name) | [-1].{{image:properties.template.containers[0].image, '
+        f'health:properties.healthState, running:properties.runningState, '
+        f'name:name}}" -o json'
+    )
+    code, output = _run(cmd, timeout=30)
+    if code == 0 and output:
+        try:
+            import json as _json
+            return _json.loads(output.strip())
+        except Exception:
+            pass
+    return {"image": None, "health": "Unknown", "running": "Unknown", "name": None}
+
+
+def verify_all_containers(tag: str) -> bool:
+    """Verify image, health, and running state for all deployed containers.
+
+    Returns True if all containers are healthy with the expected tag.
+    """
+    all_ok = True
+    expected_suffix = f":{tag}"
+
+    containers = {
+        **{f"api-gateway ({app})": app for app in [CONTAINER_APPS.get("staging", "")]},
+        **{f"agent ({ca})": ca for ca in AGENT_CONTAINER_APPS.values()},
+        **{f"infra ({ca})": ca for ca in INFRA_CONTAINER_APPS.values()},
+    }
+
+    log("Per-container verification:")
+    for label, ca_name in containers.items():
+        if not ca_name:
+            continue
+        info = verify_container_health(ca_name)
+        image = info.get("image", "")
+        health = info.get("health", "Unknown")
+        running = info.get("running", "Unknown")
+        tag_ok = expected_suffix in (image or "")
+        health_ok = health == "Healthy"
+
+        icon = "PASS" if (tag_ok and health_ok) else "FAIL"
+        log(f"  [{icon}] {label}: {health}/{running} image={image}")
+
+        if not (tag_ok and health_ok):
+            all_ok = False
+
+    return all_ok
+
+
 def record_deployment_event(
     fqdn: str,
     environment: str,
@@ -396,6 +452,12 @@ def main() -> int:
     deployed = get_deployed_image(app_name)
     if deployed:
         log(f"  Deployed image: {deployed}")
+
+    # 6b. Per-container health verification (Codex P2.1 remediation)
+    log("")
+    containers_ok = verify_all_containers(args.tag)
+    if not containers_ok:
+        log("WARNING: Not all containers are healthy with expected tag")
 
     # 7. Record deployment event
     version_ok = actual == expected_version

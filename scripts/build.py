@@ -385,7 +385,23 @@ def main() -> int:
 
     log("")
 
-    # 6. Verify ACR tags
+    # 5b. Propagate matrix workflow results to individual repo keys.
+    # Workflow "agent-containers" builds 6 agent repos; "slim-gateway" builds 1.
+    # Results are keyed by workflow name, but REPOS is keyed by individual repo.
+    _WORKFLOW_TO_REPOS = {
+        "agent-containers": [
+            "agent-intent-classifier", "agent-knowledge-retrieval",
+            "agent-response-generator", "agent-escalation-handler",
+            "agent-analytics-collector", "agent-critic-supervisor",
+        ],
+        "slim-gateway": ["slim-gateway"],
+    }
+    for wf_name, repo_names in _WORKFLOW_TO_REPOS.items():
+        if results.get(wf_name):
+            for rn in repo_names:
+                results[rn] = True
+
+    # 6. Verify ACR tags (per-repo, not per-workflow)
     log("Step 6: Verifying ACR images...")
     for name, repo in REPOS.items():
         if results.get(name):
