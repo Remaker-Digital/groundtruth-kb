@@ -495,6 +495,15 @@ async def phase_2_tenant(dry_run: bool) -> None:
             print(f"  [ERROR] {e}")
             phase_results["2_tenant"] = f"ERROR: {e}"
 
+    # SPEC-1851: Sync domain_index for O(1) Shopify domain lookups
+    try:
+        from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+        domain_index = DomainIndexRepository()
+        await domain_index.upsert(SHOP_DOMAIN, TENANT_ID, "shopify")
+        print("  [OK] Domain index synced.")
+    except Exception as e:
+        print(f"  [WARN] Domain index sync failed: {e}")
+
     # SPEC-1673: Raw tenant API key discarded after hashing — never retained.
     del api_key
 

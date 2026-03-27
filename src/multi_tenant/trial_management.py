@@ -235,6 +235,15 @@ class TrialManagementService:
         # Persist tenant
         await self._tenants.create(tenant_doc)
 
+        # SPEC-1851: Sync domain_index for O(1) Shopify domain lookups
+        if shopify_shop_domain:
+            try:
+                from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+                domain_index = DomainIndexRepository()
+                await domain_index.upsert(shopify_shop_domain, tenant_id, "shopify")
+            except Exception:
+                logger.warning("Domain index sync failed for trial tenant=%s", tenant_id)
+
         # Audit trail
         if self._audit:
             await self._audit.log_event(

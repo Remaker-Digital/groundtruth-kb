@@ -426,6 +426,24 @@ async def provision_tenant(
         else:
             updated_doc = await _tenant_repo.patch(existing_id, existing_id, operations)
 
+        # SPEC-1851: Sync domain_index on re-provision (domain or stripe ID may have changed)
+        if _domain_index_repo:
+            old_domain = existing_doc.get("shopify_shop_domain", "")
+            if shopify_shop_domain and shopify_shop_domain != old_domain:
+                if old_domain:
+                    await _domain_index_repo.delete(old_domain)
+                await _domain_index_repo.upsert(shopify_shop_domain, existing_id, "shopify")
+            elif shopify_shop_domain:
+                await _domain_index_repo.upsert(shopify_shop_domain, existing_id, "shopify")
+
+            old_stripe = existing_doc.get("stripe_customer_id", "")
+            if stripe_customer_id and stripe_customer_id != old_stripe:
+                if old_stripe:
+                    await _domain_index_repo.delete(old_stripe)
+                await _domain_index_repo.upsert(stripe_customer_id, existing_id, "stripe")
+            elif stripe_customer_id:
+                await _domain_index_repo.upsert(stripe_customer_id, existing_id, "stripe")
+
         logger.info(
             "Tenant re-provisioned: tenant=%s channel=%s tier=%s",
             existing_id,

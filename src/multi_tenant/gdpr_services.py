@@ -532,6 +532,28 @@ class CosmosDataStoreAdapter:
         """
         result: dict[str, Any] = {}
 
+        # SPEC-1851: Clean domain_index entries BEFORE deleting tenant data.
+        # Read tenant doc first to get the shopify_shop_domain for index cleanup.
+        try:
+            from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+            tenant_repo = self._repos.get("tenants")
+            if tenant_repo:
+                tenant_doc = await tenant_repo.read(tenant_id, tenant_id)
+                if tenant_doc:
+                    domain_index = DomainIndexRepository()
+                    shop_domain = tenant_doc.get("shopify_shop_domain", "")
+                    if shop_domain and ".myshopify.com" in shop_domain:
+                        await domain_index.delete(shop_domain)
+                        logger.info("Deleted domain_index entry: %s", shop_domain)
+                    stripe_id = tenant_doc.get("stripe_customer_id", "")
+                    if stripe_id:
+                        await domain_index.delete(stripe_id)
+                        logger.info("Deleted domain_index entry: %s", stripe_id)
+                    result["domain_index"] = {"deleted": True}
+        except Exception:
+            logger.exception("Error cleaning domain_index for tenant=%s", tenant_id)
+            result["domain_index"] = {"error": "cleanup_failed"}
+
         # Delete dependent collections first (conversations, vectors, etc.)
         # Tenant record is deleted last
         deletion_order = [
