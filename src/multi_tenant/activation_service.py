@@ -537,27 +537,30 @@ class ActivationService:
         existing_key = target.get("widget_key")
 
         if existing_key:
-            # Key exists in preferences — ensure the tenant doc hash is in sync.
-            # This repairs cases where the key was provisioned but the hash
-            # write failed or was lost during migration.
+            # Key exists in preferences — ensure the tenant doc hash matches.
+            # Always verify hash correctness, not just existence. A stale hash
+            # (from a previous key) silently breaks widget auth on the storefront.
             if self._tenant_repo:
                 try:
                     tenant_doc = await self._tenant_repo.read(tenant_id, tenant_id)
-                    if tenant_doc and not tenant_doc.get("widget_key_hash"):
+                    if tenant_doc:
                         key_hash = hash_widget_key(existing_key)
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        await self._tenant_repo.patch(
-                            tenant_id,
-                            tenant_id,
-                            operations=[
-                                {"op": "set", "path": "/widget_key_hash", "value": key_hash},
-                                {"op": "set", "path": "/updated_at", "value": now_iso},
-                            ],
-                        )
-                        logger.info(
-                            "Repaired missing widget_key_hash on tenant doc: tenant=%s",
-                            tenant_id[:8],
-                        )
+                        current_hash = tenant_doc.get("widget_key_hash")
+                        if current_hash != key_hash:
+                            now_iso = datetime.now(timezone.utc).isoformat()
+                            await self._tenant_repo.patch(
+                                tenant_id,
+                                tenant_id,
+                                operations=[
+                                    {"op": "set", "path": "/widget_key_hash", "value": key_hash},
+                                    {"op": "set", "path": "/updated_at", "value": now_iso},
+                                ],
+                            )
+                            logger.info(
+                                "Repaired widget_key_hash on tenant doc: tenant=%s (was=%s)",
+                                tenant_id[:8],
+                                current_hash[:8] if current_hash else "missing",
+                            )
                 except Exception:
                     logger.debug("Widget key hash repair check failed", exc_info=True)
             return
