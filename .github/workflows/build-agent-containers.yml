@@ -1,0 +1,47 @@
+name: Build Agent Containers
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (e.g. v1.95.3)'
+        required: true
+        default: 'v1.98.55'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        agent:
+          - module: intent_classifier_app
+            repo: agent-intent-classifier
+          - module: knowledge_retrieval_app
+            repo: agent-knowledge-retrieval
+          - module: response_generator_app
+            repo: agent-response-generator
+          - module: escalation_handler_app
+            repo: agent-escalation-handler
+          - module: analytics_collector_app
+            repo: agent-analytics-collector
+          - module: critic_supervisor_app
+            repo: agent-critic-supervisor
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: acragentredeastus.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push ${{ matrix.agent.repo }}
+        run: |
+          docker build \
+            -f src/agents/containers/Dockerfile \
+            --build-arg AGENT_MODULE=${{ matrix.agent.module }} \
+            -t acragentredeastus.azurecr.io/${{ matrix.agent.repo }}:${{ inputs.tag }} \
+            .
+          docker push acragentredeastus.azurecr.io/${{ matrix.agent.repo }}:${{ inputs.tag }}
+          echo "Pushed ${{ matrix.agent.repo }}:${{ inputs.tag }}"

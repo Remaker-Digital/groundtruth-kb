@@ -38,10 +38,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = {
     "api-gateway": "build-api-gateway.yml",
     "test-host": "build-test-host.yml",
+    "agent-containers": "build-agent-containers.yml",
 }
 REPOS = {
     "api-gateway": "api-gateway",
     "test-host": "test-host",
+    # Agent container repos (built by matrix workflow)
+    "agent-intent-classifier": "agent-intent-classifier",
+    "agent-knowledge-retrieval": "agent-knowledge-retrieval",
+    "agent-response-generator": "agent-response-generator",
+    "agent-escalation-handler": "agent-escalation-handler",
+    "agent-analytics-collector": "agent-analytics-collector",
+    "agent-critic-supervisor": "agent-critic-supervisor",
 }
 # Frontend projects whose dist/ directories are COPY'd into the Docker image.
 # Each entry is relative to PROJECT_ROOT.

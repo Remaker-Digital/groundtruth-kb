@@ -122,7 +122,7 @@ locals {
     }
 
     intent-classifier = {
-      image        = "intent-classifier:v1.1.0-openai"
+      image        = "agent-intent-classifier:v1.0.0"
       port         = 8080
       cpu          = 0.5
       memory       = "1Gi"
@@ -138,7 +138,7 @@ locals {
     }
 
     knowledge-retrieval = {
-      image        = "knowledge-retrieval:v1.1.1-fix"
+      image        = "agent-knowledge-retrieval:v1.0.0"
       port         = 8080
       cpu          = 0.5
       memory       = "1Gi"
@@ -154,7 +154,7 @@ locals {
     }
 
     response-generator = {
-      image        = "response-generator:v1.1.0-openai"
+      image        = "agent-response-generator:v1.0.0"
       port         = 8080
       cpu          = 1.0
       memory       = "2Gi"
@@ -170,7 +170,7 @@ locals {
     }
 
     critic-supervisor = {
-      image        = "critic-supervisor:v1.1.0-openai"
+      image        = "agent-critic-supervisor:v1.0.0"
       port         = 8080
       cpu          = 0.5
       memory       = "1Gi"
@@ -186,7 +186,7 @@ locals {
     }
 
     escalation = {
-      image        = "escalation:v1.1.0-openai"
+      image        = "agent-escalation-handler:v1.0.0"
       port         = 8080
       cpu          = 0.25
       memory       = "0.5Gi"
@@ -202,7 +202,7 @@ locals {
     }
 
     analytics = {
-      image        = "analytics:v1.1.0-openai"
+      image        = "agent-analytics-collector:v1.0.0"
       port         = 8080
       cpu          = 0.25
       memory       = "0.5Gi"

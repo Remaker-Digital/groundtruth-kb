@@ -26,27 +26,33 @@ USE_AGENT_CONTAINERS = os.environ.get(
 
 # Default agent URLs — overridden by environment variables in production.
 # Only used when USE_AGENT_CONTAINERS=true.
+# Defaults use Azure Container Apps internal DNS naming convention.
+# ADR-001: These are Tier 3 (HTTP) endpoints used when SLIM/NATS are unavailable.
+# ADR-002: Each agent runs in a dedicated container.
+_CAE_FQDN = os.environ.get("CONTAINER_APP_ENV_FQDN", "")
+_INTERNAL_BASE = f"http://agent-red-{{name}}.internal.{_CAE_FQDN}:8080" if _CAE_FQDN else "http://localhost:8080"
+
 AGENT_URLS: dict[str, str] = {
     "intent-classifier": os.environ.get(
-        "AGENT_INTENT_CLASSIFIER_URL", "http://10.0.1.10:8080"
+        "AGENT_INTENT_CLASSIFIER_URL", _INTERNAL_BASE.format(name="intent-classifier")
     ),
     "knowledge-retrieval": os.environ.get(
-        "AGENT_KNOWLEDGE_RETRIEVAL_URL", "http://10.0.1.6:8080"
+        "AGENT_KNOWLEDGE_RETRIEVAL_URL", _INTERNAL_BASE.format(name="knowledge-retrieval")
     ),
     "response-generator": os.environ.get(
-        "AGENT_RESPONSE_GENERATOR_URL", "http://10.0.1.8:8080"
+        "AGENT_RESPONSE_GENERATOR_URL", _INTERNAL_BASE.format(name="response-generator")
     ),
     "escalation-handler": os.environ.get(
-        "AGENT_ESCALATION_HANDLER_URL", "http://10.0.1.11:8080"
+        "AGENT_ESCALATION_HANDLER_URL", _INTERNAL_BASE.format(name="escalation-handler")
     ),
     "analytics-collector": os.environ.get(
-        "AGENT_ANALYTICS_COLLECTOR_URL", "http://10.0.1.9:8080"
+        "AGENT_ANALYTICS_COLLECTOR_URL", _INTERNAL_BASE.format(name="analytics-collector")
     ),
     "critic-supervisor": os.environ.get(
-        "AGENT_CRITIC_SUPERVISOR_URL", "http://10.0.1.12:8080"
+        "AGENT_CRITIC_SUPERVISOR_URL", _INTERNAL_BASE.format(name="critic-supervisor")
     ),
     "co-pilot": os.environ.get(
-        "AGENT_CO_PILOT_URL", "http://10.0.1.13:8080"
+        "AGENT_CO_PILOT_URL", _INTERNAL_BASE.format(name="co-pilot")
     ),
 }
 

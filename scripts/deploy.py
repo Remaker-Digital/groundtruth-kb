@@ -45,6 +45,17 @@ TEST_HOST_APPS = {
     "production": "agent-red-test-host-prod",
 }
 
+# ADR-002: Per-agent containers. Deployed alongside the gateway.
+# Maps ACR repo name → Azure Container App name.
+AGENT_CONTAINER_APPS: dict[str, str] = {
+    "agent-intent-classifier": "agent-red-intent-classifier",
+    "agent-knowledge-retrieval": "agent-red-knowledge-retrieval",
+    "agent-response-generator": "agent-red-response-generator",
+    "agent-escalation-handler": "agent-red-escalation",
+    "agent-analytics-collector": "agent-red-analytics",
+    "agent-critic-supervisor": "agent-red-critic-supervisor",
+}
+
 FQDNS = {
     "staging": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
     "production": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
