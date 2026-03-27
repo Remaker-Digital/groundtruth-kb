@@ -85,12 +85,13 @@ async function request<T>(
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryBaseDelay = options?.retryBaseDelayMs ?? 1000;
 
-  // SPEC-1562: When an admin API key is available (Co-pilot mode),
-  // authenticate as a team member. Falls back to widget key.
+  // SPEC-1562 + SPEC-1644: Co-pilot mode uses X-API-Key for chat
+  // endpoints but X-Widget-Key for config (which doesn't carry ?tenant=).
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (adminApiKey) {
+  const isChatPath = path.startsWith('/api/chat/') || path.startsWith('/ws/chat/');
+  if (adminApiKey && isChatPath) {
     headers['X-API-Key'] = adminApiKey;
   } else {
     headers['X-Widget-Key'] = widgetKey;
