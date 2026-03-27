@@ -21,8 +21,12 @@ import logging
 import os
 import signal
 import sys
+from aiohttp import web
 
 logger = logging.getLogger(__name__)
+
+# Health sidecar port (separate from SLIM protocol port)
+_HEALTH_PORT = int(os.environ.get("SLIM_HEALTH_PORT", "8080"))
 
 
 def _configure_logging() -> None:
@@ -96,10 +100,17 @@ async def run_slim_server() -> None:
         _run_server(service, server_config)
     )
 
+    # Start health sidecar (HTTP /healthz on _HEALTH_PORT for Container Apps probes)
+    health_runner = await _start_health_sidecar(service_name)
+
     # Wait for shutdown signal
     await shutdown_event.wait()
 
     logger.info("Shutting down SLIM service...")
+    try:
+        await health_runner.cleanup()
+    except Exception as exc:
+        logger.warning("Error stopping health sidecar: %s", exc)
     try:
         await service.shutdown_async()
     except Exception as exc:
@@ -112,6 +123,28 @@ async def run_slim_server() -> None:
         pass
 
     logger.info("SLIM routing service stopped")
+
+
+async def _start_health_sidecar(service_name: str) -> web.AppRunner:
+    """Start a lightweight HTTP health server for Container Apps probes.
+
+    SLIM speaks its own protocol on port 8443, so health probes need
+    a separate HTTP endpoint. This sidecar responds to /healthz on
+    _HEALTH_PORT with a 200 OK.
+    """
+    app = web.Application()
+
+    async def _healthz(_request: web.Request) -> web.Response:
+        return web.json_response({"status": "ok", "service": service_name})
+
+    app.router.add_get("/healthz", _healthz)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", _HEALTH_PORT)
+    await site.start()
+    logger.info("Health sidecar listening on 0.0.0.0:%d/healthz", _HEALTH_PORT)
+    return runner
 
 
 async def _run_server(

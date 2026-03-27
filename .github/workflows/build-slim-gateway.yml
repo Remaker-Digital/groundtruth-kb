@@ -1,0 +1,31 @@
+name: Build SLIM Gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (e.g. v1.98.55)'
+        required: true
+        default: 'v1.98.55'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: acragentredeastus.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push slim-gateway
+        run: |
+          docker build \
+            -f src/agents/containers/Dockerfile.slim \
+            -t acragentredeastus.azurecr.io/slim-gateway:${{ inputs.tag }} \
+            .
+          docker push acragentredeastus.azurecr.io/slim-gateway:${{ inputs.tag }}
+          echo "Pushed slim-gateway:${{ inputs.tag }}"

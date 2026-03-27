@@ -78,6 +78,12 @@ variable "nats_url" {
   default     = "nats://agent-red-nats.internal:4222"
 }
 
+variable "slim_endpoint" {
+  description = "SLIM routing service endpoint (internal Container App FQDN)"
+  type        = string
+  default     = "http://agent-red-slim.internal:8443"
+}
+
 variable "nats_monitoring_endpoint" {
   description = "NATS monitoring endpoint for KEDA scaler (host:port format)"
   type        = string

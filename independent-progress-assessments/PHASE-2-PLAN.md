@@ -122,14 +122,17 @@ Widget traffic must traverse the canonical containerized agent system:
 
 ## Implementation Sequence (Revised per Codex)
 
-1. **2A** — Remove in-process canonical fallbacks (analytics/critic/escalation)
-2. **2C** — Verify/deploy SLIM + NATS in staging
-3. **2D** — Build pipeline: add SLIM image, verify all 7 agent images build
-4. **2B** — Verify agent container health + A2A integration
-5. **2E** — Dispatch wiring: verify tier selection, env-based HTTP routing
-6. **2F** — Widget path end-to-end verification
-7. **Staging deploy** — Deploy all containers
-8. **Smoke test** — Verify transport connectivity and tier selection
+| Step | Status | Notes |
+|------|--------|-------|
+| **2A** — Remove in-process canonical fallbacks | ✅ COMPLETE (S223, f1cb97e4) | Analytics/critic/escalation — 3 distinct failure behaviors |
+| **2C** — Verify/deploy SLIM + NATS in staging | ✅ COMPLETE (S224) | NATS: running (nats:2.10-alpine). SLIM: health sidecar added, Dockerfile.slim created, Terraform SLIM env vars added |
+| **2D** — Build pipeline: add SLIM image | ✅ COMPLETE (S224) | build-slim-gateway.yml, build.py + deploy.py updated with SLIM + agent deploy loop |
+| **2B** — Verify agent container health + A2A | ✅ COMPLETE (S224) | agent_app.py: /health, /ready, A2A process(), gateway short paths. Internal DNS confirmed |
+| **2E** — Dispatch wiring verification | ✅ COMPLETE (S224) | transport→HTTP→503 chain confirmed. CONTAINER_APP_ENV_FQDN resolves correctly |
+| **2F** — Widget path verification | ✅ COMPLETE (S224) | Widget uses same dispatch pipeline (X-Widget-Key auth → standard dispatch) |
+| **Dead code** — S224 cleanup | ✅ COMPLETE (S224) | Removed _validate_with_critic_direct, _call_escalation_handler_direct, _cr_agent, _esc_agent, _an_agent |
+| **Staging deploy** — Build + deploy correct images | ⏳ BLOCKED | Agent images not yet in ACR. Trigger build-agent-containers.yml + build-slim-gateway.yml, then deploy |
+| **Smoke test** — Transport connectivity | ⏳ BLOCKED on staging deploy | Verify SLIM/NATS/HTTP tier selection end-to-end |
 
 ## Verification Criteria (Expanded per Codex)
 

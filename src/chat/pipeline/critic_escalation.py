@@ -39,7 +39,7 @@ class CriticEscalationMixin:
     """Mixin providing critic validation and escalation handling for ChatPipeline.
 
     Methods on this mixin access instance attributes set by ChatPipeline.__init__:
-    _critic, _openai_client, _cr_agent, _esc_agent, _session, _agent_urls,
+    _critic, _openai_client, _session, _agent_urls,
     _get_http_client().
     """
 
@@ -95,66 +95,6 @@ class CriticEscalationMixin:
             request_id=f"critic-{conversation_id}-{int(time.time() * 1000)}",
         )
         return False, SAFE_FALLBACK_MESSAGE, fallback_result
-
-    async def _validate_with_critic_direct(
-        self,
-        tenant_id: str,
-        conversation_id: str,
-        response_text: str,
-        customer_message: str,
-        budget: PipelineTimeoutBudget,
-        knowledge_titles: list[str] | None = None,
-    ) -> tuple[bool, str, Any]:
-        """Validate response via in-process CriticSupervisorAgent (A2A).
-
-        Delegates to the extracted agent module which encapsulates the
-        fail-closed Critic validation using Azure OpenAI GPT-4o-mini.
-
-        The agent returns a dict; this method adapts it to the
-        (approved, safe_text, CriticResult) tuple expected by the caller.
-        """
-        from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult, CriticVerdict
-
-        cr_result = await self._cr_agent.process(
-            {
-                "response_text": response_text,
-                "customer_message": customer_message,
-                "knowledge_titles": knowledge_titles or [],
-                "conversation_id": conversation_id,
-            },
-            {},
-        )
-
-        approved = cr_result.get("approved", False)
-        safe_text = cr_result.get("safe_text", SAFE_FALLBACK_MESSAGE)
-
-        # Map agent dict to CriticResult dataclass for pipeline compatibility
-        verdict_str = cr_result.get("verdict", "unavailable")
-        try:
-            verdict = CriticVerdict(verdict_str)
-        except ValueError:
-            verdict = None
-
-        block_reason_str = cr_result.get("block_reason")
-        block_reason = None
-        if block_reason_str:
-            try:
-                block_reason = CriticBlockReason(block_reason_str)
-            except ValueError:
-                block_reason = CriticBlockReason.ERROR
-
-        result = CriticResult(
-            approved=approved,
-            verdict=verdict,
-            block_reason=block_reason,
-            flags=cr_result.get("flags", []),
-            modified_response=cr_result.get("modified_response"),
-            latency_ms=cr_result.get("latency_ms", 0.0),
-            critic_instance="in-process-agent",
-            request_id=cr_result.get("request_id", f"critic-{conversation_id}"),
-        )
-
-        return approved, safe_text, result
 
     # -------------------------------------------------------------------
     # Escalation handling
@@ -332,21 +272,6 @@ class CriticEscalationMixin:
             "category": "general_inquiry",
             "model": "default",
         }
-
-    async def _call_escalation_handler_direct(
-        self,
-        message: str,
-        system_prompt: str,
-    ) -> dict[str, Any]:
-        """Evaluate escalation via in-process EscalationHandlerAgent (A2A).
-
-        Delegates to the extracted agent module which encapsulates the
-        Azure OpenAI GPT-4o-mini call for escalation analysis.
-        """
-        return await self._esc_agent.process(
-            {"message": message, "system_prompt": system_prompt},
-            {},
-        )
 
     async def _call_escalation_handler_http(
         self,

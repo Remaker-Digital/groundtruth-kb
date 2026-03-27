@@ -420,8 +420,8 @@ locals {
     slim-gateway = {
       liveness_path    = "/healthz"
       readiness_path   = "/healthz"
-      liveness_port    = 8443
-      readiness_port   = 8443
+      liveness_port    = 8080 # Health sidecar port (SLIM protocol on 8443)
+      readiness_port   = 8080
       initial_delay    = 5 # gRPC — fast startup
       liveness_period  = 30
       readiness_period = 10

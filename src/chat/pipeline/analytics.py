@@ -27,7 +27,7 @@ class AnalyticsMixin:
     """Mixin providing analytics dispatch for ChatPipeline.
 
     Methods on this mixin access instance attributes set by ChatPipeline.__init__:
-    _an_agent, _agent_urls, _get_http_client().
+    _agent_urls, _get_http_client().
     """
 
     async def _fire_analytics(

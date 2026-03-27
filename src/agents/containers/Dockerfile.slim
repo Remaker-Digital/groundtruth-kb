@@ -1,0 +1,43 @@
+# Agent Red — SLIM Routing Service Dockerfile
+#
+# Builds the SLIM (peer-to-peer mesh routing) container image.
+# SLIM provides Tier 1 transport for AGNTCY SDK agent-to-agent messaging.
+#
+# Build:
+#   docker build -f src/agents/containers/Dockerfile.slim -t slim-gateway .
+#
+# Run:
+#   docker run -e SLIM_SHARED_SECRET=$(openssl rand -hex 32) \
+#     -p 8443:8443 -p 8080:8080 slim-gateway
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies (slim-bindings + aiohttp for health sidecar)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY src/ src/
+
+# Environment defaults
+ENV SLIM_LISTEN_ADDR=0.0.0.0:8443
+ENV SLIM_HEALTH_PORT=8080
+ENV LOG_LEVEL=INFO
+
+# Health check (HTTP sidecar on 8080, not SLIM protocol port)
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8080/healthz || exit 1
+
+# Expose SLIM protocol + health sidecar
+EXPOSE 8443 8080
+
+CMD ["python", "-m", "src.agents.containers.slim_server_app"]

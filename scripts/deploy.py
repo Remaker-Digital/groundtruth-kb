@@ -56,6 +56,12 @@ AGENT_CONTAINER_APPS: dict[str, str] = {
     "agent-critic-supervisor": "agent-red-critic-supervisor",
 }
 
+# Infrastructure containers (non-agent services supporting transport)
+INFRA_CONTAINER_APPS: dict[str, str] = {
+    "slim-gateway": "agent-red-slim",
+    # NATS uses public image, managed by Terraform, not deploy.py
+}
+
 FQDNS = {
     "staging": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
     "production": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
@@ -338,6 +344,32 @@ def main() -> int:
         log(f"Deploying test host ({th_app})...")
         if not deploy_container(th_app, th_image):
             log("  WARNING: Test host deploy failed (non-fatal)")
+
+    # 3b. Deploy agent containers (ADR-002: per-agent containers)
+    log("")
+    log("Deploying agent containers...")
+    agent_failures = 0
+    for repo, ca_name in AGENT_CONTAINER_APPS.items():
+        agent_image = f"{ACR_LOGIN_SERVER}/{repo}:{args.tag}"
+        if verify_acr_tag(repo, args.tag):
+            if not deploy_container(ca_name, agent_image):
+                log(f"  WARNING: {ca_name} deploy failed (non-fatal)")
+                agent_failures += 1
+        else:
+            log(f"  SKIP: {repo}:{args.tag} not in ACR — build with: python scripts/build.py {args.tag}")
+    if agent_failures:
+        log(f"  {agent_failures} agent container(s) failed to deploy")
+    else:
+        log(f"  All {len(AGENT_CONTAINER_APPS)} agent containers deployed or skipped")
+
+    # 3c. Deploy infrastructure containers (SLIM)
+    for repo, ca_name in INFRA_CONTAINER_APPS.items():
+        infra_image = f"{ACR_LOGIN_SERVER}/{repo}:{args.tag}"
+        if verify_acr_tag(repo, args.tag):
+            if not deploy_container(ca_name, infra_image):
+                log(f"  WARNING: {ca_name} deploy failed (non-fatal)")
+        else:
+            log(f"  SKIP: {repo}:{args.tag} not in ACR")
 
     log("")
 

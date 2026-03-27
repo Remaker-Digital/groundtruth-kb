@@ -125,20 +125,15 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         self._profile_cache: dict[str, CustomerProfileDocument | None] = {}
 
         # -------------------------------------------------------------------
-        # Phase 2.4: A2A agent instances (in-process)
+        # A2A agent instances (in-process, legacy)
         #
-        # When USE_AGENT_CONTAINERS is False, the pipeline delegates to
-        # extracted agent modules instead of duplicating inline Azure OpenAI
-        # logic. Each agent implements BaseAgentProtocol.process() and
-        # encapsulates the same logic that was previously in
-        # _call_*_direct() methods.
+        # DCL-002: canonical dispatch uses transport/HTTP, not in-process.
+        # These remain only for IC/KR/RG _direct() stubs pending Phase 3
+        # dead code sweep. Analytics/Critic/Escalation agents removed (S224).
         # -------------------------------------------------------------------
         self._ic_agent: Any | None = None
         self._kr_agent: Any | None = None
         self._rg_agent: Any | None = None
-        self._esc_agent: Any | None = None
-        self._an_agent: Any | None = None
-        self._cr_agent: Any | None = None
         self._init_agents()
 
     async def _get_http_client(self) -> httpx.AsyncClient:
@@ -186,19 +181,16 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         return task
 
     def _init_agents(self) -> None:
-        """Initialize in-process A2A agent instances (SPEC-1538).
+        """Initialize in-process A2A agent instances (legacy, SPEC-1538).
 
-        Always creates in-process agents regardless of USE_AGENT_CONTAINERS.
-        When transport or containers are available, the dispatch layer routes
-        there first. In-process agents serve as graceful fallback when
-        transport/HTTP is unavailable (SPEC-1534, WI-0850).
+        DCL-002: canonical dispatch uses transport/HTTP → 503. In-process
+        agents are retained only for IC/KR/RG _direct() stubs (pending
+        Phase 3 dead code sweep) and CoPilot. Analytics, Critic, and
+        Escalation agent instances removed in S224.
         """
         from src.agents.intent_classifier import IntentClassifierAgent
         from src.agents.knowledge_retrieval import KnowledgeRetrievalAgent
         from src.agents.response_generator import ResponseGeneratorAgent
-        from src.agents.escalation_handler import EscalationHandlerAgent
-        from src.agents.analytics_collector import AnalyticsCollectorAgent
-        from src.agents.critic_supervisor import CriticSupervisorAgent
         from src.agents.co_pilot import CoPilotAgent
         from src.multi_tenant.repositories.platform import AdminDocumentationRepository
 
@@ -207,9 +199,6 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             kb_repo=self._kb_repo,
         )
         self._rg_agent = ResponseGeneratorAgent(openai_client=self._openai_client)
-        self._esc_agent = EscalationHandlerAgent(openai_client=self._openai_client)
-        self._an_agent = AnalyticsCollectorAgent()
-        self._cr_agent = CriticSupervisorAgent(openai_client=self._openai_client)
         self._copilot_agent = CoPilotAgent(
             openai_client=self._openai_client,
             admin_doc_repo=AdminDocumentationRepository(),

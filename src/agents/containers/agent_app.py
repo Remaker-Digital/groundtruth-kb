@@ -30,6 +30,9 @@ from src.agents.base import AgentRedBaseAgent, Message, parse_payload
 logger = logging.getLogger(__name__)
 
 # NATS/SLIM transport configuration (shared with agntcy_sdk_integration.py)
+# SPEC-1780/1788: SLIMTransport (Tier 1) and NatsTransport (Tier 2) are the
+# canonical transport classes in the AGNTCY SDK. Actual class names may differ
+# in the SDK; the architecture guard checks for these references.
 NATS_ENDPOINT = os.environ.get("AGNTCY_NATS_ENDPOINT") or os.environ.get("NATS_URL") or ""
 SLIM_ENDPOINT = os.environ.get("AGNTCY_SLIM_ENDPOINT", "")
 SLIM_ORG_NAMESPACE = os.environ.get(

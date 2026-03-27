@@ -92,6 +92,8 @@ locals {
   shared_env = [
     { name = "ENVIRONMENT", value = var.environment },
     { name = "NATS_URL", value = var.nats_url },
+    { name = "AGNTCY_SLIM_ENDPOINT", value = var.slim_endpoint },
+    { name = "AGNTCY_SLIM_SHARED_SECRET", secret_name = "slim-shared-secret" },
     { name = "COSMOS_DB_ENDPOINT", value = var.cosmos_db_endpoint },
     { name = "COSMOS_DB_DATABASE", value = var.cosmos_db_database },
     { name = "COSMOS_USE_MANAGED_ID", value = "true" },

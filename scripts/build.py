@@ -39,6 +39,7 @@ WORKFLOWS = {
     "api-gateway": "build-api-gateway.yml",
     "test-host": "build-test-host.yml",
     "agent-containers": "build-agent-containers.yml",
+    "slim-gateway": "build-slim-gateway.yml",
 }
 REPOS = {
     "api-gateway": "api-gateway",
@@ -50,6 +51,8 @@ REPOS = {
     "agent-escalation-handler": "agent-escalation-handler",
     "agent-analytics-collector": "agent-analytics-collector",
     "agent-critic-supervisor": "agent-critic-supervisor",
+    # Infrastructure containers
+    "slim-gateway": "slim-gateway",
 }
 # Frontend projects whose dist/ directories are COPY'd into the Docker image.
 # Each entry is relative to PROJECT_ROOT.
