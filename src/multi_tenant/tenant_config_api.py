@@ -467,6 +467,54 @@ def _generate_ai_greeting(
 
 
 # ---------------------------------------------------------------------------
+# Widget key hash self-heal
+# ---------------------------------------------------------------------------
+
+
+async def _ensure_widget_key_hash(tenant_id: str, widget_key: str) -> None:
+    """Ensure the tenant document has a widget_key_hash matching the config key.
+
+    Widget key auth (X-Widget-Key header) looks up tenants by hash. If the
+    hash is missing from the tenant document, the widget silently fails to
+    load (401 on /api/config). This repairs the gap on every activation
+    status check so the admin-embedded widget self-heals without manual
+    intervention.
+    """
+    from src.multi_tenant.auth import hash_widget_key
+    from src.multi_tenant.repositories.tenant import TenantRepository
+
+    try:
+        repo = TenantRepository()
+        tenant_doc = await repo.read(tenant_id, tenant_id)
+        if not tenant_doc:
+            return
+
+        expected_hash = hash_widget_key(widget_key)
+        current_hash = tenant_doc.get("widget_key_hash")
+
+        if current_hash == expected_hash:
+            return  # Already correct
+
+        # Hash is missing or stale — repair it
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await repo.patch(
+            tenant_id,
+            tenant_id,
+            operations=[
+                {"op": "set", "path": "/widget_key_hash", "value": expected_hash},
+                {"op": "set", "path": "/updated_at", "value": now_iso},
+            ],
+        )
+        logger.info(
+            "Self-healed widget_key_hash on tenant doc: tenant=%s (was=%s)",
+            tenant_id[:8],
+            "missing" if not current_hash else "stale",
+        )
+    except Exception:
+        logger.debug("Widget key hash self-heal failed", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
@@ -1328,6 +1376,12 @@ async def get_activation_status(
                 and brand_voice and str(brand_voice).strip()
                 and widget_key
             )
+
+            # Self-heal: ensure widget_key_hash exists on the tenant doc.
+            # Without the hash, X-Widget-Key auth returns 401 and the admin
+            # widget silently fails to load.
+            if widget_key:
+                await _ensure_widget_key_hash(ctx.tenant_id, widget_key)
             # is_active: config is activated AND not deactivated
             # deactivated_at on the active config means the merchant
             # explicitly disabled the widget.
