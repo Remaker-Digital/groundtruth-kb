@@ -1,8 +1,11 @@
 """Agent dispatch mixin — IC, KR, and RG agent call methods.
 
 Provides intent classification, knowledge retrieval, and response
-generation dispatch methods for ChatPipeline. Routes to in-process
-A2A agents (default) or AGNTCY HTTP containers.
+generation dispatch methods for ChatPipeline. Routes through the
+canonical transport stack: SLIM/gRPC → NATS → HTTP(S) → 503.
+
+SPEC-1802: All environments use the same dispatch algorithm.
+In-process dispatch is NOT part of the canonical pipeline.
 
 R10 refactoring — extracted from pipeline.py (session 39).
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -31,13 +34,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# SPEC-1802 transport priority / SPEC-1780 enforcement:
-#   Tier 1: SLIM transport (primary)
-#   Tier 2: NATS JetStream transport (fallback)
-#   Tier 3: HTTP containers (failure mode — logged as warning)
-#   Tier 4: In-process direct call (development only, blocked in staging/production)
+# SPEC-1802 canonical dispatch — same in ALL environments:
+#   Tier 1: SLIM/gRPC transport (primary — when physically possible)
+#   Tier 2: NATS JetStream transport (fallback — when physically possible)
+#   Tier 3: HTTP(S) containers (last resort — when higher tiers unavailable)
+#   Fail:   503 with tier-diagnostic reason
+#
+# In-process dispatch is NOT part of the canonical pipeline (DCL-002).
+# There is no in-process fallback — all agents run in dedicated containers.
 _ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
-_IS_DEPLOYED = _ENVIRONMENT in ("staging", "production")
 
 
 class AgentDispatchMixin:
@@ -47,15 +52,18 @@ class AgentDispatchMixin:
     _ic_agent, _kr_agent, _rg_agent, _agent_urls, _get_http_client(),
     _current_tenant_id, _current_preferences, _current_tenant.
 
-    Dispatch priority (SPEC-1802):
-        Tier 1: SLIM transport (primary — when AGNTCY SDK SLIM transport is active)
-        Tier 2: NATS JetStream transport (fallback — when NATS transport is active)
-        Tier 3: HTTP containers (failure mode — when USE_AGENT_CONTAINERS is set)
-        Tier 4: In-process direct call (development only — blocked in staging/production)
+    Canonical dispatch priority (SPEC-1802) — same in ALL environments:
+        Tier 1: SLIM/gRPC transport (primary — when physically possible)
+        Tier 2: NATS JetStream transport (fallback — when physically possible)
+        Tier 3: HTTP(S) containers (last resort — when higher tiers unavailable)
+        Fail:   503 with tier-diagnostic reason
 
-    Note: Tiers 1 and 2 are unified behind _transport_available() — the SDK
+    Tiers 1 and 2 are unified behind _transport_available() — the SDK
     singleton selects SLIM or NATS based on endpoint configuration. Tier 3 HTTP
-    is explicitly a failure mode per SPEC-1802 and emits warnings when used.
+    is explicitly a last resort per SPEC-1802 and emits warnings when used.
+
+    In-process dispatch is NOT part of the canonical pipeline (DCL-002).
+    All agents run in dedicated containers — there is no in-process fallback.
     """
 
     def _transport_available(self) -> bool:
@@ -80,30 +88,27 @@ class AgentDispatchMixin:
         )
 
     def _require_transport_or_fail(self, agent_name: str) -> None:
-        """SPEC-1780: In deployed environments, raise 503 if all tiers exhausted.
+        """SPEC-1780/SPEC-1802: Raise 503 if all transport tiers exhausted.
 
-        Called when transport (Tier 1/2) and HTTP containers (Tier 3) have
-        both failed. In local/development environments, allows Tier 4 fallback
-        (in-process). In staging/production, raises HTTPException(503) to
-        prevent silent degradation.
+        SLIM/gRPC is mandatory. In-process dispatch is not an option.
+        All environments require functioning transport (SLIM → NATS → HTTP).
         """
-        if _IS_DEPLOYED:
-            from fastapi import HTTPException
+        from fastapi import HTTPException
 
-            logger.error(
-                "All dispatch tiers exhausted for agent=%s in %s. "
-                "SPEC-1802: SLIM(T1) + NATS(T2) + HTTP(T3) all failed. "
-                "Tier 4 in-process blocked in deployed environments.",
-                agent_name, _ENVIRONMENT,
-            )
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    f"Agent dispatch unavailable: {agent_name}. "
-                    f"All transport tiers exhausted in {_ENVIRONMENT} environment. "
-                    "Contact platform administrator."
-                ),
-            )
+        logger.error(
+            "All dispatch tiers exhausted for agent=%s in %s. "
+            "SPEC-1802: SLIM(T1) + NATS(T2) + HTTP(T3) all failed. "
+            "In-process dispatch is not available.",
+            agent_name, _ENVIRONMENT,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Agent dispatch unavailable: {agent_name}. "
+                f"All transport tiers exhausted in {_ENVIRONMENT} environment. "
+                "Contact platform administrator."
+            ),
+        )
 
     async def _call_via_transport(
         self,
@@ -112,10 +117,21 @@ class AgentDispatchMixin:
     ) -> dict[str, Any]:
         """Route an agent call through SLIM/NATS transport (SPEC-1525).
 
+        Uses AGNTCY SDK v0.5.4 A2AClientFactory with A2A protocol.
+        SPEC-1802: SLIM/gRPC is always the primary transport.
         Resolves agent topic via AGNTCY Directory (SPEC-1789) with
-        static fallback. Includes tenant_id, conversation_id, and
-        trace_id in message headers for distributed tracing.
+        static fallback.
         """
+        import uuid
+
+        from a2a.types import (
+            Message as A2AMessage,
+            MessageSendParams,
+            Role,
+            SendMessageRequest,
+            TextPart,
+        )
+
         from src.multi_tenant.agntcy_directory import get_agent_topic
         from src.multi_tenant.agntcy_sdk_integration import create_a2a_client
 
@@ -126,20 +142,59 @@ class AgentDispatchMixin:
         conversation_id = getattr(self, "_current_conversation_id", "")
         trace_id = getattr(self, "_current_trace_id", "")
 
-        client = create_a2a_client(resolved_topic)
-        response = await client.send(
-            payload,
-            headers={
-                "X-Tenant-Id": tenant_id,
-                "X-Conversation-Id": conversation_id,
-                "X-Trace-Id": trace_id,
-            },
+        # Create A2A client (cached per topic)
+        client = await create_a2a_client(resolved_topic)
+
+        # Build A2A SendMessageRequest with payload as JSON text part
+        request = SendMessageRequest(
+            id=str(uuid.uuid4()),
+            jsonrpc="2.0",
+            method="message/send",
+            params=MessageSendParams(
+                message=A2AMessage(
+                    role=Role.user,
+                    message_id=str(uuid.uuid4()),
+                    parts=[TextPart(kind="text", text=json.dumps(payload))],
+                    metadata={
+                        "tenant_id": tenant_id,
+                        "conversation_id": conversation_id,
+                        "trace_id": trace_id,
+                    },
+                ),
+            ),
         )
+
+        response = await client.send_message(request)
         logger.debug(
             "A2A transport call: topic=%s (resolved=%s) tenant=%s trace=%s",
             agent_topic, resolved_topic, tenant_id, trace_id,
         )
-        return response if isinstance(response, dict) else {"result": response}
+
+        # Extract result from A2A response
+        result = response.root
+        if hasattr(result, "error"):
+            raise RuntimeError(
+                f"A2A call to {agent_topic} failed: {result.error}"
+            )
+
+        # Extract text parts from the response message/task
+        success_result = result.result
+        if hasattr(success_result, "status"):
+            # It's a Task — get the status message
+            msg = success_result.status.message
+        else:
+            # It's a direct Message
+            msg = success_result
+
+        if msg and msg.parts:
+            for part in msg.parts:
+                if hasattr(part, "text"):
+                    try:
+                        return json.loads(part.text)
+                    except (json.JSONDecodeError, TypeError):
+                        return {"result": part.text}
+
+        return {"result": str(success_result)}
 
     # -------------------------------------------------------------------
     # Intent Classification
@@ -153,7 +208,7 @@ class AgentDispatchMixin:
         """Classify customer intent.
 
         Routes via SLIM/NATS transport (preferred), AGNTCY HTTP containers,
-        or in-process based on configuration (SPEC-1525).
+        per SPEC-1802 canonical dispatch (SLIM → NATS → HTTP → 503).
         Wrapped in trace_agent_operation() span (SPEC-1539).
         """
         from src.multi_tenant.otel_tracing import record_token_usage, trace_agent_operation
@@ -176,21 +231,9 @@ class AgentDispatchMixin:
                     span.set_attribute("dispatch.mode", "http")
                     return await self._call_intent_classifier_http(message, system_prompt)
                 except Exception as exc:
-                    logger.warning("HTTP IC call failed, falling back to in-process: %s", exc)
-            # SPEC-1780: Enforce transport requirement in deployed environments
+                    logger.warning("HTTP IC call failed: %s", exc)
+            # SPEC-1802 / DCL-002: All tiers exhausted — 503. No in-process fallback.
             self._require_transport_or_fail("intent-classifier")
-            span.set_attribute("dispatch.mode", "in-process")
-            result = await self._call_intent_classifier_direct(message, system_prompt)
-            # Record token usage if available (SPEC-1540)
-            if "usage" in result:
-                usage = result["usage"]
-                record_token_usage(
-                    span,
-                    usage.get("model", "gpt-4o-mini"),
-                    usage.get("prompt_tokens", 0),
-                    usage.get("completion_tokens", 0),
-                )
-            return result
         except Exception:
             span.set_status(trace.StatusCode.ERROR)  # type: ignore[attr-defined]
             raise
@@ -244,7 +287,7 @@ class AgentDispatchMixin:
         """Retrieve relevant knowledge for the customer message.
 
         Routes via SLIM/NATS transport (preferred), AGNTCY containers,
-        or in-process based on configuration (SPEC-1525).
+        per SPEC-1802 canonical dispatch (SLIM → NATS → HTTP → 503).
         Wrapped in trace_agent_operation span (SPEC-1539).
         """
         from src.multi_tenant.otel_tracing import trace_agent_operation
@@ -267,11 +310,9 @@ class AgentDispatchMixin:
                     span.set_attribute("dispatch.mode", "http")
                     return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
                 except Exception as exc:
-                    logger.warning("HTTP KR call failed, falling back to in-process: %s", exc)
-            # SPEC-1780: Enforce transport requirement in deployed environments
+                    logger.warning("HTTP KR call failed: %s", exc)
+            # SPEC-1802 / DCL-002: All tiers exhausted — 503. No in-process fallback.
             self._require_transport_or_fail("knowledge-retrieval")
-            span.set_attribute("dispatch.mode", "in-process")
-            return await self._call_knowledge_retrieval_direct(message, intent, system_prompt)
         except Exception:
             span.set_status(trace.StatusCode.ERROR)
             raise
@@ -371,7 +412,7 @@ class AgentDispatchMixin:
     ) -> AsyncGenerator[str, None]:
         """Generate a streaming AI response.
 
-        Routes via transport → HTTP → in-process (SPEC-1536, SPEC-1537).
+        Routes per SPEC-1802 canonical dispatch: SLIM → NATS → HTTP → 503 (SPEC-1536, SPEC-1537).
         Transport streaming uses hybrid SSE-over-transport for the RG
         container when SLIM/NATS is active.
 
@@ -403,18 +444,10 @@ class AgentDispatchMixin:
                     yield chunk
                 return
             except Exception as exc:
-                logger.warning("HTTP RG stream failed, falling back to in-process: %s", exc)
+                logger.warning("HTTP RG stream failed: %s", exc)
 
-        # SPEC-1780: Enforce transport requirement in deployed environments
+        # SPEC-1802 / DCL-002: All tiers exhausted — 503. No in-process fallback.
         self._require_transport_or_fail("response-generator")
-
-        # Priority 3: In-process agent (fallback — local/development only)
-        async for chunk in self._call_response_generator_stream_direct(
-            customer_message, intent, knowledge_context,
-            system_prompt, budget, model,
-            conversation_history=conversation_history,
-        ):
-            yield chunk
 
     async def _call_response_generator_stream_transport(
         self,
@@ -620,26 +653,8 @@ class AgentDispatchMixin:
                 except Exception as exc:
                     logger.warning("HTTP co-pilot call failed: %s", exc)
 
-            # SPEC-1780: Enforce transport requirement in deployed environments
+            # SPEC-1802 / DCL-002: All tiers exhausted — 503. No in-process fallback.
             self._require_transport_or_fail("co-pilot")
-
-            # Tier 3: In-process direct (local/development only)
-            span.set_attribute("dispatch.mode", "in-process")
-            co_pilot = getattr(self, "_copilot_agent", None)
-            if co_pilot:
-                result = await co_pilot.process(payload, {
-                    "x-tenant-id": getattr(self, "_current_tenant_id", ""),
-                    "x-conversation-id": getattr(self, "_current_conversation_id", ""),
-                })
-                return result
-
-            return {
-                "response": "Co-pilot agent is not configured.",
-                "sources": [],
-                "model": "",
-                "tokens_input": 0,
-                "tokens_output": 0,
-            }
         except Exception:
             span.set_status(trace.StatusCode.ERROR)
             raise

@@ -22,6 +22,54 @@ from typing import Any
 
 DB_PATH = Path(__file__).parent / "knowledge.db"
 
+# ---------------------------------------------------------------------------
+# Transport/Container Governance Gate (Phase 0, INSIGHTS-2026-03-27-01-00)
+#
+# These spec IDs require executable test evidence before any linked test
+# can be marked 'pass' or the spec can be promoted to 'verified'.
+# Scoped to transport/container recovery — not a global KB rule.
+# ---------------------------------------------------------------------------
+_TRANSPORT_GATED_SPECS = frozenset({
+    "SPEC-1524",  # SLIM transport activation
+    "SPEC-1525",  # A2A message routing through SLIM/NATS
+    "SPEC-1535",  # Containerized Agent Deployment
+    "SPEC-1536",  # A2A Transport for All Agent Communication
+    "SPEC-1537",  # Streaming Response Generation Over Transport
+    "SPEC-1802",  # Agent Container Transport Priority
+})
+
+class TransportEvidenceGateError(ValueError):
+    """Raised when a transport/container test or spec promotion lacks executable evidence."""
+
+
+def _resolve_test_file(test_file: str | None) -> Path | None:
+    """Resolve a test_file path against the repo root."""
+    if not test_file:
+        return None
+    # Try relative to DB_PATH's grandparent (repo root = knowledge-db/../../)
+    repo_root = DB_PATH.parent.parent
+    candidate = repo_root / test_file
+    return candidate if candidate.is_file() else None
+
+
+def _validate_transport_test_pass(test_file: str | None, spec_id: str) -> None:
+    """Block last_result='pass' for transport-gated specs without executable evidence."""
+    if spec_id not in _TRANSPORT_GATED_SPECS:
+        return
+    if not test_file:
+        raise TransportEvidenceGateError(
+            f"Cannot mark test as 'pass' for transport-gated spec {spec_id}: "
+            f"test_file is required (must be a real, executable test file path). "
+            f"Phase 0 governance gate — see INSIGHTS-2026-03-27-01-00.md."
+        )
+    if not _resolve_test_file(test_file):
+        raise TransportEvidenceGateError(
+            f"Cannot mark test as 'pass' for transport-gated spec {spec_id}: "
+            f"test_file '{test_file}' does not exist on disk. "
+            f"Phase 0 governance gate — executable evidence requires a real file."
+        )
+
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS specifications (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -475,6 +523,9 @@ class KnowledgeDB:
                   as default 'requirement'.
         """
         type = self._auto_detect_spec_type(id, type)
+        # Phase 0 transport governance gate: block verified without executable evidence
+        if status == "verified" and id in _TRANSPORT_GATED_SPECS:
+            self._validate_transport_spec_verification(id)
         version = self._next_spec_version(id)
         assertions_json = json.dumps(assertions) if assertions else None
         tags_json = json.dumps(tags) if tags else None
@@ -530,6 +581,10 @@ class KnowledgeDB:
         else:
             assertions_json = current["assertions"]
 
+        # Phase 0 transport governance gate: block verified without executable evidence
+        if status == "verified" and id in _TRANSPORT_GATED_SPECS:
+            self._validate_transport_spec_verification(id)
+
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO specifications
@@ -541,6 +596,43 @@ class KnowledgeDB:
         )
         conn.commit()
         return self.get_spec(id)
+
+    def _validate_transport_spec_verification(self, spec_id: str) -> None:
+        """Block promotion to 'verified' for transport-gated specs without executable evidence.
+
+        All linked tests must have:
+        - test_file IS NOT NULL (executable test exists)
+        - last_result = 'pass'
+        """
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT id, test_file, last_result FROM current_tests WHERE spec_id = ?",
+            (spec_id,),
+        ).fetchall()
+        if not rows:
+            raise TransportEvidenceGateError(
+                f"Cannot promote {spec_id} to 'verified': no linked tests found. "
+                f"Phase 0 governance gate — executable test evidence required."
+            )
+        for row in rows:
+            if not row["test_file"]:
+                raise TransportEvidenceGateError(
+                    f"Cannot promote {spec_id} to 'verified': test {row['id']} "
+                    f"has no test_file (no executable evidence). "
+                    f"Phase 0 governance gate — see INSIGHTS-2026-03-27-01-00.md."
+                )
+            if not _resolve_test_file(row["test_file"]):
+                raise TransportEvidenceGateError(
+                    f"Cannot promote {spec_id} to 'verified': test {row['id']} "
+                    f"has test_file='{row['test_file']}' which does not exist on disk. "
+                    f"Phase 0 governance gate — executable evidence requires a real file."
+                )
+            if row["last_result"] != "pass":
+                raise TransportEvidenceGateError(
+                    f"Cannot promote {spec_id} to 'verified': test {row['id']} "
+                    f"has last_result='{row['last_result']}', not 'pass'. "
+                    f"Phase 0 governance gate."
+                )
 
     def get_spec(self, spec_id: str) -> dict[str, Any] | None:
         """Get the current (latest) version of a specification."""
@@ -1137,6 +1229,9 @@ class KnowledgeDB:
             test_type: 'unit', 'integration', 'e2e', 'manual', or 'assertion'.
             expected_outcome: What constitutes PASS — stated in human-readable terms.
         """
+        # Phase 0 transport governance gate
+        if last_result == "pass":
+            _validate_transport_test_pass(test_file, spec_id)
         version = self._next_test_version(id)
         conn = self._get_conn()
         conn.execute(
@@ -1174,6 +1269,9 @@ class KnowledgeDB:
         expected_outcome = fields.get("expected_outcome", current["expected_outcome"])
         last_result = fields.get("last_result", current["last_result"])
         last_executed_at = fields.get("last_executed_at", current["last_executed_at"])
+        # Phase 0 transport governance gate
+        if last_result == "pass":
+            _validate_transport_test_pass(test_file, spec_id)
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO tests

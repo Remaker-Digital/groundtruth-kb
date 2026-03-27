@@ -115,18 +115,18 @@ def register_health_endpoints(app: FastAPI) -> None:
         sdk_status = get_sdk_status()
         result["agntcy_sdk"] = sdk_status
 
-        # SPEC-1802 / SPEC-1780: In deployed environments, /ready returns 503
-        # when transport is not active. HTTP containers are failure mode, not ready.
+        # SPEC-1802 / DCL-002: ALL environments require transport — /ready returns
+        # 503 when transport is not active. No in-process fallback exists.
         environment = os.environ.get("ENVIRONMENT", "development").lower()
         active_tier = sdk_status.get("active_tier", "http_failure_mode")
-        if environment in ("staging", "production") and not sdk_status.get("transport_active"):
+        if not sdk_status.get("transport_active"):
             from starlette.responses import JSONResponse
 
             result["status"] = "not_ready"
             result["transport_enforcement"] = (
                 f"AGNTCY transport not active in {environment}. "
                 f"Current tier: {active_tier}. "
-                "SPEC-1802 requires SLIM or NATS transport for deployed environments."
+                "SPEC-1802 requires SLIM or NATS transport in ALL environments."
             )
             return JSONResponse(status_code=503, content=result)
 

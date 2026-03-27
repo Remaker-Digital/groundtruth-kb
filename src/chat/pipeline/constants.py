@@ -17,8 +17,8 @@ import os
 # agent containers (HTTP) or calls Azure OpenAI directly.
 #
 # Default: True — route through AGNTCY agent containers (SPEC-1534).
-# AGNTCY SDK is mandatory. In-process agents serve as fallback when
-# containers are unavailable, not as the primary dispatch path.
+# SPEC-1802: Transport priority is SLIM → NATS → HTTP(S) → 503 in ALL
+# environments. In-process dispatch is NOT part of the canonical pipeline.
 # ---------------------------------------------------------------------------
 USE_AGENT_CONTAINERS = os.environ.get(
     "USE_AGENT_CONTAINERS", "true"
