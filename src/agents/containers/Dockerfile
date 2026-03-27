@@ -41,7 +41,7 @@ COPY src/ src/
 # Environment defaults
 ENV AGENT_MODULE=${AGENT_MODULE}
 ENV PORT=8080
-ENV LOG_LEVEL=INFO
+ENV LOG_LEVEL=info
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \

@@ -51,8 +51,8 @@ AGENT_CONTAINER_APPS: dict[str, str] = {
     "agent-intent-classifier": "agent-red-intent-classifier",
     "agent-knowledge-retrieval": "agent-red-knowledge-retrieval",
     "agent-response-generator": "agent-red-response-generator",
-    "agent-escalation-handler": "agent-red-escalation",
-    "agent-analytics-collector": "agent-red-analytics",
+    "agent-escalation-handler": "agent-red-escalation-handler",
+    "agent-analytics-collector": "agent-red-analytics-collector",
     "agent-critic-supervisor": "agent-red-critic-supervisor",
 }
 
