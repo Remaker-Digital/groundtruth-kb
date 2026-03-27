@@ -218,9 +218,12 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       // SPEC-1644: Append ?tenant= to every API call so the middleware can
       // scope partition lookups.  Handles both bare paths (/api/foo) and
       // paths that already contain query parameters (/api/foo?bar=1).
+      // Fallback: when URL lacks ?tenant= (e.g. session token login),
+      // derive from tenantContext which is populated after validate-key.
+      const effectiveTenantId = urlTenantId || tenantContext?.tenantId || '';
       let url = `${API_BASE_URL}${path}`;
-      if (urlTenantId && !url.includes('tenant=')) {
-        url += url.includes('?') ? `&tenant=${urlTenantId}` : `?tenant=${urlTenantId}`;
+      if (effectiveTenantId && !url.includes('tenant=')) {
+        url += url.includes('?') ? `&tenant=${effectiveTenantId}` : `?tenant=${effectiveTenantId}`;
       }
 
       const resp = await fetch(url, {
@@ -233,7 +236,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       }
       return resp;
     },
-    [resolvedAuth.type, resolvedAuth.value, onLogout, urlTenantId],
+    [resolvedAuth.type, resolvedAuth.value, onLogout, urlTenantId, tenantContext?.tenantId],
   );
 
   // ---- Notification handler (Mantine notifications) ----------------------
