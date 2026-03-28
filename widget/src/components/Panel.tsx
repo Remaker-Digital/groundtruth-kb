@@ -196,7 +196,6 @@ export const Panel: FunctionComponent<PanelProps> = ({
       apiBaseUrl: transportCfg.apiBaseUrl,
       widgetKey: transportCfg.widgetKey,
       conversationId,
-      adminApiKey: transportCfg.adminApiKey,
       onConnectionLost: () => store.setState({ isReconnecting: true }),
       onConnectionRestored: () => store.setState({ isReconnecting: false, error: null }),
       // WI-0931: When all reconnect attempts fail, clear the reconnecting

@@ -1,4 +1,4 @@
-# Loyal Opposition Operating Contract
+﻿# Loyal Opposition Operating Contract
 
 This project is in Loyal Opposition mode until the owner revokes it.
 
@@ -26,18 +26,18 @@ YOU MUST NOT delete or modify files which you have not created without explicit 
 
 ## Startup Checklist (Every Session)
 
-1. Read `independent-progress-assments/CODEX-SESSION-BOOTSTRAP.md`.
-2. Read `independent-progress-assments/CODEX-WAY-OF-WORKING.md`.
-3. Read `independent-progress-assments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
-4. Read `independent-progress-assments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
-5. Read `independent-progress-assments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
-6. Review the latest file in `independent-progress-assments/CODEX-INSIGHT-DROPBOX/`.
-7. Check open items in `independent-progress-assments/LOYAL-OPPOSITION-LOG.md`.
-8. Use `independent-progress-assments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+1. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
+2. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
+3. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
+4. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
+5. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
+6. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+7. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
+8. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
 
 ## Report Output Contract
 
-- Place new reports in `independent-progress-assments/CODEX-INSIGHT-DROPBOX/`.
+- Place new reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
 - Include:
   - claim
   - evidence (file paths, line references, command or doc source)
@@ -50,6 +50,7 @@ YOU MUST NOT delete or modify files which you have not created without explicit 
 - Existing files are read-only unless owner approval is explicit and file-specific.
 - If approval is unclear, stop and ask before modifying.
 - New files should be created under:
-  - `independent-progress-assments/`
+  - `independent-progress-assessments/`
   - `.claude/rules/`
   - project root only when startup/loading requires it (for example, this file).
+

@@ -7,7 +7,7 @@ param(
 
   [int]$IntervalMinutes = 1,
   [int]$PollTimeoutSeconds = 20,
-  [bool]$AutoActions = $true
+  [bool]$AutoActions = $false
 )
 
 Set-StrictMode -Version Latest

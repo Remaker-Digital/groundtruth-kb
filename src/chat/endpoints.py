@@ -782,7 +782,7 @@ async def report_issue(
 
     # Verify conversation exists for this tenant
     try:
-        state = await session.get_state(
+        state = await session.get_conversation(
             tenant_id=ctx.tenant_id,
             conversation_id=conversation_id,
         )
@@ -1043,7 +1043,7 @@ async def update_consent(
 
     # Verify conversation exists
     try:
-        state = await session.get_state(
+        state = await session.get_conversation(
             tenant_id=ctx.tenant_id,
             conversation_id=conversation_id,
         )

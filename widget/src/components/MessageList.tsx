@@ -234,7 +234,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
         }}
       >
         {/* Greeting message at top of conversation — left-aligned bubble */}
-        {greetingMessage && messages.length === 0 && (
+        {(greetingMessage || (quickActions && quickActions.length > 0)) && messages.length === 0 && (
           <>
             {/* "Today" date separator */}
             <div
@@ -261,7 +261,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
             </div>
 
             {/* Greeting bubble — agent avatar + message */}
-            <div
+            {greetingMessage && <div
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -319,7 +319,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
                   {greetingMessage}
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Quick action prompt buttons (WI #228) */}
             {quickActions && quickActions.length > 0 && onQuickAction && (

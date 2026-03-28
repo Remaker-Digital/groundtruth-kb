@@ -189,8 +189,13 @@ def register_middleware(app: FastAPI) -> None:
     # Must be added LAST so it wraps ALL other middleware.
     # This ensures CORS headers appear on 429, 401, 403, 503 responses
     # from rate limiting, auth, and other middleware — not just 200s.
-    _cors_origins = os.environ.get("APP_CORS_ORIGINS", "*").split(",")
-    _cors_origin_regex = os.environ.get("APP_CORS_ORIGIN_REGEX", None)
+    _cors_origins = os.environ.get("APP_CORS_ORIGINS", "").split(",")
+    _cors_origins = [o.strip() for o in _cors_origins if o.strip()]
+    _cors_origin_regex = os.environ.get(
+        "APP_CORS_ORIGIN_REGEX",
+        # Allow any Shopify storefront, our own gateway, and localhost for dev
+        r"https://.*\.myshopify\.com|https://.*\.azurecontainerapps\.io|http://localhost:\d+",
+    )
 
     app.add_middleware(
         CORSMiddleware,

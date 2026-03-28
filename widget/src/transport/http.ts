@@ -28,9 +28,6 @@ export interface TransportConfig {
   apiBaseUrl: string;
   /** Publishable widget key (pk_live_...). */
   widgetKey: string;
-  /** Admin API key for Co-pilot mode (SPEC-1562). When set, the widget
-   *  authenticates as a team member, routing messages to the Co-pilot agent. */
-  adminApiKey?: string;
 }
 
 let _config: TransportConfig | null = null;
@@ -80,22 +77,15 @@ async function request<T>(
   body?: unknown,
   options?: RequestOptions,
 ): Promise<ApiResponse<T>> {
-  const { apiBaseUrl, widgetKey, adminApiKey } = getTransportConfig();
+  const { apiBaseUrl, widgetKey } = getTransportConfig();
   const url = `${apiBaseUrl}${path}`;
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryBaseDelay = options?.retryBaseDelayMs ?? 1000;
 
-  // SPEC-1562 + SPEC-1644: Co-pilot mode uses X-API-Key for chat
-  // endpoints but X-Widget-Key for config (which doesn't carry ?tenant=).
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Widget-Key': widgetKey,
   };
-  const isChatPath = path.startsWith('/api/chat/') || path.startsWith('/ws/chat/');
-  if (adminApiKey && isChatPath) {
-    headers['X-API-Key'] = adminApiKey;
-  } else {
-    headers['X-Widget-Key'] = widgetKey;
-  }
 
   let lastError: ApiResponse<T> | null = null;
 

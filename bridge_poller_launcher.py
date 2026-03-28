@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -69,10 +70,88 @@ def _read_pid(pid_file: Path) -> int | None:
         return None
 
 
-def _write_pid(pid_file: Path, pid: int, agent: str) -> None:
-    pid_file.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"pid": pid, "agent": agent, "started_at": _now()}
-    pid_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+def _read_state(state_file: Path) -> dict | None:
+    try:
+        data = json.loads(state_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _parse_iso(ts: str | None) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _heartbeat_ttl_seconds(timeout_seconds: int, poll_interval_ms: int) -> float:
+    poll_interval_seconds = max(1.0, poll_interval_ms / 1000.0)
+    return max(30.0, float(timeout_seconds) + poll_interval_seconds + 5.0)
+
+
+def _discover_running_poller(
+    pid_file: Path,
+    state_file: Path,
+    *,
+    agent: str,
+    heartbeat_ttl_seconds: float,
+) -> dict | None:
+    state = _read_state(state_file) or {}
+    state_pid = int(state.get("pid", 0) or 0)
+    state_agent = state.get("agent")
+    updated_at = _parse_iso(state.get("updated_at"))
+    if (
+        state_pid > 0
+        and state_agent == agent
+        and updated_at is not None
+        and _pid_is_running(state_pid)
+    ):
+        age_seconds = (datetime.now(timezone.utc) - updated_at).total_seconds()
+        if age_seconds <= heartbeat_ttl_seconds:
+            return {
+                "pid": state_pid,
+                "agent": agent,
+                "source": "heartbeat",
+                "updated_at": state.get("updated_at"),
+            }
+
+    current_pid = _read_pid(pid_file)
+    if current_pid and _pid_is_running(current_pid):
+        return {
+            "pid": current_pid,
+            "agent": agent,
+            "source": "pid",
+            "updated_at": state.get("updated_at"),
+        }
+    return None
+
+
+def _wait_for_heartbeat(
+    pid_file: Path,
+    state_file: Path,
+    *,
+    agent: str,
+    expected_pid: int,
+    timeout_seconds: float,
+    heartbeat_ttl_seconds: float,
+) -> dict | None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        running = _discover_running_poller(
+            pid_file,
+            state_file,
+            agent=agent,
+            heartbeat_ttl_seconds=heartbeat_ttl_seconds,
+        )
+        if running and running.get("pid") == expected_pid:
+            return running
+        if not _pid_is_running(expected_pid):
+            break
+        time.sleep(0.1)
+    return None
 
 
 def _start_detached(
@@ -191,10 +270,20 @@ def main() -> int:
     project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", Path(__file__).resolve().parent))
     hooks_dir = project_dir / ".claude" / "hooks"
     pid_file = hooks_dir / f".bridge-poller-{args.agent}.pid"
+    state_file = hooks_dir / f".bridge-poller-state-{args.agent}.json"
+    heartbeat_ttl_seconds = _heartbeat_ttl_seconds(
+        args.timeout_seconds,
+        args.poll_interval_ms,
+    )
 
-    current_pid = _read_pid(pid_file)
-    if current_pid and _pid_is_running(current_pid):
-        payload = {"ok": True, "running": True, "pid": current_pid, "agent": args.agent}
+    running = _discover_running_poller(
+        pid_file,
+        state_file,
+        agent=args.agent,
+        heartbeat_ttl_seconds=heartbeat_ttl_seconds,
+    )
+    if running:
+        payload = {"ok": True, "running": True, **running}
         if args.json_output:
             print(json.dumps(payload))
         else:
@@ -211,15 +300,25 @@ def main() -> int:
             limit=args.limit,
             auto_actions=args.auto_actions,
         )
-        # Validate the daemon stayed alive after spawn.
-        time_to_wait = 0.3
-        import time
-        time.sleep(time_to_wait)
-        if not _pid_is_running(new_pid):
-            raise RuntimeError("bridge poller exited immediately after launch")
+        running = _wait_for_heartbeat(
+            pid_file,
+            state_file,
+            agent=args.agent,
+            expected_pid=new_pid,
+            timeout_seconds=5.0,
+            heartbeat_ttl_seconds=heartbeat_ttl_seconds,
+        )
+        if not running:
+            running = _discover_running_poller(
+                pid_file,
+                state_file,
+                agent=args.agent,
+                heartbeat_ttl_seconds=heartbeat_ttl_seconds,
+            )
+        if not running:
+            raise RuntimeError("bridge poller did not publish a heartbeat after launch")
 
-        _write_pid(pid_file, new_pid, args.agent)
-        payload = {"ok": True, "running": True, "pid": new_pid, "agent": args.agent}
+        payload = {"ok": True, "running": True, **running}
         if args.json_output:
             print(json.dumps(payload))
         else:

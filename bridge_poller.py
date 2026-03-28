@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -91,6 +92,14 @@ def _save_state(path: Path, state: dict) -> None:
         pass
 
 
+def _save_json(path: Path, payload: dict) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _append_log(path: Path, message: str) -> None:
     line = f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
     try:
@@ -116,7 +125,47 @@ def _is_protocol_ack(item: dict) -> bool:
     return False
 
 
-def _handle_inbox(bridge, agent: str, peer: str, log_file: Path, *, write_enabled: bool) -> dict:
+def _launch_codex_wake(project_dir: Path, message_ids: list[str], log_file: Path) -> bool:
+    if not message_ids:
+        return False
+
+    python_exe = Path(sys.executable)
+    pythonw_exe = python_exe.with_name("pythonw.exe")
+    runner = pythonw_exe if pythonw_exe.exists() else python_exe
+    wake_script = project_dir / "scripts" / "codex_bridge_wake.py"
+    if not wake_script.exists():
+        _append_log(log_file, f"wake skipped: script missing at {wake_script}")
+        return False
+
+    cmd = [str(runner), str(wake_script), "--trigger", "poller-notification"]
+    for message_id in sorted(set(message_ids)):
+        cmd.extend(["--message-id", message_id])
+
+    try:
+        popen_kwargs: dict[str, object] = {
+            "cwd": str(project_dir),
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        subprocess.Popen(cmd, **popen_kwargs)
+        _append_log(log_file, f"wake launched for message_ids={','.join(sorted(set(message_ids)))}")
+        return True
+    except Exception as exc:
+        _append_log(log_file, f"wake launch failed for {message_ids}: {exc}")
+        return False
+
+
+def _handle_inbox(
+    bridge,
+    agent: str,
+    peer: str,
+    log_file: Path,
+    *,
+    project_dir: Path,
+    write_enabled: bool,
+) -> dict:
     """
     Handle new inbox items for `agent`.
 
@@ -129,9 +178,11 @@ def _handle_inbox(bridge, agent: str, peer: str, log_file: Path, *, write_enable
         "resolved_acks": 0,
         "readonly_skips": 0,
         "errors": 0,
+        "wake_launched": 0,
     }
     inbox = bridge.list_inbox(agent=agent, status="new", limit=100)
     items = inbox.get("items", [])
+    wake_candidates: list[str] = []
 
     for item in items:
         if item.get("sender") != peer:
@@ -149,6 +200,8 @@ def _handle_inbox(bridge, agent: str, peer: str, log_file: Path, *, write_enable
                 log_file,
                 f"detected (read-only mode, no auto-ack): {message_id} :: {subject}",
             )
+            if agent == "codex" and not _is_protocol_ack(item):
+                wake_candidates.append(message_id)
             continue
 
         try:
@@ -186,6 +239,9 @@ def _handle_inbox(bridge, agent: str, peer: str, log_file: Path, *, write_enable
             summary["errors"] += 1
             _append_log(log_file, f"error handling {message_id}: {exc}")
 
+    if wake_candidates and _launch_codex_wake(project_dir, wake_candidates, log_file):
+        summary["wake_launched"] = len(set(wake_candidates))
+
     return summary
 
 
@@ -212,15 +268,30 @@ def run(args: argparse.Namespace) -> int:
     hooks_dir = project_dir / ".claude" / "hooks"
     lock_file = hooks_dir / f".bridge-poller-{args.agent}.lock"
     state_file = hooks_dir / f".bridge-poller-state-{args.agent}.json"
+    pid_file = hooks_dir / f".bridge-poller-{args.agent}.pid"
     log_file = hooks_dir / f".bridge-poller-{args.agent}.log"
 
     with _FileLock(lock_file):
         state = _load_state(state_file)
         last_event_id = int(state.get("last_event_id", 0) or 0)
+        process_started_at = state.get("started_at") or _now()
 
         def _checkpoint() -> None:
             state["last_event_id"] = last_event_id
             state["updated_at"] = _now()
+            if not args.once:
+                state["pid"] = os.getpid()
+                state["agent"] = args.agent
+                state["started_at"] = process_started_at
+                _save_json(
+                    pid_file,
+                    {
+                        "pid": os.getpid(),
+                        "agent": args.agent,
+                        "started_at": process_started_at,
+                        "updated_at": state["updated_at"],
+                    },
+                )
             _save_state(state_file, state)
 
         if args.once:
@@ -232,7 +303,12 @@ def run(args: argparse.Namespace) -> int:
                 )
                 last_event_id = max(last_event_id, int(events.get("last_event_id", last_event_id)))
                 handled = _handle_inbox(
-                    bridge, args.agent, peer, log_file, write_enabled=write_enabled
+                    bridge,
+                    args.agent,
+                    peer,
+                    log_file,
+                    project_dir=project_dir,
+                    write_enabled=write_enabled,
                 )
                 _checkpoint()
                 print(
@@ -251,6 +327,7 @@ def run(args: argparse.Namespace) -> int:
                 _checkpoint()
                 return 1
 
+        _checkpoint()
         _append_log(log_file, f"poller start: agent={args.agent}, last_event_id={last_event_id}")
         while True:
             try:
@@ -267,7 +344,12 @@ def run(args: argparse.Namespace) -> int:
                         int(event_batch.get("last_event_id", last_event_id)),
                     )
                     handled = _handle_inbox(
-                        bridge, args.agent, peer, log_file, write_enabled=write_enabled
+                        bridge,
+                        args.agent,
+                        peer,
+                        log_file,
+                        project_dir=project_dir,
+                        write_enabled=write_enabled,
                     )
                     if (
                         handled["detected"]
@@ -275,6 +357,7 @@ def run(args: argparse.Namespace) -> int:
                         or handled["resolved_acks"]
                         or handled["readonly_skips"]
                         or handled["errors"]
+                        or handled["wake_launched"]
                     ):
                         _append_log(
                             log_file,
@@ -283,6 +366,7 @@ def run(args: argparse.Namespace) -> int:
                             f"accepted={handled['accepted']} "
                             f"resolved_acks={handled['resolved_acks']} "
                             f"readonly_skips={handled['readonly_skips']} "
+                            f"wake_launched={handled['wake_launched']} "
                             f"errors={handled['errors']} "
                             f"last_event_id={last_event_id}",
                         )

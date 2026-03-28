@@ -140,13 +140,8 @@ interface AgentRedSDK {
       }
     : null;
 
-  // SPEC-1562: Read admin API key for Co-pilot mode.
-  // When the widget is embedded in the admin panel, the admin's per-user
-  // API key is passed so chat messages authenticate as a team member.
-  const adminApiKey = scriptTag.getAttribute('data-admin-key') || undefined;
-
   // Configure transport
-  configureTransport({ apiBaseUrl, widgetKey, adminApiKey });
+  configureTransport({ apiBaseUrl, widgetKey });
 
   // Fetch config and initialize
   init(widgetKey, apiBaseUrl, dataOverrides, shopifyCustomer).catch((err) => {

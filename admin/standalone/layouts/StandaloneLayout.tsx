@@ -539,46 +539,16 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
           return;
         }
 
-        // Create the widget script tag with admin-specific overrides
+        // Inject the widget script — identical to storefront injection.
+        // The widget fetches its own config from /api/config using the widget key.
+        // No overrides: the widget behaves identically in admin and storefront.
+        // Co-pilot knowledge is additive — the backend injects Agent Red docs
+        // when the conversation originates from an admin session context.
         const script = document.createElement('script');
         script.id = 'agent-red-admin-widget';
-        // In dev mode, use base-relative URL so Vite serves the local build from public/
         script.src = import.meta.env.DEV ? `${import.meta.env.BASE_URL}widget.js` : `${apiUrl}/widget.js`;
         script.setAttribute('data-widget-key', widgetKey);
         script.setAttribute('data-api-url', apiUrl);
-        script.setAttribute('data-auto-open', 'false');
-        script.setAttribute('data-auto-open-delay', '0');
-        script.setAttribute('data-context', 'admin');
-        // SPEC-1562: Co-pilot mode greeting and branding overrides
-        const isCoPilot = resolvedAuth.type === 'api_key' && resolvedAuth.value;
-        script.setAttribute('data-greeting',
-          isCoPilot
-            ? 'Hi! I\u2019m your Agent Red Co-pilot. I can help you with admin tasks, configuration, analytics, and platform features. What would you like to know?'
-            : (config.greeting_message
-              || 'Hi! I\u2019m your Agent Red AI assistant. Ask me anything about managing your store, configuring the widget, or understanding your analytics.'));
-        script.setAttribute('data-header-text', isCoPilot ? 'Agent Red Co-pilot' : (config.widget_header_text || 'Agent Red Assistant'));
-        script.setAttribute('data-agent-name', isCoPilot ? 'Co-pilot' : (config.widget_agent_display_name || 'Agent Red AI'));
-        script.setAttribute('data-sound-enabled', 'false');
-
-        // SPEC-1562: Pass admin API key for Co-pilot mode. When set, the
-        // widget authenticates as a team member, routing messages to the
-        // Co-pilot agent instead of the customer-facing pipeline.
-        if (resolvedAuth.type === 'api_key' && resolvedAuth.value) {
-          script.setAttribute('data-admin-key', resolvedAuth.value);
-        }
-
-        // Pass widget appearance fields so the widget renders with tenant
-        // brand colors immediately (without waiting for its own /api/config fetch)
-        const appearanceMap: Array<[string, string]> = [
-          ['data-color', 'widget_primary_color'],
-          ['data-position', 'widget_position'],
-        ];
-        for (const [dataAttr, configKey] of appearanceMap) {
-          const val = config[configKey];
-          if (val != null && typeof val === 'string' && val.length > 0) {
-            script.setAttribute(dataAttr, val);
-          }
-        }
 
         document.body.appendChild(script);
       } catch (err) {

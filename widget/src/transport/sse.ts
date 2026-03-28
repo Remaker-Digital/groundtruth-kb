@@ -34,8 +34,6 @@ interface SSEOptions {
   apiBaseUrl: string;
   widgetKey: string;
   conversationId: string;
-  /** Admin API key for Co-pilot mode (SPEC-1562). */
-  adminApiKey?: string;
   onConnectionLost?: () => void;
   onConnectionRestored?: () => void;
   /** Called when all reconnect attempts are exhausted (WI-0931). */
@@ -104,12 +102,7 @@ export class SSEConnection {
 
     // EventSource doesn't support custom headers, so we pass authentication
     // as a query parameter. The backend accepts both header and query param.
-    // SPEC-1562: When adminApiKey is set, use it for Co-pilot mode auth.
-    if (this.options.adminApiKey) {
-      url.searchParams.set('api_key', this.options.adminApiKey);
-    } else {
-      url.searchParams.set('widget_key', this.options.widgetKey);
-    }
+    url.searchParams.set('widget_key', this.options.widgetKey);
 
     // WI #133: Pass tab_id for multi-tab coordination. The backend tracks
     // which tabs are streaming the same conversation and shares connection

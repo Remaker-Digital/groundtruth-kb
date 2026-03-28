@@ -36,6 +36,7 @@ mcp = FastMCP(
 )
 
 Agent = Literal["codex", "prime", "owner", "any"]
+ACTIONABLE_NEW_STATUSES = ("new", "pending")
 
 
 def _now() -> str:
@@ -115,6 +116,21 @@ def _recipient_matches(agent: str, recipient: str) -> bool:
 
 def _thread_correlation_id(row: sqlite3.Row) -> str:
     return row["correlation_id"] or row["id"]
+
+
+def _message_is_protocol_ack(item: dict) -> bool:
+    subject = (item.get("subject") or "").strip().lower()
+    payload = item.get("payload") or {}
+    tags = set(item.get("tags") or [])
+    response_type = str(payload.get("response_type", "")).lower()
+
+    if subject.startswith("accepted:") or subject.startswith("negotiation:"):
+        return True
+    if response_type in {"accepted", "negotiation"}:
+        return True
+    if "protocol" in tags and ("accepted" in tags or "negotiation" in tags):
+        return True
+    return False
 
 
 def _notification_targets(recipient: str) -> list[str]:
@@ -208,7 +224,7 @@ def _claim_message_in_txn(
         return False, "wrong-recipient", row
     if row["status"] == "claimed" and row["claimed_by"] == agent:
         return True, "already-claimed", row
-    if row["status"] != "new":
+    if row["status"] not in ACTIONABLE_NEW_STATUSES:
         return False, row["status"], row
 
     claimed_at = _now()
@@ -216,7 +232,7 @@ def _claim_message_in_txn(
         """
         UPDATE messages
         SET status = 'claimed', claimed_by = ?, claimed_at = ?
-        WHERE id = ? AND status = 'new'
+        WHERE id = ? AND status IN ('new', 'pending')
         """,
         (agent, claimed_at, message_id),
     )
@@ -266,6 +282,133 @@ def _list_notifications(agent: str, after_event_id: int, limit: int) -> list[dic
     return items
 
 
+def resolve_message_reference(
+    message_ref: str,
+    recipient: Literal["codex", "prime"] | None = None,
+) -> dict | None:
+    """
+    Resolve a full bridge message row from an exact ID or a unique short-id prefix.
+    """
+    if not message_ref:
+        return None
+
+    with _conn() as conn:
+        if recipient:
+            exact_row = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE id = ? AND (recipient = ? OR recipient = 'any')
+                LIMIT 1
+                """,
+                (message_ref, recipient),
+            ).fetchone()
+        else:
+            exact_row = conn.execute(
+                "SELECT * FROM messages WHERE id = ? LIMIT 1",
+                (message_ref,),
+            ).fetchone()
+        if exact_row is not None:
+            return _row_to_dict(exact_row)
+
+        like_ref = f"{message_ref}%"
+        if recipient:
+            rows = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE id LIKE ? AND (recipient = ? OR recipient = 'any')
+                ORDER BY created_at DESC
+                LIMIT 3
+                """,
+                (like_ref, recipient),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE id LIKE ?
+                ORDER BY created_at DESC
+                LIMIT 3
+                """,
+                (like_ref,),
+            ).fetchall()
+
+    if len(rows) == 1:
+        return _row_to_dict(rows[0])
+    return None
+
+
+def get_thread_messages(
+    message_ref: str,
+    recipient: Literal["codex", "prime"] | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    resolved = resolve_message_reference(message_ref, recipient=recipient)
+    if resolved is None:
+        return []
+
+    correlation_id = resolved.get("correlation_id") or resolved["id"]
+    with _conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM messages
+            WHERE COALESCE(correlation_id, id) = ?
+            ORDER BY created_at ASC
+            LIMIT ?
+            """,
+            (correlation_id, limit),
+        ).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+
+def describe_thread_context(
+    message_ref: str,
+    recipient: Literal["codex", "prime"] | None = None,
+    limit: int = 100,
+) -> dict | None:
+    resolved = resolve_message_reference(message_ref, recipient=recipient)
+    if resolved is None:
+        return None
+
+    thread_messages = get_thread_messages(
+        resolved["id"],
+        recipient=recipient,
+        limit=limit,
+    )
+
+    non_protocol = [item for item in thread_messages if not _message_is_protocol_ack(item)]
+    latest_non_protocol_codex = next(
+        (
+            item
+            for item in reversed(non_protocol)
+            if item.get("sender") == "codex"
+        ),
+        None,
+    )
+    latest_non_protocol_prime = next(
+        (
+            item
+            for item in reversed(non_protocol)
+            if item.get("sender") == "prime"
+        ),
+        None,
+    )
+    terminal_messages = [
+        item for item in thread_messages if item.get("status") in {"done", "blocked"}
+    ]
+
+    return {
+        "requested_ref": message_ref,
+        "canonical_message": resolved,
+        "thread_correlation_id": resolved.get("correlation_id") or resolved["id"],
+        "thread_messages": thread_messages,
+        "latest_thread_message": thread_messages[-1] if thread_messages else resolved,
+        "latest_non_protocol_codex_message": latest_non_protocol_codex,
+        "latest_non_protocol_prime_message": latest_non_protocol_prime,
+        "terminal_messages": terminal_messages,
+        "already_resolved": resolved.get("status") in {"done", "blocked"},
+    }
+
+
 @mcp.tool()
 def send_message(
     sender: Agent,
@@ -312,7 +455,7 @@ def send_message(
 @mcp.tool()
 def list_inbox(
     agent: Literal["codex", "prime"],
-    status: Literal["new", "claimed", "done", "blocked", "all"] = "new",
+    status: Literal["new", "pending", "claimed", "done", "blocked", "all"] = "new",
     limit: int = 20,
 ) -> dict:
     if limit < 1 or limit > 200:
@@ -321,8 +464,11 @@ def list_inbox(
     where = "(recipient = ? OR recipient = 'any')"
     params: list[object] = [agent]
     if status != "all":
-        where += " AND status = ?"
-        params.append(status)
+        if status == "new":
+            where += " AND status IN ('new', 'pending')"
+        else:
+            where += " AND status = ?"
+            params.append(status)
     params.append(limit)
 
     with _conn() as conn:
@@ -347,7 +493,7 @@ def claim_next(agent: Literal["codex", "prime"]) -> dict:
         row = conn.execute(
             """
             SELECT * FROM messages
-            WHERE (recipient = ? OR recipient = 'any') AND status = 'new'
+            WHERE (recipient = ? OR recipient = 'any') AND status IN ('new', 'pending')
             ORDER BY priority DESC, created_at ASC
             LIMIT 1
             """,

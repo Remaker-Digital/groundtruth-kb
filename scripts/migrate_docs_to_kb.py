@@ -1,4 +1,4 @@
-"""
+﻿"""
 Migrate internal knowledge markdown files to Knowledge DB (GOV-08 compliance).
 
 Reads each internal markdown file and inserts it into the documents table.
@@ -63,7 +63,7 @@ FILES = [
      ["operations", "upgrade", "runbook"], "docs/operations/UPGRADE-RUNBOOK-1.0-TO-1.1.md"),
     ("doc-external-url-reachability", "External URL Reachability Procedure", "procedure",
      ["operations", "testing", "url-reachability"], "docs/operations/external-url-reachability-procedure.md"),
-    # Test procedures (full doc content — KB test_procedures table has structured metadata only)
+    # Test procedures (full doc content â€” KB test_procedures table has structured metadata only)
     ("doc-api-security-procedure", "API Security Test Procedure (full doc)", "test-procedure",
      ["testing", "security", "api"], "docs/operations/api-security-test-procedure.md"),
     ("doc-cq-procedure", "Conversation Quality Test Procedure (full doc)", "test-procedure",
@@ -188,7 +188,7 @@ FILES = [
 ]
 
 # Auto-discover independent assessments
-for f in sorted(glob.glob(str(base / "independent-progress-assments" / "**" / "*.md"), recursive=True)):
+for f in sorted(glob.glob(str(base / "independent-progress-assessments" / "**" / "*.md"), recursive=True)):
     rel = os.path.relpath(f, base).replace("\\", "/")
     fname = os.path.basename(f).replace(".md", "")
     doc_id = "doc-ia-" + fname.lower().replace(" ", "-")[:45]
@@ -257,3 +257,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
