@@ -133,7 +133,10 @@ class CriticEscalationMixin:
                 latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
             )
 
-            yield stage_event("escalation-handler", "completed")
+            yield stage_event(
+                "escalation-handler", "completed",
+                latency_ms=int(budget.stages[-1].elapsed_ms) if budget.stages else None,
+            )
 
         except (PipelineTimeoutError, Exception) as exc:
             logger.warning(

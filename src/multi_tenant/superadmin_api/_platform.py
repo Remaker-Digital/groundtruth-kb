@@ -623,14 +623,36 @@ async def get_infrastructure_topology(
             }
         nodes.append(node)
 
+    # SPEC-1847 / WI-1660: Detect actual transport protocol at runtime.
+    # Static edges declare "SLIM" but runtime may use NATS or HTTP fallback.
+    runtime_transport = "SLIM"  # default
+    try:
+        from src.multi_tenant.agntcy_sdk_integration import get_sdk_status
+        sdk_status = get_sdk_status()
+        active = (sdk_status.get("active_tier") or "slim").upper()
+        if active in ("SLIM", "NATS", "HTTP", "HTTP_FAILURE_MODE"):
+            runtime_transport = active if active != "HTTP_FAILURE_MODE" else "HTTP"
+    except Exception:
+        pass  # Fall back to static if SDK unavailable
+
     # Build edges with traffic metrics
     infra_edges: list[InfrastructureEdge] = []
     for src, tgt, protocol, label in INFRASTRUCTURE_EDGES_DEF:
+        # Replace static "SLIM" protocol with runtime-detected transport
+        # for internal agent-to-agent edges (SPEC-1847)
+        effective_protocol = protocol
+        if protocol == "SLIM":
+            # DCL-002 v4: RG streaming uses gateway in-process, not transport cascade
+            if tgt == "response-generator":
+                effective_protocol = "In-Process"
+            else:
+                effective_protocol = runtime_transport
+
         edge = InfrastructureEdge(
             source=src,
             target=tgt,
             label=label,
-            protocol=protocol,
+            protocol=effective_protocol,
         )
         # Enrich agent-to-agent edges with live metrics
         em = edge_metrics.get((src, tgt))
