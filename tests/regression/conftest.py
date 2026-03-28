@@ -138,18 +138,6 @@ def client():
             "skipping regression tests (API Gateway may be down or subscription suspended)"
         )
 
-    # WI-1642: Credential preflight — detect stale credentials early
-    stale = _check_credentials_valid()
-    if stale:
-        summary = "; ".join(f"{k}: {v}" for k, v in stale.items())
-        import warnings
-        warnings.warn(
-            f"Stale test credentials detected (WI-1642): {summary}. "
-            "Tests requiring these credentials will be skipped. "
-            "Refresh credentials from Key Vault — see REPEATABLE-PROCEDURES.md Section 7.",
-            stacklevel=1,
-        )
-
     with httpx.Client(base_url=PROD_URL, timeout=30.0, follow_redirects=True) as c:
         yield c
 
@@ -174,10 +162,15 @@ def api_key():
 
 
 @pytest.fixture(scope="session")
-def admin_headers(api_key):
-    """Headers for SPA platform admin API calls (/api/superadmin/*)."""
+def admin_headers(api_key, credential_status):
+    """Headers for SPA platform admin API calls (/api/superadmin/*).
+
+    Skips on missing or stale credentials (WI-1642).
+    """
     if not api_key:
         pytest.skip("SUPERADMIN_PREVIEW_API_KEY not set — skipping admin API tests")
+    if "API_KEY" in credential_status:
+        pytest.skip(f"Admin API key is stale: {credential_status['API_KEY']}")
     return {"X-API-Key": api_key}
 
 
@@ -188,14 +181,17 @@ def tenant_key():
 
 
 @pytest.fixture(scope="session")
-def tenant_admin_headers(tenant_key):
+def tenant_admin_headers(tenant_key, credential_status):
     """Headers for tenant-scoped admin API calls (/api/admin/*, /api/dashboard/*).
 
     SPEC-1644: Tenant keys (ar_live_*) require ?tenant= in the URL.
     SPA keys cannot access tenant-scoped endpoints.
+    Skips on missing or stale credentials (WI-1642).
     """
     if not tenant_key:
         pytest.skip("STAGING_REMAKER_TENANT_KEY not set — skipping tenant admin tests")
+    if "TENANT_KEY" in credential_status:
+        pytest.skip(f"Tenant key is stale: {credential_status['TENANT_KEY']}")
     return {"X-API-Key": tenant_key}
 
 
@@ -206,22 +202,34 @@ def tenant_id():
 
 
 @pytest.fixture(scope="session")
-def widget_headers(widget_key):
-    """Headers for widget/chat API calls.
+def credential_status():
+    """WI-1642: Session-scoped credential preflight probe.
 
-    Skips tests if WIDGET_KEY is not set (WI-1642 credential preflight).
+    Runs once per session. Probes each credential against a lightweight
+    endpoint and records which are stale (401/403). Header fixtures
+    consume this to skip-on-stale rather than failing with misleading errors.
     """
-    if not widget_key:
-        pytest.skip("WIDGET_KEY not set — skipping widget API tests")
-    return {"X-Widget-Key": widget_key}
+    stale = _check_credentials_valid() if PROD_URL else {}
+    if stale:
+        import warnings
+        summary = "; ".join(f"{k}: {v}" for k, v in stale.items())
+        warnings.warn(
+            f"Stale test credentials detected (WI-1642): {summary}. "
+            "Tests requiring these credentials will be skipped. "
+            "Refresh credentials from Key Vault — see REPEATABLE-PROCEDURES.md Section 7.",
+            stacklevel=1,
+        )
+    return stale
 
 
 @pytest.fixture(scope="session")
-def credential_status():
-    """Exposes credential preflight results to individual tests.
+def widget_headers(widget_key, credential_status):
+    """Headers for widget/chat API calls.
 
-    Tests can use this to skip gracefully when their specific credential is stale:
-        if 'WIDGET_KEY' in credential_status:
-            pytest.skip(credential_status['WIDGET_KEY'])
+    Skips on missing or stale widget key (WI-1642 credential preflight).
     """
-    return _check_credentials_valid() if PROD_URL else {}
+    if not widget_key:
+        pytest.skip("WIDGET_KEY not set — skipping widget API tests")
+    if "WIDGET_KEY" in credential_status:
+        pytest.skip(f"Widget key is stale: {credential_status['WIDGET_KEY']}")
+    return {"X-Widget-Key": widget_key}
