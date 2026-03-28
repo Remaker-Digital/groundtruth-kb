@@ -362,6 +362,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             response_model = "gpt-4o"  # Default base model
             ab_variant: str | None = None
             ab_experiment_id: str | None = None
+            quality_experiment_variant: str | None = None
+            quality_experiment_id: str | None = None
 
             if (
                 preferences.fine_tuning_enabled
