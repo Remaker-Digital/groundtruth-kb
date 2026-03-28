@@ -111,24 +111,37 @@ class TestGate1TransportTests:
 class TestGate2WidgetTests:
     """Widget E2E tests must exist and be collectible by pytest."""
 
-    def test_widget_e2e_tests_collectible(self):
-        """Widget E2E tests must be collectible (not just file existence)."""
+    def test_widget_conversation_tests_collectible(self):
+        """Widget conversation E2E tests must be collectible."""
         result = subprocess.run(
             [sys.executable, "-m", "pytest",
-             "tests/transport/test_containerized_e2e.py::TestWidgetPath",
+             "tests/transport/test_containerized_e2e.py::TestWidgetConversationPath",
              "--collect-only", "-q"],
             capture_output=True, text=True,
             cwd=str(PROJECT_ROOT), timeout=15,
         )
-        assert "TestWidgetPath" in result.stdout or "selected" in result.stdout, (
-            f"Widget tests not collectible: {result.stdout}"
+        assert "TestWidgetConversationPath" in result.stdout or "selected" in result.stdout, (
+            f"Widget conversation tests not collectible: {result.stdout}"
+        )
+
+    def test_widget_streaming_tests_collectible(self):
+        """Widget streaming E2E tests must be collectible."""
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest",
+             "tests/transport/test_containerized_e2e.py::TestWidgetStreamingPath",
+             "--collect-only", "-q"],
+            capture_output=True, text=True,
+            cwd=str(PROJECT_ROOT), timeout=15,
+        )
+        assert "TestWidgetStreamingPath" in result.stdout or "selected" in result.stdout, (
+            f"Widget streaming tests not collectible: {result.stdout}"
         )
 
     def test_widget_test_has_authenticated_dispatch(self):
-        """TestWidgetPath must contain an authenticated chat request."""
-        from tests.transport.test_containerized_e2e import TestWidgetPath
-        source = inspect.getsource(TestWidgetPath)
-        assert "widget_headers" in source or "X-Widget-Key" in source, (
+        """Widget tests must contain an authenticated chat request."""
+        from tests.transport.test_containerized_e2e import TestWidgetConversationPath
+        source = inspect.getsource(TestWidgetConversationPath)
+        assert "X-Widget-Key" in source, (
             "Widget test must use widget key auth"
         )
         assert "/api/chat" in source, "Widget test must hit /api/chat endpoint"

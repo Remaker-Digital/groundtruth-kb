@@ -223,18 +223,21 @@ class TestEscalationPath:
 
     @requires_test_host
     def test_escalation_path_dispatches_to_handler(self):
-        """An escalation-trigger message must traverse the pipeline.
+        """An escalation-trigger message must produce escalation-specific evidence.
 
-        When agent containers have full LLM access, the IC should classify
-        the intent as "escalation" and trigger the escalation handler.
-        When running in HTTP fallback mode (containers return safe fallback
-        text), the pipeline still completes IC→KR→RG→Critic but without
-        real intent classification.
+        The approved plan requires this test to DISTINGUISH escalation from
+        the normal happy path. Generic pipeline completion is NOT acceptable
+        as escalation proof — that would pass on the same evidence as test 1.
 
-        This test asserts:
-        - Pipeline traversal (IC completed) — always verifiable
-        - Escalation-specific evidence OR fallback pipeline completion
+        Asserts:
+        - stage("intent-classifier", "completed")
+        - Escalation-specific evidence: escalation-handler stage OR
+          escalation-related text in the stream
         - done event
+
+        If the environment cannot produce escalation-specific evidence
+        (e.g., agent containers in HTTP fallback mode without LLM access),
+        this test SKIPS rather than passing with non-escalation evidence.
 
         Authentication: Uses X-Widget-Key (chat endpoints are customer-facing).
         """
@@ -279,10 +282,8 @@ class TestEscalationPath:
                 f"Missing IC stage — intent not classified. Events: {events}"
             )
 
-            # Escalation evidence: either explicit escalation-handler stage,
-            # escalation text in the stream, OR the full pipeline completes
-            # (when in HTTP fallback mode, RG returns safe text — the pipeline
-            # still runs, just without real LLM classification)
+            # Escalation-specific evidence ONLY — no generic pipeline fallback.
+            # Either escalation-handler stage or escalation text in the stream.
             has_escalation_stage = _has_stage(events, "escalation-handler") or any(
                 "escalation" in str(e.get("stage", "")).lower()
                 for e in events
@@ -292,13 +293,13 @@ class TestEscalationPath:
                 "escalat" in json.dumps(e).lower()
                 for e in events
             )
-            has_pipeline_completion = (
-                _has_stage(events, "response-generator")
-                and _has_done_event(events)
-            )
-            assert has_escalation_stage or has_escalation_message or has_pipeline_completion, (
-                f"No escalation or pipeline completion evidence. Events: {events}"
-            )
+
+            if not (has_escalation_stage or has_escalation_message):
+                pytest.skip(
+                    "Escalation-specific evidence not observable in current environment "
+                    "(agent containers likely in HTTP fallback mode without LLM access). "
+                    "Pipeline ran but IC did not classify as escalation intent."
+                )
 
             # Must reach terminal state
             assert _has_done_event(events), "No done event"
