@@ -277,6 +277,128 @@ def verify_all_containers(tag: str) -> bool:
     return all_ok
 
 
+def verify_chat_conversation(fqdn: str, environment: str) -> bool:
+    """Post-deploy smoke test: send a real chat message and verify pipeline completion.
+
+    Creates a conversation via the widget key, consumes the SSE stream, and
+    checks that IC, KR, RG, and Critic stages all complete without errors.
+    This catches issues that health checks miss: CriticPolicy not wired,
+    Critic timeouts, NameErrors in post-Critic code paths, etc.
+
+    Returns True if the pipeline completes successfully.
+    """
+    import json as _json
+
+    # Need a widget key for the target environment
+    widget_key = os.environ.get("DEPLOY_SMOKE_WIDGET_KEY", "")
+    if not widget_key:
+        # Try environment-specific keys
+        if environment == "staging":
+            widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
+        elif environment == "production":
+            widget_key = os.environ.get("PRODUCTION_WIDGET_KEY", "")
+
+    if not widget_key:
+        log("  Chat smoke test: SKIP (no widget key configured)")
+        log("    Set DEPLOY_SMOKE_WIDGET_KEY or STAGING_REMAKER_WIDGET_KEY env var")
+        return True  # Non-fatal skip
+
+    log("Chat conversation smoke test...")
+
+    try:
+        import httpx
+
+        base = f"https://{fqdn}"
+        headers = {
+            "X-Widget-Key": widget_key,
+            "Content-Type": "application/json",
+            "X-Widget-Origin": "https://deploy-smoke-test.internal",
+        }
+
+        # 1. Create conversation
+        resp = httpx.post(
+            f"{base}/api/chat/conversations",
+            headers=headers,
+            json={"initial_message": "Hello"},
+            timeout=30.0,
+        )
+        if resp.status_code != 201:
+            log(f"  [FAIL] Conversation creation: {resp.status_code} {resp.text[:100]}")
+            return False
+
+        conv = resp.json()
+        conv_id = conv["conversation_id"]
+        stream_url = conv.get("stream_url", f"/api/chat/stream/{conv_id}")
+
+        # 2. Consume SSE stream
+        stream = httpx.get(
+            f"{base}{stream_url}",
+            headers={**headers, "Accept": "text/event-stream"},
+            timeout=60.0,
+        )
+        if stream.status_code != 200:
+            log(f"  [FAIL] Stream: {stream.status_code}")
+            return False
+
+        # 3. Parse events and check pipeline stages
+        stages_completed = []
+        has_tokens = False
+        has_error = False
+        has_done = False
+        error_detail = ""
+
+        for line in stream.text.split("\n"):
+            line = line.strip()
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if not payload:
+                continue
+            try:
+                evt = _json.loads(payload)
+                if evt.get("stage") and evt.get("status") == "completed":
+                    stages_completed.append(evt["stage"])
+                elif "text" in evt and "sequence" in evt:
+                    has_tokens = True
+                elif evt.get("code"):
+                    has_error = True
+                    error_detail = f'{evt["code"]}: {evt.get("message", "")[:80]}'
+                elif "conversation_id" in evt and "turn_count" in evt:
+                    has_done = True
+            except _json.JSONDecodeError:
+                pass
+
+        # 4. Verify pipeline completion
+        required_stages = ["intent-classifier", "knowledge-retrieval",
+                           "response-generator", "critic-supervisor"]
+        missing = [s for s in required_stages if s not in stages_completed]
+
+        if has_error:
+            log(f"  [FAIL] Pipeline error: {error_detail}")
+            return False
+
+        if missing:
+            log(f"  [FAIL] Missing stages: {missing}")
+            log(f"    Completed: {stages_completed}")
+            return False
+
+        if not has_tokens:
+            log("  [FAIL] No response tokens received")
+            return False
+
+        if not has_done:
+            log("  [FAIL] Stream did not complete (no done event)")
+            return False
+
+        log(f"  [PASS] Pipeline: {' → '.join(stages_completed)}")
+        log(f"    Tokens: yes, Done: yes, Errors: none")
+        return True
+
+    except Exception as exc:
+        log(f"  [FAIL] Chat smoke test exception: {type(exc).__name__}: {exc}")
+        return False
+
+
 def record_deployment_event(
     fqdn: str,
     environment: str,
@@ -459,7 +581,11 @@ def main() -> int:
     if not containers_ok:
         log("WARNING: Not all containers are healthy with expected tag")
 
-    # 7. Record deployment event
+    # 7. Chat conversation smoke test (post-deploy readiness)
+    #    Proves the pipeline works end-to-end, not just that containers are up.
+    chat_ok = verify_chat_conversation(fqdn, args.environment)
+
+    # 8. Record deployment event
     version_ok = actual == expected_version
     duration = time.monotonic() - deploy_start
     record_deployment_event(
@@ -474,9 +600,12 @@ def main() -> int:
     # Summary
     log("")
     log("=" * 50)
-    icon = "✅" if version_ok else "⚠️"
+    all_ok = version_ok and chat_ok
+    icon = "✅" if all_ok else "⚠️"
     log(f"  {icon} {args.environment}: {actual or 'unknown'}")
     log(f"  URL: https://{fqdn}")
+    if not chat_ok:
+        log(f"  ⚠️  Chat smoke test FAILED — pipeline may not be working")
     log("=" * 50)
 
     _close_log()
