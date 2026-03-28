@@ -412,43 +412,35 @@ class AgentDispatchMixin:
     ) -> AsyncGenerator[str, None]:
         """Generate a streaming AI response.
 
-        Routes directly to HTTP container for RG streaming.
+        Per-interface transport policy (DCL-002 v4, owner-approved 2026-03-28):
+        RG token streaming uses the gateway's in-process ResponseGeneratorAgent
+        as the intended production path. This is not a fallback — it is the
+        correct interface-level choice for token streaming.
 
-        Both SLIM and NATS transports are bypassed for RG streaming because:
-        - SLIM: does not support point-to-point streaming (NotImplementedError
-          in agntcy_app_sdk), and connections drop during long responses due to
-          Container Apps ingress idle timeouts (proven: INSIGHTS-2026-03-28-00-21).
-        - NATS: same connection-drop behavior confirmed empirically (v1.98.58 test).
-          NATS WebSocket idle timeout in Container Apps kills the connection before
-          the nats-py 120s default ping_interval fires.
+        Rationale (INSIGHTS-2026-03-28-01-10, INSIGHTS-2026-03-28-01-20):
+        - SLIM: does not support point-to-point streaming (NotImplementedError)
+        - NATS: connection drops during long streaming (Container Apps idle timeout)
+        - HTTP to RG container: Container Apps outbound networking drops Azure
+          OpenAI streaming connections mid-response (~17 tokens)
+        - Gateway in-process: proven reliable (gateway's Azure OpenAI client
+          streams successfully from the same Container Apps environment)
 
-        HTTP streaming to the RG container is the intended production path for
-        response generation. This is normal operation, not a failure mode.
-
-        Non-streaming agents (IC, KR, CR, EH) continue the full SLIM → NATS → HTTP
-        cascade per SPEC-1802.
+        Non-streaming agents (IC, KR, CR, EH) continue containerized dispatch
+        via SLIM/NATS/HTTP cascade per SPEC-1802.
 
         WI #93-96: The ``model`` parameter allows Layer 4 fine-tuned
         models to override the default gpt-4o for Enterprise tenants
         with the fine-tuning add-on enabled.
         """
-        # RG streaming goes directly to HTTP container.
-        # SLIM proven infeasible (INSIGHTS-2026-03-28-00-21-SLIM-DIAGNOSTIC).
-        # NATS confirmed infeasible (v1.98.58 empirical test — same connection drops).
-        # HTTP is intended, not a fallback — no failure-mode warning.
-        if USE_AGENT_CONTAINERS:
-            try:
-                async for chunk in self._call_response_generator_stream_http(
-                    customer_message, intent, knowledge_context,
-                    system_prompt, budget, model,
-                ):
-                    yield chunk
-                return
-            except Exception as exc:
-                logger.warning("HTTP RG stream failed: %s", exc)
-
-        # SPEC-1802 / DCL-002: All tiers exhausted — 503. No in-process fallback.
-        self._require_transport_or_fail("response-generator")
+        # RG token streaming: gateway in-process (intended production path).
+        # DCL-002 v4: in-process RG streaming is the per-interface transport
+        # decision, not a fallback. Owner-approved 2026-03-28.
+        async for chunk in self._call_response_generator_stream_direct(
+            customer_message, intent, knowledge_context,
+            system_prompt, budget, model,
+            conversation_history=conversation_history,
+        ):
+            yield chunk
 
     async def _call_response_generator_stream_transport(
         self,
