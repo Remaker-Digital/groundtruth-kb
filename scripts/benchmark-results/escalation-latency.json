@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-03-28T09:24:07Z",
+  "test": "escalation_path_latency",
+  "measurement_gap": true,
+  "stages": {
+    "intent-classifier": {
+      "name": "escalation-ic",
+      "tier": "per-interface",
+      "sample_count": 5,
+      "p50_ms": 19,
+      "p95_ms": 23,
+      "p99_ms": 23,
+      "errors": 0
+    },
+    "escalation-handler": {
+      "name": "escalation-handler",
+      "tier": "per-interface",
+      "sample_count": 0,
+      "p50_ms": 0,
+      "p95_ms": 0,
+      "p99_ms": 0,
+      "errors": 0
+    }
+  }
+}

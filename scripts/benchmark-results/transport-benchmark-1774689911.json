@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-03-28T09:25:11Z",
+  "version": "1.98.60",
+  "phase": "4",
+  "test_host_url": "(staging gateway)",
+  "artifacts": {
+    "escalation-latency": {
+      "timestamp": "2026-03-28T09:24:07Z",
+      "test": "escalation_path_latency",
+      "measurement_gap": true,
+      "stages": {
+        "intent-classifier": {
+          "name": "escalation-ic",
+          "tier": "per-interface",
+          "sample_count": 5,
+          "p50_ms": 19,
+          "p95_ms": 23,
+          "p99_ms": 23,
+          "errors": 0
+        },
+        "escalation-handler": {
+          "name": "escalation-handler",
+          "tier": "per-interface",
+          "sample_count": 0,
+          "p50_ms": 0,
+          "p95_ms": 0,
+          "p99_ms": 0,
+          "errors": 0
+        }
+      }
+    },
+    "per-hop-latency": {
+      "timestamp": "2026-03-28T09:22:43Z",
+      "test": "per_hop_stage_latency",
+      "sample_count": 20,
+      "stages": {
+        "intent-classifier": {
+          "name": "ic-latency",
+          "tier": "per-interface",
+          "sample_count": 20,
+          "p50_ms": 19.0,
+          "p95_ms": 26,
+          "p99_ms": 26,
+          "errors": 0
+        },
+        "knowledge-retrieval": {
+          "name": "kr-latency",
+          "tier": "per-interface",
+          "sample_count": 20,
+          "p50_ms": 905.0,
+          "p95_ms": 1267,
+          "p99_ms": 1267,
+          "errors": 0
+        },
+        "response-generator": {
+          "name": "rg-latency",
+          "tier": "per-interface",
+          "sample_count": 20,
+          "p50_ms": 1270.5,
+          "p95_ms": 1932,
+          "p99_ms": 1932,
+          "errors": 0
+        },
+        "critic-supervisor": {
+          "name": "critic-latency",
+          "tier": "per-interface",
+          "sample_count": 20,
+          "p50_ms": 0.0,
+          "p95_ms": 0,
+          "p99_ms": 0,
+          "errors": 0
+        }
+      }
+    },
+    "pipeline-latency": {
+      "timestamp": "2026-03-28T09:23:49Z",
+      "test": "total_pipeline_latency",
+      "benchmarks": [
+        {
+          "name": "total-pipeline",
+          "tier": "end-to-end",
+          "sample_count": 20,
+          "p50_ms": 2188.5,
+          "p95_ms": 5076,
+          "p99_ms": 5076,
+          "errors": 0
+        }
+      ]
+    },
+    "transport-tier": {
+      "timestamp": "2026-03-28T09:25:08Z",
+      "test": "transport_tier_identification",
+      "active_tier": "slim",
+      "transport_active": true,
+      "slim_endpoint": "http://agent-red-slim",
+      "nats_endpoint": "ws://agent-red-nats"
+    },
+    "widget-latency": {
+      "timestamp": "2026-03-28T09:25:07Z",
+      "test": "widget_pipeline_latency",
+      "benchmarks": [
+        {
+          "name": "widget-pipeline",
+          "tier": "widget",
+          "sample_count": 20,
+          "p50_ms": 2020.5,
+          "p95_ms": 2764,
+          "p99_ms": 2764,
+          "errors": 0
+        }
+      ]
+    }
+  }
+}

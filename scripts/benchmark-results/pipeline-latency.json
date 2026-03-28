@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-03-28T09:23:49Z",
+  "test": "total_pipeline_latency",
+  "benchmarks": [
+    {
+      "name": "total-pipeline",
+      "tier": "end-to-end",
+      "sample_count": 20,
+      "p50_ms": 2188.5,
+      "p95_ms": 5076,
+      "p99_ms": 5076,
+      "errors": 0
+    }
+  ]
+}

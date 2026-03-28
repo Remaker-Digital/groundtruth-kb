@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-03-28T09:25:07Z",
+  "test": "widget_pipeline_latency",
+  "benchmarks": [
+    {
+      "name": "widget-pipeline",
+      "tier": "widget",
+      "sample_count": 20,
+      "p50_ms": 2020.5,
+      "p95_ms": 2764,
+      "p99_ms": 2764,
+      "errors": 0
+    }
+  ]
+}
