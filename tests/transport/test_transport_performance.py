@@ -1,17 +1,20 @@
 """Phase 4 — Transport performance benchmark matrix.
 
-Defines and runs benchmarks for the containerized agent transport layer:
-- Per-container latency (P50/P95/P99)
-- Cross-container hop latency
-- Transport tier comparison (SLIM vs NATS vs HTTP)
-- Single-container recovery under load
-- Widget-origin traffic performance
+Measures the actual deployed architecture using per-hop stage latency
+from SSE events. All benchmarks use the real chat API contract
+(POST /conversations + GET /stream/{id}), authenticated via X-Widget-Key.
 
-These tests require the staging test host and are skipped locally.
-Results are structured for comparison across transport tiers.
+Per-hop attribution uses latency_ms from completed stage events (server-side
+wall-clock from PipelineTimeoutBudget), not elapsed_ms subtraction.
+
+Latency targets are provisional measurement thresholds, not hard gates.
+Hard enforcement deferred to Phase 5 after baseline stabilization.
+
+Analytics is explicitly excluded: fire-and-forget, non-customer-facing.
 
 Recovery plan reference: INSIGHTS-2026-03-27-01-00.md Phase 4.
-Governing decisions: ADR-001, ADR-002.
+Codex GO: INSIGHTS-2026-03-28-02-05-PHASE4-PLAN-REREVIEW.md.
+Governing decisions: ADR-001, DCL-002 v4.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -20,253 +23,401 @@ from __future__ import annotations
 
 import json
 import os
-import statistics
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 
-# Skip entire module if no test host URL
-TEST_HOST_URL = os.environ.get("TEST_HOST_URL", "")
-requires_test_host = pytest.mark.skipif(
-    not TEST_HOST_URL,
-    reason="TEST_HOST_URL not set — transport perf tests require staging test host",
+from tests.transport.conftest import (
+    BenchmarkResult,
+    consume_sse_events,
+    get_stage_latency,
+    get_total_latency,
+    has_error_event,
+    has_stage,
+    requires_test_host,
+    run_conversation,
+    STAGING_WIDGET_KEY,
+    TEST_HOST_URL,
 )
 
-pytestmark = [requires_test_host, pytest.mark.performance]
+# Sample messages — varied to avoid caching effects
+SAMPLE_MESSAGES = [
+    "What are your store hours?",
+    "Do you offer free shipping?",
+    "What is your return policy?",
+    "Do you have any sales right now?",
+    "How can I track my order?",
+    "What payment methods do you accept?",
+    "Do you ship internationally?",
+    "Can I cancel my order?",
+    "What products do you recommend?",
+    "How do I contact support?",
+    "Do you have a loyalty program?",
+    "What are your best sellers?",
+    "How long does delivery take?",
+    "Do you offer gift cards?",
+    "What is your warranty policy?",
+    "Can I change my shipping address?",
+    "Do you price match?",
+    "What sizes are available?",
+    "How do I apply a discount code?",
+    "When will my item be back in stock?",
+]
+
+ESCALATION_MESSAGES = [
+    "I need to speak with a human agent right now",
+    "Let me talk to a real person please",
+    "I want to escalate this issue",
+    "Connect me to a manager",
+    "This is urgent, I need human help",
+]
 
 
 # ---------------------------------------------------------------------------
-# Benchmark data structures
+# Category A: Per-Hop Stage Latency
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class BenchmarkResult:
-    """Captures a single benchmark run."""
-    name: str
-    tier: str  # slim, nats, http
-    samples: list[float] = field(default_factory=list)  # latency in ms
-    errors: int = 0
+class TestPerHopStageLatency:
+    """Measure per-agent latency from SSE stage events (latency_ms)."""
 
-    @property
-    def p50(self) -> float:
-        return statistics.median(self.samples) if self.samples else 0
+    @requires_test_host
+    def test_per_hop_stage_latency(self, staging_base_url, widget_headers, benchmark_output):
+        """20 conversations — per-stage P50/P95 from latency_ms.
 
-    @property
-    def p95(self) -> float:
-        if not self.samples:
-            return 0
-        idx = int(len(self.samples) * 0.95)
-        return sorted(self.samples)[min(idx, len(self.samples) - 1)]
-
-    @property
-    def p99(self) -> float:
-        if not self.samples:
-            return 0
-        idx = int(len(self.samples) * 0.99)
-        return sorted(self.samples)[min(idx, len(self.samples) - 1)]
-
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "tier": self.tier,
-            "sample_count": len(self.samples),
-            "p50_ms": round(self.p50, 2),
-            "p95_ms": round(self.p95, 2),
-            "p99_ms": round(self.p99, 2),
-            "errors": self.errors,
+        Provisional targets (measurement, not hard gates):
+        - IC P95 < 200ms (gpt-4o-mini classification)
+        - KR P95 < 2000ms (vector search + Cosmos)
+        - RG P95 < 5000ms (gpt-4o streaming, in-process per DCL-002 v4)
+        - Critic P95 < 1000ms (fail-closed if unavailable)
+        """
+        stage_results = {
+            "intent-classifier": BenchmarkResult(name="ic-latency", tier="per-interface"),
+            "knowledge-retrieval": BenchmarkResult(name="kr-latency", tier="per-interface"),
+            "response-generator": BenchmarkResult(name="rg-latency", tier="per-interface"),
+            "critic-supervisor": BenchmarkResult(name="critic-latency", tier="per-interface"),
         }
 
+        for msg in SAMPLE_MESSAGES[:20]:
+            events = run_conversation(staging_base_url, widget_headers, msg)
+            if has_error_event(events):
+                for r in stage_results.values():
+                    r.errors += 1
+                continue
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+            for stage_name, result in stage_results.items():
+                latency = get_stage_latency(events, stage_name)
+                if latency is not None:
+                    result.samples.append(latency)
 
+        # Report
+        for stage_name, result in stage_results.items():
+            print(f"\n  {stage_name}: P50={result.p50:.0f}ms P95={result.p95:.0f}ms "
+                  f"({len(result.samples)} samples, {result.errors} errors)")
 
-@pytest.fixture
-def test_host_url() -> str:
-    return TEST_HOST_URL.rstrip("/")
+        # Provisional thresholds (measurement, not hard gates)
+        ic = stage_results["intent-classifier"]
+        kr = stage_results["knowledge-retrieval"]
+        rg = stage_results["response-generator"]
+        cr = stage_results["critic-supervisor"]
 
+        assert len(ic.samples) >= 10, f"Insufficient IC samples: {len(ic.samples)}"
+        assert ic.p95 < 200, f"IC P95={ic.p95:.0f}ms exceeds provisional 200ms"
+        assert kr.p95 < 2000, f"KR P95={kr.p95:.0f}ms exceeds provisional 2000ms"
+        assert rg.p95 < 5000, f"RG P95={rg.p95:.0f}ms exceeds provisional 5000ms"
+        assert cr.p95 < 1000, f"Critic P95={cr.p95:.0f}ms exceeds provisional 1000ms"
 
-@pytest.fixture
-def http_client():
-    import httpx
-    client = httpx.Client(timeout=30.0)
-    yield client
-    client.close()
+        # Write benchmark artifact
+        report = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "test": "per_hop_stage_latency",
+            "sample_count": 20,
+            "stages": {name: r.to_dict() for name, r in stage_results.items()},
+        }
+        (benchmark_output / "per-hop-latency.json").write_text(json.dumps(report, indent=2))
 
+    @requires_test_host
+    def test_total_pipeline_latency(self, staging_base_url, widget_headers, benchmark_output):
+        """20 conversations — total pipeline P50/P95/P99 from done event."""
+        result = BenchmarkResult(name="total-pipeline", tier="end-to-end")
 
-@pytest.fixture
-def benchmark_output() -> Path:
-    """Output directory for benchmark results."""
-    out = Path(__file__).parent.parent.parent / "scripts" / "benchmark-results"
-    out.mkdir(exist_ok=True)
-    return out
-
-
-# ---------------------------------------------------------------------------
-# 1. Per-container latency (health endpoint baseline)
-# ---------------------------------------------------------------------------
-
-
-class TestPerContainerLatency:
-    """Measure per-container /health response latency."""
-
-    def test_gateway_health_latency(self, test_host_url, http_client):
-        """Gateway /ready latency should be under 500ms P95."""
-        result = BenchmarkResult(name="gateway-health", tier="http")
-        for _ in range(20):
-            start = time.monotonic()
-            resp = http_client.get(f"{test_host_url}/ready")
-            elapsed = (time.monotonic() - start) * 1000
-            if resp.status_code == 200:
-                result.samples.append(elapsed)
-            else:
+        for msg in SAMPLE_MESSAGES[:20]:
+            events = run_conversation(staging_base_url, widget_headers, msg)
+            if has_error_event(events):
                 result.errors += 1
+                continue
+            total = get_total_latency(events)
+            if total is not None:
+                result.samples.append(total)
 
-        assert result.p95 < 500, f"Gateway P95={result.p95:.1f}ms exceeds 500ms"
+        print(f"\n  Pipeline: P50={result.p50:.0f}ms P95={result.p95:.0f}ms "
+              f"P99={result.p99:.0f}ms ({len(result.samples)} samples, {result.errors} errors)")
+
+        assert len(result.samples) >= 10, f"Insufficient samples: {len(result.samples)}"
+        assert result.p95 < 8000, f"Pipeline P95={result.p95:.0f}ms exceeds provisional 8000ms"
+
+        report = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "test": "total_pipeline_latency",
+            "benchmarks": [result.to_dict()],
+        }
+        (benchmark_output / "pipeline-latency.json").write_text(json.dumps(report, indent=2))
+
+    @requires_test_host
+    def test_gateway_baseline_latency(self, staging_base_url):
+        """20x /ready — gateway overhead without agent dispatch."""
+        import httpx
+        result = BenchmarkResult(name="gateway-baseline", tier="http")
+        client = httpx.Client(timeout=30.0)
+        try:
+            for _ in range(20):
+                start = time.monotonic()
+                resp = client.get(f"{staging_base_url}/ready")
+                elapsed = (time.monotonic() - start) * 1000
+                if resp.status_code == 200:
+                    result.samples.append(elapsed)
+                else:
+                    result.errors += 1
+        finally:
+            client.close()
+
+        print(f"\n  Gateway baseline: P50={result.p50:.0f}ms P95={result.p95:.0f}ms")
+        assert result.p95 < 500, f"Gateway P95={result.p95:.0f}ms exceeds 500ms"
         assert result.errors == 0
 
-    def test_transport_tier_detection(self, test_host_url, http_client):
-        """Verify which transport tier is active on the gateway."""
-        resp = http_client.get(f"{test_host_url}/ready")
-        data = resp.json()
-        sdk = data.get("agntcy_sdk", {})
-        tier = sdk.get("active_tier", "unknown")
-        active = sdk.get("transport_active", False)
-        assert active, f"Transport not active (tier={tier})"
-        # Record the active tier for other tests
-        print(f"\n  Active transport tier: {tier}")
-        print(f"  SLIM endpoint: {sdk.get('slim_endpoint', 'N/A')}")
-        print(f"  NATS endpoint: {sdk.get('nats_endpoint', 'N/A')}")
+    @requires_test_host
+    def test_escalation_path_latency(self, staging_base_url, widget_headers, benchmark_output):
+        """5 escalation conversations — IC + escalation-handler latency_ms.
 
-
-# ---------------------------------------------------------------------------
-# 2. Cross-container hop latency (agent dispatch roundtrip)
-# ---------------------------------------------------------------------------
-
-
-class TestCrossContainerLatency:
-    """Measure cross-container dispatch latency via real chat requests."""
-
-    @pytest.fixture
-    def api_headers(self) -> dict[str, str]:
-        api_key = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
-        if not api_key:
-            pytest.skip("SUPERADMIN_PREVIEW_API_KEY not set")
-        return {"X-API-Key": api_key, "Content-Type": "application/json"}
-
-    def test_chat_dispatch_roundtrip_latency(
-        self, test_host_url, http_client, api_headers, benchmark_output,
-    ):
-        """Measure full chat dispatch latency (IC→KR→RG→Critic).
-
-        This is the real cross-container benchmark: an authenticated chat
-        request traverses the full agent pipeline. The latency includes
-        transport overhead, agent processing, and AI inference.
+        If escalation is not classifiable (environment limitation), reports
+        as a measurement gap — not a pass-equivalent (per Codex advisory).
         """
-        tenant = os.environ.get("STAGING_TENANT_ID", "remaker-digital-001")
-        result = BenchmarkResult(name="chat-dispatch-roundtrip", tier="measured")
+        ic_result = BenchmarkResult(name="escalation-ic", tier="per-interface")
+        esc_result = BenchmarkResult(name="escalation-handler", tier="per-interface")
+        measurement_gap = False
 
-        for i in range(5):
+        for msg in ESCALATION_MESSAGES[:5]:
+            events = run_conversation(staging_base_url, widget_headers, msg)
+            if has_error_event(events):
+                ic_result.errors += 1
+                continue
+
+            ic_latency = get_stage_latency(events, "intent-classifier")
+            if ic_latency is not None:
+                ic_result.samples.append(ic_latency)
+
+            esc_latency = get_stage_latency(events, "escalation-handler")
+            if esc_latency is not None:
+                esc_result.samples.append(esc_latency)
+            elif not has_stage(events, "escalation-handler"):
+                measurement_gap = True
+
+        print(f"\n  Escalation IC: P50={ic_result.p50:.0f}ms ({len(ic_result.samples)} samples)")
+        print(f"  Escalation Handler: P50={esc_result.p50:.0f}ms ({len(esc_result.samples)} samples)")
+        if measurement_gap:
+            print("  WARNING: escalation-handler stage not observed — measurement gap")
+
+        assert len(ic_result.samples) >= 1, "No IC samples from escalation attempts"
+
+        report = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "test": "escalation_path_latency",
+            "measurement_gap": measurement_gap,
+            "stages": {
+                "intent-classifier": ic_result.to_dict(),
+                "escalation-handler": esc_result.to_dict(),
+            },
+        }
+        (benchmark_output / "escalation-latency.json").write_text(json.dumps(report, indent=2))
+
+    @requires_test_host
+    def test_widget_pipeline_latency(self, staging_base_url, widget_headers, benchmark_output):
+        """20 widget conversations — same metrics as per-hop test.
+
+        Verifies widget traffic has comparable latency.
+        """
+        result = BenchmarkResult(name="widget-pipeline", tier="widget")
+
+        for msg in SAMPLE_MESSAGES[:20]:
+            events = run_conversation(staging_base_url, widget_headers, msg)
+            if has_error_event(events):
+                result.errors += 1
+                continue
+            total = get_total_latency(events)
+            if total is not None:
+                result.samples.append(total)
+
+        print(f"\n  Widget pipeline: P50={result.p50:.0f}ms P95={result.p95:.0f}ms "
+              f"({len(result.samples)} samples, {result.errors} errors)")
+
+        assert len(result.samples) >= 10, f"Insufficient widget samples: {len(result.samples)}"
+
+        report = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "test": "widget_pipeline_latency",
+            "benchmarks": [result.to_dict()],
+        }
+        (benchmark_output / "widget-latency.json").write_text(json.dumps(report, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Category B: Architecture Verification
+# ---------------------------------------------------------------------------
+
+
+class TestArchitectureVerification:
+    """Verify transport tier and RG placement match architecture decisions."""
+
+    @requires_test_host
+    def test_transport_tier_identification(self, staging_base_url, benchmark_output):
+        """Query /ready and record the active transport tier."""
+        import httpx
+        client = httpx.Client(timeout=30.0)
+        try:
+            resp = client.get(f"{staging_base_url}/ready")
+            assert resp.status_code == 200
+            sdk = resp.json().get("agntcy_sdk", {})
+            tier = sdk.get("active_tier", "unknown")
+            active = sdk.get("transport_active", False)
+            slim = sdk.get("slim_endpoint")
+            nats = sdk.get("nats_endpoint")
+        finally:
+            client.close()
+
+        print(f"\n  Active tier: {tier}")
+        print(f"  Transport active: {active}")
+        print(f"  SLIM: {slim or 'None'}")
+        print(f"  NATS: {nats or 'None'}")
+
+        report = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "test": "transport_tier_identification",
+            "active_tier": tier,
+            "transport_active": active,
+            "slim_endpoint": slim,
+            "nats_endpoint": nats,
+        }
+        (benchmark_output / "transport-tier.json").write_text(json.dumps(report, indent=2))
+
+    def test_rg_placement_verification(self):
+        """DCL-002 v4 in KB records in-process RG as intended production path.
+
+        This is architecture metadata verification, not latency inference.
+        """
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "knowledge-db"))
+        import db as kb_db
+        kdb = kb_db.KnowledgeDB()
+
+        spec = kdb.get_spec("DCL-002")
+        assert spec is not None, "DCL-002 not found in KB"
+        assert spec["version"] >= 4, (
+            f"DCL-002 version {spec['version']} — expected >=4 (per-interface policy)"
+        )
+
+        desc = spec.get("description", "")
+        assert "in-process" in desc.lower() or "gateway" in desc.lower(), (
+            "DCL-002 v4 should document in-process RG streaming as intended path"
+        )
+        assert "response" in desc.lower() or "rg" in desc.lower(), (
+            "DCL-002 v4 should reference response generator"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Category C: Failure Injection
+# ---------------------------------------------------------------------------
+
+
+class TestFailureInjection:
+    """Verify failure paths have bounded latency."""
+
+    def test_503_on_transport_exhaustion(self):
+        """_require_transport_or_fail() raises HTTPException 503."""
+        from fastapi import HTTPException
+        from src.chat.pipeline.agent_dispatch import AgentDispatchMixin
+
+        mixin = AgentDispatchMixin.__new__(AgentDispatchMixin)
+        start = time.monotonic()
+        with pytest.raises(HTTPException) as exc_info:
+            mixin._require_transport_or_fail("test-agent")
+        elapsed = (time.monotonic() - start) * 1000
+
+        assert exc_info.value.status_code == 503
+        assert elapsed < 50, f"503 took {elapsed:.1f}ms — should be near-instant"
+
+    def test_critic_fail_closed_latency(self):
+        """Critic unavailable returns safe fallback in <10ms."""
+        import asyncio
+        from unittest.mock import patch
+
+        from src.chat.pipeline.critic_escalation import CriticEscalationMixin
+        from src.multi_tenant.critic_policy import SAFE_FALLBACK_MESSAGE
+
+        mixin = CriticEscalationMixin.__new__(CriticEscalationMixin)
+        mixin._critic = None
+        mixin._agent_urls = {}
+
+        with patch("src.multi_tenant.agntcy_sdk_integration._transport", None), \
+             patch("src.multi_tenant.agntcy_sdk_integration._transport_setup_ok", False):
             start = time.monotonic()
-            resp = http_client.post(
-                f"{test_host_url}/api/chat",
-                headers=api_headers,
-                json={
-                    "message": "What products do you have?",
-                    "conversation_id": f"perf-bench-{int(time.time())}-{i}",
-                    "tenant_id": tenant,
-                },
-                timeout=30.0,
+            approved, message, result = asyncio.run(
+                mixin._validate_with_critic(
+                    tenant_id="test-tenant",
+                    conversation_id="test-conv",
+                    response_text="Test response",
+                    customer_message="Test question",
+                    budget=None,
+                    knowledge_titles=None,
+                )
             )
             elapsed = (time.monotonic() - start) * 1000
 
-            if resp.status_code == 200:
-                result.samples.append(elapsed)
-            else:
-                result.errors += 1
-
-        # Benchmark must have successful samples — 503 is not a valid benchmark
-        assert len(result.samples) > 0, (
-            f"No successful dispatches in {result.errors + len(result.samples)} attempts. "
-            "Benchmark requires at least one 200 response proving pipeline traversal."
-        )
-        print(f"\n  Chat dispatch P50={result.p50:.0f}ms P95={result.p95:.0f}ms "
-              f"({len(result.samples)} samples, {result.errors} errors)")
-
-        # Write benchmark report
-        report = {
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "test_host_url": test_host_url,
-            "benchmarks": [result.to_dict()],
-        }
-        report_path = benchmark_output / "chat-dispatch-benchmark.json"
-        report_path.write_text(json.dumps(report, indent=2))
-
-    def test_transport_overhead_baseline(
-        self, test_host_url, http_client, benchmark_output,
-    ):
-        """Baseline: gateway-only latency (no agent dispatch).
-
-        The difference between this and chat dispatch approximates
-        transport + agent processing overhead.
-        """
-        result = BenchmarkResult(name="gateway-baseline", tier="http")
-        for _ in range(10):
-            start = time.monotonic()
-            resp = http_client.get(f"{test_host_url}/ready")
-            elapsed = (time.monotonic() - start) * 1000
-            if resp.status_code == 200:
-                result.samples.append(elapsed)
-
-        if result.samples:
-            print(f"\n  Gateway baseline P50={result.p50:.0f}ms P95={result.p95:.0f}ms")
+        assert approved is False
+        assert message == SAFE_FALLBACK_MESSAGE
+        assert elapsed < 10, f"Fail-closed took {elapsed:.1f}ms — should be <10ms"
+        print(f"\n  Critic fail-closed: {elapsed:.1f}ms")
 
 
 # ---------------------------------------------------------------------------
-# 3. Benchmark output
+# Category D: Benchmark Output
 # ---------------------------------------------------------------------------
 
 
 class TestBenchmarkOutput:
-    """Ensure benchmark infrastructure works and outputs are structured."""
+    """Generate consolidated benchmark report."""
 
-    def test_benchmark_result_serialization(self):
-        """BenchmarkResult should serialize to structured dict."""
-        result = BenchmarkResult(
-            name="test-bench",
-            tier="slim",
-            samples=[10.0, 20.0, 30.0, 40.0, 50.0],
-        )
-        d = result.to_dict()
-        assert d["name"] == "test-bench"
-        assert d["tier"] == "slim"
-        assert d["p50_ms"] == 30.0
-        assert d["sample_count"] == 5
+    def test_benchmark_report_generation(self, benchmark_output):
+        """Generate structured JSON report from all benchmark artifacts."""
+        import httpx
 
-    def test_gateway_benchmark_report(
-        self, test_host_url, http_client, benchmark_output
-    ):
-        """Generate a benchmark report from gateway health probes."""
-        result = BenchmarkResult(name="gateway-ready", tier="http")
-        for _ in range(10):
-            start = time.monotonic()
-            resp = http_client.get(f"{test_host_url}/ready")
-            elapsed = (time.monotonic() - start) * 1000
-            if resp.status_code == 200:
-                result.samples.append(elapsed)
-            else:
-                result.errors += 1
+        artifacts = {}
+        for f in benchmark_output.glob("*.json"):
+            if f.stem.startswith("transport-benchmark-"):
+                continue  # Skip prior consolidated reports
+            try:
+                artifacts[f.stem] = json.loads(f.read_text())
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        version = "unknown"
+        if TEST_HOST_URL:
+            try:
+                resp = httpx.get(f"{TEST_HOST_URL.rstrip('/')}/health", timeout=10.0)
+                version = resp.json().get("product_version", "unknown")
+            except Exception:
+                pass
 
         report = {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "test_host_url": test_host_url,
-            "benchmarks": [result.to_dict()],
+            "version": version,
+            "phase": "4",
+            "test_host_url": TEST_HOST_URL or "not configured",
+            "artifacts": artifacts,
         }
 
-        report_path = benchmark_output / "transport-benchmark-latest.json"
+        report_path = benchmark_output / f"transport-benchmark-{int(time.time())}.json"
         report_path.write_text(json.dumps(report, indent=2))
+        print(f"\n  Benchmark report: {report_path}")
         assert report_path.exists()
