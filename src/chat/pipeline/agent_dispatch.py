@@ -420,20 +420,14 @@ class AgentDispatchMixin:
         models to override the default gpt-4o for Enterprise tenants
         with the fine-tuning add-on enabled.
         """
-        # Priority 1: SLIM/NATS transport (SPEC-1537)
-        if self._transport_available():
-            try:
-                async for chunk in self._call_response_generator_stream_transport(
-                    customer_message, intent, knowledge_context,
-                    system_prompt, budget, model,
-                    conversation_history=conversation_history,
-                ):
-                    yield chunk
-                return
-            except Exception as exc:
-                logger.warning("Transport RG stream failed, falling back: %s", exc)
+        # RG streaming bypasses SLIM/NATS transport and uses HTTP directly.
+        # SLIM does not support point-to-point streaming (raises NotImplementedError),
+        # and the SLIM connection drops during long-running responses due to
+        # Container Apps ingress idle timeouts (INSIGHTS-2026-03-28-00-21-SLIM-DIAGNOSTIC).
+        # SLIM/NATS transport works correctly for non-streaming agents (IC, KR, CR, EH).
+        # HTTP container streaming is the canonical path for RG (ADR-001 amendment).
 
-        # Tier 3: HTTP container (failure mode per SPEC-1802)
+        # Tier 3: HTTP container streaming (canonical for RG per SLIM diagnostic)
         if USE_AGENT_CONTAINERS:
             try:
                 self._warn_http_failure_mode("response-generator")
