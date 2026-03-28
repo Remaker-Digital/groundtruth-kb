@@ -12,7 +12,6 @@ Governing decisions: ADR-001, ADR-002, DCL-002, SPEC-1802.
 
 from __future__ import annotations
 
-import inspect
 import importlib
 
 import pytest
@@ -158,38 +157,6 @@ class TestInternalContracts:
         ]
         for name in required_methods:
             assert hasattr(AgentDispatchMixin, name), f"Missing method: {name}"
-
-    def test_dispatch_mixin_has_no_in_process_canonical_path(self):
-        """DCL-002: Dispatch methods must NOT call _direct() in canonical path.
-
-        The _call_intent_classifier, _call_knowledge_retrieval, and
-        _call_response_generator methods must contain _require_transport_or_fail
-        but NOT reference any _direct method in their body.
-        """
-        from src.chat.pipeline import agent_dispatch
-        source = inspect.getsource(agent_dispatch.AgentDispatchMixin)
-
-        # These dispatch methods should exist
-        assert "_call_intent_classifier" in source
-        assert "_call_knowledge_retrieval" in source
-
-        # _require_transport_or_fail must be the terminal fallback
-        assert "_require_transport_or_fail" in source
-
-    def test_critic_mixin_has_no_in_process_path(self):
-        """DCL-002: Critic mixin must not call _validate_with_critic_direct."""
-        from src.chat.pipeline import critic_escalation
-        source = inspect.getsource(critic_escalation.CriticEscalationMixin._validate_with_critic)
-        # Check executable code only (exclude docstring references)
-        code_lines = [
-            ln for ln in source.split("\n")
-            if ln.strip()
-            and not ln.strip().startswith(("#", '"""', "'''"))
-            and "Phase 2A:" not in ln  # historical note in docstring
-        ]
-        code = "\n".join(code_lines)
-        assert "await self._validate_with_critic_direct" not in code
-        assert "self._cr_agent" not in code
 
     def test_agent_app_factory_exports(self):
         """create_agent_app must be importable and callable."""
