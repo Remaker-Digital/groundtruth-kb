@@ -240,20 +240,38 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
             )
             # Try NATS specifically for subscription (receive interface)
             nats_transport = await _try_nats_transport_with_setup(timeout=10.0)
-            if nats_transport is not None:
-                subscription = await nats_transport.subscribe(topic)
-            if subscription is None:
+            if nats_transport is None:
                 logger.info(
                     "Agent %s: no transport supports subscription for this interface. "
                     "Agent will receive requests via HTTP /process endpoint (Tier 3).",
                     agent.agent_type,
                 )
                 return
+
+            # NATS uses callback pattern: set handler → subscribe
+            async def _nats_message_handler(message: Any) -> None:
+                try:
+                    response = await agent.handle_message(message)
+                    if hasattr(message, "reply_to") and message.reply_to:
+                        await nats_transport.publish(message.reply_to, response)
+                except Exception as exc:
+                    logger.exception(
+                        "Agent %s: error processing NATS message on '%s': %s",
+                        agent.agent_type, topic, exc,
+                    )
+
+            nats_transport.set_callback(_nats_message_handler)
+            await nats_transport.subscribe(topic)
             logger.info(
                 "Agent %s: NATS subscription active for receive interface (Tier 2). "
                 "Dispatch via SLIM (Tier 1), receive via NATS (Tier 2).",
                 agent.agent_type,
             )
+            # NATS subscription is callback-driven — keep the task alive
+            # by waiting on the shutdown event (set by container lifecycle)
+            shutdown_event = asyncio.Event()
+            await shutdown_event.wait()
+            return
 
         async for message in subscription:
             try:
