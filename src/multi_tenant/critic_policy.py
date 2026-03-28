@@ -68,10 +68,11 @@ logger = logging.getLogger(__name__)
 # Critic timeout budget (Decision #15 — 800ms of the 8s pipeline deadline)
 CRITIC_TIMEOUT_MS = 800
 
-# HTTP timeout for Critic requests (slightly above the budget to allow
-# for network overhead — the Critic agent itself has an internal 800ms
+# HTTP timeout for Critic requests. Must be generous enough to allow
+# the Critic container to call Azure OpenAI (gpt-4o-mini, ~800-1200ms)
+# plus network overhead through Container Apps internal ingress.
 # deadline, but we give the HTTP call a small buffer).
-CRITIC_HTTP_TIMEOUT_SECONDS = 1.0
+CRITIC_HTTP_TIMEOUT_SECONDS = 3.0
 
 # Circuit breaker thresholds (Decision #15 — 3 failures / 15s for Cosmos,
 # adapted: 5 failures / 30s for Critic as it has 2 replicas with failover).
