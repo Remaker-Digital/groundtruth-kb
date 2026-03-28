@@ -78,7 +78,7 @@ class ResponseGeneratorAgent(AgentRedBaseAgent):
         system_prompt = payload.get("system_prompt", "")
         model = payload.get("model", AZURE_RG_MODEL)
         conversation_history = payload.get("conversation_history") or []
-        timeout_seconds = payload.get("timeout_seconds", 8.0)
+        timeout_seconds = payload.get("timeout_seconds", 15.0)
 
         # Assemble full response from streaming chunks
         full_response = ""
@@ -109,7 +109,7 @@ class ResponseGeneratorAgent(AgentRedBaseAgent):
         system_prompt: str,
         model: str = "gpt-4o",
         conversation_history: list[dict[str, str]] | None = None,
-        timeout_seconds: float = 8.0,
+        timeout_seconds: float = 15.0,
     ) -> AsyncGenerator[str, None]:
         """Stream response tokens from Azure OpenAI.
 
