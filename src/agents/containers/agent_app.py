@@ -226,12 +226,23 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
         )
 
         # SDK transport subscription loop
-        # The transport.subscribe() method is transport-specific;
-        # for NATS it returns an async iterator of Messages.
-        # NOTE: subscribe() is an async method — must be awaited before
-        # iterating. Without await, we get a coroutine instead of an
-        # async iterator (discovered in S183 container log diagnosis).
+        # The transport.subscribe() method is transport-specific:
+        # - NATS: returns an async iterator of Messages
+        # - SLIM: returns None (SLIM is dispatch-only, not pub/sub)
+        # When subscribe returns None, the agent operates in HTTP reception
+        # mode — requests arrive via the FastAPI /process endpoint instead
+        # of through the transport message bus.
         subscription = await transport.subscribe(topic)
+        if subscription is None:
+            tier_name = type(transport).__name__
+            logger.info(
+                "Agent %s: transport %s connected (Tier 1) but does not support "
+                "subscription. Agent will receive requests via HTTP endpoint. "
+                "This is expected for SLIM (dispatch-only transport).",
+                agent.agent_type, tier_name,
+            )
+            return
+
         async for message in subscription:
             try:
                 response = await agent.handle_message(message)

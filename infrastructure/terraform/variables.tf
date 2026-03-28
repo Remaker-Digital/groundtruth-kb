@@ -73,15 +73,15 @@ variable "container_apps_subnet_id" {
 # ---------------------------------------------------------------------------
 
 variable "nats_url" {
-  description = "NATS JetStream URL via WebSocket (Container Apps HTTP ingress requires WS, not raw TCP)"
+  description = "NATS JetStream URL via secure WebSocket (Container Apps TLS ingress requires wss://)"
   type        = string
-  default     = "ws://agent-red-nats.internal:8080"
+  default     = "wss://agent-red-nats.internal:8080"
 }
 
 variable "slim_endpoint" {
-  description = "SLIM routing service endpoint (Container Apps HTTPS ingress, port 443)"
+  description = "SLIM routing endpoint via plain HTTP/2 (allowInsecure=true for gRPC compatibility)"
   type        = string
-  default     = "agent-red-slim.internal:443"
+  default     = "http://agent-red-slim.internal"
 }
 
 variable "nats_monitoring_endpoint" {
