@@ -51,7 +51,7 @@ def _add_streaming_route(app: FastAPI, agent: ResponseGeneratorAgent) -> None:
                 system_prompt=body.get("system_prompt", ""),
                 model=body.get("model", "gpt-4o"),
                 conversation_history=body.get("conversation_history"),
-                timeout_seconds=body.get("timeout_seconds", 8.0),
+                timeout_seconds=body.get("timeout_seconds", 15.0),
             ):
                 yield f"data: {chunk}\n\n"
             yield "data: [DONE]\n\n"

@@ -563,6 +563,7 @@ class AgentDispatchMixin:
                 "system_prompt": system_prompt,
                 "model": model,
                 "enable_prefix_caching": True,
+                "timeout_seconds": read_timeout,
             },
             timeout=httpx.Timeout(
                 connect=1.0,
