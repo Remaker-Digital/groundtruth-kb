@@ -612,11 +612,27 @@ async def _startup_chat_services() -> None:
         # WI #207: Create KnowledgeBaseRepository for direct retrieval
         kb_repo = KnowledgeBaseRepository()
 
+        # Initialize CriticPolicy with Critic container URL (fail-closed safety).
+        # Without CriticPolicy, every AI response is replaced with SAFE_FALLBACK_MESSAGE.
+        critic = None
+        try:
+            from src.multi_tenant.critic_policy import CriticPolicy
+            from src.chat.pipeline.constants import AGENT_URLS
+            critic_url = AGENT_URLS.get("critic-supervisor", "")
+            if critic_url:
+                critic = CriticPolicy(critic_urls=[critic_url])
+                logger.info("CriticPolicy initialized with URL: %s", critic_url)
+            else:
+                logger.warning("Critic URL not configured — CriticPolicy disabled (fail-closed)")
+        except Exception as exc:
+            logger.warning("CriticPolicy initialization failed — fail-closed: %s", exc)
+
         pipeline = configure_chat_pipeline(
             session=session,
             prompt_builder=get_prompt_builder(),
             profile_service=get_profile_service(),
             kb_repo=kb_repo,
+            critic=critic,
         )
 
         mode = "agent containers" if USE_AGENT_CONTAINERS else "direct Azure OpenAI"
