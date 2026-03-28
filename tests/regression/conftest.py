@@ -70,17 +70,86 @@ def _check_production_reachable() -> bool:
         return False
 
 
+def _check_credentials_valid() -> dict[str, str]:
+    """Preflight probe: test each credential against a lightweight endpoint.
+
+    Returns a dict of {credential_name: problem_description} for any stale
+    or invalid credentials. Empty dict = all credentials valid.
+    """
+    problems: dict[str, str] = {}
+    if not PROD_URL:
+        return problems  # Can't probe without a URL
+
+    try:
+        with httpx.Client(timeout=5.0) as c:
+            # Widget key probe
+            if WIDGET_KEY:
+                try:
+                    resp = c.get(
+                        f"{PROD_URL}/api/config",
+                        params={"page_type": "index"},
+                        headers={"X-Widget-Key": WIDGET_KEY},
+                    )
+                    if resp.status_code in (401, 403):
+                        problems["WIDGET_KEY"] = f"returned {resp.status_code} — credential is stale or invalid"
+                except Exception:
+                    pass  # Network error, not a credential problem
+
+            # Admin key probe
+            if API_KEY:
+                try:
+                    resp = c.get(
+                        f"{PROD_URL}/api/superadmin/dashboard",
+                        headers={"X-API-Key": API_KEY},
+                    )
+                    if resp.status_code in (401, 403):
+                        problems["API_KEY"] = f"returned {resp.status_code} — credential is stale or invalid"
+                except Exception:
+                    pass
+
+            # Tenant key probe
+            if TENANT_KEY and TENANT_ID:
+                try:
+                    resp = c.get(
+                        f"{PROD_URL}/api/admin/team",
+                        params={"tenant": TENANT_ID},
+                        headers={"X-API-Key": TENANT_KEY},
+                    )
+                    if resp.status_code in (401, 403):
+                        problems["TENANT_KEY"] = f"returned {resp.status_code} — credential is stale or invalid"
+                except Exception:
+                    pass
+    except Exception:
+        pass  # Can't probe, don't block
+
+    return problems
+
+
 @pytest.fixture(scope="session")
 def client():
     """Shared httpx client for all regression tests.
 
     Skips the entire session if the production endpoint is unreachable.
+    Warns if any credentials are stale (WI-1642 preflight validation).
     """
     if not _check_production_reachable():
         pytest.skip(
             f"Production endpoint unreachable at {PROD_URL} — "
             "skipping regression tests (API Gateway may be down or subscription suspended)"
         )
+
+    # WI-1642: Credential preflight — detect stale credentials early
+    stale = _check_credentials_valid()
+    if stale:
+        summary = "; ".join(f"{k}: {v}" for k, v in stale.items())
+        import warnings
+        warnings.warn(
+            f"Stale test credentials detected (WI-1642): {summary}. "
+            "Tests requiring these credentials will be skipped. "
+            "Refresh credentials from Key Vault — see REPEATABLE-PROCEDURES.md Section 7.",
+            stacklevel=1,
+        )
+
     with httpx.Client(base_url=PROD_URL, timeout=30.0, follow_redirects=True) as c:
         yield c
 
@@ -138,5 +207,21 @@ def tenant_id():
 
 @pytest.fixture(scope="session")
 def widget_headers(widget_key):
-    """Headers for widget/chat API calls."""
+    """Headers for widget/chat API calls.
+
+    Skips tests if WIDGET_KEY is not set (WI-1642 credential preflight).
+    """
+    if not widget_key:
+        pytest.skip("WIDGET_KEY not set — skipping widget API tests")
     return {"X-Widget-Key": widget_key}
+
+
+@pytest.fixture(scope="session")
+def credential_status():
+    """Exposes credential preflight results to individual tests.
+
+    Tests can use this to skip gracefully when their specific credential is stale:
+        if 'WIDGET_KEY' in credential_status:
+            pytest.skip(credential_status['WIDGET_KEY'])
+    """
+    return _check_credentials_valid() if PROD_URL else {}

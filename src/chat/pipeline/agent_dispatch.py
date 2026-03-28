@@ -1,11 +1,13 @@
 """Agent dispatch mixin — IC, KR, and RG agent call methods.
 
 Provides intent classification, knowledge retrieval, and response
-generation dispatch methods for ChatPipeline. Routes through the
-canonical transport stack: SLIM/gRPC → NATS → HTTP(S) → 503.
+generation dispatch methods for ChatPipeline.
 
-SPEC-1802: All environments use the same dispatch algorithm.
-In-process dispatch is NOT part of the canonical pipeline.
+SPEC-1802 / DCL-002 v4: Per-interface transport policy.
+- Non-streaming agents (IC, KR, CR, EH, AN): containerized dispatch
+  via SLIM/gRPC → NATS → HTTP(S) → 503 cascade.
+- RG token streaming: gateway in-process (intended production path,
+  not a fallback — see DCL-002 v4, owner-approved 2026-03-28).
 
 R10 refactoring — extracted from pipeline.py (session 39).
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -34,14 +36,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# SPEC-1802 canonical dispatch — same in ALL environments:
+# SPEC-1802 / DCL-002 v4: Per-interface transport policy.
+#
+# Non-streaming agents (IC, KR, CR, EH, AN):
 #   Tier 1: SLIM/gRPC transport (primary — when physically possible)
 #   Tier 2: NATS JetStream transport (fallback — when physically possible)
 #   Tier 3: HTTP(S) containers (last resort — when higher tiers unavailable)
 #   Fail:   503 with tier-diagnostic reason
 #
-# In-process dispatch is NOT part of the canonical pipeline (DCL-002).
-# There is no in-process fallback — all agents run in dedicated containers.
+# RG token streaming: gateway in-process (intended production path).
+# See _call_response_generator_stream() for rationale (DCL-002 v4).
 _ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
 
 
@@ -52,18 +56,21 @@ class AgentDispatchMixin:
     _ic_agent, _kr_agent, _rg_agent, _agent_urls, _get_http_client(),
     _current_tenant_id, _current_preferences, _current_tenant.
 
-    Canonical dispatch priority (SPEC-1802) — same in ALL environments:
+    Per-interface transport policy (SPEC-1802 / DCL-002 v4):
+
+    Non-streaming agents (IC, KR, CR, EH, AN):
         Tier 1: SLIM/gRPC transport (primary — when physically possible)
         Tier 2: NATS JetStream transport (fallback — when physically possible)
         Tier 3: HTTP(S) containers (last resort — when higher tiers unavailable)
         Fail:   503 with tier-diagnostic reason
 
+    RG token streaming:
+        Gateway in-process ResponseGeneratorAgent.generate_stream() is the
+        intended production path (not a fallback). See DCL-002 v4.
+
     Tiers 1 and 2 are unified behind _transport_available() — the SDK
     singleton selects SLIM or NATS based on endpoint configuration. Tier 3 HTTP
     is explicitly a last resort per SPEC-1802 and emits warnings when used.
-
-    In-process dispatch is NOT part of the canonical pipeline (DCL-002).
-    All agents run in dedicated containers — there is no in-process fallback.
     """
 
     def _transport_available(self) -> bool:

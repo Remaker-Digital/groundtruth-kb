@@ -17,8 +17,8 @@ import os
 # agent containers (HTTP) or calls Azure OpenAI directly.
 #
 # Default: True — route through AGNTCY agent containers (SPEC-1534).
-# SPEC-1802: Transport priority is SLIM → NATS → HTTP(S) → 503 in ALL
-# environments. In-process dispatch is NOT part of the canonical pipeline.
+# SPEC-1802 / DCL-002 v4: Non-streaming agents use SLIM → NATS → HTTP(S) → 503.
+# RG token streaming uses gateway in-process (intended production path).
 # ---------------------------------------------------------------------------
 USE_AGENT_CONTAINERS = os.environ.get(
     "USE_AGENT_CONTAINERS", "true"

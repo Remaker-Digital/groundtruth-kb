@@ -1,11 +1,12 @@
 """Phase 3 — Environment parity tests.
 
-Proves transport selection behavior is identical across environments and
-no in-process rescue path exists. ALL tests execute behavior — none
-inspect source code.
+Proves transport selection behavior is identical across environments.
+Non-streaming agents use containerized dispatch (SLIM/NATS/HTTP);
+RG streaming uses gateway in-process per DCL-002 v4.
+ALL tests execute behavior — none inspect source code.
 
 Recovery plan reference: INSIGHTS-2026-03-27-01-00.md Phase 3, Category 4.
-Governing decisions: ADR-001, DCL-002.
+Governing decisions: ADR-001, DCL-002 v4.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """

@@ -300,7 +300,9 @@ INFRASTRUCTURE_NODES = [
 ]
 
 # Canonical infrastructure edges with protocols
-# Transport hierarchy per SPEC-1802: SLIM (primary) → NATS (fallback) → HTTP (external)
+# Per-interface transport policy (SPEC-1802 / DCL-002 v4):
+# Non-streaming: SLIM (primary) → NATS (fallback) → HTTP (external)
+# RG streaming: gateway in-process (intended production path)
 INFRASTRUCTURE_EDGES_DEF = [
     # Ingress → API Gateway (external, HTTPS)
     ("shopify-webhook", "api-gateway", "HTTPS", "Webhook events"),
