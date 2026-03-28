@@ -147,8 +147,10 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
   // keys (ar_user_*, ar_live_*, etc.) will fail with 401 on every call
   // because the middleware requires ?tenant= which the provider has no way
   // to supply.  Warn loudly if a non-SPA key slips through.
+  // Suppress in mock mode (no VITE_API_URL) since mock keys are never real.
   useEffect(() => {
-    if (apiKey && !apiKey.startsWith('ar_spa_')) {
+    const isMockMode = !import.meta.env?.VITE_API_URL;
+    if (apiKey && !apiKey.startsWith('ar_spa_') && !isMockMode) {
       console.error(
         '[ProviderLayout] WARNING: API key does not have ar_spa_ prefix. ' +
         'The provider console requires a platform SPA key (ar_spa_plat_*). ' +
@@ -194,7 +196,7 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
         const res = await apiFetch('/api/superadmin/dashboard');
         if (res.ok && !cancelled) {
           const data = await res.json();
-          setProductVersion(data.system_health?.version?.product ?? null);
+          setProductVersion(data.systemHealth?.version?.product ?? data.system_health?.version?.product ?? null);
         }
       } catch {
         // non-fatal

@@ -24,6 +24,15 @@ export function registerComplianceHandlers(): void {
     return { status: 200, body: getStore().compliance.sla };
   });
 
+  GET('/api/superadmin/sla/trends', (req: MockRequest): MockResponse => {
+    const trends = getStore().compliance.slaTrends;
+    const rangeDays = parseInt(req.query.range_days || '7', 10);
+    return {
+      status: 200,
+      body: { ...trends, rangeDays },
+    };
+  });
+
   GET('/api/superadmin/costs', (_req: MockRequest): MockResponse => {
     return { status: 200, body: getStore().compliance.costs };
   });

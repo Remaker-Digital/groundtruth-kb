@@ -32,6 +32,7 @@ import { agentRedTheme } from '../shared/theme/agentRedTheme';
 import { StandaloneLayout } from './layouts/StandaloneLayout';
 import { ApiKeyLogin } from './login/ApiKeyLogin';
 import { DashboardPage } from './pages/Dashboard';
+import { AnalyticsPage } from './pages/Analytics';
 import { InboxPage } from './pages/Inbox';
 
 import { ConfigurationPage } from './pages/Configuration';
@@ -246,7 +247,7 @@ const App: React.FC = () => {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/inbox" element={<InboxPage />} />
             <Route path="/team" element={<TeamPage />} />
-            <Route path="/analytics" element={<NavigateWithQuery to="/" replace />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
 
             {/* Admin-only routes (WI #295 Phase 4) */}
             <Route path="/configuration" element={

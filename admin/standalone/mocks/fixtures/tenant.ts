@@ -30,6 +30,6 @@ export function createTenantFixture() {
       display_name: 'Mock Admin',
       id: 'member-001',
     },
-    productVersion: '1.81.2',
+    productVersion: '1.98.65-mock',
   };
 }

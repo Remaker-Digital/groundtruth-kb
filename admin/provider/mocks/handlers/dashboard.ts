@@ -10,6 +10,6 @@ import type { MockRequest, MockResponse } from '../router';
 export function registerDashboardHandlers(): void {
   GET('/api/superadmin/dashboard', (_req: MockRequest): MockResponse => {
     const d = getStore().dashboard;
-    return { status: 200, body: d.health };
+    return { status: 200, body: d };
   });
 }

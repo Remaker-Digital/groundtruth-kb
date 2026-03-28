@@ -15,7 +15,15 @@ export function registerBillingHandlers(): void {
     return { status: 200, body: s().status };
   });
 
+  GET('/api/shopify/billing/status', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: s().status };
+  });
+
   GET('/api/billing/packs', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: { balance: 5, packs: [] } };
+  });
+
+  GET('/api/packs/balance/:customerId', (_req: MockRequest): MockResponse => {
     return { status: 200, body: { balance: 5, packs: [] } };
   });
 

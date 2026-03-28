@@ -62,7 +62,7 @@ export function useAppContext(): AppContextValue {
 // ---------------------------------------------------------------------------
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const STANDALONE_ADMIN_URL = `${API_BASE_URL || ''}/admin/standalone/`;
+const STANDALONE_ADMIN_URL = API_BASE_URL ? `${API_BASE_URL}/admin/standalone/` : `${window.location.origin}/admin/standalone/`;
 const DOCS_URL = 'https://agentredcx.com';
 
 // ---------------------------------------------------------------------------

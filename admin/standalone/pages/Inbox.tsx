@@ -544,7 +544,7 @@ function PipelineTracePanel({
         {stages.map((s: PipelineStage, idx: number) => {
           const color = STAGE_COLORS[s.stage] ?? '#868e96';
           const widthPct = totalMs > 0 ? Math.max(4, (s.elapsedMs / totalMs) * 100) : 25;
-          const label = s.stage.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+          const label = s.stage.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
           return (
             <Box key={s.stage || idx}>
