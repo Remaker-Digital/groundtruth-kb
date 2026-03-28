@@ -212,7 +212,9 @@ class TestPerHopStageLatency:
             esc_latency = get_stage_latency(events, "escalation-handler")
             if esc_latency is not None:
                 esc_result.samples.append(esc_latency)
-            elif not has_stage(events, "escalation-handler"):
+            else:
+                # Stage may exist without latency_ms, or not exist at all.
+                # Either way, escalation-handler latency is unmeasured.
                 measurement_gap = True
 
         print(f"\n  Escalation IC: P50={ic_result.p50:.0f}ms ({len(ic_result.samples)} samples)")
