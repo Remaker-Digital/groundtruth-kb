@@ -171,32 +171,39 @@ class TestGate3PerformanceBaselines:
         pytest.fail(f"Could not parse test count: {result.stdout[-200:]}")
 
     def test_benchmark_artifacts_validated(self):
-        """Benchmark artifacts must exist, parse, and contain valid data.
+        """Benchmark artifacts must exist, parse, and contain valid structure.
 
         Per Codex advisory: file existence alone is not sufficient.
-        Content must be parsed and validated.
+        Content must be parsed and validated for required keys, version,
+        sample counts, and measurement gaps.
         """
         benchmark_dir = PROJECT_ROOT / "scripts" / "benchmark-results"
-        required_files = [
-            "per-hop-latency.json",
-            "pipeline-latency.json",
-            "escalation-latency.json",
-            "widget-latency.json",
-            "transport-tier.json",
-        ]
+
+        # Expected artifact contracts: {filename: required_top_level_keys}
+        artifact_contracts = {
+            "per-hop-latency.json": ["timestamp", "test", "stages"],
+            "pipeline-latency.json": ["timestamp", "test", "benchmarks"],
+            "escalation-latency.json": ["timestamp", "test", "stages"],
+            "widget-latency.json": ["timestamp", "test", "benchmarks"],
+            "transport-tier.json": ["timestamp", "test", "active_tier"],
+        }
 
         measurement_gaps: list[str] = []
 
-        for filename in required_files:
+        for filename, required_keys in artifact_contracts.items():
             path = benchmark_dir / filename
             assert path.exists(), f"Missing benchmark artifact: {filename}"
 
             data = json.loads(path.read_text())
 
-            # Must have a timestamp
-            assert "timestamp" in data, f"{filename}: missing timestamp"
+            # Validate required top-level keys
+            for key in required_keys:
+                assert key in data, (
+                    f"{filename}: missing required key '{key}'. "
+                    f"Found: {list(data.keys())}"
+                )
 
-            # Content-specific validation
+            # Validate stages have sample counts where coverage is claimed
             if "stages" in data:
                 for stage_name, stage_data in data["stages"].items():
                     if isinstance(stage_data, dict):
@@ -207,6 +214,7 @@ class TestGate3PerformanceBaselines:
                                 "— benchmark claims coverage but has no data"
                             )
 
+            # Validate benchmarks have non-zero samples
             if "benchmarks" in data:
                 for bench in data["benchmarks"]:
                     if isinstance(bench, dict):
@@ -217,6 +225,16 @@ class TestGate3PerformanceBaselines:
             # Surface measurement gaps honestly
             if data.get("measurement_gap"):
                 measurement_gaps.append(filename)
+
+        # Validate consolidated report has version
+        consolidated = list(benchmark_dir.glob("transport-benchmark-*.json"))
+        if consolidated:
+            report = json.loads(consolidated[-1].read_text())
+            version = report.get("version", "unknown")
+            assert version != "unknown", (
+                "Consolidated benchmark report has version='unknown' — "
+                "staging version not captured"
+            )
 
         if measurement_gaps:
             print(f"\n  WARNING: Measurement gaps in: {measurement_gaps}")
@@ -318,20 +336,53 @@ class TestGate5MCPExceptions:
     """MCP exception register must be clean or explicitly approved."""
 
     def test_mcp_exception_register_clean_or_approved(self):
-        """DOC-MCP-EXCEPTIONS must exist in KB."""
+        """DOC-MCP-EXCEPTIONS must exist and be empty or explicitly approved.
+
+        Each exception entry must have the required schema fields
+        (target_system, protocol_used, blocking_reason) — the presence
+        of these fields constitutes explicit documentation/approval.
+        An empty register or a register where every entry has the
+        required fields satisfies the gate.
+        """
         sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
         import db as kb_db
         kdb = kb_db.KnowledgeDB(str(PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"))
-        docs = kdb.list_documents()
-        mcp_docs = [
-            d for d in docs
-            if any(term in d.get("title", "").upper()
-                   for term in ("MCP-EXCEPTION", "MCP EXCEPTION", "DOC-MCP"))
-        ]
-        assert len(mcp_docs) > 0, (
+
+        doc = kdb.get_document("DOC-MCP-EXCEPTIONS")
+        assert doc is not None, (
             "DOC-MCP-EXCEPTIONS not found in KB — create it to track "
             "transport/MCP deviations before production deploy"
         )
+
+        content = doc.get("content", "")
+
+        # Parse exception entries — each starts with "### N."
+        import re
+        entries = re.findall(r"###\s+\d+\.\s+(.+?)(?=###\s+\d+\.|\Z)", content, re.DOTALL)
+
+        if not entries:
+            # Empty register — clean
+            print("\n  MCP exception register: empty (clean)")
+            return
+
+        # Each entry must have required schema fields
+        required_fields = ["target_system", "protocol_used", "blocking_reason"]
+        for i, entry in enumerate(entries, 1):
+            entry_lower = entry.lower()
+            missing = [f for f in required_fields if f.replace("_", " ") not in entry_lower
+                       and f not in entry_lower]
+            # Also check with "- field:" format
+            if missing:
+                missing = [f for f in missing
+                           if f"- {f}:" not in entry_lower
+                           and f"- {f.replace('_', ' ')}:" not in entry_lower]
+            assert not missing, (
+                f"MCP exception entry {i} is missing required fields: {missing}. "
+                "Each exception must have target_system, protocol_used, blocking_reason "
+                "to be considered explicitly approved."
+            )
+
+        print(f"\n  MCP exception register: {len(entries)} entries, all explicitly documented")
 
 
 # ---------------------------------------------------------------------------
