@@ -129,23 +129,16 @@ class TestFullPipelinePath:
             },
             timeout=30.0,
         )
-        # The request should either succeed (200) or fail with a
-        # transport/agent error (503) — but NOT with auth error (401/403)
-        assert resp.status_code != 401, "Auth failed — check SUPERADMIN_PREVIEW_API_KEY"
-        assert resp.status_code != 403, "Forbidden — API key may lack chat permission"
-
-        if resp.status_code == 200:
-            data = resp.json()
-            # Response should contain AI-generated content
-            assert "response" in data or "message" in data or "text" in data
-            print(f"\n  Chat response received (200) — pipeline traversal confirmed")
-        elif resp.status_code == 503:
-            # 503 = transport exhausted per ADR-001 — agents unreachable
-            print(f"\n  503 received — agent containers unreachable via transport")
-            # This is still useful evidence: it proves the dispatch chain ran
-            # and terminated at _require_transport_or_fail()
-        else:
-            print(f"\n  Unexpected status: {resp.status_code}")
+        # Must succeed — 503 means transport failed, which is a test failure
+        assert resp.status_code == 200, (
+            f"Chat dispatch failed with {resp.status_code}. "
+            f"Expected 200 proving IC→KR→RG→Critic traversal. "
+            f"Body: {resp.text[:200]}"
+        )
+        data = resp.json()
+        assert "response" in data or "message" in data or "text" in data, (
+            "Response missing content — pipeline may not have completed"
+        )
 
     def test_streaming_response_through_rg(
         self, test_host_url, http_client, api_headers,
@@ -161,12 +154,15 @@ class TestFullPipelinePath:
             },
             timeout=30.0,
         )
-        assert resp.status_code != 401, "Auth failed"
-        # Streaming returns 200 with SSE content type
-        if resp.status_code == 200:
-            content_type = resp.headers.get("content-type", "")
-            assert "text/event-stream" in content_type or "application/json" in content_type
-            print(f"\n  Streaming response received — RG container dispatch confirmed")
+        assert resp.status_code == 200, (
+            f"Streaming dispatch failed with {resp.status_code}. "
+            f"Expected 200 proving RG streaming through container. "
+            f"Body: {resp.text[:200]}"
+        )
+        content_type = resp.headers.get("content-type", "")
+        assert "text/event-stream" in content_type or "application/json" in content_type, (
+            f"Unexpected content type: {content_type}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -191,10 +187,11 @@ class TestEscalationPath:
             },
             timeout=30.0,
         )
-        assert resp.status_code != 401, "Auth failed"
-        # Escalation may succeed (200 with escalation context) or 503
-        if resp.status_code == 200:
-            print(f"\n  Escalation response received — escalation handler dispatched")
+        assert resp.status_code == 200, (
+            f"Escalation dispatch failed with {resp.status_code}. "
+            f"Expected 200 proving escalation handler container dispatch. "
+            f"Body: {resp.text[:200]}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +219,8 @@ class TestWidgetPath:
             },
             timeout=30.0,
         )
-        assert resp.status_code != 401, "Widget auth failed — check STAGING_WIDGET_KEY"
-        if resp.status_code == 200:
-            print(f"\n  Widget chat response — same pipeline as API dispatch")
+        assert resp.status_code == 200, (
+            f"Widget chat dispatch failed with {resp.status_code}. "
+            f"Expected 200 proving widget traffic through container pipeline. "
+            f"Body: {resp.text[:200]}"
+        )

@@ -205,6 +205,7 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
     try:
         from src.multi_tenant.agntcy_sdk_integration import (
             get_transport_with_setup,
+            _try_nats_transport_with_setup,
         )
 
         # ADR-001: per-interface transport evaluation with cascade.
@@ -225,23 +226,34 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
             agent.agent_type, topic,
         )
 
-        # SDK transport subscription loop
-        # The transport.subscribe() method is transport-specific:
-        # - NATS: returns an async iterator of Messages
-        # - SLIM: returns None (SLIM is dispatch-only, not pub/sub)
-        # When subscribe returns None, the agent operates in HTTP reception
-        # mode — requests arrive via the FastAPI /process endpoint instead
-        # of through the transport message bus.
+        # ADR-001 per-interface cascade for subscription:
+        # Each interconnection is evaluated independently. If the current
+        # transport (e.g. SLIM) doesn't support subscribe(), cascade to the
+        # next tier (NATS) specifically for the receive interface.
         subscription = await transport.subscribe(topic)
         if subscription is None:
             tier_name = type(transport).__name__
             logger.info(
-                "Agent %s: transport %s connected (Tier 1) but does not support "
-                "subscription. Agent will receive requests via HTTP endpoint. "
-                "This is expected for SLIM (dispatch-only transport).",
+                "Agent %s: transport %s does not support subscription — "
+                "cascading to NATS for receive interface (ADR-001 per-interface).",
                 agent.agent_type, tier_name,
             )
-            return
+            # Try NATS specifically for subscription (receive interface)
+            nats_transport = await _try_nats_transport_with_setup(timeout=10.0)
+            if nats_transport is not None:
+                subscription = await nats_transport.subscribe(topic)
+            if subscription is None:
+                logger.info(
+                    "Agent %s: no transport supports subscription for this interface. "
+                    "Agent will receive requests via HTTP /process endpoint (Tier 3).",
+                    agent.agent_type,
+                )
+                return
+            logger.info(
+                "Agent %s: NATS subscription active for receive interface (Tier 2). "
+                "Dispatch via SLIM (Tier 1), receive via NATS (Tier 2).",
+                agent.agent_type,
+            )
 
         async for message in subscription:
             try:

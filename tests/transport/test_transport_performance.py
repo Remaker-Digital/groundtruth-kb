@@ -184,23 +184,27 @@ class TestCrossContainerLatency:
             )
             elapsed = (time.monotonic() - start) * 1000
 
-            if resp.status_code in (200, 503):
+            if resp.status_code == 200:
                 result.samples.append(elapsed)
             else:
                 result.errors += 1
 
-        if result.samples:
-            print(f"\n  Chat dispatch P50={result.p50:.0f}ms P95={result.p95:.0f}ms "
-                  f"({len(result.samples)} samples, {result.errors} errors)")
+        # Benchmark must have successful samples — 503 is not a valid benchmark
+        assert len(result.samples) > 0, (
+            f"No successful dispatches in {result.errors + len(result.samples)} attempts. "
+            "Benchmark requires at least one 200 response proving pipeline traversal."
+        )
+        print(f"\n  Chat dispatch P50={result.p50:.0f}ms P95={result.p95:.0f}ms "
+              f"({len(result.samples)} samples, {result.errors} errors)")
 
-            # Write benchmark report
-            report = {
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "test_host_url": test_host_url,
-                "benchmarks": [result.to_dict()],
-            }
-            report_path = benchmark_output / "chat-dispatch-benchmark.json"
-            report_path.write_text(json.dumps(report, indent=2))
+        # Write benchmark report
+        report = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "test_host_url": test_host_url,
+            "benchmarks": [result.to_dict()],
+        }
+        report_path = benchmark_output / "chat-dispatch-benchmark.json"
+        report_path.write_text(json.dumps(report, indent=2))
 
     def test_transport_overhead_baseline(
         self, test_host_url, http_client, benchmark_output,

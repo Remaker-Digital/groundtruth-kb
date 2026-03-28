@@ -38,44 +38,69 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class TestGate1TransportTests:
-    """Transport and container contract tests must pass."""
+    """Transport contract, smoke, and parity tests must PASS (not just exist)."""
 
-    def test_contract_tests_importable(self):
-        """Contract test module must be importable."""
-        import tests.transport.test_transport_contracts
-        assert tests.transport.test_transport_contracts is not None
+    def test_contract_suite_passes(self):
+        """Contract test suite must pass (not just be importable)."""
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest",
+             "tests/transport/test_transport_contracts.py", "-q", "--tb=line"],
+            capture_output=True, text=True,
+            cwd=str(PROJECT_ROOT), timeout=60,
+        )
+        assert result.returncode == 0, (
+            f"Contract tests FAILED (rc={result.returncode}):\n{result.stdout[-500:]}"
+        )
 
-    def test_smoke_tests_importable(self):
-        """Smoke test module must be importable."""
-        import tests.transport.test_transport_smoke
-        assert tests.transport.test_transport_smoke is not None
+    def test_smoke_suite_passes(self):
+        """Smoke test suite must pass."""
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest",
+             "tests/transport/test_transport_smoke.py", "-q", "--tb=line"],
+            capture_output=True, text=True,
+            cwd=str(PROJECT_ROOT), timeout=60,
+        )
+        assert result.returncode == 0, (
+            f"Smoke tests FAILED (rc={result.returncode}):\n{result.stdout[-500:]}"
+        )
 
-    def test_parity_tests_importable(self):
-        """Environment parity test module must be importable."""
-        import tests.transport.test_environment_parity
-        assert tests.transport.test_environment_parity is not None
+    def test_parity_suite_passes(self):
+        """Environment parity test suite must pass."""
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest",
+             "tests/transport/test_environment_parity.py", "-q", "--tb=line"],
+            capture_output=True, text=True,
+            cwd=str(PROJECT_ROOT), timeout=60,
+        )
+        assert result.returncode == 0, (
+            f"Parity tests FAILED (rc={result.returncode}):\n{result.stdout[-500:]}"
+        )
 
     def test_transport_test_count_sufficient(self):
-        """Transport test suite must have >= 30 tests."""
+        """Transport test suite (excluding this gate file) must have >= 30 tests."""
+        # Exclude the gate file itself to avoid recursive pytest invocation
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", "tests/transport/", "--collect-only", "-q"],
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-            timeout=30,
+            [sys.executable, "-m", "pytest",
+             "tests/transport/test_transport_contracts.py",
+             "tests/transport/test_transport_smoke.py",
+             "tests/transport/test_environment_parity.py",
+             "--collect-only", "-q"],
+            capture_output=True, text=True,
+            cwd=str(PROJECT_ROOT), timeout=30,
         )
-        # Parse "X tests collected" from output
+        # Parse "X tests collected" or "X selected"
+        count = 0
         for line in result.stdout.split("\n"):
-            if "selected" in line or "collected" in line:
-                # Extract number
+            if "collected" in line or "selected" in line:
                 parts = line.split()
                 for p in parts:
                     if p.isdigit():
                         count = int(p)
-                        assert count >= 30, f"Only {count} transport tests (need >=30)"
-                        return
-        # If we get here, couldn't parse — just check the output isn't empty
-        assert "test" in result.stdout.lower()
+                        break
+        assert count >= 30, (
+            f"Only {count} transport tests collected (need >=30). "
+            f"Output: {result.stdout[-200:]}"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -302,6 +302,41 @@ async def get_transport_with_setup(timeout: float = 10.0) -> BaseTransport:
     return None  # type: ignore[return-value]
 
 
+async def _try_nats_transport_with_setup(timeout: float = 10.0) -> BaseTransport:
+    """Try NATS transport specifically for a single interface (e.g. receive).
+
+    ADR-001: each interconnection is evaluated independently. When the primary
+    transport (SLIM) is active for dispatch but doesn't support subscription,
+    this function creates a separate NATS transport for the receive interface.
+
+    Returns the NATS transport if setup succeeds, None otherwise.
+    Does NOT modify the global _transport singleton.
+    """
+    import asyncio
+
+    if not NATS_ENDPOINT:
+        return None  # type: ignore[return-value]
+
+    factory = get_agntcy_factory()
+    try:
+        nats = factory.create_transport(
+            transport="NATS",
+            name="agent-red-nats-receive",
+            endpoint=NATS_ENDPOINT,
+        )
+        await asyncio.wait_for(nats.setup(), timeout=timeout)
+        logger.info(
+            "NATS transport setup succeeded for receive interface (endpoint=%s)",
+            NATS_ENDPOINT,
+        )
+        return nats
+    except Exception as exc:
+        logger.warning(
+            "NATS transport setup failed for receive interface: %s", exc,
+        )
+        return None  # type: ignore[return-value]
+
+
 def _build_agent_card(agent_topic: str) -> Any:
     """Build an AgentCard for an internal pipeline agent.
 
