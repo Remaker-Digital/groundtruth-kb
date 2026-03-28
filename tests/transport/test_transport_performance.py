@@ -171,6 +171,8 @@ class TestPerHopStageLatency:
         result = BenchmarkResult(name="gateway-baseline", tier="http")
         client = httpx.Client(timeout=30.0)
         try:
+            # Warm-up request (TLS handshake + connection pool init)
+            client.get(f"{staging_base_url}/ready")
             for _ in range(20):
                 start = time.monotonic()
                 resp = client.get(f"{staging_base_url}/ready")
