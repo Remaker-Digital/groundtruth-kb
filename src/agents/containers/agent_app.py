@@ -204,39 +204,20 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
     """
     try:
         from src.multi_tenant.agntcy_sdk_integration import (
-            get_agntcy_factory,
-            get_default_transport,
+            get_transport_with_setup,
         )
 
-        transport = get_default_transport()
+        # ADR-001: per-interface transport evaluation with cascade.
+        # get_transport_with_setup() tries SLIM setup → NATS setup → None,
+        # cascading on actual connectivity failure (not just object creation).
+        transport = await get_transport_with_setup(timeout=10.0)
         if transport is None:
             logger.warning(
-                "Agent %s: no transport configured — running in HTTP-only mode. "
-                "A2A messages will not be received via NATS/SLIM.",
+                "Agent %s: no transport connected after SLIM→NATS cascade — "
+                "running in HTTP-only mode. A2A messages will not be received.",
                 agent.agent_type,
             )
             return
-
-        # AGNTCY SDK lifecycle: create_transport() creates the object but
-        # setup() must be called to establish the actual connection.
-        # Without setup(), subscribe/publish raise RuntimeError.
-        # If setup() fails (e.g., NATS server unreachable due to Azure Container
-        # Apps TCP ingress limitations), fall back to HTTP-only mode gracefully.
-        if hasattr(transport, "setup"):
-            logger.info(
-                "Agent %s: calling transport.setup() to establish connection",
-                agent.agent_type,
-            )
-            try:
-                await asyncio.wait_for(transport.setup(), timeout=10.0)
-            except (asyncio.TimeoutError, Exception) as exc:
-                logger.warning(
-                    "Agent %s: transport.setup() failed (%s) — running in HTTP-only mode. "
-                    "NATS/SLIM subscription will not be active. This may indicate "
-                    "Azure Container Apps TCP ingress is not routing to the NATS server.",
-                    agent.agent_type, exc,
-                )
-                return
 
         topic = agent.create_agent_topic()
         logger.info(

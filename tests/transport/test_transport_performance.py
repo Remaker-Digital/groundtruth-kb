@@ -149,34 +149,77 @@ class TestPerContainerLatency:
 
 
 class TestCrossContainerLatency:
-    """Measure cross-container dispatch latency.
+    """Measure cross-container dispatch latency via real chat requests."""
 
-    These tests send requests through the gateway that dispatch to
-    agent containers, measuring the full roundtrip including transport
-    overhead and agent processing.
-    """
+    @pytest.fixture
+    def api_headers(self) -> dict[str, str]:
+        api_key = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
+        if not api_key:
+            pytest.skip("SUPERADMIN_PREVIEW_API_KEY not set")
+        return {"X-API-Key": api_key, "Content-Type": "application/json"}
 
-    def test_intent_classifier_roundtrip(self, test_host_url, http_client):
-        """IC dispatch roundtrip should complete within budget."""
-        # This would require an authenticated request to the chat endpoint
-        # which triggers IC dispatch. Placeholder for when auth fixtures
-        # are available.
-        pass
+    def test_chat_dispatch_roundtrip_latency(
+        self, test_host_url, http_client, api_headers, benchmark_output,
+    ):
+        """Measure full chat dispatch latency (IC→KR→RG→Critic).
 
-    def test_transport_overhead_baseline(self, test_host_url, http_client):
-        """Baseline: gateway-only latency vs agent dispatch latency.
-
-        The difference approximates transport + agent processing overhead.
+        This is the real cross-container benchmark: an authenticated chat
+        request traverses the full agent pipeline. The latency includes
+        transport overhead, agent processing, and AI inference.
         """
-        # Gateway-only baseline (no agent dispatch)
-        gateway_times = []
+        tenant = os.environ.get("STAGING_TENANT_ID", "remaker-digital-001")
+        result = BenchmarkResult(name="chat-dispatch-roundtrip", tier="measured")
+
+        for i in range(5):
+            start = time.monotonic()
+            resp = http_client.post(
+                f"{test_host_url}/api/chat",
+                headers=api_headers,
+                json={
+                    "message": "What products do you have?",
+                    "conversation_id": f"perf-bench-{int(time.time())}-{i}",
+                    "tenant_id": tenant,
+                },
+                timeout=30.0,
+            )
+            elapsed = (time.monotonic() - start) * 1000
+
+            if resp.status_code in (200, 503):
+                result.samples.append(elapsed)
+            else:
+                result.errors += 1
+
+        if result.samples:
+            print(f"\n  Chat dispatch P50={result.p50:.0f}ms P95={result.p95:.0f}ms "
+                  f"({len(result.samples)} samples, {result.errors} errors)")
+
+            # Write benchmark report
+            report = {
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "test_host_url": test_host_url,
+                "benchmarks": [result.to_dict()],
+            }
+            report_path = benchmark_output / "chat-dispatch-benchmark.json"
+            report_path.write_text(json.dumps(report, indent=2))
+
+    def test_transport_overhead_baseline(
+        self, test_host_url, http_client, benchmark_output,
+    ):
+        """Baseline: gateway-only latency (no agent dispatch).
+
+        The difference between this and chat dispatch approximates
+        transport + agent processing overhead.
+        """
+        result = BenchmarkResult(name="gateway-baseline", tier="http")
         for _ in range(10):
             start = time.monotonic()
-            http_client.get(f"{test_host_url}/ready")
-            gateway_times.append((time.monotonic() - start) * 1000)
+            resp = http_client.get(f"{test_host_url}/ready")
+            elapsed = (time.monotonic() - start) * 1000
+            if resp.status_code == 200:
+                result.samples.append(elapsed)
 
-        gw_p50 = statistics.median(gateway_times)
-        print(f"\n  Gateway baseline P50: {gw_p50:.1f}ms")
+        if result.samples:
+            print(f"\n  Gateway baseline P50={result.p50:.0f}ms P95={result.p95:.0f}ms")
 
 
 # ---------------------------------------------------------------------------

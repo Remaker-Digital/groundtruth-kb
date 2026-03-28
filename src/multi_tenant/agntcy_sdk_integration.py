@@ -108,6 +108,7 @@ class AgentTopic(str, Enum):
 
 _factory: AgntcyFactory | None = None
 _transport: BaseTransport | None = None
+_transport_setup_ok: bool = False  # True only after transport.setup() succeeds
 
 
 def get_agntcy_factory() -> AgntcyFactory:
@@ -218,40 +219,197 @@ def get_default_transport() -> BaseTransport:
     return _transport
 
 
-def create_a2a_client(
+async def get_transport_with_setup(timeout: float = 10.0) -> BaseTransport:
+    """Try each transport tier with actual setup(), cascading on failure.
+
+    ADR-001: Each container interconnection is evaluated independently.
+    The standing priority order SLIM → NATS → HTTP is applied per-interface,
+    not globally. This function tries:
+
+    1. SLIM: create_transport() + setup() → if setup fails, cascade
+    2. NATS: create_transport() + setup() → if setup fails, cascade
+    3. Return None (HTTP failure mode)
+
+    Unlike get_default_transport() which only cascades at creation time,
+    this function cascades at the *connectivity* level — a transport that
+    creates successfully but fails setup() triggers the next tier.
+    """
+    global _transport, _transport_setup_ok
+    import asyncio
+
+    factory = get_agntcy_factory()
+
+    # Tier 1: SLIM
+    if SLIM_ENDPOINT:
+        try:
+            slim = factory.create_transport(
+                transport="SLIM",
+                name=f"{SLIM_ORG_NAMESPACE}/gateway",
+                endpoint=SLIM_ENDPOINT,
+                tls_insecure=SLIM_TLS_INSECURE,
+                shared_secret_identity=SLIM_SHARED_SECRET or None,
+            )
+            logger.info(
+                "SLIM transport created — attempting setup (endpoint=%s)",
+                SLIM_ENDPOINT,
+            )
+            await asyncio.wait_for(slim.setup(), timeout=timeout)
+            _transport = slim
+            _transport_setup_ok = True
+            logger.info("SLIM transport setup succeeded — Tier 1 active")
+            return _transport
+        except Exception as exc:
+            logger.warning(
+                "SLIM transport setup failed (%s) — cascading to NATS (Tier 2)",
+                exc,
+            )
+
+    # Tier 2: NATS
+    if NATS_ENDPOINT:
+        try:
+            nats_kwargs: dict[str, Any] = {
+                "transport": "NATS",
+                "name": "agent-red-nats",
+                "endpoint": NATS_ENDPOINT,
+            }
+            nats = factory.create_transport(**nats_kwargs)
+            logger.info(
+                "NATS transport created — attempting setup (endpoint=%s, protocol=%s)",
+                NATS_ENDPOINT,
+                "websocket" if NATS_ENDPOINT.startswith("ws") else "tcp",
+            )
+            await asyncio.wait_for(nats.setup(), timeout=timeout)
+            _transport = nats
+            _transport_setup_ok = True
+            logger.info("NATS transport setup succeeded — Tier 2 active")
+            return _transport
+        except Exception as exc:
+            logger.warning(
+                "NATS transport setup failed (%s) — all transports exhausted. "
+                "Agent will operate in HTTP-only mode (Tier 3).",
+                exc,
+            )
+
+    # Tier 3: No transport available
+    _transport = None
+    _transport_setup_ok = False
+    logger.warning(
+        "No transport connected after setup cascade. "
+        "SLIM=%r (setup failed), NATS=%r (setup failed). "
+        "Operating in HTTP-only mode per ADR-001.",
+        SLIM_ENDPOINT, NATS_ENDPOINT,
+    )
+    return None  # type: ignore[return-value]
+
+
+def _build_agent_card(agent_topic: str) -> Any:
+    """Build an AgentCard for an internal pipeline agent.
+
+    Creates a minimal AgentCard with SLIM transport as the preferred
+    transport and the agent's SLIM topic as the URL.
+    """
+    from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+
+    slim_url = f"slim://{SLIM_ORG_NAMESPACE}/{agent_topic}"
+
+    return AgentCard(
+        name=agent_topic,
+        description=f"Agent Red pipeline agent: {agent_topic}",
+        url=slim_url,
+        version="1.0.0",
+        capabilities=AgentCapabilities(streaming=False),
+        default_input_modes=["text"],
+        default_output_modes=["text"],
+        preferred_transport="slimpatterns",
+        skills=[
+            AgentSkill(
+                id=agent_topic,
+                name=agent_topic,
+                description=f"Process {agent_topic} requests",
+                tags=[agent_topic],
+            ),
+        ],
+    )
+
+
+def _get_client_config() -> Any:
+    """Build a ClientConfig with SLIM as primary transport.
+
+    SPEC-1802: SLIM/gRPC is always primary. NATS is first fallback.
+    HTTP (JSONRPC) is second fallback. In-process is not an option.
+    """
+    from agntcy_app_sdk.semantic.a2a.client.config import (
+        ClientConfig,
+        NatsTransportConfig,
+        SlimTransportConfig,
+    )
+
+    slim_cfg = None
+    nats_cfg = None
+
+    if SLIM_ENDPOINT:
+        slim_cfg = SlimTransportConfig(
+            endpoint=SLIM_ENDPOINT,
+            name=f"{SLIM_ORG_NAMESPACE}/gateway",
+            shared_secret_identity=SLIM_SHARED_SECRET or "slim-mls-secret-REPLACE_WITH_RANDOM_32PLUS_CHARS",
+            tls_insecure=SLIM_TLS_INSECURE,
+        )
+
+    if NATS_ENDPOINT:
+        nats_cfg = NatsTransportConfig(
+            endpoint=NATS_ENDPOINT,
+            name="agent-red-nats",
+        )
+
+    return ClientConfig(
+        slim_config=slim_cfg,
+        nats_config=nats_cfg,
+    )
+
+
+# Cache of A2A clients keyed by agent topic
+_a2a_clients: dict[str, Any] = {}
+
+
+async def create_a2a_client(
     agent_topic: str | AgentTopic,
-    transport: BaseTransport | None = None,
     **kwargs: Any,
 ) -> Any:
     """Create an A2A protocol client for communicating with a specific agent.
 
+    Uses the AGNTCY SDK v0.5.4 A2AClientFactory.connect() API.
+    SPEC-1802: SLIM/gRPC is always primary transport.
+
     Args:
-        agent_topic: The target agent's topic identifier (e.g., AgentTopic.INTENT_CLASSIFIER).
-        transport: Optional override transport. Uses default if not provided.
-        **kwargs: Additional kwargs passed to factory.create_client().
+        agent_topic: The target agent's topic identifier.
+        **kwargs: Additional kwargs for future extension.
 
     Returns:
-        A2A client instance bound to the specified agent topic and transport.
+        A2A client instance bound to the specified agent topic.
 
     Raises:
-        RuntimeError: If no transport is available.
+        RuntimeError: If no transport is configured.
     """
-    factory = get_agntcy_factory()
-    t = transport or get_default_transport()
-    if t is None:
-        raise RuntimeError(
-            f"Cannot create A2A client for {agent_topic}: no transport available. "
-            "Configure AGNTCY_SLIM_ENDPOINT or AGNTCY_NATS_ENDPOINT."
-        )
+    from agntcy_app_sdk.semantic.a2a.client.factory import A2AClientFactory
 
     topic = agent_topic.value if isinstance(agent_topic, AgentTopic) else agent_topic
-    client = factory.create_client(
-        "A2A",
-        agent_topic=topic,
-        transport=t,
-        **kwargs,
-    )
-    logger.debug("A2A client created for topic=%s", topic)
+
+    # Return cached client if available
+    if topic in _a2a_clients:
+        return _a2a_clients[topic]
+
+    if not SLIM_ENDPOINT and not NATS_ENDPOINT:
+        raise RuntimeError(
+            f"Cannot create A2A client for {topic}: no transport configured. "
+            "Set AGNTCY_SLIM_ENDPOINT (required) or AGNTCY_NATS_ENDPOINT (fallback)."
+        )
+
+    card = _build_agent_card(topic)
+    config = _get_client_config()
+
+    client = await A2AClientFactory.connect(card, config)
+    _a2a_clients[topic] = client
+    logger.info("A2A client created for topic=%s (transport=SLIM/gRPC)", topic)
     return client
 
 
@@ -344,48 +502,19 @@ async def init_agntcy_sdk() -> None:
         factory.registered_transports(),
     )
 
-    # Attempt to create default transport (may be None if not configured)
-    transport = get_default_transport()
+    # ADR-001: per-interface transport cascade with actual connectivity proof.
+    # get_transport_with_setup() tries SLIM→NATS→None, cascading on setup() failure.
+    transport = await get_transport_with_setup(timeout=15.0)
     if transport is not None:
-        # AGNTCY SDK lifecycle: create_transport() creates the object but
-        # setup() must be called to establish the actual NATS/SLIM connection.
-        # If setup() fails (e.g., NATS unreachable due to Azure Container Apps
-        # TCP ingress limitations), the transport object still exists for
-        # health reporting but actual A2A communication won't work.
-        if hasattr(transport, "setup"):
-            import asyncio as _asyncio
-            endpoint_info = SLIM_ENDPOINT or NATS_ENDPOINT or "unknown"
-            protocol = "websocket" if endpoint_info.startswith("ws") else "tcp"
-            logger.info(
-                "Calling transport.setup() (endpoint=%s, protocol=%s)...",
-                endpoint_info, protocol,
-            )
-            try:
-                await _asyncio.wait_for(transport.setup(), timeout=15.0)
-                logger.info(
-                    "Transport setup() complete — connection established "
-                    "(endpoint=%s, protocol=%s)",
-                    endpoint_info, protocol,
-                )
-            except _asyncio.TimeoutError:
-                logger.warning(
-                    "Transport setup() TIMED OUT after 15s (endpoint=%s, protocol=%s). "
-                    "Check: (1) NATS/SLIM server is running, (2) endpoint is reachable "
-                    "from this container, (3) DNS resolution for internal FQDNs.",
-                    endpoint_info, protocol,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Transport setup() FAILED: %s (endpoint=%s, protocol=%s). "
-                    "A2A communication will fall back to HTTP containers (Tier 3).",
-                    exc, endpoint_info, protocol,
-                )
-        logger.info("Default transport ready: %s", TRANSPORT_TYPE)
+        logger.info(
+            "Transport ready: tier=%s, setup_ok=%s",
+            "slim" if "SLIM" in type(transport).__name__.upper() else "nats",
+            _transport_setup_ok,
+        )
     else:
         logger.info(
-            "No default transport configured — SDK available for factory "
-            "operations but agent-to-agent communication is not active. "
-            "This is expected during Phase 1."
+            "No transport connected after cascade — SDK available for factory "
+            "operations but A2A communication uses HTTP (Tier 3)."
         )
 
 
@@ -445,7 +574,7 @@ def get_sdk_status() -> dict[str, Any]:
     status: dict[str, Any] = {
         "sdk_initialized": factory is not None,
         "transport_type": active_tier,
-        "transport_active": transport is not None,
+        "transport_active": _transport_setup_ok,  # Actual connectivity, not just object existence
         "active_tier": active_tier or "http_failure_mode",
         "slim_endpoint": SLIM_ENDPOINT or None,
         "nats_endpoint": NATS_ENDPOINT or None,

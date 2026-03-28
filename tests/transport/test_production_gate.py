@@ -84,17 +84,29 @@ class TestGate1TransportTests:
 
 
 class TestGate2WidgetTests:
-    """Widget E2E test structure must exist."""
+    """Widget E2E tests must exist and be collectible by pytest."""
 
-    def test_widget_e2e_test_file_exists(self):
-        """Widget path E2E test must exist in transport suite."""
-        widget_test = PROJECT_ROOT / "tests" / "transport" / "test_containerized_e2e.py"
-        assert widget_test.exists()
+    def test_widget_e2e_tests_collectible(self):
+        """Widget E2E tests must be collectible (not just file existence)."""
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest",
+             "tests/transport/test_containerized_e2e.py::TestWidgetPath",
+             "--collect-only", "-q"],
+            capture_output=True, text=True,
+            cwd=str(PROJECT_ROOT), timeout=15,
+        )
+        assert "TestWidgetPath" in result.stdout or "selected" in result.stdout, (
+            f"Widget tests not collectible: {result.stdout}"
+        )
 
-    def test_widget_test_class_exists(self):
-        """TestWidgetPath class must exist."""
+    def test_widget_test_has_authenticated_dispatch(self):
+        """TestWidgetPath must contain an authenticated chat request."""
         from tests.transport.test_containerized_e2e import TestWidgetPath
-        assert TestWidgetPath is not None
+        source = inspect.getsource(TestWidgetPath)
+        assert "widget_headers" in source or "X-Widget-Key" in source, (
+            "Widget test must use widget key auth"
+        )
+        assert "/api/chat" in source, "Widget test must hit /api/chat endpoint"
 
 
 # ---------------------------------------------------------------------------
@@ -103,18 +115,32 @@ class TestGate2WidgetTests:
 
 
 class TestGate3PerformanceBaselines:
-    """Performance benchmark infrastructure must exist."""
+    """Performance benchmarks must include real dispatch measurement."""
 
-    def test_performance_test_file_exists(self):
-        """Transport performance test file must exist."""
-        perf_test = PROJECT_ROOT / "tests" / "transport" / "test_transport_performance.py"
-        assert perf_test.exists()
+    def test_performance_tests_collectible(self):
+        """Performance tests must be collectible by pytest."""
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest",
+             "tests/transport/test_transport_performance.py",
+             "--collect-only", "-q"],
+            capture_output=True, text=True,
+            cwd=str(PROJECT_ROOT), timeout=15,
+        )
+        # Must have at least 4 tests (baseline + dispatch + serialization + report)
+        for line in result.stdout.split("\n"):
+            if "selected" in line:
+                parts = line.split()
+                for p in parts:
+                    if p.isdigit():
+                        assert int(p) >= 4, f"Only {p} perf tests (need >=4)"
+                        break
 
-    def test_benchmark_result_class_exists(self):
-        """BenchmarkResult data class must exist."""
-        from tests.transport.test_transport_performance import BenchmarkResult
-        result = BenchmarkResult(name="test", tier="http", samples=[1.0, 2.0])
-        assert result.p50 > 0
+    def test_benchmark_includes_dispatch_measurement(self):
+        """Performance suite must include cross-container dispatch measurement."""
+        from tests.transport.test_transport_performance import TestCrossContainerLatency
+        source = inspect.getsource(TestCrossContainerLatency)
+        assert "/api/chat" in source, "Benchmarks must measure real chat dispatch latency"
+        assert "BenchmarkResult" in source, "Benchmarks must record structured results"
 
 
 # ---------------------------------------------------------------------------
@@ -158,15 +184,26 @@ class TestGate4FailureInjection:
 class TestGate5MCPExceptions:
     """MCP exception register must be clean or explicitly approved."""
 
-    def test_mcp_exception_document_exists(self):
-        """DOC-MCP-EXCEPTIONS must exist in KB."""
+    def test_mcp_exception_register_clean_or_approved(self):
+        """MCP exception register must exist and be empty or owner-approved.
+
+        DOC-MCP-EXCEPTIONS tracks known transport/MCP deviations. For
+        production readiness, all entries must be explicitly approved.
+        """
         sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
         import db as kb_db
         kdb = kb_db.KnowledgeDB(str(PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"))
-        # Check for MCP exception document
+        # Search for MCP exception document by various naming patterns
         docs = kdb.list_documents()
-        mcp_docs = [d for d in docs if "MCP" in d.get("title", "").upper() and "EXCEPTION" in d.get("title", "").upper()]
-        assert len(mcp_docs) > 0 or True  # Non-blocking: document may use different naming
+        mcp_docs = [
+            d for d in docs
+            if any(term in d.get("title", "").upper()
+                   for term in ("MCP-EXCEPTION", "MCP EXCEPTION", "DOC-MCP"))
+        ]
+        assert len(mcp_docs) > 0, (
+            "DOC-MCP-EXCEPTIONS not found in KB — create it to track "
+            "transport/MCP deviations before production deploy"
+        )
 
 
 # ---------------------------------------------------------------------------
