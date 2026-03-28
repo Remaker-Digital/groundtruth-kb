@@ -412,22 +412,42 @@ class AgentDispatchMixin:
     ) -> AsyncGenerator[str, None]:
         """Generate a streaming AI response.
 
-        Routes per SPEC-1802 canonical dispatch: SLIM → NATS → HTTP → 503 (SPEC-1536, SPEC-1537).
-        Transport streaming uses hybrid SSE-over-transport for the RG
-        container when SLIM/NATS is active.
+        Routes per SPEC-1802 dispatch: NATS → HTTP → 503.
+        SLIM is bypassed for RG streaming because SLIM point-to-point
+        does not support streaming (NotImplementedError in agntcy_app_sdk)
+        and SLIM connections drop during long-running responses due to
+        Container Apps ingress idle timeouts (INSIGHTS-2026-03-28-00-21).
+
+        Non-streaming agents (IC, KR, CR, EH) continue to use the full
+        SLIM → NATS → HTTP cascade.
 
         WI #93-96: The ``model`` parameter allows Layer 4 fine-tuned
         models to override the default gpt-4o for Enterprise tenants
         with the fine-tuning add-on enabled.
         """
-        # RG streaming bypasses SLIM/NATS transport and uses HTTP directly.
-        # SLIM does not support point-to-point streaming (raises NotImplementedError),
-        # and the SLIM connection drops during long-running responses due to
-        # Container Apps ingress idle timeouts (INSIGHTS-2026-03-28-00-21-SLIM-DIAGNOSTIC).
-        # SLIM/NATS transport works correctly for non-streaming agents (IC, KR, CR, EH).
-        # HTTP container streaming is the canonical path for RG (ADR-001 amendment).
+        # Priority 1 for RG streaming: NATS transport (skip SLIM — proven
+        # infeasible for streaming per INSIGHTS-2026-03-28-00-21-SLIM-DIAGNOSTIC)
+        if self._transport_available():
+            from src.multi_tenant.agntcy_sdk_integration import TRANSPORT_TYPE
+            if TRANSPORT_TYPE != "slim":
+                # NATS or other non-SLIM transport — attempt streaming
+                try:
+                    async for chunk in self._call_response_generator_stream_transport(
+                        customer_message, intent, knowledge_context,
+                        system_prompt, budget, model,
+                        conversation_history=conversation_history,
+                    ):
+                        yield chunk
+                    return
+                except Exception as exc:
+                    logger.warning("Transport RG stream failed, falling back to HTTP: %s", exc)
+            else:
+                logger.info(
+                    "Skipping SLIM transport for RG streaming (not supported for "
+                    "point-to-point streaming — see INSIGHTS-2026-03-28-00-21)"
+                )
 
-        # Tier 3: HTTP container streaming (canonical for RG per SLIM diagnostic)
+        # Tier 3: HTTP container (failure mode per SPEC-1802)
         if USE_AGENT_CONTAINERS:
             try:
                 self._warn_http_failure_mode("response-generator")
