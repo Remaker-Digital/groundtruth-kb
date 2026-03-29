@@ -319,11 +319,18 @@ class TestInfrastructureTopology:
 
     @pytest.mark.asyncio
     async def test_edge_protocol_field(self, superadmin_ctx):
-        """Edges have protocol information."""
+        """Edges have protocol information (SPEC-1847: runtime-detected)."""
         result = await get_infrastructure_topology(period="24h")
         protocols = {e.protocol for e in result.edges}
         assert "HTTPS" in protocols
-        assert "SLIM" in protocols
+        # SPEC-1847: Internal agent edges report the runtime transport tier
+        # (SLIM, NATS, or HTTP) and RG shows "In-Process" per DCL-002 v4.
+        # At least one internal transport protocol must be present.
+        internal_transports = {"SLIM", "NATS", "HTTP", "In-Process"}
+        assert protocols & internal_transports, (
+            f"Expected at least one internal transport in {protocols}, "
+            f"valid: {internal_transports}"
+        )
 
     @pytest.mark.asyncio
     async def test_node_status_default_healthy(self, superadmin_ctx):
