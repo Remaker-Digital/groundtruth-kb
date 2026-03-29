@@ -136,6 +136,7 @@ TTL_ALERT_HISTORY = 90 * 24 * 60 * 60     # 90 days (alert history retention)
 TTL_INGESTION_JOBS = 30 * 24 * 60 * 60   # 30 days (ingestion job retention)
 TTL_INTEGRATION_EVENTS = 30 * 24 * 60 * 60  # 30 days (integration event retention, SPEC-1773)
 TTL_PII_TOKEN_MAPPINGS = 7 * 24 * 60 * 60  # 7 days (PII token mapping retention)
+TTL_INVOCATION_EVENTS = 30 * 24 * 60 * 60  # 30 days (invocation event retention, SPEC-1855)
 
 
 # ---------------------------------------------------------------------------
@@ -375,9 +376,23 @@ class ConversationDocument(BaseModel):
         default="customer",
         description=(
             "Conversation origin: 'customer' (default — storefront visitor) or "
-            "'admin_assistance' (team member querying Co-pilot from admin panel). "
-            "Admin conversations are non-billable and routed to the Co-pilot agent."
+            "'admin_assistance' (team member assistance — co-pilot or direct agent). "
+            "Admin conversations are non-billable."
         ),
+    )
+
+    # Actor/channel metadata (SPEC-1862 — Codex P1.3 normalization)
+    actor_type: str = Field(
+        default="customer",
+        description="Actor who initiated: 'customer', 'team_member', or 'internal_agent'.",
+    )
+    channel_origin: str = Field(
+        default="widget",
+        description="Channel of origin: 'widget', 'admin_console', or 'internal'.",
+    )
+    target_agent_id: str = Field(
+        default="",
+        description="Peer agent targeted by team member (empty = co-pilot/pipeline).",
     )
 
     # Billing (Decision #24 — billable conversation definition)
@@ -1396,6 +1411,17 @@ class TeamMemberDocument(BaseModel):
         description="Escalation categories this agent handles: "
         "service, support, sales, account, technical_assistance, general_inquiry. "
         "Only applicable when role = escalation_agent.",
+    )
+
+    # Direct agent chat access (SPEC-1862 — Phase 3)
+    agent_access: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Peer agents this member can chat with directly. "
+            "Empty = no direct agent chat (backward compat). "
+            '["sales", "campaigns"] = specific agents. '
+            "superadmin/admin roles get implicit wildcard access at runtime."
+        ),
     )
     max_concurrent_conversations: int = Field(
         default=5,
@@ -2418,6 +2444,127 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "rate_limit_rpm": RATE_LIMIT_RPM_DEFAULT,
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# Agent Extensibility — Agent Skill Binding (SPEC-1856)
+# ---------------------------------------------------------------------------
+
+
+class BindingApprovalPolicy(str, Enum):
+    """Approval policy for a skill binding."""
+
+    AUTO = "auto"
+    REQUIRE_CONFIRMATION = "require_confirmation"
+
+
+class AgentSkillBindingDocument(BaseModel):
+    """Per-tenant, per-agent, per-skill authorization binding (SPEC-1856).
+
+    Partition key: /tenant_id
+    No TTL — bindings persist until deleted.
+
+    Deny-by-default: if no binding exists for (tenant_id, agent_id, skill_id),
+    the skill is DENIED for that tenant (SPEC-1856 req 3).
+    """
+
+    id: str = ""
+    tenant_id: str = ""
+    agent_id: str = ""
+    skill_id: str = ""
+    credential_ref: str | None = None
+    mode: str = "read"
+    approval_policy: str = BindingApprovalPolicy.AUTO.value
+    enabled: bool = True
+    created_at: str = ""
+    updated_at: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Agent Extensibility — Tenant Agent Overlay (SPEC-1854)
+# ---------------------------------------------------------------------------
+
+
+class SkillOverride(BaseModel):
+    """Per-skill override within a tenant agent overlay."""
+
+    enabled: bool = True
+    mode_override: str | None = None
+    credential_ref: str | None = None
+
+
+class TenantAgentOverlayDocument(BaseModel):
+    """Per-tenant, per-agent configuration overlay (SPEC-1854).
+
+    Partition key: /tenant_id
+    No TTL — overlays persist until deleted.
+
+    Effective config = base_registry[agent_id] merged with this overlay.
+    Overlay values take precedence over base defaults.
+    """
+
+    id: str = ""
+    tenant_id: str = ""
+    agent_id: str = ""
+    enabled: bool = True
+    prompt_overrides: dict[str, str] = Field(
+        default_factory=dict,
+        description="Reserved for Phase 2. Not consumed by SystemPromptBuilder until prompt-resolution contract is specified.",
+    )
+    skill_overrides: dict[str, SkillOverride] = Field(default_factory=dict)
+    custom_metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Agent Extensibility — Invocation Event (SPEC-1855)
+# ---------------------------------------------------------------------------
+
+
+class InvocationResultClass(str, Enum):
+    """Outcome classification for an agent/skill invocation."""
+
+    SUCCESS = "success"
+    ERROR = "error"
+    TIMEOUT = "timeout"
+    DENIED = "denied"
+
+
+class InvocationPolicyVerdict(str, Enum):
+    """Policy evaluation result for an invocation attempt."""
+
+    ALLOWED = "allowed"
+    DENIED_BY_BINDING = "denied_by_binding"
+    DENIED_BY_RBAC = "denied_by_rbac"
+    DENIED_BY_MODE = "denied_by_mode"
+
+
+class InvocationEventDocument(BaseModel):
+    """Structured invocation event for observability and audit (SPEC-1855).
+
+    Partition key: /tenant_id
+    TTL: 30 days.
+
+    Events form a tree: root event for pipeline execution, child events
+    for each agent/skill invocation within it (linked by parent_event_id).
+    """
+
+    id: str = ""
+    event_id: str = ""
+    trace_id: str = ""
+    parent_event_id: str | None = None
+    invoker: str = "system"
+    target_agent_id: str = ""
+    skill_id: str | None = None
+    tenant_id: str = ""
+    conversation_id: str = ""
+    timestamp: str = ""
+    latency_ms: float = 0
+    result_class: str = InvocationResultClass.SUCCESS.value
+    policy_verdict: str = InvocationPolicyVerdict.ALLOWED.value
+    error_detail: str | None = None
+    ttl: int = Field(default=TTL_INVOCATION_EVENTS, alias="_ts_ttl")
 
 
 # ---------------------------------------------------------------------------

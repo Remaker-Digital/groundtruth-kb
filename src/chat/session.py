@@ -233,6 +233,11 @@ class ConversationSession:
             })
             message_count = 1
 
+        # SPEC-1862: Set actor/channel metadata for team-member conversations
+        target_agent_id = getattr(request, "target_agent_id", None) or ""
+        actor_type = "team_member" if target_agent_id else "customer"
+        channel_origin = "admin_console" if target_agent_id else "widget"
+
         doc = ConversationDocument(
             id=conversation_id,
             tenant_id=tenant_id,
@@ -247,6 +252,9 @@ class ConversationSession:
             messages=messages,
             started_at=now,
             last_activity_at=now,
+            actor_type=actor_type,
+            channel_origin=channel_origin,
+            target_agent_id=target_agent_id,
         )
 
         await self._repo.create(tenant_id, doc)
@@ -619,6 +627,7 @@ class ConversationSession:
             messages=messages,
             is_escalated=doc.get("status") == ConversationStatus.ESCALATED.value,
             customer_verified=bool(doc.get("customer_verified", False)),
+            target_agent_id=doc.get("target_agent_id", ""),
             created_at=doc.get("started_at", ""),
             last_activity_at=doc.get("last_activity_at", ""),
         )

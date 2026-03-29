@@ -87,15 +87,43 @@ logger = logging.getLogger(__name__)
 # The nats.py library supports both protocols transparently.
 NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 
-# Agent topic suffixes — matching AGNTCY upstream topic-based routing
-AGENT_TOPICS = (
-    "intent-classifier",
-    "knowledge-retrieval",
-    "response-generator",
-    "escalation-handler",
-    "analytics-collector",
-    "critic-supervisor",
-)
+# Agent topic suffixes — dynamically derived from registry (SPEC-1852).
+# Previously a hard-coded 6-agent tuple (missing co-pilot).
+
+_agent_topics_cache: tuple[str, ...] | None = None
+
+
+def get_agent_topics() -> tuple[str, ...]:
+    """Return core agent topic suffixes from the registry."""
+    global _agent_topics_cache
+    if _agent_topics_cache is None:
+        try:
+            from src.agents.plugins.registry import PluginAgentRegistry
+            reg = PluginAgentRegistry.get_instance()
+            _agent_topics_cache = tuple(reg.get_core_agent_ids())
+        except Exception:
+            # Fallback for early import / test contexts
+            _agent_topics_cache = (
+                "intent-classifier",
+                "knowledge-retrieval",
+                "response-generator",
+                "escalation-handler",
+                "analytics-collector",
+                "critic-supervisor",
+                "co-pilot",
+            )
+    return _agent_topics_cache
+
+
+def reset_agent_topics_cache() -> None:
+    """Clear the cached agent topics (testing only)."""
+    global _agent_topics_cache
+    _agent_topics_cache = None
+
+
+# Module-level constant for backward compat — calls get_agent_topics() lazily.
+# Code that imports AGENT_TOPICS at module level will get a tuple on first access.
+AGENT_TOPICS = get_agent_topics()
 
 # Platform-wide topics (not tenant-scoped)
 PLATFORM_TOPICS = (

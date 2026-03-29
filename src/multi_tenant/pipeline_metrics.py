@@ -233,26 +233,28 @@ class _MetricsCache:
 # PipelineMetricsAggregator
 # ---------------------------------------------------------------------------
 
-# Canonical pipeline agent list and edge definitions
-PIPELINE_AGENTS = [
-    "intent-classifier",
-    "knowledge-retrieval",
-    "response-generator",
-    "escalation-handler",
-    "analytics-collector",
-    "critic-supervisor",
-    "co-pilot",
-]
+# Pipeline agent list and edge topology sourced from registry (SPEC-1852).
+# Lazy-loaded on first access to avoid import-time registry initialization.
+_pipeline_agents_cache: list[str] | None = None
+_pipeline_edges_cache: list[tuple[str, str]] | None = None
 
-PIPELINE_EDGES = [
-    ("intent-classifier", "knowledge-retrieval"),
-    ("intent-classifier", "escalation-handler"),
-    ("intent-classifier", "co-pilot"),
-    ("knowledge-retrieval", "response-generator"),
-    ("response-generator", "critic-supervisor"),
-    ("critic-supervisor", "analytics-collector"),
-    ("escalation-handler", "analytics-collector"),
-]
+
+def get_pipeline_agents() -> list[str]:
+    """Return core pipeline agent IDs from registry (replaces PIPELINE_AGENTS constant)."""
+    global _pipeline_agents_cache
+    if _pipeline_agents_cache is None:
+        from src.agents.plugins.registry import PluginAgentRegistry
+        _pipeline_agents_cache = PluginAgentRegistry.get_instance().get_core_agent_ids()
+    return _pipeline_agents_cache
+
+
+def get_pipeline_edges() -> list[tuple[str, str]]:
+    """Return pipeline edge topology from registry (replaces PIPELINE_EDGES constant)."""
+    global _pipeline_edges_cache
+    if _pipeline_edges_cache is None:
+        from src.agents.plugins.registry import PluginAgentRegistry
+        _pipeline_edges_cache = PluginAgentRegistry.get_instance().get_pipeline_edges()
+    return _pipeline_edges_cache
 
 # Estimated RU cost per conversation document read
 _ESTIMATED_RU_PER_READ = 3.5
@@ -295,10 +297,10 @@ class PipelineMetricsAggregator:
         This is a pure computation — no I/O.
         """
         agents: dict[str, AgentMetrics] = {
-            name: AgentMetrics(agent=name) for name in PIPELINE_AGENTS
+            name: AgentMetrics(agent=name) for name in get_pipeline_agents()
         }
         edges: dict[tuple[str, str], EdgeMetrics] = {
-            (s, t): EdgeMetrics(source=s, target=t) for s, t in PIPELINE_EDGES
+            (s, t): EdgeMetrics(source=s, target=t) for s, t in get_pipeline_edges()
         }
         tenants: dict[str, TenantMetrics] = {}
 

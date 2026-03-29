@@ -285,6 +285,61 @@ class AgentDispatchMixin:
     # Knowledge Retrieval
     # -------------------------------------------------------------------
 
+    def _resolve_kr_mcp_payload(self) -> dict[str, Any]:
+        """Resolve MCP configs for KR through the migration state machine (SPEC-1860).
+
+        Returns dict with mcp_configs and tenant_shop_domain to merge
+        into the KR dispatch payload.
+
+        For binding_enforced tenants: skips legacy resolve_mcp_configs()
+        entirely — configs derive from the binding's credential_ref.
+        For legacy/dual_read tenants: resolves via preferences.mcp_servers
+        then routes through the migration gate.
+        """
+        tenant_id = getattr(self, "_current_tenant_id", None)
+        prefs = getattr(self, "_current_preferences", None)
+        tenant = getattr(self, "_current_tenant", None)
+
+        if not tenant_id or not prefs or not tenant:
+            return {"mcp_configs": [], "tenant_shop_domain": None}
+
+        try:
+            from src.agents.plugins.kr_migration import (
+                MigrationState,
+                get_migration_state,
+                resolve_kr_with_fallback,
+            )
+
+            state = get_migration_state(tenant_id)
+
+            if state == MigrationState.BINDING_ENFORCED:
+                # Skip legacy resolution entirely — binding is the sole source
+                resolution = resolve_kr_with_fallback(tenant_id, [])
+            else:
+                # Legacy or dual_read: resolve from preferences, then gate
+                import dataclasses as _dc
+                from src.multi_tenant.mcp_client import resolve_mcp_configs
+
+                configs = resolve_mcp_configs(prefs, tenant)
+                mcp_configs = [_dc.asdict(c) for c in configs]
+                resolution = resolve_kr_with_fallback(tenant_id, mcp_configs)
+
+            if resolution["source"] == "error":
+                logger.error(
+                    "KR MCP resolution blocked for tenant %s: %s",
+                    tenant_id, resolution.get("error", ""),
+                )
+                return {"mcp_configs": [], "tenant_shop_domain": None, "kr_blocked": True}
+
+            return {
+                "mcp_configs": resolution.get("mcp_configs", []),
+                "tenant_shop_domain": getattr(tenant, "shopify_shop_domain", None),
+                "kr_source": resolution["source"],
+            }
+        except Exception:
+            logger.debug("KR MCP resolution failed", exc_info=True)
+            return {"mcp_configs": [], "tenant_shop_domain": None}
+
     async def _call_knowledge_retrieval(
         self,
         message: str,
@@ -294,20 +349,35 @@ class AgentDispatchMixin:
         """Retrieve relevant knowledge for the customer message.
 
         Routes via SLIM/NATS transport (preferred), AGNTCY containers,
-        per SPEC-1802 canonical dispatch (SLIM → NATS → HTTP → 503).
+        per SPEC-1802 canonical dispatch (SLIM -> NATS -> HTTP -> 503).
+        MCP configs resolved through migration state machine (SPEC-1860).
         Wrapped in trace_agent_operation span (SPEC-1539).
         """
         from src.multi_tenant.otel_tracing import trace_agent_operation
 
         span = trace_agent_operation("knowledge-retrieval", "retrieve")
         try:
+            # Resolve MCP configs through migration state (SPEC-1860)
+            mcp_payload = self._resolve_kr_mcp_payload()
+            kr_payload: dict[str, Any] = {
+                "message": message,
+                "intent": intent,
+                "system_prompt": system_prompt,
+            }
+            # Enrich payload with MCP configs if available
+            if mcp_payload.get("mcp_configs"):
+                kr_payload["mcp_configs"] = mcp_payload["mcp_configs"]
+            if mcp_payload.get("tenant_shop_domain"):
+                kr_payload["tenant_shop_domain"] = mcp_payload["tenant_shop_domain"]
+
             if self._transport_available():
                 try:
                     result = await self._call_via_transport(
                         "knowledge-retrieval",
-                        {"message": message, "intent": intent, "system_prompt": system_prompt},
+                        kr_payload,
                     )
                     span.set_attribute("dispatch.mode", "transport")
+                    span.set_attribute("kr.mcp_source", mcp_payload.get("kr_source", "none"))
                     return result
                 except Exception as exc:
                     logger.warning("Transport KR call failed, falling back: %s", exc)
@@ -315,10 +385,11 @@ class AgentDispatchMixin:
                 try:
                     self._warn_http_failure_mode("knowledge-retrieval")
                     span.set_attribute("dispatch.mode", "http")
-                    return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
+                    span.set_attribute("kr.mcp_source", mcp_payload.get("kr_source", "none"))
+                    return await self._call_knowledge_retrieval_http(kr_payload)
                 except Exception as exc:
                     logger.warning("HTTP KR call failed: %s", exc)
-            # SPEC-1802 / DCL-002: All tiers exhausted — 503. No in-process fallback.
+            # SPEC-1802 / DCL-002: All tiers exhausted -- 503. No in-process fallback.
             self._require_transport_or_fail("knowledge-retrieval")
         except Exception:
             span.set_status(trace.StatusCode.ERROR)
@@ -384,9 +455,7 @@ class AgentDispatchMixin:
 
     async def _call_knowledge_retrieval_http(
         self,
-        message: str,
-        intent: str,
-        system_prompt: str,
+        payload: dict[str, Any],
     ) -> dict[str, Any]:
         """Call the Knowledge Retrieval agent via HTTP (AGNTCY container)."""
         url = self._agent_urls.get("knowledge-retrieval", "")
@@ -394,11 +463,7 @@ class AgentDispatchMixin:
 
         response = await client.post(
             f"{url.rstrip('/')}{AGENT_RETRIEVE_PATH}",
-            json={
-                "message": message,
-                "intent": intent,
-                "system_prompt": system_prompt,
-            },
+            json=payload,
         )
         response.raise_for_status()
         return response.json()

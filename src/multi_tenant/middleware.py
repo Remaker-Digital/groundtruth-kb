@@ -671,6 +671,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             team_member_email=member.get("email"),
             team_member_role=role,
             escalation_categories=tuple(member.get("escalation_categories", [])),
+            agent_access=tuple(member.get("agent_access", [])),
         )
 
     async def _auth_spa_api_key(self, api_key: str) -> TenantContext:
@@ -870,6 +871,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         role_str = payload.get("role")
         role: TeamMemberRole | None = None
         escalation_cats: tuple[str, ...] = ()
+        agent_access_list: tuple[str, ...] = ()
 
         if member_id and role_str:
             try:
@@ -877,7 +879,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 role = TeamMemberRole.VIEWER
 
-            # For escalation agents, resolve their category assignments
+            # For escalation agents and viewers, resolve categories + agent access
             if role in (
                 TeamMemberRole.ESCALATION_AGENT,
                 TeamMemberRole.VIEWER,
@@ -891,9 +893,12 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                     escalation_cats = tuple(
                         member_doc.get("escalation_categories", []),
                     )
+                    agent_access_list = tuple(
+                        member_doc.get("agent_access", []),
+                    )
                 except Exception:
                     logger.warning(
-                        "Failed to resolve escalation categories: "
+                        "Failed to resolve member fields: "
                         "tenant=%s member=%s",
                         tenant_id, member_id,
                     )
@@ -915,6 +920,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             team_member_id=member_id,
             team_member_role=role,
             escalation_categories=escalation_cats,
+            agent_access=agent_access_list,
         )
 
 

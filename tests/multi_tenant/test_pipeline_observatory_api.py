@@ -28,9 +28,8 @@ from src.multi_tenant.superadmin_api import (
     get_tenant_pipeline_metrics,
     INFRASTRUCTURE_EDGES_DEF,
     INFRASTRUCTURE_NODES,
-    PIPELINE_AGENTS,
-    PIPELINE_EDGES,
 )
+from src.multi_tenant.pipeline_metrics import get_pipeline_agents, get_pipeline_edges
 
 
 # ---------------------------------------------------------------------------
@@ -88,16 +87,16 @@ class TestPipelineTopology:
         assert isinstance(result, PipelineTopologyResponse)
         assert len(result.nodes) == 7
         agent_names = {n.agent for n in result.nodes}
-        assert agent_names == set(PIPELINE_AGENTS)
+        assert agent_names == set(get_pipeline_agents())
 
     @pytest.mark.asyncio
     async def test_topology_returns_edges(self, superadmin_ctx):
         """GET /pipeline/topology returns pipeline edges (TEST-2755)."""
         result = await get_pipeline_topology(period="24h")
-        assert len(result.edges) == len(PIPELINE_EDGES)
+        assert len(result.edges) == len(get_pipeline_edges())
         for edge in result.edges:
-            assert edge.source in PIPELINE_AGENTS
-            assert edge.target in PIPELINE_AGENTS
+            assert edge.source in get_pipeline_agents()
+            assert edge.target in get_pipeline_agents()
 
     @pytest.mark.asyncio
     async def test_topology_period_parameter(self, superadmin_ctx):

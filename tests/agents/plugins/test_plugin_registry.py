@@ -106,8 +106,8 @@ class TestLoading:
     def test_load_from_yaml(self):
         r = PluginAgentRegistry.get_instance()
         count = r.load_from_yaml()
-        # agents.yaml has 5 internal + 5 external = 10
-        assert count == 10
+        # agents.yaml has 7 core + 5 peer internal + 5 external = 17
+        assert count == 17
 
     def test_load_from_missing_yaml(self, tmp_path):
         r = PluginAgentRegistry.get_instance()

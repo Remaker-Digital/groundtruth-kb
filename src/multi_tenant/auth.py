@@ -192,6 +192,7 @@ class TenantContext:
     team_member_email: str | None = None
     team_member_role: TeamMemberRole | None = None
     escalation_categories: tuple[str, ...] = ()
+    agent_access: tuple[str, ...] = ()  # SPEC-1862: direct agent chat access
 
     # Platform admin identity (populated for spa_api_key auth, SPEC-1667)
     platform_admin_id: str | None = None

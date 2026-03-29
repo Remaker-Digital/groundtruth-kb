@@ -16,8 +16,8 @@ from src.multi_tenant.pipeline_metrics import (
     EdgeMetrics,
     PipelineMetricsAggregator,
     TenantMetrics,
-    PIPELINE_AGENTS,
-    PIPELINE_EDGES,
+    get_pipeline_agents,
+    get_pipeline_edges,
     _MetricsCache,
     _cutoff_timestamp,
     _period_to_seconds,
@@ -166,7 +166,7 @@ class TestAgentAggregation:
         agg = PipelineMetricsAggregator()
         agents, edges, tenants = agg.aggregate_conversations([])
 
-        assert len(agents) == len(PIPELINE_AGENTS)
+        assert len(agents) == len(get_pipeline_agents())
         for am in agents.values():
             assert am.invocation_count == 0
             assert am.avg_latency_ms == 0.0
@@ -225,7 +225,7 @@ class TestEdgeAggregation:
         agg = PipelineMetricsAggregator()
         _, edges, _ = agg.aggregate_conversations([])
 
-        assert len(edges) == len(PIPELINE_EDGES)
+        assert len(edges) == len(get_pipeline_edges())
         for (src, tgt), em in edges.items():
             assert em.source == src
             assert em.target == tgt

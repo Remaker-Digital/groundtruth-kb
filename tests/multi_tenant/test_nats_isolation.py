@@ -120,9 +120,9 @@ class TestTopicNamespace:
         result = tenant_topic(TENANT_A, "intent-classifier")
         assert result == f"{TENANT_A}.intent-classifier"
 
-    def test_ni_02_all_six_agent_topics(self) -> None:
-        """NI-02: All 6 agent topics are defined and form valid subjects."""
-        assert len(AGENT_TOPICS) == 6
+    def test_ni_02_all_core_agent_topics(self) -> None:
+        """NI-02: All 7 core agent topics are defined and form valid subjects."""
+        assert len(AGENT_TOPICS) == 7
         expected = {
             "intent-classifier",
             "knowledge-retrieval",
@@ -130,6 +130,7 @@ class TestTopicNamespace:
             "escalation-handler",
             "analytics-collector",
             "critic-supervisor",
+            "co-pilot",
         }
         assert set(AGENT_TOPICS) == expected
 

@@ -243,6 +243,114 @@ class PluginDispatcher:
                 **template_vars,
             )
 
+    # -- Binding-enforced dispatch (SPEC-1857) --------------------------------
+
+    async def dispatch_with_binding(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        *,
+        tenant_id: str,
+        agent_id: str,
+        skill_id: str,
+        conversation_id: str = "",
+        timeout_ms: int = DEFAULT_TIMEOUT_MS,
+        **template_vars: str,
+    ) -> PluginDispatchResult:
+        """Dispatch a tool call with deny-by-default binding enforcement (SPEC-1857).
+
+        1. Check binding for (tenant_id, agent_id, skill_id)
+        2. If denied: emit denial event, return denied result
+        3. If allowed: resolve credential from binding, dispatch
+        """
+        start = time.monotonic()
+        self._call_count += 1
+
+        from src.agents.plugins.bindings import SkillBindingService
+        from src.agents.plugins.events import emit_invocation
+
+        svc = SkillBindingService.get_instance()
+
+        # Resolve skill mode from registry for mode enforcement
+        skill_defn = self._registry.get_skill(skill_id)
+        required_mode = skill_defn.mode if skill_defn else None
+
+        check = svc.check_binding(
+            tenant_id, agent_id, skill_id,
+            required_mode=required_mode,
+        )
+
+        if check.denied:
+            # SPEC-1857 req 6: Emit denial event
+            emit_invocation(
+                trace_id="",
+                target_agent_id=agent_id,
+                skill_id=skill_id,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                result_class="denied",
+                policy_verdict=check.policy_verdict,
+                error_detail=check.reason,
+            )
+            self._error_count += 1
+            return PluginDispatchResult(
+                tool_name=tool_name,
+                agent_id=agent_id,
+                success=False,
+                error=check.reason,
+                elapsed_ms=_elapsed(start),
+                metadata={
+                    "policy_verdict": check.policy_verdict,
+                    "skill_id": skill_id,
+                },
+            )
+
+        # Dispatch with binding-resolved credential (SPEC-1858 req 2)
+        result = await self.dispatch(
+            tool_name,
+            arguments,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            timeout_ms=timeout_ms,
+            **template_vars,
+        )
+
+        # Attach binding metadata to result
+        result.metadata["credential_ref"] = check.credential_ref
+        result.metadata["skill_id"] = skill_id
+        result.metadata["policy_verdict"] = "allowed"
+
+        return result
+
+    def get_bound_tool_catalog(
+        self,
+        tenant_id: str,
+        *,
+        tier: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Build tool catalog filtered to bound skills only (SPEC-1857 req 5).
+
+        Unbound tools do NOT appear in the catalog.
+        """
+        from src.agents.plugins.bindings import SkillBindingService
+        svc = SkillBindingService.get_instance()
+        bound_skills = set(svc.get_bound_skill_ids(tenant_id))
+
+        full_catalog = self._registry.get_tool_catalog(tier=tier)
+        filtered: list[dict[str, Any]] = []
+        for tool in full_catalog:
+            agent_id = tool.get("_agent_id", "")
+            func_name = tool.get("function", {}).get("name", "")
+            # Check if any skill for this agent+tool is bound
+            for skill_id in bound_skills:
+                if skill_id.startswith(f"{agent_id}:"):
+                    # Check if this tool maps to this skill
+                    skill_defn = self._registry.get_skill(skill_id)
+                    if skill_defn and func_name in skill_defn.mcp_tool_names:
+                        filtered.append(tool)
+                        break
+        return filtered
+
     # -- Health checks ------------------------------------------------------
 
     async def health_check(

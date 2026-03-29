@@ -180,6 +180,35 @@ async def _load_tenant_context(
 
 
 # ---------------------------------------------------------------------------
+# Agent access validation (SPEC-1862)
+# ---------------------------------------------------------------------------
+
+
+def _validate_agent_access(ctx: TenantContext, agent_id: str) -> None:
+    """Validate team member has access to chat with the specified agent.
+
+    superadmin/admin roles get implicit wildcard access.
+    Other roles must have the agent in their agent_access list.
+    Raises 403 if access is denied.
+    """
+    from src.multi_tenant.auth import TeamMemberRole
+
+    if ctx.team_member_role in (TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN):
+        return  # Implicit wildcard
+
+    # For other roles, check explicit agent_access list
+    # agent_access is loaded from TeamMemberDocument during auth
+    agent_access = list(getattr(ctx, "agent_access", []) or [])
+    if "*" in agent_access or agent_id in agent_access:
+        return
+
+    raise HTTPException(
+        status_code=403,
+        detail=f"You do not have access to chat with agent '{agent_id}'.",
+    )
+
+
+# ---------------------------------------------------------------------------
 # POST /api/chat/conversations — Start a new conversation
 # ---------------------------------------------------------------------------
 
@@ -212,23 +241,53 @@ async def start_conversation(
     # --- Activation gate ---
     # Block conversation creation if the tenant has never activated or
     # has explicitly deactivated their configuration.
-    try:
-        prefs_repo = PreferencesRepository()
-        active_prefs = await prefs_repo.get_active(ctx.tenant_id)
-    except Exception:
-        active_prefs = None
+    # SPEC-1862 / WI-3009: Team members bypass the activation gate —
+    # admin agent chat is an internal capability, not storefront visitor chat.
+    is_team_member = ctx.team_member_role is not None
 
-    if not active_prefs or not active_prefs.get("activated_at"):
-        raise HTTPException(
-            status_code=403,
-            detail={"type": "not_active", "message": "This store has not been configured yet."},
-        )
+    if not is_team_member:
+        try:
+            prefs_repo = PreferencesRepository()
+            active_prefs = await prefs_repo.get_active(ctx.tenant_id)
+        except Exception:
+            active_prefs = None
 
-    if active_prefs.get("deactivated_at"):
-        raise HTTPException(
-            status_code=403,
-            detail={"type": "not_active", "message": "Chat is currently disabled for this store."},
-        )
+        if not active_prefs or not active_prefs.get("activated_at"):
+            raise HTTPException(
+                status_code=403,
+                detail={"type": "not_active", "message": "This store has not been configured yet."},
+            )
+
+        if active_prefs.get("deactivated_at"):
+            raise HTTPException(
+                status_code=403,
+                detail={"type": "not_active", "message": "Chat is currently disabled for this store."},
+            )
+
+    # --- Agent access validation (SPEC-1862) ---
+    # If target_agent_id is set, validate team member access.
+    if request.target_agent_id:
+        if not is_team_member:
+            raise HTTPException(
+                status_code=403,
+                detail="Only team members can target specific agents.",
+            )
+        # Validate agent exists in registry
+        try:
+            from src.agents.plugins.registry import PluginAgentRegistry
+            reg = PluginAgentRegistry.get_instance()
+            if reg.get(request.target_agent_id) is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Unknown agent: {request.target_agent_id}",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+        # Validate agent_access permission
+        _validate_agent_access(ctx, request.target_agent_id)
 
     # --- Identity verification (AUTH-4 Shopify HMAC + AUTH-5 OTP token) ---
     # Track whether the customer's identity has been cryptographically verified.
@@ -598,6 +657,7 @@ async def stream_response(
                     ctx.team_member_role.value
                     if ctx.team_member_role else None
                 ),  # SPEC-1558: Co-pilot routing for team members
+                target_agent_id=getattr(state, "target_agent_id", None) or None,
             )
 
             async for sse_text in sse_mgr.wrap_stream(

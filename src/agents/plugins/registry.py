@@ -32,6 +32,26 @@ logger = logging.getLogger(__name__)
 _CONFIG_PATH = Path(__file__).parent / "agents.yaml"
 
 
+class AgentKind(str, Enum):
+    """Kind classification for agents (SPEC-1852).
+
+    core     — part of the standard customer-service pipeline
+    peer     — independently routable via IntentRouter
+    internal — infrastructure agent, not directly invocable by users
+
+    Named 'agent_kind' (not 'agent_type') to avoid collision with
+    base.py's agent_type routing identifier.
+    """
+
+    CORE = "core"
+    PEER = "peer"
+    INTERNAL = "internal"
+
+
+# Backward-compat alias — do not use in new code
+AgentType = AgentKind
+
+
 class AgentCategory(str, Enum):
     """Categories for plug-in agents."""
 
@@ -61,6 +81,47 @@ class AuthType(str, Enum):
     NONE = "none"
 
 
+class SkillMode(str, Enum):
+    """Execution mode for a skill (SPEC-1853).
+
+    read     — no side effects (queries, lookups)
+    mutate   — creates or modifies external state
+    internal — system-only, not tenant-configurable
+    """
+
+    READ = "read"
+    MUTATE = "mutate"
+    INTERNAL = "internal"
+
+
+# ---------------------------------------------------------------------------
+# Skill definition (SPEC-1853)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SkillDefinition:
+    """Immutable definition of an agent skill.
+
+    skill_id format: "{agent_id}:{skill_name}" (SPEC-1853 req 1).
+    Maps stable skill identity to underlying MCP tool names.
+    """
+
+    skill_id: str
+    agent_id: str
+    skill_name: str
+    display_name: str
+    description: str = ""
+    mode: str = "read"
+    mcp_tool_names: tuple[str, ...] = ()
+    credential_types: tuple[str, ...] = ()
+    enabled: bool = True
+
+    @property
+    def is_read_only(self) -> bool:
+        return self.mode == SkillMode.READ.value
+
+
 # ---------------------------------------------------------------------------
 # Agent definition
 # ---------------------------------------------------------------------------
@@ -76,11 +137,13 @@ class PluginAgentDefinition:
     spec_id: str
     category: str
     endpoint: str
+    agent_kind: str = "peer"
     health_check: str = "/health"
     auth_type: str = "internal"
     credential_env: str = ""
     tier_gate: str = "professional"
     capabilities: tuple[str, ...] = ()
+    skills: tuple[SkillDefinition, ...] = ()
     read_only: bool = True
     status: str = "available"
     is_external: bool = False
@@ -125,6 +188,9 @@ class PluginAgentRegistry:
 
     def __init__(self) -> None:
         self._agents: dict[str, PluginAgentDefinition] = {}
+        self._skills: dict[str, SkillDefinition] = {}
+        self._pipeline_edges: list[tuple[str, str]] = []
+        self._routing_rules: dict[str, dict[str, str]] = {}
         self._loaded = False
 
     @classmethod
@@ -168,10 +234,25 @@ class PluginAgentRegistry:
             self._loaded = True
             return 0
 
+        # Load pipeline edge topology
+        raw_edges = config.get("pipeline_edges") or []
+        self._pipeline_edges = [
+            (e[0], e[1]) for e in raw_edges
+            if isinstance(e, list) and len(e) == 2
+        ]
+
+        # Load routing rules (SPEC-1861 / ADR-003)
+        raw_rules = config.get("routing_rules") or {}
+        self._routing_rules = {
+            intent: rule for intent, rule in raw_rules.items()
+            if isinstance(rule, dict)
+        }
+
         count = 0
 
         # Load internal agents
         for agent_id, agent_cfg in (config.get("agents") or {}).items():
+            skills = self._parse_skills(agent_id, agent_cfg)
             defn = PluginAgentDefinition(
                 agent_id=agent_id,
                 display_name=agent_cfg.get("display_name", agent_id),
@@ -179,18 +260,22 @@ class PluginAgentRegistry:
                 spec_id=agent_cfg.get("spec_id", ""),
                 category=agent_cfg.get("category", ""),
                 endpoint=agent_cfg.get("endpoint", ""),
+                agent_kind=agent_cfg.get("agent_kind", AgentKind.PEER.value),
                 health_check=agent_cfg.get("health_check", "/health"),
                 auth_type=agent_cfg.get("auth_type", "internal"),
                 tier_gate=agent_cfg.get("tier_gate", "professional"),
                 capabilities=tuple(agent_cfg.get("capabilities", [])),
+                skills=skills,
                 status=agent_cfg.get("status", "available"),
                 is_external=False,
             )
             self._agents[agent_id] = defn
+            self._register_skills(skills)
             count += 1
 
         # Load external MCP servers
         for server_id, server_cfg in (config.get("external_servers") or {}).items():
+            skills = self._parse_skills(server_id, server_cfg)
             defn = PluginAgentDefinition(
                 agent_id=server_id,
                 display_name=server_cfg.get("display_name", server_id),
@@ -198,15 +283,18 @@ class PluginAgentRegistry:
                 spec_id=server_cfg.get("spec_id", ""),
                 category="external",
                 endpoint=server_cfg.get("endpoint", ""),
+                agent_kind=AgentKind.PEER.value,
                 auth_type=server_cfg.get("auth_type", "none"),
                 credential_env=server_cfg.get("credential_env", ""),
                 tier_gate=server_cfg.get("tier_gate", "starter"),
                 capabilities=tuple(server_cfg.get("capabilities", [])),
+                skills=skills,
                 read_only=server_cfg.get("read_only", True),
                 status=server_cfg.get("status", "available"),
                 is_external=True,
             )
             self._agents[server_id] = defn
+            self._register_skills(skills)
             count += 1
 
         self._loaded = True
@@ -221,6 +309,7 @@ class PluginAgentRegistry:
         """Load agent definitions from a dict (testing)."""
         count = 0
         for agent_id, cfg in definitions.items():
+            skills = self._parse_skills(agent_id, cfg)
             defn = PluginAgentDefinition(
                 agent_id=agent_id,
                 display_name=cfg.get("display_name", agent_id),
@@ -228,19 +317,51 @@ class PluginAgentRegistry:
                 spec_id=cfg.get("spec_id", ""),
                 category=cfg.get("category", ""),
                 endpoint=cfg.get("endpoint", ""),
+                agent_kind=cfg.get("agent_kind", AgentKind.PEER.value),
                 health_check=cfg.get("health_check", "/health"),
                 auth_type=cfg.get("auth_type", "internal"),
                 credential_env=cfg.get("credential_env", ""),
                 tier_gate=cfg.get("tier_gate", "professional"),
                 capabilities=tuple(cfg.get("capabilities", [])),
+                skills=skills,
                 read_only=cfg.get("read_only", True),
                 status=cfg.get("status", "available"),
                 is_external=cfg.get("is_external", False),
             )
             self._agents[agent_id] = defn
+            self._register_skills(skills)
             count += 1
         self._loaded = True
         return count
+
+    @staticmethod
+    def _parse_skills(
+        agent_id: str, cfg: dict[str, Any]
+    ) -> tuple[SkillDefinition, ...]:
+        """Parse skill definitions from an agent config block."""
+        raw_skills = cfg.get("skills") or {}
+        results: list[SkillDefinition] = []
+        for skill_name, skill_cfg in raw_skills.items():
+            if not isinstance(skill_cfg, dict):
+                continue
+            skill_id = f"{agent_id}:{skill_name}"
+            results.append(SkillDefinition(
+                skill_id=skill_id,
+                agent_id=agent_id,
+                skill_name=skill_name,
+                display_name=skill_cfg.get("display_name", skill_name),
+                description=skill_cfg.get("description", ""),
+                mode=skill_cfg.get("mode", SkillMode.READ.value),
+                mcp_tool_names=tuple(skill_cfg.get("mcp_tool_names", [])),
+                credential_types=tuple(skill_cfg.get("credential_types", [])),
+                enabled=skill_cfg.get("enabled", True),
+            ))
+        return tuple(results)
+
+    def _register_skills(self, skills: tuple[SkillDefinition, ...]) -> None:
+        """Add skills to the global skill index."""
+        for skill in skills:
+            self._skills[skill.skill_id] = skill
 
     def _ensure_loaded(self) -> None:
         """Lazy-load from YAML on first access."""
@@ -358,3 +479,91 @@ class PluginAgentRegistry:
             if defn.has_capability(tool_name):
                 return defn
         return None
+
+    # -- Agent kind queries (SPEC-1852) ------------------------------------
+
+    def list_agents(
+        self,
+        *,
+        agent_kind: str | None = None,
+        include_disabled: bool = False,
+    ) -> list[PluginAgentDefinition]:
+        """List all registered agents with optional kind filter (SPEC-1852 req 7)."""
+        self._ensure_loaded()
+        results = []
+        for defn in self._agents.values():
+            if not include_disabled and defn.status in (
+                AgentStatus.DISABLED.value, AgentStatus.DEPRECATED.value
+            ):
+                continue
+            if agent_kind and defn.agent_kind != agent_kind:
+                continue
+            results.append(defn)
+        return sorted(results, key=lambda d: d.agent_id)
+
+    def get_core_agents(self) -> list[PluginAgentDefinition]:
+        """List agents that are part of the standard pipeline."""
+        return self.list_agents(agent_kind=AgentKind.CORE.value)
+
+    def get_peer_agents(self) -> list[PluginAgentDefinition]:
+        """List independently routable business agents."""
+        return self.list_agents(agent_kind=AgentKind.PEER.value)
+
+    def get_core_agent_ids(self) -> list[str]:
+        """Return agent_ids for core pipeline agents (replaces PIPELINE_AGENTS)."""
+        return [a.agent_id for a in self.get_core_agents()]
+
+    def get_pipeline_edges(self) -> list[tuple[str, str]]:
+        """Return pipeline edge topology (replaces PIPELINE_EDGES)."""
+        self._ensure_loaded()
+        return list(self._pipeline_edges)
+
+    # -- Routing rules (SPEC-1861 / ADR-003) --------------------------------
+
+    def get_routing_rule(self, intent: str) -> dict[str, str] | None:
+        """Get the default routing rule for an intent (SPEC-1861).
+
+        Returns dict with suggested_peer and skill, or None if no rule.
+        Tenant overlay intent_routes take precedence over these defaults.
+        """
+        self._ensure_loaded()
+        return self._routing_rules.get(intent)
+
+    def get_all_routing_rules(self) -> dict[str, dict[str, str]]:
+        """Return all configured routing rules."""
+        self._ensure_loaded()
+        return dict(self._routing_rules)
+
+    # -- Skill queries (SPEC-1853) -----------------------------------------
+
+    def get_skill(self, skill_id: str) -> SkillDefinition | None:
+        """Get a skill definition by its stable skill_id."""
+        self._ensure_loaded()
+        return self._skills.get(skill_id)
+
+    def list_skills(
+        self,
+        agent_id: str | None = None,
+        *,
+        mode: str | None = None,
+        enabled_only: bool = True,
+    ) -> list[SkillDefinition]:
+        """List skills, optionally filtered by agent and mode (SPEC-1853 req 6)."""
+        self._ensure_loaded()
+        results = []
+        for skill in self._skills.values():
+            if agent_id and skill.agent_id != agent_id:
+                continue
+            if mode and skill.mode != mode:
+                continue
+            if enabled_only and not skill.enabled:
+                continue
+            results.append(skill)
+        return sorted(results, key=lambda s: s.skill_id)
+
+    def resolve_skill_to_tools(self, skill_id: str) -> tuple[str, ...]:
+        """Map a skill_id to its underlying MCP tool name(s) (SPEC-1853 req 3)."""
+        skill = self.get_skill(skill_id)
+        if skill is None:
+            return ()
+        return skill.mcp_tool_names

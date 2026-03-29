@@ -144,6 +144,11 @@ class ResponseDecisionTrace:
     detected_intent: str = ""
     intent_confidence: float = 0.0
 
+    # Route decision (Phase 2 IntentRouter, SPEC-1861)
+    route_target: str = ""  # core_pipeline | escalation | co_pilot | peer_agent
+    route_agent_id: str | None = None  # peer agent_id if routed
+    route_fallback_from: str | None = None  # attempted peer before fallback
+
     # Response metadata
     response_language: str = "en"
     was_escalated: bool = False
@@ -496,6 +501,24 @@ class DecisionTraceBuilder:
     def set_language(self, language: str) -> DecisionTraceBuilder:
         """Record response language."""
         self._trace.response_language = language
+        return self
+
+    def set_route_decision(
+        self,
+        target: str,
+        agent_id: str | None = None,
+        fallback_from: str | None = None,
+    ) -> DecisionTraceBuilder:
+        """Record the IntentRouter route decision (SPEC-1861).
+
+        Args:
+            target: RouteTarget value (core_pipeline, escalation, co_pilot, peer_agent).
+            agent_id: Peer agent_id if routed to a peer agent.
+            fallback_from: Agent that was attempted before falling back.
+        """
+        self._trace.route_target = target
+        self._trace.route_agent_id = agent_id
+        self._trace.route_fallback_from = fallback_from
         return self
 
     def set_ab_variant(

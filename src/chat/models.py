@@ -161,6 +161,10 @@ class ConversationStartRequest(BaseModel):
         max_length=4000,
         description="Optional first message sent with conversation start",
     )
+    target_agent_id: str | None = Field(
+        default=None,
+        description="Peer agent to chat with directly (team members only, SPEC-1862).",
+    )
     metadata: dict[str, Any] | None = Field(
         default=None,
         description="Client metadata (browser, device, locale)",
@@ -387,6 +391,10 @@ class ConversationStateResponse(BaseModel):
     customer_verified: bool = Field(
         default=False,
         description="Whether the customer has been verified (OTP, Shopify HMAC, etc.)",
+    )
+    target_agent_id: str = Field(
+        default="",
+        description="Peer agent targeted by team member (SPEC-1862).",
     )
     created_at: str = Field(description="When conversation started")
     last_activity_at: str = Field(description="Last message timestamp")

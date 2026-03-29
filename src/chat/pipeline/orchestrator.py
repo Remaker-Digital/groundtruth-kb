@@ -257,6 +257,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         trace_id: str | None = None,
         conversation_history: list[dict[str, str]] | None = None,
         team_member_role: str | None = None,
+        target_agent_id: str | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run the full pipeline for a customer message.
 
@@ -495,9 +496,39 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             # ---------------------------------------------------------------
-            # Phase 1b: Escalation check (KR results discarded if escalated)
+            # Phase 1b: IntentRouter execution-plan boundary (SPEC-1861)
+            #
+            # Replaces hardcoded escalation/co-pilot if/else with a
+            # configurable routing engine. Default routing rules come
+            # from agents.yaml; per-tenant overrides from TenantAgentOverlay.
+            # All existing traffic defaults to CORE_PIPELINE.
             # ---------------------------------------------------------------
-            if intent == ESCALATION_INTENT:
+            from src.chat.pipeline.intent_router import IntentRouter, RouteTarget
+
+            # Load tenant overlay store for IntentRouter routing decisions
+            overlay_store: dict[str, dict] | None = None
+            try:
+                from src.multi_tenant.superadmin_api._agent_overlays import (
+                    _get_tenant_overlays,
+                )
+                overlay_store = _get_tenant_overlays(tenant_id) or None
+            except Exception:
+                logger.debug("Overlay store unavailable for routing", exc_info=True)
+
+            router = IntentRouter()
+            route = router.resolve(
+                tenant_id=tenant_id,
+                intent=intent,
+                confidence=confidence,
+                team_member_role=team_member_role,
+                target_agent_id=target_agent_id,
+                overlay_store=overlay_store,
+            )
+            trace.set_route_decision(
+                route.target.value, route.agent_id, route.fallback_from,
+            )
+
+            if route.target == RouteTarget.ESCALATION:
                 async for event in self._handle_escalation(
                     tenant_id, conversation_id, customer_message,
                     prompts[AgentRole.ESCALATION_HANDLER], budget, trace,
@@ -505,16 +536,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     yield event
                 return
 
-            # ---------------------------------------------------------------
-            # Phase 1c: Co-pilot routing (SPEC-1558)
-            #
-            # If the user is an authenticated team member OR the IC detects
-            # admin_assistance intent, route to the Co-pilot agent. The
-            # Co-pilot has its own hybrid retrieval and response generation
-            # from the shared admin_documentation_vectors collection, so
-            # we bypass the standard KR→RG→Critic pipeline.
-            # ---------------------------------------------------------------
-            if team_member_role or intent == ADMIN_ASSISTANCE_INTENT:
+            if route.target == RouteTarget.CO_PILOT:
                 async for event in self._handle_co_pilot(
                     tenant_id=tenant_id,
                     conversation_id=conversation_id,
@@ -528,6 +550,33 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 ):
                     yield event
                 return
+
+            if route.target == RouteTarget.PEER_AGENT:
+                async for event in self._handle_peer_agent(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    customer_message=customer_message,
+                    agent_id=route.agent_id or "",
+                    skill_id=route.skill_id,
+                    budget=budget,
+                    trace=trace,
+                    trace_id=trace_id,
+                ):
+                    yield event
+                return
+
+            if route.target == RouteTarget.ERROR:
+                # Explicit target_agent_id verification failed (SPEC-1862)
+                error_msg = (
+                    f"Unable to connect to agent '{route.agent_id}': "
+                    f"{route.error_reason or 'verification failed'}. "
+                    "Please check agent availability and your access permissions."
+                )
+                yield token_event(error_msg, sequence=0)
+                yield done_event(conversation_id, 0, trace_id=trace_id)
+                return
+
+            # CORE_PIPELINE — continue standard KR→RG→Critic flow
 
             # Process KR result
             # For greeting intents, clear knowledge context so the
@@ -732,6 +781,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 "confidence": confidence,
                 "critic_passed": approved,
                 "model_used": response_model,
+                "route_target": route.target.value,
+                "route_agent_id": route.agent_id,
             }
             try:
                 await self._session.update_conversation_metadata(
@@ -741,6 +792,26 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 )
             except Exception:
                 logger.debug("Failed to persist pipeline trace", exc_info=True)
+
+            # SPEC-1855: Emit invocation events for each pipeline stage
+            try:
+                from src.agents.plugins.events import emit_invocation
+                root_event_id = None
+                for stg in budget.stages:
+                    evt = emit_invocation(
+                        trace_id=trace_id,
+                        target_agent_id=stg.stage,
+                        tenant_id=tenant_id,
+                        conversation_id=conversation_id,
+                        invoker="system" if root_event_id is None else "orchestrator",
+                        parent_event_id=root_event_id,
+                        latency_ms=stg.elapsed_ms,
+                        result_class="success" if stg.succeeded else "error",
+                    )
+                    if root_event_id is None:
+                        root_event_id = evt.event_id
+            except Exception:
+                logger.debug("Failed to emit invocation events", exc_info=True)
 
             logger.debug(
                 "Pipeline complete: conv=%s intent=%s critic=%s latency=%.0fms trace=%s",
@@ -817,6 +888,190 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
     # Co-pilot routing (SPEC-1557 / SPEC-1558)
     # -------------------------------------------------------------------
 
+    async def _handle_peer_agent(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        customer_message: str,
+        agent_id: str,
+        skill_id: str | None,
+        budget: "PipelineTimeoutBudget",
+        trace: "DecisionTraceBuilder",
+        trace_id: str | None = None,
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """Route a customer message to a peer agent via binding-enforced dispatch.
+
+        Follows the co-pilot handler pattern (SPEC-1861 / ADR-003):
+        stage_event -> dispatch_with_binding -> token_event -> session ->
+        agents_invoked -> invocation events -> analytics -> done_event.
+
+        conversation_type stays 'customer' (Codex correction: route info
+        is recorded in pipeline_trace and invocation events only).
+        """
+        yield stage_event(
+            agent_id, "started",
+            trace_id=trace_id,
+            elapsed_ms=int(budget.elapsed_ms),
+        )
+
+        try:
+            from src.agents.plugins.dispatch import PluginDispatcher
+            from src.agents.plugins.events import emit_invocation
+
+            dispatcher = PluginDispatcher()
+            effective_skill = skill_id or ""
+
+            result = await budget.execute_with_budget(
+                agent_id,
+                dispatcher.dispatch_with_binding(
+                    tool_name=effective_skill,
+                    arguments={"message": customer_message},
+                    tenant_id=tenant_id,
+                    agent_id=agent_id,
+                    skill_id=effective_skill,
+                    conversation_id=conversation_id,
+                ),
+            )
+
+            response = ""
+            model_used = ""
+            if result.error:
+                emit_invocation(
+                    trace_id=trace_id,
+                    invoker="intent-router",
+                    target_agent_id=agent_id,
+                    skill_id=effective_skill,
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    result_class="denied" if "denied" in (result.error or "") else "error",
+                    policy_verdict=result.metadata.get("policy_verdict", "error"),
+                    error_detail=result.error,
+                    latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
+                )
+                logger.warning(
+                    "Peer agent %s dispatch failed: %s", agent_id, result.error,
+                )
+                response = (
+                    "I wasn't able to connect to a specialized agent for your request. "
+                    "Let me help you with our standard service instead."
+                )
+            else:
+                response = result.result.get("response", "") if result.result else ""
+                model_used = result.result.get("model", "") if result.result else ""
+                emit_invocation(
+                    trace_id=trace_id,
+                    invoker="intent-router",
+                    target_agent_id=agent_id,
+                    skill_id=effective_skill,
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    result_class="success",
+                    policy_verdict="allowed",
+                    latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
+                )
+
+            trace.add_stage(
+                agent_id,
+                model=model_used,
+                latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
+            )
+
+            yield stage_event(
+                agent_id, "completed",
+                trace_id=trace_id,
+                elapsed_ms=int(budget.elapsed_ms),
+            )
+
+            yield token_event(response, sequence=0)
+
+            # Store response first to get message_id for validated_event
+            message_id = await self._session.add_ai_message(
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                content=response,
+                agents_invoked=[agent_id],
+                model_used=model_used,
+                critic_passed=None,
+            )
+
+            yield validated_event(conversation_id, message_id or "")
+
+            # Do NOT patch conversation_type — stays 'customer' (Codex P1 correction)
+            # Route info is in pipeline_trace and invocation events only.
+
+            # Persist pipeline_trace for this routed branch
+            try:
+                peer_trace = {
+                    "trace_id": trace_id,
+                    "stages": [
+                        {"stage": s.stage, "elapsed_ms": int(s.elapsed_ms), "succeeded": s.succeeded}
+                        for s in budget.stages
+                    ],
+                    "total_latency_ms": int(budget.elapsed_ms),
+                    "route_target": "peer_agent",
+                    "route_agent_id": agent_id,
+                    "model_used": model_used,
+                }
+                await self._session.update_conversation_metadata(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    metadata={"pipeline_trace": peer_trace},
+                )
+            except Exception:
+                logger.debug("Failed to persist peer-agent pipeline_trace", exc_info=True)
+
+            # Fire analytics
+            self._create_background_task(
+                self._fire_analytics(
+                    tenant_id, conversation_id, "customer",
+                    budget, trace,
+                ),
+                name=f"analytics-peer-{agent_id}-{conversation_id}",
+            )
+
+            # turn_count incremented by add_ai_message; retrieve from session
+            turn_count = 0
+            try:
+                conv = await self._session.get_conversation(tenant_id, conversation_id)
+                turn_count = conv.turn_count
+            except Exception:
+                pass
+
+            yield done_event(
+                conversation_id, turn_count,
+                trace_id=trace_id,
+                total_latency_ms=int(budget.elapsed_ms),
+            )
+
+        except PipelineTimeoutError:
+            raise
+
+        except Exception as exc:
+            logger.warning(
+                "Peer agent %s failed: conv=%s error=%s",
+                agent_id, conversation_id, exc,
+            )
+            try:
+                from src.agents.plugins.events import emit_invocation
+                emit_invocation(
+                    trace_id=trace_id,
+                    invoker="intent-router",
+                    target_agent_id=agent_id,
+                    skill_id=skill_id or "",
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    result_class="error",
+                    error_detail=str(exc),
+                )
+            except Exception:
+                pass
+            fallback = (
+                "I encountered an issue connecting to a specialized agent. "
+                "Please try again in a moment."
+            )
+            yield token_event(fallback, sequence=0)
+            yield done_event(conversation_id, 0, trace_id=trace_id)
+
     async def _handle_co_pilot(
         self,
         tenant_id: str,
@@ -871,6 +1126,21 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 trace_id=trace_id,
                 elapsed_ms=int(budget.elapsed_ms),
             )
+
+            # SPEC-1855: Emit invocation event for co-pilot path
+            try:
+                from src.agents.plugins.events import emit_invocation
+                emit_invocation(
+                    trace_id=trace_id,
+                    target_agent_id="co-pilot",
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    invoker="system",
+                    latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
+                    result_class="success",
+                )
+            except Exception:
+                logger.debug("Failed to emit co-pilot invocation event", exc_info=True)
 
             # Emit the response as a single validated token (non-streamed)
             yield token_event(response, sequence=0)

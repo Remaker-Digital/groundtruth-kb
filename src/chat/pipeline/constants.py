@@ -24,7 +24,7 @@ USE_AGENT_CONTAINERS = os.environ.get(
     "USE_AGENT_CONTAINERS", "true"
 ).lower() == "true"
 
-# Default agent URLs — overridden by environment variables in production.
+# Default agent URLs — dynamically derived from registry (SPEC-1852).
 # Only used when USE_AGENT_CONTAINERS=true.
 # Defaults use Azure Container Apps internal DNS naming convention.
 # ADR-001: These are Tier 3 (HTTP) endpoints used when SLIM/NATS are unavailable.
@@ -32,29 +32,31 @@ USE_AGENT_CONTAINERS = os.environ.get(
 _CAE_FQDN = os.environ.get("CONTAINER_APP_ENV_FQDN", "")
 _INTERNAL_BASE = f"http://agent-red-{{name}}.internal.{_CAE_FQDN}:8080" if _CAE_FQDN else "http://localhost:8080"
 
-AGENT_URLS: dict[str, str] = {
-    "intent-classifier": os.environ.get(
-        "AGENT_INTENT_CLASSIFIER_URL", _INTERNAL_BASE.format(name="intent-classifier")
-    ),
-    "knowledge-retrieval": os.environ.get(
-        "AGENT_KNOWLEDGE_RETRIEVAL_URL", _INTERNAL_BASE.format(name="knowledge-retrieval")
-    ),
-    "response-generator": os.environ.get(
-        "AGENT_RESPONSE_GENERATOR_URL", _INTERNAL_BASE.format(name="response-generator")
-    ),
-    "escalation-handler": os.environ.get(
-        "AGENT_ESCALATION_HANDLER_URL", _INTERNAL_BASE.format(name="escalation-handler")
-    ),
-    "analytics-collector": os.environ.get(
-        "AGENT_ANALYTICS_COLLECTOR_URL", _INTERNAL_BASE.format(name="analytics-collector")
-    ),
-    "critic-supervisor": os.environ.get(
-        "AGENT_CRITIC_SUPERVISOR_URL", _INTERNAL_BASE.format(name="critic-supervisor")
-    ),
-    "co-pilot": os.environ.get(
-        "AGENT_CO_PILOT_URL", _INTERNAL_BASE.format(name="co-pilot")
-    ),
-}
+
+def _build_agent_urls() -> dict[str, str]:
+    """Build agent URL map from registry core agents."""
+    try:
+        from src.agents.plugins.registry import PluginAgentRegistry
+        reg = PluginAgentRegistry.get_instance()
+        agent_ids = reg.get_core_agent_ids()
+    except Exception:
+        # Fallback for early import / test contexts
+        agent_ids = [
+            "intent-classifier", "knowledge-retrieval", "response-generator",
+            "escalation-handler", "analytics-collector", "critic-supervisor",
+            "co-pilot",
+        ]
+
+    urls: dict[str, str] = {}
+    for agent_id in agent_ids:
+        env_key = "AGENT_" + agent_id.upper().replace("-", "_") + "_URL"
+        urls[agent_id] = os.environ.get(
+            env_key, _INTERNAL_BASE.format(name=agent_id)
+        )
+    return urls
+
+
+AGENT_URLS: dict[str, str] = _build_agent_urls()
 
 # Agent HTTP paths
 AGENT_CLASSIFY_PATH = "/classify"

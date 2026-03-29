@@ -29,29 +29,11 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Pipeline Observatory (SPEC-1579..1583)
+# Pipeline Observatory (SPEC-1579..1583, SPEC-1852)
 # ---------------------------------------------------------------------------
 
-# Pipeline topology definition — the 7-agent pipeline
-PIPELINE_AGENTS = [
-    "intent-classifier",
-    "knowledge-retrieval",
-    "response-generator",
-    "escalation-handler",
-    "analytics-collector",
-    "critic-supervisor",
-    "co-pilot",
-]
-
-PIPELINE_EDGES = [
-    ("intent-classifier", "knowledge-retrieval"),
-    ("intent-classifier", "escalation-handler"),
-    ("intent-classifier", "co-pilot"),
-    ("knowledge-retrieval", "response-generator"),
-    ("response-generator", "critic-supervisor"),
-    ("critic-supervisor", "analytics-collector"),
-    ("escalation-handler", "analytics-collector"),
-]
+# Pipeline topology now sourced from registry (SPEC-1852)
+from src.multi_tenant.pipeline_metrics import get_pipeline_agents, get_pipeline_edges
 
 
 class PipelineNodeMetrics(CamelCaseModel):
@@ -350,7 +332,7 @@ async def get_pipeline_topology(
     )
 
     nodes = []
-    for agent_name in PIPELINE_AGENTS:
+    for agent_name in get_pipeline_agents():
         am = agent_metrics.get(agent_name)
         if am:
             nodes.append(PipelineNodeMetrics(
@@ -369,7 +351,7 @@ async def get_pipeline_topology(
             nodes.append(PipelineNodeMetrics(agent=agent_name))
 
     edges = []
-    for src, tgt in PIPELINE_EDGES:
+    for src, tgt in get_pipeline_edges():
         em = edge_metrics.get((src, tgt))
         if em:
             edges.append(PipelineEdgeMetrics(
@@ -402,10 +384,10 @@ async def get_agent_metrics(
 
 ) -> AgentDetailMetrics:
     """Return detailed performance metrics for one agent (SPEC-1580)."""
-    if agent not in PIPELINE_AGENTS:
+    if agent not in get_pipeline_agents():
         raise HTTPException(
             status_code=404,
-            detail=f"Unknown agent: {agent}. Valid agents: {', '.join(PIPELINE_AGENTS)}",
+            detail=f"Unknown agent: {agent}. Valid agents: {', '.join(get_pipeline_agents())}",
         )
 
     aggregator = get_aggregator()

@@ -98,19 +98,17 @@ class TestAgentTopicEnum:
         )
 
     def test_asdk_04_topic_values_match_nats_agent_topics(self) -> None:
-        """ASDK-04: NATS AGENT_TOPICS is a subset of AgentTopic (Co-pilot is in-process only)."""
+        """ASDK-04: NATS AGENT_TOPICS matches AgentTopic enum values."""
         from src.multi_tenant.nats_isolation import AGENT_TOPICS
 
         agent_topic_values = {t.value for t in AgentTopic}
         nats_topics = set(AGENT_TOPICS)
-        # Co-pilot is in-process only — no NATS subject (SPEC-1557).
-        in_process_only = {"co-pilot"}
-        assert nats_topics <= agent_topic_values, (
-            f"NATS topics not in AgentTopic: {nats_topics - agent_topic_values}"
-        )
-        assert agent_topic_values - nats_topics == in_process_only, (
-            f"Unexpected AgentTopic without NATS subject: "
-            f"{agent_topic_values - nats_topics - in_process_only}"
+        # Since SPEC-1852, AGENT_TOPICS is registry-driven and includes all
+        # core agents (including co-pilot). Both sets should match exactly.
+        assert nats_topics == agent_topic_values, (
+            f"NATS topics and AgentTopic enum diverged: "
+            f"nats_only={nats_topics - agent_topic_values}, "
+            f"enum_only={agent_topic_values - nats_topics}"
         )
 
 

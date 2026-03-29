@@ -6,17 +6,157 @@
 #
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
-version: "1.0"
+version: "1.1"
+
+# Pipeline edge topology — defines flow between core agents
+pipeline_edges:
+  - ["intent-classifier", "knowledge-retrieval"]
+  - ["intent-classifier", "escalation-handler"]
+  - ["intent-classifier", "co-pilot"]
+  - ["knowledge-retrieval", "response-generator"]
+  - ["response-generator", "critic-supervisor"]
+  - ["critic-supervisor", "analytics-collector"]
+  - ["escalation-handler", "analytics-collector"]
 
 # ---------------------------------------------------------------------------
-# Internal plug-in agents (Agent Red domain agents)
+# Core pipeline agents (SPEC-1852 agent_kind: core)
 # ---------------------------------------------------------------------------
 agents:
+  intent-classifier:
+    display_name: "Intent Classifier"
+    description: "Classifies customer intent from conversation context"
+    spec_id: "SPEC-0100"
+    category: "core-pipeline"
+    agent_kind: "core"
+    endpoint: "in-process"
+    tier_gate: "free"
+    capabilities:
+      - "pipeline.classify_intent"
+    skills:
+      classify-intent:
+        display_name: "Classify Intent"
+        description: "Determine customer intent from message context"
+        mode: "read"
+        mcp_tool_names: []
+    status: "available"
+
+  knowledge-retrieval:
+    display_name: "Knowledge Retrieval"
+    description: "Retrieves relevant knowledge articles for response generation"
+    spec_id: "SPEC-0101"
+    category: "core-pipeline"
+    agent_kind: "core"
+    endpoint: "in-process"
+    tier_gate: "free"
+    capabilities:
+      - "pipeline.retrieve_knowledge"
+    skills:
+      retrieve-knowledge:
+        display_name: "Retrieve Knowledge"
+        description: "Search and retrieve relevant knowledge articles"
+        mode: "read"
+        mcp_tool_names: []
+    status: "available"
+
+  response-generator:
+    display_name: "Response Generator"
+    description: "Generates customer-facing responses from knowledge and context"
+    spec_id: "SPEC-0102"
+    category: "core-pipeline"
+    agent_kind: "core"
+    endpoint: "in-process"
+    tier_gate: "free"
+    capabilities:
+      - "pipeline.generate_response"
+    skills:
+      generate-response:
+        display_name: "Generate Response"
+        description: "Produce a customer-facing response"
+        mode: "read"
+        mcp_tool_names: []
+    status: "available"
+
+  escalation-handler:
+    display_name: "Escalation Handler"
+    description: "Detects escalation signals and routes to human agents"
+    spec_id: "SPEC-0103"
+    category: "core-pipeline"
+    agent_kind: "core"
+    endpoint: "in-process"
+    tier_gate: "free"
+    capabilities:
+      - "pipeline.handle_escalation"
+    skills:
+      handle-escalation:
+        display_name: "Handle Escalation"
+        description: "Evaluate escalation signals and route appropriately"
+        mode: "read"
+        mcp_tool_names: []
+    status: "available"
+
+  analytics-collector:
+    display_name: "Analytics Collector"
+    description: "Collects conversation analytics and quality metrics"
+    spec_id: "SPEC-0104"
+    category: "core-pipeline"
+    agent_kind: "core"
+    endpoint: "in-process"
+    tier_gate: "free"
+    capabilities:
+      - "pipeline.collect_analytics"
+    skills:
+      collect-analytics:
+        display_name: "Collect Analytics"
+        description: "Record conversation metrics and quality scores"
+        mode: "internal"
+        mcp_tool_names: []
+    status: "available"
+
+  critic-supervisor:
+    display_name: "Critic Supervisor"
+    description: "Reviews and scores response quality before delivery"
+    spec_id: "SPEC-0105"
+    category: "core-pipeline"
+    agent_kind: "core"
+    endpoint: "in-process"
+    tier_gate: "free"
+    capabilities:
+      - "pipeline.critique_response"
+    skills:
+      critique-response:
+        display_name: "Critique Response"
+        description: "Evaluate response quality and apply corrections"
+        mode: "read"
+        mcp_tool_names: []
+    status: "available"
+
+  co-pilot:
+    display_name: "Co-Pilot"
+    description: "Admin assistance mode for team member queries"
+    spec_id: "SPEC-0106"
+    category: "core-pipeline"
+    agent_kind: "core"
+    endpoint: "in-process"
+    tier_gate: "starter"
+    capabilities:
+      - "pipeline.assist_admin"
+    skills:
+      assist-admin:
+        display_name: "Assist Admin"
+        description: "Handle team member queries in co-pilot mode"
+        mode: "read"
+        mcp_tool_names: []
+    status: "available"
+
+# ---------------------------------------------------------------------------
+# Peer plug-in agents (SPEC-1852 agent_kind: peer)
+# ---------------------------------------------------------------------------
   campaigns:
     display_name: "Campaigns Agent"
     description: "Marketing campaign information and promotional content"
     spec_id: "SPEC-1707"
     category: "marketing"
+    agent_kind: "peer"
     endpoint: "${AGENT_CAMPAIGNS_URL:-http://10.0.1.20:8080}"
     health_check: "/health"
     auth_type: "internal"
@@ -26,6 +166,27 @@ agents:
       - "campaigns.get_discount_codes"
       - "campaigns.get_talking_points"
       - "campaigns.track_metrics"
+    skills:
+      list-active:
+        display_name: "List Active Campaigns"
+        description: "List currently active marketing campaigns"
+        mode: "read"
+        mcp_tool_names: ["campaigns.list_active"]
+      get-discount-codes:
+        display_name: "Get Discount Codes"
+        description: "Retrieve discount codes for a campaign"
+        mode: "read"
+        mcp_tool_names: ["campaigns.get_discount_codes"]
+      get-talking-points:
+        display_name: "Get Talking Points"
+        description: "Retrieve talking points for a campaign"
+        mode: "read"
+        mcp_tool_names: ["campaigns.get_talking_points"]
+      track-metrics:
+        display_name: "Track Metrics"
+        description: "Record campaign interaction metrics"
+        mode: "mutate"
+        mcp_tool_names: ["campaigns.track_metrics"]
     status: "available"
 
   bot_agent:
@@ -33,6 +194,7 @@ agents:
     description: "External AI agent conversation handler"
     spec_id: "SPEC-1708"
     category: "agent-to-agent"
+    agent_kind: "peer"
     endpoint: "${AGENT_BOT_URL:-http://10.0.1.21:8080}"
     health_check: "/health"
     auth_type: "internal"
@@ -42,6 +204,27 @@ agents:
       - "bot.negotiate_parameters"
       - "bot.exchange_messages"
       - "bot.enforce_guardrails"
+    skills:
+      authenticate-agent:
+        display_name: "Authenticate Agent"
+        description: "Authenticate an external AI agent"
+        mode: "read"
+        mcp_tool_names: ["bot.authenticate_agent"]
+      negotiate-parameters:
+        display_name: "Negotiate Parameters"
+        description: "Negotiate conversation parameters with external agent"
+        mode: "read"
+        mcp_tool_names: ["bot.negotiate_parameters"]
+      exchange-messages:
+        display_name: "Exchange Messages"
+        description: "Exchange messages with an external AI agent"
+        mode: "mutate"
+        mcp_tool_names: ["bot.exchange_messages"]
+      enforce-guardrails:
+        display_name: "Enforce Guardrails"
+        description: "Apply guardrails and audit logging to agent exchanges"
+        mode: "read"
+        mcp_tool_names: ["bot.enforce_guardrails"]
     status: "available"
 
   sales:
@@ -49,6 +232,7 @@ agents:
     description: "In-line product discovery and purchase completion"
     spec_id: "SPEC-1709"
     category: "commerce"
+    agent_kind: "peer"
     endpoint: "${AGENT_SALES_URL:-http://10.0.1.22:8080}"
     health_check: "/health"
     auth_type: "internal"
@@ -59,6 +243,32 @@ agents:
       - "sales.check_inventory"
       - "sales.create_checkout"
       - "sales.track_order"
+    skills:
+      search-products:
+        display_name: "Search Products"
+        description: "Search the product catalog"
+        mode: "read"
+        mcp_tool_names: ["sales.search_products"]
+      manage-cart:
+        display_name: "Manage Cart"
+        description: "Add, remove, or update cart items"
+        mode: "mutate"
+        mcp_tool_names: ["sales.manage_cart"]
+      check-inventory:
+        display_name: "Check Inventory"
+        description: "Check product availability and stock levels"
+        mode: "read"
+        mcp_tool_names: ["sales.check_inventory"]
+      create-checkout:
+        display_name: "Create Checkout"
+        description: "Create a checkout session for the customer"
+        mode: "mutate"
+        mcp_tool_names: ["sales.create_checkout"]
+      track-order:
+        display_name: "Track Order"
+        description: "Look up order status and tracking information"
+        mode: "read"
+        mcp_tool_names: ["sales.track_order"]
     status: "available"
 
   gateway:
@@ -66,6 +276,7 @@ agents:
     description: "Human escalation and live agent connection"
     spec_id: "SPEC-1710"
     category: "escalation"
+    agent_kind: "peer"
     endpoint: "${AGENT_GATEWAY_URL:-http://10.0.1.23:8080}"
     health_check: "/health"
     auth_type: "internal"
@@ -75,6 +286,27 @@ agents:
       - "gateway.queue_customer"
       - "gateway.transfer_context"
       - "gateway.monitor_queue"
+    skills:
+      check-availability:
+        display_name: "Check Availability"
+        description: "Check if live agents are available"
+        mode: "read"
+        mcp_tool_names: ["gateway.check_availability"]
+      queue-customer:
+        display_name: "Queue Customer"
+        description: "Place customer in escalation queue"
+        mode: "mutate"
+        mcp_tool_names: ["gateway.queue_customer"]
+      transfer-context:
+        display_name: "Transfer Context"
+        description: "Transfer conversation context to live agent"
+        mode: "mutate"
+        mcp_tool_names: ["gateway.transfer_context"]
+      monitor-queue:
+        display_name: "Monitor Queue"
+        description: "Monitor escalation queue status"
+        mode: "read"
+        mcp_tool_names: ["gateway.monitor_queue"]
     status: "available"
 
   schedule:
@@ -82,6 +314,7 @@ agents:
     description: "Follow-up scheduling and event-driven notifications"
     spec_id: "SPEC-1711"
     category: "scheduling"
+    agent_kind: "peer"
     endpoint: "${AGENT_SCHEDULE_URL:-http://10.0.1.24:8080}"
     health_check: "/health"
     auth_type: "internal"
@@ -92,7 +325,61 @@ agents:
       - "schedule.cancel_followup"
       - "schedule.ingest_event"
       - "schedule.send_notification"
+    skills:
+      create-followup:
+        display_name: "Create Follow-up"
+        description: "Schedule a follow-up interaction"
+        mode: "mutate"
+        mcp_tool_names: ["schedule.create_followup"]
+      list-pending:
+        display_name: "List Pending"
+        description: "List pending follow-up interactions"
+        mode: "read"
+        mcp_tool_names: ["schedule.list_pending"]
+      cancel-followup:
+        display_name: "Cancel Follow-up"
+        description: "Cancel a scheduled follow-up"
+        mode: "mutate"
+        mcp_tool_names: ["schedule.cancel_followup"]
+      ingest-event:
+        display_name: "Ingest Event"
+        description: "Ingest an external event for processing"
+        mode: "mutate"
+        mcp_tool_names: ["schedule.ingest_event"]
+      send-notification:
+        display_name: "Send Notification"
+        description: "Send a proactive notification to a customer"
+        mode: "mutate"
+        mcp_tool_names: ["schedule.send_notification"]
     status: "available"
+
+# ---------------------------------------------------------------------------
+# Default routing rules (SPEC-1861 / ADR-003)
+#
+# Maps IC intents to suggested peer agents. These are defaults only —
+# tenant overlay custom_metadata.intent_routes takes precedence.
+# Routing only activates when the tenant has an enabled agent overlay
+# AND a skill binding for the suggested peer.
+# ---------------------------------------------------------------------------
+routing_rules:
+  product_question:
+    suggested_peer: "sales"
+    skill: "sales:search-products"
+  pricing_question:
+    suggested_peer: "sales"
+    skill: "sales:search-products"
+  availability_check:
+    suggested_peer: "sales"
+    skill: "sales:check-inventory"
+  order_status:
+    suggested_peer: "sales"
+    skill: "sales:track-order"
+  payment_issue:
+    suggested_peer: "stripe_mcp"
+    skill: "stripe_mcp:list-charges"
+  subscription_question:
+    suggested_peer: "stripe_mcp"
+    skill: "stripe_mcp:get-subscription"
 
 # ---------------------------------------------------------------------------
 # 3rd-party MCP servers (SPEC-1712)
@@ -111,6 +398,27 @@ external_servers:
       - "stripe.list_charges"
       - "stripe.create_refund"
       - "stripe.get_subscription"
+    skills:
+      get-balance:
+        display_name: "Get Balance"
+        mode: "read"
+        mcp_tool_names: ["stripe.get_balance"]
+        credential_types: ["oauth2"]
+      list-charges:
+        display_name: "List Charges"
+        mode: "read"
+        mcp_tool_names: ["stripe.list_charges"]
+        credential_types: ["oauth2"]
+      create-refund:
+        display_name: "Create Refund"
+        mode: "mutate"
+        mcp_tool_names: ["stripe.create_refund"]
+        credential_types: ["oauth2"]
+      get-subscription:
+        display_name: "Get Subscription"
+        mode: "read"
+        mcp_tool_names: ["stripe.get_subscription"]
+        credential_types: ["oauth2"]
     read_only: false
     status: "available"
 
@@ -125,6 +433,19 @@ external_servers:
       - "shopify.search_products"
       - "shopify.get_order"
       - "shopify.get_collections"
+    skills:
+      search-products:
+        display_name: "Search Products"
+        mode: "read"
+        mcp_tool_names: ["shopify.search_products"]
+      get-order:
+        display_name: "Get Order"
+        mode: "read"
+        mcp_tool_names: ["shopify.get_order"]
+      get-collections:
+        display_name: "Get Collections"
+        mode: "read"
+        mcp_tool_names: ["shopify.get_collections"]
     read_only: true
     status: "available"
 
@@ -140,6 +461,22 @@ external_servers:
       - "square.get_payments"
       - "square.list_appointments"
       - "square.get_loyalty"
+    skills:
+      get-payments:
+        display_name: "Get Payments"
+        mode: "read"
+        mcp_tool_names: ["square.get_payments"]
+        credential_types: ["oauth2"]
+      list-appointments:
+        display_name: "List Appointments"
+        mode: "read"
+        mcp_tool_names: ["square.list_appointments"]
+        credential_types: ["oauth2"]
+      get-loyalty:
+        display_name: "Get Loyalty"
+        mode: "read"
+        mcp_tool_names: ["square.get_loyalty"]
+        credential_types: ["oauth2"]
     read_only: false
     status: "beta"
 
@@ -154,6 +491,17 @@ external_servers:
     capabilities:
       - "paypal.get_transaction"
       - "paypal.list_disputes"
+    skills:
+      get-transaction:
+        display_name: "Get Transaction"
+        mode: "read"
+        mcp_tool_names: ["paypal.get_transaction"]
+        credential_types: ["oauth2"]
+      list-disputes:
+        display_name: "List Disputes"
+        mode: "read"
+        mcp_tool_names: ["paypal.list_disputes"]
+        credential_types: ["oauth2"]
     read_only: true
     status: "beta"
 
@@ -168,5 +516,16 @@ external_servers:
     capabilities:
       - "coinbase.get_charge"
       - "coinbase.list_events"
+    skills:
+      get-charge:
+        display_name: "Get Charge"
+        mode: "read"
+        mcp_tool_names: ["coinbase.get_charge"]
+        credential_types: ["api_key"]
+      list-events:
+        display_name: "List Events"
+        mode: "read"
+        mcp_tool_names: ["coinbase.list_events"]
+        credential_types: ["api_key"]
     read_only: true
     status: "beta"

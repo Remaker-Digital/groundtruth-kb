@@ -84,10 +84,10 @@ ENABLE_SDK_TRACING = os.environ.get("AGNTCY_ENABLE_TRACING", "false").lower() ==
 class AgentTopic(str, Enum):
     """Agent topic identifiers matching AGNTCY upstream convention.
 
-    DEPRECATED: Use agntcy_directory.get_agent_topic() or resolve_agent()
-    for dynamic discovery via AGNTCY Directory (SPEC-1789 / WI-1385).
-    This enum is retained as a static fallback when the Directory server
-    is unavailable.
+    DEPRECATED: Use PluginAgentRegistry.get_core_agent_ids() or
+    agntcy_directory.get_agent_topic() for dynamic discovery (SPEC-1852).
+    This enum is a static fallback only — do not add new entries here.
+    Prefer registry lookups in all new code.
 
     These map 1:1 to the AgentRole enum in system_prompt_builder.py and to
     the NATS topic suffixes in nats_isolation.py.
