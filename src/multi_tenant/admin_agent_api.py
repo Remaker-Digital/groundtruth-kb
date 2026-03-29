@@ -450,6 +450,39 @@ async def delete_binding(
 
 
 @router.get(
+    "/{agent_id}/bindable-skills",
+    response_model=list[EffectiveSkillModel],
+    summary="List all skills that can be bound for an agent",
+    status_code=200,
+)
+async def list_bindable_skills(
+    agent_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> list[EffectiveSkillModel]:
+    """List skills from the registry for an agent, regardless of binding state.
+
+    This endpoint returns the full skill catalog for Add Binding bootstrapping.
+    Unlike /available-skills, it does NOT require existing bindings to return results.
+    """
+    _validate_agent_id(agent_id)
+    reg = _get_registry()
+    agent_defn = reg.get(agent_id)
+    if agent_defn is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id}")
+
+    return [
+        EffectiveSkillModel(
+            skill_id=skill.skill_id,
+            display_name=skill.display_name,
+            mode=skill.mode,
+            enabled=skill.enabled,
+            credential_ref=None,
+        )
+        for skill in agent_defn.skills
+    ]
+
+
+@router.get(
     "/available-skills",
     response_model=list[EffectiveSkillModel],
     summary="List all invocable skills for this tenant",

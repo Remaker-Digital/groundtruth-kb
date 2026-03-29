@@ -40,6 +40,11 @@ export const AgentManager: React.FC<AgentManagerProps> = ({
   const agentsList = useAgents(apiFetch);
   const [selectedId, setSelectedId] = useState<string | null>(initialAgentId);
 
+  // Sync selectedId when initialAgentId prop changes (back/forward, manual URL edit)
+  useEffect(() => {
+    setSelectedId(initialAgentId ?? null);
+  }, [initialAgentId]);
+
   // Track viewport for responsive collapse
   const [isNarrow, setIsNarrow] = useState(
     typeof window !== 'undefined' ? window.innerWidth < BREAKPOINT : false,

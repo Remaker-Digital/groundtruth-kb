@@ -57,6 +57,20 @@ export function useAvailableSkills(apiFetch: ApiFetch, agentId?: string, enabled
   return useApi<EffectiveSkill[]>(apiFetch, path, enabled);
 }
 
+/** List bindable skills from the registry (for Add Binding dialog).
+ *
+ * Unlike useAvailableSkills, this returns ALL skills for an agent regardless
+ * of binding state — solving the bootstrapping problem where an agent with
+ * zero bindings has zero available skills.
+ */
+export function useBindableSkills(apiFetch: ApiFetch, agentId: string, enabled = true) {
+  return useApi<EffectiveSkill[]>(
+    apiFetch,
+    `/api/admin/agents/${encodeURIComponent(agentId)}/bindable-skills`,
+    enabled && !!agentId,
+  );
+}
+
 /** Get resolved effective config for an agent. */
 export function useEffectiveConfig(apiFetch: ApiFetch, agentId: string, enabled = true) {
   return useApi<EffectiveAgentConfig>(

@@ -35,6 +35,16 @@ export function useApi<T>(apiFetch: ApiFetch, path: string, enabled = true): Use
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
 
+  // Clear stale data when path changes (prevents cross-entity data leak)
+  const prevPathRef = useRef(path);
+  useEffect(() => {
+    if (prevPathRef.current !== path) {
+      setData(null);
+      setError(null);
+      prevPathRef.current = path;
+    }
+  }, [path]);
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -53,7 +63,10 @@ export function useApi<T>(apiFetch: ApiFetch, path: string, enabled = true): Use
         setData(json);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || 'Request failed');
+        if (!cancelled) {
+          setData(null);  // Clear stale data on error (e.g., 404)
+          setError(err.message || 'Request failed');
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -22,6 +22,7 @@ import { registerWidgetHandlers } from "./handlers/widget";
 import { registerBillingHandlers } from "./handlers/billing";
 import { registerMemoryHandlers } from "./handlers/memory";
 import { registerIntegrationHandlers } from "./handlers/integrations";
+import { registerAgentHandlers } from "./handlers/agents";
 
 let handlersRegistered = false;
 function ensureHandlers(): void {
@@ -37,6 +38,7 @@ function ensureHandlers(): void {
   registerBillingHandlers();
   registerMemoryHandlers();
   registerIntegrationHandlers();
+  registerAgentHandlers();
   handlersRegistered = true;
 }
 import { matchRoute } from "./router";

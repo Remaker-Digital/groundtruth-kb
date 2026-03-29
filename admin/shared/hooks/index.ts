@@ -150,6 +150,7 @@ export {
   useAgentOverlay,
   useAgentBindings,
   useAvailableSkills,
+  useBindableSkills,
   useEffectiveConfig,
   useToggleOverlay,
   useCreateBinding,

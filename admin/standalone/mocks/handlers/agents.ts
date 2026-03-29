@@ -154,7 +154,14 @@ export function registerAgentHandlers() {
     return { status: 204, body: null };
   });
 
-  // GET /api/admin/agents/available-skills
+  // GET /api/admin/agents/:aid/bindable-skills — registry catalog for Add Binding
+  GET("/api/admin/agents/:aid/bindable-skills", (req) => {
+    const { aid } = req.params;
+    const skills = s().availableSkills.filter((sk: any) => sk.skillId.startsWith(aid + ':'));
+    return { status: 200, body: skills };
+  });
+
+  // GET /api/admin/agents/available-skills — resolved skills only
   GET("/api/admin/agents/available-skills", (req) => {
     const agentId = req.query.agent_id;
     let skills = s().availableSkills;

@@ -24,7 +24,7 @@ import type { ApiFetch } from '../hooks/useApi';
 import {
   useAgentOverlay,
   useAgentBindings,
-  useAvailableSkills,
+  useBindableSkills,
   useEffectiveConfig,
   useToggleOverlay,
   useCreateBinding,
@@ -48,7 +48,7 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
 }) => {
   const overlayResult = useAgentOverlay(apiFetch, agent.agentId);
   const bindingsResult = useAgentBindings(apiFetch, agent.agentId);
-  const availableSkillsResult = useAvailableSkills(apiFetch, agent.agentId);
+  const bindableSkillsResult = useBindableSkills(apiFetch, agent.agentId);
   const effectiveResult = useEffectiveConfig(apiFetch, agent.agentId);
 
   const { toggle: toggleOverlay, loading: toggleLoading } = useToggleOverlay(apiFetch);
@@ -81,7 +81,7 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
     if (result) {
       onNotify(`Binding created for ${skillId}`, 'success');
       bindingsResult.refetch();
-      availableSkillsResult.refetch();
+      bindableSkillsResult.refetch();
       effectiveResult.refetch();
     } else {
       onNotify('Failed to create binding', 'error');
@@ -93,7 +93,7 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
     if (ok) {
       onNotify(`Binding removed for ${skillId}`, 'success');
       bindingsResult.refetch();
-      availableSkillsResult.refetch();
+      bindableSkillsResult.refetch();
       effectiveResult.refetch();
     } else {
       onNotify('Failed to delete binding', 'error');
@@ -199,7 +199,7 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
         {/* Skill Bindings */}
         <SkillBindingsTable
           bindings={bindingsResult.data ?? []}
-          availableSkills={availableSkillsResult.data ?? []}
+          availableSkills={bindableSkillsResult.data ?? []}
           loading={bindingsResult.loading}
           onAdd={handleAddBinding}
           onDelete={handleDeleteBinding}
