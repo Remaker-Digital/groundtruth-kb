@@ -19,6 +19,7 @@ import { createQuickActionsFixture } from './fixtures/quick-actions';
 import { createWidgetFixture } from './fixtures/widget';
 import { createBillingFixture } from './fixtures/billing';
 import { createMemoryFixture } from './fixtures/memory';
+import { createAgentsFixture } from './fixtures/agents';
 
 export interface MockStore {
   tenant: ReturnType<typeof createTenantFixture>;
@@ -31,6 +32,7 @@ export interface MockStore {
   widget: ReturnType<typeof createWidgetFixture>;
   billing: ReturnType<typeof createBillingFixture>;
   memory: ReturnType<typeof createMemoryFixture>;
+  agents: ReturnType<typeof createAgentsFixture>;
 }
 
 let _store: MockStore | null = null;
@@ -49,6 +51,7 @@ export function getStore(): MockStore {
       widget: createWidgetFixture(),
       billing: createBillingFixture(),
       memory: createMemoryFixture(),
+      agents: createAgentsFixture(),
     };
     console.log('[mock] Store initialized with fixture data');
   }

@@ -152,6 +152,7 @@ const navItemsBefore: NavPage[] = [
 
 /** Pages participating in the Save→Activate lifecycle (grouped in sidebar). */
 const configGroupItems: NavPage[] = [
+  { path: '/agents', label: 'Agents', icon: 'agents', roles: ['superadmin', 'admin'] },
   { path: '/configuration', label: 'Agent configuration', icon: 'config', roles: ['superadmin', 'admin'] },
   { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge', roles: ['superadmin', 'admin'] },
   { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions', roles: ['superadmin', 'admin'] },

@@ -402,6 +402,25 @@ export interface IntegrationResponse {
 // Common component props
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Agents (Phase 4a)
+// ---------------------------------------------------------------------------
+
+export type {
+  AgentSummary,
+  AgentOverlay,
+  AgentOverlayInput,
+  SkillOverride,
+  AgentBinding,
+  AgentBindingInput,
+  EffectiveSkill,
+  EffectiveAgentConfig,
+} from './agents';
+
+// ---------------------------------------------------------------------------
+// Common component props
+// ---------------------------------------------------------------------------
+
 /** Base props that every shared component receives from the shell. */
 export interface BaseComponentProps {
   tenantContext: TenantContext;

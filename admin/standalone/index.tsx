@@ -43,6 +43,7 @@ import { TeamPage } from './pages/Team';
 import { IntegrationsPage } from './pages/Integrations';
 import { QuickActionsPage } from './pages/QuickActions';
 import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
+import { AgentsPage } from './pages/Agents';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { TwoFaChallenge } from './components/TwoFaChallenge';
 
@@ -249,7 +250,12 @@ const App: React.FC = () => {
             <Route path="/team" element={<TeamPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
 
-            {/* Admin-only routes (WI #295 Phase 4) */}
+            {/* Admin-only routes */}
+            <Route path="/agents" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <AgentsPage />
+              </ProtectedRoute>
+            } />
             <Route path="/configuration" element={
               <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
                 <ConfigurationPage />

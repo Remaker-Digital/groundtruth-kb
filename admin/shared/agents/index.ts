@@ -1,0 +1,9 @@
+/**
+ * Agent sub-components barrel export — Phase 4a.
+ *
+ * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+ */
+export { AgentListPanel } from './AgentListPanel';
+export { AgentDetailPanel } from './AgentDetailPanel';
+export { SkillBindingsTable } from './SkillBindingsTable';
+export { AddBindingDialog } from './AddBindingDialog';

@@ -87,6 +87,12 @@ class TestIsAdminOnlyPath:
         "/api/admin/config-lock",
         "/api/admin/team",
         "/api/admin/team/member-123",
+        "/api/admin/agents",
+        "/api/admin/agents/campaigns/overlay",
+        "/api/admin/agents/campaigns/bindings",
+        "/api/admin/agents/campaigns/skills/campaigns:list-active/binding",
+        "/api/admin/agents/campaigns/effective-config",
+        "/api/admin/agents/available-skills",
     ])
     def test_admin_only_paths_detected(self, path):
         assert is_admin_only_path(path) is True
@@ -200,6 +206,49 @@ class TestEnforceRbac:
             enforce_rbac("/api/config", ctx)
         assert "Admin access required" in exc_info.value.detail
 
+    # -- Phase 4a: /api/admin/agents RBAC boundary tests --------------------
+
+    @pytest.mark.parametrize("path", [
+        "/api/admin/agents",
+        "/api/admin/agents/campaigns/overlay",
+        "/api/admin/agents/campaigns/bindings",
+        "/api/admin/agents/campaigns/skills/campaigns:list-active/binding",
+    ])
+    def test_viewer_blocked_on_agent_endpoints(self, path):
+        """Viewer gets 403 on all agent admin endpoints (WI-4016)."""
+        ctx = _make_ctx(TeamMemberRole.VIEWER)
+        with pytest.raises(HTTPException) as exc_info:
+            enforce_rbac(path, ctx)
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.parametrize("path", [
+        "/api/admin/agents",
+        "/api/admin/agents/campaigns/overlay",
+        "/api/admin/agents/campaigns/skills/campaigns:list-active/binding",
+    ])
+    def test_escalation_agent_blocked_on_agent_endpoints(self, path):
+        """Escalation agent gets 403 on agent admin endpoints (WI-4016)."""
+        ctx = _make_ctx(TeamMemberRole.ESCALATION_AGENT)
+        with pytest.raises(HTTPException) as exc_info:
+            enforce_rbac(path, ctx)
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.parametrize("path", [
+        "/api/admin/agents",
+        "/api/admin/agents/campaigns/overlay",
+        "/api/admin/agents/campaigns/bindings",
+    ])
+    def test_admin_allowed_on_agent_endpoints(self, path):
+        """Admin role can access agent admin endpoints (WI-4016)."""
+        ctx = _make_ctx(TeamMemberRole.ADMIN)
+        enforce_rbac(path, ctx)  # Should not raise
+
+    def test_superadmin_allowed_on_agent_endpoints(self):
+        """Superadmin can access agent admin endpoints."""
+        ctx = _make_ctx(TeamMemberRole.SUPERADMIN)
+        enforce_rbac("/api/admin/agents", ctx)  # Should not raise
+        enforce_rbac("/api/admin/agents/foo/overlay", ctx)  # Should not raise
+
 
 # ---------------------------------------------------------------------------
 # get_tenant_context integration (RBAC-09)
@@ -282,8 +331,8 @@ class TestRbacEnforcementS130:
         enforce_rbac("/api/admin/conversations", ctx)
 
     def test_admin_only_prefixes_count(self) -> None:
-        """TEST-2904: Drift detection — _ADMIN_ONLY_PREFIXES has 17 entries."""
-        assert len(_ADMIN_ONLY_PREFIXES) == 17, (
-            f"Expected 17 admin-only prefixes, got {len(_ADMIN_ONLY_PREFIXES)}. "
+        """TEST-2904: Drift detection — _ADMIN_ONLY_PREFIXES has 18 entries."""
+        assert len(_ADMIN_ONLY_PREFIXES) == 18, (
+            f"Expected 18 admin-only prefixes, got {len(_ADMIN_ONLY_PREFIXES)}. "
             f"If a prefix was intentionally added/removed, update SPEC-0363 and this test."
         )

@@ -1193,6 +1193,7 @@ _ADMIN_ONLY_PREFIXES = (
     "/api/admin/tier-upgrade",
     "/api/admin/config-lock",
     "/api/admin/team",
+    "/api/admin/agents",
 )
 
 # Paths within admin-only prefixes that remain open to all roles.

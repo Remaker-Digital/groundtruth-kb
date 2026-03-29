@@ -143,3 +143,15 @@ export type {
 
 // Auto-save draft (focusout-driven)
 export { useAutoSaveDraft } from './useAutoSaveDraft';
+
+// Agents (Phase 4a)
+export {
+  useAgents,
+  useAgentOverlay,
+  useAgentBindings,
+  useAvailableSkills,
+  useEffectiveConfig,
+  useToggleOverlay,
+  useCreateBinding,
+  useDeleteBinding,
+} from './useAgents';

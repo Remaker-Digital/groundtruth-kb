@@ -52,6 +52,7 @@ from src.multi_tenant.admin_contact_api import router as admin_contact_router
 from src.multi_tenant.superadmin_contact_api import router as superadmin_contact_router
 from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
 from src.multi_tenant.admin_fine_tuning_api import router as admin_fine_tuning_router
+from src.multi_tenant.admin_agent_api import router as admin_agent_router
 from src.multi_tenant.widget_otp_verification import router as widget_otp_router
 from src.multi_tenant.spa_recovery import router as spa_recovery_router
 from src.multi_tenant.tenant_recovery import router as tenant_recovery_router
@@ -106,6 +107,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(admin_contact_router)
     app.include_router(superadmin_contact_router)
     app.include_router(admin_fine_tuning_router)
+    app.include_router(admin_agent_router)
     app.include_router(widget_otp_router)
     app.include_router(spa_recovery_router)  # SPEC-1678: unauthenticated
     app.include_router(tenant_recovery_router)  # SPEC-1677: SPA-facing
