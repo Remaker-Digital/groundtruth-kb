@@ -41,6 +41,8 @@ from src.multi_tenant.repositories.verification import VerificationTokenReposito
 from src.multi_tenant.repositories.incidents import IncidentRepository
 from src.multi_tenant.repositories.alerts import AlertRuleRepository, AlertHistoryRepository
 from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+from src.multi_tenant.repositories.agent_overlays import TenantAgentOverlayRepository
+from src.multi_tenant.repositories.agent_bindings import AgentSkillBindingRepository
 
 __all__ = [
     # Exceptions
@@ -69,4 +71,6 @@ __all__ = [
     "AlertHistoryRepository",
     "PlatformAdminRepository",
     "DomainIndexRepository",
+    "TenantAgentOverlayRepository",
+    "AgentSkillBindingRepository",
 ]

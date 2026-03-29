@@ -1,6 +1,7 @@
-"""Superadmin API -- Tenant Agent Overlay CRUD (SPEC-1854, WI-1666).
+"""Superadmin API -- Tenant Agent Overlay CRUD (SPEC-1854, WI-1666, WI-4013/4014).
 
-Admin endpoints for managing per-tenant, per-agent configuration overlays.
+Admin endpoints for managing per-tenant, per-agent configuration overlays
+and skill bindings. Backed by Cosmos DB repositories (WI-4011, WI-4012).
 
   GET  /tenants/{tenant_id}/agents                             — List overlays for a tenant
   GET  /tenants/{tenant_id}/agents/{agent_id}/overlay          — Get overlay
@@ -13,7 +14,6 @@ Admin endpoints for managing per-tenant, per-agent configuration overlays.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Depends, HTTPException
@@ -29,8 +29,30 @@ router = _state.router
 
 logger = logging.getLogger(__name__)
 
-# In-memory overlay store (will be replaced with Cosmos repo in Phase 1)
-_overlay_store: dict[str, dict[str, dict[str, Any]]] = {}
+
+def _get_overlay_repo():
+    """Lazy import to avoid circular imports at module load."""
+    from src.multi_tenant.repositories.agent_overlays import TenantAgentOverlayRepository
+    return TenantAgentOverlayRepository()
+
+
+def _get_binding_repo():
+    """Lazy import to avoid circular imports at module load."""
+    from src.multi_tenant.repositories.agent_bindings import AgentSkillBindingRepository
+    return AgentSkillBindingRepository()
+
+
+def _invalidate_caches(tenant_id: str | None = None) -> None:
+    """Invalidate all resolution and binding caches on every write/delete.
+
+    Codex Finding 1: no second TTL cache — write-path invalidation is
+    mandatory before any caching layer is acceptable.
+    """
+    from src.agents.plugins.overlay import clear_resolution_cache
+    from src.agents.plugins.bindings import SkillBindingService
+    clear_resolution_cache()
+    svc = SkillBindingService.get_instance()
+    svc.invalidate(tenant_id)
 
 
 def _get_registry():
@@ -127,9 +149,14 @@ def _validate_agent_id(agent_id: str) -> None:
         )
 
 
-def _get_tenant_overlays(tenant_id: str) -> dict[str, dict[str, Any]]:
-    """Get all overlays for a tenant."""
-    return _overlay_store.get(tenant_id, {})
+async def _get_tenant_overlays(tenant_id: str) -> dict[str, dict[str, Any]]:
+    """Get all overlays for a tenant from Cosmos DB.
+
+    Returns agent_id -> overlay dict mapping (same shape as the old in-memory store).
+    """
+    repo = _get_overlay_repo()
+    docs = await repo.list_overlays(tenant_id)
+    return {doc["agent_id"]: doc for doc in docs}
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +176,7 @@ async def list_tenant_agents(
 ) -> list[AgentSummaryModel]:
     """List all registered agents with whether a tenant overlay exists (SPEC-1854)."""
     reg = _get_registry()
-    overlays = _get_tenant_overlays(tenant_id)
+    overlays = await _get_tenant_overlays(tenant_id)
     results = []
     for agent in reg.list_agents():
         overlay = overlays.get(agent.agent_id)
@@ -176,15 +203,22 @@ async def get_agent_overlay(
 ) -> AgentOverlayModel:
     """Get the overlay for a specific tenant + agent (SPEC-1854)."""
     _validate_agent_id(agent_id)
-    overlays = _get_tenant_overlays(tenant_id)
-    overlay = overlays.get(agent_id)
+    repo = _get_overlay_repo()
+    overlay = await repo.get_overlay(tenant_id, agent_id)
     if overlay is None:
         raise HTTPException(status_code=404, detail="No overlay for this agent")
 
     return AgentOverlayModel(
-        tenant_id=tenant_id,
-        agent_id=agent_id,
-        **overlay,
+        tenant_id=overlay.get("tenant_id", tenant_id),
+        agent_id=overlay.get("agent_id", agent_id),
+        enabled=overlay.get("enabled", True),
+        prompt_overrides=overlay.get("prompt_overrides", {}),
+        skill_overrides={
+            k: SkillOverrideModel(**v) if isinstance(v, dict) else v
+            for k, v in overlay.get("skill_overrides", {}).items()
+        },
+        custom_metadata=overlay.get("custom_metadata", {}),
+        updated_at=overlay.get("updated_at", ""),
     )
 
 
@@ -203,24 +237,35 @@ async def put_agent_overlay(
     """Create or update overlay for a tenant + agent (SPEC-1854)."""
     _validate_agent_id(agent_id)
 
-    now = datetime.now(timezone.utc).isoformat()
-    overlay_data = body.model_dump()
-    overlay_data["updated_at"] = now
-
-    # Serialize skill overrides to dict
+    # Serialize skill overrides to dict for Cosmos storage
     skill_ovr = {}
     for sid, so in (body.skill_overrides or {}).items():
         skill_ovr[sid] = so.model_dump() if hasattr(so, "model_dump") else so
-    overlay_data["skill_overrides"] = skill_ovr
 
-    if tenant_id not in _overlay_store:
-        _overlay_store[tenant_id] = {}
-    _overlay_store[tenant_id][agent_id] = overlay_data
+    repo = _get_overlay_repo()
+    result = await repo.upsert_overlay(
+        tenant_id,
+        agent_id,
+        enabled=body.enabled,
+        prompt_overrides=body.prompt_overrides,
+        skill_overrides=skill_ovr,
+        custom_metadata=body.custom_metadata,
+    )
+
+    # Codex Finding 1: invalidate resolution cache on every write
+    _invalidate_caches(tenant_id)
 
     return AgentOverlayModel(
-        tenant_id=tenant_id,
-        agent_id=agent_id,
-        **overlay_data,
+        tenant_id=result.get("tenant_id", tenant_id),
+        agent_id=result.get("agent_id", agent_id),
+        enabled=result.get("enabled", True),
+        prompt_overrides=result.get("prompt_overrides", {}),
+        skill_overrides={
+            k: SkillOverrideModel(**v) if isinstance(v, dict) else v
+            for k, v in result.get("skill_overrides", {}).items()
+        },
+        custom_metadata=result.get("custom_metadata", {}),
+        updated_at=result.get("updated_at", ""),
     )
 
 
@@ -236,10 +281,13 @@ async def delete_agent_overlay(
 ) -> None:
     """Delete overlay, reverting to base registry defaults (SPEC-1854)."""
     _validate_agent_id(agent_id)
-    overlays = _get_tenant_overlays(tenant_id)
-    if agent_id not in overlays:
+    repo = _get_overlay_repo()
+    deleted = await repo.delete_overlay(tenant_id, agent_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail="No overlay for this agent")
-    del _overlay_store[tenant_id][agent_id]
+
+    # Codex Finding 1: invalidate resolution cache on every delete
+    _invalidate_caches(tenant_id)
 
 
 @router.get(
@@ -257,7 +305,7 @@ async def get_effective_config(
     _validate_agent_id(agent_id)
 
     from src.agents.plugins.overlay import resolve_for_tenant
-    overlays = _get_tenant_overlays(tenant_id)
+    overlays = await _get_tenant_overlays(tenant_id)
     config = resolve_for_tenant(tenant_id, agent_id, overlays)
     if config is None:
         raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id}")
@@ -319,6 +367,7 @@ def _validate_skill_id(agent_id: str, skill_id: str) -> None:
 
 
 def _get_binding_svc():
+    """Get SkillBindingService — still used for runtime authorization checks."""
     from src.agents.plugins.bindings import SkillBindingService
     return SkillBindingService.get_instance()
 
@@ -336,9 +385,20 @@ async def list_skill_bindings(
 ) -> list[BindingModel]:
     """List all bindings for a tenant + agent (SPEC-1856 req 7)."""
     _validate_agent_id(agent_id)
-    svc = _get_binding_svc()
-    bindings = svc.list_bindings(tenant_id, agent_id=agent_id)
-    return [BindingModel(**b) for b in bindings]
+    repo = _get_binding_repo()
+    bindings = await repo.list_bindings(tenant_id, agent_id=agent_id)
+    return [
+        BindingModel(
+            tenant_id=b.get("tenant_id", tenant_id),
+            agent_id=b.get("agent_id", agent_id),
+            skill_id=b.get("skill_id", ""),
+            credential_ref=b.get("credential_ref"),
+            mode=b.get("mode", "read"),
+            approval_policy=b.get("approval_policy", "auto"),
+            enabled=b.get("enabled", True),
+        )
+        for b in bindings
+    ]
 
 
 @router.get(
@@ -356,11 +416,19 @@ async def get_skill_binding(
     """Get a specific skill binding (SPEC-1856 req 7)."""
     _validate_agent_id(agent_id)
     _validate_skill_id(agent_id, skill_id)
-    svc = _get_binding_svc()
-    binding = svc.get_binding(tenant_id, agent_id, skill_id)
+    repo = _get_binding_repo()
+    binding = await repo.get_binding(tenant_id, skill_id)
     if binding is None:
         raise HTTPException(status_code=404, detail="No binding found")
-    return BindingModel(**binding)
+    return BindingModel(
+        tenant_id=binding.get("tenant_id", tenant_id),
+        agent_id=binding.get("agent_id", agent_id),
+        skill_id=binding.get("skill_id", skill_id),
+        credential_ref=binding.get("credential_ref"),
+        mode=binding.get("mode", "read"),
+        approval_policy=binding.get("approval_policy", "auto"),
+        enabled=binding.get("enabled", True),
+    )
 
 
 @router.put(
@@ -379,17 +447,29 @@ async def put_skill_binding(
     """Create or update a binding (SPEC-1856 req 7)."""
     _validate_agent_id(agent_id)
     _validate_skill_id(agent_id, skill_id)
-    svc = _get_binding_svc()
-    binding = svc.create_binding(
-        tenant_id=tenant_id,
-        agent_id=agent_id,
-        skill_id=skill_id,
+    repo = _get_binding_repo()
+    result = await repo.upsert_binding(
+        tenant_id,
+        agent_id,
+        skill_id,
         credential_ref=body.credential_ref,
         mode=body.mode,
         approval_policy=body.approval_policy,
         enabled=body.enabled,
     )
-    return BindingModel(**binding)
+
+    # Codex Finding 1: invalidate resolution cache on binding write
+    _invalidate_caches(tenant_id)
+
+    return BindingModel(
+        tenant_id=result.get("tenant_id", tenant_id),
+        agent_id=result.get("agent_id", agent_id),
+        skill_id=result.get("skill_id", skill_id),
+        credential_ref=result.get("credential_ref"),
+        mode=result.get("mode", "read"),
+        approval_policy=result.get("approval_policy", "auto"),
+        enabled=result.get("enabled", True),
+    )
 
 
 @router.delete(
@@ -405,9 +485,14 @@ async def delete_skill_binding(
 ) -> None:
     """Delete a binding, revoking tenant access to this skill (SPEC-1856)."""
     _validate_agent_id(agent_id)
-    svc = _get_binding_svc()
-    if not svc.delete_binding(tenant_id, agent_id, skill_id):
+    _validate_skill_id(agent_id, skill_id)
+    repo = _get_binding_repo()
+    deleted = await repo.delete_binding(tenant_id, skill_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail="No binding found")
+
+    # Codex Finding 1: invalidate resolution cache on binding delete
+    _invalidate_caches(tenant_id)
 
 
 @router.get(
@@ -423,7 +508,14 @@ async def list_tenant_available_skills(
 ) -> list[EffectiveSkillModel]:
     """List skills that pass all three resolution layers (SPEC-1859 req 7)."""
     from src.agents.plugins.overlay import list_available_skills
-    overlays = _get_tenant_overlays(tenant_id)
+    from src.agents.plugins.bindings import SkillBindingService
+
+    # WI-4014: Hydrate binding cache before sync resolve_skill reads
+    _svc = SkillBindingService.get_instance()
+    if tenant_id not in _svc._loaded_tenants:
+        await _svc.load_tenant_bindings(tenant_id)
+
+    overlays = await _get_tenant_overlays(tenant_id)
     resolved = list_available_skills(
         tenant_id, overlay_store=overlays, agent_id=agent_id
     )

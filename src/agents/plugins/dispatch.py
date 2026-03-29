@@ -271,6 +271,13 @@ class PluginDispatcher:
 
         svc = SkillBindingService.get_instance()
 
+        # WI-4014: Hydrate binding cache from Cosmos if not yet loaded
+        if tenant_id not in svc._loaded_tenants:
+            try:
+                await svc.load_tenant_bindings(tenant_id)
+            except Exception:
+                logger.debug("Binding cache hydration failed in dispatch", exc_info=True)
+
         # Resolve skill mode from registry for mode enforcement
         skill_defn = self._registry.get_skill(skill_id)
         required_mode = skill_defn.mode if skill_defn else None

@@ -357,6 +357,17 @@ class AgentDispatchMixin:
 
         span = trace_agent_operation("knowledge-retrieval", "retrieve")
         try:
+            # WI-4014: Hydrate binding cache before sync KR resolution
+            tenant_id = getattr(self, "_current_tenant_id", None)
+            if tenant_id:
+                try:
+                    from src.agents.plugins.bindings import SkillBindingService
+                    _svc = SkillBindingService.get_instance()
+                    if tenant_id not in _svc._loaded_tenants:
+                        await _svc.load_tenant_bindings(tenant_id)
+                except Exception:
+                    logger.debug("Binding cache hydration failed in KR", exc_info=True)
+
             # Resolve MCP configs through migration state (SPEC-1860)
             mcp_payload = self._resolve_kr_mcp_payload()
             kr_payload: dict[str, Any] = {

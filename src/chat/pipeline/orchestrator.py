@@ -511,9 +511,19 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 from src.multi_tenant.superadmin_api._agent_overlays import (
                     _get_tenant_overlays,
                 )
-                overlay_store = _get_tenant_overlays(tenant_id) or None
+                overlay_store = await _get_tenant_overlays(tenant_id) or None
             except Exception:
                 logger.debug("Overlay store unavailable for routing", exc_info=True)
+
+            # WI-4014: Hydrate binding cache from Cosmos before sync reads.
+            # This is the async boundary before IntentRouter/dispatch sync code.
+            try:
+                from src.agents.plugins.bindings import SkillBindingService
+                binding_svc = SkillBindingService.get_instance()
+                if tenant_id not in binding_svc._loaded_tenants:
+                    await binding_svc.load_tenant_bindings(tenant_id)
+            except Exception:
+                logger.debug("Binding cache hydration failed", exc_info=True)
 
             router = IntentRouter()
             route = router.resolve(

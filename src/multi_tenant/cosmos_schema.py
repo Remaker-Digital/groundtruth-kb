@@ -87,6 +87,10 @@ COLLECTION_NORMALIZED_CONTACTS = "normalized_contacts"
 # Domain → tenant_id index (SPEC-1644: eliminates cross-partition queries)
 COLLECTION_DOMAIN_INDEX = "domain_index"
 
+# Agent Extensibility — overlay + binding persistence (WI-4010)
+COLLECTION_AGENT_OVERLAYS = "agent_overlays"
+COLLECTION_AGENT_BINDINGS = "agent_bindings"
+
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
     COLLECTION_CONVERSATIONS,
@@ -115,6 +119,9 @@ ALL_COLLECTIONS = [
     COLLECTION_NORMALIZED_TICKETS,
     COLLECTION_NORMALIZED_CONTACTS,
     COLLECTION_DOMAIN_INDEX,
+    # Agent Extensibility (WI-4010)
+    COLLECTION_AGENT_OVERLAYS,
+    COLLECTION_AGENT_BINDINGS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -2399,6 +2406,53 @@ def get_collection_configs() -> list[CollectionConfig]:
                 "indexingMode": "consistent",
                 "includedPaths": [{"path": "/*"}],
                 "excludedPaths": [{"path": '/"_etag"/?'}],
+            },
+        ),
+        # 27. agent_overlays — WI-4010: per-tenant agent configuration overlays (SPEC-1854)
+        # Partition key: /tenant_id. ID: agent_id (unique per tenant partition).
+        # Narrow indexing: exclude skill_overrides/prompt_overrides/custom_metadata blobs
+        # that are never directly queried (Codex Finding 5).
+        CollectionConfig(
+            name=COLLECTION_AGENT_OVERLAYS,
+            partition_key="/tenant_id",
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [
+                    {"path": "/id/?"},
+                    {"path": "/tenant_id/?"},
+                    {"path": "/agent_id/?"},
+                    {"path": "/enabled/?"},
+                    {"path": "/updated_at/?"},
+                ],
+                "excludedPaths": [
+                    {"path": "/*"},
+                    {"path": '/"_etag"/?'},
+                ],
+            },
+        ),
+        # 28. agent_bindings — WI-4010: per-tenant agent skill bindings (SPEC-1856)
+        # Partition key: /tenant_id. ID: skill_id (unique per tenant partition).
+        # Narrow indexing: index only fields used in queries.
+        CollectionConfig(
+            name=COLLECTION_AGENT_BINDINGS,
+            partition_key="/tenant_id",
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [
+                    {"path": "/id/?"},
+                    {"path": "/tenant_id/?"},
+                    {"path": "/agent_id/?"},
+                    {"path": "/skill_id/?"},
+                    {"path": "/credential_ref/?"},
+                    {"path": "/enabled/?"},
+                    {"path": "/updated_at/?"},
+                ],
+                "excludedPaths": [
+                    {"path": "/*"},
+                    {"path": '/"_etag"/?'},
+                ],
             },
         ),
     ]
