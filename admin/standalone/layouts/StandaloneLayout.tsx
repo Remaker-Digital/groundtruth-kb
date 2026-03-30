@@ -540,16 +540,21 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
           return;
         }
 
-        // Inject the widget script — identical to storefront injection.
-        // The widget fetches its own config from /api/config using the widget key.
-        // No overrides: the widget behaves identically in admin and storefront.
-        // Co-pilot knowledge is additive — the backend injects Agent Red docs
-        // when the conversation originates from an admin session context.
+        // Inject the widget script with admin identity passthrough.
+        // The widget uses the widget key for config fetch but includes the
+        // admin's auth credential so the chat backend can identify the caller
+        // as a team member (middleware checks X-API-Key before X-Widget-Key).
+        // This enables Co-pilot routing and agent access enforcement.
         const script = document.createElement('script');
         script.id = 'agent-red-admin-widget';
         script.src = import.meta.env.DEV ? `${import.meta.env.BASE_URL}widget.js` : `${apiUrl}/widget.js`;
         script.setAttribute('data-widget-key', widgetKey);
         script.setAttribute('data-api-url', apiUrl);
+
+        // Pass admin auth credential for team member identification
+        if (resolvedAuth.value) {
+          script.setAttribute('data-auth-token', resolvedAuth.value);
+        }
 
         document.body.appendChild(script);
       } catch (err) {

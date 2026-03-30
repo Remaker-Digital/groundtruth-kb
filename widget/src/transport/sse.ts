@@ -34,6 +34,8 @@ interface SSEOptions {
   apiBaseUrl: string;
   widgetKey: string;
   conversationId: string;
+  /** Optional admin auth token for team member identification. */
+  authToken?: string;
   onConnectionLost?: () => void;
   onConnectionRestored?: () => void;
   /** Called when all reconnect attempts are exhausted (WI-0931). */
@@ -103,6 +105,12 @@ export class SSEConnection {
     // EventSource doesn't support custom headers, so we pass authentication
     // as a query parameter. The backend accepts both header and query param.
     url.searchParams.set('widget_key', this.options.widgetKey);
+
+    // Pass admin auth token for team member identification (SPEC-1562).
+    // Middleware checks api_key query param before widget_key.
+    if (this.options.authToken) {
+      url.searchParams.set('api_key', this.options.authToken);
+    }
 
     // WI #133: Pass tab_id for multi-tab coordination. The backend tracks
     // which tabs are streaming the same conversation and shares connection

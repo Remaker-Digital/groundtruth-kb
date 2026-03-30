@@ -140,8 +140,11 @@ interface AgentRedSDK {
       }
     : null;
 
-  // Configure transport
-  configureTransport({ apiBaseUrl, widgetKey });
+  // Read optional admin auth token (set by standalone admin layout)
+  const authToken = scriptTag.getAttribute('data-auth-token') || undefined;
+
+  // Configure transport (authToken enables team member identification)
+  configureTransport({ apiBaseUrl, widgetKey, authToken });
 
   // Fetch config and initialize
   init(widgetKey, apiBaseUrl, dataOverrides, shopifyCustomer).catch((err) => {

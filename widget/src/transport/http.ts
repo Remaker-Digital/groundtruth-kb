@@ -28,6 +28,10 @@ export interface TransportConfig {
   apiBaseUrl: string;
   /** Publishable widget key (pk_live_...). */
   widgetKey: string;
+  /** Optional admin auth token (user API key or session token).
+   *  When present, the middleware identifies the caller as a team member,
+   *  enabling Co-pilot routing and agent access enforcement. */
+  authToken?: string;
 }
 
 let _config: TransportConfig | null = null;
@@ -77,7 +81,7 @@ async function request<T>(
   body?: unknown,
   options?: RequestOptions,
 ): Promise<ApiResponse<T>> {
-  const { apiBaseUrl, widgetKey } = getTransportConfig();
+  const { apiBaseUrl, widgetKey, authToken } = getTransportConfig();
   const url = `${apiBaseUrl}${path}`;
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryBaseDelay = options?.retryBaseDelayMs ?? 1000;
@@ -86,6 +90,13 @@ async function request<T>(
     'Content-Type': 'application/json',
     'X-Widget-Key': widgetKey,
   };
+
+  // When loaded in admin console, include the admin's auth credential.
+  // Middleware checks X-API-Key before X-Widget-Key, so the caller is
+  // authenticated as a team member with role-based routing.
+  if (authToken) {
+    headers['X-API-Key'] = authToken;
+  }
 
   let lastError: ApiResponse<T> | null = null;
 

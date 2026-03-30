@@ -195,6 +195,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
     sseRef.current = new SSEConnection({
       apiBaseUrl: transportCfg.apiBaseUrl,
       widgetKey: transportCfg.widgetKey,
+      authToken: transportCfg.authToken,
       conversationId,
       onConnectionLost: () => store.setState({ isReconnecting: true }),
       onConnectionRestored: () => store.setState({ isReconnecting: false, error: null }),
