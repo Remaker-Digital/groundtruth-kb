@@ -14,7 +14,9 @@
 export interface AgentSummary {
   agentId: string;
   displayName: string;
+  description: string;
   agentKind: string;
+  category: string;
   hasOverlay: boolean;
   enabled: boolean;
 }
@@ -72,6 +74,7 @@ export interface AgentBindingInput {
 export interface EffectiveSkill {
   skillId: string;
   displayName: string;
+  description: string;
   mode: string;
   enabled: boolean;
   credentialRef: string | null;

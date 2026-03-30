@@ -5,5 +5,3 @@
  */
 export { AgentListPanel } from './AgentListPanel';
 export { AgentDetailPanel } from './AgentDetailPanel';
-export { SkillBindingsTable } from './SkillBindingsTable';
-export { AddBindingDialog } from './AddBindingDialog';

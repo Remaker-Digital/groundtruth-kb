@@ -152,8 +152,8 @@ const navItemsBefore: NavPage[] = [
 
 /** Pages participating in the Save→Activate lifecycle (grouped in sidebar). */
 const configGroupItems: NavPage[] = [
-  { path: '/agents', label: 'Agents', icon: 'agents', roles: ['superadmin', 'admin'] },
-  { path: '/configuration', label: 'Agent configuration', icon: 'config', roles: ['superadmin', 'admin'] },
+  { path: '/configuration', label: 'AI configuration', icon: 'config', roles: ['superadmin', 'admin'] },
+  { path: '/agents', label: 'Agents configuration', icon: 'agents', roles: ['superadmin', 'admin'] },
   { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge', roles: ['superadmin', 'admin'] },
   { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions', roles: ['superadmin', 'admin'] },
   { path: '/widget', label: 'Widget configuration', icon: 'widget', roles: ['superadmin', 'admin'] },
@@ -161,7 +161,6 @@ const configGroupItems: NavPage[] = [
 
 /** Nav items rendered AFTER the configuration group. */
 const navItemsAfter: NavPage[] = [
-  { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
   { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
   { path: '/billing', label: 'Account & billing', icon: 'billing', roles: ['superadmin', 'admin'] },
 ];
@@ -827,7 +826,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         </AppShell.Header>
 
         {/* ---- Navbar ---- */}
-        <AppShell.Navbar p="xs">
+        <AppShell.Navbar p="xs" style={{ overflowY: 'auto' }}>
           <AppShell.Section grow>
             {/* --- Before-group items (Dashboard, Inbox, Team members) --- */}
             {navItemsBefore

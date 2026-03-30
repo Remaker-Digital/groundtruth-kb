@@ -109,6 +109,7 @@ class AgentOverlayInput(CamelCaseModel):
 class EffectiveSkillModel(CamelCaseModel):
     skill_id: str
     display_name: str
+    description: str = ""
     mode: str
     enabled: bool
     credential_ref: str | None = None
@@ -126,7 +127,9 @@ class EffectiveAgentConfigModel(CamelCaseModel):
 class AgentSummaryModel(CamelCaseModel):
     agent_id: str
     display_name: str
+    description: str = ""
     agent_kind: str
+    category: str = ""
     has_overlay: bool
     enabled: bool
 
@@ -174,7 +177,9 @@ async def list_agents(
         results.append(AgentSummaryModel(
             agent_id=agent.agent_id,
             display_name=agent.display_name,
+            description=agent.description,
             agent_kind=agent.agent_kind,
+            category=agent.category,
             has_overlay=overlay is not None,
             enabled=overlay.get("enabled", True) if overlay else True,
         ))
@@ -474,6 +479,7 @@ async def list_bindable_skills(
         EffectiveSkillModel(
             skill_id=skill.skill_id,
             display_name=skill.display_name,
+            description=skill.description,
             mode=skill.mode,
             enabled=skill.enabled,
             credential_ref=None,

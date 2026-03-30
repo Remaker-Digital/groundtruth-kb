@@ -43,9 +43,9 @@ export const AgentsPage: React.FC = () => {
 
   return (
     <div>
-      <Title order={2} mb="xs">Agents</Title>
+      <Title order={2} mb="xs">Agents configuration</Title>
       <Text size="sm" c="dimmed" mb="lg">
-        View registered agents, toggle overlays, and manage skill bindings.
+        Configure agents, manage skill bindings, and connect third-party integrations.
       </Text>
 
       <AgentManager

@@ -529,3 +529,115 @@ external_servers:
         credential_types: ["api_key"]
     read_only: true
     status: "beta"
+
+# ---------------------------------------------------------------------------
+# Integration agents (SPEC-1761-1778 integration framework adapters)
+#
+# These agents represent third-party service integrations. The underlying
+# implementation uses the integration framework (adapters, OAuth, webhooks,
+# sync) but from the admin perspective they are agents with skills.
+# ---------------------------------------------------------------------------
+  zendesk:
+    display_name: "Zendesk"
+    description: "Helpdesk ticket sync and customer support integration via Zendesk"
+    spec_id: "SPEC-1776"
+    endpoint: "integration-adapter"
+    auth_type: "oauth2"
+    credential_env: "ZENDESK_API_TOKEN"
+    tier_gate: "professional"
+    category: "integration"
+    agent_kind: "peer"
+    capabilities:
+      - "zendesk.sync_tickets"
+      - "zendesk.create_ticket"
+      - "zendesk.update_ticket"
+    skills:
+      sync-tickets:
+        display_name: "Sync Tickets"
+        description: "Synchronize helpdesk tickets from Zendesk"
+        mode: "read"
+        mcp_tool_names: ["zendesk.sync_tickets"]
+        credential_types: ["oauth2"]
+      create-ticket:
+        display_name: "Create Ticket"
+        description: "Create a new support ticket in Zendesk"
+        mode: "mutate"
+        mcp_tool_names: ["zendesk.create_ticket"]
+        credential_types: ["oauth2"]
+      update-ticket:
+        display_name: "Update Ticket"
+        description: "Update an existing Zendesk ticket"
+        mode: "mutate"
+        mcp_tool_names: ["zendesk.update_ticket"]
+        credential_types: ["oauth2"]
+    status: "available"
+
+  slack:
+    display_name: "Slack"
+    description: "Channel messaging and team notification integration via Slack"
+    spec_id: "SPEC-1777"
+    endpoint: "integration-adapter"
+    auth_type: "oauth2"
+    credential_env: "SLACK_BOT_TOKEN"
+    tier_gate: "professional"
+    category: "integration"
+    agent_kind: "peer"
+    capabilities:
+      - "slack.send_message"
+      - "slack.list_channels"
+      - "slack.post_notification"
+    skills:
+      send-message:
+        display_name: "Send Message"
+        description: "Send a message to a Slack channel"
+        mode: "mutate"
+        mcp_tool_names: ["slack.send_message"]
+        credential_types: ["oauth2"]
+      list-channels:
+        display_name: "List Channels"
+        description: "List available Slack channels"
+        mode: "read"
+        mcp_tool_names: ["slack.list_channels"]
+        credential_types: ["oauth2"]
+      post-notification:
+        display_name: "Post Notification"
+        description: "Post a notification to a configured Slack channel"
+        mode: "mutate"
+        mcp_tool_names: ["slack.post_notification"]
+        credential_types: ["oauth2"]
+    status: "available"
+
+  google_docs:
+    display_name: "Google Docs"
+    description: "Knowledge ingestion and document sync from Google Docs"
+    spec_id: "SPEC-1778"
+    endpoint: "integration-adapter"
+    auth_type: "oauth2"
+    credential_env: "GOOGLE_DOCS_CREDENTIALS"
+    tier_gate: "professional"
+    category: "integration"
+    agent_kind: "peer"
+    capabilities:
+      - "google_docs.ingest_document"
+      - "google_docs.list_documents"
+      - "google_docs.sync_folder"
+    skills:
+      ingest-document:
+        display_name: "Ingest Document"
+        description: "Import a Google Doc into the knowledge base"
+        mode: "mutate"
+        mcp_tool_names: ["google_docs.ingest_document"]
+        credential_types: ["oauth2"]
+      list-documents:
+        display_name: "List Documents"
+        description: "List available documents in connected Google Drive"
+        mode: "read"
+        mcp_tool_names: ["google_docs.list_documents"]
+        credential_types: ["oauth2"]
+      sync-folder:
+        display_name: "Sync Folder"
+        description: "Synchronize a Google Drive folder with the knowledge base"
+        mode: "mutate"
+        mcp_tool_names: ["google_docs.sync_folder"]
+        credential_types: ["oauth2"]
+    status: "available"

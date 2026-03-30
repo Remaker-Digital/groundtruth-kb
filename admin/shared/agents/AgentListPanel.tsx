@@ -8,8 +8,9 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { TextInput, Badge, Text, Stack, Group, Paper } from '@mantine/core';
+import { TextInput, Badge, Text, Stack, Group, Paper, Tooltip } from '@mantine/core';
 import type { AgentSummary } from '../types/agents';
+import { getAgentLogo } from '../icons/agent-logos';
 import { tokens } from '../theme/styles';
 
 interface AgentListPanelProps {
@@ -97,14 +98,19 @@ export const AgentListPanel: React.FC<AgentListPanelProps> = ({
                 }}
               >
                 <Group justify="space-between" wrap="nowrap">
-                  <div style={{ minWidth: 0 }}>
-                    <Text size="sm" fw={500} truncate="end">
-                      {agent.displayName}
-                    </Text>
-                    <Text size="xs" c="dimmed" truncate="end">
-                      {agent.agentId}
-                    </Text>
-                  </div>
+                  <Group gap={10} wrap="nowrap" style={{ minWidth: 0 }}>
+                    {(() => { const L = getAgentLogo(agent.agentId); return <L size={28} />; })()}
+                    <Tooltip label={agent.description || agent.agentId} multiline w={250} withArrow>
+                      <div style={{ minWidth: 0 }}>
+                        <Text size="sm" fw={500} truncate="end">
+                          {agent.displayName}
+                        </Text>
+                        <Text size="xs" c="dimmed" truncate="end">
+                          {agent.agentId}
+                        </Text>
+                      </div>
+                    </Tooltip>
+                  </Group>
                   <Group gap={6} wrap="nowrap">
                     <Badge
                       size="xs"

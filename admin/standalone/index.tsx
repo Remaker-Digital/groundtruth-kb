@@ -40,7 +40,6 @@ import { KnowledgeBasePage } from './pages/KnowledgeBase';
 import { WidgetPage } from './pages/Widget';
 import { BillingPage } from './pages/Billing';
 import { TeamPage } from './pages/Team';
-import { IntegrationsPage } from './pages/Integrations';
 import { QuickActionsPage } from './pages/QuickActions';
 import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
 import { AgentsPage } from './pages/Agents';
@@ -279,11 +278,6 @@ const App: React.FC = () => {
             <Route path="/billing" element={
               <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
                 <BillingPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/integrations" element={
-              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
-                <IntegrationsPage />
               </ProtectedRoute>
             } />
             <Route path="/memory-privacy" element={

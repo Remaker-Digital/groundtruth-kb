@@ -106,7 +106,7 @@ class TestCanonicalAgentIdentity:
         reg = PluginAgentRegistry.get_instance()
         reg.load_from_yaml()
         all_agents = reg.list_agents()
-        assert len(all_agents) == 17
+        assert len(all_agents) == 20
         for a in all_agents:
             assert a.agent_kind in ("core", "peer", "internal")
             assert a.status in ("available", "beta", "disabled", "deprecated")
@@ -119,7 +119,7 @@ class TestCanonicalAgentIdentity:
         peer = reg.list_agents(agent_kind="peer")
         assert all(a.agent_kind == "core" for a in core)
         assert all(a.agent_kind == "peer" for a in peer)
-        assert len(core) + len(peer) == 17
+        assert len(core) + len(peer) == 20
 
     def test_get_core_agent_ids_replaces_pipeline_agents(self):
         """get_core_agent_ids() provides same data as old PIPELINE_AGENTS (SPEC-1852 req 3)."""
