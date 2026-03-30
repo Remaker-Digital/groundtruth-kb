@@ -458,6 +458,59 @@ def _build_identification_section(prefs: PreferencesDocument) -> str:
 # Tenant configuration section builder
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# B3: Response Tone Presets
+# ---------------------------------------------------------------------------
+# Presets seed existing brand_voice / formality_level / response_length fields.
+# NOT a parallel tone system — presets are shorthand for the existing controls.
+# 'custom' or None = merchant uses the individual field values directly.
+
+_TONE_PRESETS: dict[str, dict[str, str]] = {
+    "professional": {
+        "brand_voice": "professional, knowledgeable, and courteous",
+        "formality_level": "formal",
+        "response_length": "standard",
+    },
+    "friendly": {
+        "brand_voice": "friendly, warm, and approachable",
+        "formality_level": "balanced",
+        "response_length": "standard",
+    },
+    "casual": {
+        "brand_voice": "casual, relaxed, and conversational",
+        "formality_level": "casual",
+        "response_length": "concise",
+    },
+    "expert": {
+        "brand_voice": "authoritative, precise, and reassuring",
+        "formality_level": "formal",
+        "response_length": "detailed",
+    },
+}
+
+
+def _resolve_tone_preset(
+    prefs: PreferencesDocument,
+) -> tuple[str | None, str | None, str | None]:
+    """Return effective (brand_voice, formality_level, response_length).
+
+    When a tone preset is active (not 'custom'/None), the preset values
+    take precedence over the individual fields. This lets merchants pick
+    a preset and optionally override individual fields later by switching
+    to 'custom'.
+    """
+    preset_name = getattr(prefs, "response_tone_preset", None)
+    preset = _TONE_PRESETS.get(preset_name or "")
+    if preset:
+        return (
+            preset["brand_voice"],
+            preset["formality_level"],
+            preset["response_length"],
+        )
+    # No preset or 'custom' — use individual fields
+    return (prefs.brand_voice, prefs.formality_level, prefs.response_length)
+
+
 def _build_tenant_config_section(
     prefs: PreferencesDocument,
     agent: AgentRole,
@@ -499,12 +552,15 @@ def _build_tenant_config_section(
 
     # --- Full persona (Response Generator only) ---
     if agent == AgentRole.RESPONSE_GENERATOR:
-        if prefs.brand_voice:
-            lines.append(f"- Brand voice: {prefs.brand_voice}")
-        if prefs.formality_level:
-            lines.append(f"- Formality: {prefs.formality_level}")
-        if prefs.response_length:
-            lines.append(f"- Response length: {prefs.response_length}")
+        # B3: Resolve tone preset into effective brand_voice / formality / length.
+        # Preset takes precedence over individual fields when set (not 'custom'/null).
+        brand_voice, formality, length = _resolve_tone_preset(prefs)
+        if brand_voice:
+            lines.append(f"- Brand voice: {brand_voice}")
+        if formality:
+            lines.append(f"- Formality: {formality}")
+        if length:
+            lines.append(f"- Response length: {length}")
         if prefs.return_policy:
             lines.append(f"- Return policy: {prefs.return_policy}")
         if prefs.shipping_info:

@@ -33,6 +33,7 @@ class RouteTarget(str, Enum):
     ESCALATION = "escalation"
     CO_PILOT = "co_pilot"
     PEER_AGENT = "peer_agent"
+    CLARIFICATION = "clarification"  # B2: IC confidence below tenant threshold
     ERROR = "error"  # Explicit target verification failure (SPEC-1862)
 
 
@@ -79,6 +80,7 @@ class IntentRouter:
         overlay_store: dict[str, dict[str, Any]] | None = None,
         tenant_tier: str | None = None,
         staff_domain_tags: tuple[str, ...] | None = None,
+        intent_confidence_threshold: float = 0.0,
     ) -> RouteDecision:
         """Determine execution route from IC result + tenant config.
 
@@ -123,6 +125,24 @@ class IntentRouter:
         if intent == _ESCALATION_INTENT:
             return RouteDecision(
                 target=RouteTarget.ESCALATION,
+                confidence=confidence,
+            )
+
+        # 2b. Intent confidence threshold gating (B2)
+        # When tenant has set a threshold and IC confidence is below it,
+        # route to CLARIFICATION instead of proceeding with uncertain intent.
+        # Disabled when threshold is 0.0 (default).
+        if (
+            intent_confidence_threshold > 0.0
+            and confidence < intent_confidence_threshold
+            and intent != _ESCALATION_INTENT  # escalation always proceeds
+        ):
+            logger.info(
+                "IntentRouter: confidence %.2f below threshold %.2f for tenant %s",
+                confidence, intent_confidence_threshold, tenant_id,
+            )
+            return RouteDecision(
+                target=RouteTarget.CLARIFICATION,
                 confidence=confidence,
             )
 

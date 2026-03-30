@@ -980,6 +980,17 @@ class PreferencesDocument(BaseModel):
     brand_name: str | None = Field(default=None, description="Merchant's brand display name")
     brand_voice: str | None = Field(default=None, description="Tone descriptor (e.g. friendly, formal)")
 
+    # Response tone preset (B3 — customer competitiveness)
+    response_tone_preset: str | None = Field(
+        default=None,
+        description=(
+            "Preset that seeds brand_voice, formality_level, and response_length. "
+            "Values: professional, friendly, casual, expert, custom. "
+            "When set (not 'custom'), the preset values take precedence in "
+            "prompt building. 'custom' or null = merchant uses individual fields."
+        ),
+    )
+
     # Languages (onboarding step 2)
     primary_language: str = Field(default="en", description="Primary support language")
     additional_languages: list[str] = Field(default_factory=list, description="Additional languages")
@@ -1000,6 +1011,17 @@ class PreferencesDocument(BaseModel):
     escalation_keywords: list[str] = Field(
         default_factory=list,
         description="Keywords that trigger immediate escalation",
+    )
+
+    # Intent confidence gating (B2 — customer competitiveness)
+    intent_confidence_threshold: float = Field(
+        default=0.0,
+        description=(
+            "Minimum IC confidence required to proceed to response generation. "
+            "When IC confidence falls below this threshold, the pipeline routes "
+            "to a clarification prompt instead. 0.0 = disabled (default). "
+            "Typical merchant values: 0.3-0.6."
+        ),
     )
 
     # Memory & privacy (onboarding step 8)

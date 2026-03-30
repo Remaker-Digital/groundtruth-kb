@@ -454,16 +454,26 @@ def token_event(text: str, sequence: int) -> StreamEvent:
     )
 
 
-def validated_event(conversation_id: str, message_id: str) -> StreamEvent:
-    """Create a validated event — Critic approved the response."""
-    return StreamEvent(
-        event=StreamEventType.VALIDATED,
-        data={
-            "conversation_id": conversation_id,
-            "message_id": message_id,
-            "critic_passed": True,
-        },
-    )
+def validated_event(
+    conversation_id: str,
+    message_id: str,
+    sources: list[dict[str, str]] | None = None,
+) -> StreamEvent:
+    """Create a validated event — Critic approved the response.
+
+    Args:
+        sources: Optional structured source attribution (B1). Each entry
+            has ``title`` and optionally ``url``. Included only when
+            ``cite_sources_in_response`` is enabled and KR returned sources.
+    """
+    data: dict = {
+        "conversation_id": conversation_id,
+        "message_id": message_id,
+        "critic_passed": True,
+    }
+    if sources:
+        data["sources"] = sources
+    return StreamEvent(event=StreamEventType.VALIDATED, data=data)
 
 
 def retracted_event(fallback_text: str, reason: str) -> StreamEvent:

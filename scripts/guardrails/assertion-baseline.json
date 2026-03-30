@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 20679,
-    "total_files": 448
+    "total_assertions": 20727,
+    "total_files": 450
   },
   "baselines": {
     "tests/agents/plugins/test_agent_extensibility_phase0.py": 71,
@@ -24,7 +24,7 @@
     "tests/agents/test_knowledge_retrieval.py": 26,
     "tests/agents/test_knowledge_retrieval_mcp.py": 37,
     "tests/agents/test_response_generator.py": 23,
-    "tests/chat/pipeline/test_intent_router.py": 53,
+    "tests/chat/pipeline/test_intent_router.py": 61,
     "tests/chat/pipeline/test_intent_router_integration.py": 38,
     "tests/chat/pipeline/test_team_agent_chat.py": 26,
     "tests/chat/test_consent_endpoint.py": 17,
@@ -40,6 +40,7 @@
     "tests/chat/test_quality_reporting_api.py": 17,
     "tests/chat/test_session_escalation.py": 11,
     "tests/chat/test_session_pii_scrubbing.py": 29,
+    "tests/chat/test_source_attribution.py": 13,
     "tests/chat/test_sse_error_handling.py": 71,
     "tests/chat/test_sse_integration.py": 35,
     "tests/chat/test_sse_metering_multitab.py": 64,
@@ -339,6 +340,7 @@
     "tests/multi_tenant/test_tenant_param_validation.py": 11,
     "tests/multi_tenant/test_tenant_recovery.py": 33,
     "tests/multi_tenant/test_tenant_secret_service.py": 40,
+    "tests/multi_tenant/test_tone_presets.py": 27,
     "tests/multi_tenant/test_trial_expiry_warning.py": 15,
     "tests/multi_tenant/test_trial_lifecycle_e2e.py": 33,
     "tests/multi_tenant/test_trial_management.py": 136,

@@ -32,6 +32,28 @@ fields:
     pii_classification: none
     injected_in_prompt: true
 
+  - field_name: response_tone_preset
+    display_name: Response tone preset
+    field_type: enum
+    validation:
+      allowed_values:
+        - professional
+        - friendly
+        - casual
+        - expert
+        - custom
+    platform_default: null
+    tier_gate: pro+
+    onboarding_step: 1
+    step_order: 0
+    tooltip: Quick-start tone profile that sets brand voice, formality, and response length.
+    description: "Select a preset to quickly configure your AI's communication style. 'Professional': formal and courteous. 'Friendly': warm and approachable. 'Casual': relaxed and conversational. 'Expert': authoritative and detailed. Choose 'Custom' to set brand voice, formality, and response length individually."
+    doc_link: "https://agentredcx.com/docs/configuration/brand-tone#presets"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: false
+
   - field_name: brand_voice
     display_name: Brand voice
     field_type: string
@@ -502,6 +524,28 @@ fields:
       - response-generator
     pii_classification: none
     injected_in_prompt: true
+
+  - field_name: intent_confidence_threshold
+    display_name: Intent confidence threshold
+    field_type: float
+    validation:
+      min_value: 0.0
+      max_value: 1.0
+    platform_default: 0.0
+    tier_defaults:
+      starter: 0.0
+      professional: 0.4
+      enterprise: 0.5
+    tier_gate: pro+
+    onboarding_step: 6
+    step_order: 2
+    tooltip: Minimum confidence for the AI to answer directly vs. ask a clarifying question.
+    description: "When the AI is less confident than this threshold about what the customer is asking, it asks a clarifying follow-up question instead of guessing. 0 = disabled (always attempt an answer). Higher values produce more clarification questions but fewer wrong answers. Professional+ feature."
+    doc_link: "https://agentredcx.com/docs/configuration/intent#confidence-threshold"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: false
 
   - field_name: escalation_keywords
     display_name: Escalation keywords

@@ -29,6 +29,7 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     # AI behavior (original 12 fields)
     "brand_name",
     "brand_voice",
+    "response_tone_preset",
     "primary_language",
     "additional_languages",
     "response_length",
@@ -37,6 +38,7 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "shipping_info",
     "escalation_threshold",
     "escalation_keywords",
+    "intent_confidence_threshold",
     "memory_enabled",
     "custom_instructions",
     # Widget appearance — visual (21 fields)
