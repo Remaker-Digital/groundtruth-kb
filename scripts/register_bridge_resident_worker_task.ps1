@@ -2,13 +2,11 @@ param(
   [ValidateSet("codex", "prime")]
   [string]$Agent = "codex",
 
-  [ValidateSet("daemon", "once")]
-  [string]$Mode = "daemon",
-
-  [int]$IntervalMinutes = 1,
   [int]$PollTimeoutSeconds = 20,
   [int]$PollIntervalMs = 100,
-  [bool]$AutoActions = $false
+  [int]$CadenceMinutes = 9,
+  [int]$ExecTimeoutSeconds = 900,
+  [int]$ErrorBackoffSeconds = 5
 )
 
 Set-StrictMode -Version Latest
@@ -26,49 +24,9 @@ if (-not $pythonExe) {
 
 $pythonw = Join-Path (Split-Path $pythonExe -Parent) "pythonw.exe"
 $runner = if (Test-Path $pythonw) { $pythonw } else { $pythonExe }
-
-$taskName = "AgentRedBridgePoller-$Agent"
+$taskName = "AgentRedBridgeResidentWorker-$Agent"
 $userId = "$env:USERDOMAIN\$env:USERNAME"
-
-$arguments = "bridge_poller.py --agent $Agent"
-if ($Mode -eq "once") {
-  $arguments += " --once"
-} else {
-  $arguments += " --timeout-seconds $PollTimeoutSeconds --poll-interval-ms $PollIntervalMs --limit 50"
-}
-if ($AutoActions) {
-  $arguments += " --auto-actions"
-}
-
-if ($Mode -eq "once") {
-  $startBoundary = (Get-Date).AddMinutes(1).ToString("s")
-  $triggerXml = @"
-    <CalendarTrigger>
-      <StartBoundary>$startBoundary</StartBoundary>
-      <Enabled>true</Enabled>
-      <ScheduleByDay>
-        <DaysInterval>1</DaysInterval>
-      </ScheduleByDay>
-      <Repetition>
-        <Interval>PT${IntervalMinutes}M</Interval>
-        <Duration>P3650D</Duration>
-        <StopAtDurationEnd>false</StopAtDurationEnd>
-      </Repetition>
-    </CalendarTrigger>
-"@
-  $executionLimit = "PT4M"
-  $description = "Silent bridge poller (one-shot) for $Agent, every $IntervalMinutes minute(s)."
-} else {
-  $triggerXml = @"
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-      <UserId>$userId</UserId>
-      <Delay>PT15S</Delay>
-    </LogonTrigger>
-"@
-  $executionLimit = "PT0S"
-  $description = "Silent bridge poller daemon for $Agent (starts at logon)."
-}
+$arguments = "bridge_resident_worker.py --agent $Agent --timeout-seconds $PollTimeoutSeconds --poll-interval-ms $PollIntervalMs --cadence-minutes $CadenceMinutes --exec-timeout-seconds $ExecTimeoutSeconds --error-backoff-seconds $ErrorBackoffSeconds"
 
 $xml = @"
 <?xml version="1.0" encoding="UTF-16"?>
@@ -76,10 +34,14 @@ $xml = @"
   <RegistrationInfo>
     <Date>$((Get-Date).ToString("s"))</Date>
     <Author>Agent Red / Codex</Author>
-    <Description>$(Escape-Xml $description)</Description>
+    <Description>$(Escape-Xml "Silent resident bridge worker daemon for $Agent (starts at logon).")</Description>
   </RegistrationInfo>
   <Triggers>
-$triggerXml
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <UserId>$userId</UserId>
+      <Delay>PT15S</Delay>
+    </LogonTrigger>
   </Triggers>
   <Principals>
     <Principal id="Author">
@@ -104,7 +66,7 @@ $triggerXml
     <Hidden>true</Hidden>
     <RunOnlyIfIdle>false</RunOnlyIfIdle>
     <WakeToRun>false</WakeToRun>
-    <ExecutionTimeLimit>$executionLimit</ExecutionTimeLimit>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
     <Priority>7</Priority>
     <RestartOnFailure>
       <Interval>PT1M</Interval>
@@ -121,7 +83,7 @@ $triggerXml
 </Task>
 "@
 
-$xmlPath = Join-Path $projectDir "scripts\tmp-bridge-poller-$Agent-task.xml"
+$xmlPath = Join-Path $projectDir "scripts\tmp-bridge-resident-worker-$Agent-task.xml"
 $xml | Out-File -FilePath $xmlPath -Encoding Unicode -Force
 
 try {
@@ -135,7 +97,7 @@ try {
     throw "schtasks /Run failed for $taskName (exit $LASTEXITCODE)"
   }
 
-  Write-Output "REGISTERED:$taskName MODE=$Mode RUNNER=$runner ARGS=$arguments"
+  Write-Output "REGISTERED:$taskName RUNNER=$runner ARGS=$arguments"
 } finally {
   Remove-Item -LiteralPath $xmlPath -Force -ErrorAction SilentlyContinue
 }

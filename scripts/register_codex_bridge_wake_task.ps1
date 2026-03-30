@@ -1,14 +1,7 @@
 param(
-  [ValidateSet("codex", "prime")]
-  [string]$Agent = "codex",
-
-  [ValidateSet("daemon", "once")]
-  [string]$Mode = "daemon",
-
-  [int]$IntervalMinutes = 1,
-  [int]$PollTimeoutSeconds = 20,
-  [int]$PollIntervalMs = 100,
-  [bool]$AutoActions = $false
+  [int]$IntervalMinutes = 3,
+  [int]$CadenceMinutes = 9,
+  [int]$TimeoutSeconds = 900
 )
 
 Set-StrictMode -Version Latest
@@ -26,23 +19,21 @@ if (-not $pythonExe) {
 
 $pythonw = Join-Path (Split-Path $pythonExe -Parent) "pythonw.exe"
 $runner = if (Test-Path $pythonw) { $pythonw } else { $pythonExe }
-
-$taskName = "AgentRedBridgePoller-$Agent"
+$scriptPath = Join-Path $projectDir "scripts\codex_bridge_wake.py"
+$taskName = "AgentRedCodexBridgeWake"
 $userId = "$env:USERDOMAIN\$env:USERNAME"
+$startBoundary = (Get-Date).AddMinutes(1).ToString("s")
+$arguments = "scripts\codex_bridge_wake.py --cadence-minutes $CadenceMinutes --timeout-seconds $TimeoutSeconds"
 
-$arguments = "bridge_poller.py --agent $Agent"
-if ($Mode -eq "once") {
-  $arguments += " --once"
-} else {
-  $arguments += " --timeout-seconds $PollTimeoutSeconds --poll-interval-ms $PollIntervalMs --limit 50"
-}
-if ($AutoActions) {
-  $arguments += " --auto-actions"
-}
-
-if ($Mode -eq "once") {
-  $startBoundary = (Get-Date).AddMinutes(1).ToString("s")
-  $triggerXml = @"
+$xml = @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Date>$((Get-Date).ToString("s"))</Date>
+    <Author>Agent Red / Codex</Author>
+    <Description>Wake Codex headless bridge worker when pending bridge work exists.</Description>
+  </RegistrationInfo>
+  <Triggers>
     <CalendarTrigger>
       <StartBoundary>$startBoundary</StartBoundary>
       <Enabled>true</Enabled>
@@ -55,31 +46,6 @@ if ($Mode -eq "once") {
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
     </CalendarTrigger>
-"@
-  $executionLimit = "PT4M"
-  $description = "Silent bridge poller (one-shot) for $Agent, every $IntervalMinutes minute(s)."
-} else {
-  $triggerXml = @"
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-      <UserId>$userId</UserId>
-      <Delay>PT15S</Delay>
-    </LogonTrigger>
-"@
-  $executionLimit = "PT0S"
-  $description = "Silent bridge poller daemon for $Agent (starts at logon)."
-}
-
-$xml = @"
-<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo>
-    <Date>$((Get-Date).ToString("s"))</Date>
-    <Author>Agent Red / Codex</Author>
-    <Description>$(Escape-Xml $description)</Description>
-  </RegistrationInfo>
-  <Triggers>
-$triggerXml
   </Triggers>
   <Principals>
     <Principal id="Author">
@@ -103,8 +69,8 @@ $triggerXml
     <Enabled>true</Enabled>
     <Hidden>true</Hidden>
     <RunOnlyIfIdle>false</RunOnlyIfIdle>
-    <WakeToRun>false</WakeToRun>
-    <ExecutionTimeLimit>$executionLimit</ExecutionTimeLimit>
+    <WakeToRun>true</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
     <Priority>7</Priority>
     <RestartOnFailure>
       <Interval>PT1M</Interval>
@@ -121,7 +87,7 @@ $triggerXml
 </Task>
 "@
 
-$xmlPath = Join-Path $projectDir "scripts\tmp-bridge-poller-$Agent-task.xml"
+$xmlPath = Join-Path $projectDir "scripts\tmp-codex-bridge-wake-task.xml"
 $xml | Out-File -FilePath $xmlPath -Encoding Unicode -Force
 
 try {
@@ -135,7 +101,7 @@ try {
     throw "schtasks /Run failed for $taskName (exit $LASTEXITCODE)"
   }
 
-  Write-Output "REGISTERED:$taskName MODE=$Mode RUNNER=$runner ARGS=$arguments"
+  Write-Output "REGISTERED:$taskName INTERVAL=$IntervalMinutes CADENCE=$CadenceMinutes RUNNER=$runner SCRIPT=$scriptPath"
 } finally {
   Remove-Item -LiteralPath $xmlPath -Force -ErrorAction SilentlyContinue
 }
