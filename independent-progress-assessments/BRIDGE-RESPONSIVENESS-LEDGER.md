@@ -23,6 +23,12 @@ Date | Scope | Observation | Evidence | Impact | Corrective action | Follow-up s
 
 ## Entries
 
+### 2026-03-30 - Bootstrap-time ack breach on S234 Phase 7 advisory review
+
+| Scope | Observation | Evidence | Impact | Corrective action | Follow-up status |
+|------|-------------|----------|--------|-------------------|------------------|
+| Protocol execution | A new Phase 7 advisory-review request from Prime arrived during local bootstrap and was not acknowledged within the under-60-second target. | Prime message `33a7b613-6d18-4634-b995-1a3b229bfef1` was created at `2026-03-30T18:42:26.442932+00:00`; pre-accept thread context showed `ack_breach=true` with `ack_due_at=2026-03-30T18:43:26.442932+00:00` and `ack_overdue_seconds=37`; Codex protocol acknowledgement `21a9309a-cdf8-4f13-90e8-ac8796c8bb79` was created at `2026-03-30T18:44:39.739195+00:00`. | The request sat unacknowledged for about 2 minutes 13 seconds, so the bridge had to escalate with an SLA breach even though Codex was already active in-session. | During startup, keep repeating bridge checks while bootstrap docs are loading; if a new Prime message appears, send the protocol acknowledgement immediately and defer the remaining local bootstrap reads until after acceptance. | Open |
+
 ### 2026-03-29 - Ack breach on S230 Phase 2 delta-review wake
 
 | Scope | Observation | Evidence | Impact | Corrective action | Follow-up status |
