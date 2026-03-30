@@ -77,6 +77,12 @@ TRANSPORT_TYPE = os.environ.get("AGNTCY_TRANSPORT_TYPE", "slim").lower()
 SLIM_TLS_INSECURE = os.environ.get("AGNTCY_SLIM_TLS_INSECURE", "false").lower() == "true"
 SLIM_SHARED_SECRET = os.environ.get("AGNTCY_SLIM_SHARED_SECRET", "")
 
+# WI-1657: SLIM client keepalive gap. AGNTCY SDK slim_bindings.new_insecure_client_config()
+# uses keepalive=None. Server sends pings every 2min, but client is not configured to
+# respond. Container Apps Envoy drops idle connections at ~60s. Until the AGNTCY SDK
+# exposes client keepalive config, NATS is the more reliable fallback transport.
+# Track: https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service
+
 # Enable SDK tracing (Phase 5 will wire this to OpenTelemetry)
 ENABLE_SDK_TRACING = os.environ.get("AGNTCY_ENABLE_TRACING", "false").lower() == "true"
 
