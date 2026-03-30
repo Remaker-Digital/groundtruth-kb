@@ -1,7 +1,8 @@
 # Agent Red Customer Experience — AGNTCY Directory Integration
 #
 # Provides dynamic agent discovery via the AGNTCY Directory registry,
-# replacing the hardcoded AgentTopic enum for agent routing (SPEC-1789).
+# replacing the hardcoded AgentTopic enum for agent routing
+# (SPEC-1789 retired; canonical identity now SPEC-1852).
 #
 # Architecture:
 #   - Agents register with the Directory on container startup

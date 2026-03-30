@@ -345,17 +345,17 @@ xychart-beta
 ### Phase 6: Launch Preparation
 **Status:** Partially Complete — triaged S234 🔄
 
-> **Triage note (S234, 2026-03-30):** Production v1.98.73 deployed with 20 tenants (9 active).
-> Cosmos, Redis, Key Vault all healthy. CORS hardened. Phase 4c (agent extensibility) complete.
-> Items below annotated with current status after S234 triage.
+> **Triage note (S234, 2026-03-30):** Items below annotated with current status after S234 triage.
+> Production/deployment claims are owner-reported via MEMORY.md; formal deployment closure
+> artifacts (GOV-16 record, stability verification) should be linked when available.
 
 #### 6.1 Infrastructure & Deployment
 | Task | WI | Status |
 |------|-----|--------|
 | Cosmos DB full initialization (10 containers, DiskANN) | — | ✅ Done — scripts/init_cosmos_containers.py, all 10 verified |
 | Azure OpenAI custom subdomain | — | ✅ Done (S234 triage) — Azure OpenAI on all 6 agent containers, 150K TPM GlobalStandard |
-| Build Docker container images + push to ACR | #196 | ✅ Done (S234 triage) — v1.98.73, 10 images built and pushed via build.py |
-| Production deployment (Terraform apply) | #197 | ✅ Done (S234 triage) — production v1.98.73 deployed, GOV-16 approved S233 |
+| Build Docker container images + push to ACR | #196 | ✅ Done (owner-reported) — v1.98.73, 10 images built and pushed via build.py |
+| Production deployment (Terraform apply) | #197 | 🔶 Owner-reported — v1.98.73 deployed per MEMORY.md S233; GOV-16 closure artifact pending |
 | Widget bundle deployment | #198 | ✅ Done (S234 triage) — widget delivered via CDN/API, not TAE asset copy (architecture changed) |
 
 #### 6.2 Remaker Digital Storefront (Sales Channel + Live Demo)
@@ -389,7 +389,7 @@ xychart-beta
 | Task | WI | Status |
 |------|-----|--------|
 | Final documentation review | — | 📋 Active — agentredcx.com docs need update for extensibility |
-| Production stability validation (48 hrs) | — | ✅ Done (S234 triage) — production stable since v1.98.41 (S221), currently v1.98.73 |
+| Production stability validation (48 hrs) | — | 🔶 Owner-reported — production operational since v1.98.41 (S221); formal 48-hr validation artifact pending |
 | GA launch | — | 📋 Blocked — requires creative assets + Shopify submission |
 
 ---

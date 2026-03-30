@@ -619,7 +619,7 @@ def get_sdk_status() -> dict[str, Any]:
         "agent_topics": [t.value for t in AgentTopic],
     }
 
-    # Include Directory status (SPEC-1789)
+    # Include Directory status (SPEC-1852)
     try:
         from src.multi_tenant.agntcy_directory import get_directory_status
         status["directory"] = get_directory_status()

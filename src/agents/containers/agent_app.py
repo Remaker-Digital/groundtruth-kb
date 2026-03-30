@@ -85,7 +85,7 @@ def create_agent_app(
         await agent.setup()
         logger.info("Agent %s configured and ready", agent.agent_type)
 
-        # Register with AGNTCY Directory (SPEC-1789 / WI-1385)
+        # Register with AGNTCY Directory (SPEC-1789 retired; see SPEC-1852)
         try:
             from src.multi_tenant.agntcy_directory import register_agent
             register_agent(agent.agent_type)
