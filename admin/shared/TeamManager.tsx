@@ -64,6 +64,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<TeamRole>('escalation_agent');
+  const [inviteDomainTags, setInviteDomainTags] = useState<string[]>([]);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [roleTooltipOpen, setRoleTooltipOpen] = useState(false);
 
@@ -76,6 +77,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
   const [editRole, setEditRole] = useState<TeamRole>('escalation_agent');
   const [editCategories, setEditCategories] = useState<string[]>([]);
+  const [editDomainTags, setEditDomainTags] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
 
   // Data hooks
@@ -101,18 +103,22 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
       return;
     }
 
-    const result = await invite(inviteEmail.trim(), inviteRole, inviteName.trim() || undefined);
+    const result = await invite(
+      inviteEmail.trim(), inviteRole, inviteName.trim() || undefined,
+      inviteDomainTags.length > 0 ? inviteDomainTags : undefined,
+    );
     if (result) {
       onNotify(`Invited ${inviteEmail.trim()} as ${inviteRole}.`, 'success');
       setInviteEmail('');
       setInviteName('');
       setInviteRole('escalation_agent');
+      setInviteDomainTags([]);
       setShowInviteForm(false);
       team.refetch();
     } else {
       onNotify(inviteError || 'Failed to invite team member.', 'error');
     }
-  }, [inviteEmail, inviteName, inviteRole, invite, inviteError, onNotify, team]);
+  }, [inviteEmail, inviteName, inviteRole, inviteDomainTags, invite, inviteError, onNotify, team]);
 
   // -------------------------------------------------------------------------
   // Edit handler
@@ -122,6 +128,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     setEditMember(member);
     setEditRole(member.role as TeamRole);
     setEditCategories(member.escalationCategories || []);
+    setEditDomainTags(member.staffDomainTags || []);
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
@@ -138,6 +145,12 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
         editCategories.some((c) => !origCats.includes(c))
       );
       if (catsChanged) body.escalation_categories = editCategories;
+
+      // Domain tags (Phase 4c)
+      const origTags = editMember.staffDomainTags || [];
+      const tagsChanged = editDomainTags.length !== origTags.length
+        || editDomainTags.some((t) => !origTags.includes(t));
+      if (tagsChanged) body.staff_domain_tags = editDomainTags;
 
       if (Object.keys(body).length === 0) {
         setEditMember(null);
@@ -164,7 +177,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     } finally {
       setEditLoading(false);
     }
-  }, [editMember, editRole, editCategories, apiFetch, onNotify, team]);
+  }, [editMember, editRole, editCategories, editDomainTags, apiFetch, onNotify, team]);
 
   // -------------------------------------------------------------------------
   // Remove / disable handler
@@ -340,11 +353,13 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           inviteEmail={inviteEmail}
           inviteName={inviteName}
           inviteRole={inviteRole}
+          inviteDomainTags={inviteDomainTags}
           inviting={inviting}
           inviteError={inviteError}
           onEmailChange={setInviteEmail}
           onNameChange={setInviteName}
           onRoleChange={setInviteRole}
+          onDomainTagsChange={setInviteDomainTags}
           onInvite={handleInvite}
         />
       )}
@@ -409,6 +424,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                   onRoleChange={handleInlineRoleChange}
                   onCategoryToggle={handleCategoryToggle}
                   onToggleActive={handleToggleActive}
+                  onEdit={openEdit}
                   onRemove={(m) => {
                     setConfirmMember(m);
                     setConfirmAction('remove');
@@ -444,9 +460,11 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           isDark={isDark}
           editRole={editRole}
           editCategories={editCategories}
+          editDomainTags={editDomainTags}
           editLoading={editLoading}
           onRoleChange={setEditRole}
           onCategoriesChange={setEditCategories}
+          onDomainTagsChange={setEditDomainTags}
           onSave={handleSaveEdit}
           onCancel={() => setEditMember(null)}
         />

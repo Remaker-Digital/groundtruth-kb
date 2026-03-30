@@ -672,6 +672,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             team_member_role=role,
             escalation_categories=tuple(member.get("escalation_categories", [])),
             agent_access=tuple(member.get("agent_access", [])),
+            staff_domain_tags=tuple(member.get("staff_domain_tags", [])),
         )
 
     async def _auth_spa_api_key(self, api_key: str) -> TenantContext:
@@ -872,6 +873,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         role: TeamMemberRole | None = None
         escalation_cats: tuple[str, ...] = ()
         agent_access_list: tuple[str, ...] = ()
+        staff_domain_tags: tuple[str, ...] = ()
 
         if member_id and role_str:
             try:
@@ -879,29 +881,31 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 role = TeamMemberRole.VIEWER
 
-            # For escalation agents and viewers, resolve categories + agent access
-            if role in (
-                TeamMemberRole.ESCALATION_AGENT,
-                TeamMemberRole.VIEWER,
-            ):
-                try:
-                    from src.multi_tenant.repositories import (
-                        TeamMemberRepository,
-                    )
-                    team_repo = TeamMemberRepository()
-                    member_doc = await team_repo.read(tenant_id, member_id)
-                    escalation_cats = tuple(
-                        member_doc.get("escalation_categories", []),
-                    )
-                    agent_access_list = tuple(
-                        member_doc.get("agent_access", []),
-                    )
-                except Exception:
-                    logger.warning(
-                        "Failed to resolve member fields: "
-                        "tenant=%s member=%s",
-                        tenant_id, member_id,
-                    )
+            # Resolve member fields for all roles — escalation_categories
+            # only apply to escalation_agent, but agent_access and
+            # staff_domain_tags are needed for domain-scope enforcement
+            # even for admin/superadmin (Phase 4b WP4).
+            try:
+                from src.multi_tenant.repositories import (
+                    TeamMemberRepository,
+                )
+                team_repo = TeamMemberRepository()
+                member_doc = await team_repo.read(tenant_id, member_id)
+                escalation_cats = tuple(
+                    member_doc.get("escalation_categories", []),
+                )
+                agent_access_list = tuple(
+                    member_doc.get("agent_access", []),
+                )
+                staff_domain_tags = tuple(
+                    member_doc.get("staff_domain_tags", []),
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to resolve member fields: "
+                    "tenant=%s member=%s",
+                    tenant_id, member_id,
+                )
 
         logger.debug(
             "Magic link session resolved: tenant=%s email=%s "
@@ -921,6 +925,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             team_member_role=role,
             escalation_categories=escalation_cats,
             agent_access=agent_access_list,
+            staff_domain_tags=staff_domain_tags,
         )
 
 

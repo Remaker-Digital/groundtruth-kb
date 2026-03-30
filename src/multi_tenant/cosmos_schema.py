@@ -1430,6 +1430,18 @@ class TeamMemberDocument(BaseModel):
             "superadmin/admin roles get implicit wildcard access at runtime."
         ),
     )
+
+    # Domain-scoping seam (Phase 4b WP4)
+    staff_domain_tags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Domain tags controlling which private-scope agents this member "
+            "can interact with at runtime. Empty = no domain restriction "
+            "(backward compat). Agents with visibility_scope='private' and "
+            "matching staff_domain_tags are accessible. admin/superadmin "
+            "roles bypass domain scope for management but not for runtime."
+        ),
+    )
     max_concurrent_conversations: int = Field(
         default=5,
         description="Max simultaneous escalated conversations this agent can handle",
@@ -2566,6 +2578,26 @@ class TenantAgentOverlayDocument(BaseModel):
     )
     skill_overrides: dict[str, SkillOverride] = Field(default_factory=dict)
     custom_metadata: dict[str, Any] = Field(default_factory=dict)
+
+    # Domain-scoping seam (Phase 4b WP4)
+    visibility_scope: str = Field(
+        default="public",
+        description=(
+            "Controls agent visibility. 'public' = visible to all staff. "
+            "'private' = only visible to staff with matching staff_domain_tags. "
+            "admin/superadmin roles bypass scope for management views but "
+            "runtime chat enforces domain matching."
+        ),
+    )
+    staff_domain_tags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Domain tags required for private-scope agents. Staff members "
+            "must have at least one matching tag to interact at runtime. "
+            "Empty = no domain restriction (even if visibility_scope='private')."
+        ),
+    )
+
     created_at: str = ""
     updated_at: str = ""
 

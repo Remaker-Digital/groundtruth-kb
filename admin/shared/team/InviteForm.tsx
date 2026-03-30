@@ -18,11 +18,13 @@ export const InviteForm: React.FC<InviteFormProps> = ({
   inviteEmail,
   inviteName,
   inviteRole,
+  inviteDomainTags,
   inviting,
   inviteError,
   onEmailChange,
   onNameChange,
   onRoleChange,
+  onDomainTagsChange,
   onInvite,
 }) => {
   return (
@@ -79,6 +81,22 @@ export const InviteForm: React.FC<InviteFormProps> = ({
               </option>
             ))}
           </select>
+        </div>
+        <div style={{ ...s.formField, minWidth: 180, flex: '1 1 auto' }}>
+          <label style={s.formLabel}>Domain tags</label>
+          <input
+            type="text"
+            style={s.input}
+            placeholder="tag1, tag2..."
+            value={inviteDomainTags.join(', ')}
+            onChange={(e) => {
+              const tags = e.target.value
+                .split(',')
+                .map((t) => t.trim().toLowerCase())
+                .filter(Boolean);
+              onDomainTagsChange(tags);
+            }}
+          />
         </div>
         <button
           style={{

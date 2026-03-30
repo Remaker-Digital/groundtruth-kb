@@ -83,6 +83,7 @@ class TeamMemberResponse(CamelCaseModel):
     role: str
     is_active: bool = True
     escalation_categories: list[str] = Field(default_factory=list)
+    staff_domain_tags: list[str] = Field(default_factory=list)
     max_concurrent_conversations: int = 5
     user_api_key_prefix: str | None = Field(
         default=None, description="First 12 chars of the API key for display (ar_user_rema...)"
@@ -143,6 +144,10 @@ class CreateTeamMemberRequest(CamelCaseModel):
         le=50,
         description="Max simultaneous escalated conversations (escalation_agent role)",
     )
+    staff_domain_tags: list[str] = Field(
+        default_factory=list,
+        description="Domain tags controlling which private-scope agents this member can interact with at runtime",
+    )
 
 
 class UpdateTeamMemberRequest(CamelCaseModel):
@@ -172,6 +177,10 @@ class UpdateTeamMemberRequest(CamelCaseModel):
     is_active: bool | None = Field(
         default=None,
         description="Whether member has access",
+    )
+    staff_domain_tags: list[str] | None = Field(
+        default=None,
+        description="Domain tags controlling which private-scope agents this member can interact with at runtime",
     )
 
 
@@ -247,6 +256,7 @@ def _build_member_response(doc: dict[str, Any], tenant_id: str) -> TeamMemberRes
         role=doc.get("role", "viewer"),
         is_active=doc.get("is_active", True),
         escalation_categories=doc.get("escalation_categories", []),
+        staff_domain_tags=doc.get("staff_domain_tags", []),
         max_concurrent_conversations=doc.get("max_concurrent_conversations", 5),
         user_api_key_prefix=doc.get("user_api_key_prefix"),
         unresolved_escalation_count=doc.get("unresolved_escalation_count", 0),
@@ -544,6 +554,7 @@ async def create_team_member(
         is_active=True,
         escalation_categories=request.escalation_categories,
         max_concurrent_conversations=request.max_concurrent_conversations,
+        staff_domain_tags=request.staff_domain_tags,
         user_api_key_hash=key_hash,
         user_api_key_prefix=key_prefix,
         created_at=now,
@@ -764,6 +775,8 @@ async def update_team_member(
         patch_operations.append({"op": "set", "path": "/max_concurrent_conversations", "value": request.max_concurrent_conversations})
     if request.is_active is not None:
         patch_operations.append({"op": "set", "path": "/is_active", "value": request.is_active})
+    if request.staff_domain_tags is not None:
+        patch_operations.append({"op": "set", "path": "/staff_domain_tags", "value": request.staff_domain_tags})
 
     # Patch non-encrypted fields
     await repo.patch(
@@ -795,6 +808,8 @@ async def update_team_member(
         updated["max_concurrent_conversations"] = request.max_concurrent_conversations
     if request.is_active is not None:
         updated["is_active"] = request.is_active
+    if request.staff_domain_tags is not None:
+        updated["staff_domain_tags"] = request.staff_domain_tags
     updated["updated_at"] = now
 
     logger.info(

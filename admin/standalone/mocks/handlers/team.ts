@@ -26,6 +26,7 @@ export function registerTeamHandlers() {
       isActive: true,
       maxConcurrentConversations: 5,
       escalationCategories: [],
+      staffDomainTags: (body as any).staff_domain_tags || [],
       userApiKeyPrefix: "ar_user_mock...",
       userApiKey: "ar_user_mock_" + Math.random().toString(36).slice(2, 18),
       createdAt: new Date().toISOString(),
@@ -67,6 +68,9 @@ export function registerTeamHandlers() {
     if (body.is_active !== undefined) member.isActive = body.is_active as boolean;
     if (body.escalation_categories !== undefined) {
       member.escalationCategories = body.escalation_categories as string[];
+    }
+    if (body.staff_domain_tags !== undefined) {
+      member.staffDomainTags = body.staff_domain_tags as string[];
     }
     member.updatedAt = new Date().toISOString();
     return { status: 200, body: member };

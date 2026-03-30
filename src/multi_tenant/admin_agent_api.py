@@ -69,6 +69,40 @@ def _validate_agent_id(agent_id: str) -> None:
         raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id}")
 
 
+def _validate_tier_gate(ctx: TenantContext, agent_id: str) -> None:
+    """Enforce tier-based entitlement for the given agent.
+
+    Compares the tenant's tier against the agent's tier_gate field from
+    the registry YAML. If the tenant tier is below the required gate,
+    returns 403 (fail-closed). Platform admins bypass the gate.
+
+    SPEC-1852 / Phase 4b WP1: shared entitlement gate applied to all
+    admin agent API endpoints and runtime dispatch paths.
+    """
+    if ctx.is_platform_admin:
+        return  # Platform admins bypass tier gating
+
+    reg = _get_registry()
+    agent_defn = reg.get(agent_id)
+    if agent_defn is None:
+        return  # Let _validate_agent_id handle 404
+
+    tier_gate = getattr(agent_defn, "tier_gate", None)
+    if not tier_gate or tier_gate == "free":
+        return  # No gate or free-tier agent — always accessible
+
+    tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+    tenant_tier = ctx.tier.value if ctx.tier and hasattr(ctx.tier, "value") else (ctx.tier or "free")
+    tenant_level = tier_order.get(str(tenant_tier), 0)
+    required_level = tier_order.get(tier_gate, 0)
+
+    if tenant_level < required_level:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Agent '{agent_id}' requires tier '{tier_gate}'. Current tier: '{tenant_tier}'.",
+        )
+
+
 def _validate_skill_id(agent_id: str, skill_id: str) -> None:
     reg = _get_registry()
     skill = reg.get_skill(skill_id)
@@ -96,6 +130,8 @@ class AgentOverlayModel(CamelCaseModel):
     prompt_overrides: dict[str, str] = Field(default_factory=dict)
     skill_overrides: dict[str, SkillOverrideModel] = Field(default_factory=dict)
     custom_metadata: dict[str, Any] = Field(default_factory=dict)
+    visibility_scope: str = "public"
+    staff_domain_tags: list[str] = Field(default_factory=list)
     updated_at: str = ""
 
 
@@ -104,6 +140,14 @@ class AgentOverlayInput(CamelCaseModel):
     prompt_overrides: dict[str, str] = Field(default_factory=dict)
     skill_overrides: dict[str, SkillOverrideModel] = Field(default_factory=dict)
     custom_metadata: dict[str, Any] = Field(default_factory=dict)
+    visibility_scope: str = Field(
+        default="public",
+        description="Controls agent visibility: 'public' (all staff) or 'private' (matching domain tags only)",
+    )
+    staff_domain_tags: list[str] = Field(
+        default_factory=list,
+        description="Domain tags required for private-scope agents",
+    )
 
 
 class EffectiveSkillModel(CamelCaseModel):
@@ -164,15 +208,16 @@ class BindingInput(CamelCaseModel):
 async def list_agents(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> list[AgentSummaryModel]:
-    """List all registered agents with overlay status for the tenant."""
+    """List registered agents filtered by tenant tier entitlement."""
     tenant_id = ctx.tenant_id
+    tenant_tier = ctx.tier.value if ctx.tier and hasattr(ctx.tier, "value") else (ctx.tier or "free")
     reg = _get_registry()
     repo = _get_overlay_repo()
     docs = await repo.list_overlays(tenant_id)
     overlays = {doc["agent_id"]: doc for doc in docs}
 
     results = []
-    for agent in reg.list_agents():
+    for agent in reg.list_available(tier=str(tenant_tier)):
         overlay = overlays.get(agent.agent_id)
         results.append(AgentSummaryModel(
             agent_id=agent.agent_id,
@@ -198,6 +243,7 @@ async def get_overlay(
 ) -> AgentOverlayModel:
     """Get the overlay for this tenant + agent."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     repo = _get_overlay_repo()
     overlay = await repo.get_overlay(ctx.tenant_id, agent_id)
     if overlay is None:
@@ -212,6 +258,8 @@ async def get_overlay(
             for k, v in overlay.get("skill_overrides", {}).items()
         },
         custom_metadata=overlay.get("custom_metadata", {}),
+        visibility_scope=overlay.get("visibility_scope", "public"),
+        staff_domain_tags=overlay.get("staff_domain_tags", []),
         updated_at=overlay.get("updated_at", ""),
     )
 
@@ -229,6 +277,7 @@ async def put_overlay(
 ) -> AgentOverlayModel:
     """Create or update overlay for this tenant + agent."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     tenant_id = ctx.tenant_id
 
     skill_ovr = {}
@@ -243,6 +292,8 @@ async def put_overlay(
         prompt_overrides=body.prompt_overrides,
         skill_overrides=skill_ovr,
         custom_metadata=body.custom_metadata,
+        visibility_scope=body.visibility_scope,
+        staff_domain_tags=body.staff_domain_tags,
     )
 
     _invalidate_caches(tenant_id)
@@ -256,6 +307,8 @@ async def put_overlay(
             for k, v in result.get("skill_overrides", {}).items()
         },
         custom_metadata=result.get("custom_metadata", {}),
+        visibility_scope=result.get("visibility_scope", "public"),
+        staff_domain_tags=result.get("staff_domain_tags", []),
         updated_at=result.get("updated_at", ""),
     )
 
@@ -271,6 +324,7 @@ async def delete_overlay(
 ) -> None:
     """Delete overlay, reverting to base registry defaults."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     repo = _get_overlay_repo()
     deleted = await repo.delete_overlay(ctx.tenant_id, agent_id)
     if not deleted:
@@ -295,6 +349,7 @@ async def get_effective_config(
 ) -> EffectiveAgentConfigModel:
     """Resolve and return the effective config for this tenant + agent."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     tenant_id = ctx.tenant_id
 
     from src.agents.plugins.overlay import resolve_for_tenant
@@ -349,6 +404,7 @@ async def list_bindings(
 ) -> list[BindingModel]:
     """List all bindings for this tenant + agent."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     repo = _get_binding_repo()
     bindings = await repo.list_bindings(ctx.tenant_id, agent_id=agent_id)
     return [
@@ -377,6 +433,7 @@ async def get_binding(
 ) -> BindingModel:
     """Get a specific skill binding."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     _validate_skill_id(agent_id, skill_id)
     repo = _get_binding_repo()
     binding = await repo.get_binding(ctx.tenant_id, skill_id)
@@ -406,6 +463,7 @@ async def put_binding(
 ) -> BindingModel:
     """Create or update a binding."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     _validate_skill_id(agent_id, skill_id)
     tenant_id = ctx.tenant_id
     repo = _get_binding_repo()
@@ -441,6 +499,7 @@ async def delete_binding(
 ) -> None:
     """Delete a binding, revoking tenant access to this skill."""
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     _validate_skill_id(agent_id, skill_id)
     repo = _get_binding_repo()
     deleted = await repo.delete_binding(ctx.tenant_id, skill_id)
@@ -470,6 +529,7 @@ async def list_bindable_skills(
     Unlike /available-skills, it does NOT require existing bindings to return results.
     """
     _validate_agent_id(agent_id)
+    _validate_tier_gate(ctx, agent_id)
     reg = _get_registry()
     agent_defn = reg.get(agent_id)
     if agent_defn is None:
@@ -513,7 +573,8 @@ async def list_available_skills(
     docs = await repo.list_overlays(tenant_id)
     overlays = {doc["agent_id"]: doc for doc in docs}
 
-    resolved = _list_available(tenant_id, overlay_store=overlays, agent_id=agent_id)
+    tenant_tier = ctx.tier.value if ctx.tier and hasattr(ctx.tier, "value") else (ctx.tier or "free")
+    resolved = _list_available(tenant_id, overlay_store=overlays, agent_id=agent_id, tier=str(tenant_tier))
     return [
         EffectiveSkillModel(
             skill_id=s.skill_id,

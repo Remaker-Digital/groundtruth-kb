@@ -36,6 +36,8 @@ export function registerAgentHandlers() {
       promptOverrides: {},
       skillOverrides: {},
       customMetadata: {},
+      visibilityScope: 'public',
+      staffDomainTags: [],
     };
 
     const updated = {
@@ -44,6 +46,8 @@ export function registerAgentHandlers() {
       promptOverrides: body.promptOverrides ?? existing.promptOverrides,
       skillOverrides: body.skillOverrides ?? existing.skillOverrides,
       customMetadata: body.customMetadata ?? existing.customMetadata,
+      visibilityScope: body.visibilityScope ?? existing.visibilityScope ?? 'public',
+      staffDomainTags: body.staffDomainTags ?? existing.staffDomainTags ?? [],
       updatedAt: now,
     };
 

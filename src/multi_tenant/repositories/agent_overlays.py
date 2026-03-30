@@ -101,6 +101,8 @@ class TenantAgentOverlayRepository(TenantScopedRepository):
         prompt_overrides: dict[str, str] | None = None,
         skill_overrides: dict[str, Any] | None = None,
         custom_metadata: dict[str, Any] | None = None,
+        visibility_scope: str = "public",
+        staff_domain_tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create or replace an overlay for tenant + agent."""
         now = datetime.now(timezone.utc).isoformat()
@@ -130,6 +132,8 @@ class TenantAgentOverlayRepository(TenantScopedRepository):
             prompt_overrides=prompt_overrides or {},
             skill_overrides=skill_overrides or {},
             custom_metadata=clean_metadata,
+            visibility_scope=visibility_scope,
+            staff_domain_tags=staff_domain_tags or [],
             created_at=now,
             updated_at=now,
         )

@@ -15,6 +15,8 @@ export function createAgentsFixture() {
       promptOverrides: {},
       skillOverrides: {},
       customMetadata: {},
+      visibilityScope: 'public',
+      staffDomainTags: [],
       updatedAt: NOW,
     },
     'sales': {
@@ -23,6 +25,8 @@ export function createAgentsFixture() {
       promptOverrides: {},
       skillOverrides: {},
       customMetadata: {},
+      visibilityScope: 'private',
+      staffDomainTags: ['sales-dept', 'commerce'],
       updatedAt: NOW,
     },
     'gateway': {
@@ -31,6 +35,8 @@ export function createAgentsFixture() {
       promptOverrides: {},
       skillOverrides: {},
       customMetadata: {},
+      visibilityScope: 'public',
+      staffDomainTags: [],
       updatedAt: NOW,
     },
   };

@@ -193,6 +193,7 @@ class TenantContext:
     team_member_role: TeamMemberRole | None = None
     escalation_categories: tuple[str, ...] = ()
     agent_access: tuple[str, ...] = ()  # SPEC-1862: direct agent chat access
+    staff_domain_tags: tuple[str, ...] = ()  # Phase 4b WP4: domain-scoping seam
 
     # Platform admin identity (populated for spa_api_key auth, SPEC-1667)
     platform_admin_id: str | None = None

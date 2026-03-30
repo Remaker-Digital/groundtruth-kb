@@ -11,11 +11,12 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Title,
   Text,
   Badge,
+  Button,
   Switch,
   Stack,
   Group,
@@ -23,6 +24,7 @@ import {
   Table,
   Tooltip,
   Select,
+  TagsInput,
 } from '@mantine/core';
 import type { AgentSummary, AgentBindingInput } from '../types/agents';
 import type { ApiFetch } from '../hooks/useApi';
@@ -30,11 +32,14 @@ import {
   useAgentOverlay,
   useAgentBindings,
   useBindableSkills,
+  useEffectiveConfig,
   useToggleOverlay,
+  useUpdateOverlay,
   useCreateBinding,
   useDeleteBinding,
 } from '../hooks/useAgents';
 import { getAgentLogo } from '../icons/agent-logos';
+import { normalizeDomainTags } from '../utils/domainTags';
 import { tokens } from '../theme/styles';
 
 interface AgentDetailPanelProps {
@@ -76,13 +81,19 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
   const overlayResult = useAgentOverlay(apiFetch, agent.agentId);
   const bindingsResult = useAgentBindings(apiFetch, agent.agentId);
   const bindableSkillsResult = useBindableSkills(apiFetch, agent.agentId);
+  const effectiveResult = useEffectiveConfig(apiFetch, agent.agentId);
 
   const { toggle: toggleOverlay, loading: toggleLoading } = useToggleOverlay(apiFetch);
+  const { update: updateOverlay, loading: updateLoading } = useUpdateOverlay(apiFetch);
   const { create: createBinding } = useCreateBinding(apiFetch);
   const { remove: removeBinding } = useDeleteBinding(apiFetch);
 
   // Track in-flight skill toggles to prevent double-clicks
   const [busySkills, setBusySkills] = useState<Set<string>>(new Set());
+
+  // Domain-scope local state
+  const [localScope, setLocalScope] = useState<string | null>(null);
+  const [localTags, setLocalTags] = useState<string[] | null>(null);
 
   const overlay = overlayResult.data;
   const isEnabled = overlay?.enabled ?? agent.enabled;
@@ -92,11 +103,25 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
   // Build a map of current bindings by skill_id
   const bindingMap = new Map(bindings.map((b) => [b.skillId, b]));
 
+  // Build a map of effective skill config for credential + status visibility
+  const effectiveSkills = effectiveResult.data?.skills ?? [];
+  const effectiveMap = new Map(effectiveSkills.map((s) => [s.skillId, s]));
+
+  // Domain-scope: use local edits if present, otherwise overlay values
+  const currentScope = localScope ?? overlay?.visibilityScope ?? 'public';
+  const currentTags = localTags ?? overlay?.staffDomainTags ?? [];
+  const domainDirty = useMemo(() => {
+    const savedScope = overlay?.visibilityScope ?? 'public';
+    const savedTags = overlay?.staffDomainTags ?? [];
+    return currentScope !== savedScope
+      || JSON.stringify(normalizeDomainTags(currentTags)) !== JSON.stringify(normalizeDomainTags(savedTags));
+  }, [currentScope, currentTags, overlay]);
+
   const Logo = getAgentLogo(agent.agentId);
 
   const handleToggleAgent = async () => {
     const newEnabled = !isEnabled;
-    const result = await toggleOverlay(agent.agentId, newEnabled);
+    const result = await toggleOverlay(agent.agentId, newEnabled, overlay);
     if (result) {
       onNotify(
         `${agent.displayName} ${newEnabled ? 'enabled' : 'disabled'}`,
@@ -168,6 +193,22 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
     }
   }, [agent.agentId, createBinding, bindingMap, bindingsResult]);
 
+  const handleSaveDomainScope = useCallback(async () => {
+    const result = await updateOverlay(agent.agentId, overlay ?? null, {
+      visibilityScope: currentScope,
+      staffDomainTags: normalizeDomainTags(currentTags),
+    });
+    if (result) {
+      onNotify('Domain scope updated', 'success');
+      setLocalScope(null);
+      setLocalTags(null);
+      overlayResult.refetch();
+      onAgentChanged();
+    } else {
+      onNotify('Failed to update domain scope', 'error');
+    }
+  }, [agent.agentId, overlay, currentScope, currentTags, updateOverlay, onNotify, overlayResult, onAgentChanged]);
+
   return (
     <div style={{ padding: '16px 20px', overflowY: 'auto', height: '100%' }}>
       <Stack gap="lg">
@@ -202,6 +243,50 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
           />
         </Group>
 
+        {/* Domain Scope Controls (Phase 4c) */}
+        <Group gap="md" align="flex-end">
+          <Select
+            label="Visibility scope"
+            description="Controls which staff members can interact with this agent"
+            data={[
+              { value: 'public', label: 'Public — all staff' },
+              { value: 'private', label: 'Private — matching domain tags only' },
+            ]}
+            value={currentScope}
+            onChange={(v) => v && setLocalScope(v)}
+            size="sm"
+            w={300}
+          />
+          {domainDirty && (
+            <Button
+              size="sm"
+              variant="filled"
+              onClick={handleSaveDomainScope}
+              loading={updateLoading}
+            >
+              Save scope
+            </Button>
+          )}
+        </Group>
+
+        {currentScope === 'private' && (
+          <div>
+            <TagsInput
+              label="Domain tags"
+              description="Staff members must have at least one matching tag to interact with this agent"
+              placeholder="Type a tag and press Enter"
+              value={currentTags}
+              onChange={setLocalTags}
+              size="sm"
+            />
+            {currentTags.length === 0 && (
+              <Text size="xs" c="yellow" mt={4}>
+                No tags configured — all staff will be denied access to this agent
+              </Text>
+            )}
+          </div>
+        )}
+
         <Divider />
 
         {/* Unified Skills Table */}
@@ -235,6 +320,11 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
                   <Table.Th style={{ width: 170 }}>
                     <Tooltip label="Auto-approve: no human review. Require confirmation: human must approve." withArrow>
                       <Text size="xs" fw={600} style={{ cursor: 'help' }}>Approval</Text>
+                    </Tooltip>
+                  </Table.Th>
+                  <Table.Th style={{ width: 120 }}>
+                    <Tooltip label="Shows whether an external credential is configured for this skill" withArrow>
+                      <Text size="xs" fw={600} style={{ cursor: 'help' }}>Credential</Text>
                     </Tooltip>
                   </Table.Th>
                 </Table.Tr>
@@ -296,6 +386,34 @@ export const AgentDetailPanel: React.FC<AgentDetailPanelProps> = ({
                             },
                           }}
                         />
+                      </Table.Td>
+                      <Table.Td>
+                        {(() => {
+                          const eff = effectiveMap.get(skill.skillId);
+                          const credRef = eff?.credentialRef ?? binding?.credentialRef;
+                          if (!isBound) {
+                            return <Text size="xs" c="dimmed">—</Text>;
+                          }
+                          if (credRef) {
+                            return (
+                              <Tooltip label={CREDENTIAL_TOOLTIPS.configured} withArrow>
+                                <Badge size="xs" variant="light" color="green">Configured</Badge>
+                              </Tooltip>
+                            );
+                          }
+                          if (skill.mode === 'internal') {
+                            return (
+                              <Tooltip label={CREDENTIAL_TOOLTIPS.none} withArrow>
+                                <Badge size="xs" variant="light" color="gray">Internal</Badge>
+                              </Tooltip>
+                            );
+                          }
+                          return (
+                            <Tooltip label="No credential configured — this skill may not function for external operations" withArrow>
+                              <Badge size="xs" variant="light" color="yellow">Missing</Badge>
+                            </Tooltip>
+                          );
+                        })()}
                       </Table.Td>
                     </Table.Tr>
                   );

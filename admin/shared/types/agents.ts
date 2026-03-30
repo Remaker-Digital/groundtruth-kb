@@ -37,6 +37,8 @@ export interface AgentOverlay {
   promptOverrides: Record<string, string>;
   skillOverrides: Record<string, SkillOverride>;
   customMetadata: Record<string, unknown>;
+  visibilityScope: string;
+  staffDomainTags: string[];
   updatedAt: string;
 }
 
@@ -45,6 +47,8 @@ export interface AgentOverlayInput {
   promptOverrides?: Record<string, string>;
   skillOverrides?: Record<string, SkillOverride>;
   customMetadata?: Record<string, unknown>;
+  visibilityScope?: string;
+  staffDomainTags?: string[];
 }
 
 // ---------------------------------------------------------------------------

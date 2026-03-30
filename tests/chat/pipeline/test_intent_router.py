@@ -274,3 +274,265 @@ class TestDenialAndFallback:
         assert route.skill_id == "sales:search-products"
         assert route.confidence == 0.75
         assert route.fallback_from is None
+
+
+# ---------------------------------------------------------------------------
+# Tier-gate enforcement (Phase 4b WP1)
+# ---------------------------------------------------------------------------
+
+
+class TestTierGateEnforcement:
+    """Tier-gate denies under-tiered tenants at the router level."""
+
+    def test_professional_agent_denied_for_starter_tier(self, registry, router, binding_svc):
+        """Starter-tier tenant cannot route to professional-gated agent."""
+        # zendesk is professional-gated in agents.yaml
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="zendesk",
+            skill_id="zendesk:list-tickets",
+        )
+        overlay = {
+            "zendesk": {"enabled": True},
+        }
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, tenant_tier="starter",
+            target_agent_id="zendesk", team_member_role="admin",
+        )
+        assert route.target == RouteTarget.ERROR
+        assert route.fallback_from == "zendesk"
+
+    def test_professional_agent_allowed_for_professional_tier(self, registry, router, binding_svc):
+        """Professional-tier tenant can route to professional-gated agent."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="zendesk",
+            skill_id="zendesk:list-tickets",
+        )
+        overlay = {
+            "zendesk": {"enabled": True},
+        }
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, tenant_tier="professional",
+            target_agent_id="zendesk", team_member_role="admin",
+        )
+        assert route.target == RouteTarget.PEER_AGENT
+        assert route.agent_id == "zendesk"
+
+    def test_tier_gate_none_does_not_block(self, registry, router, binding_svc):
+        """When tenant_tier is None, tier gate is not enforced (backward compat)."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            tenant_tier=None,
+        )
+        assert route.target == RouteTarget.PEER_AGENT
+
+    def test_registry_routing_rules_enforce_tier_gate(self, registry, router, binding_svc):
+        """Registry routing_rules branch enforces tier gate (regression: was missing context)."""
+        # sales is professional-gated; create binding so only tier blocks
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        # Registry routes product_question -> sales (professional-gated)
+        # Starter tenant should be denied at tier gate
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            tenant_tier="starter",
+        )
+        # Should NOT route to sales — tier gate blocks it
+        assert route.target == RouteTarget.CORE_PIPELINE
+
+    def test_registry_routing_rules_pass_tier_gate(self, registry, router, binding_svc):
+        """Registry routing_rules allows routing when tier is sufficient."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            tenant_tier="professional",
+        )
+        assert route.target == RouteTarget.PEER_AGENT
+        assert route.agent_id == "sales"
+
+
+# ---------------------------------------------------------------------------
+# Domain-scope enforcement (Phase 4b WP4)
+# ---------------------------------------------------------------------------
+
+
+class TestDomainScopeEnforcement:
+    """Private-scope agents require matching staff_domain_tags."""
+
+    def test_private_agent_denied_for_untagged_caller(self, registry, router, binding_svc):
+        """Caller with no domain tags is denied access to private-scope agent."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        overlay = {
+            "sales": {
+                "enabled": True,
+                "visibility_scope": "private",
+                "staff_domain_tags": ["sales-dept"],
+                "custom_metadata": {
+                    "intent_routes": {
+                        "product_question": {
+                            "agent_id": "sales",
+                            "skill_id": "sales:search-products",
+                        },
+                    },
+                },
+            },
+        }
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, staff_domain_tags=(),
+        )
+        assert route.target == RouteTarget.CORE_PIPELINE
+        assert route.fallback_from == "sales"
+
+    def test_private_agent_denied_for_none_tags(self, registry, router, binding_svc):
+        """Caller with None domain tags is denied access to private-scope agent."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        overlay = {
+            "sales": {
+                "enabled": True,
+                "visibility_scope": "private",
+                "staff_domain_tags": ["sales-dept"],
+                "custom_metadata": {
+                    "intent_routes": {
+                        "product_question": {
+                            "agent_id": "sales",
+                            "skill_id": "sales:search-products",
+                        },
+                    },
+                },
+            },
+        }
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, staff_domain_tags=None,
+        )
+        assert route.target == RouteTarget.CORE_PIPELINE
+        assert route.fallback_from == "sales"
+
+    def test_private_agent_denied_for_wrong_tags(self, registry, router, binding_svc):
+        """Caller with non-matching tags is denied access to private-scope agent."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        overlay = {
+            "sales": {
+                "enabled": True,
+                "visibility_scope": "private",
+                "staff_domain_tags": ["sales-dept"],
+                "custom_metadata": {
+                    "intent_routes": {
+                        "product_question": {
+                            "agent_id": "sales",
+                            "skill_id": "sales:search-products",
+                        },
+                    },
+                },
+            },
+        }
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, staff_domain_tags=("support-dept",),
+        )
+        assert route.target == RouteTarget.CORE_PIPELINE
+        assert route.fallback_from == "sales"
+
+    def test_private_agent_allowed_for_matching_tags(self, registry, router, binding_svc):
+        """Caller with matching tags can access private-scope agent."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        overlay = {
+            "sales": {
+                "enabled": True,
+                "visibility_scope": "private",
+                "staff_domain_tags": ["sales-dept"],
+                "custom_metadata": {
+                    "intent_routes": {
+                        "product_question": {
+                            "agent_id": "sales",
+                            "skill_id": "sales:search-products",
+                        },
+                    },
+                },
+            },
+        }
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, staff_domain_tags=("sales-dept",),
+        )
+        assert route.target == RouteTarget.PEER_AGENT
+        assert route.agent_id == "sales"
+
+    def test_public_agent_accessible_without_tags(self, registry, router, binding_svc):
+        """Public-scope agent (default) is accessible without domain tags."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        overlay = {
+            "sales": {
+                "enabled": True,
+                "visibility_scope": "public",
+                "custom_metadata": {
+                    "intent_routes": {
+                        "product_question": {
+                            "agent_id": "sales",
+                            "skill_id": "sales:search-products",
+                        },
+                    },
+                },
+            },
+        }
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, staff_domain_tags=(),
+        )
+        assert route.target == RouteTarget.PEER_AGENT
+        assert route.agent_id == "sales"
+
+    def test_private_scope_no_overlay_tags_denies_all(self, registry, router, binding_svc):
+        """Private scope with empty overlay tags denies all callers."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        overlay = {
+            "sales": {
+                "enabled": True,
+                "visibility_scope": "private",
+                "staff_domain_tags": [],
+                "custom_metadata": {
+                    "intent_routes": {
+                        "product_question": {
+                            "agent_id": "sales",
+                            "skill_id": "sales:search-products",
+                        },
+                    },
+                },
+            },
+        }
+        # Even a caller with tags should be denied when overlay scope is private
+        # but overlay itself has no tags (deny-by-default)
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.8,
+            overlay_store=overlay, staff_domain_tags=("sales-dept",),
+        )
+        assert route.target == RouteTarget.CORE_PIPELINE

@@ -206,6 +206,22 @@ class TestEffectiveResolution:
         available = list_available_skills("t-1")
         assert len(available) == 0
 
+    def test_list_available_skills_tier_filter_with_agent_id(self, registry, binding_svc):
+        """list_available_skills enforces tier even when agent_id is specified (regression)."""
+        # zendesk is professional-gated — create a binding for its actual skill
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="zendesk",
+            skill_id="zendesk:sync-tickets",
+        )
+        # Starter tier should get zero skills from zendesk
+        available = list_available_skills("t-1", agent_id="zendesk", tier="starter")
+        assert len(available) == 0
+
+        # Professional tier should get skills
+        available = list_available_skills("t-1", agent_id="zendesk", tier="professional")
+        ids = {s.skill_id for s in available}
+        assert "zendesk:sync-tickets" in ids
+
     def test_list_available_skills_multiple_agents(self, registry, binding_svc):
         """list_available_skills across multiple agents."""
         binding_svc.create_binding(

@@ -258,6 +258,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         conversation_history: list[dict[str, str]] | None = None,
         team_member_role: str | None = None,
         target_agent_id: str | None = None,
+        staff_domain_tags: tuple[str, ...] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run the full pipeline for a customer message.
 
@@ -533,6 +534,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 team_member_role=team_member_role,
                 target_agent_id=target_agent_id,
                 overlay_store=overlay_store,
+                tenant_tier=tier.value if hasattr(tier, "value") else str(tier),
+                staff_domain_tags=staff_domain_tags,
             )
             trace.set_route_decision(
                 route.target.value, route.agent_id, route.fallback_from,

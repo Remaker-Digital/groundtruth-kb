@@ -27,16 +27,20 @@ export function useInviteTeamMember(apiFetch: ApiFetch) {
   const [error, setError] = useState<string | null>(null);
 
   const invite = useCallback(
-    async (email: string, role: string, name?: string) => {
+    async (email: string, role: string, name?: string, staffDomainTags?: string[]) => {
       setLoading(true);
       setError(null);
       try {
         // Backend expects display_name (required, min_length=1), not name
         const display_name = name?.trim() || email.split('@')[0];
+        const body: Record<string, unknown> = { email, role, display_name };
+        if (staffDomainTags && staffDomainTags.length > 0) {
+          body.staff_domain_tags = staffDomainTags;
+        }
         const resp = await apiFetch('/api/admin/team', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, role, display_name }),
+          body: JSON.stringify(body),
         });
         if (!resp.ok) {
           const data = await resp.json().catch(() => ({}));

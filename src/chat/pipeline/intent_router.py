@@ -77,6 +77,8 @@ class IntentRouter:
         team_member_role: str | None = None,
         target_agent_id: str | None = None,
         overlay_store: dict[str, dict[str, Any]] | None = None,
+        tenant_tier: str | None = None,
+        staff_domain_tags: tuple[str, ...] | None = None,
     ) -> RouteDecision:
         """Determine execution route from IC result + tenant config.
 
@@ -96,6 +98,8 @@ class IntentRouter:
                 skill_id=None,
                 confidence=confidence,
                 overlay_store=overlay_store,
+                tenant_tier=tenant_tier,
+                staff_domain_tags=staff_domain_tags,
             )
             if decision.target == RouteTarget.PEER_AGENT:
                 return decision
@@ -139,6 +143,8 @@ class IntentRouter:
                             skill_id=skill_id,
                             confidence=confidence,
                             overlay_store=overlay_store,
+                            tenant_tier=tenant_tier,
+                            staff_domain_tags=staff_domain_tags,
                         )
                         if decision.target == RouteTarget.PEER_AGENT:
                             return decision
@@ -164,6 +170,8 @@ class IntentRouter:
                         skill_id=skill_id,
                         confidence=confidence,
                         overlay_store=overlay_store,
+                        tenant_tier=tenant_tier,
+                        staff_domain_tags=staff_domain_tags,
                     )
                     if decision.target == RouteTarget.PEER_AGENT:
                         return decision
@@ -186,12 +194,14 @@ class IntentRouter:
         skill_id: str | None,
         confidence: float,
         overlay_store: dict[str, dict[str, Any]] | None,
+        tenant_tier: str | None = None,
+        staff_domain_tags: tuple[str, ...] | None = None,
     ) -> RouteDecision:
         """Attempt to route to a peer agent with full verification.
 
-        Checks: agent exists in registry, agent enabled for tenant,
-        skill binding exists (deny-by-default). Emits denial event
-        if verification fails.
+        Checks: agent exists in registry, tenant tier meets agent tier_gate,
+        agent enabled for tenant, skill binding exists (deny-by-default).
+        Emits denial event if verification fails.
         """
         try:
             from src.agents.plugins.registry import PluginAgentRegistry
@@ -211,6 +221,22 @@ class IntentRouter:
                     fallback_from=agent_id,
                 )
 
+            # Tier-gate enforcement (Phase 4b WP1)
+            tier_gate = getattr(agent_defn, "tier_gate", None)
+            if tier_gate and tier_gate != "free" and tenant_tier:
+                tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+                if tier_order.get(str(tenant_tier), 0) < tier_order.get(tier_gate, 0):
+                    logger.info(
+                        "IntentRouter: agent %s tier-gated (%s) for tenant tier %s",
+                        agent_id, tier_gate, tenant_tier,
+                    )
+                    self._emit_denial(tenant_id, agent_id, skill_id, "tier_gate_denied")
+                    return RouteDecision(
+                        target=RouteTarget.CORE_PIPELINE,
+                        confidence=confidence,
+                        fallback_from=agent_id,
+                    )
+
             # Agent must be enabled for this tenant (overlay check)
             config = resolve_effective_config(
                 agent_defn,
@@ -224,6 +250,33 @@ class IntentRouter:
                     confidence=confidence,
                     fallback_from=agent_id,
                 )
+
+            # Domain-scope enforcement (Phase 4b WP4)
+            # Private-scope agents require matching staff_domain_tags.
+            # Fail-closed: untagged callers (empty tuple) are denied.
+            overlay_data = (overlay_store or {}).get(agent_id) or {}
+            visibility_scope = overlay_data.get("visibility_scope", "public")
+            if visibility_scope == "private":
+                overlay_domain_tags = set(overlay_data.get("staff_domain_tags", []))
+                caller_domain_tags = set(staff_domain_tags or ())
+                # Deny-by-default for private scope:
+                # - Caller has no tags → denied
+                # - Overlay has no required tags → denied (not yet configured)
+                # - Tags exist on both sides but no intersection → denied
+                if (not caller_domain_tags
+                        or not overlay_domain_tags
+                        or not (caller_domain_tags & overlay_domain_tags)):
+                    logger.info(
+                        "IntentRouter: agent %s domain-scoped (private), "
+                        "caller tags %s do not match overlay tags %s",
+                        agent_id, caller_domain_tags, overlay_domain_tags,
+                    )
+                    self._emit_denial(tenant_id, agent_id, skill_id, "domain_scope_denied")
+                    return RouteDecision(
+                        target=RouteTarget.CORE_PIPELINE,
+                        confidence=confidence,
+                        fallback_from=agent_id,
+                    )
 
             # Skill binding must exist (deny-by-default)
             svc = SkillBindingService.get_instance()

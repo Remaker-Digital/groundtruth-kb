@@ -92,11 +92,13 @@ export interface InviteFormProps {
   inviteEmail: string;
   inviteName: string;
   inviteRole: TeamRole;
+  inviteDomainTags: string[];
   inviting: boolean;
   inviteError: string | null;
   onEmailChange: (value: string) => void;
   onNameChange: (value: string) => void;
   onRoleChange: (value: TeamRole) => void;
+  onDomainTagsChange: (tags: string[]) => void;
   onInvite: () => void;
 }
 
@@ -109,6 +111,8 @@ export interface TeamMemberRowProps {
   onCategoryToggle: (member: TeamMember, categoryId: string) => void;
   /** WI #280: Toggle active/inactive status for a team member. */
   onToggleActive: (member: TeamMember) => void;
+  /** Phase 4c: Open edit dialog for domain tags and other settings. */
+  onEdit: (member: TeamMember) => void;
   onRemove: (member: TeamMember) => void;
 }
 
@@ -127,9 +131,11 @@ export interface EditMemberDialogProps {
   isDark: boolean;
   editRole: TeamRole;
   editCategories: string[];
+  editDomainTags: string[];
   editLoading: boolean;
   onRoleChange: (value: TeamRole) => void;
   onCategoriesChange: (categories: string[]) => void;
+  onDomainTagsChange: (tags: string[]) => void;
   onSave: () => void;
   onCancel: () => void;
 }

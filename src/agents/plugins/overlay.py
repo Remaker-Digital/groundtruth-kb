@@ -312,21 +312,33 @@ def list_available_skills(
     *,
     overlay_store: dict[str, dict[str, Any]] | None = None,
     agent_id: str | None = None,
+    tier: str | None = None,
 ) -> list[ResolvedSkill]:
     """List all invocable skills for a tenant (SPEC-1859 req 7).
 
     Returns only skills that pass all three resolution layers.
+    If *tier* is supplied, agents above the tenant's tier are excluded.
     Used for LLM tool catalog generation.
     """
     registry = PluginAgentRegistry.get_instance()
-    agents = (
-        [registry.get(agent_id)] if agent_id else registry.list_agents()
-    )
+    if agent_id:
+        agents = [registry.get(agent_id)]
+    else:
+        agents = registry.list_available(tier=tier) if tier else registry.list_agents()
+
+    # Tier filtering applies even for single-agent lookups
+    tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+    tenant_level = tier_order.get(tier, 99) if tier else 99  # 99 = no gate
 
     results: list[ResolvedSkill] = []
     for agent_defn in agents:
         if agent_defn is None:
             continue
+        # Skip agents above the tenant's tier
+        if tier and getattr(agent_defn, "tier_gate", None):
+            required_level = tier_order.get(agent_defn.tier_gate, 0)
+            if tenant_level < required_level:
+                continue
         for skill in agent_defn.skills:
             resolved = resolve_skill(
                 tenant_id, agent_defn.agent_id, skill.skill_id,

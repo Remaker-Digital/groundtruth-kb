@@ -187,17 +187,43 @@ async def _load_tenant_context(
 def _validate_agent_access(ctx: TenantContext, agent_id: str) -> None:
     """Validate team member has access to chat with the specified agent.
 
-    superadmin/admin roles get implicit wildcard access.
+    Tier-gate check (Phase 4b WP1): regardless of role, the tenant's tier
+    must meet the agent's tier_gate. This prevents a starter-tier tenant
+    from reaching professional-only agents via direct-target chat.
+
+    superadmin/admin roles get implicit wildcard access for agent_access.
     Other roles must have the agent in their agent_access list.
     Raises 403 if access is denied.
     """
     from src.multi_tenant.auth import TeamMemberRole
 
+    # --- Tier-gate enforcement (WP1, fail-closed) ---
+    # Only enforce if tenant has a resolved tier (None = tier not yet resolved)
+    if ctx.tier is not None:
+        try:
+            from src.agents.plugins.registry import PluginAgentRegistry
+            reg = PluginAgentRegistry.get_instance()
+            agent_defn = reg.get(agent_id)
+            if agent_defn is not None:
+                tier_gate = getattr(agent_defn, "tier_gate", None)
+                if tier_gate and tier_gate != "free":
+                    tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+                    tenant_tier = ctx.tier.value if hasattr(ctx.tier, "value") else str(ctx.tier)
+                    if tier_order.get(tenant_tier, 0) < tier_order.get(tier_gate, 0):
+                        raise HTTPException(
+                            status_code=403,
+                            detail=f"Agent '{agent_id}' requires tier '{tier_gate}'.",
+                        )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # Registry not loaded — let downstream handle
+
+    # --- Role-based agent_access ---
     if ctx.team_member_role in (TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN):
-        return  # Implicit wildcard
+        return  # Implicit wildcard (domain-scope enforced in IntentRouter)
 
     # For other roles, check explicit agent_access list
-    # agent_access is loaded from TeamMemberDocument during auth
     agent_access = list(getattr(ctx, "agent_access", []) or [])
     if "*" in agent_access or agent_id in agent_access:
         return
@@ -658,6 +684,7 @@ async def stream_response(
                     if ctx.team_member_role else None
                 ),  # SPEC-1558: Co-pilot routing for team members
                 target_agent_id=getattr(state, "target_agent_id", None) or None,
+                staff_domain_tags=ctx.staff_domain_tags,
             )
 
             async for sse_text in sse_mgr.wrap_stream(

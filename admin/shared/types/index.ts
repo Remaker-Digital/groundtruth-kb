@@ -307,6 +307,8 @@ export interface TeamMember {
   maxConcurrentConversations: number;
   /** Escalation categories this agent handles (WI #279). Only relevant for role = 'escalation_agent'. */
   escalationCategories?: string[];
+  /** Domain tags controlling which private-scope agents this member can interact with (Phase 4c). */
+  staffDomainTags?: string[];
   /** API key prefix for display (ar_user_rema...). Never the full key. */
   userApiKeyPrefix?: string | null;
   /** Full API key — only returned ONCE on creation or rotation. */
