@@ -1,0 +1,50 @@
+name: Feature Request
+description: Suggest an improvement or new capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We value feedback that helps improve the engineering method behind
+        GroundTruth. Please describe the problem you're trying to solve and
+        the approach you have in mind.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: |
+        Describe the problem or limitation you encountered. Focus on the
+        "why" — what were you trying to accomplish and what got in the way?
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: What approach do you suggest?
+      description: |
+        How would you solve this? Be as specific as you can. If you have
+        multiple approaches, list them with tradeoffs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What alternatives did you consider?
+      description: Other approaches you thought about and why you didn't choose them.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: How broad is this change?
+      options:
+        - Small (single file / function)
+        - Medium (multiple files, same module)
+        - Large (cross-cutting, architecture-level)
+    validations:
+      required: true
