@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import subprocess
 import sys
 
@@ -43,14 +44,19 @@ ENVIRONMENTS = {
     },
 }
 
+# Agent containers listen on 8080 inside ACA; the ingress proxy handles
+# the external/internal routing surface separately.
+AGENT_PORT = 8080
+DEFAULT_NATS_ENDPOINT = "ws://agent-red-nats"
+
 # Agent configurations: (name, port, cpu, memory)
 AGENT_APPS = [
-    ("intent-classifier", 8081, "0.25", "0.5Gi"),
-    ("knowledge-retrieval", 8082, "0.5", "1.0Gi"),
-    ("response-generator", 8083, "0.5", "1.0Gi"),
-    ("escalation-handler", 8084, "0.25", "0.5Gi"),
-    ("analytics-collector", 8085, "0.25", "0.5Gi"),
-    ("critic-supervisor", 8086, "0.25", "0.5Gi"),
+    ("intent-classifier", AGENT_PORT, "0.25", "0.5Gi"),
+    ("knowledge-retrieval", AGENT_PORT, "0.5", "1.0Gi"),
+    ("response-generator", AGENT_PORT, "0.5", "1.0Gi"),
+    ("escalation-handler", AGENT_PORT, "0.25", "0.5Gi"),
+    ("analytics-collector", AGENT_PORT, "0.25", "0.5Gi"),
+    ("critic-supervisor", AGENT_PORT, "0.25", "0.5Gi"),
 ]
 
 
@@ -62,6 +68,7 @@ def provision_app(
     env_name: str,
     tag: str,
     env_config: dict,
+    nats_endpoint: str,
 ) -> bool:
     """Provision a single agent Container App."""
     app_name = f"agent-red-{name}"
@@ -90,7 +97,8 @@ def provision_app(
         "--memory", memory,
         "--env-vars",
         f"AGENT_PORT={port}",
-        "AGNTCY_NATS_ENDPOINT=nats://nats:4222",
+        f"AGNTCY_NATS_ENDPOINT={nats_endpoint}",
+        f"NATS_URL={nats_endpoint}",
         "AGNTCY_TRANSPORT_TYPE=slim",
         "LOG_LEVEL=INFO",
         "--subscription", SUBSCRIPTION,
@@ -147,21 +155,34 @@ def main() -> None:
     )
     parser.add_argument("--tag", type=str, default=None, help="Image tag")
     parser.add_argument("--agent", type=str, default=None, help="Provision only this agent")
+    parser.add_argument(
+        "--nats-endpoint",
+        type=str,
+        default=None,
+        help="Override the NATS WebSocket endpoint (default: AGNTCY_NATS_ENDPOINT/NATS_URL env or ws://agent-red-nats)",
+    )
     args = parser.parse_args()
 
     env_config = ENVIRONMENTS[args.env]
     tag = args.tag or "latest"
+    nats_endpoint = (
+        args.nats_endpoint
+        or os.environ.get("AGNTCY_NATS_ENDPOINT")
+        or os.environ.get("NATS_URL")
+        or DEFAULT_NATS_ENDPOINT
+    )
 
     print(f"Agent Container Provisioning")
     print(f"Environment: {args.env}")
     print(f"Tag: {tag}")
     print(f"Container App Env: {env_config['container_app_env']}")
+    print(f"NATS endpoint: {nats_endpoint}")
 
     results: list[tuple[str, bool]] = []
     for name, port, cpu, memory in AGENT_APPS:
         if args.agent and args.agent != name:
             continue
-        ok = provision_app(name, port, cpu, memory, args.env, tag, env_config)
+        ok = provision_app(name, port, cpu, memory, args.env, tag, env_config, nats_endpoint)
         results.append((name, ok))
 
     # Summary

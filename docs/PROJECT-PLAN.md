@@ -343,50 +343,54 @@ xychart-beta
 ---
 
 ### Phase 6: Launch Preparation
-**Status:** In Progress 🔄
+**Status:** Partially Complete — triaged S234 🔄
+
+> **Triage note (S234, 2026-03-30):** Production v1.98.73 deployed with 20 tenants (9 active).
+> Cosmos, Redis, Key Vault all healthy. CORS hardened. Phase 4c (agent extensibility) complete.
+> Items below annotated with current status after S234 triage.
 
 #### 6.1 Infrastructure & Deployment
 | Task | WI | Status |
 |------|-----|--------|
 | Cosmos DB full initialization (10 containers, DiskANN) | — | ✅ Done — scripts/init_cosmos_containers.py, all 10 verified |
-| Azure OpenAI custom subdomain | — | 📋 Todo — `az cognitiveservices account update --custom-domain` |
-| Build Docker container images + push to ACR | #196 | 📋 Todo |
-| Production deployment (Terraform apply) | #197 | 📋 Todo |
-| Widget bundle → Theme App Extension deployment | #198 | 📋 Todo |
+| Azure OpenAI custom subdomain | — | ✅ Done (S234 triage) — Azure OpenAI on all 6 agent containers, 150K TPM GlobalStandard |
+| Build Docker container images + push to ACR | #196 | ✅ Done (S234 triage) — v1.98.73, 10 images built and pushed via build.py |
+| Production deployment (Terraform apply) | #197 | ✅ Done (S234 triage) — production v1.98.73 deployed, GOV-16 approved S233 |
+| Widget bundle deployment | #198 | ✅ Done (S234 triage) — widget delivered via CDN/API, not TAE asset copy (architecture changed) |
 
 #### 6.2 Remaker Digital Storefront (Sales Channel + Live Demo)
 **Strategy (decided 2026-02-03):** Create a Remaker Digital Shopify storefront to serve dual purpose: (1) sell Agent Red subscriptions via Stripe-direct, (2) deploy Agent Red as the store's own chat system as a live product demo. Agent Red becomes tenant #1.
 
 | Task | WI | Status |
 |------|-----|--------|
-| Create Remaker Digital Shopify storefront | #199 | 📋 Todo — owner task |
-| Onboard Remaker Digital as tenant #1 | #200 | 📋 Todo — requires production deployment |
-| Seed knowledge base with Agent Red product data | #201 | 📋 Todo |
-| Deploy widget on storefront | #202 | 📋 Todo — requires production backend |
-| UX consultant evaluation — Mazel (onboarding, Shopify integration, widget testing, escalation) | #203 | 📋 Todo — requires working storefront |
+| Create Remaker Digital Shopify storefront | #199 | ✅ Done (S234 triage) — blanco-9939.myshopify.com operational, widget verified S226 |
+| Onboard Remaker Digital as tenant #1 | #200 | ✅ Done (S234 triage) — tenant seeded, 20 tenants total |
+| Seed knowledge base with Agent Red product data | #201 | ✅ Done — SPEC-0201 implemented |
+| Deploy widget on storefront | #202 | ✅ Done (S234 triage) — widget live on blanco-9939, verified S226 |
+| UX consultant evaluation — Mazel (onboarding, Shopify integration, widget testing, escalation) | #203 | 📋 Blocked — owner prerequisite (consultant scheduling) |
 
 #### 6.3 Shopify App Store Submission
 | Task | WI | Status |
 |------|-----|--------|
-| App icon (1200x1200) | — | 📋 Todo — owner/designer task |
-| Key benefit images (3× 1600x1200) | — | 📋 Todo — owner task |
-| Screenshots (desktop + mobile, 1600x900) | — | 📋 Todo — requires live storefront |
-| Demo video (optional) | — | 📋 Todo — requires live storefront |
-| Submit for Shopify App Store review | — | 📋 Todo — blocked by creative assets + production deployment |
+| App icon (1200x1200) | — | 📋 Blocked — owner/designer task |
+| Key benefit images (3x 1600x1200) | — | 📋 Blocked — owner task |
+| Screenshots (desktop + mobile, 1600x900) | — | 📋 Blocked — requires creative assets |
+| Demo video (optional) | — | 📋 Blocked — requires creative assets |
+| Submit for Shopify App Store review | — | 📋 Blocked — requires creative assets + owner decision |
 
 #### 6.4 Creative Assets
 | Task | WI | Status |
 |------|-----|--------|
-| Favicon and app icons (from icon-master.png) | #204 | 📋 Todo |
-| Admin UI color palette refinement | — | 📋 Todo — graphic designer working on worksheet |
-| OG image for social sharing (1200x630) | — | 📋 Todo |
+| Favicon and app icons (from icon-master.png) | #204 | 📋 Blocked — owner/designer task |
+| Admin UI color palette refinement | — | 📋 Blocked — owner/designer task |
+| OG image for social sharing (1200x630) | — | 📋 Blocked — owner/designer task |
 
 #### 6.5 Launch Readiness
 | Task | WI | Status |
 |------|-----|--------|
-| Final documentation review | — | 📋 Todo |
-| Production stability validation (48 hrs) | — | 📋 Todo — requires production deployment |
-| GA launch | — | 📋 Todo |
+| Final documentation review | — | 📋 Active — agentredcx.com docs need update for extensibility |
+| Production stability validation (48 hrs) | — | ✅ Done (S234 triage) — production stable since v1.98.41 (S221), currently v1.98.73 |
+| GA launch | — | 📋 Blocked — requires creative assets + Shopify submission |
 
 ---
 

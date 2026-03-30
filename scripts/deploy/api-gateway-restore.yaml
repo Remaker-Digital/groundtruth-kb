@@ -57,7 +57,7 @@ properties:
           - name: USE_AGENT_CONTAINERS
             value: "false"
           - name: NATS_URL
-            value: nats://agent-red-nats.internal.orangeglacier-f566a4e7.eastus.azurecontainerapps.io:4222
+            value: ws://agent-red-nats
           - name: GRACEFUL_SHUTDOWN_TIMEOUT
             value: "60"
           - name: SHOPIFY_API_KEY

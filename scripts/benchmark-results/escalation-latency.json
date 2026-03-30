@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-28T09:24:07Z",
+  "timestamp": "2026-03-28T10:24:02Z",
   "test": "escalation_path_latency",
   "measurement_gap": true,
   "stages": {
@@ -7,9 +7,9 @@
       "name": "escalation-ic",
       "tier": "per-interface",
       "sample_count": 5,
-      "p50_ms": 19,
-      "p95_ms": 23,
-      "p99_ms": 23,
+      "p50_ms": 6,
+      "p95_ms": 30,
+      "p99_ms": 30,
       "errors": 0
     },
     "escalation-handler": {
