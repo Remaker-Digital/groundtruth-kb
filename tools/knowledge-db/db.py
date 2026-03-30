@@ -524,6 +524,16 @@ class KnowledgeDB:
                   as default 'requirement'.
         """
         type = self._auto_detect_spec_type(id, type)
+
+        # Option B enforcement: implemented ADR/DCL must have executable assertions
+        if status == "implemented" and type in ("architecture_decision", "design_constraint"):
+            if not assertions:
+                raise ValueError(
+                    f"Cannot insert {id} as 'implemented': architecture-layer artifacts "
+                    f"(type={type}) require non-empty assertions for executable "
+                    f"compliance evidence. Add assertions before promoting. (Option B, Phase 3)"
+                )
+
         # Phase 0 transport governance gate: block verified without executable evidence
         if status == "verified" and id in _TRANSPORT_GATED_SPECS:
             self._validate_transport_spec_verification(id)
@@ -581,6 +591,16 @@ class KnowledgeDB:
             assertions_json = json.dumps(raw_assertions) if raw_assertions is not None else None
         else:
             assertions_json = current["assertions"]
+
+        # Option B enforcement: implemented ADR/DCL must have executable assertions
+        if status == "implemented" and spec_type in ("architecture_decision", "design_constraint"):
+            _parsed = json.loads(assertions_json) if assertions_json else None
+            if not _parsed:
+                raise ValueError(
+                    f"Cannot promote {id} to 'implemented': architecture-layer artifacts "
+                    f"(type={spec_type}) require non-empty assertions for executable "
+                    f"compliance evidence. Add assertions before promoting. (Option B, Phase 3)"
+                )
 
         # Phase 0 transport governance gate: block verified without executable evidence
         if status == "verified" and id in _TRANSPORT_GATED_SPECS:
