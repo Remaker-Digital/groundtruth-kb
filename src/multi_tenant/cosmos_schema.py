@@ -2419,7 +2419,6 @@ def get_collection_configs() -> list[CollectionConfig]:
                 "automatic": True,
                 "indexingMode": "consistent",
                 "includedPaths": [
-                    {"path": "/id/?"},
                     {"path": "/tenant_id/?"},
                     {"path": "/agent_id/?"},
                     {"path": "/enabled/?"},
@@ -2434,6 +2433,7 @@ def get_collection_configs() -> list[CollectionConfig]:
         # 28. agent_bindings — WI-4010: per-tenant agent skill bindings (SPEC-1856)
         # Partition key: /tenant_id. ID: skill_id (unique per tenant partition).
         # Narrow indexing: index only fields used in queries.
+        # Note: /id is a Cosmos system property — always indexed, cannot be in includedPaths.
         CollectionConfig(
             name=COLLECTION_AGENT_BINDINGS,
             partition_key="/tenant_id",
@@ -2441,7 +2441,6 @@ def get_collection_configs() -> list[CollectionConfig]:
                 "automatic": True,
                 "indexingMode": "consistent",
                 "includedPaths": [
-                    {"path": "/id/?"},
                     {"path": "/tenant_id/?"},
                     {"path": "/agent_id/?"},
                     {"path": "/skill_id/?"},
