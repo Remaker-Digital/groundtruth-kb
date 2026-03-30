@@ -1,13 +1,14 @@
 """
-Knowledge Database — Append-only SQLite store for project artifacts: specifications,
+Knowledge Database — Versioned SQLite store for project artifacts: specifications,
 tests, test plans, work items, backlog snapshots, operational procedures, documents,
-and environment config. No UPDATE in place, no DELETE. Every mutation creates a new
-versioned record. Claude is the sole writer; the owner observes via read-only UI.
+and environment config. Core data uses append-only versioning (UNIQUE(id, version)) —
+every mutation creates a new versioned record. Claude is the sole writer; the owner
+observes via read-only UI.
 
-RETENTION POLICY: Never delete. All rows are retained indefinitely. At ~20 KB per
-session (~48 assertion runs + spec updates), 400 GB of storage supports ~57,000 years
-of daily sessions. Storage is not a constraint. No pruning, archival, or compaction
-is needed or desired. Use export_json() for logical backups.
+RETENTION POLICY: Core artifact rows (specifications, tests, work items, etc.) are
+never deleted. Operational tables (assertion_runs, quality_scores) permit maintenance
+deletes for pruning stale history, gated behind explicit admin commands or the
+session-start hook's pruning routine. Use export_json() for logical backups.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """

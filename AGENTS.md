@@ -26,14 +26,21 @@ YOU MUST NOT delete or modify files which you have not created without explicit 
 
 ## Startup Checklist (Every Session)
 
-1. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
-2. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
-3. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
-4. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
-5. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
-6. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
-7. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
-8. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+**Phase A — Bridge sweep (first, within 60 seconds):**
+1. Query bridge for unresolved messages addressed to this agent.
+2. Check `list_threads_at_risk()` and `bridge_sla_report()`.
+3. Acknowledge, claim, or negotiate each live message per protocol.
+4. Report sweep count: "Bridge sweep: N messages processed."
+
+**Phase B — Local bootstrap (after bridge obligations are clear):**
+5. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
+6. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
+7. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
+8. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
+9. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
+10. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+11. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
+12. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
 
 ## Report Output Contract
 
