@@ -488,6 +488,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 tokens_input=intent_result.get("tokens_input", 0),
                 tokens_output=intent_result.get("tokens_output", 0),
             )
+            # Preserve original IC result before any clarification overwrite (Codex P2 fix)
+            trace.set_intent(intent, confidence)
+            detected_intent = intent
 
             yield stage_event(
                 "intent-classifier", "completed",
@@ -771,6 +774,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         **({"quality_experiment_variant": quality_experiment_variant,
                             "quality_experiment_id": quality_experiment_id}
                            if quality_experiment_variant else {}),
+                        **({"sources": structured_sources}
+                           if structured_sources else {}),
                     },
                 )
                 yield validated_event(
@@ -825,6 +830,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     for s in budget.stages
                 ],
                 "total_latency_ms": int(budget.elapsed_ms),
+                "detected_intent": detected_intent,
                 "intent": intent,
                 "confidence": confidence,
                 "critic_passed": approved,
@@ -840,6 +846,23 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 )
             except Exception:
                 logger.debug("Failed to persist pipeline trace", exc_info=True)
+
+            # SPEC-1874: Langfuse trace export (Lane 1 structural, fire-and-forget)
+            try:
+                from src.observability.langfuse_exporter import (
+                    LANGFUSE_ENABLED,
+                    export_trace as langfuse_export,
+                )
+                if LANGFUSE_ENABLED:
+                    langfuse_export(
+                        decision_trace,
+                        trace_id=trace_id,
+                        system_prompt_template=prompts.get(
+                            AgentRole.RESPONSE_GENERATOR, "",
+                        ),
+                    )
+            except Exception:
+                logger.debug("Langfuse export failed (non-blocking)", exc_info=True)
 
             # SPEC-1855: Emit invocation events for each pipeline stage
             try:
