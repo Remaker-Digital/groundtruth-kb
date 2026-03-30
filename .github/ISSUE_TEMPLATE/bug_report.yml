@@ -1,0 +1,69 @@
+name: Bug Report
+description: Report a bug in the GroundTruth Knowledge DB toolkit
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out the fields
+        below so we can diagnose and fix the issue.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the toolkit is affected?
+      options:
+        - Knowledge DB (db.py)
+        - Assertions engine (assertions.py)
+        - Web UI (app.py / templates)
+        - CLI / seed tooling
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Include error messages if applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Install groundtruth-kb v0.1.0
+        2. Run `groundtruth init`
+        3. Insert a spec with ...
+        4. See error ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Output of `pip show groundtruth-kb | grep Version`"
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other context (screenshots, logs, environment details).
+    validations:
+      required: false
