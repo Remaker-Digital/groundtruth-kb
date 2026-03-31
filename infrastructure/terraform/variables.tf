@@ -231,6 +231,36 @@ variable "job_image_tag" {
 }
 
 # ---------------------------------------------------------------------------
+# Langfuse Observability (G1 Lane 2, SPEC-1874)
+# ---------------------------------------------------------------------------
+
+variable "enable_langfuse" {
+  description = "Enable Langfuse observability (Lane 1 structural export, api-gateway only)"
+  type        = bool
+  default     = false
+}
+
+variable "langfuse_host" {
+  description = "Langfuse Cloud host URL"
+  type        = string
+  default     = "https://us.cloud.langfuse.com"
+}
+
+variable "langfuse_public_key" {
+  description = "Langfuse project public key (from Cloud dashboard, required when enable_langfuse=true)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "langfuse_secret_key" {
+  description = "Langfuse project secret key (from Cloud dashboard, required when enable_langfuse=true)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
 # Tags
 # ---------------------------------------------------------------------------
 

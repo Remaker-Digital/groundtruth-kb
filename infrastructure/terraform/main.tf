@@ -25,6 +25,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.100"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   # Remote state — uncomment and configure for team use
@@ -243,6 +247,25 @@ locals {
       scale_rule   = {}
     }
   }
+
+  # Per-app environment variables (supplements shared_env for specific apps)
+  # G1 Lane 2: Langfuse vars scoped to api-gateway only (least privilege)
+  per_app_env = {
+    api-gateway = var.enable_langfuse ? [
+      { name = "LANGFUSE_ENABLED",    value = "true" },
+      { name = "LANGFUSE_HOST",       value = var.langfuse_host },
+      { name = "LANGFUSE_HASH_SALT",  secret_name = "langfuse-hash-salt" },
+      { name = "LANGFUSE_PUBLIC_KEY", secret_name = "langfuse-public-key" },
+      { name = "LANGFUSE_SECRET_KEY", secret_name = "langfuse-secret-key" },
+    ] : []
+  }
+
+  # Langfuse KV secret name → versionless ID mapping (api-gateway only)
+  langfuse_secret_map = var.enable_langfuse ? {
+    "langfuse-hash-salt"  = azurerm_key_vault_secret.langfuse_hash_salt[0].versionless_id
+    "langfuse-public-key" = azurerm_key_vault_secret.langfuse_public_key[0].versionless_id
+    "langfuse-secret-key" = azurerm_key_vault_secret.langfuse_secret_key[0].versionless_id
+  } : {}
 }
 
 # ---------------------------------------------------------------------------
@@ -280,6 +303,16 @@ resource "azurerm_container_app" "apps" {
     value = var.appinsights_connection_string
   }
 
+  # Langfuse secrets (api-gateway only, Key Vault-backed)
+  dynamic "secret" {
+    for_each = each.key == "api-gateway" ? local.langfuse_secret_map : {}
+    content {
+      name                = secret.key
+      key_vault_secret_id = secret.value
+      identity            = "system"
+    }
+  }
+
   template {
     min_replicas = each.value.min_replicas
     max_replicas = each.value.max_replicas
@@ -294,9 +327,14 @@ resource "azurerm_container_app" "apps" {
       cpu    = each.value.cpu
       memory = each.value.memory
 
-      # Environment variables (shared)
+      # Environment variables (shared + per-app)
       dynamic "env" {
-        for_each = [for e in local.shared_env : e if !contains(keys(e), "secret_name")]
+        for_each = [
+          for e in concat(
+            local.shared_env,
+            lookup(local.per_app_env, each.key, [])
+          ) : e if !contains(keys(e), "secret_name")
+        ]
         content {
           name  = env.value.name
           value = env.value.value
@@ -304,7 +342,12 @@ resource "azurerm_container_app" "apps" {
       }
 
       dynamic "env" {
-        for_each = [for e in local.shared_env : e if contains(keys(e), "secret_name")]
+        for_each = [
+          for e in concat(
+            local.shared_env,
+            lookup(local.per_app_env, each.key, [])
+          ) : e if contains(keys(e), "secret_name")
+        ]
         content {
           name        = env.value.name
           secret_name = env.value.secret_name
