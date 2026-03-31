@@ -21,13 +21,26 @@ project-owned boundary.
 
 ## Usage
 
+Templates are shipped inside the installed `groundtruth-kb` wheel. To find their
+location on disk after installation:
+
+```python
+from groundtruth_kb import get_templates_dir
+print(get_templates_dir())
+```
+
+Then copy them into your project:
+
 ```bash
+# Find the installed templates path
+TEMPLATES=$(python -c "from groundtruth_kb import get_templates_dir; print(get_templates_dir())")
+
 # Copy templates to your project
-cp templates/CLAUDE.md my-project/CLAUDE.md
-cp templates/MEMORY.md my-project/MEMORY.md
+cp "$TEMPLATES/CLAUDE.md" my-project/CLAUDE.md
+cp "$TEMPLATES/MEMORY.md" my-project/MEMORY.md
 mkdir -p my-project/.claude/hooks my-project/.claude/rules
-cp templates/hooks/*.py my-project/.claude/hooks/
-cp templates/rules/*.md my-project/.claude/rules/
+cp "$TEMPLATES/hooks/"*.py my-project/.claude/hooks/
+cp "$TEMPLATES/rules/"*.md my-project/.claude/rules/
 
 # Then customize placeholders in each file
 ```

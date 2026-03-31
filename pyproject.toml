@@ -51,6 +51,9 @@ Issues = "https://github.com/Remaker-Digital/groundtruth-kb/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["src/groundtruth_kb"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"templates" = "groundtruth_kb/templates"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

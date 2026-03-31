@@ -45,23 +45,23 @@ def main() -> None:
         )
         db = KnowledgeDB(db_path=config.db_path, gate_registry=registry)
 
-        results = run_all_assertions(db, project_root=config.project_root)
+        summary = run_all_assertions(db, project_root=config.project_root)
         db.close()
 
-        if not results:
+        if not summary or "error" in summary:
             print(json.dumps({}))
             return
 
-        # Count pass/fail
-        passed = sum(1 for r in results if r.get("overall_passed"))
-        failed = sum(1 for r in results if not r.get("overall_passed"))
-        total = len(results)
+        passed = summary.get("passed", 0)
+        failed = summary.get("failed", 0)
+        total = summary.get("specs_with_assertions", 0)
+        details = summary.get("details", [])
 
         lines = [f"Assertion check: {passed}/{total} passed, {failed} failed."]
         if failed > 0:
             lines.append("REGRESSIONS DETECTED — investigate before proceeding.")
-            for r in results:
-                if not r.get("overall_passed"):
+            for r in details:
+                if not r.get("skipped") and not r.get("overall_passed"):
                     lines.append(f"  FAIL: {r.get('spec_id', '?')}")
 
         context = "\n".join(lines)
