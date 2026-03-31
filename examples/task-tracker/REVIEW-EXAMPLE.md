@@ -42,8 +42,8 @@ should be fixed before closure.
 **Fix applied:** Added `max_length=200` to `TaskCreate.title` and
 `TaskUpdate.title` fields in `models.py`.
 
-**Test added:** TEST-002 already covers the "no title" case. The `max_length`
-constraint is enforced by Pydantic validation (returns 422 for titles > 200 chars).
+**Test added:** TEST-008 ("POST /tasks with title > 200 chars returns error")
+verifies the max_length constraint. TEST-002 covers the missing-title case separately.
 
 ## Re-Review
 

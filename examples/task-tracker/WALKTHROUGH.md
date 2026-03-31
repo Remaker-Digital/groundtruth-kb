@@ -13,6 +13,10 @@ upstream promotion model.
 ## Step 1: Set up the project
 
 ```bash
+# From the groundtruth-kb repo root, install the package first
+pip install -e .
+
+# Then install the example project
 cd examples/task-tracker
 pip install -e ".[dev]"
 ```

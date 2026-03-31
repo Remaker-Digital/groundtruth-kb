@@ -3,8 +3,8 @@
 ## Current Status
 
 - **Version:** 0.1.0
-- **Knowledge DB:** 7 specs (5 domain + 2 GOV), 7 tests, 1 ADR, 1 DCL, 1 WI (resolved)
-- **Tests:** 7/7 pass
+- **Knowledge DB:** 7 specs (5 domain + 2 GOV), 8 tests, 1 ADR, 1 DCL, 1 WI (resolved)
+- **Tests:** 8/8 pass
 - **Assertions:** All passing
 
 ## Recent Sessions

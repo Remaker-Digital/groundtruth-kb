@@ -12,6 +12,10 @@ A minimal task-tracker API demonstrating all six layers of the GroundTruth metho
 ## Quick start
 
 ```bash
+# From the groundtruth-kb repo root, install the package first
+pip install -e .
+
+# Then install the example project
 cd examples/task-tracker
 pip install -e ".[dev]"
 
@@ -38,7 +42,7 @@ layer of the GroundTruth method.
 | Artifact | Count | Details |
 |----------|-------|---------|
 | Specifications | 7 | 5 domain (SPEC-001–005) + 2 governance (GOV-01, GOV-03) |
-| Tests | 7 | Each linked to a spec, all passing |
+| Tests | 8 | Each linked to a spec, all passing |
 | Architecture | 2 | ADR-001 (in-memory store) + DCL-001 (no external DB) |
 | Work items | 1 | WI-001 (title validation defect, resolved) |
 | Backlog | 1 | BL-001 (initial review defects) |
