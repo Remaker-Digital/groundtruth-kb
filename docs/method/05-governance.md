@@ -89,9 +89,8 @@ Assertions are the continuous monitoring layer. Where gates enforce rules at tra
 
 ### When assertions run
 
-- **Session start**: automatic check of all assertions on implemented/verified specs
-- **Pre-build**: gate check before container builds
-- **On demand**: `gt assert` from the CLI or triggered by scripts
+- **On demand**: `gt assert` from the CLI or from scripts via the Python API
+- **At project-configured checkpoints**: projects can configure hooks to run assertions at session start, before builds, or at other lifecycle points — these are project-specific automation, not built into the package
 
 ### Interpreting results
 

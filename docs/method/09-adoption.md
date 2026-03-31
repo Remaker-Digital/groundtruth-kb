@@ -37,7 +37,6 @@ These files originate from GroundTruth and are updated when you pull a new upstr
 | File/directory | Purpose |
 |----------------|---------|
 | `groundtruth_kb/` (installed package) | KB engine, CLI, web UI, gates |
-| Template originals in upstream repo | CLAUDE.md template, hook templates |
 | Built-in governance gates | ADRDCLAssertionGate, OwnerApprovalGate |
 
 ### Project-owned files (you control)
@@ -46,11 +45,9 @@ These files are generated from templates during `gt init` or created by you. Gro
 
 | File | Purpose |
 |------|---------|
-| `groundtruth.toml` | Project configuration (DB path, branding, gate plugins) |
-| `groundtruth.db` | Your project's knowledge database |
-| `CLAUDE.md` | Your project's rules and procedures |
-| `MEMORY.md` | Your project's operational state |
-| Project-specific hooks | Hooks you write for your workflow |
+| `groundtruth.toml` | Project configuration (DB path, branding, gate plugins) — created by `gt init` |
+| `groundtruth.db` | Your project's knowledge database — created by `gt init` |
+| Rules and state files | Your project's rules file and operational state (you create these as needed for your workflow) |
 | Gate plugins | Custom governance gates for your domain |
 | `src/`, `tests/`, etc. | Your application code |
 

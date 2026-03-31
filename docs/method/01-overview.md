@@ -79,7 +79,7 @@ Governance specifications (prefixed `GOV-`) define the rules of the method itsel
 - **GOV-03 (Test clarity)**: Every test must produce an unambiguous pass or fail result.
 - **GOV-12 (WI triggers tests)**: Creating a work item must be followed by creating linked tests.
 
-Governance gates enforce these rules at lifecycle transitions. When you try to promote a specification from "implemented" to "verified", the gate checks that all linked tests pass. When you try to resolve a defect work item, the gate checks that the owner has approved. Gates are pluggable — projects can add their own enforcement rules (see [Adoption](09-adoption.md)).
+Governance gates enforce rules at lifecycle transitions. The two built-in gates are: ADR/DCL specs must have assertions before reaching "implemented", and defect/regression work items require owner approval before resolution. Projects can add their own enforcement gates as plugins — for example, requiring executable test evidence before a spec can reach "verified" status. Gates are pluggable and configured per-project (see [Adoption](09-adoption.md)).
 
 ## Assertions
 
@@ -89,7 +89,7 @@ Assertions are automated checks that run against the codebase and verify that sp
 - **glob**: Does a required file exist? (e.g., "tests/test_auth.py must exist")
 - **grep_absent**: Is a forbidden pattern absent? (e.g., "no hardcoded API keys in source")
 
-Assertions run automatically at session start, before builds, and on demand. Failing assertions on "implemented" or "verified" specifications indicate regressions — something that was working no longer is.
+Assertions can be run on demand with `gt assert` or invoked from scripts. Projects may also configure them to run at session start or before builds via hooks. Failing assertions on "implemented" or "verified" specifications indicate regressions — something that was working no longer is.
 
 ## Dual-agent collaboration
 

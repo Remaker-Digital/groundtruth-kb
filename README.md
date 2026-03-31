@@ -25,10 +25,13 @@ history. No UPDATE, no DELETE — every change is a new version.
 pip install groundtruth-kb
 
 # Initialize a new project
-groundtruth init
+gt init my-project
+
+# Seed with governance specs and examples
+gt --config my-project/groundtruth.toml seed --example
 
 # Open the web UI
-groundtruth serve
+gt --config my-project/groundtruth.toml serve
 # Visit http://localhost:8090
 ```
 
