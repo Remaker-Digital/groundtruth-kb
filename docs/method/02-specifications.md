@@ -76,7 +76,7 @@ Architecture Decision Records capture cross-cutting technical choices: why a par
 
 Design Constraints are machine-checkable rules derived from ADRs. Where an ADR says "we chose SQLite for the knowledge database because of single-file portability", the corresponding DCL says "the knowledge database must use SQLite" and carries assertions to verify it.
 
-For details, see the [Architecture Decisions guide](08-architecture.md) (coming soon).
+For details, see the Architecture Decisions guide (coming in a future update).
 
 ## The spec-first workflow
 
@@ -126,7 +126,7 @@ Use tags for cross-cutting concerns (a spec might be tagged both `["api", "secur
 
 **Under-specifying acceptance.** "The system should handle errors gracefully." This cannot be tested. Better: "When an API call fails, the response must include an error code, a human-readable message, and a correlation ID for debugging."
 
-**Spec drift.** Specifications written early and never revisited as the system evolves. Assertions catch some drift automatically, but teams should review spec coverage at phase boundaries (see [Governance](05-governance.md), coming soon).
+**Spec drift.** Specifications written early and never revisited as the system evolves. Assertions catch some drift automatically, but teams should review spec coverage at phase boundaries (see the Governance guide, coming in a future update).
 
 **Retrofitting specs to code.** Writing code first, then creating specifications that describe what was built. This produces specifications that are implementation descriptions, not requirements — defeating the decision-log purpose.
 
