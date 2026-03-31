@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Operational Procedures{% endblock %}
+{% block content %}
+<h1>Operational Procedures</h1>
+
+<form class="filter-bar" method="get" action="/ops">
+    <select name="type">
+        <option value="">All types</option>
+        {% for t in types %}
+        <option value="{{ t }}" {% if filters.type == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Filter</button>
+    <a href="/ops" class="btn-clear">Clear</a>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>v</th>
+            <th>Last Changed</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for proc in procedures %}
+        <tr>
+            <td class="mono"><a href="/ops/{{ proc.id }}">{{ proc.id }}</a></td>
+            <td><a href="/ops/{{ proc.id }}">{{ proc.title }}</a></td>
+            <td>{{ proc.type or '' }}</td>
+            <td>{{ proc.version }}</td>
+            <td class="mono">{{ proc.changed_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

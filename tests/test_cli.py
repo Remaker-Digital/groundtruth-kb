@@ -1,0 +1,373 @@
+"""Tests for groundtruth_kb.cli module."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from click.testing import CliRunner
+
+from groundtruth_kb.cli import main
+from groundtruth_kb.db import KnowledgeDB
+
+
+@pytest.fixture()
+def runner() -> CliRunner:
+    return CliRunner()
+
+
+@pytest.fixture()
+def project_dir(tmp_path: Path) -> Path:
+    """Create a project dir with groundtruth.toml and a seeded DB."""
+    toml = tmp_path / "groundtruth.toml"
+    toml.write_text(
+        f'[groundtruth]\ndb_path = "{(tmp_path / "groundtruth.db").as_posix()}"\n'
+        f'project_root = "{tmp_path.as_posix()}"\napp_title = "Test Project"\n',
+        encoding="utf-8",
+    )
+    # Create a simple file for assertions to find
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "main.py").write_text("def hello():\n    return 'world'\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("# Test\n", encoding="utf-8")
+    return tmp_path
+
+
+# ---------------------------------------------------------------------------
+# gt init
+# ---------------------------------------------------------------------------
+
+
+class TestInit:
+    def test_init_creates_project(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "new-project"
+        result = runner.invoke(main, ["init", "new-project", "--dir", str(target)])
+        assert result.exit_code == 0
+        assert (target / "groundtruth.toml").exists()
+        assert (target / "groundtruth.db").exists()
+        assert "Initialized" in result.output
+
+    def test_init_default_dir(self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(main, ["init", "my-app"])
+        assert result.exit_code == 0
+        assert (tmp_path / "my-app" / "groundtruth.toml").exists()
+
+    def test_init_already_exists(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "existing"
+        target.mkdir()
+        (target / "groundtruth.toml").write_text("exists", encoding="utf-8")
+        result = runner.invoke(main, ["init", "existing", "--dir", str(target)])
+        assert result.exit_code == 1
+        assert "already exists" in result.output
+
+
+# ---------------------------------------------------------------------------
+# gt seed
+# ---------------------------------------------------------------------------
+
+
+class TestSeed:
+    def test_seed_governance(self, runner: CliRunner, project_dir: Path) -> None:
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "seed"])
+        assert result.exit_code == 0
+        assert "5 governance specs" in result.output
+
+    def test_seed_with_examples(self, runner: CliRunner, project_dir: Path) -> None:
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "seed", "--example"])
+        assert result.exit_code == 0
+        assert "governance specs" in result.output
+        assert "example specs" in result.output
+
+    def test_seed_idempotent(self, runner: CliRunner, project_dir: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed", "--example"])
+        result = runner.invoke(main, [*config_flag, "seed", "--example"])
+        assert result.exit_code == 0
+        assert "0 governance specs" in result.output
+        assert "0 example specs" in result.output
+
+
+# ---------------------------------------------------------------------------
+# gt summary
+# ---------------------------------------------------------------------------
+
+
+class TestSummary:
+    def test_summary_empty_db(self, runner: CliRunner, project_dir: Path) -> None:
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "summary"])
+        assert result.exit_code == 0
+        assert "0 total" in result.output
+
+    def test_summary_with_data(self, runner: CliRunner, project_dir: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed", "--example"])
+        result = runner.invoke(main, [*config_flag, "summary"])
+        assert result.exit_code == 0
+        assert "8 total" in result.output  # 5 GOV + 3 example
+
+
+# ---------------------------------------------------------------------------
+# gt history
+# ---------------------------------------------------------------------------
+
+
+class TestHistory:
+    def test_history_empty(self, runner: CliRunner, project_dir: Path) -> None:
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "history"])
+        assert result.exit_code == 0
+        assert "No changes" in result.output
+
+    def test_history_with_data(self, runner: CliRunner, project_dir: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed"])
+        result = runner.invoke(main, [*config_flag, "history", "--limit", "3"])
+        assert result.exit_code == 0
+        assert "GOV-" in result.output
+
+
+# ---------------------------------------------------------------------------
+# gt assert
+# ---------------------------------------------------------------------------
+
+
+class TestAssert:
+    def test_assert_no_specs(self, runner: CliRunner, project_dir: Path) -> None:
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "assert"])
+        assert result.exit_code == 0
+
+    def test_assert_with_passing_spec(self, runner: CliRunner, project_dir: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed"])
+        result = runner.invoke(main, [*config_flag, "assert"])
+        assert result.exit_code == 0
+        assert "PASSED" in result.output
+
+    def test_assert_single_spec(self, runner: CliRunner, project_dir: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed"])
+        result = runner.invoke(main, [*config_flag, "assert", "--spec", "GOV-01"])
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# gt export / import
+# ---------------------------------------------------------------------------
+
+
+class TestExportImport:
+    def test_export_creates_file(self, runner: CliRunner, project_dir: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed"])
+        output_path = project_dir / "export.json"
+        result = runner.invoke(main, [*config_flag, "export", "--output", str(output_path)])
+        assert result.exit_code == 0
+        assert output_path.exists()
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        assert "tables" in data
+        assert len(data["tables"]["specifications"]) >= 5
+
+    def test_import_from_export(self, runner: CliRunner, project_dir: Path, tmp_path: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed"])
+        export_path = project_dir / "export.json"
+        runner.invoke(main, [*config_flag, "export", "--output", str(export_path)])
+
+        # Create a fresh DB and import
+        fresh_dir = tmp_path / "fresh"
+        fresh_dir.mkdir()
+        fresh_toml = fresh_dir / "groundtruth.toml"
+        fresh_toml.write_text(
+            f'[groundtruth]\ndb_path = "{(fresh_dir / "groundtruth.db").as_posix()}"\n',
+            encoding="utf-8",
+        )
+        # Create the empty DB first
+        db = KnowledgeDB(db_path=fresh_dir / "groundtruth.db")
+        db.close()
+
+        result = runner.invoke(main, ["--config", str(fresh_toml), "import", str(export_path)])
+        assert result.exit_code == 0
+        assert "Imported" in result.output
+
+    def test_import_merge_mode(self, runner: CliRunner, project_dir: Path) -> None:
+        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
+        runner.invoke(main, [*config_flag, "seed"])
+        export_path = project_dir / "export.json"
+        runner.invoke(main, [*config_flag, "export", "--output", str(export_path)])
+        # Import into same DB with merge — should skip duplicates
+        result = runner.invoke(main, [*config_flag, "import", str(export_path), "--merge"])
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# gt config
+# ---------------------------------------------------------------------------
+
+
+class TestConfig:
+    def test_config_shows_values(self, runner: CliRunner, project_dir: Path) -> None:
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "config"])
+        assert result.exit_code == 0
+        assert "Test Project" in result.output
+        assert "db_path" in result.output
+
+
+# ---------------------------------------------------------------------------
+# gt serve
+# ---------------------------------------------------------------------------
+
+
+class TestServe:
+    def test_serve_imports_create_app(
+        self, runner: CliRunner, project_dir: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify gt serve wires up create_app and uvicorn (without blocking)."""
+        captured: dict = {}
+
+        def fake_run(app, *, host, port, log_level):
+            captured["host"] = host
+            captured["port"] = port
+
+        monkeypatch.setattr("uvicorn.run", fake_run)
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "serve"])
+        assert result.exit_code == 0
+        assert captured["host"] == "127.0.0.1"
+        assert captured["port"] == 8090
+
+    def test_serve_custom_port(self, runner: CliRunner, project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured: dict = {}
+
+        def fake_run(app, *, host, port, log_level):
+            captured["port"] = port
+
+        monkeypatch.setattr("uvicorn.run", fake_run)
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "serve", "--port", "9999"])
+        assert result.exit_code == 0
+        assert captured["port"] == 9999
+
+
+# ---------------------------------------------------------------------------
+# gt --version
+# ---------------------------------------------------------------------------
+
+
+class TestVersion:
+    def test_version(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["--version"])
+        assert result.exit_code == 0
+        assert "0.1.0" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Regression: --config from outside project directory (Codex P1)
+# ---------------------------------------------------------------------------
+
+
+class TestConfigRelativePaths:
+    """Verify that relative paths in groundtruth.toml resolve against the
+    config file's directory, NOT the caller's cwd."""
+
+    def _init_and_seed(self, runner: CliRunner, project_path: Path) -> None:
+        """Create and seed a project at the given path."""
+        result = runner.invoke(main, ["init", "proj", "--dir", str(project_path)])
+        assert result.exit_code == 0
+        toml = str(project_path / "groundtruth.toml")
+        result = runner.invoke(main, ["--config", toml, "seed", "--example"])
+        assert result.exit_code == 0
+
+    def test_summary_from_outside_project_dir(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """gt --config <project>/groundtruth.toml summary must work from any cwd."""
+        project = tmp_path / "my-project"
+        self._init_and_seed(runner, project)
+
+        # Change to a completely different directory
+        other_dir = tmp_path / "other"
+        other_dir.mkdir()
+        monkeypatch.chdir(other_dir)
+
+        result = runner.invoke(main, ["--config", str(project / "groundtruth.toml"), "summary"])
+        assert result.exit_code == 0
+        assert "8 total" in result.output  # 5 GOV + 3 example
+
+    def test_assert_spec_from_outside_project_dir(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """gt --config <project>/groundtruth.toml assert --spec GOV-01 must resolve correctly."""
+        project = tmp_path / "my-project"
+        self._init_and_seed(runner, project)
+
+        other_dir = tmp_path / "elsewhere"
+        other_dir.mkdir()
+        monkeypatch.chdir(other_dir)
+
+        result = runner.invoke(main, ["--config", str(project / "groundtruth.toml"), "assert", "--spec", "GOV-01"])
+        assert result.exit_code == 0
+
+    def test_history_from_outside_project_dir(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """gt --config <project>/groundtruth.toml history must show seeded data."""
+        project = tmp_path / "my-project"
+        self._init_and_seed(runner, project)
+
+        other_dir = tmp_path / "away"
+        other_dir.mkdir()
+        monkeypatch.chdir(other_dir)
+
+        result = runner.invoke(main, ["--config", str(project / "groundtruth.toml"), "history"])
+        assert result.exit_code == 0
+        assert "GOV-" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Regression: import validation (Codex P2)
+# ---------------------------------------------------------------------------
+
+
+class TestImportValidation:
+    """Verify that gt import rejects malformed input instead of silently succeeding."""
+
+    def test_import_unknown_table_warns(self, runner: CliRunner, project_dir: Path) -> None:
+        """Import with an unknown table name should warn and skip it."""
+        bad_json = project_dir / "bad.json"
+        bad_json.write_text(
+            json.dumps({"tables": {"nonexistent_table": [{"col": "val"}]}}),
+            encoding="utf-8",
+        )
+        result = runner.invoke(main, [
+            "--config", str(project_dir / "groundtruth.toml"),
+            "import", str(bad_json), "--merge",
+        ])
+        assert result.exit_code == 0
+        assert "Skipped unknown tables" in result.output or "Imported 0" in result.output
+
+    def test_import_unknown_columns_rejects_without_merge(self, runner: CliRunner, project_dir: Path) -> None:
+        """Import with unknown columns should fail loudly without --merge."""
+        bad_json = project_dir / "bad_cols.json"
+        bad_json.write_text(
+            json.dumps({"tables": {"specifications": [{"bogus_column": "val"}]}}),
+            encoding="utf-8",
+        )
+        result = runner.invoke(main, [
+            "--config", str(project_dir / "groundtruth.toml"),
+            "import", str(bad_json),
+        ])
+        assert result.exit_code != 0
+        assert "Unknown columns" in result.output
+
+    def test_import_unknown_columns_skips_in_merge(self, runner: CliRunner, project_dir: Path) -> None:
+        """Import with unknown columns in merge mode should skip and warn."""
+        bad_json = project_dir / "bad_cols_merge.json"
+        bad_json.write_text(
+            json.dumps({"tables": {"specifications": [{"bogus_column": "val"}]}}),
+            encoding="utf-8",
+        )
+        result = runner.invoke(main, [
+            "--config", str(project_dir / "groundtruth.toml"),
+            "import", str(bad_json), "--merge",
+        ])
+        assert result.exit_code == 0
+        assert "WARNING" in result.output or "rejected" in result.output

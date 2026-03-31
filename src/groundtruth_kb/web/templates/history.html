@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Change History{% endblock %}
+{% block content %}
+<h1>Change History</h1>
+
+<form class="filter-bar" method="get" action="/history">
+    <select name="changed_by">
+        <option value="">All authors</option>
+        {% for author in authors %}
+        <option value="{{ author }}" {% if filters.changed_by == author %}selected{% endif %}>{{ author }}</option>
+        {% endfor %}
+    </select>
+    <select name="table">
+        <option value="">All tables</option>
+        <option value="specifications" {% if filters.table == 'specifications' %}selected{% endif %}>specifications</option>
+        <option value="test_procedures" {% if filters.table == 'test_procedures' %}selected{% endif %}>test_procedures</option>
+        <option value="operational_procedures" {% if filters.table == 'operational_procedures' %}selected{% endif %}>operational_procedures</option>
+    </select>
+    <button type="submit">Filter</button>
+    <a href="/history" class="btn-clear">Clear</a>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Table</th>
+            <th>ID</th>
+            <th>v</th>
+            <th>Title</th>
+            <th>By</th>
+            <th>Reason</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for change in changes %}
+        <tr>
+            <td class="mono">{{ change.changed_at[:16] }}</td>
+            <td>{{ change.table_name }}</td>
+            <td class="mono">
+                {% if change.table_name == 'specifications' %}
+                <a href="/specs/{{ change.record_id }}">{{ change.record_id }}</a>
+                {% elif change.table_name == 'test_procedures' %}
+                <a href="/tests/{{ change.record_id }}">{{ change.record_id }}</a>
+                {% elif change.table_name == 'operational_procedures' %}
+                <a href="/ops/{{ change.record_id }}">{{ change.record_id }}</a>
+                {% else %}{{ change.record_id }}{% endif %}
+            </td>
+            <td>{{ change.version }}</td>
+            <td>{{ change.title }}</td>
+            <td>{{ change.changed_by }}</td>
+            <td class="truncate">{{ change.change_reason }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

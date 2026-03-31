@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Test: {{ proc.id }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs">
+    <a href="/tests">Test Procedures</a> &raquo; {{ proc.id }}
+</div>
+
+<h1>{{ proc.title }}</h1>
+
+<div class="detail-grid">
+    <div class="detail-row"><strong>ID:</strong> <span class="mono">{{ proc.id }}</span></div>
+    <div class="detail-row"><strong>Type:</strong> {{ proc.type or '—' }}</div>
+    <div class="detail-row"><strong>Assertion count:</strong> {{ proc.assertion_count or 0 }}</div>
+    <div class="detail-row"><strong>Last status:</strong>
+        {% if proc.last_execution_status %}
+        <span class="{{ 'pass' if proc.last_execution_status == 'PASS' else 'fail' }}">
+            {{ proc.last_execution_status }}
+        </span>
+        {% else %}—{% endif %}
+    </div>
+    <div class="detail-row"><strong>Version:</strong> {{ proc.version }}</div>
+    <div class="detail-row"><strong>Last changed:</strong> {{ proc.changed_at }} by {{ proc.changed_by }}</div>
+</div>
+
+{% if proc.content %}
+<h2>Procedure</h2>
+<div class="description-box">{{ proc.content }}</div>
+{% endif %}
+
+<h2>Version History ({{ history|length }} versions)</h2>
+<table>
+    <thead>
+        <tr><th>v</th><th>Status</th><th>Assertions</th><th>Changed at</th><th>By</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+        {% for h in history %}
+        <tr {% if h.version == proc.version %}class="current-version"{% endif %}>
+            <td>{{ h.version }}</td>
+            <td>{{ h.last_execution_status or '—' }}</td>
+            <td>{{ h.assertion_count or 0 }}</td>
+            <td class="mono">{{ h.changed_at }}</td>
+            <td>{{ h.changed_by }}</td>
+            <td>{{ h.change_reason }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
