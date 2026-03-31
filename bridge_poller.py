@@ -8,7 +8,10 @@ without manual inbox checks.
 
 Behavior:
 - Polls notifications with wait_for_notifications() in a timed loop.
-- Auto-accepts new non-ack peer messages (codex<->prime).
+- Detects new peer messages and wakes follow-up handling without auto-accepting
+  substantive work.
+- Treats breach notifications and invalid-message notifications as direct wake
+  signals for the responsible agent.
 - Auto-resolves pure protocol acknowledgements ("Accepted:" / "Negotiation:").
 - Persists last processed notification event ID to disk.
 - Uses a file lock to prevent duplicate pollers per agent.
@@ -28,6 +31,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import msvcrt
+
+from bridge_worker_context import DEFAULT_MAX_DISPATCH_TARGETS
+from bridge_resident_worker import resident_worker_should_defer
+
+BREACH_EVENT_TYPES = {
+    "thread.ack_breach",
+    "thread.response_window_breach",
+    "thread.claimed_silence_breach",
+}
+DIRECT_WAKE_EVENT_TYPES = BREACH_EVENT_TYPES | {"message.invalid"}
+SUBSTANTIVE_WAKE_COOLDOWN_SECONDS = 5 * 60
 
 
 def _now() -> str:
@@ -79,9 +93,15 @@ class _FileLock:
 
 def _load_state(path: Path) -> dict:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            raise ValueError("poller state must be a dict")
+        wake_state = state.get("last_wake_by_message")
+        if not isinstance(wake_state, dict):
+            state["last_wake_by_message"] = {}
+        return state
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {"last_event_id": 0, "updated_at": _now()}
+        return {"last_event_id": 0, "updated_at": _now(), "last_wake_by_message": {}}
 
 
 def _save_state(path: Path, state: dict) -> None:
@@ -111,6 +131,8 @@ def _append_log(path: Path, message: str) -> None:
 
 
 def _is_protocol_ack(item: dict) -> bool:
+    if item.get("message_kind") == "protocol_ack":
+        return True
     subject = (item.get("subject") or "").strip().lower()
     payload = item.get("payload") or {}
     tags = set(item.get("tags") or [])
@@ -125,9 +147,16 @@ def _is_protocol_ack(item: dict) -> bool:
     return False
 
 
-def _launch_codex_wake(project_dir: Path, message_ids: list[str], log_file: Path) -> bool:
+def _launch_agent_wake(
+    agent: str,
+    project_dir: Path,
+    message_ids: list[str],
+    log_file: Path,
+    *,
+    trigger: str,
+) -> list[str]:
     if not message_ids:
-        return False
+        return []
 
     python_exe = Path(sys.executable)
     pythonw_exe = python_exe.with_name("pythonw.exe")
@@ -135,10 +164,19 @@ def _launch_codex_wake(project_dir: Path, message_ids: list[str], log_file: Path
     wake_script = project_dir / "scripts" / "codex_bridge_wake.py"
     if not wake_script.exists():
         _append_log(log_file, f"wake skipped: script missing at {wake_script}")
-        return False
+        return []
 
-    cmd = [str(runner), str(wake_script), "--trigger", "poller-notification"]
-    for message_id in sorted(set(message_ids)):
+    unique_ids = sorted(set(message_ids))
+    launch_ids = unique_ids[:DEFAULT_MAX_DISPATCH_TARGETS]
+    deferred_ids = unique_ids[DEFAULT_MAX_DISPATCH_TARGETS:]
+    if deferred_ids:
+        _append_log(
+            log_file,
+            f"wake launch capped at {DEFAULT_MAX_DISPATCH_TARGETS}; deferred_message_ids={','.join(deferred_ids)}",
+        )
+
+    cmd = [str(runner), str(wake_script), "--agent", agent, "--trigger", trigger]
+    for message_id in launch_ids:
         cmd.extend(["--message-id", message_id])
 
     try:
@@ -150,11 +188,138 @@ def _launch_codex_wake(project_dir: Path, message_ids: list[str], log_file: Path
         if os.name == "nt":
             popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
         subprocess.Popen(cmd, **popen_kwargs)
-        _append_log(log_file, f"wake launched for message_ids={','.join(sorted(set(message_ids)))}")
-        return True
+        _append_log(
+            log_file,
+            f"wake launched agent={agent} trigger={trigger} message_ids={','.join(launch_ids)}",
+        )
+        return launch_ids
     except Exception as exc:
         _append_log(log_file, f"wake launch failed for {message_ids}: {exc}")
+        return []
+
+
+def _notification_message_ref(event: dict) -> str | None:
+    details = event.get("details") or {}
+    for candidate in (
+        details.get("thread_id"),
+        details.get("latest_request_message_id"),
+        details.get("latest_substantive_message_id"),
+        event.get("message_id"),
+    ):
+        if candidate:
+            return str(candidate)
+    return None
+
+
+def _notification_should_wake(agent: str, event: dict) -> bool:
+    event_type = str(event.get("event_type") or "")
+    details = event.get("details") or {}
+    if event_type in BREACH_EVENT_TYPES:
+        return details.get("current_assignee") == agent
+    if event_type == "message.invalid":
+        return details.get("sender") == agent
+    return False
+
+
+def _last_wake_at(state: dict, message_id: str) -> datetime | None:
+    wake_state = state.get("last_wake_by_message", {})
+    if not isinstance(wake_state, dict):
+        return None
+    value = wake_state.get(message_id)
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _should_wake_substantive_item(
+    item: dict,
+    state: dict,
+    *,
+    cooldown_seconds: int = SUBSTANTIVE_WAKE_COOLDOWN_SECONDS,
+) -> bool:
+    message_id = str(item.get("id") or "")
+    if not message_id or item.get("status") == "invalid":
         return False
+    last_wake = _last_wake_at(state, message_id)
+    if last_wake is None:
+        return True
+    return (datetime.now(timezone.utc) - last_wake).total_seconds() >= cooldown_seconds
+
+
+def _record_wake_launch(state: dict, message_ids: list[str]) -> None:
+    if not message_ids:
+        return
+    wake_state = state.setdefault("last_wake_by_message", {})
+    if not isinstance(wake_state, dict):
+        wake_state = {}
+        state["last_wake_by_message"] = wake_state
+    timestamp = _now()
+    for message_id in sorted(set(message_ids)):
+        wake_state[message_id] = timestamp
+
+
+def _resident_worker_health(
+    agent: str,
+    *,
+    hooks_dir: Path,
+) -> tuple[bool, str]:
+    return resident_worker_should_defer(agent, [], hooks_dir=hooks_dir)
+
+
+def _resident_worker_should_defer_wake(
+    agent: str,
+    wake_candidates: list[str],
+    *,
+    hooks_dir: Path,
+    now: datetime | None = None,
+) -> tuple[bool, str]:
+    return resident_worker_should_defer(
+        agent,
+        wake_candidates,
+        hooks_dir=hooks_dir,
+        now=now,
+    )
+
+
+def _handle_notification_batch(
+    bridge,
+    agent: str,
+    events: list[dict],
+    log_file: Path,
+) -> dict:
+    summary = {
+        "breach_events": 0,
+        "invalid_events": 0,
+        "wake_refs": [],
+    }
+
+    for event in events:
+        event_type = str(event.get("event_type") or "")
+        if event_type not in DIRECT_WAKE_EVENT_TYPES:
+            continue
+
+        message_ref = _notification_message_ref(event)
+        if not message_ref:
+            continue
+
+        if event_type in BREACH_EVENT_TYPES:
+            summary["breach_events"] += 1
+        elif event_type == "message.invalid":
+            summary["invalid_events"] += 1
+
+        details = event.get("details") or {}
+        _append_log(
+            log_file,
+            f"signal event: type={event_type} ref={message_ref} subject={event.get('subject','')} details={json.dumps(details, sort_keys=True)}",
+        )
+        if _notification_should_wake(agent, event):
+            summary["wake_refs"].append(message_ref)
+
+    summary["wake_refs"] = sorted(set(summary["wake_refs"]))
+    return summary
 
 
 def _handle_inbox(
@@ -163,22 +328,31 @@ def _handle_inbox(
     peer: str,
     log_file: Path,
     *,
+    state: dict,
     project_dir: Path,
     write_enabled: bool,
+    resident_worker_healthy: bool = False,
 ) -> dict:
     """
     Handle new inbox items for `agent`.
 
     - Protocol acks are claimed and auto-resolved.
-    - Non-ack peer messages are auto-accepted.
+    - Non-ack peer messages are surfaced for explicit accept/negotiation,
+      never auto-accepted.
+    - Invalid inbox items remain visible in runtime reporting, but are not
+      surfaced as fresh actionable work.
+    - Repeated wake for the same unresolved substantive item is suppressed for
+      a short cooldown window.
     """
     summary = {
         "detected": 0,
-        "accepted": 0,
+        "surfaced": 0,
         "resolved_acks": 0,
+        "invalid_inbox": 0,
         "readonly_skips": 0,
+        "resident_deferrals": 0,
         "errors": 0,
-        "wake_launched": 0,
+        "wake_candidates": [],
     }
     inbox = bridge.list_inbox(agent=agent, status="new", limit=100)
     items = inbox.get("items", [])
@@ -194,13 +368,27 @@ def _handle_inbox(
             continue
         summary["detected"] += 1
 
+        if item.get("status") == "invalid":
+            summary["invalid_inbox"] += 1
+            _append_log(
+                log_file,
+                f"invalid substantive item ignored for wake: {message_id} :: {subject}",
+            )
+            continue
+
         if not write_enabled:
             summary["readonly_skips"] += 1
             _append_log(
                 log_file,
                 f"detected (read-only mode, no auto-ack): {message_id} :: {subject}",
             )
-            if agent == "codex" and not _is_protocol_ack(item):
+            if not _is_protocol_ack(item):
+                if not _should_wake_substantive_item(item, state):
+                    _append_log(
+                        log_file,
+                        f"suppressed repeat wake: {message_id} :: {subject}",
+                    )
+                    continue
                 wake_candidates.append(message_id)
             continue
 
@@ -218,30 +406,26 @@ def _handle_inbox(
                     _append_log(log_file, f"resolved ack: {message_id} :: {subject}")
                 continue
 
-            accepted = bridge.accept_message(
-                message_id=message_id,
-                agent=agent,
-                note=(
-                    f"Auto-accepted by {agent} periodic bridge poller at {_now()}. "
-                    "Codex/Prime will continue execution without manual inbox polling."
-                ),
-            )
-            if accepted.get("ok"):
-                summary["accepted"] += 1
-                _append_log(log_file, f"accepted: {message_id} :: {subject}")
-            else:
-                summary["errors"] += 1
+            if not _should_wake_substantive_item(item, state):
+                _append_log(log_file, f"suppressed repeat wake: {message_id} :: {subject}")
+                continue
+
+            if resident_worker_healthy:
+                summary["resident_deferrals"] += 1
                 _append_log(
                     log_file,
-                    f"accept failed: {message_id} :: status={accepted.get('status')}",
+                    f"resident worker healthy; deferring substantive wake: {message_id} :: {subject}",
                 )
+                continue
+
+            summary["surfaced"] += 1
+            _append_log(log_file, f"surfaced substantive work (no auto-accept): {message_id} :: {subject}")
+            wake_candidates.append(message_id)
         except Exception as exc:
             summary["errors"] += 1
             _append_log(log_file, f"error handling {message_id}: {exc}")
 
-    if wake_candidates and _launch_codex_wake(project_dir, wake_candidates, log_file):
-        summary["wake_launched"] = len(set(wake_candidates))
-
+    summary["wake_candidates"] = sorted(set(wake_candidates))
     return summary
 
 
@@ -296,20 +480,63 @@ def run(args: argparse.Namespace) -> int:
 
         if args.once:
             try:
+                resident_worker_healthy, resident_worker_state = _resident_worker_health(
+                    args.agent,
+                    hooks_dir=hooks_dir,
+                )
                 events = bridge.list_notifications(
                     agent=args.agent,
                     after_event_id=last_event_id,
                     limit=args.limit,
                 )
                 last_event_id = max(last_event_id, int(events.get("last_event_id", last_event_id)))
+                event_items = events.get("items", [])
+                signals = _handle_notification_batch(
+                    bridge,
+                    args.agent,
+                    event_items,
+                    log_file,
+                )
                 handled = _handle_inbox(
                     bridge,
                     args.agent,
                     peer,
                     log_file,
+                    state=state,
                     project_dir=project_dir,
                     write_enabled=write_enabled,
+                    resident_worker_healthy=resident_worker_healthy,
                 )
+                wake_candidates = sorted(
+                    set(handled["wake_candidates"]) | set(signals["wake_refs"])
+                )
+                trigger = "poller-breach" if signals["breach_events"] else "poller-notification"
+                wake_launched = 0
+                resident_worker_should_defer, resident_worker_state = _resident_worker_should_defer_wake(
+                    args.agent,
+                    wake_candidates,
+                    hooks_dir=hooks_dir,
+                )
+                if wake_candidates and resident_worker_should_defer:
+                    handled["resident_deferrals"] += len(wake_candidates)
+                    _append_log(
+                        log_file,
+                        f"resident worker healthy ({resident_worker_state}); fallback wake suppressed for {','.join(wake_candidates)}",
+                    )
+                elif wake_candidates:
+                    launched_ids = _launch_agent_wake(
+                        args.agent,
+                        project_dir,
+                        wake_candidates,
+                        log_file,
+                        trigger=trigger,
+                    )
+                    if launched_ids:
+                        _record_wake_launch(state, launched_ids)
+                        wake_launched = len(launched_ids)
+                handled["wake_launched"] = wake_launched
+                handled["signal_breach_events"] = signals["breach_events"]
+                handled["signal_invalid_events"] = signals["invalid_events"]
                 _checkpoint()
                 print(
                     json.dumps(
@@ -331,6 +558,10 @@ def run(args: argparse.Namespace) -> int:
         _append_log(log_file, f"poller start: agent={args.agent}, last_event_id={last_event_id}")
         while True:
             try:
+                resident_worker_healthy, resident_worker_state = _resident_worker_health(
+                    args.agent,
+                    hooks_dir=hooks_dir,
+                )
                 event_batch = bridge.wait_for_notifications(
                     agent=args.agent,
                     after_event_id=last_event_id,
@@ -339,23 +570,69 @@ def run(args: argparse.Namespace) -> int:
                     limit=args.limit,
                 )
                 if event_batch.get("notified"):
+                    event_items = event_batch.get("items", [])
                     last_event_id = max(
                         last_event_id,
                         int(event_batch.get("last_event_id", last_event_id)),
+                    )
+                    signals = _handle_notification_batch(
+                        bridge,
+                        args.agent,
+                        event_items,
+                        log_file,
                     )
                     handled = _handle_inbox(
                         bridge,
                         args.agent,
                         peer,
                         log_file,
+                        state=state,
                         project_dir=project_dir,
                         write_enabled=write_enabled,
+                        resident_worker_healthy=resident_worker_healthy,
                     )
+                    wake_candidates = sorted(
+                        set(handled["wake_candidates"]) | set(signals["wake_refs"])
+                    )
+                    trigger = "poller-breach" if signals["breach_events"] else "poller-notification"
+                    resident_worker_should_defer, resident_worker_state = _resident_worker_should_defer_wake(
+                        args.agent,
+                        wake_candidates,
+                        hooks_dir=hooks_dir,
+                    )
+                    if wake_candidates and resident_worker_should_defer:
+                        handled["wake_launched"] = 0
+                        handled["resident_deferrals"] += len(wake_candidates)
+                        _append_log(
+                            log_file,
+                            f"resident worker healthy ({resident_worker_state}); fallback wake suppressed for {','.join(wake_candidates)}",
+                        )
+                    elif wake_candidates:
+                        launched_ids = _launch_agent_wake(
+                            args.agent,
+                            project_dir,
+                            wake_candidates,
+                            log_file,
+                            trigger=trigger,
+                        )
+                        if launched_ids:
+                            _record_wake_launch(state, launched_ids)
+                            handled["wake_launched"] = len(launched_ids)
+                        else:
+                            handled["wake_launched"] = 0
+                    else:
+                        handled["wake_launched"] = 0
+                    handled["signal_breach_events"] = signals["breach_events"]
+                    handled["signal_invalid_events"] = signals["invalid_events"]
                     if (
                         handled["detected"]
-                        or handled["accepted"]
+                        or handled["surfaced"]
+                        or handled["invalid_inbox"]
                         or handled["resolved_acks"]
+                        or handled["signal_breach_events"]
+                        or handled["signal_invalid_events"]
                         or handled["readonly_skips"]
+                        or handled["resident_deferrals"]
                         or handled["errors"]
                         or handled["wake_launched"]
                     ):
@@ -363,9 +640,13 @@ def run(args: argparse.Namespace) -> int:
                             log_file,
                             "cycle: "
                             f"detected={handled['detected']} "
-                            f"accepted={handled['accepted']} "
+                            f"surfaced={handled['surfaced']} "
+                            f"invalid_inbox={handled['invalid_inbox']} "
                             f"resolved_acks={handled['resolved_acks']} "
+                            f"signal_breach_events={handled['signal_breach_events']} "
+                            f"signal_invalid_events={handled['signal_invalid_events']} "
                             f"readonly_skips={handled['readonly_skips']} "
+                            f"resident_deferrals={handled['resident_deferrals']} "
                             f"wake_launched={handled['wake_launched']} "
                             f"errors={handled['errors']} "
                             f"last_event_id={last_event_id}",
@@ -383,11 +664,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--auto-actions",
         action="store_true",
-        help="Enable auto-accept/auto-resolve writes (requires bridge DB write access).",
+        help="Enable protocol-ack auto-resolve writes (substantive work is never auto-accepted).",
     )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--timeout-seconds", type=int, default=20, help="Long-poll timeout")
-    parser.add_argument("--poll-interval-ms", type=int, default=500, help="Within-call poll interval")
+    parser.add_argument("--poll-interval-ms", type=int, default=100, help="Within-call poll interval")
     parser.add_argument("--limit", type=int, default=50, help="Max events per poll")
     parser.add_argument(
         "--error-backoff-seconds",

@@ -7,6 +7,7 @@ param(
 
   [int]$IntervalMinutes = 1,
   [int]$PollTimeoutSeconds = 20,
+  [int]$PollIntervalMs = 100,
   [bool]$AutoActions = $false
 )
 
@@ -33,7 +34,7 @@ $arguments = "bridge_poller.py --agent $Agent"
 if ($Mode -eq "once") {
   $arguments += " --once"
 } else {
-  $arguments += " --timeout-seconds $PollTimeoutSeconds --poll-interval-ms 500 --limit 50"
+  $arguments += " --timeout-seconds $PollTimeoutSeconds --poll-interval-ms $PollIntervalMs --limit 50"
 }
 if ($AutoActions) {
   $arguments += " --auto-actions"

@@ -1,7 +1,8 @@
 # Agent Red Customer Experience — AGNTCY Directory Integration
 #
 # Provides dynamic agent discovery via the AGNTCY Directory registry,
-# replacing the hardcoded AgentTopic enum for agent routing (SPEC-1789).
+# replacing the hardcoded AgentTopic enum for agent routing
+# (SPEC-1789 retired; canonical identity now SPEC-1852).
 #
 # Architecture:
 #   - Agents register with the Directory on container startup
@@ -34,17 +35,19 @@ ORG_NAMESPACE = os.environ.get(
 # Agent version (matches product version for consistency)
 AGENT_VERSION = os.environ.get("PRODUCT_VERSION", "1.89.0")
 
-# Well-known agent names — these are the canonical identifiers for the
-# 7-agent pipeline. Used for both Directory registration and static fallback.
-AGENT_NAMES: tuple[str, ...] = (
-    "intent-classifier",
-    "knowledge-retrieval",
-    "response-generator",
-    "escalation-handler",
-    "analytics-collector",
-    "critic-supervisor",
-    "co-pilot",
-)
+# Agent names sourced from registry (SPEC-1852). Lazy-loaded to avoid
+# import-time initialization of the plugin registry.
+_agent_names_cache: tuple[str, ...] | None = None
+
+
+def _get_agent_names() -> tuple[str, ...]:
+    global _agent_names_cache
+    if _agent_names_cache is None:
+        from src.agents.plugins.registry import PluginAgentRegistry
+        _agent_names_cache = tuple(
+            PluginAgentRegistry.get_instance().get_core_agent_ids()
+        )
+    return _agent_names_cache
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +210,7 @@ def resolve_agent(agent_name: str) -> dict[str, Any] | None:
             )
 
     # Static fallback — agent exists in well-known list
-    if agent_name in AGENT_NAMES:
+    if agent_name in _get_agent_names():
         return {
             "name": f"{ORG_NAMESPACE}/{agent_name}",
             "version": AGENT_VERSION,
@@ -247,7 +250,7 @@ def list_agents() -> list[dict[str, Any]]:
 
     # Merge with static registry (ensure all well-known agents are listed)
     listed_names = {a.get("short_name") for a in agents}
-    for agent_name in AGENT_NAMES:
+    for agent_name in _get_agent_names():
         if agent_name not in listed_names:
             agents.append({
                 "name": f"{ORG_NAMESPACE}/{agent_name}",
@@ -291,7 +294,7 @@ def get_directory_status() -> dict[str, Any]:
         "directory_available": _directory_available,
         "directory_addr": DIRECTORY_ADDR or None,
         "registered_agents": list(_agent_cache.keys()),
-        "total_known_agents": len(AGENT_NAMES),
+        "total_known_agents": len(_get_agent_names()),
         "discovery_mode": "directory" if _directory_available else "static",
     }
 
@@ -310,7 +313,7 @@ async def init_agent_directory() -> None:
         logger.info(
             "AGNTCY Directory not available — using static agent registry "
             "with %d well-known agents",
-            len(AGENT_NAMES),
+            len(_get_agent_names()),
         )
 
 

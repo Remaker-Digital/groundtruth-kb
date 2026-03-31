@@ -404,6 +404,8 @@ class TenantNATSManager:
                 connect_timeout=CONNECT_TIMEOUT_SECONDS,
                 reconnect_time_wait=RECONNECT_TIME_WAIT_SECONDS,
                 max_reconnect_attempts=MAX_RECONNECT_ATTEMPTS,
+                ping_interval=30,  # WI-1657: 30s keepalive for Container Apps Envoy idle timeout
+                max_outstanding_pings=3,  # WI-1657: allow 3 missed pings before disconnect
                 error_cb=self._error_callback,
                 disconnected_cb=self._disconnected_callback,
                 reconnected_cb=self._reconnected_callback,

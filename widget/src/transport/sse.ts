@@ -236,8 +236,16 @@ export class SSEConnection {
       }
 
       case 'validated': {
-        // Critic approved — mark the streaming message as complete
-        store.updateLastAgentMessage(this.currentStreamContent, false);
+        // Critic approved — mark the streaming message as complete.
+        // B1: pass structured sources when present in validated payload.
+        let validatedSources: Array<{ title: string; url?: string }> | undefined;
+        try {
+          const payload = JSON.parse(event.data);
+          if (Array.isArray(payload.sources)) {
+            validatedSources = payload.sources;
+          }
+        } catch { /* raw data — no sources */ }
+        store.updateLastAgentMessage(this.currentStreamContent, false, validatedSources);
         this.currentStreamContent = '';
         break;
       }

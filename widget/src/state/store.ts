@@ -30,6 +30,8 @@ export interface Message {
   retracted?: boolean;
   /** Per-message feedback rating: 'positive' or 'negative' (SPEC-1836). */
   feedbackRating?: 'positive' | 'negative' | null;
+  /** Structured source attribution from validated event (B1). */
+  sources?: Array<{ title: string; url?: string }>;
 }
 
 export interface PreChatData {
@@ -136,11 +138,20 @@ class Store {
   }
 
   /** Update the last agent message (for streaming token append). */
-  updateLastAgentMessage(content: string, streaming: boolean): void {
+  updateLastAgentMessage(
+    content: string,
+    streaming: boolean,
+    sources?: Array<{ title: string; url?: string }>,
+  ): void {
     const messages = [...this.state.messages];
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'agent' && messages[i].streaming) {
-        messages[i] = { ...messages[i], content, streaming };
+        messages[i] = {
+          ...messages[i],
+          content,
+          streaming,
+          ...(sources ? { sources } : {}),
+        };
         break;
       }
     }

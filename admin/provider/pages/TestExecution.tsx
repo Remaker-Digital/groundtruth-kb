@@ -156,8 +156,9 @@ export const TestExecutionPage: React.FC = () => {
   const [triggerSuites, setTriggerSuites] = useState<string[]>([]);
   const [triggering, setTriggering] = useState(false);
 
-  // Dynamic suite availability — fetched from backend
+  // Dynamic suite availability + counts — fetched from backend (WI-1647)
   const [availableSuites, setAvailableSuites] = useState<Set<string> | null>(null);
+  const [suiteEstimates, setSuiteEstimates] = useState<Record<string, string>>({});
 
   // Detail modal — track by ID, derive data from runs to stay in sync with polling
   const [detailRunId, setDetailRunId] = useState<string | null>(null);
@@ -188,15 +189,22 @@ export const TestExecutionPage: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           const names = new Set<string>();
-          // In-process suites
-          (data.inprocess || []).forEach((s: any) => {
-            if (s.runnable !== false) names.add(s.name);
-          });
-          // Test host suites
-          (data.testhost || []).forEach((s: any) => {
-            if (s.runnable !== false) names.add(s.name);
-          });
+          const estimates: Record<string, string> = {};
+          // In-process + test host suites
+          for (const list of [data.inprocess || [], data.testhost || []]) {
+            for (const s of list) {
+              if (s.runnable !== false) names.add(s.name);
+              // WI-1647: Build dynamic estimate string from API response
+              if (s.estimatedCount != null) {
+                const countStr = s.estimatedCount >= 1000
+                  ? `~${(s.estimatedCount / 1000).toFixed(1)}k` : `~${s.estimatedCount}`;
+                const dur = s.estimatedDuration || '';
+                estimates[s.name] = dur ? `${countStr} checks, ${dur}` : `${countStr} checks`;
+              }
+            }
+          }
           setAvailableSuites(names);
+          setSuiteEstimates(estimates);
           // Deselect any suites that are no longer available
           setTriggerSuites(prev => prev.filter(s => names.has(s)));
         }
@@ -391,7 +399,7 @@ export const TestExecutionPage: React.FC = () => {
                         label={
                           <Group gap={6}>
                             <Text size="sm">{suite.label}</Text>
-                            <Text size="xs" c="dimmed">({suite.estimate})</Text>
+                            <Text size="xs" c="dimmed">({suiteEstimates[suite.value] || suite.estimate})</Text>
                           </Group>
                         }
                         checked={triggerSuites.includes(suite.value)}

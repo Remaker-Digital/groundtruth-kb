@@ -10,7 +10,7 @@ Supervision features:
   - Detects unexpected exit and auto-restarts (up to MAX_RESTARTS in RESTART_WINDOW)
   - Logs startup/exit/restart events with timestamps
   - Proxies stdin/stdout transparently for MCP stdio transport
-  - Health breadcrumb file: .prime-bridge-mcp-health.json
+  - Health breadcrumb file: .prime-bridge-mcp-health.json, including bridge SLA summary
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -65,6 +65,22 @@ def _log(msg: str) -> None:
         f.write(f"[{_now_iso()}] [supervisor] {msg}\n")
 
 
+def _bridge_health_snapshot() -> dict | None:
+    try:
+        import prime_bridge_runtime as bridge
+
+        snapshot = json.loads(bridge.health())
+        return {
+            "schema_version_current": snapshot.get("schema_version_current"),
+            "messages": snapshot.get("messages", {}),
+            "threads": snapshot.get("threads", {}),
+            "sla": snapshot.get("sla", {}),
+            "max_event_id": snapshot.get("max_event_id"),
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 def _write_health(status: str, pid: int | None = None, restarts: int = 0,
                    last_exit: str | None = None) -> None:
     """Write a health breadcrumb for external monitoring."""
@@ -75,6 +91,7 @@ def _write_health(status: str, pid: int | None = None, restarts: int = 0,
         "restarts": restarts,
         "last_exit_reason": last_exit,
         "updated_at": _now_iso(),
+        "bridge_health": _bridge_health_snapshot(),
     }
     try:
         with open(HEALTH_FILE, "w", encoding="utf-8") as f:

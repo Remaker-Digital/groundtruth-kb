@@ -729,6 +729,8 @@ class SuiteInfoItem(CamelCaseModel):
     reason: str = ""
     is_composite: bool = False
     group: str = ""
+    estimated_count: int | None = None  # WI-1647: dynamic test/check count
+    estimated_duration: str | None = None  # WI-1647: estimated run time
 
 
 class AvailableSuitesResponse(CamelCaseModel):
@@ -809,12 +811,27 @@ async def get_available_suites(
             f"Valid: {sorted(VALID_ENVIRONMENTS)}",
         )
 
-    # In-process suites are always available
-    inprocess_suites = [
-        {"name": s, "label": s.replace("_", " ").title(), "runnable": True,
-         "reason": "", "is_composite": False, "group": "quick"}
-        for s in sorted(_INPROCESS_SUITES)
-    ]
+    # WI-1647: Compute in-process suite check counts from VerificationRunner
+    from src.multi_tenant.verification_runner import SUITE_CATEGORIES, SUITE_DESCRIPTIONS
+
+    inprocess_suites = []
+    for s in sorted(_INPROCESS_SUITES):
+        count = None
+        try:
+            # Instantiate a temporary runner to count checks without executing
+            from src.multi_tenant.verification_runner import VerificationRunner
+            runner = VerificationRunner(suite=s, run_id="count-only", fqdn="", environment=environment)
+            categories = SUITE_CATEGORIES.get(s, ["health"])
+            checks = runner._get_checks_for_categories(categories)
+            count = len(checks)
+        except Exception:
+            pass  # Fall back to None if counting fails
+        duration = SUITE_DESCRIPTIONS.get(s, "")
+        inprocess_suites.append({
+            "name": s, "label": s.replace("_", " ").title(), "runnable": True,
+            "reason": "", "is_composite": False, "group": "quick",
+            "estimated_count": count, "estimated_duration": duration,
+        })
 
     # Try to fetch test host suite metadata (includes can_run() results)
     import httpx
@@ -829,13 +846,25 @@ async def get_available_suites(
     except Exception as exc:
         logger.warning("Could not reach test host for suite metadata: %s", exc)
 
+    # WI-1647: Fallback test count registry (updated periodically, better than UI hardcoding)
+    _TESTHOST_COUNT_REGISTRY: dict[str, tuple[int, str]] = {
+        "unit": (950, "~2min"), "core": (3700, "~5min"), "integration": (270, "~3min"),
+        "agents": (430, "~3min"), "security": (290, "~3min"), "ops": (80, "~4min"),
+        "widget": (60, "~2min"), "e2e_live": (25, "~5min"), "load": (10, "~10min"),
+        "fuzzing": (307, "~8min"), "property": (60, "~3min"),
+        "regression_pytest": (55, "~2min"), "full": (6000, "~45min"),
+    }
+
     # If test host is unreachable, fall back to the known suite list
     if not test_host_suites:
-        test_host_suites = [
-            {"name": s, "label": s, "runnable": True, "reason": "",
-             "is_composite": s in ("pipeline", "full"), "group": "comprehensive"}
-            for s in sorted(_TESTHOST_SUITES)
-        ]
+        test_host_suites = []
+        for s in sorted(_TESTHOST_SUITES):
+            count, duration = _TESTHOST_COUNT_REGISTRY.get(s, (None, None))
+            test_host_suites.append({
+                "name": s, "label": s, "runnable": True, "reason": "",
+                "is_composite": s in ("pipeline", "full"), "group": "comprehensive",
+                "estimated_count": count, "estimated_duration": duration,
+            })
 
     return AvailableSuitesResponse(
         environment=environment,

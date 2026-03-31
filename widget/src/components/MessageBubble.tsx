@@ -307,8 +307,52 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
           {formatTime(message.timestamp)}
         </div>
 
-        {/* Source citation — shown below agent messages that reference KB articles */}
+        {/* Source attribution (B1) — structured sources from validated event,
+            fallback to domain extraction from markdown links */}
         {!isCustomer && !message.streaming && (() => {
+          // Prefer structured sources from validated event (B1)
+          if (message.sources && message.sources.length > 0) {
+            return (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: tokens.space1,
+                  marginTop: '2px',
+                  padding: `0 ${tokens.space1}`,
+                  fontSize: tokens.fontSizeXs,
+                  fontFamily: tokens.fontFamily,
+                  color: tokens.colorTextMuted,
+                  lineHeight: 1.3,
+                }}
+              >
+                <SourceIcon size={10} />
+                {message.sources.map((src, i) => (
+                  <span key={i}>
+                    {src.url ? (
+                      <a
+                        href={src.url}
+                        target="_top"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: tokens.colorTextMuted,
+                          textDecoration: 'underline',
+                          textUnderlineOffset: '2px',
+                        }}
+                      >
+                        {src.title}
+                      </a>
+                    ) : (
+                      src.title
+                    )}
+                    {i < message.sources!.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+              </div>
+            );
+          }
+          // Fallback: extract source domains from markdown links in text
           const domains = extractSourceDomains(message.content);
           if (domains.length === 0) return null;
           return (

@@ -536,3 +536,74 @@ class TestDomainScopeEnforcement:
             overlay_store=overlay, staff_domain_tags=("sales-dept",),
         )
         assert route.target == RouteTarget.CORE_PIPELINE
+
+
+# ---------------------------------------------------------------------------
+# Intent confidence threshold (B2, SPEC-1869)
+# ---------------------------------------------------------------------------
+
+
+class TestIntentConfidenceThreshold:
+    """B2: Tenant-configurable IC confidence gating (SPEC-1869)."""
+
+    def test_threshold_disabled_routes_core_pipeline(self, registry, router):
+        """threshold=0.0 (default/disabled) never triggers CLARIFICATION."""
+        route = router.resolve(
+            tenant_id="t-1", intent="general_inquiry", confidence=0.1,
+            intent_confidence_threshold=0.0,
+        )
+        assert route.target == RouteTarget.CORE_PIPELINE
+
+    def test_confidence_below_threshold_routes_clarification(self, registry, router):
+        """Confidence below threshold routes to CLARIFICATION."""
+        route = router.resolve(
+            tenant_id="t-1", intent="general_inquiry", confidence=0.3,
+            intent_confidence_threshold=0.5,
+        )
+        assert route.target == RouteTarget.CLARIFICATION
+        assert route.confidence == 0.3
+
+    def test_confidence_at_threshold_routes_core_pipeline(self, registry, router):
+        """Confidence exactly at threshold proceeds (not strict less-than)."""
+        route = router.resolve(
+            tenant_id="t-1", intent="general_inquiry", confidence=0.5,
+            intent_confidence_threshold=0.5,
+        )
+        assert route.target == RouteTarget.CORE_PIPELINE
+
+    def test_confidence_above_threshold_routes_core_pipeline(self, registry, router):
+        """Confidence above threshold proceeds normally."""
+        route = router.resolve(
+            tenant_id="t-1", intent="general_inquiry", confidence=0.8,
+            intent_confidence_threshold=0.5,
+        )
+        assert route.target == RouteTarget.CORE_PIPELINE
+
+    def test_escalation_bypasses_threshold(self, registry, router):
+        """Escalation intent routes to ESCALATION regardless of threshold."""
+        route = router.resolve(
+            tenant_id="t-1", intent="escalation", confidence=0.1,
+            intent_confidence_threshold=0.9,
+        )
+        assert route.target == RouteTarget.ESCALATION
+
+    def test_co_pilot_bypasses_threshold(self, registry, router):
+        """Team member role routes to CO_PILOT regardless of threshold."""
+        route = router.resolve(
+            tenant_id="t-1", intent="general_inquiry", confidence=0.1,
+            team_member_role="admin",
+            intent_confidence_threshold=0.9,
+        )
+        assert route.target == RouteTarget.CO_PILOT
+
+    def test_clarification_has_priority_over_peer_routing(self, registry, router, binding_svc):
+        """Low confidence clarifies before attempting peer agent routing."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        route = router.resolve(
+            tenant_id="t-1", intent="product_question", confidence=0.2,
+            intent_confidence_threshold=0.5,
+        )
+        assert route.target == RouteTarget.CLARIFICATION

@@ -181,6 +181,17 @@ class ResponseGeneratorAgent(AgentRedBaseAgent):
                 "[Respond warmly and naturally to this greeting. "
                 "Be friendly and conversational. Ask how you can help.]"
             )
+        elif intent == "clarification_needed":
+            # B2: IC confidence was below the tenant's threshold.
+            # Ask a focused follow-up question to disambiguate intent.
+            user_content = (
+                f"{customer_message}\n\n"
+                "[The customer's intent was unclear. DO NOT attempt to answer "
+                "the question directly. Instead, ask ONE concise, friendly "
+                "clarifying question to understand what they need. Keep the "
+                "follow-up specific — reference their words and offer 2-3 "
+                "concrete options when possible. Stay in the brand voice.]"
+            )
         else:
             user_content = customer_message
 

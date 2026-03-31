@@ -145,7 +145,7 @@ class ResponseDecisionTrace:
     intent_confidence: float = 0.0
 
     # Route decision (Phase 2 IntentRouter, SPEC-1861)
-    route_target: str = ""  # core_pipeline | escalation | co_pilot | peer_agent
+    route_target: str = ""  # core_pipeline | escalation | co_pilot | peer_agent | clarification
     route_agent_id: str | None = None  # peer agent_id if routed
     route_fallback_from: str | None = None  # attempted peer before fallback
 

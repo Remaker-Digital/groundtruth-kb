@@ -45,7 +45,7 @@ import { tokens } from './theme/styles';
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = 'visual' | 'behavior' | 'content';
+type Tab = 'visual' | 'behavior' | 'content' | 'security';
 
 interface WidgetConfig {
   // Visual (12)
@@ -92,6 +92,8 @@ interface WidgetConfig {
   widget_header_subtitle: string;
   widget_input_placeholder: string;
   widget_page_rules: string[];
+  // Security (WI-1676 / SPEC-1840)
+  approved_widget_origins: string[];
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -135,6 +137,7 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widget_header_subtitle: '',
   widget_input_placeholder: '',
   widget_page_rules: [],
+  approved_widget_origins: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -1378,13 +1381,13 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
 
         {/* Tabs */}
         <div style={s.tabs}>
-          {(['visual', 'behavior', 'content'] as Tab[]).map((tab) => (
+          {(['visual', 'behavior', 'content', 'security'] as Tab[]).map((tab) => (
             <button
               key={tab}
               style={s.tab(activeTab === tab)}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === 'visual' ? 'Visual' : tab === 'behavior' ? 'Behavior' : 'Content & Targeting'}
+              {tab === 'visual' ? 'Visual' : tab === 'behavior' ? 'Behavior' : tab === 'content' ? 'Content & Targeting' : 'Security'}
             </button>
           ))}
         </div>
@@ -1938,6 +1941,75 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 No page rules configured. The widget will appear on all pages.
               </div>
             )}
+          </div>
+        )}
+        {/* ============================================================ */}
+        {/* SECURITY TAB (WI-1676 / SPEC-1840)                          */}
+        {/* ============================================================ */}
+        {activeTab === 'security' && (
+          <div style={s.card}>
+            <h4 style={s.sectionTitle}>Allowed widget origins</h4>
+            <p style={{ fontSize: 13, color: '#888', margin: '0 0 12px' }}>
+              Restrict which domains can use your widget key. When origins are configured,
+              requests from unapproved domains are blocked. Leave empty to allow all origins.
+            </p>
+            {/* Origin list */}
+            {localConfig.approved_widget_origins.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                {localConfig.approved_widget_origins.map((origin, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: isDarkMode ? '#2a2a2a' : '#f5f5f5', borderRadius: 6 }}>
+                    <span style={{ flex: 1, fontSize: 13, fontFamily: 'monospace' }}>{origin}</span>
+                    <button
+                      style={{ border: 'none', background: 'transparent', color: '#e53935', cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}
+                      title="Remove origin"
+                      onClick={() => {
+                        const updated = localConfig.approved_widget_origins.filter((_, idx) => idx !== i);
+                        updateField('approved_widget_origins', updated);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: '#aaa', padding: '8px 0', marginBottom: 12 }}>
+                No origins configured — widget key accepts requests from any domain.
+              </div>
+            )}
+            {/* Add origin input */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id="new-origin-input"
+                type="text"
+                placeholder="https://mystore.myshopify.com"
+                style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #ccc', fontSize: 13, fontFamily: 'monospace' }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const input = e.currentTarget;
+                    const val = input.value.trim().toLowerCase().replace(/\/+$/, '');
+                    if (val && val.startsWith('http') && !localConfig.approved_widget_origins.includes(val)) {
+                      updateField('approved_widget_origins', [...localConfig.approved_widget_origins, val]);
+                      input.value = '';
+                    }
+                  }
+                }}
+              />
+              <button
+                style={{ ...s.saveButton, padding: '8px 16px' }}
+                onClick={() => {
+                  const input = document.getElementById('new-origin-input') as HTMLInputElement;
+                  if (!input) return;
+                  const val = input.value.trim().toLowerCase().replace(/\/+$/, '');
+                  if (val && val.startsWith('http') && !localConfig.approved_widget_origins.includes(val)) {
+                    updateField('approved_widget_origins', [...localConfig.approved_widget_origins, val]);
+                    input.value = '';
+                  }
+                }}
+              >
+                Add origin
+              </button>
+            </div>
           </div>
         )}
         {/* Save draft inputs — persists field edits to draft state */}

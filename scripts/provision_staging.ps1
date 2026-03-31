@@ -84,26 +84,35 @@ az containerapp env create `
 
 # 5. NATS Container App
 Write-Host "`n[5/6] Creating NATS Container App" -ForegroundColor Yellow
+$NATS_BOOTSTRAP = @'
+cat > /tmp/nats.conf <<'EOF'
+jetstream {
+  store_dir: "/tmp/nats/jetstream"
+}
+http: 8222
+websocket {
+  port: 8080
+  no_tls: true
+}
+EOF
+exec nats-server -c /tmp/nats.conf
+'@
 az containerapp create `
   --name agent-red-staging-nats `
   --resource-group $RG `
   --environment agent-red-staging-cae `
   --image nats:2.10-alpine `
   --min-replicas 1 --max-replicas 1 `
-  --target-port 4222 `
+  --target-port 8080 `
   --ingress internal `
-  --transport tcp `
+  --transport auto `
+  --command /bin/sh `
+  --args -c $NATS_BOOTSTRAP `
   --subscription $SUBSCRIPTION `
   --output table
 
 # 6. API Gateway Container App
 Write-Host "`n[6/6] Creating API Gateway Container App" -ForegroundColor Yellow
-
-# Get NATS internal FQDN
-$NATS_FQDN = az containerapp show `
-  --name agent-red-staging-nats `
-  --resource-group $RG `
-  --query "properties.configuration.ingress.fqdn" -o tsv
 
 az containerapp create `
   --name agent-red-staging-gateway `
@@ -124,7 +133,7 @@ az containerapp create `
     USE_AZURE_OPENAI=true `
     USE_REAL_APIS=true `
     USE_AGENT_CONTAINERS=false `
-    NATS_URL="nats://${NATS_FQDN}:4222" `
+    NATS_URL=ws://agent-red-staging-nats `
     GRACEFUL_SHUTDOWN_TIMEOUT=60 `
   --subscription $SUBSCRIPTION `
   --output table

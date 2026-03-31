@@ -42,10 +42,8 @@ MANAGED_ENV_ID = (
 )
 ACR_SERVER = "acragentredeastus.azurecr.io"
 GATEWAY_IMAGE = f"{ACR_SERVER}/api-gateway:v1.85.0"
-NATS_ENDPOINT = (
-    "nats://agent-red-nats.internal."
-    "orangeglacier-f566a4e7.eastus.azurecontainerapps.io:4222"
-)
+AGENT_PORT = 8080
+NATS_ENDPOINT = os.environ.get("AGNTCY_NATS_ENDPOINT", "ws://agent-red-nats")
 OPENAI_ENDPOINT = "https://agent-red-openai.openai.azure.com/"
 
 
@@ -59,7 +57,7 @@ def _build_yaml(agent_name: str, module_path: str, env: str, openai_key: str) ->
                 "activeRevisionsMode": "Single",
                 "ingress": {
                     "external": False,
-                    "targetPort": 8000,
+                    "targetPort": AGENT_PORT,
                     "transport": "Auto",
                 },
                 "registries": [
@@ -75,7 +73,7 @@ def _build_yaml(agent_name: str, module_path: str, env: str, openai_key: str) ->
                             "tini", "--",
                             "uvicorn", module_path,
                             "--host", "0.0.0.0",
-                            "--port", "8000",
+                            "--port", str(AGENT_PORT),
                             "--log-level", "info",
                         ],
                         "resources": {"cpu": 0.5, "memory": "1Gi"},

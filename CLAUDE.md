@@ -2,6 +2,8 @@
 
 This document provides active guidance for AI assistants working on the Agent Red Customer Experience commercial project. It is loaded at the start of every session. **GOV-01: This file MUST NOT exceed 300 lines.**
 
+**Role precedence:** if `AGENTS.md` declares Loyal Opposition mode, that contract overrides any builder-first default in this file. In Loyal Opposition mode, Codex is analysis-first, report-oriented, and non-implementing unless Mike explicitly asks for implementation.
+
 > **📁 Reference data** (legal, pricing, infrastructure, AGNTCY rules): `CLAUDE-REFERENCE.md` — read on demand.
 > **📁 Architecture** (project structure, module inventory): `CLAUDE-ARCHITECTURE.md` — read on demand.
 > **📁 Historical archive** (session logs, technical decisions): `CLAUDE_ARCHIVE.md` — read when investigating historical decisions.
@@ -45,7 +47,9 @@ All new work in this repository must include:
 
 **Owner role:** Provides direction (actions to take) and decisions (specifications to create, approve, or modify). The owner supplies the *what* and *why*.
 
-**Claude role:** Creates, manages, maintains and frequently references all artifacts. Proposes specifications, implements changes, runs tests, and keeps the system internally consistent. Claude is responsible for the *how*. Claude *never assumes* and *always chwecks* before making statements about causes of errors or compliance with specifications.
+**Prime Builder role (Claude Code / Opus):** Creates, manages, maintains and frequently references implementation artifacts. Proposes specifications, implements approved changes, runs tests, and keeps the system internally consistent. Prime Builder is responsible for the *how* during implementation work.
+
+**Loyal Opposition role (Codex):** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work.
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
@@ -156,13 +160,14 @@ Next: [describe task].
 
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
-- **DO NOT create new markdown files** to store project knowledge. Ask: "Should this be a KB record instead?" The answer is always yes.
-- **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), external-facing published docs (wiki, website, legal).
+- **DO NOT create new markdown files** to store canonical project knowledge or session memory outside approved exception paths.
+- **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
 
 ### Session Wrap-Up & Handoff
 
-Execute `/kb-session-wrap <session-id>` for the full 5-phase procedure. Every 5th session is an **audit session** (extra hygiene steps included in the skill).
+- **Prime Builder sessions:** Execute `/kb-session-wrap <session-id>` for the full 5-phase procedure. Every 5th session is an **audit session** (extra hygiene steps included in the skill).
+- **Loyal Opposition sessions:** default wrap-up is an evidence-based report in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` plus unresolved-item updates in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`. Do not update KB, MEMORY.md, push, or deploy unless Mike explicitly asked for it.
 
 ### Session Scheduler
 

@@ -126,7 +126,7 @@ class AgentDispatchMixin:
 
         Uses AGNTCY SDK v0.5.4 A2AClientFactory with A2A protocol.
         SPEC-1802: SLIM/gRPC is always the primary transport.
-        Resolves agent topic via AGNTCY Directory (SPEC-1789) with
+        Resolves agent topic via AGNTCY Directory (SPEC-1852) with
         static fallback.
         """
         import uuid
@@ -142,7 +142,7 @@ class AgentDispatchMixin:
         from src.multi_tenant.agntcy_directory import get_agent_topic
         from src.multi_tenant.agntcy_sdk_integration import create_a2a_client
 
-        # SPEC-1789: Resolve agent topic via Directory (falls back to static)
+        # SPEC-1852: Resolve agent topic via Directory (falls back to static)
         resolved_topic = get_agent_topic(agent_topic)
 
         tenant_id = getattr(self, "_current_tenant_id", "")
@@ -551,7 +551,7 @@ class AgentDispatchMixin:
         remaining_ms = budget.remaining_ms
         timeout_seconds = max(0.5, remaining_ms / 1000)
 
-        # SPEC-1789: Resolve via Directory with static fallback
+        # SPEC-1852: Resolve via Directory with static fallback
         rg_topic = get_agent_topic("response-generator")
         client = create_a2a_client(rg_topic)
         response = await client.send(

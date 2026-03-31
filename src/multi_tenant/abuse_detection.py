@@ -250,18 +250,20 @@ async def _detect_volume_spike(
 async def _detect_widget_abuse(
     tenant_id: str, tenant_doc: dict[str, Any], now: datetime,
 ) -> AbuseSignal | None:
-    """Detect widget origin mismatch.
+    """Detect widget origin mismatch (SPEC-1840).
 
-    Checks if the tenant has a configured widget origin. If not configured,
-    flags as potential widget abuse (open widget without origin restriction).
-    Degrades gracefully on error.
+    Checks if the tenant has configured approved widget origins. If not
+    configured, flags as potential widget abuse (open widget without origin
+    restriction). Degrades gracefully on error.
     """
     try:
-        widget_origin = tenant_doc.get("widget_allowed_origin", "")
+        # SPEC-1840: approved_widget_origins is the canonical field (list).
+        # Fall back to legacy widget_allowed_origin (string) for migration.
+        approved_origins = tenant_doc.get("approved_widget_origins", [])
         widget_key = tenant_doc.get("widget_key", "")
 
         # Flag tenants that have a widget key but no origin restriction
-        if widget_key and not widget_origin:
+        if widget_key and not approved_origins:
             return AbuseSignal(
                 tenant_id=tenant_id,
                 signal_type=SignalType.WIDGET_ABUSE.value,

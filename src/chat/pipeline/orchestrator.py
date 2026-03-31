@@ -488,6 +488,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 tokens_input=intent_result.get("tokens_input", 0),
                 tokens_output=intent_result.get("tokens_output", 0),
             )
+            # Preserve original IC result before any clarification overwrite (Codex P2 fix)
+            trace.set_intent(intent, confidence)
+            detected_intent = intent
 
             yield stage_event(
                 "intent-classifier", "completed",
@@ -527,6 +530,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 logger.debug("Binding cache hydration failed", exc_info=True)
 
             router = IntentRouter()
+            _ict = getattr(
+                self._current_preferences, "intent_confidence_threshold", 0.0
+            )
             route = router.resolve(
                 tenant_id=tenant_id,
                 intent=intent,
@@ -536,6 +542,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 overlay_store=overlay_store,
                 tenant_tier=tier.value if hasattr(tier, "value") else str(tier),
                 staff_domain_tags=staff_domain_tags,
+                intent_confidence_threshold=float(_ict or 0.0),
             )
             trace.set_route_decision(
                 route.target.value, route.agent_id, route.fallback_from,
@@ -578,6 +585,19 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     yield event
                 return
 
+            if route.target == RouteTarget.CLARIFICATION:
+                # B2: IC confidence below tenant threshold.
+                # Override intent so system prompt builder injects a
+                # clarification directive into RG. Continue through the
+                # standard CORE_PIPELINE flow (KR→RG→Critic) so
+                # telemetry, traces, and critic all work normally.
+                intent = "clarification_needed"
+                logger.info(
+                    "IntentRouter: CLARIFICATION route — "
+                    "confidence %.2f below threshold, conv=%s",
+                    confidence, conversation_id,
+                )
+
             if route.target == RouteTarget.ERROR:
                 # Explicit target_agent_id verification failed (SPEC-1862)
                 error_msg = (
@@ -589,7 +609,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 yield done_event(conversation_id, 0, trace_id=trace_id)
                 return
 
-            # CORE_PIPELINE — continue standard KR→RG→Critic flow
+            # CORE_PIPELINE / CLARIFICATION — continue standard KR→RG→Critic flow
 
             # Process KR result
             # For greeting intents, clear knowledge context so the
@@ -714,10 +734,25 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             if approved:
-                # Append source citations if enabled (RAG Phase 1)
+                # Source attribution (B1 — unified with cite_sources_in_response)
+                structured_sources: list[dict[str, str]] | None = None
                 prefs = getattr(self, "_current_preferences", None)
                 if prefs and prefs.cite_sources_in_response and sources:
-                    source_titles = [s.get("title", "") for s in sources if s.get("title")]
+                    # Build structured source list for widget rendering
+                    structured_sources = []
+                    source_titles = []
+                    for s in sources:
+                        title = s.get("title", "")
+                        if not title:
+                            continue
+                        source_titles.append(title)
+                        entry: dict[str, str] = {"title": title}
+                        # Include URL when KR returned a source link
+                        url = s.get("url") or s.get("source_url", "")
+                        if url:
+                            entry["url"] = url
+                        structured_sources.append(entry)
+                    # Append plain-text citation for non-widget consumers
                     if source_titles:
                         citation_line = "\n\nSources: " + ", ".join(source_titles)
                         safe_text = safe_text + citation_line
@@ -739,9 +774,14 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         **({"quality_experiment_variant": quality_experiment_variant,
                             "quality_experiment_id": quality_experiment_id}
                            if quality_experiment_variant else {}),
+                        **({"sources": structured_sources}
+                           if structured_sources else {}),
                     },
                 )
-                yield validated_event(conversation_id, message_id)
+                yield validated_event(
+                    conversation_id, message_id,
+                    sources=structured_sources or None,
+                )
             else:
                 # Critic rejected -- retract streamed text, deliver fallback
                 message_id = await self._session.add_ai_message(
@@ -790,6 +830,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     for s in budget.stages
                 ],
                 "total_latency_ms": int(budget.elapsed_ms),
+                "detected_intent": detected_intent,
                 "intent": intent,
                 "confidence": confidence,
                 "critic_passed": approved,
@@ -805,6 +846,23 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 )
             except Exception:
                 logger.debug("Failed to persist pipeline trace", exc_info=True)
+
+            # SPEC-1874: Langfuse trace export (Lane 1 structural, fire-and-forget)
+            try:
+                from src.observability.langfuse_exporter import (
+                    LANGFUSE_ENABLED,
+                    export_trace as langfuse_export,
+                )
+                if LANGFUSE_ENABLED:
+                    langfuse_export(
+                        decision_trace,
+                        trace_id=trace_id,
+                        system_prompt_template=prompts.get(
+                            AgentRole.RESPONSE_GENERATOR, "",
+                        ),
+                    )
+            except Exception:
+                logger.debug("Langfuse export failed (non-blocking)", exc_info=True)
 
             # SPEC-1855: Emit invocation events for each pipeline stage
             try:

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-28T09:22:43Z",
+  "timestamp": "2026-03-28T10:22:42Z",
   "test": "per_hop_stage_latency",
   "sample_count": 20,
   "stages": {
@@ -7,27 +7,27 @@
       "name": "ic-latency",
       "tier": "per-interface",
       "sample_count": 20,
-      "p50_ms": 19.0,
-      "p95_ms": 26,
-      "p99_ms": 26,
+      "p50_ms": 5.5,
+      "p95_ms": 34,
+      "p99_ms": 34,
       "errors": 0
     },
     "knowledge-retrieval": {
       "name": "kr-latency",
       "tier": "per-interface",
       "sample_count": 20,
-      "p50_ms": 905.0,
-      "p95_ms": 1267,
-      "p99_ms": 1267,
+      "p50_ms": 893.5,
+      "p95_ms": 1844,
+      "p99_ms": 1844,
       "errors": 0
     },
     "response-generator": {
       "name": "rg-latency",
       "tier": "per-interface",
       "sample_count": 20,
-      "p50_ms": 1270.5,
-      "p95_ms": 1932,
-      "p99_ms": 1932,
+      "p50_ms": 1214.0,
+      "p95_ms": 1562,
+      "p99_ms": 1562,
       "errors": 0
     },
     "critic-supervisor": {

@@ -4,7 +4,7 @@ properties:
     activeRevisionsMode: Single
     ingress:
       external: false
-      targetPort: 8000
+      targetPort: 8080
       transport: Auto
     registries:
       - server: acragentredeastus.azurecr.io
@@ -21,7 +21,7 @@ properties:
           - "--host"
           - "0.0.0.0"
           - "--port"
-          - "8000"
+          - "8080"
           - "--log-level"
           - info
         resources:
@@ -35,7 +35,7 @@ properties:
           - name: AZURE_OPENAI_API_KEY
             value: "***REMOVED_SECRET***"
           - name: AGNTCY_NATS_ENDPOINT
-            value: "nats://agent-red-nats.internal.orangeglacier-f566a4e7.eastus.azurecontainerapps.io:4222"
+            value: "ws://agent-red-nats"
     scale:
       minReplicas: 1
       maxReplicas: 3
