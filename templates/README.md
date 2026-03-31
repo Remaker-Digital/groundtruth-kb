@@ -18,6 +18,9 @@ project-owned boundary.
 | `hooks/spec-classifier.py` | UserPromptSubmit hook — detect spec language, enforce spec-first | `.claude/hooks/` |
 | `rules/loyal-opposition.md` | Review agent behavior rules | `.claude/rules/` |
 | `rules/prime-builder.md` | Build agent behavior rules | `.claude/rules/` |
+| `ci/test.yml` | GitHub Actions — pytest + ruff + assertions | `.github/workflows/` |
+| `ci/build.yml` | GitHub Actions — Docker build + registry push | `.github/workflows/` |
+| `ci/deploy.yml` | GitHub Actions — deploy with environment selection | `.github/workflows/` |
 
 ## Usage
 
