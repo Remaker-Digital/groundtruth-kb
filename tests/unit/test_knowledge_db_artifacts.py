@@ -19,6 +19,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools", 
 
 from db import KnowledgeDB
 
+from groundtruth_kb.gates import GateRegistry
+from groundtruth_kb.gates_transport import TransportEvidenceGate
+
 
 @pytest.fixture
 def db():
@@ -29,6 +32,19 @@ def db():
     yield database
     database.close()
     os.unlink(path)
+
+
+@pytest.fixture
+def gated_db(tmp_path):
+    """Create a temporary database with transport evidence gate active."""
+    gate = TransportEvidenceGate(
+        spec_ids={"SPEC-1524", "SPEC-1525", "SPEC-1535", "SPEC-1536", "SPEC-1537", "SPEC-1802"},
+        project_root=tmp_path,
+    )
+    registry = GateRegistry(_gates=[gate])
+    database = KnowledgeDB(tmp_path / "test.db", gate_registry=registry)
+    yield database
+    database.close()
 
 
 # ------------------------------------------------------------------
@@ -579,92 +595,92 @@ class TestTransportGovernanceGate:
     © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
     """
 
-    def test_insert_test_rejects_pass_without_test_file(self, db):
+    def test_insert_test_rejects_pass_without_test_file(self, gated_db):
         """Transport test cannot be inserted with pass and no test_file."""
         from db import TransportEvidenceGateError
-        db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
-            db.insert_test(
+            gated_db.insert_test(
                 "TEST-9001", "Phantom test", "SPEC-1524", "e2e", "Should pass",
                 "test", "gate test", last_result="pass",
             )
 
-    def test_update_test_rejects_pass_without_test_file(self, db):
+    def test_update_test_rejects_pass_without_test_file(self, gated_db):
         """Transport test cannot be updated to pass without test_file."""
         from db import TransportEvidenceGateError
-        db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
-        db.insert_test(
+        gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        gated_db.insert_test(
             "TEST-9001", "Test", "SPEC-1524", "e2e", "Should pass",
             "test", "init", last_result="not_proven",
         )
         with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
-            db.update_test("TEST-9001", "test", "promote", last_result="pass")
+            gated_db.update_test("TEST-9001", "test", "promote", last_result="pass")
 
-    def test_insert_test_rejects_pass_with_fake_file(self, db):
+    def test_insert_test_rejects_pass_with_fake_file(self, gated_db):
         """Transport test cannot be marked pass with a nonexistent file."""
         from db import TransportEvidenceGateError
-        db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="does not exist on disk"):
-            db.insert_test(
+            gated_db.insert_test(
                 "TEST-9001", "Fake path test", "SPEC-1524", "e2e", "Should pass",
                 "test", "gate test",
                 test_file="does/not/exist.py", last_result="pass",
             )
 
-    def test_update_test_rejects_pass_with_fake_file(self, db):
+    def test_update_test_rejects_pass_with_fake_file(self, gated_db):
         """Transport test cannot be updated to pass with a nonexistent file."""
         from db import TransportEvidenceGateError
-        db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
-        db.insert_test(
+        gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        gated_db.insert_test(
             "TEST-9001", "Test", "SPEC-1524", "e2e", "Should pass",
             "test", "init",
         )
         with pytest.raises(TransportEvidenceGateError, match="does not exist on disk"):
-            db.update_test(
+            gated_db.update_test(
                 "TEST-9001", "test", "promote",
                 test_file="does/not/exist.py", last_result="pass",
             )
 
-    def test_insert_spec_rejects_verified_without_evidence(self, db):
+    def test_insert_spec_rejects_verified_without_evidence(self, gated_db):
         """Transport spec cannot be inserted as verified without evidence."""
         from db import TransportEvidenceGateError
         with pytest.raises(TransportEvidenceGateError, match="no linked tests"):
-            db.insert_spec(
+            gated_db.insert_spec(
                 "SPEC-1524", "SLIM transport", "verified", "test", "bypass attempt",
             )
 
-    def test_update_spec_rejects_verified_without_evidence(self, db):
+    def test_update_spec_rejects_verified_without_evidence(self, gated_db):
         """Transport spec cannot be promoted to verified without evidence."""
         from db import TransportEvidenceGateError
-        db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
         with pytest.raises(TransportEvidenceGateError, match="no linked tests"):
-            db.update_spec("SPEC-1524", "test", "promote", status="verified")
+            gated_db.update_spec("SPEC-1524", "test", "promote", status="verified")
 
-    def test_update_spec_rejects_verified_with_fake_file_test(self, db):
+    def test_update_spec_rejects_verified_with_fake_file_test(self, gated_db):
         """Transport spec cannot be verified when linked test has fake file."""
         from db import TransportEvidenceGateError
-        db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
-        db.insert_test(
+        gated_db.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        gated_db.insert_test(
             "TEST-9001", "Fake test", "SPEC-1524", "e2e", "Should pass",
             "test", "init", test_file="does/not/exist.py", last_result="not_proven",
         )
         # Manually set to pass (bypassing the gate by using non-transport spec first)
-        conn = db._get_conn()
+        conn = gated_db._get_conn()
         conn.execute(
             "UPDATE tests SET last_result='pass' WHERE id='TEST-9001' AND version=1"
         )
         conn.commit()
         with pytest.raises(TransportEvidenceGateError, match="does not exist on disk"):
-            db.update_spec("SPEC-1524", "test", "promote", status="verified")
+            gated_db.update_spec("SPEC-1524", "test", "promote", status="verified")
 
-    def test_nontransport_spec_not_gated(self, db):
+    def test_nontransport_spec_not_gated(self, gated_db):
         """Non-transport specs are not affected by the gate."""
-        db.insert_spec("SPEC-0001", "Unrelated spec", "implemented", "test", "init")
-        db.insert_test(
+        gated_db.insert_spec("SPEC-0001", "Unrelated spec", "implemented", "test", "init")
+        gated_db.insert_test(
             "TEST-9001", "Test", "SPEC-0001", "unit", "Should pass",
             "test", "init", last_result="pass",
         )
         # Should succeed — no gate
-        db.update_spec("SPEC-0001", "test", "promote", status="verified")
-        spec = db.get_spec("SPEC-0001")
+        gated_db.update_spec("SPEC-0001", "test", "promote", status="verified")
+        spec = gated_db.get_spec("SPEC-0001")
         assert spec["status"] == "verified"

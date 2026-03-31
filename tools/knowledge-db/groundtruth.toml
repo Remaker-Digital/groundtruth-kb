@@ -1,0 +1,25 @@
+# Agent Red Knowledge DB — GroundTruth configuration
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# This file wires the groundtruth-kb package to Agent Red's branding and database.
+# Paths are relative to this file's directory (tools/knowledge-db/).
+
+[groundtruth]
+db_path = "./knowledge.db"
+project_root = "../.."
+app_title = "Agent Red Knowledge DB"
+brand_mark = "AR"
+brand_color = "#ff3621"
+legal_footer = "(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved."
+
+[gates]
+plugins = ["groundtruth_kb.gates_transport:TransportEvidenceGate"]
+
+[gates.config.TransportEvidenceGate]
+spec_ids = [
+    "SPEC-1524",
+    "SPEC-1525",
+    "SPEC-1535",
+    "SPEC-1536",
+    "SPEC-1537",
+    "SPEC-1802",
+]
