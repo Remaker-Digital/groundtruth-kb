@@ -202,7 +202,13 @@ db.close()
 | `insert_work_item()` / `update_work_item()` | Create or version a work item |
 | `list_specs()` / `list_tests()` / `list_work_items()` | Query with filters |
 | `get_spec()` / `get_test()` / `get_work_item()` | Get latest version by ID |
-| `run_assertions()` | Execute assertions for a spec |
-| `export_json()` / `import_json()` | Full database export/import |
-| `summary_stats()` | Aggregate counts by status |
-| `global_history()` | Cross-table change timeline |
+| `export_json()` | Full database export to JSON |
+| `get_summary()` | Aggregate counts by status |
+| `get_history()` | Cross-table change timeline |
+
+Assertions are executed via the `assertions` module, not directly on `KnowledgeDB`:
+
+```python
+from groundtruth_kb.assertions import run_all_assertions, run_single_assertion
+results = run_all_assertions(db, project_root=config.project_root)
+```
