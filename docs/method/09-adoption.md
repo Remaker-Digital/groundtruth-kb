@@ -21,7 +21,7 @@ groundtruth-kb (upstream)
     └── src/                      ← your application code
 ```
 
-**GroundTruth** provides the method documentation, the knowledge database engine, and the governance gate framework. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation (hooks, CI/CD, rules files). The boundary between them is explicit.
+**GroundTruth** provides the method documentation, the knowledge database engine, the governance gate framework, and reference [process templates](../../templates/README.md) for project setup. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation. The boundary between them is explicit.
 
 ## Managed vs project-owned files
 

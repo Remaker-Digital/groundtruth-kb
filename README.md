@@ -63,6 +63,12 @@ The [method documentation](docs/method/README.md) describes the engineering disc
 - [Adoption & Promotion](docs/method/09-adoption.md) — upstream/downstream model, update procedures
 - [KB Tooling](docs/method/10-tooling.md) — CLI commands, web UI, Python API, configuration
 
+## Process Templates
+
+The [templates/](templates/README.md) directory contains reference templates for
+setting up a GroundTruth project: rules files, state files, hooks, and agent
+configuration. Copy them into your project and customize the placeholders.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute. We
