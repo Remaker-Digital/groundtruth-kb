@@ -51,9 +51,14 @@ The [method documentation](docs/method/README.md) describes the engineering disc
 
 - [Method Overview](docs/method/01-overview.md) — what GroundTruth is, core workflow, governance model
 - [Specifications](docs/method/02-specifications.md) — writing and managing specifications
+- [Testing](docs/method/03-testing.md) — test forms, outside-in testing, pipeline organization
+- [Work Items & Backlog](docs/method/04-work-items.md) — tracking gaps, stage lifecycle, prioritization
+- [Governance](docs/method/05-governance.md) — GOV specs, gates, assertions, protected behaviors
+- [Dual-Agent Collaboration](docs/method/06-dual-agent.md) — Prime Builder + Loyal Opposition
+- [Session Discipline](docs/method/07-sessions.md) — session IDs, wrap-up, audit cadence
+- [Architecture Decisions](docs/method/08-architecture.md) — ADR/DCL/IPR/CVR workflow
 - [Adoption & Promotion](docs/method/09-adoption.md) — upstream/downstream model, update procedures
-
-More guides (testing, work items, governance, sessions, architecture) are coming soon.
+- [KB Tooling](docs/method/10-tooling.md) — CLI commands, web UI, Python API, configuration
 
 ## Contributing
 

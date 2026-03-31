@@ -8,14 +8,14 @@ Engineering discipline for AI-powered systems — from specification to producti
 |---|----------|-------------|
 | 01 | [Method Overview](01-overview.md) | What GroundTruth is, core workflow, governance model |
 | 02 | [Specifications](02-specifications.md) | Writing and managing specifications — the decision log |
-| 03 | Testing *(coming soon)* | Test forms, outside-in testing, pipeline organization |
-| 04 | Work Items & Backlog *(coming soon)* | Tracking gaps between specs and implementation |
-| 05 | Governance *(coming soon)* | GOV specs, machine-readable rules, enforcement gates |
-| 06 | Dual-Agent Collaboration *(coming soon)* | Prime Builder + Loyal Opposition review cycle |
-| 07 | Session Discipline *(coming soon)* | Session IDs, wrap-up procedures, audit cadence |
-| 08 | Architecture Decisions *(coming soon)* | ADR/DCL/IPR/CVR workflow, compliance checking |
+| 03 | [Testing](03-testing.md) | Test forms, outside-in testing, pipeline organization |
+| 04 | [Work Items & Backlog](04-work-items.md) | Tracking gaps between specs and implementation |
+| 05 | [Governance](05-governance.md) | GOV specs, machine-readable rules, enforcement gates |
+| 06 | [Dual-Agent Collaboration](06-dual-agent.md) | Prime Builder + Loyal Opposition review cycle |
+| 07 | [Session Discipline](07-sessions.md) | Session IDs, wrap-up procedures, audit cadence |
+| 08 | [Architecture Decisions](08-architecture.md) | ADR/DCL/IPR/CVR workflow, compliance checking |
 | 09 | [Adoption & Promotion](09-adoption.md) | Upstream/downstream model, managed files, update procedures |
-| 10 | KB Tooling *(coming soon)* | Installation, CLI commands, web UI, configuration |
+| 10 | [KB Tooling](10-tooling.md) | Installation, CLI commands, web UI, configuration |
 
 ## Prerequisites
 
