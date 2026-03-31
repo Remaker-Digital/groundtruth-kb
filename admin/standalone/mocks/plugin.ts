@@ -88,6 +88,50 @@ export function mockApiPlugin(): Plugin {
         }
 
         const method = (req.method || "GET").toUpperCase();
+
+        // SSE preview endpoint — bypasses standard JSON mock router (SPEC-1872)
+        if (method === "POST" && pathname === "/api/admin/preview/chat") {
+          const body = await readBody(req) as { message?: string } | undefined;
+          const message = body?.message ?? "Hello";
+          const convId = "preview-" + Date.now();
+
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "X-Preview-Mode": "true",
+            "X-Conversation-Id": convId,
+            "X-Mock": "true",
+          });
+
+          // Simulate pipeline SSE events with delays
+          const events = [
+            `event: stage\ndata: ${JSON.stringify({ stage: "intent-classifier", status: "started" })}\n\n`,
+            `event: stage\ndata: ${JSON.stringify({ stage: "knowledge-retrieval", status: "started" })}\n\n`,
+            `event: stage\ndata: ${JSON.stringify({ stage: "response-generator", status: "started" })}\n\n`,
+            `event: token\ndata: ${JSON.stringify({ text: "Thank you for your question" })}\n\n`,
+            `event: token\ndata: ${JSON.stringify({ text: " about \"" + message.slice(0, 40) + "\"." })}\n\n`,
+            `event: token\ndata: ${JSON.stringify({ text: " Based on our knowledge base, " })}\n\n`,
+            `event: token\ndata: ${JSON.stringify({ text: "I can help you with that. " })}\n\n`,
+            `event: token\ndata: ${JSON.stringify({ text: "This is a preview response generated in mock mode to demonstrate the streaming interface." })}\n\n`,
+            `event: validated\ndata: ${JSON.stringify({ conversation_id: convId, critic_passed: true })}\n\n`,
+            `event: done\ndata: ${JSON.stringify({ reason: "complete" })}\n\n`,
+            `event: trace\ndata: ${JSON.stringify({ trace: { detected_intent: "general_inquiry", confidence: 0.87, route: "knowledge-retrieval", agent: "response-generator", sources: [{ title: "FAQ", relevance: 0.92 }], timing_ms: { intent: 45, kr: 120, rg: 890 } }, conversation_id: convId })}\n\n`,
+          ];
+
+          let i = 0;
+          const interval = setInterval(() => {
+            if (i >= events.length) {
+              clearInterval(interval);
+              res.end();
+              return;
+            }
+            res.write(events[i]);
+            i++;
+          }, 150);
+
+          return;
+        }
+
         const matched = matchRoute(method, pathname);
 
         if (!matched) {

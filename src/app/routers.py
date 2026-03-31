@@ -1,6 +1,6 @@
 """Router registration for Agent Red Customer Experience.
 
-Imports all 32 API routers and provides a single function to register
+Imports all 45 API routers and provides a single function to register
 them on the FastAPI application instance.
 
 R1 refactoring — session 31.
@@ -51,6 +51,8 @@ from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
 from src.multi_tenant.admin_contact_api import router as admin_contact_router
 from src.multi_tenant.superadmin_contact_api import router as superadmin_contact_router
 from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
+from src.multi_tenant.admin_preview_api import router as admin_preview_router
+from src.multi_tenant.admin_knowledge_score_api import router as admin_knowledge_score_router
 from src.multi_tenant.admin_fine_tuning_api import router as admin_fine_tuning_router
 from src.multi_tenant.admin_agent_api import router as admin_agent_router
 from src.multi_tenant.widget_otp_verification import router as widget_otp_router
@@ -62,7 +64,7 @@ from src.multi_tenant.email_change import router as email_change_router
 
 
 def register_routers(app: FastAPI) -> None:
-    """Register all 43 API routers on the FastAPI application.
+    """Register all 45 API routers on the FastAPI application.
 
     This mirrors the router registration block from main.py lines 186-209.
     """
@@ -78,7 +80,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(chat_router)
     app.include_router(admin_inbox_router)
     app.include_router(admin_ingestion_router)  # Must be before knowledge router (shared prefix, specific routes first)
+    app.include_router(admin_knowledge_score_router)  # Must be before knowledge router (shared /api/admin/knowledge prefix)
     app.include_router(admin_knowledge_router)
+    app.include_router(admin_preview_router)  # SPEC-1872: conversation preview (SSE)
     app.include_router(admin_analytics_router)
     app.include_router(admin_team_router)
     app.include_router(admin_gdpr_router)
