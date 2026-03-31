@@ -45,6 +45,16 @@ This project is in early development. The toolkit is extracted from a
 production system where it has managed 2,000+ specifications and 11,000+
 tests. The extraction and packaging for standalone use is in progress.
 
+## Documentation
+
+The [method documentation](docs/method/README.md) describes the engineering discipline behind GroundTruth:
+
+- [Method Overview](docs/method/01-overview.md) — what GroundTruth is, core workflow, governance model
+- [Specifications](docs/method/02-specifications.md) — writing and managing specifications
+- [Adoption & Promotion](docs/method/09-adoption.md) — upstream/downstream model, update procedures
+
+More guides (testing, work items, governance, sessions, architecture) are coming soon.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute. We
