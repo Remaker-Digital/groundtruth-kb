@@ -15,6 +15,7 @@ from __future__ import annotations
 import importlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 
@@ -137,6 +138,7 @@ class GateRegistry:
         gate_paths: list[str],
         include_builtins: bool = True,
         gate_config: dict[str, dict[str, Any]] | None = None,
+        project_root: Path | None = None,
     ) -> GateRegistry:
         """Create a registry from dotted-path strings + optional built-in gates.
 
@@ -146,6 +148,9 @@ class GateRegistry:
             gate_config: Optional per-gate config dicts keyed by class name. If a gate's
                          class name appears here and the class has a ``from_config`` classmethod,
                          it will be used instead of the no-arg constructor.
+            project_root: Fallback project root injected into gate configs that don't
+                          specify their own. Ensures file-resolution gates use the
+                          project root from GTConfig, not cwd.
         """
         gate_config = gate_config or {}
         registry = cls()
@@ -154,7 +159,10 @@ class GateRegistry:
             registry.register(OwnerApprovalGate())
         for path in gate_paths:
             gate_cls = _import_gate(path)
-            cfg = gate_config.get(gate_cls.__name__, {})
+            cfg = dict(gate_config.get(gate_cls.__name__, {}))
+            # Inject project_root fallback for gates that need it
+            if project_root is not None and "project_root" not in cfg:
+                cfg["project_root"] = str(project_root)
             if cfg and hasattr(gate_cls, "from_config"):
                 registry.register(gate_cls.from_config(cfg))
             else:

@@ -371,3 +371,79 @@ class TestImportValidation:
         ])
         assert result.exit_code == 0
         assert "WARNING" in result.output or "rejected" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Regression: CLI gate_config wiring (Codex P1)
+# ---------------------------------------------------------------------------
+
+
+class TestCLIGateConfigWiring:
+    """Verify that _open_db() passes gate_config so TOML-configured gates are active."""
+
+    def test_cli_path_wires_transport_gate(self, tmp_path: Path) -> None:
+        """A TOML-configured TransportEvidenceGate must block pass on the CLI path."""
+        from groundtruth_kb.cli import _open_db
+        from groundtruth_kb.config import GTConfig
+        from groundtruth_kb.gates_transport import TransportEvidenceGateError
+
+        toml = tmp_path / "groundtruth.toml"
+        toml.write_text(
+            f"""[groundtruth]
+db_path = "{(tmp_path / 'test.db').as_posix()}"
+project_root = "{tmp_path.as_posix()}"
+
+[gates]
+plugins = ["groundtruth_kb.gates_transport:TransportEvidenceGate"]
+
+[gates.config.TransportEvidenceGate]
+spec_ids = ["SPEC-1524"]
+""",
+            encoding="utf-8",
+        )
+        config = GTConfig.load(config_path=toml)
+        db = _open_db(config)
+
+        # Verify gate is wired with config
+        gate_names = [g.name() for g in db._gate_registry._gates]
+        assert "Transport Evidence Gate" in gate_names
+
+        # Verify spec_ids are populated (not empty frozenset)
+        transport_gates = [g for g in db._gate_registry._gates if g.name() == "Transport Evidence Gate"]
+        assert len(transport_gates) == 1
+        assert "SPEC-1524" in transport_gates[0]._spec_ids
+
+        # Verify enforcement
+        db.insert_spec("SPEC-1524", "Transport test", "implemented", "test", "test")
+        with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
+            db.insert_test(
+                "TEST-CLI-001", "CLI path test", "SPEC-1524", "e2e",
+                "pass expected", "test", "regression", last_result="pass",
+            )
+        db.close()
+
+    def test_cli_path_inherits_project_root(self, tmp_path: Path) -> None:
+        """Gate must inherit project_root from GTConfig when not set in gate config."""
+        from groundtruth_kb.cli import _open_db
+        from groundtruth_kb.config import GTConfig
+
+        toml = tmp_path / "groundtruth.toml"
+        toml.write_text(
+            f"""[groundtruth]
+db_path = "{(tmp_path / 'test.db').as_posix()}"
+project_root = "{tmp_path.as_posix()}"
+
+[gates]
+plugins = ["groundtruth_kb.gates_transport:TransportEvidenceGate"]
+
+[gates.config.TransportEvidenceGate]
+spec_ids = ["SPEC-1524"]
+""",
+            encoding="utf-8",
+        )
+        config = GTConfig.load(config_path=toml)
+        db = _open_db(config)
+
+        transport_gates = [g for g in db._gate_registry._gates if g.name() == "Transport Evidence Gate"]
+        assert transport_gates[0]._project_root == tmp_path
+        db.close()
