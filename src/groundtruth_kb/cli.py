@@ -47,7 +47,12 @@ def _resolve_config(ctx: click.Context) -> GTConfig:
 
 def _open_db(config: GTConfig, *, check_same_thread: bool = True) -> KnowledgeDB:
     """Open a KnowledgeDB from resolved config, wiring governance gates."""
-    registry = GateRegistry.from_config(config.governance_gates, include_builtins=True)
+    registry = GateRegistry.from_config(
+        config.governance_gates,
+        include_builtins=True,
+        gate_config=config.gate_config,
+        project_root=config.project_root,
+    )
     return KnowledgeDB(db_path=config.db_path, gate_registry=registry, check_same_thread=check_same_thread)
 
 
