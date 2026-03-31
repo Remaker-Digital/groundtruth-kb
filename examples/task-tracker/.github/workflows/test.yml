@@ -1,0 +1,44 @@
+# GroundTruth CI — Test workflow
+# Runs pytest, ruff linting, and GroundTruth assertions on every push and PR.
+#
+# Customize: adjust Python versions, test paths, and assertion config path.
+
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install groundtruth-kb[dev]
+          # Install your project's dependencies here:
+          # pip install -r requirements.txt
+          # pip install -e .
+
+      - name: Lint with ruff
+        run: ruff check .
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+      - name: Run GroundTruth assertions
+        run: gt --config groundtruth.toml assert
