@@ -63,6 +63,12 @@ The [method documentation](docs/method/README.md) describes the engineering disc
 - [Adoption & Promotion](docs/method/09-adoption.md) — upstream/downstream model, update procedures
 - [KB Tooling](docs/method/10-tooling.md) — CLI commands, web UI, Python API, configuration
 
+## Bootstrap Guide
+
+New to GroundTruth? The [bootstrap guide](docs/bootstrap.md) walks you through
+the full setup: install, init, first spec, first test, assertions, web UI,
+templates, and CI/CD — in 10 steps.
+
 ## Process Templates
 
 The [templates/](templates/README.md) directory contains reference templates for

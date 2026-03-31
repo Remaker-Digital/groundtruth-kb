@@ -1,0 +1,46 @@
+# GroundTruth CI — Build workflow
+# Builds a Docker image and pushes to a container registry.
+# Triggered on version tags (v*) after tests pass.
+#
+# Customize: adjust registry URL, image name, and Dockerfile path.
+# Required secrets: REGISTRY_USERNAME, REGISTRY_PASSWORD
+
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
