@@ -9,22 +9,19 @@ groundtruth-kb (upstream)
     │
     ├── Method documentation
     ├── KB engine + CLI + web UI
-    ├── Governance gates (built-in + plugin)
-    ├── Process templates
-    └── CI/CD templates
+    └── Governance gates (built-in + plugin)
          │
          ▼
    Your project (downstream)
     │
-    ├── groundtruth.toml          ← project-specific config
-    ├── groundtruth.db            ← project-specific data
-    ├── CLAUDE.md                 ← project-specific rules (from template)
-    ├── MEMORY.md                 ← project-specific state
-    ├── hooks/                    ← mix of GT-managed + project-specific
+    ├── groundtruth.toml          ← project-specific config (created by gt init)
+    ├── groundtruth.db            ← project-specific data (created by gt init)
+    ├── Rules/state files         ← you create these per your workflow
+    ├── Gate plugins              ← project-specific governance enforcement
     └── src/                      ← your application code
 ```
 
-**GroundTruth** provides the method, the toolkit, and the templates. **Your project** provides the domain knowledge, specifications, tests, and implementation. The boundary between them is explicit and enforced.
+**GroundTruth** provides the method documentation, the knowledge database engine, and the governance gate framework. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation (hooks, CI/CD, rules files). The boundary between them is explicit.
 
 ## Managed vs project-owned files
 
@@ -41,7 +38,7 @@ These files originate from GroundTruth and are updated when you pull a new upstr
 
 ### Project-owned files (you control)
 
-These files are generated from templates during `gt init` or created by you. GroundTruth never overwrites them after initial creation.
+These files are created by `gt init` or by you. GroundTruth never overwrites them after initial creation.
 
 | File | Purpose |
 |------|---------|
@@ -64,8 +61,7 @@ Not every improvement discovered in a downstream project belongs upstream. Use t
 - Fixes a bug in the KB engine, CLI, web UI, or built-in gates
 - Adds a governance gate that would benefit any GroundTruth project (not just yours)
 - Improves a method document with a correction or clarification
-- Adds a process template that codifies a general engineering practice
-- Fixes a CI/CD template that was broken or incomplete
+- Adds a reusable pattern (e.g., a governance gate, a seed data set) that would benefit any GroundTruth project
 
 **Keep project-local** when the change:
 
@@ -99,7 +95,7 @@ When a new GroundTruth release is available:
    ```bash
    gt assert
    ```
-4. **Check for new templates.** If the release includes updated process templates, compare them against your project-owned copies and merge relevant improvements manually.
+4. **Check for new features.** Review any new governance gates, seed data, or CLI commands. Evaluate whether they apply to your project.
 5. **Test the web UI and CLI.** Verify that `gt serve` and `gt summary` still work with your database.
 6. **Run your project's test suite.** Ensure no regressions in code that interacts with the KB.
 
@@ -134,7 +130,7 @@ GroundTruth ──publish──→ Downstream projects
      └──── feedback ←──────────┘
 ```
 
-Downstream projects are the proving ground for the method. When you discover that a governance rule is too strict, a template is missing a step, or the CLI doesn't handle an edge case — that feedback improves GroundTruth for everyone.
+Downstream projects are the proving ground for the method. When you discover that a governance rule is too strict, the CLI doesn't handle an edge case, or a method document is unclear — that feedback improves GroundTruth for everyone.
 
 The `method-feedback` label on the issue tracker is specifically for observations about the engineering method itself (not just tooling bugs). These are reviewed monthly and incorporated into method documentation updates.
 
