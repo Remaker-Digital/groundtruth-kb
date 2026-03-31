@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Op: {{ proc.id }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs">
+    <a href="/ops">Operational Procedures</a> &raquo; {{ proc.id }}
+</div>
+
+<h1>{{ proc.title }}</h1>
+
+<div class="detail-grid">
+    <div class="detail-row"><strong>ID:</strong> <span class="mono">{{ proc.id }}</span></div>
+    <div class="detail-row"><strong>Type:</strong> {{ proc.type or '—' }}</div>
+    <div class="detail-row"><strong>Version:</strong> {{ proc.version }}</div>
+    <div class="detail-row"><strong>Last changed:</strong> {{ proc.changed_at }} by {{ proc.changed_by }}</div>
+</div>
+
+{% if proc._variables_parsed %}
+<h2>Variables</h2>
+<table>
+    <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+    <tbody>
+        {% for k, v in proc._variables_parsed.items() %}
+        <tr>
+            <td class="mono">{{ k }}</td>
+            <td class="mono">{{ v }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if proc._steps_parsed %}
+<h2>Steps</h2>
+<table>
+    <thead><tr><th>Phase</th><th>Title</th><th>Actions</th></tr></thead>
+    <tbody>
+        {% for step in proc._steps_parsed %}
+        <tr>
+            <td class="mono">{{ step.phase }}</td>
+            <td>{{ step.title }}</td>
+            <td>{% if step.actions %}{{ step.actions|join(', ') }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if proc._known_failure_modes_parsed %}
+<h2>Known Failure Modes</h2>
+<ul>
+    {% for fm in proc._known_failure_modes_parsed %}
+    <li>{{ fm }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<h2>Version History ({{ history|length }} versions)</h2>
+<table>
+    <thead>
+        <tr><th>v</th><th>Changed at</th><th>By</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+        {% for h in history %}
+        <tr {% if h.version == proc.version %}class="current-version"{% endif %}>
+            <td>{{ h.version }}</td>
+            <td class="mono">{{ h.changed_at }}</td>
+            <td>{{ h.changed_by }}</td>
+            <td>{{ h.change_reason }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

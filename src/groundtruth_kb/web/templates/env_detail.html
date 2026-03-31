@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Env: {{ config.id }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs">
+    <a href="/env">Environment Config</a> &raquo; {{ config.id }}
+</div>
+
+<h1>{{ config.key }}</h1>
+
+<div class="detail-grid">
+    <div class="detail-row"><strong>ID:</strong> <span class="mono">{{ config.id }}</span></div>
+    <div class="detail-row"><strong>Environment:</strong> <span class="env-badge env-{{ config.environment }}">{{ config.environment }}</span></div>
+    <div class="detail-row"><strong>Category:</strong> {{ config.category }}</div>
+    <div class="detail-row"><strong>Key:</strong> <span class="mono">{{ config.key }}</span></div>
+    <div class="detail-row"><strong>Value:</strong> <span class="mono">{% if config.sensitive %}<span class="sensitive-mask" title="Sensitive — masked">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span>{% else %}{{ config.value }}{% endif %}</span></div>
+    <div class="detail-row"><strong>Sensitive:</strong> {% if config.sensitive %}<span class="fail">Yes</span>{% else %}No{% endif %}</div>
+    <div class="detail-row"><strong>Version:</strong> {{ config.version }}</div>
+    <div class="detail-row"><strong>Last changed:</strong> {{ config.changed_at }} by {{ config.changed_by }}</div>
+    {% if config.notes %}
+    <div class="detail-row"><strong>Notes:</strong> {{ config.notes }}</div>
+    {% endif %}
+</div>
+
+<h2>Version History ({{ history|length }} versions)</h2>
+<table>
+    <thead>
+        <tr>
+            <th>v</th>
+            <th>Value</th>
+            <th>Changed at</th>
+            <th>By</th>
+            <th>Reason</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for h in history %}
+        <tr {% if h.version == config.version %}class="current-version"{% endif %}>
+            <td>{{ h.version }}</td>
+            <td class="mono">{% if h.sensitive %}<span class="sensitive-mask">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span>{% else %}{{ h.value }}{% endif %}</td>
+            <td class="mono">{{ h.changed_at }}</td>
+            <td>{{ h.changed_by }}</td>
+            <td>{{ h.change_reason }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

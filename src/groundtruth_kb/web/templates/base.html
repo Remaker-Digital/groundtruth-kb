@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Knowledge DB{% endblock %} — {{ app_title }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root {
+            --brand: {{ brand_color }};
+            --brand-dark: {{ brand_color_dark }};
+        }
+    </style>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="brand">
+            {% if logo_url %}
+            <img src="{{ logo_url }}" alt="{{ brand_mark }}" class="brand-logo">
+            {% else %}
+            <span class="brand-mark">{{ brand_mark }}</span>
+            {% endif %}
+            <span class="brand-text">Knowledge DB</span>
+        </div>
+        <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
+        <a href="/specs" class="nav-link {% if '/specs' in request.url.path %}active{% endif %}">Specifications</a>
+        <a href="/tests" class="nav-link {% if '/tests' in request.url.path %}active{% endif %}">Test Procedures</a>
+        <a href="/ops" class="nav-link {% if '/ops' in request.url.path %}active{% endif %}">Operations</a>
+        <a href="/env" class="nav-link {% if '/env' in request.url.path %}active{% endif %}">Environment</a>
+        <a href="/assertions" class="nav-link {% if '/assertions' in request.url.path %}active{% endif %}">Assertions</a>
+        <a href="/history" class="nav-link {% if '/history' in request.url.path %}active{% endif %}">History</a>
+        <div class="nav-footer">
+            <span class="read-only-badge">READ-ONLY</span>
+            {% if legal_footer %}
+            <div class="legal-footer">{{ legal_footer }}</div>
+            {% endif %}
+        </div>
+    </nav>
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

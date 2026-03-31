@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Spec {{ spec.id }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs">
+    <a href="/specs">Specifications</a>
+    {% if parent %}
+    &raquo; <a href="/specs/{{ parent.id }}">{{ parent.id }}</a>
+    {% endif %}
+    &raquo; {{ spec.id }}
+</div>
+
+<h1>
+    <span class="mono">{{ spec.id }}</span> — {{ spec.title }}
+    <span class="status-badge {{ status_class(spec.status) }}">{{ spec.status }}</span>
+</h1>
+
+<div class="detail-grid">
+    <div class="detail-row"><strong>Priority:</strong> {{ spec.priority or '—' }}</div>
+    <div class="detail-row"><strong>Scope:</strong> {{ spec.scope or '—' }}</div>
+    <div class="detail-row"><strong>Section:</strong> {{ spec.section or '—' }}</div>
+    {% if spec.handle %}
+    <div class="detail-row"><strong>Handle:</strong> <span class="handle-badge">{{ spec.handle }}</span></div>
+    {% endif %}
+    {% if spec._tags_parsed %}
+    <div class="detail-row"><strong>Tags:</strong>
+        {% for tag in spec._tags_parsed %}
+        <span class="tag-badge">{{ tag }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <div class="detail-row"><strong>Version:</strong> {{ spec.version }}</div>
+    <div class="detail-row"><strong>Last changed:</strong> {{ spec.changed_at }} by {{ spec.changed_by }}</div>
+    <div class="detail-row"><strong>Change reason:</strong> {{ spec.change_reason }}</div>
+</div>
+
+{% if spec.description %}
+<h2>Description</h2>
+<div class="description-box">{{ spec.description }}</div>
+{% endif %}
+
+{% if children %}
+<h2>Sub-items ({{ children|length }})</h2>
+<table>
+    <thead><tr><th>ID</th><th>Title</th><th>Status</th></tr></thead>
+    <tbody>
+        {% for child in children %}
+        <tr>
+            <td class="mono"><a href="/specs/{{ child.id }}">{{ child.id }}</a></td>
+            <td>{{ child.title }}</td>
+            <td><span class="status-badge {{ status_class(child.status) }}">{{ child.status }}</span></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if assertion_run %}
+<h2>Latest Assertion Run</h2>
+<div class="assertion-summary {{ pass_fail_class(assertion_run.overall_passed) }}">
+    {{ 'PASSED' if assertion_run.overall_passed else 'FAILED' }}
+    — run at {{ assertion_run.run_at }} ({{ assertion_run.triggered_by }})
+</div>
+{% if assertion_run._results_parsed %}
+<table>
+    <thead><tr><th>Type</th><th>Description</th><th>Result</th><th>Detail</th></tr></thead>
+    <tbody>
+        {% for r in assertion_run._results_parsed %}
+        <tr class="{{ pass_fail_class(r.passed) }}">
+            <td class="mono">{{ r.type }}</td>
+            <td>{{ r.description }}</td>
+            <td><span class="{{ pass_fail_class(r.passed) }}">{{ 'PASS' if r.passed else 'FAIL' }}</span></td>
+            <td class="mono">{{ r.detail }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endif %}
+
+{% if spec._assertions_parsed %}
+<h2>Assertion Definitions ({{ spec._assertions_parsed|length }})</h2>
+<table>
+    <thead><tr><th>Type</th><th>Pattern</th><th>File</th><th>Description</th></tr></thead>
+    <tbody>
+        {% for a in spec._assertions_parsed %}
+        <tr>
+            <td class="mono">{{ a.type }}</td>
+            <td class="mono">{{ a.pattern }}</td>
+            <td class="mono">{{ a.get('file', '') }}</td>
+            <td>{{ a.description }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<h2>Version History ({{ history|length }} versions)</h2>
+<table>
+    <thead>
+        <tr><th>v</th><th>Status</th><th>Changed at</th><th>By</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+        {% for h in history %}
+        <tr {% if h.version == spec.version %}class="current-version"{% endif %}>
+            <td>{{ h.version }}</td>
+            <td><span class="status-badge {{ status_class(h.status) }}">{{ h.status }}</span></td>
+            <td class="mono">{{ h.changed_at }}</td>
+            <td>{{ h.changed_by }}</td>
+            <td>{{ h.change_reason }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

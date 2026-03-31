@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Test Procedures{% endblock %}
+{% block content %}
+<h1>Test Procedures</h1>
+
+<form class="filter-bar" method="get" action="/tests">
+    <select name="type">
+        <option value="">All types</option>
+        {% for t in types %}
+        <option value="{{ t }}" {% if filters.type == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Filter</button>
+    <a href="/tests" class="btn-clear">Clear</a>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Assertions</th>
+            <th>Last Status</th>
+            <th>v</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for proc in procedures %}
+        <tr>
+            <td class="mono"><a href="/tests/{{ proc.id }}">{{ proc.id }}</a></td>
+            <td><a href="/tests/{{ proc.id }}">{{ proc.title }}</a></td>
+            <td>{{ proc.type or '' }}</td>
+            <td>{{ proc.assertion_count or 0 }}</td>
+            <td>
+                {% if proc.last_execution_status %}
+                <span class="{{ 'pass' if proc.last_execution_status == 'PASS' else 'fail' }}">
+                    {{ proc.last_execution_status }}
+                </span>
+                {% else %}—{% endif %}
+            </td>
+            <td>{{ proc.version }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Specifications{% endblock %}
+{% block content %}
+<h1>Specifications</h1>
+
+<form class="filter-bar" method="get" action="/specs">
+    <select name="status">
+        <option value="">All statuses</option>
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+    <select name="priority">
+        <option value="">All priorities</option>
+        {% for p in priorities %}
+        <option value="{{ p }}" {% if filters.priority == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+    </select>
+    <select name="section">
+        <option value="">All sections</option>
+        {% for sec in sections %}
+        <option value="{{ sec }}" {% if filters.section == sec %}selected{% endif %}>{{ sec }}</option>
+        {% endfor %}
+    </select>
+    {% if handles %}
+    <select name="handle">
+        <option value="">All handles</option>
+        {% for h in handles %}
+        <option value="{{ h }}" {% if filters.handle == h %}selected{% endif %}>{{ h }}</option>
+        {% endfor %}
+    </select>
+    {% endif %}
+    <input type="text" name="search" placeholder="Search..." value="{{ filters.search or '' }}">
+    <button type="submit">Filter</button>
+    <a href="/specs" class="btn-clear">Clear</a>
+</form>
+
+<div class="spec-count">{{ specs|length }} specifications</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Priority</th>
+            <th>Scope</th>
+            <th>Handle</th>
+            <th>Status</th>
+            <th>v</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for spec in specs %}
+        <tr>
+            <td class="mono" style="padding-left: {{ get_depth(spec.id) * 1.5 }}em">
+                <a href="/specs/{{ spec.id }}">{{ spec.id }}</a>
+            </td>
+            <td><a href="/specs/{{ spec.id }}">{{ spec.title }}</a></td>
+            <td>{{ spec.priority or '' }}</td>
+            <td>{{ spec.scope or '' }}</td>
+            <td>{% if spec.handle %}<span class="handle-badge">{{ spec.handle }}</span>{% endif %}</td>
+            <td><span class="status-badge {{ status_class(spec.status) }}">{{ spec.status }}</span></td>
+            <td>{{ spec.version }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
