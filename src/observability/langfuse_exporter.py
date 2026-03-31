@@ -62,7 +62,7 @@ def _get_client() -> Any:
 
     public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
     secret_key = os.getenv("LANGFUSE_SECRET_KEY")
-    host = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
+    host = os.getenv("LANGFUSE_HOST") or os.getenv("LANGFUSE_BASE_URL", "http://localhost:3000")
 
     if not public_key or not secret_key:
         logger.warning("LANGFUSE_PUBLIC_KEY or LANGFUSE_SECRET_KEY not set — exporter disabled")
