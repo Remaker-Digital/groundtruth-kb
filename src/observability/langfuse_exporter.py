@@ -186,31 +186,35 @@ def export_trace(
             system_prompt_template=system_prompt_template,
         )
 
-        langfuse_trace = client.trace(
-            id=trace_id or None,
-            name="agent-red-pipeline",
-            metadata=payload,
-            tags=[
-                f"intent:{payload['detected_intent']}",
-                f"route:{payload['route_target']}",
-                f"critic:{payload['critic_verdict']}",
-            ],
-        )
+        tags = [
+            f"intent:{payload['detected_intent']}",
+            f"route:{payload['route_target']}",
+            f"critic:{payload['critic_verdict']}",
+        ]
 
-        # Create spans for each pipeline stage
-        for sa in payload["stage_attributions"]:
-            langfuse_trace.span(
-                name=sa["stage"],
-                metadata={
-                    "model": sa["model"],
-                    "tokens_input": sa["tokens_input"],
-                    "tokens_output": sa["tokens_output"],
-                    "cost_estimate": sa["cost_estimate"],
-                    "succeeded": sa["succeeded"],
-                },
-                start_time=None,  # Langfuse will use trace start
-                end_time=None,
-            )
+        # Langfuse SDK v3: use start_as_current_observation context manager
+        # (v2 client.trace() was removed in v3)
+        with client.start_as_current_observation(
+            as_type="span",
+            name="agent-red-pipeline",
+            trace_id=trace_id or None,
+            metadata=payload,
+            tags=tags,
+        ) as root:
+            # Create child spans for each pipeline stage
+            for sa in payload["stage_attributions"]:
+                with client.start_as_current_observation(
+                    as_type="span",
+                    name=sa["stage"],
+                    metadata={
+                        "model": sa["model"],
+                        "tokens_input": sa["tokens_input"],
+                        "tokens_output": sa["tokens_output"],
+                        "cost_estimate": sa["cost_estimate"],
+                        "succeeded": sa["succeeded"],
+                    },
+                ):
+                    pass  # span auto-closes on context exit
 
         # Flush asynchronously (Langfuse SDK batches internally)
         client.flush()
