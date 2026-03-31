@@ -25,6 +25,11 @@ class TestCreateTask:
         resp = client.post("/tasks", json={})
         assert resp.status_code == 422
 
+    def test_create_with_overlength_title_returns_422(self, client: TestClient):
+        """TEST-008: POST /tasks with title > 200 chars returns error (WI-001 fix)."""
+        resp = client.post("/tasks", json={"title": "x" * 201})
+        assert resp.status_code == 422
+
 
 class TestStatusTransitions:
     """SPEC-002: Tasks transition through created → in_progress → done."""

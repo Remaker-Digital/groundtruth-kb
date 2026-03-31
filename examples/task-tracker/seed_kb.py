@@ -154,6 +154,9 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
         ("TEST-007", "DELETE then GET returns 404", "SPEC-005", "e2e",
          "After deleting a task, GET returns 404",
          "tests/test_api.py", "TestDelete", "test_delete_then_get_returns_404"),
+        ("TEST-008", "POST /tasks with title > 200 chars returns error", "SPEC-001", "e2e",
+         "Title exceeding max_length=200 returns 422 (WI-001 remediation)",
+         "tests/test_api.py", "TestCreateTask", "test_create_with_overlength_title_returns_422"),
     ]
     for tid, title, spec_id, ttype, outcome, tfile, tcls, tfunc in tests:
         if db.get_test(tid):
