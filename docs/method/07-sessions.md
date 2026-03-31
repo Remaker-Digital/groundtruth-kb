@@ -1,0 +1,89 @@
+# 7. Session Discipline
+
+Work in GroundTruth is organized into numbered sessions. Session discipline prevents context loss, ensures continuity across conversations, and provides a natural rhythm for quality checks.
+
+## Session identity
+
+Each session has a monotonically increasing ID: `S1`, `S2`, ..., `S240`. The ID is derived by reading the most recent session from the project's state file and incrementing by one.
+
+Session IDs serve as:
+
+- **Correlation keys** for all artifacts created in that session (`changed_by: "S42"`)
+- **Commit message prefixes** for git history (`feat(S42): implement rate limiting`)
+- **Reference points** in state files and handoff notes
+
+## Session structure
+
+Every session follows the same structure:
+
+### 1. Start
+
+State the objective clearly. Read the project's state file to understand:
+- What was done in the previous session
+- What was planned as "next"
+- Current status of key systems (versions, test counts, open work items)
+
+### 2. Execute
+
+Work toward the stated objective. Along the way:
+- Record specifications, tests, and work items in the knowledge database
+- Follow the spec-first workflow when encountering new requirements
+- Run assertions after making changes to catch regressions early
+
+### 3. Wrap up
+
+Before ending the session:
+- **Update the state file** with: what was done, what changed, what's next
+- **Record a session document** in the knowledge database (category: `session_record`)
+- **Run assertions** one final time to confirm no regressions
+- **Commit** with a message that references the session ID
+
+## State management
+
+GroundTruth uses two complementary state files:
+
+### Rules file (CLAUDE.md)
+
+Contains **how to work**: procedures, governance rules, evaluation criteria, role definitions. Updated rarely — only when the rules of engagement change.
+
+### State file (MEMORY.md)
+
+Contains **what has been done**: current status, recent sessions, quick reference values (URLs, version numbers, connection strings). Updated every session during wrap-up.
+
+### The boundary rule
+
+If it tells the agent *what to do*, it goes in the rules file. If it tells the agent *what has been done* or *how to access something*, it goes in the state file. All canonical project knowledge lives in the knowledge database — state files are operational memory, not the source of truth.
+
+## Audit sessions
+
+Every fifth session (S5, S10, S15, ...) is an **audit session** with additional hygiene steps:
+
+1. **Stale work item review**: identify open work items that haven't progressed
+2. **Spec coverage check**: verify that implemented specs have linked, passing tests
+3. **Assertion health**: confirm all assertions on implemented/verified specs pass
+4. **State file cleanup**: remove obsolete entries, update version numbers
+5. **Operational record pruning**: clean up old assertion runs and quality scores
+
+Audit sessions prevent gradual degradation — the slow accumulation of stale artifacts, orphaned work items, and failing assertions that nobody notices because each individual session's scope was too narrow to catch them.
+
+## Handoff continuity
+
+Sessions are designed so that a different agent (or a future instance of the same agent) can continue where the last session left off. This requires:
+
+- **Self-contained state**: the state file plus the knowledge database contain everything needed to understand the project's current position
+- **No implicit context**: decisions, trade-offs, and open questions are recorded, not assumed
+- **Clear "next" section**: every session wrap-up states what should happen next
+
+The test: if you delete the entire conversation history and start fresh with only the rules file, state file, and knowledge database, you should be able to continue productive work within minutes.
+
+## Session documents
+
+Each session produces a document in the knowledge database (category: `session_record`) that captures:
+
+- Session ID and date
+- What was accomplished (summary)
+- Key decisions made
+- Artifacts created or modified (spec IDs, test counts, work item IDs)
+- What's next
+
+These documents form the project's operational history. Unlike state files (which are overwritten each session), session documents are append-only — every session's record is preserved.
