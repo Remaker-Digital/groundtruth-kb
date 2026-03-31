@@ -1,0 +1,112 @@
+# Order Support — full lifecycle: orders, shipping, payments
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+id: order_support
+display_name: "Order Support"
+description: "Full order lifecycle: tracking, shipping, payments, cancellations, and modifications"
+icon: "truck-delivery"
+
+preferences:
+  brand_voice: "efficient and reassuring"
+  formality_level: "balanced"
+  response_length: "standard"
+  escalation_threshold: 0.35
+  escalation_keywords:
+    - "fraud"
+    - "unauthorized"
+    - "chargeback"
+    - "stolen"
+    - "scam"
+    - "lawyer"
+    - "BBB"
+    - "attorney general"
+  custom_instructions: |
+    Help customers with all order-related inquiries.
+    Always ask for the order number first to pull up details.
+    Provide clear timelines for shipping, refunds, and modifications.
+    For payment issues, verify the customer's identity before sharing details.
+    Proactively offer tracking links and estimated delivery dates.
+
+quick_actions:
+  - label: "Track My Order"
+    message: "I'd like to check on the status of my recent order"
+  - label: "Cancel or Modify"
+    message: "I need to cancel or make changes to an order I placed"
+  - label: "Shipping Question"
+    message: "I have a question about shipping options or delivery times"
+  - label: "Payment Issue"
+    message: "I have a question about a charge or payment on my account"
+
+widget:
+  greeting_message: "Hi! Need help with an order? I can look up tracking, process changes, and more."
+  input_placeholder: "Enter your order number or describe your issue..."
+
+knowledge_seed:
+  - title: "Shipping Information"
+    content: |
+      We offer several shipping options to get your order to you
+      as quickly as possible.
+
+      **Shipping Methods:**
+      - Standard Shipping: 5-7 business days
+      - Expedited Shipping: 2-3 business days
+      - Overnight Shipping: Next business day (order by 2 PM)
+
+      **Tracking Your Order:**
+      - You'll receive a tracking email once your order ships
+      - Track your package using the link in your confirmation email
+      - Ask our AI assistant for real-time tracking updates
+
+      **International Shipping:**
+      - Available to select countries
+      - Delivery times vary by destination (7-21 business days)
+      - Customer is responsible for customs duties and taxes
+    category: "policies"
+  - title: "Order Modifications & Cancellations"
+    content: |
+      Need to change or cancel your order? Here's what you need
+      to know:
+
+      **Cancellations:**
+      - Orders can be cancelled within 1 hour of placement
+      - After 1 hour, we'll attempt to cancel but cannot guarantee
+      - Refunds for cancelled orders process within 3-5 business days
+
+      **Modifications:**
+      - Address changes are possible before shipping
+      - Item changes may require cancelling and reordering
+      - Contact us as soon as possible for the best chance of changes
+
+      **Payment Issues:**
+      - If a charge appears incorrect, contact us with your order number
+      - We can provide itemized receipts for any order
+      - Refunds return to the original payment method
+    category: "processes"
+  - title: "Payment & Billing FAQ"
+    content: |
+      **Accepted Payment Methods:**
+      - Credit/debit cards (Visa, Mastercard, Amex, Discover)
+      - PayPal
+      - Shop Pay
+      - Apple Pay and Google Pay
+
+      **When am I charged?**
+      Your payment is processed when you place your order.
+      Pre-authorization holds may appear on your statement.
+
+      **Refund Timeline:**
+      - Refunds are initiated within 24 hours of approval
+      - Bank processing takes 3-7 business days
+      - PayPal refunds appear within 1-2 business days
+    category: "policies"
+
+agents_recommended:
+  - agent_id: sales
+    tier_required: professional
+    reason: "Order lookup, inventory checks, and checkout assistance"
+  - agent_id: schedule
+    tier_required: professional
+    reason: "Delivery follow-ups and callback scheduling"
+  - agent_id: gateway
+    tier_required: professional
+    reason: "Live agent handoff for complex payment disputes"

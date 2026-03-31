@@ -975,10 +975,162 @@ def phase_8_summary() -> None:
 # Main orchestrator
 # ---------------------------------------------------------------------------
 
+async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
+    """Apply a vertical preset after preferences are created (SPEC-1878).
+
+    Uses direct repository writes — the same pattern as Phase 3 — to avoid
+    dependency on app-startup singletons (ActivationService, QA repo).
+    """
+    print()
+    print("=" * 65)
+    print("  PHASE 3b: Vertical Preset")
+    print("=" * 65)
+
+    if not preset_id:
+        print("  [SKIP] No preset requested (use --preset <id>)")
+        phase_results["3b_preset"] = "SKIPPED — use --preset flag"
+        return
+
+    from src.presets.preset_service import PresetService, CONFIG_SAVE_FIELDS
+
+    svc = PresetService()
+    preset = svc.get_preset(preset_id)
+    if preset is None:
+        available = [p.id for p in svc.list_presets()]
+        print(f"  [ERROR] Preset '{preset_id}' not found. Available: {available}")
+        phase_results["3b_preset"] = f"ERROR: unknown preset '{preset_id}'"
+        return
+
+    config_fields = svc._extract_config_fields(preset)
+    qa_list = preset.get("quick_actions", [])
+    kb_articles = preset.get("knowledge_seed", [])
+
+    if dry_run:
+        print(f"  [DRY RUN] Would apply preset: {preset['display_name']}")
+        print(f"            Config fields: {len(config_fields)}")
+        print(f"            Quick actions: {len(qa_list)}")
+        print(f"            KB articles:   {len(kb_articles)}")
+        phase_results["3b_preset"] = f"DRY RUN — {preset_id}"
+        return
+
+    from src.multi_tenant.repository import PreferencesRepository
+    import uuid as _uuid
+
+    repo = PreferencesRepository()
+    now = datetime.now(timezone.utc).isoformat()
+    qa_created = 0
+    kb_created = 0
+
+    try:
+        # Step 1: Merge config fields into the preferences document
+        prefs = await repo.get_draft(TENANT_ID)
+        if prefs is None:
+            print("  [ERROR] Preferences document not found (Phase 3 must run first)")
+            phase_results["3b_preset"] = "ERROR: no preferences document"
+            return
+
+        prefs_dict = prefs if isinstance(prefs, dict) else prefs.model_dump()
+        for key, value in config_fields.items():
+            prefs_dict[key] = value
+        # Map widget fields to their prefs-document names
+        widget = preset.get("widget", {})
+        if "greeting_message" in widget:
+            prefs_dict["widget_greeting_message"] = widget["greeting_message"]
+        if "input_placeholder" in widget:
+            prefs_dict["widget_input_placeholder"] = widget["input_placeholder"]
+
+        # Step 2: Add quick-action prompts directly to the prefs document
+        existing_qa = prefs_dict.get("quick_actions", [])
+        created_ids = []
+        for i, qa in enumerate(qa_list):
+            action_id = str(_uuid.uuid4())
+            existing_qa.append({
+                "id": action_id,
+                "label": qa.get("label", ""),
+                "prompt_template": qa.get("message", ""),
+                "icon": qa.get("icon", ""),
+                "is_active": True,
+                "sort_order": i * 10,
+                "created_at": now,
+                "updated_at": now,
+            })
+            created_ids.append(action_id)
+        prefs_dict["quick_actions"] = existing_qa
+        qa_created = len(created_ids)
+
+        # Step 3: Add page assignment for first 2 actions
+        if created_ids:
+            assignment = {
+                "page_type": "all",
+                "page_handle": None,
+                "auto_open": False,
+                "auto_open_delay_ms": 3000,
+            }
+            if len(created_ids) >= 1:
+                assignment["slot_1_action_id"] = created_ids[0]
+            if len(created_ids) >= 2:
+                assignment["slot_2_action_id"] = created_ids[1]
+            existing_assignments = prefs_dict.get("quick_action_assignments", [])
+            existing_assignments.append(assignment)
+            prefs_dict["quick_action_assignments"] = existing_assignments
+
+        # Upsert the merged preferences document
+        from src.multi_tenant.cosmos_schema import PreferencesDocument
+        updated_prefs = PreferencesDocument(**prefs_dict)
+        await repo.upsert(TENANT_ID, updated_prefs)
+        print(f"  Config fields merged: {len(config_fields)}")
+        print(f"  Quick actions added:  {qa_created}")
+
+        # Step 4: Seed KB articles directly via KB repository
+        if kb_articles:
+            from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
+            from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
+
+            kb_repo = KnowledgeBaseRepository()
+            for article in kb_articles:
+                try:
+                    entry_id = str(_uuid.uuid4())
+                    doc = KnowledgeBaseDocument(
+                        id=entry_id,
+                        tenant_id=TENANT_ID,
+                        entry_type="article",
+                        title=article.get("title", ""),
+                        content=article.get("content", ""),
+                        metadata={"preset_source": preset_id},
+                        tags=[],
+                        language="en",
+                        category=article.get("category", "general"),
+                        status="published",
+                        is_active=True,
+                        source_type="preset",
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    await kb_repo.create(TENANT_ID, doc)
+                    kb_created += 1
+                except Exception as exc:
+                    print(f"  [WARN] KB article failed: {exc}")
+
+        agents = preset.get("agents_recommended", [])
+        print(f"  KB articles created:  {kb_created}")
+        if agents:
+            agent_names = ", ".join(a["agent_id"] for a in agents)
+            print(f"  Recommended agents:   {agent_names}")
+
+        phase_results["3b_preset"] = (
+            f"OK — {preset_id}: config={len(config_fields)}, "
+            f"qa={qa_created}, kb={kb_created}"
+        )
+    except Exception as e:
+        print(f"  [ERROR] {e}")
+        phase_results["3b_preset"] = f"ERROR: {e}"
+
+
 async def seed(
     dry_run: bool = True,
     demo: bool = False,
     embed: bool = False,
+    preset: str | None = None,
 ) -> None:
     """Run all seed phases in sequence (initialization)."""
 
@@ -988,12 +1140,15 @@ async def seed(
     print("|  Tenant: " + TENANT_ID + " " * (53 - len(TENANT_ID)) + "|")
     mode_str = "DRY RUN" if dry_run else "EXECUTE"
     print("|  Mode:   " + mode_str + " " * (53 - len(mode_str)) + "|")
+    if preset:
+        print("|  Preset: " + preset + " " * (53 - len(preset)) + "|")
     print("+" + "=" * 63 + "+")
 
     await phase_1_containers(dry_run)
     await phase_0_clean_partition(dry_run)
     await phase_2_tenant(dry_run)
     await phase_3_preferences(dry_run)
+    await phase_3b_preset(dry_run, preset)
     # Phase 5 (KB articles) removed — initialization yields zero articles.
     # Use seed_knowledge_base.py separately if KB data is needed.
     await phase_6_platform_config(dry_run)
@@ -1023,10 +1178,17 @@ async def main() -> None:
         action="store_true",
         help="Also embed KB articles (requires Azure OpenAI)",
     )
+    parser.add_argument(
+        "--preset",
+        type=str,
+        default=None,
+        metavar="PRESET_ID",
+        help="Apply a vertical preset after seeding (e.g. returns_agent, order_support)",
+    )
     args = parser.parse_args()
 
     dry_run = not args.execute
-    await seed(dry_run=dry_run, demo=args.demo, embed=args.embed)
+    await seed(dry_run=dry_run, demo=args.demo, embed=args.embed, preset=args.preset)
 
 
 if __name__ == "__main__":

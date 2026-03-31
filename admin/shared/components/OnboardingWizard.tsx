@@ -38,6 +38,31 @@ import type { ApiFetch } from '../hooks';
 // Types
 // ---------------------------------------------------------------------------
 
+interface Preset {
+  id: string;
+  display_name: string;
+  description: string;
+  icon: string;
+  quick_action_count: number;
+  article_count: number;
+  agents_recommended: Array<{
+    agent_id: string;
+    tier_required: string;
+    reason: string;
+  }>;
+}
+
+interface PresetApplyResult {
+  draft_created: boolean;
+  quick_actions_created: number;
+  assignments_created: boolean;
+  articles_created: number;
+  agents_recommended: Array<{
+    agent_id: string;
+    tier_required: string;
+  }>;
+}
+
 interface Template {
   id: string;
   name: string;
@@ -107,6 +132,10 @@ export const OnboardingWizard: React.FC<Props> = ({
   onNavigate,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [presetsLoading, setPresetsLoading] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [presetApplyResult, setPresetApplyResult] = useState<PresetApplyResult | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -128,6 +157,17 @@ export const OnboardingWizard: React.FC<Props> = ({
   const effectiveUrl = !shopDomain && storefrontUrl.trim() ? storefrontUrl.trim() : null;
   const urlValid = !effectiveUrl || isValidUrl(effectiveUrl);
   const selectedTemplate = templates.find((t) => t.id === selectedCategory);
+
+  // Load presets on open
+  useEffect(() => {
+    if (!opened) return;
+    setPresetsLoading(true);
+    apiFetch('/api/admin/presets')
+      .then((r) => r.json())
+      .then((data) => setPresets(data.presets || []))
+      .catch(() => setPresets([]))
+      .finally(() => setPresetsLoading(false));
+  }, [opened, apiFetch]);
 
   // Load templates on open
   useEffect(() => {
@@ -193,27 +233,61 @@ export const OnboardingWizard: React.FC<Props> = ({
   // -------------------------------------------------------------------
 
   const handleApplyTemplate = useCallback(async () => {
-    if (!selectedCategory) return;
+    if (!selectedPreset && !selectedCategory) return;
     setApplyLoading(true);
     setApplyError(null);
     setStep(2);
 
     try {
-      const res = await apiFetch(`/api/admin/knowledge/templates/${selectedCategory}/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Template application failed' }));
-        throw new Error(err.detail || `HTTP ${res.status}`);
+      // Step 1: Apply preset (config draft + quick actions + KB seed)
+      if (selectedPreset) {
+        const presetRes = await apiFetch(`/api/admin/presets/${selectedPreset}/apply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (presetRes.ok) {
+          const presetData = await presetRes.json();
+          setPresetApplyResult(presetData);
+        } else {
+          const err = await presetRes.json().catch(() => ({ detail: 'Preset application failed' }));
+          // If no category selected, this is a hard failure
+          if (!selectedCategory) {
+            throw new Error(err.detail || `Preset failed: HTTP ${presetRes.status}`);
+          }
+          // With a category selected, preset failure is non-fatal — warn only
+          console.warn('Preset application failed:', err.detail || presetRes.status);
+        }
       }
-      const result = await res.json();
+
+      // Step 2: Apply category template (KB articles)
+      let articlesCreated = 0;
+      let articlesFailed = 0;
+      let totalChars = 0;
+      let configSuggestions: Record<string, string> | undefined;
+
+      if (selectedCategory) {
+        const res = await apiFetch(`/api/admin/knowledge/templates/${selectedCategory}/apply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Template application failed' }));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        const result = await res.json();
+        articlesCreated = result.articles_created ?? result.articlesCreated ?? 0;
+        articlesFailed = result.articles_failed ?? result.articlesFailed ?? 0;
+        totalChars = result.total_chars ?? result.totalChars ?? 0;
+        configSuggestions = result.config_suggestions ?? result.configSuggestions;
+      }
+
       setApplyResult({
-        articlesCreated: result.articles_created ?? result.articlesCreated ?? 0,
-        articlesFailed: result.articles_failed ?? result.articlesFailed ?? 0,
-        totalChars: result.total_chars ?? result.totalChars ?? 0,
-        configSuggestions: result.config_suggestions ?? result.configSuggestions,
+        articlesCreated,
+        articlesFailed,
+        totalChars,
+        configSuggestions,
       });
 
       // Start storefront ingestion: Shopify path or URL path
@@ -227,7 +301,7 @@ export const OnboardingWizard: React.FC<Props> = ({
     } finally {
       setApplyLoading(false);
     }
-  }, [selectedCategory, apiFetch, shopDomain, effectiveUrl]);
+  }, [selectedPreset, selectedCategory, apiFetch, shopDomain, effectiveUrl]);
 
   // -------------------------------------------------------------------
   // Shopify ingestion
@@ -345,6 +419,11 @@ export const OnboardingWizard: React.FC<Props> = ({
     if (selectedTemplate) {
       return selectedTemplate.name;
     }
+    // Preset-only flow: use preset display name as brand fallback
+    if (selectedPreset) {
+      const p = presets.find((x) => x.id === selectedPreset);
+      if (p) return p.display_name;
+    }
     return null;
   };
 
@@ -407,7 +486,7 @@ export const OnboardingWizard: React.FC<Props> = ({
     } finally {
       setActivating(false);
     }
-  }, [suggestions, apiFetch, onNavigate, shopDomain, selectedTemplate, customInstructions]);
+  }, [suggestions, apiFetch, onNavigate, shopDomain, selectedTemplate, selectedPreset, presets, customInstructions]);
 
   // Navigate to config page (fallback for manual review)
   const handleGoToConfig = useCallback(() => {
@@ -418,6 +497,8 @@ export const OnboardingWizard: React.FC<Props> = ({
   // Reset on close
   const handleClose = useCallback(() => {
     setStep(1);
+    setSelectedPreset(null);
+    setPresetApplyResult(null);
     setSelectedCategory(null);
     setStorefrontUrl('');
     setApplyResult(null);
@@ -465,12 +546,12 @@ export const OnboardingWizard: React.FC<Props> = ({
       closeOnClickOutside={false}
       closeOnEscape={step === 1}
     >
-      {/* Step 1: Category selection + storefront URL */}
+      {/* Step 1: Preset + Category selection + storefront URL */}
       {step === 1 && (
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            What type of products or services does your store sell? We'll create
-            starter knowledge base articles tailored to your industry.
+            Choose a starting point for your AI assistant, then pick your
+            product category for tailored knowledge base articles.
           </Text>
 
           {existingArticleCount > 0 && (
@@ -487,6 +568,61 @@ export const OnboardingWizard: React.FC<Props> = ({
               </Text>
             </Alert>
           )}
+
+          {/* Preset cards */}
+          <Divider label="Choose your starting point" labelPosition="center" />
+
+          {presetsLoading ? (
+            <Group justify="center" py="sm">
+              <Loader size="sm" />
+              <Text size="sm" c="dimmed">Loading presets...</Text>
+            </Group>
+          ) : (
+            <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
+              {presets.map((p) => (
+                <Card
+                  key={p.id}
+                  padding="sm"
+                  radius="sm"
+                  withBorder
+                  style={{
+                    cursor: 'pointer',
+                    borderColor: selectedPreset === p.id ? 'var(--mantine-color-green-6)' : undefined,
+                    backgroundColor: selectedPreset === p.id ? 'var(--mantine-color-green-light)' : undefined,
+                  }}
+                  onClick={() => setSelectedPreset(selectedPreset === p.id ? null : p.id)}
+                >
+                  <Text size="sm" fw={500} lineClamp={1}>
+                    {p.display_name}
+                  </Text>
+                  <Text size="xs" c="dimmed" lineClamp={2} mt={2}>
+                    {p.description}
+                  </Text>
+                </Card>
+              ))}
+            </SimpleGrid>
+          )}
+
+          {selectedPreset && (() => {
+            const p = presets.find((x) => x.id === selectedPreset);
+            if (!p) return null;
+            return (
+              <Alert variant="light" color="green" radius="sm">
+                <Text size="xs">
+                  <strong>{p.display_name}</strong> will pre-configure your assistant with{' '}
+                  <strong>{p.quick_action_count} quick actions</strong> and{' '}
+                  <strong>{p.article_count} starter articles</strong>.
+                  {p.agents_recommended.length > 0 && (
+                    <> Recommended agents: {p.agents_recommended.map((a) => a.agent_id).join(', ')}
+                    {' '}— enable them on the <Anchor size="xs" onClick={() => { onClose(); onNavigate?.('/agents'); }}>Agents page</Anchor>.</>
+                  )}
+                </Text>
+              </Alert>
+            );
+          })()}
+
+          {/* Category template cards */}
+          <Divider label="Then pick your product category" labelPosition="center" />
 
           {templatesLoading ? (
             <Group justify="center" py="xl">
@@ -559,7 +695,7 @@ export const OnboardingWizard: React.FC<Props> = ({
             <Button
               color="action"
               onClick={handleApplyTemplate}
-              disabled={!selectedCategory || (!!storefrontUrl.trim() && !urlValid)}
+              disabled={(!selectedPreset && !selectedCategory) || (!!storefrontUrl.trim() && !urlValid)}
               size="sm"
             >
               Continue
@@ -574,7 +710,9 @@ export const OnboardingWizard: React.FC<Props> = ({
           {applyLoading && (
             <Group justify="center" py="lg">
               <Loader size="sm" />
-              <Text size="sm">Applying {selectedTemplate?.name} template...</Text>
+              <Text size="sm">
+                {selectedPreset ? 'Applying preset and template...' : `Applying ${selectedTemplate?.name} template...`}
+              </Text>
             </Group>
           )}
 
@@ -593,16 +731,30 @@ export const OnboardingWizard: React.FC<Props> = ({
             </Alert>
           )}
 
-          {applyResult && !applyLoading && (
+          {(applyResult || presetApplyResult) && !applyLoading && (
             <>
-              <Alert variant="light" color="green" radius="sm" title="Knowledge base created">
-                <Text size="sm">
-                  <strong>{applyResult.articlesCreated}</strong> articles added
-                  {applyResult.articlesFailed > 0 && (
-                    <> ({applyResult.articlesFailed} failed)</>
-                  )}
-                </Text>
-              </Alert>
+              {presetApplyResult && (
+                <Alert variant="light" color="green" radius="sm" title="Preset applied">
+                  <Text size="sm">
+                    Configuration draft created with{' '}
+                    <strong>{presetApplyResult.quick_actions_created}</strong> quick actions
+                    {presetApplyResult.articles_created > 0 && (
+                      <> and <strong>{presetApplyResult.articles_created}</strong> starter articles</>
+                    )}
+                  </Text>
+                </Alert>
+              )}
+
+              {applyResult && applyResult.articlesCreated > 0 && (
+                <Alert variant="light" color="green" radius="sm" title="Knowledge base created">
+                  <Text size="sm">
+                    <strong>{applyResult.articlesCreated}</strong> articles added
+                    {applyResult.articlesFailed > 0 && (
+                      <> ({applyResult.articlesFailed} failed)</>
+                    )}
+                  </Text>
+                </Alert>
+              )}
 
               {ingestionRunning && ingestionJob && (
                 <>

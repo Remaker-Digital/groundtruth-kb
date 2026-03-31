@@ -1,0 +1,44 @@
+# Preset YAML Schema — G6 Vertical Template Starter Kits (SPEC-1878)
+#
+# Each preset file must conform to this structure. Fields marked
+# "v1 scope" are the only ones written to tenant config in v1.
+# Fields marked "informational" are displayed in UI but not persisted.
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+# Required metadata
+id: string                  # unique slug (matches filename without .yaml)
+display_name: string        # UI label
+description: string         # 1-2 sentence summary
+icon: string                # Mantine icon reference (e.g. "package-return")
+
+# v1 scope — written to PreferencesDocument draft via PUT /api/config
+preferences:
+  brand_voice: string
+  formality_level: string   # casual | balanced | formal
+  response_length: string   # concise | standard | detailed
+  escalation_threshold: float  # 0.0-1.0
+  escalation_keywords: list[string]
+  custom_instructions: string  # multiline
+
+# v1 scope — quick actions created via POST /api/admin/quick-actions
+quick_actions:
+  - label: string           # button text
+    message: string         # prompt template sent to AI
+
+# v1 scope — widget overrides via PUT /api/config
+widget:
+  greeting_message: string
+  input_placeholder: string
+
+# v1 scope — starter KB articles created via TemplateLoader pattern
+knowledge_seed:
+  - title: string
+    content: string         # multiline article body
+    category: string        # KB category tag
+
+# Informational only in v1 — becomes functional in v2 (WI-3025)
+agents_recommended:
+  - agent_id: string
+    tier_required: string   # free | starter | professional | enterprise
+    reason: string
