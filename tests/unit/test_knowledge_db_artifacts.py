@@ -684,3 +684,53 @@ class TestTransportGovernanceGate:
         gated_db.update_spec("SPEC-0001", "test", "promote", status="verified")
         spec = gated_db.get_spec("SPEC-0001")
         assert spec["status"] == "verified"
+
+
+class TestDefaultShimGateEnforcement:
+    """Regression tests proving the AR db.py shim auto-wires the transport gate.
+
+    These tests use the default KnowledgeDB() constructor (no explicit gate_registry),
+    proving that unchanged downstream callers still get gate enforcement.
+
+    © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+    """
+
+    def test_default_knowledgedb_has_gate_registry(self):
+        """Default KnowledgeDB() must have a non-None gate registry."""
+        database = KnowledgeDB(":memory:")
+        assert database._gate_registry is not None
+        gate_names = [g.name() for g in database._gate_registry._gates]
+        assert "Transport Evidence Gate" in gate_names
+        database.close()
+
+    def test_default_path_blocks_transport_test_pass(self):
+        """Default KnowledgeDB() must block pass for transport-gated spec without test_file."""
+        from db import TransportEvidenceGateError
+        database = KnowledgeDB(":memory:")
+        database.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
+            database.insert_test(
+                "TEST-DEFAULT-001", "Default path test", "SPEC-1524", "e2e",
+                "pass expected", "test", "regression test", last_result="pass",
+            )
+        database.close()
+
+    def test_default_path_blocks_transport_spec_verified(self):
+        """Default KnowledgeDB() must block verified for transport-gated spec without evidence."""
+        from db import TransportEvidenceGateError
+        database = KnowledgeDB(":memory:")
+        database.insert_spec("SPEC-1524", "SLIM transport", "implemented", "test", "init")
+        with pytest.raises(TransportEvidenceGateError, match="no linked tests"):
+            database.update_spec("SPEC-1524", "test", "promote", status="verified")
+        database.close()
+
+    def test_default_path_allows_non_gated_spec(self):
+        """Default KnowledgeDB() must allow pass for non-transport specs."""
+        database = KnowledgeDB(":memory:")
+        database.insert_spec("SPEC-9999", "Non-transport", "implemented", "test", "init")
+        result = database.insert_test(
+            "TEST-DEFAULT-002", "Non-gated test", "SPEC-9999", "unit",
+            "pass expected", "test", "regression test", last_result="pass",
+        )
+        assert result["last_result"] == "pass"
+        database.close()
