@@ -30,7 +30,8 @@ gt init my-project
 # Seed with governance specs and examples
 gt --config my-project/groundtruth.toml seed --example
 
-# Open the web UI
+# Open the web UI (requires [web] extra)
+pip install groundtruth-kb[web]
 gt --config my-project/groundtruth.toml serve
 # Visit http://localhost:8090
 ```

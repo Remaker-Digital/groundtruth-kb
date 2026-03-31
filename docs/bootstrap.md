@@ -133,7 +133,10 @@ If the assertion passes (the file and pattern exist), you'll see a passing resul
 
 ## Step 8: Browse with the web UI
 
+The web UI requires the `[web]` extra:
+
 ```bash
+pip install groundtruth-kb[web]
 gt serve
 ```
 
