@@ -288,6 +288,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             conversation_id=conversation_id,
             tenant_id=tenant_id,
             customer_id=customer_id or "",
+            message_index=len(conversation_history) if conversation_history else 0,
         )
         tier = tenant.tier or TenantTier.STARTER
 
@@ -351,6 +352,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 AgentRole.RESPONSE_GENERATOR, tenant, preferences, profile,
             )
             trace.set_profile_context(prompt_trace)
+
+            # S251 G5 Phase 1: record response language for Lane 2
+            trace.set_language(getattr(preferences, "primary_language", "en"))
 
             # ---------------------------------------------------------------
             # Layer 4: Fine-tuned model selection + A/B routing (WI #93-96)
@@ -477,6 +481,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             intent_result, knowledge_result = await asyncio.gather(ic_task, kr_task)
+
+            # S251 G5 Phase 1: record the query sent to knowledge retrieval
+            trace.set_knowledge_query(tokenized_message)
 
             # Process IC result
             intent = intent_result.get("intent", "general_inquiry")
@@ -625,7 +632,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     entry_id=source.get("id", ""),
                     title=source.get("title", ""),
                     relevance_score=source.get("score", 0.0),
-                    entry_type=source.get("type", ""),
+                    entry_type=source.get("entry_type", source.get("type", "")),
                 )
             kr_stage_idx = 1 if len(budget.stages) >= 2 else 0
             trace.add_stage(
@@ -1315,9 +1322,18 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 self._profile_cache[cache_key] = None
                 return None
 
+        # S251 G5 Phase 1: record profile state for Lane 2 observability
+        if profile:
+            is_stale = getattr(profile, "is_stale", False)
+            is_empty = not getattr(profile, "name", None) and not getattr(profile, "email", None)
+            trace.set_profile_state(is_stale=is_stale, is_empty=is_empty)
+        else:
+            trace.set_profile_state(is_stale=False, is_empty=True)
+
         # Layer 2: semantic history search (consent-gated)
         if profile and self._vectorizer:
             consent = getattr(profile, "consent_status", ConsentStatus.NOT_ASKED)
+            trace.set_consent(consent.value if hasattr(consent, "value") else str(consent))
             if consent == ConsentStatus.GRANTED:
                 try:
                     history_results = await self._vectorizer.search_history(
@@ -1333,10 +1349,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         )
                         for result in history_results:
                             trace.add_memory_signal(
-                                source="conversation_history",
-                                content_preview=result.get("chunk_text", "")[:80],
-                                relevance_score=result.get("score", 0.0),
-                                age_days=result.get("age_days", 0),
+                                layer=2,
+                                source_conversation_id=result.get("conversation_id", ""),
+                                similarity_score=result.get("score", 0.0),
+                                signal_type="prior_conversation",
+                                chunk_summary=result.get("chunk_text", "")[:80],
                             )
                 except Exception:
                     logger.debug(
