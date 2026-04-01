@@ -10,7 +10,7 @@
 
 Standard checklist executed for **every** production (or staging) deployment. Verifies source integrity, build correctness, post-deploy platform health, and — critically — that a new customer tenant can be provisioned, configured, and serve AI-powered conversations with zero defects.
 
-Five phases execute in sequence. Any FAIL in Phases A–C blocks the deployment or triggers rollback. Phase D failures indicate the deployment is live but tenant provisioning is defective — no new customers should be onboarded until resolved.
+Five phases execute in sequence. Any FAIL in Phases A–D blocks the deployment or triggers rollback. Phase D failures (widget/chat critical path) require immediate rollback — the chat widget is core product surface (S251 OM-3).
 
 **Automation:** `python scripts/pre_flight_checklist.py --env production --new-version X.Y.Z`
 
