@@ -21,7 +21,7 @@ PRECONDITIONS:
 
 POSTCONDITIONS:
   [ ] All prior tenant data deleted from 11 containers (clean slate)
-  [ ] 10 Cosmos DB containers created/verified
+  [ ] 12 Cosmos DB containers created/verified
   [ ] Tenant document with API key + widget key
   [ ] Preferences document (config_state=draft, all fields empty, zero quick actions)
   [ ] 1 team member (superadmin) with per-user API key
@@ -97,7 +97,7 @@ Creates all Cosmos DB containers and provisions
 a complete tenant environment with sensible defaults.
 
 Orchestrates 8 phases:
-    1. Containers   — 10 Cosmos DB containers with indexes
+    1. Containers   — 12 Cosmos DB containers with indexes
     0. Clean        — Delete ALL existing tenant docs (clean slate)
     2. Tenant       — TenantDocument (active, professional) + API/widget keys
     3. Preferences  — PreferencesDocument v1 (draft config, brand, widget, quick actions)
@@ -338,7 +338,7 @@ async def phase_0_clean_partition(dry_run: bool) -> None:
 # ---------------------------------------------------------------------------
 
 async def phase_1_containers(dry_run: bool) -> None:
-    """Create all 10 Cosmos DB containers with indexes.
+    """Create all 12 Cosmos DB containers with indexes.
 
     Uses a tolerant approach: creates each container individually so that
     failures (e.g., vector search capability not yet propagated) don't block
