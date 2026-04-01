@@ -140,11 +140,15 @@ interface AgentRedSDK {
       }
     : null;
 
-  // Read optional admin auth token (set by standalone admin layout)
+  // Read optional admin auth token + context (set by standalone admin layout)
   const authToken = scriptTag.getAttribute('data-auth-token') || undefined;
+  const authType = (scriptTag.getAttribute('data-auth-type') || 'api_key') as 'api_key' | 'session_token';
+  const tenantId = scriptTag.getAttribute('data-tenant-id') || undefined;
 
-  // Configure transport (authToken enables team member identification)
-  configureTransport({ apiBaseUrl, widgetKey, authToken });
+  // Configure transport (authToken enables team member identification,
+  // tenantId enables SPEC-1644 partition-scoped auth, authType selects
+  // the correct header: X-API-Key vs X-Session-Token)
+  configureTransport({ apiBaseUrl, widgetKey, authToken, authType, tenantId });
 
   // Fetch config and initialize
   init(widgetKey, apiBaseUrl, dataOverrides, shopifyCustomer).catch((err) => {

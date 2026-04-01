@@ -205,6 +205,8 @@ export const Panel: FunctionComponent<PanelProps> = ({
       apiBaseUrl: transportCfg.apiBaseUrl,
       widgetKey: transportCfg.widgetKey,
       authToken: transportCfg.authToken,
+      authType: transportCfg.authType,
+      tenantId: transportCfg.tenantId,
       conversationId,
       onConnectionLost: () => store.setState({ isReconnecting: true }),
       onConnectionRestored: () => store.setState({ isReconnecting: false, error: null }),

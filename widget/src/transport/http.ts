@@ -32,6 +32,14 @@ export interface TransportConfig {
    *  When present, the middleware identifies the caller as a team member,
    *  enabling Co-pilot routing and agent access enforcement. */
   authToken?: string;
+  /** Auth type: determines which header carries the auth token.
+   *  'api_key' → X-API-Key, 'session_token' → X-Session-Token.
+   *  Default: 'api_key' for backward compatibility. */
+  authType?: 'api_key' | 'session_token';
+  /** Tenant ID for SPEC-1644 partition-scoped auth.
+   *  When set, appended as ?tenant= to API calls so the middleware can
+   *  scope non-SPA API key lookups to a single Cosmos partition. */
+  tenantId?: string;
 }
 
 let _config: TransportConfig | null = null;
@@ -81,21 +89,31 @@ async function request<T>(
   body?: unknown,
   options?: RequestOptions,
 ): Promise<ApiResponse<T>> {
-  const { apiBaseUrl, widgetKey, authToken } = getTransportConfig();
-  const url = `${apiBaseUrl}${path}`;
+  const { apiBaseUrl, widgetKey, authToken, authType, tenantId } = getTransportConfig();
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryBaseDelay = options?.retryBaseDelayMs ?? 1000;
+
+  // Build URL with ?tenant= for SPEC-1644 partition-scoped auth
+  let url = `${apiBaseUrl}${path}`;
+  if (tenantId && !url.includes('tenant=')) {
+    url += url.includes('?') ? `&tenant=${tenantId}` : `?tenant=${tenantId}`;
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Widget-Key': widgetKey,
   };
 
-  // When loaded in admin console, include the admin's auth credential.
-  // Middleware checks X-API-Key before X-Widget-Key, so the caller is
+  // When loaded in admin console, include the admin's auth credential
+  // using the correct header based on auth type. Middleware checks
+  // X-API-Key / X-Session-Token before X-Widget-Key, so the caller is
   // authenticated as a team member with role-based routing.
   if (authToken) {
-    headers['X-API-Key'] = authToken;
+    if (authType === 'session_token') {
+      headers['X-Session-Token'] = authToken;
+    } else {
+      headers['X-API-Key'] = authToken;
+    }
   }
 
   let lastError: ApiResponse<T> | null = null;

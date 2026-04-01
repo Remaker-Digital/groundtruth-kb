@@ -547,15 +547,25 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         // admin's auth credential so the chat backend can identify the caller
         // as a team member (middleware checks X-API-Key before X-Widget-Key).
         // This enables Co-pilot routing and agent access enforcement.
+        //
+        // S251: Also pass tenant ID and auth type so the widget transport
+        // can include ?tenant= (SPEC-1644) and use the correct auth header
+        // (X-API-Key vs X-Session-Token).
         const script = document.createElement('script');
         script.id = 'agent-red-admin-widget';
         script.src = import.meta.env.DEV ? `${import.meta.env.BASE_URL}widget.js` : `${apiUrl}/widget.js`;
         script.setAttribute('data-widget-key', widgetKey);
         script.setAttribute('data-api-url', apiUrl);
 
-        // Pass admin auth credential for team member identification
+        // Pass admin auth credential + context for team member identification
         if (resolvedAuth.value) {
           script.setAttribute('data-auth-token', resolvedAuth.value);
+          script.setAttribute('data-auth-type', resolvedAuth.type); // 'api_key' or 'session_token'
+        }
+        // Pass tenant ID so widget transport includes ?tenant= (SPEC-1644)
+        const widgetTenantId = urlTenantId || tenantContext?.tenantId || '';
+        if (widgetTenantId) {
+          script.setAttribute('data-tenant-id', widgetTenantId);
         }
 
         document.body.appendChild(script);

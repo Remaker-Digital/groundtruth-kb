@@ -2,7 +2,7 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 21093,
+    "total_assertions": 21094,
     "total_files": 457
   },
   "baselines": {
@@ -253,7 +253,7 @@
     "tests/multi_tenant/test_message_feedback.py": 63,
     "tests/multi_tenant/test_mfa_totp.py": 65,
     "tests/multi_tenant/test_mfa_totp_specs.py": 70,
-    "tests/multi_tenant/test_middleware_pipeline.py": 39,
+    "tests/multi_tenant/test_middleware_pipeline.py": 40,
     "tests/multi_tenant/test_mutation_api_keys.py": 43,
     "tests/multi_tenant/test_mutation_communication.py": 35,
     "tests/multi_tenant/test_mutation_email_change.py": 23,

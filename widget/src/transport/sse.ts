@@ -36,6 +36,10 @@ interface SSEOptions {
   conversationId: string;
   /** Optional admin auth token for team member identification. */
   authToken?: string;
+  /** Auth type: 'api_key' or 'session_token'. Default: 'api_key'. */
+  authType?: 'api_key' | 'session_token';
+  /** Tenant ID for SPEC-1644 partition-scoped auth. */
+  tenantId?: string;
   onConnectionLost?: () => void;
   onConnectionRestored?: () => void;
   /** Called when all reconnect attempts are exhausted (WI-0931). */
@@ -106,10 +110,21 @@ export class SSEConnection {
     // as a query parameter. The backend accepts both header and query param.
     url.searchParams.set('widget_key', this.options.widgetKey);
 
+    // SPEC-1644: Append tenant for partition-scoped auth
+    if (this.options.tenantId) {
+      url.searchParams.set('tenant', this.options.tenantId);
+    }
+
     // Pass admin auth token for team member identification (SPEC-1562).
-    // Middleware checks api_key query param before widget_key.
+    // Use the correct query param based on auth type:
+    //   api_key → middleware checks api_key before widget_key
+    //   session_token → middleware checks X-Session-Token header (via query param)
     if (this.options.authToken) {
-      url.searchParams.set('api_key', this.options.authToken);
+      if (this.options.authType === 'session_token') {
+        url.searchParams.set('session_token', this.options.authToken);
+      } else {
+        url.searchParams.set('api_key', this.options.authToken);
+      }
     }
 
     // WI #133: Pass tab_id for multi-tab coordination. The backend tracks

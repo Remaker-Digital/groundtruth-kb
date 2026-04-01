@@ -634,6 +634,30 @@ class TestApiKeyWidgetKeyFallthrough:
         assert resp.status_code != 401
 
     @pytest.mark.unit
+    def test_valid_api_key_with_widget_key_no_tenant_falls_through(
+        self, app_client,
+    ):
+        """MWP-31: Valid non-SPA API key + widget key WITHOUT ?tenant=.
+
+        This matches the pre-fix admin-widget caller shape: non-SPA key
+        without ?tenant= triggers SPEC-1644 rejection, which then falls
+        through to widget key auth. This is the real-world incident path.
+        After S251 caller-side fix, the widget now sends ?tenant=, so
+        this scenario only occurs with stale widget code.
+        """
+        headers = {
+            "X-API-Key": TEST_API_KEY_STARTER,  # Valid but no ?tenant=
+            "X-Widget-Key": TEST_WIDGET_KEY,
+        }
+        resp = app_client.post(
+            "/api/chat/conversations",  # No ?tenant= parameter
+            headers=headers,
+            json={"initial_message": "test"},
+        )
+        # Should NOT be 401 — falls through to widget key auth
+        assert resp.status_code != 401
+
+    @pytest.mark.unit
     def test_fallthrough_still_rejects_admin_paths(
         self, app_client,
     ):
