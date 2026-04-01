@@ -286,6 +286,36 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
                         )
                     continue
 
+                # Validate assertions in specifications rows
+                if table_name == "specifications" and "assertions" in row and row["assertions"]:
+                    from groundtruth_kb.assertion_schema import validate_assertion_list
+                    try:
+                        raw = row["assertions"]
+                        parsed_assertions = json.loads(raw) if isinstance(raw, str) else raw
+                        validation_errors = validate_assertion_list(parsed_assertions)
+                        if validation_errors:
+                            spec_id = row.get("id", "unknown")
+                            if not merge:
+                                raise click.ClickException(
+                                    f"Invalid assertions in {spec_id}: "
+                                    f"{'; '.join(validation_errors)}"
+                                )
+                            click.echo(
+                                f"  WARNING: {spec_id}: invalid assertions "
+                                f"skipped ({len(validation_errors)} error(s))",
+                                err=True,
+                            )
+                            rejected += 1
+                            continue
+                    except (json.JSONDecodeError, TypeError) as exc:
+                        if not merge:
+                            raise click.ClickException(
+                                f"Malformed assertions JSON in "
+                                f"{row.get('id', 'unknown')}"
+                            ) from exc
+                        rejected += 1
+                        continue
+
                 cols = list(row.keys())
                 placeholders = ", ".join(["?"] * len(cols))
                 col_names = ", ".join(cols)

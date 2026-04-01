@@ -481,6 +481,7 @@ class KnowledgeDB:
         tags: list[str] | None = None,
         assertions: list[dict] | None = None,
         type: str = "requirement",
+        validate_assertions: bool = True,
     ) -> dict[str, Any]:
         """Insert a new version of a specification.
 
@@ -489,8 +490,17 @@ class KnowledgeDB:
                   'architecture_decision', or 'design_constraint'.
                   Auto-detected from ID prefix (GOV-*, PB-*, ADR-*, DCL-*) when left
                   as default 'requirement'.
+            validate_assertions: If True (default), validate assertion definitions
+                  before writing. Set False only for tested migration tooling.
         """
         type = self._auto_detect_spec_type(id, type)
+
+        # Validate assertions at write time
+        if validate_assertions and assertions:
+            from groundtruth_kb.assertion_schema import validate_assertion_list
+            errors = validate_assertion_list(assertions)
+            if errors:
+                raise ValueError(f"Invalid assertions for {id}: {'; '.join(errors)}")
 
         # Run governance gates on initial insert (for status enforcement)
         if self._gate_registry is not None:
@@ -521,12 +531,26 @@ class KnowledgeDB:
         id: str,
         changed_by: str,
         change_reason: str,
+        *,
+        validate_assertions: bool = True,
         **fields: Any,
     ) -> dict[str, Any]:
-        """Create a new version of a spec, carrying forward unchanged fields."""
+        """Create a new version of a spec, carrying forward unchanged fields.
+
+        Args:
+            validate_assertions: If True (default), validate assertion definitions
+                  before writing. Set False only for tested migration tooling.
+        """
         current = self.get_spec(id)
         if not current:
             raise ValueError(f"Spec {id} not found")
+
+        # Validate assertions at write time if provided
+        if validate_assertions and "assertions" in fields and fields["assertions"] is not None:
+            from groundtruth_kb.assertion_schema import validate_assertion_list
+            errors = validate_assertion_list(fields["assertions"])
+            if errors:
+                raise ValueError(f"Invalid assertions for {id}: {'; '.join(errors)}")
 
         version = self._next_spec_version(id)
         # Merge: new fields override current values
@@ -1006,18 +1030,24 @@ class KnowledgeDB:
         """List all current design constraint specs (DCL-*)."""
         return self.list_specs(type="design_constraint", status=status)
 
-    def validate_dcl_constraints(self, dcl_id: str | None = None) -> list[dict[str, Any]]:
+    def validate_dcl_constraints(
+        self, dcl_id: str | None = None, project_root: Path | None = None,
+    ) -> list[dict[str, Any]]:
         """Validate design constraint assertions against the codebase.
 
         If dcl_id is provided, validates only that constraint.
         Otherwise validates all implemented/verified DCL-* specs with assertions.
 
+        Args:
+            dcl_id: Optional single DCL spec ID to validate.
+            project_root: Project root for file resolution. Falls back to cwd.
+
         Returns list of {dcl_id, title, passed, results: [...]} dicts.
         """
-        import importlib
-        import sys as _sys
-        _sys.path.insert(0, str(Path(__file__).parent))
-        assertions_mod = importlib.import_module("assertions")
+        from groundtruth_kb.assertions import run_single_assertion
+
+        if project_root is None:
+            project_root = Path.cwd()
 
         if dcl_id:
             specs = [self.get_spec(dcl_id)]
@@ -1035,7 +1065,7 @@ class KnowledgeDB:
             spec_results = []
             all_passed = True
             for assertion in assertion_list:
-                r = assertions_mod.run_single_assertion(assertion)
+                r = run_single_assertion(assertion, project_root)
                 spec_results.append(r)
                 if not r.get("passed") and not r.get("skipped"):
                     all_passed = False
