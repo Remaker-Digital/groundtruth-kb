@@ -35,6 +35,7 @@ from tests.conftest import (
     hash_test_api_key,
     make_tenant_document,
 )
+from src.multi_tenant.auth import TenantContext
 from tests.helpers.fake_tenant_repo import FakeTenantRepo, run_sync
 from src.multi_tenant.cosmos_schema import TenantStatus, TenantTier
 
@@ -697,3 +698,99 @@ class TestApiKeyWidgetKeyFallthrough:
             headers=headers,
         )
         assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# S251: Session-token + widget-key precedence tests
+# ---------------------------------------------------------------------------
+
+
+class TestSessionTokenWidgetKeyPrecedence:
+    """S251: When both X-Session-Token and X-Widget-Key are present,
+    session token must take precedence (team member identity preserved).
+
+    Also verifies session_token query param for SSE/EventSource paths.
+    """
+
+    @pytest.mark.unit
+    def test_http_session_token_takes_precedence_over_widget_key(
+        self, app_client,
+    ):
+        """MWP-32: X-Session-Token + X-Widget-Key → session auth, not widget.
+
+        Middleware must check session token before widget key so the
+        admin-embedded widget preserves team member identity.
+        """
+        mock_ctx = TenantContext(
+            tenant_id=STARTER_TENANT_ID,
+            status="active",
+            auth_method="magic_link_session",
+            team_member_id="member-1",
+            team_member_role="admin",
+        )
+        with patch(
+            "src.multi_tenant.middleware.TenantAuthMiddleware._auth_magic_link_session",
+            new_callable=AsyncMock,
+            return_value=mock_ctx,
+        ) as mock_session:
+            headers = {
+                "X-Session-Token": "valid-session-jwt",
+                "X-Widget-Key": TEST_WIDGET_KEY,
+            }
+            resp = app_client.post(
+                f"/api/chat/conversations?tenant={STARTER_TENANT_ID}",
+                headers=headers,
+                json={"initial_message": "test"},
+            )
+            # Session auth should be tried (team member path)
+            mock_session.assert_called_once_with("valid-session-jwt")
+
+    @pytest.mark.unit
+    def test_sse_session_token_query_param_accepted(
+        self, app_client,
+    ):
+        """MWP-33: SSE ?session_token= + ?widget_key= → session auth.
+
+        EventSource cannot set headers. The middleware must accept
+        session_token as a query parameter for SSE paths.
+        """
+        mock_ctx = TenantContext(
+            tenant_id=STARTER_TENANT_ID,
+            status="active",
+            auth_method="magic_link_session",
+            team_member_id="member-1",
+            team_member_role="admin",
+        )
+        with patch(
+            "src.multi_tenant.middleware.TenantAuthMiddleware._auth_magic_link_session",
+            new_callable=AsyncMock,
+            return_value=mock_ctx,
+        ) as mock_session:
+            resp = app_client.get(
+                f"/api/chat/stream/conv-123"
+                f"?session_token=valid-session-jwt"
+                f"&widget_key={TEST_WIDGET_KEY}"
+                f"&tenant={STARTER_TENANT_ID}",
+            )
+            # Session token query param should be picked up
+            mock_session.assert_called_once_with("valid-session-jwt")
+
+    @pytest.mark.unit
+    def test_sse_api_key_still_works_as_positive_control(
+        self, app_client,
+    ):
+        """MWP-34: SSE ?api_key= + ?widget_key= + ?tenant= → API key auth.
+
+        Positive control: the existing API-key SSE path still works
+        and resolves as a team member.
+        """
+        headers: dict[str, str] = {}
+        resp = app_client.get(
+            f"/api/chat/stream/conv-123"
+            f"?api_key={TEST_API_KEY_STARTER}"
+            f"&widget_key={TEST_WIDGET_KEY}"
+            f"&tenant={STARTER_TENANT_ID}",
+            headers=headers,
+        )
+        # Should NOT be 401 — API key auth succeeds with ?tenant=
+        assert resp.status_code != 401

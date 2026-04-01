@@ -418,6 +418,17 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 else:
                     raise  # No widget key fallback — propagate the 401
 
+        # Try magic link session token (X-Session-Token header or query param)
+        # S251: Moved BEFORE widget key so admin-embedded widgets with both
+        # X-Session-Token and X-Widget-Key resolve as team members, not
+        # anonymous widget users. SSE/EventSource passes session_token as
+        # a query param since browsers cannot set custom headers.
+        session_token = request.headers.get("X-Session-Token")
+        if not session_token:
+            session_token = request.query_params.get("session_token")
+        if session_token:
+            return await self._auth_magic_link_session(session_token)
+
         # Try publishable widget key (X-Widget-Key header or query param)
         widget_key = request.headers.get(WIDGET_KEY_HEADER)
         if not widget_key:
@@ -433,11 +444,6 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if widget_key:
             origin = request.headers.get("origin") or request.headers.get("referer")
             return await self._auth_widget_key(widget_key, request.url.path, origin)
-
-        # Try magic link session token (X-Session-Token header)
-        session_token = request.headers.get("X-Session-Token")
-        if session_token:
-            return await self._auth_magic_link_session(session_token)
 
         # Try internal verification token (SPEC-1846: cloud-native verification)
         verification_token = request.headers.get(VERIFICATION_TOKEN_HEADER)
