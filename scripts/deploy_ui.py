@@ -383,10 +383,14 @@ def verify_deployment(env: str) -> dict:
 
     # Widget config auth check — verifies widget key auth works on /api/config
     # (S251: the exact failure mode diagnosed when the admin widget returned 401)
-    widget_key = os.environ.get(
-        "DEPLOY_SMOKE_WIDGET_KEY",
-        os.environ.get("STAGING_REMAKER_WIDGET_KEY", ""),
-    )
+    # Environment-specific key resolution (mirrors deploy.py pattern)
+    widget_key = os.environ.get("DEPLOY_SMOKE_WIDGET_KEY", "")
+    if not widget_key:
+        if env == "staging":
+            widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
+        elif env == "production":
+            widget_key = os.environ.get("PRODUCTION_WIDGET_KEY", "")
+
     if widget_key:
         config_url = f"{base_url}/api/config?page_type=all"
         try:
@@ -404,7 +408,12 @@ def verify_deployment(env: str) -> dict:
             results["widget_config_auth"] = {"url": config_url, "status": 0, "ok": False, "error": str(e)}
             logger.warning("  [FAIL] widget_config_auth -> %s", e)
     else:
-        logger.warning("  [SKIP] widget_config_auth — no widget key configured")
+        # No widget key = hard fail (not a skip). Widget verification is mandatory.
+        results["widget_config_auth"] = {
+            "url": f"{base_url}/api/config", "status": 0, "ok": False,
+            "error": "No widget key configured (set DEPLOY_SMOKE_WIDGET_KEY or environment-specific key)",
+        }
+        logger.warning("  [FAIL] widget_config_auth — no widget key configured")
 
     passed = sum(1 for k, r in results.items() if k != "summary" and isinstance(r, dict) and r.get("ok"))
     total = sum(1 for k, r in results.items() if k != "summary" and isinstance(r, dict))
