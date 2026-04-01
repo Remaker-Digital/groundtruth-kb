@@ -393,7 +393,30 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             api_key = request.query_params.get("api_key")
         if api_key:
             url_tenant = request.query_params.get("tenant")
-            return await self._auth_api_key(api_key, url_tenant)
+            try:
+                return await self._auth_api_key(api_key, url_tenant)
+            except AuthenticationError:
+                # S251 fallthrough: if a widget key is also present, fall
+                # through to widget key auth instead of returning 401.
+                # This handles admin-embedded widgets where the admin token
+                # may be stale but the widget key is still valid. The widget
+                # degrades to anonymous-customer mode (no team member context).
+                # Security: widget key auth is MORE restrictive (scoped to
+                # /api/chat/*, /ws/chat/*, /api/config only), so this cannot
+                # escalate privileges.
+                widget_key_fallback = (
+                    request.headers.get(WIDGET_KEY_HEADER)
+                    or request.query_params.get("widget_key")
+                    or request.query_params.get("key")
+                )
+                if widget_key_fallback:
+                    logger.warning(
+                        "API key auth failed with widget key present — "
+                        "falling through to widget key auth (path=%s)",
+                        request.url.path,
+                    )
+                else:
+                    raise  # No widget key fallback — propagate the 401
 
         # Try publishable widget key (X-Widget-Key header or query param)
         widget_key = request.headers.get(WIDGET_KEY_HEADER)
