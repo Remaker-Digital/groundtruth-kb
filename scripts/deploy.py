@@ -299,9 +299,10 @@ def verify_chat_conversation(fqdn: str, environment: str) -> bool:
             widget_key = os.environ.get("PRODUCTION_WIDGET_KEY", "")
 
     if not widget_key:
-        log("  Chat smoke test: SKIP (no widget key configured)")
+        log("  [FAIL] Chat smoke test: no widget key configured")
         log("    Set DEPLOY_SMOKE_WIDGET_KEY or STAGING_REMAKER_WIDGET_KEY env var")
-        return True  # Non-fatal skip
+        log("    To deploy without widget verification, pass --skip-widget-check")
+        return False
 
     log("Chat conversation smoke test...")
 
@@ -465,6 +466,11 @@ def main() -> int:
         "--test-host-tag",
         help="Test host image tag (staging only, defaults to same as tag)",
     )
+    parser.add_argument(
+        "--skip-widget-check",
+        action="store_true",
+        help="Skip widget chat smoke test (requires explicit owner approval)",
+    )
     args = parser.parse_args()
 
     if not re.match(r"^v\d+\.\d+\.\d+$", args.tag):
@@ -583,33 +589,46 @@ def main() -> int:
 
     # 7. Chat conversation smoke test (post-deploy readiness)
     #    Proves the pipeline works end-to-end, not just that containers are up.
-    chat_ok = verify_chat_conversation(fqdn, args.environment)
+    #    This is a STRICT GATE: deployment fails if the widget is non-functional.
+    #    Only exception: --skip-widget-check with explicit owner approval.
+    if args.skip_widget_check:
+        log("")
+        log("⚠️  Widget chat smoke test SKIPPED (--skip-widget-check)")
+        log("    Deployment proceeding WITHOUT widget verification.")
+        log("    This requires explicit owner approval.")
+        chat_ok = True  # Explicit skip — owner responsibility
+    else:
+        chat_ok = verify_chat_conversation(fqdn, args.environment)
 
     # 8. Record deployment event
     version_ok = actual == expected_version
+    all_ok = version_ok and chat_ok
     duration = time.monotonic() - deploy_start
     record_deployment_event(
         fqdn=fqdn,
         environment=args.environment,
         version=args.tag,
         image=gw_image,
-        success=version_ok,
+        success=all_ok,
         duration_s=duration,
     )
 
     # Summary
     log("")
     log("=" * 50)
-    all_ok = version_ok and chat_ok
-    icon = "✅" if all_ok else "⚠️"
+    icon = "✅" if all_ok else "❌"
     log(f"  {icon} {args.environment}: {actual or 'unknown'}")
     log(f"  URL: https://{fqdn}")
+    if not version_ok:
+        log(f"  ❌ Version mismatch: expected {expected_version}, got {actual}")
     if not chat_ok:
-        log(f"  ⚠️  Chat smoke test FAILED — pipeline may not be working")
+        log(f"  ❌ Widget chat smoke test FAILED — deployment is NOT verified")
+    if args.skip_widget_check:
+        log(f"  ⚠️  Widget check was SKIPPED (--skip-widget-check)")
     log("=" * 50)
 
     _close_log()
-    return 0 if version_ok else 1
+    return 0 if all_ok else 1
 
 
 if __name__ == "__main__":

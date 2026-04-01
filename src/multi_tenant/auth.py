@@ -713,7 +713,8 @@ async def verify_widget_key(
 def is_widget_key_allowed_path(path: str) -> bool:
     """Check if the request path is allowed for widget key auth.
 
-    Widget keys are scoped to /api/chat/* and /ws/chat/* only.
+    Widget keys are scoped to /api/chat/*, /ws/chat/*, and /api/config.
+    The /api/config endpoint is read-only and required for widget initialization.
     """
     return path.startswith(WIDGET_KEY_ALLOWED_PREFIXES)
 

@@ -237,8 +237,9 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         6. Store TenantContext in request.state.tenant_context.
         7. Forward to route handler.
 
-    Widget key auth (Decision UI-6) is scoped to /api/chat/* and
-    /ws/chat/* paths only. Requests to other paths with a widget key
+    Widget key auth (Decision UI-6) is scoped to /api/chat/*,
+    /ws/chat/*, and /api/config (read-only, required for widget
+    initialization). Requests to other paths with a widget key
     are rejected.
 
     On authentication failure, returns a JSON error response without

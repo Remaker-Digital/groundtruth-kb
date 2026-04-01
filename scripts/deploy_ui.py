@@ -381,8 +381,33 @@ def verify_deployment(env: str) -> dict:
             results[name] = {"url": url, "status": 0, "ok": False, "error": str(e)}
             logger.warning("  [FAIL] %s -> %s", name, e)
 
-    passed = sum(1 for r in results.values() if r["ok"])
-    total = len(results)
+    # Widget config auth check — verifies widget key auth works on /api/config
+    # (S251: the exact failure mode diagnosed when the admin widget returned 401)
+    widget_key = os.environ.get(
+        "DEPLOY_SMOKE_WIDGET_KEY",
+        os.environ.get("STAGING_REMAKER_WIDGET_KEY", ""),
+    )
+    if widget_key:
+        config_url = f"{base_url}/api/config?page_type=all"
+        try:
+            req = urllib.request.Request(config_url, method="GET")
+            req.add_header("X-Widget-Key", widget_key)
+            req.add_header("User-Agent", "deploy-ui-verify/1.0")
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                status = resp.getcode()
+                results["widget_config_auth"] = {"url": config_url, "status": status, "ok": status == 200}
+                logger.info("  [%s] widget_config_auth -> %d", "OK" if status == 200 else "FAIL", status)
+        except urllib.error.HTTPError as e:
+            results["widget_config_auth"] = {"url": config_url, "status": e.code, "ok": False}
+            logger.warning("  [FAIL] widget_config_auth -> HTTP %d", e.code)
+        except Exception as e:
+            results["widget_config_auth"] = {"url": config_url, "status": 0, "ok": False, "error": str(e)}
+            logger.warning("  [FAIL] widget_config_auth -> %s", e)
+    else:
+        logger.warning("  [SKIP] widget_config_auth — no widget key configured")
+
+    passed = sum(1 for k, r in results.items() if k != "summary" and isinstance(r, dict) and r.get("ok"))
+    total = sum(1 for k, r in results.items() if k != "summary" and isinstance(r, dict))
     results["summary"] = {"passed": passed, "total": total, "all_ok": passed == total}
     logger.info("Verification: %d/%d passed", passed, total)
     return results
