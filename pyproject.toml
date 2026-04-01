@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "groundtruth-kb"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Specification-driven governance toolkit for AI engineering teams"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -47,6 +47,9 @@ gt = "groundtruth_kb.cli:main"
 Homepage = "https://github.com/Remaker-Digital/groundtruth-kb"
 Repository = "https://github.com/Remaker-Digital/groundtruth-kb"
 Issues = "https://github.com/Remaker-Digital/groundtruth-kb/issues"
+
+[tool.hatch.version]
+path = "src/groundtruth_kb/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/groundtruth_kb"]
