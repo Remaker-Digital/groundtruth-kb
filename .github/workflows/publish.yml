@@ -1,23 +1,25 @@
-# Publish groundtruth-kb to PyPI on GitHub Release creation.
+# Verify and attach built artifacts to GitHub Releases.
 #
-# Requires: PYPI_API_TOKEN secret on the repository.
+# groundtruth-kb is distributed as a GitHub-installable package:
+#   pip install git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.0
 #
-# Usage: Create a GitHub Release from a version tag (e.g., v0.1.0).
-# The workflow builds the wheel + sdist, verifies with twine, and uploads.
+# This workflow runs on Release creation to verify the wheel builds
+# cleanly and attaches built artifacts to the Release for reference.
+# PyPI upload is optional and can be added later if needed.
 #
 # Copyright (c) 2026 Remaker Digital. Licensed under AGPL-3.0-or-later.
 
-name: Publish to PyPI
+name: Release
 
 on:
   release:
     types: [published]
 
 jobs:
-  publish:
+  build-verify:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -46,8 +48,15 @@ jobs:
           assert groundtruth_kb.get_templates_dir().exists(), 'Templates must be packaged'
           "
 
-      - name: Upload to PyPI
+      - name: Smoke test — install from GitHub ref
+        run: |
+          pip install --target /tmp/gt-github-smoke "groundtruth-kb @ git+https://github.com/${{ github.repository }}.git@${{ github.ref_name }}"
+          PYTHONPATH=/tmp/gt-github-smoke python -c "import groundtruth_kb; print(f'GitHub install OK: {groundtruth_kb.__version__}')"
+
+      - name: Attach artifacts to release
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in dist/*; do
+            gh release upload "${{ github.event.release.tag_name }}" "$f" --clobber
+          done
