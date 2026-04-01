@@ -2,10 +2,8 @@
 
 Loads vertical presets from YAML files and applies them to tenants
 through existing config/QA/KB surfaces. Presets pre-fill configuration
-draft, seed quick actions, and create starter KB articles.
-
-v1 scope: preferences + quick actions + widget + KB articles only.
-Overlay/binding writes deferred to v2 (WI-3025).
+draft, seed quick actions, create starter KB articles, and provision
+agent overlays + skill bindings (v2 — WI-3025).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -73,7 +71,7 @@ class ApplyResult:
 
     __slots__ = ("draft_created", "quick_actions_created",
                  "assignments_created", "articles_created",
-                 "agents_recommended")
+                 "agents_recommended", "agents_enabled", "agents_skipped")
 
     def __init__(
         self,
@@ -83,12 +81,16 @@ class ApplyResult:
         assignments_created: bool = False,
         articles_created: int = 0,
         agents_recommended: list[dict[str, str]] | None = None,
+        agents_enabled: list[str] | None = None,
+        agents_skipped: list[str] | None = None,
     ) -> None:
         self.draft_created = draft_created
         self.quick_actions_created = quick_actions_created
         self.assignments_created = assignments_created
         self.articles_created = articles_created
         self.agents_recommended = agents_recommended or []
+        self.agents_enabled = agents_enabled or []
+        self.agents_skipped = agents_skipped or []
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -97,6 +99,8 @@ class ApplyResult:
             "assignments_created": self.assignments_created,
             "articles_created": self.articles_created,
             "agents_recommended": self.agents_recommended,
+            "agents_enabled": self.agents_enabled,
+            "agents_skipped": self.agents_skipped,
         }
 
 
@@ -182,10 +186,19 @@ class PresetService:
         )
         result.articles_created = articles_created
 
+        # Step 5: Agent overlays + bindings (v2 — WI-3025)
+        # Create-if-absent: only provision agents that don't have existing overlays.
+        enabled, skipped = await self._provision_agents(
+            tenant_id, preset.get("agents_recommended", []), tier,
+        )
+        result.agents_enabled = enabled
+        result.agents_skipped = skipped
+
         logger.info(
-            "Applied preset '%s' to tenant %s: draft=%s, qa=%d, kb=%d",
+            "Applied preset '%s' to tenant %s: draft=%s, qa=%d, kb=%d, agents=%d (skipped=%d)",
             preset_id, tenant_id[:8], result.draft_created,
             result.quick_actions_created, result.articles_created,
+            len(enabled), len(skipped),
         )
         return result
 
@@ -347,6 +360,111 @@ class PresetService:
                 )
 
         return created
+
+
+    @staticmethod
+    async def _provision_agents(
+        tenant_id: str,
+        agents_recommended: list[dict[str, Any]],
+        tier: str,
+    ) -> tuple[list[str], list[str]]:
+        """Provision agent overlays + skill bindings for recommended agents.
+
+        Create-if-absent: only creates overlays/bindings that don't already
+        exist, so re-applying a preset never overwrites admin customizations.
+        Binding mode comes from the registry skill definition, not hardcoded.
+        Tier gating uses the registry tier_gate (authoritative), not the
+        preset YAML tier_required (advisory display-only).
+
+        Returns (agents_enabled, agents_skipped).
+        """
+        if not agents_recommended:
+            return [], []
+
+        from src.agents.plugins.bindings import SkillBindingService
+        from src.agents.plugins.overlay import clear_resolution_cache
+        from src.agents.plugins.registry import PluginAgentRegistry
+        from src.multi_tenant.repositories.agent_bindings import (
+            AgentSkillBindingRepository,
+        )
+        from src.multi_tenant.repositories.agent_overlays import (
+            TenantAgentOverlayRepository,
+        )
+
+        registry = PluginAgentRegistry.get_instance()
+        overlay_repo = TenantAgentOverlayRepository()
+        binding_repo = AgentSkillBindingRepository()
+
+        tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+        tenant_tier_level = tier_order.get(tier.lower(), 0)
+
+        enabled: list[str] = []
+        skipped: list[str] = []
+        wrote_any = False
+
+        for rec in agents_recommended:
+            agent_id = rec.get("agent_id", "")
+            if not agent_id:
+                continue
+
+            # Look up agent in registry for authoritative tier_gate and skills
+            agent_def = registry.get(agent_id)
+            if agent_def is None:
+                logger.warning(
+                    "Preset agent %r not found in registry, skipping", agent_id,
+                )
+                continue
+
+            # Tier gate from registry (authoritative source)
+            required_level = tier_order.get(agent_def.tier_gate.lower(), 0)
+            if tenant_tier_level < required_level:
+                logger.info(
+                    "Preset agent %s tier-gated: tenant=%s, required=%s",
+                    agent_id, tier, agent_def.tier_gate,
+                )
+                skipped.append(agent_id)
+                continue
+
+            # Create-if-absent: check for existing overlay before creating
+            existing_overlay = await overlay_repo.get_overlay(tenant_id, agent_id)
+            if existing_overlay is not None:
+                logger.info(
+                    "Preset agent %s already has overlay for tenant %s, skipping",
+                    agent_id, tenant_id[:8],
+                )
+                skipped.append(agent_id)
+                continue
+
+            # Create overlay (enabled=True, no customizations)
+            await overlay_repo.upsert_overlay(
+                tenant_id, agent_id, enabled=True,
+            )
+            wrote_any = True
+
+            # Create bindings for each skill (create-if-absent, registry mode)
+            for skill_def in agent_def.skills:
+                existing_binding = await binding_repo.get_binding(
+                    tenant_id, skill_def.skill_id,
+                )
+                if existing_binding is not None:
+                    continue
+                await binding_repo.upsert_binding(
+                    tenant_id,
+                    agent_id,
+                    skill_def.skill_id,
+                    mode=skill_def.mode,  # from registry, not hardcoded
+                    enabled=True,
+                )
+
+            enabled.append(agent_id)
+
+        # Invalidate caches if any writes occurred (same pattern as admin API)
+        if wrote_any:
+            clear_resolution_cache()
+            svc = SkillBindingService.get_instance()
+            svc.invalidate(tenant_id)
+
+        return enabled, skipped
 
 
 # ---------------------------------------------------------------------------

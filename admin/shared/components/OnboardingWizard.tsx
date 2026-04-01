@@ -61,6 +61,8 @@ interface PresetApplyResult {
     agent_id: string;
     tier_required: string;
   }>;
+  agents_enabled: string[];
+  agents_skipped: string[];
 }
 
 interface Template {
@@ -613,8 +615,8 @@ export const OnboardingWizard: React.FC<Props> = ({
                   <strong>{p.quick_action_count} quick actions</strong> and{' '}
                   <strong>{p.article_count} starter articles</strong>.
                   {p.agents_recommended.length > 0 && (
-                    <> Recommended agents: {p.agents_recommended.map((a) => a.agent_id).join(', ')}
-                    {' '}— enable them on the <Anchor size="xs" onClick={() => { onClose(); onNavigate?.('/agents'); }}>Agents page</Anchor>.</>
+                    <> Agents included: {p.agents_recommended.map((a) => a.agent_id).join(', ')}
+                    {' '}— automatically enabled if your plan supports them.</>
                   )}
                 </Text>
               </Alert>
@@ -740,6 +742,12 @@ export const OnboardingWizard: React.FC<Props> = ({
                     <strong>{presetApplyResult.quick_actions_created}</strong> quick actions
                     {presetApplyResult.articles_created > 0 && (
                       <> and <strong>{presetApplyResult.articles_created}</strong> starter articles</>
+                    )}
+                    {presetApplyResult.agents_enabled?.length > 0 && (
+                      <>. <strong>{presetApplyResult.agents_enabled.length}</strong> agent{presetApplyResult.agents_enabled.length > 1 ? 's' : ''} enabled</>
+                    )}
+                    {presetApplyResult.agents_skipped?.length > 0 && (
+                      <> ({presetApplyResult.agents_skipped.length} already configured)</>
                     )}
                   </Text>
                 </Alert>

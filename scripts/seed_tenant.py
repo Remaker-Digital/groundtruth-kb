@@ -20,7 +20,7 @@ PRECONDITIONS:
   [ ] Project dependencies installed                   — python -c "import azure.cosmos"
 
 POSTCONDITIONS:
-  [ ] All prior tenant data deleted from 9 containers (clean slate)
+  [ ] All prior tenant data deleted from 11 containers (clean slate)
   [ ] 10 Cosmos DB containers created/verified
   [ ] Tenant document with API key + widget key
   [ ] Preferences document (config_state=draft, all fields empty, zero quick actions)
@@ -262,6 +262,8 @@ TENANT_CONTAINERS = [
     "memory_vectors",
     "usage",
     "audit_log",
+    "agent_overlays",
+    "agent_bindings",
 ]
 # platform_config uses /tenant_id="platform" — not tenant-specific, skip.
 
@@ -1113,13 +1115,67 @@ async def phase_3b_preset(dry_run: bool, preset_id: str | None) -> None:
 
         agents = preset.get("agents_recommended", [])
         print(f"  KB articles created:  {kb_created}")
+
+        # Step 5: Agent overlay/binding provisioning (WI-3025)
+        agents_enabled = 0
+        agents_skipped = 0
+        if agents and not dry_run:
+            from src.agents.plugins.bindings import SkillBindingService
+            from src.agents.plugins.overlay import clear_resolution_cache
+            from src.agents.plugins.registry import PluginAgentRegistry
+            from src.multi_tenant.repositories.agent_bindings import (
+                AgentSkillBindingRepository,
+            )
+            from src.multi_tenant.repositories.agent_overlays import (
+                TenantAgentOverlayRepository,
+            )
+
+            registry = PluginAgentRegistry.get_instance()
+            overlay_repo = TenantAgentOverlayRepository()
+            binding_repo = AgentSkillBindingRepository()
+            tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+            tenant_tier_level = tier_order.get(TIER.lower(), 0)
+
+            for rec in agents:
+                agent_id = rec.get("agent_id", "")
+                agent_def = registry.get(agent_id) if agent_id else None
+                if agent_def is None:
+                    print(f"  [WARN] Agent {agent_id!r} not in registry, skipping")
+                    continue
+
+                required_level = tier_order.get(agent_def.tier_gate.lower(), 0)
+                if tenant_tier_level < required_level:
+                    print(f"  [SKIP] Agent {agent_id}: tier {TIER} < {agent_def.tier_gate}")
+                    agents_skipped += 1
+                    continue
+
+                existing = await overlay_repo.get_overlay(TENANT_ID, agent_id)
+                if existing is not None:
+                    print(f"  [SKIP] Agent {agent_id}: overlay already exists")
+                    agents_skipped += 1
+                    continue
+
+                await overlay_repo.upsert_overlay(TENANT_ID, agent_id, enabled=True)
+                for skill_def in agent_def.skills:
+                    existing_b = await binding_repo.get_binding(TENANT_ID, skill_def.skill_id)
+                    if existing_b is None:
+                        await binding_repo.upsert_binding(
+                            TENANT_ID, agent_id, skill_def.skill_id,
+                            mode=skill_def.mode, enabled=True,
+                        )
+                agents_enabled += 1
+                print(f"  [OK] Agent {agent_id}: overlay + {len(agent_def.skills)} bindings")
+
+            if agents_enabled > 0:
+                clear_resolution_cache()
+                SkillBindingService.get_instance().invalidate(TENANT_ID)
+
         if agents:
-            agent_names = ", ".join(a["agent_id"] for a in agents)
-            print(f"  Recommended agents:   {agent_names}")
+            print(f"  Agents enabled:       {agents_enabled} (skipped: {agents_skipped})")
 
         phase_results["3b_preset"] = (
             f"OK — {preset_id}: config={len(config_fields)}, "
-            f"qa={qa_created}, kb={kb_created}"
+            f"qa={qa_created}, kb={kb_created}, agents={agents_enabled}"
         )
     except Exception as e:
         print(f"  [ERROR] {e}")
