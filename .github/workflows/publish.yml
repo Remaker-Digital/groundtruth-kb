@@ -1,0 +1,53 @@
+# Publish groundtruth-kb to PyPI on GitHub Release creation.
+#
+# Requires: PYPI_API_TOKEN secret on the repository.
+#
+# Usage: Create a GitHub Release from a version tag (e.g., v0.1.0).
+# The workflow builds the wheel + sdist, verifies with twine, and uploads.
+#
+# Copyright (c) 2026 Remaker Digital. Licensed under AGPL-3.0-or-later.
+
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build wheel + sdist
+        run: python -m build
+
+      - name: Verify distribution
+        run: twine check dist/*
+
+      - name: Smoke test — install built wheel
+        run: |
+          pip install --no-deps dist/*.whl --target /tmp/gt-smoke
+          PYTHONPATH=/tmp/gt-smoke python -c "
+          import groundtruth_kb
+          print(f'Version: {groundtruth_kb.__version__}')
+          print(f'Templates: {groundtruth_kb.get_templates_dir()}')
+          assert groundtruth_kb.__version__, 'Version must be set'
+          assert groundtruth_kb.get_templates_dir().exists(), 'Templates must be packaged'
+          "
+
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload dist/*
