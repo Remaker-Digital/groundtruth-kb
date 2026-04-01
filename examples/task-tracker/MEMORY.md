@@ -16,4 +16,4 @@
 - **Run tests:** `pytest tests/ -v`
 - **Run assertions:** `gt --config groundtruth.toml assert`
 - **Start API:** `uvicorn task_tracker.app:app --reload`
-- **Web UI:** `pip install groundtruth-kb[web] && gt --config groundtruth.toml serve`
+- **Web UI:** `pip install -e ".[web]" && gt --config groundtruth.toml serve` (from GT repo root)

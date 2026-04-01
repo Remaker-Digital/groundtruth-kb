@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install groundtruth-kb[dev]
+          pip install "groundtruth-kb[dev] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
           # Install your project's dependencies here:
           # pip install -r requirements.txt
           # pip install -e .

@@ -21,7 +21,7 @@ Engineering discipline for AI-powered systems — from specification to producti
 
 - Familiarity with software engineering fundamentals (version control, testing, CI/CD)
 - A project you want to manage with traceable specifications
-- `groundtruth-kb` installed (`pip install groundtruth-kb`)
+- `groundtruth-kb` installed (see [Tooling](10-tooling.md) for install instructions)
 
 ## Conventions
 

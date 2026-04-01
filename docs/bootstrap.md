@@ -11,7 +11,7 @@ A step-by-step walkthrough from zero to a working GroundTruth project. By the en
 ## Step 1: Install GroundTruth
 
 ```bash
-pip install groundtruth-kb
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
 ```
 
 Verify the installation:
@@ -136,7 +136,7 @@ If the assertion passes (the file and pattern exist), you'll see a passing resul
 The web UI requires the `[web]` extra:
 
 ```bash
-pip install groundtruth-kb[web]
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"[web]
 gt serve
 ```
 

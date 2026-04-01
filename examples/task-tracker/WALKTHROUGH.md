@@ -8,7 +8,7 @@ upstream promotion model.
 ## Prerequisites
 
 - Python 3.11+
-- `pip install groundtruth-kb` (already installed if you cloned the repo)
+- `groundtruth-kb` installed (clone the repo and `pip install -e .`)
 
 ## Step 1: Set up the project
 
@@ -33,7 +33,7 @@ This database was pre-seeded by `seed_kb.py` to give you something real to inspe
 ## Step 3: Browse with the web UI
 
 ```bash
-pip install groundtruth-kb[web]
+pip install -e ".[web]"  # from groundtruth-kb repo root
 gt --config groundtruth.toml serve
 ```
 
