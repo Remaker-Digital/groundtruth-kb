@@ -582,8 +582,17 @@ class TestPiiScrubber:
     def test_scrub_shopify_token(self):
         assert _scrub_for_export("token shpat_abc123def") == "token [SHOPIFY_TOKEN]"
 
-    def test_scrub_stripe_key(self):
+    def test_scrub_stripe_secret_key(self):
         assert _scrub_for_export("key sk_live_abc123") == "key [STRIPE_KEY]"
+
+    def test_scrub_stripe_publishable_key(self):
+        assert _scrub_for_export("key pk_test_xyz789") == "key [STRIPE_KEY]"
+
+    def test_scrub_stripe_restricted_key_live(self):
+        assert _scrub_for_export("key rk_live_abc123") == "key [STRIPE_KEY]"
+
+    def test_scrub_stripe_restricted_key_test(self):
+        assert _scrub_for_export("key rk_test_secret456") == "key [STRIPE_KEY]"
 
     def test_scrub_ar_api_key(self):
         assert _scrub_for_export("key ar_spa_test123") == "key [API_KEY]"
@@ -717,6 +726,16 @@ class TestBuildLane2Payload:
         ]
         for text in prohibited:
             assert text not in serialized, f"Prohibited content leaked: {text}"
+
+    def test_lane2_adversarial_stripe_restricted_key(self):
+        """Stripe restricted keys in knowledge_query are scrubbed."""
+        trace = ResponseDecisionTrace(
+            knowledge_query="customer pasted rk_live_secret123 and rk_test_abc456",
+        )
+        lane2 = build_lane2_payload(trace)
+        assert "rk_live_secret123" not in lane2["knowledge_query_scrubbed"]
+        assert "rk_test_abc456" not in lane2["knowledge_query_scrubbed"]
+        assert "[STRIPE_KEY]" in lane2["knowledge_query_scrubbed"]
 
     def test_lane2_adversarial_zk(self):
         """PII-laden trace fields don't leak through Lane 2."""

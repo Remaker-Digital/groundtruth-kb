@@ -115,8 +115,8 @@ def _normalize_critic_flags(raw_flags: list[str]) -> list[str]:
 _EXPORT_SCRUB_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Shopify access tokens: shpat_ followed by hex/alphanumeric
     (re.compile(r"shpat_[A-Za-z0-9_-]+"), "[SHOPIFY_TOKEN]"),
-    # Stripe secret/publishable keys: sk_live_, sk_test_, pk_live_, pk_test_
-    (re.compile(r"[sp]k_(live|test)_[A-Za-z0-9]+"), "[STRIPE_KEY]"),
+    # Stripe keys: secret (sk_), publishable (pk_), restricted (rk_)
+    (re.compile(r"[spr]k_(live|test)_[A-Za-z0-9]+"), "[STRIPE_KEY]"),
     # Agent Red API keys: ar_live_, ar_spa_, ar_user_, ar_tenant_
     (re.compile(r"ar_(live|spa|user|tenant)_[A-Za-z0-9_-]+"), "[API_KEY]"),
     # Order numbers: #12345, ORD-12345, ORDER-12345, INV-12345
