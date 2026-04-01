@@ -163,11 +163,19 @@ az role assignment create `
     --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME" `
     -o none 2>$null
 
-# Key Vault Secrets Officer
-Write-Host "  Assigning Key Vault Secrets Officer..."
+# Key Vault Secrets User (least privilege — read-only secret access)
+Write-Host "  Assigning Key Vault Secrets User..."
 az role assignment create `
     --assignee $principalId `
-    --role "Key Vault Secrets Officer" `
+    --role "Key Vault Secrets User" `
+    --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$KEYVAULT_NAME" `
+    -o none 2>$null
+
+# Key Vault Crypto User (wrap/unwrap DEKs via Master KEK — SPEC-1843 / WI-1625)
+Write-Host "  Assigning Key Vault Crypto User..."
+az role assignment create `
+    --assignee $principalId `
+    --role "Key Vault Crypto User" `
     --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$KEYVAULT_NAME" `
     -o none 2>$null
 

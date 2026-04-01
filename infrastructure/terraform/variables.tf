@@ -231,6 +231,22 @@ variable "job_image_tag" {
 }
 
 # ---------------------------------------------------------------------------
+# Container App References (CI/CD-managed apps, data-source lookups)
+# ---------------------------------------------------------------------------
+
+variable "gateway_container_app_name" {
+  description = "Name of the CI/CD-managed API Gateway container app (for data-source lookups)"
+  type        = string
+  default     = ""
+}
+
+variable "gateway_managed_identity_principal_id" {
+  description = "System-assigned Managed Identity principal ID of the CI/CD-managed gateway (for RBAC assignments). Get via: az containerapp show -n <name> -g <rg> --query identity.principalId -o tsv"
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
 # Langfuse Observability (G1 Lane 2, SPEC-1874)
 # ---------------------------------------------------------------------------
 

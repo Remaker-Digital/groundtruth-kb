@@ -559,7 +559,11 @@ async def _startup_envelope_encryption() -> None:
     """Initialize the EnvelopeEncryptionService (SPEC-1843 / WI-1631).
 
     In dev mode (no MASTER_KEK_KEY_ID), uses an in-memory test KEK.
-    In production, connects to Azure Key Vault for the Master KEK.
+    In staging/production, connects to Azure Key Vault for the Master KEK.
+
+    Fail-closed (S251): In non-development environments, missing
+    MASTER_KEK_KEY_ID is a fatal startup error. This prevents silent
+    degradation to insecure dev-mode encryption in production.
     """
     from src.multi_tenant.envelope_encryption import (
         EnvelopeEncryptionService,
@@ -568,7 +572,21 @@ async def _startup_envelope_encryption() -> None:
 
     kek_key_id = os.environ.get("MASTER_KEK_KEY_ID")
     vault_url = os.environ.get("AZURE_KEYVAULT_URL")
+    environment = os.environ.get("ENVIRONMENT", "development").lower().strip()
     dev_mode = not kek_key_id
+
+    # S251 fail-closed: refuse to start without KEK in non-dev environments
+    if dev_mode and environment in ("staging", "production"):
+        logger.critical(
+            "MASTER_KEK_KEY_ID is not set in %s environment. "
+            "Refusing to start — field-level encryption would fall back to "
+            "insecure dev-mode KEK. Set MASTER_KEK_KEY_ID to the Key Vault "
+            "key versionless ID (e.g., https://<vault>/keys/agent-red-cmk).",
+            environment,
+        )
+        raise RuntimeError(
+            f"MASTER_KEK_KEY_ID required in {environment} environment"
+        )
 
     try:
         svc = EnvelopeEncryptionService(

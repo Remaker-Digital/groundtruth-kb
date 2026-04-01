@@ -60,6 +60,8 @@ properties:
             value: ws://agent-red-nats
           - name: GRACEFUL_SHUTDOWN_TIMEOUT
             value: "60"
+          - name: MASTER_KEK_KEY_ID
+            value: https://kv-agentred-eastus.vault.azure.net/keys/agent-red-cmk
           - name: SHOPIFY_API_KEY
             secretRef: shopify-api-key
           - name: SHOPIFY_API_SECRET

@@ -76,11 +76,14 @@ resource "azurerm_key_vault_secret" "langfuse_secret_key" {
 # ---------------------------------------------------------------------------
 # RBAC — Key Vault Secrets User for api-gateway ONLY (least privilege)
 # ---------------------------------------------------------------------------
+#
+# S251 Codex P1 remediation: Security RBAC stays in Terraform even though
+# the container app itself is CI/CD-managed. Uses data source lookup.
 
 resource "azurerm_role_assignment" "gateway_langfuse_secrets" {
-  count = var.enable_langfuse ? 1 : 0
+  count = var.enable_langfuse && local.gateway_principal_id != "" ? 1 : 0
 
   scope                = data.azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_container_app.apps["api-gateway"].identity[0].principal_id
+  principal_id         = local.gateway_principal_id
 }

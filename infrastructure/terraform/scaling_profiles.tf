@@ -70,12 +70,12 @@ locals {
 
   # Scaling metrics summary — for operational dashboards
   scaling_metrics = {
-    total_min_replicas = sum([for v in local.container_apps : v.min_replicas])
-    total_max_replicas = sum([for v in local.container_apps : v.max_replicas])
-    critical_count     = length([for v in local.container_apps : v if v.critical])
-    non_critical_count = length([for v in local.container_apps : v if !v.critical])
+    total_min_replicas     = sum([for v in local.container_apps : v.min_replicas])
+    total_max_replicas     = sum([for v in local.container_apps : v.max_replicas])
+    critical_count         = length([for v in local.container_apps : v if v.critical])
+    non_critical_count     = length([for v in local.container_apps : v if !v.critical])
     night_savings_estimate = length(local.night_scalable_apps) > 0 ? "$20-30/mo" : "disabled"
-    total_min_vcpu = sum([for v in local.container_apps : v.cpu * v.min_replicas])
+    total_min_vcpu         = sum([for v in local.container_apps : v.cpu * v.min_replicas])
     total_min_memory_gi = sum([
       for v in local.container_apps : (
         tonumber(replace(v.memory, "Gi", "")) * v.min_replicas

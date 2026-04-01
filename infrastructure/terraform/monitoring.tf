@@ -51,134 +51,23 @@ resource "azurerm_monitor_action_group" "owner_alerts" {
 }
 
 # ---------------------------------------------------------------------------
-# Alert 1: API Gateway 5xx Errors (> 5 in 5 minutes)
+# Alerts — app-scoped alerts removed (S251), infrastructure alerts restored
 # ---------------------------------------------------------------------------
 #
-# Fires when the API Gateway returns more than 5 server errors (HTTP 5xx)
-# within a 5-minute window. Indicates a code bug, downstream service
-# failure, or infrastructure issue requiring immediate attention.
-
-resource "azurerm_monitor_metric_alert" "api_gateway_5xx" {
-  count = var.enable_monitoring_alerts ? 1 : 0
-
-  name                = "agentred-api-gateway-5xx-errors"
-  resource_group_name = var.resource_group_name
-  scopes              = [azurerm_container_app.apps["api-gateway"].id]
-  description         = "API Gateway is returning server errors (HTTP 5xx). Check application logs for root cause."
-  severity            = 1 # Sev1 — requires prompt attention
-  frequency           = "PT1M"
-  window_size         = "PT5M"
-
-  criteria {
-    metric_namespace = "Microsoft.App/containerApps"
-    metric_name      = "Requests"
-    aggregation      = "Count"
-    operator         = "GreaterThan"
-    threshold        = 5
-
-    dimension {
-      name     = "statusCodeCategory"
-      operator = "Include"
-      values   = ["5xx"]
-    }
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.owner_alerts[0].id
-  }
-
-  tags = merge(var.tags, {
-    alert_type = "error-rate"
-    component  = "api-gateway"
-  })
-}
-
-# ---------------------------------------------------------------------------
-# Alert 2: API Gateway Response Latency P95 > 3,000ms
-# ---------------------------------------------------------------------------
+# App-scoped alerts (1, 2, 3, 5) were removed because they reference
+# container apps which are CI/CD-managed, not Terraform-managed.
+# Preserved in git history (commit prior to S251).
 #
-# Fires when the 95th percentile response time exceeds 3,000ms
-# (SLA commitment: P95 < 2,000ms; alert at 3,000ms gives headroom
-# before SLA breach). Indicates slow pipeline stages, Azure OpenAI
-# throttling, or Cosmos DB contention.
-
-resource "azurerm_monitor_metric_alert" "api_gateway_latency" {
-  count = var.enable_monitoring_alerts ? 1 : 0
-
-  name                = "agentred-api-gateway-high-latency"
-  resource_group_name = var.resource_group_name
-  scopes              = [azurerm_container_app.apps["api-gateway"].id]
-  description         = "API Gateway P95 latency exceeds 3s. Check Azure OpenAI, Cosmos DB, and pipeline stage timings."
-  severity            = 2 # Sev2 — performance degradation
-  frequency           = "PT5M"
-  window_size         = "PT15M"
-
-  criteria {
-    metric_namespace = "Microsoft.App/containerApps"
-    metric_name      = "RequestDuration"
-    aggregation      = "Average"
-    operator         = "GreaterThan"
-    threshold        = 3000 # milliseconds
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.owner_alerts[0].id
-  }
-
-  tags = merge(var.tags, {
-    alert_type = "latency"
-    component  = "api-gateway"
-  })
-}
+# Cosmos throttling alert (4) restored below — it depends only on the
+# Cosmos data source, not on container apps. (S251 Codex P2 remediation)
 
 # ---------------------------------------------------------------------------
-# Alert 3: Container App Replica Restarts (> 3 in 15 minutes)
-# ---------------------------------------------------------------------------
-#
-# Fires when any critical container app restarts more than 3 times in
-# 15 minutes. Frequent restarts indicate crash loops (OOM, unhandled
-# exceptions, health probe failures).
-#
-# Note: Only monitors API Gateway — the AGNTCY agent containers have
-# ActivationFailed as their expected state (demo mode images restart
-# continuously). Adding them would cause constant false positives.
-
-resource "azurerm_monitor_metric_alert" "container_restarts" {
-  count = var.enable_monitoring_alerts ? 1 : 0
-
-  name                = "agentred-container-restarts"
-  resource_group_name = var.resource_group_name
-  scopes              = [azurerm_container_app.apps["api-gateway"].id]
-  description         = "API Gateway container is restarting frequently. Check application logs for crash cause."
-  severity            = 1 # Sev1 — potential outage
-  frequency           = "PT5M"
-  window_size         = "PT15M"
-
-  criteria {
-    metric_namespace = "Microsoft.App/containerApps"
-    metric_name      = "RestartCount"
-    aggregation      = "Total"
-    operator         = "GreaterThan"
-    threshold        = 3
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.owner_alerts[0].id
-  }
-
-  tags = merge(var.tags, {
-    alert_type = "container-health"
-    component  = "api-gateway"
-  })
-}
-
-# ---------------------------------------------------------------------------
-# Alert 4: Cosmos DB Throttled Requests (429s)
+# Alert 4: Cosmos DB Throttled Requests (429s) — RESTORED
 # ---------------------------------------------------------------------------
 #
 # Fires when Cosmos DB returns throttled (429) responses, indicating
 # RU exhaustion on the serverless account. This causes read/write
-# failures across all tenants.
+# failures across all tenants. Does NOT depend on container apps.
 
 resource "azurerm_monitor_metric_alert" "cosmos_throttling" {
   count = var.enable_monitoring_alerts ? 1 : 0
@@ -216,44 +105,6 @@ resource "azurerm_monitor_metric_alert" "cosmos_throttling" {
 }
 
 # ---------------------------------------------------------------------------
-# Alert 5: API Gateway Replica Count Drops to Zero
-# ---------------------------------------------------------------------------
-#
-# Fires if the API Gateway has zero running replicas — a total outage.
-# With min_replicas=2 this should never happen, but monitors for
-# platform-level failures (Container App Environment issues, subnet
-# exhaustion, ACR pull failures).
-
-resource "azurerm_monitor_metric_alert" "api_gateway_no_replicas" {
-  count = var.enable_monitoring_alerts ? 1 : 0
-
-  name                = "agentred-api-gateway-no-replicas"
-  resource_group_name = var.resource_group_name
-  scopes              = [azurerm_container_app.apps["api-gateway"].id]
-  description         = "API Gateway has zero running replicas — TOTAL OUTAGE. Check Container App Environment health and ACR image availability."
-  severity            = 0 # Sev0 — critical outage
-  frequency           = "PT1M"
-  window_size         = "PT5M"
-
-  criteria {
-    metric_namespace = "Microsoft.App/containerApps"
-    metric_name      = "Replicas"
-    aggregation      = "Maximum"
-    operator         = "LessThan"
-    threshold        = 1
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.owner_alerts[0].id
-  }
-
-  tags = merge(var.tags, {
-    alert_type = "outage"
-    component  = "api-gateway"
-  })
-}
-
-# ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
 
@@ -263,12 +114,8 @@ output "monitoring_configuration" {
     enabled     = var.enable_monitoring_alerts
     alert_email = var.enable_monitoring_alerts ? var.alert_email : "disabled"
     alert_rules = var.enable_monitoring_alerts ? [
-      "api-gateway-5xx-errors (Sev1)",
-      "api-gateway-high-latency (Sev2)",
-      "container-restarts (Sev1)",
-      "cosmos-db-throttling (Sev2)",
-      "api-gateway-no-replicas (Sev0)",
+      "cosmos-db-throttling (Sev2, standalone — no app dependency)",
     ] : []
-    estimated_cost = "$0.50/month"
+    estimated_cost = "$0.10/month"
   }
 }
