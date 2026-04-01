@@ -103,6 +103,11 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     # Widget engagement triggers (WI-0816)
     "widget_exit_intent_enabled",
     "widget_scroll_depth_trigger",
+    # Transcript continuity (SPEC-1868)
+    "widget_transcript_continuity",
+    "widget_transcript_ttl_hours",
+    # Structured answer blocks (SPEC-1867)
+    "structured_blocks_enabled",
     # Integrations (C10)
     "shopify_sync_enabled",
     "zendesk_escalation_enabled",

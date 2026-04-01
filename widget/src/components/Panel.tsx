@@ -41,11 +41,13 @@ import {
   sendOtp as apiSendOtp,
   verifyOtp as apiVerifyOtp,
   submitConsent as apiSubmitConsent,
+  fetchConversation,
   getTransportConfig,
 } from '@/transport/http';
 import { SSEConnection } from '@/transport/sse';
 import { detectPageContext, resolveTemplate } from '@/utils/templateVars';
 import { ConsentBanner } from './ConsentBanner';
+import { loadTranscript, saveTranscript, clearTranscript } from '@/persistence/transcript';
 
 // ---------------------------------------------------------------------------
 // Props (passed from the iframe bootstrap)
@@ -178,6 +180,13 @@ export const Panel: FunctionComponent<PanelProps> = ({
       preChatData: preChatData || null,
     });
 
+    // SPEC-1868: Persist conversation_id for transcript continuity
+    const continuity = activeConfig.widget_transcript_continuity || 'none';
+    if (continuity !== 'none') {
+      const { widgetKey } = getTransportConfig();
+      saveTranscript(widgetKey, conversationId, continuity);
+    }
+
     // SSE is NOT connected here — the stream endpoint returns 400 when no
     // customer message exists yet. handleSend() connects SSE after the
     // first message is sent (line ~241), which is the correct sequence.
@@ -224,6 +233,13 @@ export const Panel: FunctionComponent<PanelProps> = ({
         return;
       }
       store.setState({ conversationId: newId, isLoading: false });
+
+      // SPEC-1868: Persist conversation_id for transcript continuity
+      const continuityMode = activeConfig.widget_transcript_continuity || 'none';
+      if (continuityMode !== 'none') {
+        const { widgetKey } = getTransportConfig();
+        saveTranscript(widgetKey, newId, continuityMode);
+      }
 
       // Add the customer message to UI immediately (optimistic)
       store.addMessage({
@@ -468,6 +484,42 @@ export const Panel: FunctionComponent<PanelProps> = ({
     };
   }, []);
 
+  // SPEC-1868: Transcript continuity — restore previous conversation on mount
+  const transcriptRestored = useRef(false);
+  useEffect(() => {
+    if (transcriptRestored.current) return;
+    transcriptRestored.current = true;
+
+    const continuity = activeConfig.widget_transcript_continuity || 'none';
+    if (continuity === 'none') return;
+
+    const { widgetKey } = getTransportConfig();
+    const ttl = activeConfig.widget_transcript_ttl_hours ?? 24;
+    const storedId = loadTranscript(widgetKey, continuity, ttl);
+    if (!storedId) return;
+
+    // Restore conversation in background
+    fetchConversation(storedId).then((result) => {
+      if (!result.ok) {
+        // Only clear on permanent failures (not_found, not_active).
+        // Transient errors (503, network) keep storage intact for next load.
+        if (result.reason !== 'transient') {
+          clearTranscript(widgetKey, continuity);
+        }
+        return;
+      }
+      if (!result.data.messages || result.data.messages.length === 0) {
+        clearTranscript(widgetKey, continuity);
+        return;
+      }
+      const store = getStore();
+      store.restoreMessages(result.data.conversation_id, result.data.messages);
+      store.setState({ view: 'conversation' });
+    }).catch(() => {
+      // Network-level errors are transient — do NOT clear storage
+    });
+  }, [activeConfig.widget_transcript_continuity, activeConfig.widget_transcript_ttl_hours]);
+
   // Auto-start conversation for Shopify customers (AUTH-4).
   // When the widget opens with verified Shopify identity, skip pre-chat
   // and OTP entirely and begin the conversation immediately.
@@ -570,6 +622,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
             greetingMessage={greetingMessage}
             quickActions={quickActions}
             onQuickAction={handleQuickAction}
+            restoredMessageCount={state.restoredMessageCount}
           />
 
           {/* Report an Issue link (C7) — shown when conversation has messages */}

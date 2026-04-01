@@ -71,6 +71,8 @@ interface MessageListProps {
   onQuickAction?: (promptTemplate: string) => void;
   /** Callback for per-message feedback (SPEC-1836). */
   onMessageFeedback?: (messageId: string, rating: 'positive' | 'negative') => void;
+  /** Number of messages restored from previous session (SPEC-1868). */
+  restoredMessageCount?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +131,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
   quickActions,
   onQuickAction,
   onMessageFeedback,
+  restoredMessageCount = 0,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -210,6 +213,34 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
         onFeedback={onMessageFeedback}
       />,
     );
+
+    // SPEC-1868: Separator between restored and new messages
+    if (restoredMessageCount > 0 && i === restoredMessageCount - 1 && i < messages.length - 1) {
+      elements.push(
+        <div
+          key="restored-separator"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: tokens.space2,
+            padding: `${tokens.space2} ${tokens.space4}`,
+          }}
+        >
+          <div style={{ flex: 1, height: '1px', backgroundColor: tokens.colorBorder }} />
+          <span
+            style={{
+              fontSize: tokens.fontSizeXs,
+              fontFamily: tokens.fontFamily,
+              color: tokens.colorTextMuted,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Previous conversation
+          </span>
+          <div style={{ flex: 1, height: '1px', backgroundColor: tokens.colorBorder }} />
+        </div>,
+      );
+    }
   }
 
   return (

@@ -778,9 +778,24 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                            if structured_sources else {}),
                     },
                 )
+                # SPEC-1867: Structured answer blocks (tier-gated)
+                structured_blocks: list[dict] | None = None
+                if (
+                    prefs
+                    and getattr(prefs, "structured_blocks_enabled", False)
+                    and tier
+                    and tier.value in ("professional", "enterprise")
+                ):
+                    try:
+                        from src.chat.blocks import extract_blocks
+                        structured_blocks = extract_blocks(safe_text) or None
+                    except Exception:
+                        pass  # Block extraction failure is non-fatal
+
                 yield validated_event(
                     conversation_id, message_id,
                     sources=structured_sources or None,
+                    blocks=structured_blocks,
                 )
             else:
                 # Critic rejected -- retract streamed text, deliver fallback

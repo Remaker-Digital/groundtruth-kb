@@ -1113,6 +1113,13 @@ class PreferencesDocument(BaseModel):
     widget_exit_intent_enabled: bool = Field(default=False, description="Auto-open widget on exit intent (desktop mouseleave)")
     widget_scroll_depth_trigger: int | None = Field(default=None, description="Auto-open widget at scroll depth percentage (1-100)")
 
+    # Transcript continuity (SPEC-1868)
+    widget_transcript_continuity: str = Field(default="none", description="Transcript continuity level: none, session (sessionStorage), persistent (localStorage+TTL)")
+    widget_transcript_ttl_hours: int = Field(default=24, description="TTL in hours for persistent transcript continuity (max 168 = 7 days)")
+
+    # Structured answer blocks (SPEC-1867)
+    structured_blocks_enabled: bool = Field(default=False, description="Enable structured answer blocks in widget (professional+ tier)")
+
     # Notifications (WI-G: email alerts)
     notification_email: str | None = Field(
         default=None,

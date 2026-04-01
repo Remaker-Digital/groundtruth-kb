@@ -238,14 +238,19 @@ export class SSEConnection {
       case 'validated': {
         // Critic approved — mark the streaming message as complete.
         // B1: pass structured sources when present in validated payload.
+        // SPEC-1867: pass structured blocks when present.
         let validatedSources: Array<{ title: string; url?: string }> | undefined;
+        let validatedBlocks: import('@/state/store').AnswerBlock[] | undefined;
         try {
           const payload = JSON.parse(event.data);
           if (Array.isArray(payload.sources)) {
             validatedSources = payload.sources;
           }
-        } catch { /* raw data — no sources */ }
-        store.updateLastAgentMessage(this.currentStreamContent, false, validatedSources);
+          if (Array.isArray(payload.blocks)) {
+            validatedBlocks = payload.blocks;
+          }
+        } catch { /* raw data — no sources/blocks */ }
+        store.updateLastAgentMessage(this.currentStreamContent, false, validatedSources, validatedBlocks);
         this.currentStreamContent = '';
         break;
       }

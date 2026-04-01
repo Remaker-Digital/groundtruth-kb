@@ -168,6 +168,11 @@ export interface WidgetConfig {
   widget_panel_width?: 'compact' | 'standard' | 'wide' | null;
   widget_panel_height?: 'short' | 'standard' | 'tall' | null;
   widget_locale?: 'auto' | 'en' | 'es' | 'fr' | 'de' | 'pt' | 'ja' | 'zh' | 'ko' | null;
+  // Transcript continuity (SPEC-1868)
+  widget_transcript_continuity?: 'none' | 'session' | 'persistent' | null;
+  widget_transcript_ttl_hours?: number | null;
+  // Structured answer blocks (SPEC-1867)
+  structured_blocks_enabled?: boolean | null;
   // Non-widget fields used for display
   brand_name?: string | null;
   // Quick action buttons for the current page context (WI #228)

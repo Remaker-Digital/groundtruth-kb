@@ -18,6 +18,7 @@
 import { FunctionComponent, VNode } from 'preact';
 import type { DesignTokens } from '@/theme/tokens';
 import type { Message } from '@/state/store';
+import { AnswerBlocks } from './AnswerBlocks';
 
 // ---------------------------------------------------------------------------
 // Markdown link parser — converts [text](url) to clickable <a> elements
@@ -379,6 +380,11 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
             </div>
           );
         })()}
+
+        {/* Structured answer blocks (SPEC-1867) */}
+        {!isCustomer && !message.streaming && message.blocks && message.blocks.length > 0 && (
+          <AnswerBlocks blocks={message.blocks} tokens={tokens} />
+        )}
 
         {/* Per-message feedback (SPEC-1836) — thumbs up/down on AI messages */}
         {!isCustomer && !message.streaming && message.id && onFeedback && (

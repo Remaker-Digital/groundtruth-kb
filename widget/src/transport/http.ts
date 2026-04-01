@@ -360,3 +360,52 @@ export async function verifyOtp(
   }
   return { verified: false, customerToken: null };
 }
+
+// ---------------------------------------------------------------------------
+// Transcript restore (SPEC-1868)
+// ---------------------------------------------------------------------------
+
+interface BackendMessage {
+  message_id: string;
+  role: string;
+  content: string;
+  timestamp: string; // ISO 8601
+  metadata?: Record<string, unknown>;
+}
+
+interface ConversationRestoreResponse {
+  conversation_id: string;
+  status: string;
+  messages: BackendMessage[];
+}
+
+export type RestoreResult =
+  | { ok: true; data: ConversationRestoreResponse }
+  | { ok: false; reason: 'not_found' | 'not_active' | 'transient' };
+
+/**
+ * Fetch a conversation for transcript restoration.
+ *
+ * Returns a discriminated result so callers can distinguish
+ * permanent failures (clear storage) from transient ones (keep storage).
+ */
+export async function fetchConversation(
+  conversationId: string,
+): Promise<RestoreResult> {
+  const resp = await request<ConversationRestoreResponse>(
+    'GET', `/api/chat/conversations/${conversationId}`,
+  );
+  if (!resp.ok || !resp.data) {
+    // 404/403 = conversation gone, clear storage
+    if (resp.status === 404 || resp.status === 403) {
+      return { ok: false, reason: 'not_found' };
+    }
+    // 5xx / network error = transient, keep storage
+    return { ok: false, reason: 'transient' };
+  }
+  // Status policy: restore only active conversations
+  if (resp.data.status !== 'active') {
+    return { ok: false, reason: 'not_active' };
+  }
+  return { ok: true, data: resp.data };
+}
