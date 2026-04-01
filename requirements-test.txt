@@ -42,3 +42,8 @@ pact-python>=2.2.0
 
 # JSON test report output (for test host container)
 pytest-json-report>=1.5.0
+
+# GroundTruth KB — specification-driven governance toolkit (S251 closeout)
+# Installed from GitHub tag for reproducible CI. Local dev can override
+# via requirements-local.txt with an editable sibling checkout.
+groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1
