@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Deploy UI components independently without a full system build.
+"""Deploy UI components independently — SMOKE HELPER ONLY (S251 OM-1).
+
+WARNING: This script is a UI deployment smoke helper. Its verify command
+proves static asset reachability and widget config auth, but it does NOT
+prove end-to-end widget conversation readiness. The canonical production
+GO/NO-GO path is: scripts/release_pipeline.py
 
 Implements SPEC-1705: Local UI development and staging deployment without
 full build. Uses Dockerfile.ui to overlay only the UI dist directories on

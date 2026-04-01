@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Deploy Orchestrator — automated deploy-verify-rollback lifecycle.
+"""Deploy Orchestrator — SMOKE HELPER ONLY (S251 OM-1).
+
+WARNING: This script is a deployment smoke helper. It is NOT the
+production approval path. The canonical production GO/NO-GO path is:
+
+    scripts/release_pipeline.py
+
+This script may be used for rapid staging iteration and smoke
+verification, but its exit code MUST NOT be used as the basis
+for production promotion decisions.
 
 Deterministic script that can be triggered by:
   - Claude Code (manual invocation)

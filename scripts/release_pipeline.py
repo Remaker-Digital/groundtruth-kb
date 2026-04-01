@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Release Pipeline — End-to-End.
+"""Release Pipeline — CANONICAL PRODUCTION APPROVAL PATH (S251 OM-1).
+
+This is the ONLY script whose exit code may be used to authorize
+production promotion. All other deploy scripts (deploy_orchestrator.py,
+deploy_ui.py, deploy.py) are smoke helpers whose verdicts are advisory.
 
 Single-invocation pipeline that executes the complete release cycle:
 
@@ -311,6 +315,16 @@ def main() -> int:
                         help="Validate without executing destructive actions")
     parser.add_argument("--skip-offline", action="store_true",
                         help="Skip offline test suite (Step 1)")
+    parser.add_argument(
+        "--change-class",
+        choices=["A", "B", "C"],
+        required=True,
+        help=(
+            "Change classification by blast radius (S251 OM-2). "
+            "A=UI-only, B=admin/config/integration, "
+            "C=widget/auth/chat/config/activation/migration"
+        ),
+    )
     args = parser.parse_args()
 
     if not re.match(r"^v\d+\.\d+\.\d+$", args.version):
@@ -321,6 +335,8 @@ def main() -> int:
     results: list[StepResult] = []
 
     log("INFO", f"Release Pipeline: {args.version}")
+    log("INFO", f"  Change Class: {args.change_class}"
+        f" ({'UI-only' if args.change_class == 'A' else 'admin/config' if args.change_class == 'B' else 'widget/auth/chat — FULL GATES'})")
     log("INFO", f"  staging -> E2E -> production -> verify")
     if args.dry_run:
         log("INFO", "  *** DRY RUN MODE ***")

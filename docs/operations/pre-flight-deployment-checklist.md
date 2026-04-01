@@ -386,7 +386,7 @@ The concluding end-to-end verification. Creates a real tenant and exercises ever
 |-----------|---------|--------|
 | All A, B, C, D pass | **DEPLOYMENT VERIFIED** | Record results. Update `Last verified` date in this procedure. |
 | Phase C assertion fails | **ROLLBACK REQUIRED** | Execute `scripts/deploy/rollback.ps1 -Version {previous}` immediately. |
-| Phase D assertion fails | **DEPLOYMENT LIVE BUT DEFECTIVE** | Do not onboard new customers. Investigate and fix the failing assertion. Re-run `--phase D` after fix. |
+| Phase D assertion fails | **ROLLBACK REQUIRED** | Widget/chat critical-path failure. Execute `scripts/deploy/rollback.ps1 -Version {previous}` immediately. The chat widget is core product surface — a broken widget is a failed deployment (S251 OM-3). |
 | Phase A or B fails | **DEPLOYMENT BLOCKED** | Fix the issue. Re-run from Phase A. |
 
 ---
