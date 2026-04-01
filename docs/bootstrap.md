@@ -136,7 +136,7 @@ If the assertion passes (the file and pattern exist), you'll see a passing resul
 The web UI requires the `[web]` extra:
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"[web]
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
 gt serve
 ```
 

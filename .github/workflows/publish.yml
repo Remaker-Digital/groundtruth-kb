@@ -1,11 +1,11 @@
 # Verify and attach built artifacts to GitHub Releases.
 #
 # groundtruth-kb is distributed as a GitHub-installable package:
-#   pip install git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.0
+#   pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
 #
 # This workflow runs on Release creation to verify the wheel builds
 # cleanly and attaches built artifacts to the Release for reference.
-# PyPI upload is optional and can be added later if needed.
+# The package is NOT published to PyPI. Distribution is GitHub-only.
 #
 # Copyright (c) 2026 Remaker Digital. Licensed under AGPL-3.0-or-later.
 
