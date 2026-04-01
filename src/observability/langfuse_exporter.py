@@ -39,7 +39,69 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
-_HASH_SALT = os.getenv("LANGFUSE_HASH_SALT", "agent-red-langfuse-default")
+_HASH_SALT = os.getenv("LANGFUSE_HASH_SALT", "")
+
+# ---------------------------------------------------------------------------
+# Critic flag normalization (S251 Phase 0 — Codex P1 ZK boundary fix)
+# ---------------------------------------------------------------------------
+# Critic returns free-form flags that may echo customer text or KB content.
+# Normalize to a closed set before export. Unknown flags become "other".
+# Derived from Critic prompt violation categories + internal codes.
+
+CRITIC_SAFE_FLAGS: frozenset[str] = frozenset({
+    "pii_leakage",
+    "secrets_exposure",
+    "medical_advice",
+    "legal_advice",
+    "financial_advice",
+    "hate_speech",
+    "policy_contradiction",
+    "tone_check",
+    "off_topic",
+    "factual_concern",
+    "hallucination_risk",
+    "safety_flag",
+    "length_concern",
+    "modified_verdict_without_text",
+})
+
+_FLAG_ALIASES: dict[str, str] = {
+    "pii": "pii_leakage",
+    "cross_customer": "pii_leakage",
+    "secret": "secrets_exposure",
+    "medical": "medical_advice",
+    "legal": "legal_advice",
+    "financial": "financial_advice",
+    "hate": "hate_speech",
+    "policy": "policy_contradiction",
+    "tone": "tone_check",
+    "hallucination": "hallucination_risk",
+    "safety": "safety_flag",
+    "length": "length_concern",
+}
+
+
+def _normalize_critic_flags(raw_flags: list[str]) -> list[str]:
+    """Map free-form Critic flags to the closed safe set.
+
+    Exact matches pass through. Substring aliases resolve next.
+    Anything unrecognized becomes "other".
+    """
+    result: list[str] = []
+    for flag in raw_flags:
+        lower = flag.lower().strip()
+        if lower in CRITIC_SAFE_FLAGS:
+            result.append(lower)
+            continue
+        matched = False
+        for alias, safe in _FLAG_ALIASES.items():
+            if alias in lower:
+                result.append(safe)
+                matched = True
+                break
+        if not matched:
+            result.append("other")
+    return result
 
 # Langfuse client singleton (lazy-initialised)
 _langfuse_client: Any = None
@@ -83,7 +145,13 @@ def _get_client() -> Any:
 
 
 def _hash_id(value: str) -> str:
-    """One-way SHA-256 hash with salt. Irreversible."""
+    """One-way SHA-256 hash with salt. Irreversible.
+
+    Returns empty string if LANGFUSE_HASH_SALT is not configured,
+    which causes export_trace() to skip (fail-closed).
+    """
+    if not _HASH_SALT:
+        return ""
     return hashlib.sha256(f"{_HASH_SALT}:{value}".encode()).hexdigest()[:16]
 
 
@@ -144,9 +212,9 @@ def build_lane1_payload(
             }
             for sa in trace.stage_attributions
         ],
-        # Critic assessment (structural)
+        # Critic assessment (structural — flags normalized to closed enum)
         "critic_verdict": trace.critic.verdict,
-        "critic_flags": trace.critic.flags,
+        "critic_flags": _normalize_critic_flags(trace.critic.flags),
         "critic_latency_ms": trace.critic.latency_ms,
         # Timing
         "total_latency_ms": trace.total_latency_ms,
@@ -174,6 +242,12 @@ def export_trace(
     No-op if LANGFUSE_ENABLED is false or client unavailable.
     """
     if not LANGFUSE_ENABLED:
+        return
+
+    if not _HASH_SALT:
+        logger.warning(
+            "LANGFUSE_HASH_SALT not set — Langfuse export disabled (fail-closed)"
+        )
         return
 
     client = _get_client()

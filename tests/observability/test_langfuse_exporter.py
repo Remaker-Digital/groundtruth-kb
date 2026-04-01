@@ -131,6 +131,7 @@ def sample_trace() -> ResponseDecisionTrace:
 # ---------------------------------------------------------------------------
 
 
+@patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
 class TestHashing:
     """Verify hashing is SHA-256, irreversible, and salted."""
 
@@ -342,6 +343,7 @@ class TestExportTrace:
         # Should not raise, should not call anything
         export_trace(sample_trace, trace_id="test-123")
 
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
     @patch("src.observability.langfuse_exporter.LANGFUSE_ENABLED", True)
     @patch("src.observability.langfuse_exporter._get_client")
     def test_client_none_is_noop(self, mock_get_client, sample_trace):
@@ -351,29 +353,35 @@ class TestExportTrace:
         mock_get_client.return_value = None
         export_trace(sample_trace, trace_id="test-123")
 
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
     @patch("src.observability.langfuse_exporter.LANGFUSE_ENABLED", True)
     @patch("src.observability.langfuse_exporter._get_client")
     def test_successful_export(self, mock_get_client, sample_trace):
-        """Successful export creates trace with spans and flushes."""
+        """Successful export creates trace with spans and flushes (v3 API)."""
         from src.observability.langfuse_exporter import export_trace
 
         mock_client = MagicMock()
-        mock_trace = MagicMock()
-        mock_client.trace.return_value = mock_trace
+        # v3 API: start_as_current_observation returns a context manager
+        mock_ctx = MagicMock()
+        mock_client.start_as_current_observation.return_value = mock_ctx
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
         mock_get_client.return_value = mock_client
 
         export_trace(sample_trace, trace_id="trace-001")
 
-        mock_client.trace.assert_called_once()
-        call_kwargs = mock_client.trace.call_args[1]
-        assert call_kwargs["id"] == "trace-001"
-        assert call_kwargs["name"] == "agent-red-pipeline"
-        assert "intent:product_return" in call_kwargs["tags"]
+        # v3: uses start_as_current_observation, not trace()
+        assert mock_client.start_as_current_observation.call_count >= 1
+        root_call = mock_client.start_as_current_observation.call_args_list[0]
+        assert root_call.kwargs["name"] == "agent-red-pipeline"
+        assert root_call.kwargs["trace_id"] == "trace-001"
+        assert "intent:product_return" in root_call.kwargs["tags"]
 
-        # Should create spans for each stage
-        assert mock_trace.span.call_count == 2
+        # Root span + child spans for each stage (2 in fixture)
+        assert mock_client.start_as_current_observation.call_count == 3
         mock_client.flush.assert_called_once()
 
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
     @patch("src.observability.langfuse_exporter.LANGFUSE_ENABLED", True)
     @patch("src.observability.langfuse_exporter._get_client")
     def test_exception_swallowed(self, mock_get_client, sample_trace):
@@ -381,7 +389,9 @@ class TestExportTrace:
         from src.observability.langfuse_exporter import export_trace
 
         mock_client = MagicMock()
-        mock_client.trace.side_effect = RuntimeError("Langfuse down")
+        mock_client.start_as_current_observation.side_effect = RuntimeError(
+            "Langfuse down"
+        )
         mock_get_client.return_value = mock_client
 
         # Should not raise
@@ -423,3 +433,121 @@ class TestEdgeCases:
         trace = ResponseDecisionTrace(stage_attributions=stages)
         payload = build_lane1_payload(trace)
         assert len(payload["stage_attributions"]) == 10
+
+
+# ---------------------------------------------------------------------------
+# Phase 0: Critic flag normalization tests (S251 ZK boundary fix)
+# ---------------------------------------------------------------------------
+
+
+class TestCriticFlagNormalization:
+    """Verify critic.flags are normalized to a closed safe set."""
+
+    def test_safe_flags_pass_through(self):
+        """Known safe flags are preserved."""
+        from src.observability.langfuse_exporter import _normalize_critic_flags
+
+        result = _normalize_critic_flags(["tone_check", "pii_leakage"])
+        assert result == ["tone_check", "pii_leakage"]
+
+    def test_unknown_flags_become_other(self):
+        """Free-form model output maps to 'other'."""
+        from src.observability.langfuse_exporter import _normalize_critic_flags
+
+        result = _normalize_critic_flags([
+            "customer said their email is john@example.com",
+            "mentions internal KB article about returns",
+        ])
+        assert result == ["other", "other"]
+
+    def test_alias_matching(self):
+        """Substring aliases resolve to safe flags."""
+        from src.observability.langfuse_exporter import _normalize_critic_flags
+
+        result = _normalize_critic_flags([
+            "potential pii leak detected",
+            "medical recommendation",
+        ])
+        assert result == ["pii_leakage", "medical_advice"]
+
+    def test_case_insensitive(self):
+        """Flag matching is case-insensitive."""
+        from src.observability.langfuse_exporter import _normalize_critic_flags
+
+        result = _normalize_critic_flags(["TONE_CHECK", "Policy_Contradiction"])
+        assert result == ["tone_check", "policy_contradiction"]
+
+    def test_adversarial_flags_with_pii(self):
+        """Flags containing customer PII are safely normalized to 'other'."""
+        from src.observability.langfuse_exporter import _normalize_critic_flags
+
+        adversarial = [
+            "user john.doe@example.com asked about returns",
+            "order #12345 has shipping issue",
+            "customer phone (555) 123-4567 mentioned",
+        ]
+        result = _normalize_critic_flags(adversarial)
+        assert all(f == "other" for f in result), f"PII leaked via flags: {result}"
+
+    def test_empty_flags(self):
+        """Empty flags list returns empty."""
+        from src.observability.langfuse_exporter import _normalize_critic_flags
+
+        assert _normalize_critic_flags([]) == []
+
+    def test_flags_normalized_in_payload(self, sample_trace):
+        """build_lane1_payload applies normalization."""
+        sample_trace.critic.flags = [
+            "tone_check",
+            "customer wants refund on Widget Pro",
+        ]
+        payload = build_lane1_payload(sample_trace)
+        assert payload["critic_flags"] == ["tone_check", "other"]
+
+    def test_internal_code_preserved(self):
+        """Internal Critic code passes through."""
+        from src.observability.langfuse_exporter import _normalize_critic_flags
+
+        result = _normalize_critic_flags(["modified_verdict_without_text"])
+        assert result == ["modified_verdict_without_text"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 0: Hash salt fail-closed tests (S251)
+# ---------------------------------------------------------------------------
+
+
+class TestHashSaltFailClosed:
+    """Verify export is disabled when LANGFUSE_HASH_SALT is not set."""
+
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "")
+    def test_hash_id_returns_empty_without_salt(self):
+        """_hash_id returns empty string when salt is not configured."""
+        from src.observability.langfuse_exporter import _hash_id
+
+        assert _hash_id("some-value") == ""
+
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
+    def test_hash_id_works_with_salt(self):
+        """_hash_id produces a 16-char hex hash when salt is set."""
+        from src.observability.langfuse_exporter import _hash_id
+
+        result = _hash_id("test-value")
+        assert len(result) == 16
+        assert all(c in "0123456789abcdef" for c in result)
+
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "")
+    @patch("src.observability.langfuse_exporter.LANGFUSE_ENABLED", True)
+    def test_export_disabled_without_salt(self, sample_trace):
+        """export_trace is a no-op when salt is empty."""
+        from src.observability.langfuse_exporter import export_trace
+
+        # Should not raise or call any client
+        export_trace(sample_trace, trace_id="test-123")
+
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
+    def test_hash_deterministic(self):
+        """Same input + same salt = same hash."""
+        from src.observability.langfuse_exporter import _hash_id
+
+        assert _hash_id("conv-123") == _hash_id("conv-123")
