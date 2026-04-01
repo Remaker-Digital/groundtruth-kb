@@ -402,6 +402,20 @@ class ConversationDocument(BaseModel):
         description="Peer agent targeted by team member (empty = co-pilot/pipeline).",
     )
 
+    # SPEC-1866: Conversation-level agent override
+    conversation_agent_override: str | None = Field(
+        default=None,
+        description="Agent ID override for this conversation. Set by admin to route to a specific peer agent without modifying tenant config.",
+    )
+    conversation_agent_override_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when override was set.",
+    )
+    conversation_agent_override_by: str | None = Field(
+        default=None,
+        description="Admin user ID who set the override.",
+    )
+
     # Billing (Decision #24 — billable conversation definition)
     is_billable: bool = Field(default=False, description="Whether this conversation counts for billing")
     message_count: int = Field(default=0, description="Total messages in conversation")

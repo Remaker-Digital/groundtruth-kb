@@ -540,6 +540,17 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             _ict = getattr(
                 self._current_preferences, "intent_confidence_threshold", 0.0
             )
+            # S251 SPEC-1866: conversation-level agent override
+            _conv_override = None
+            if hasattr(self, "_session") and self._session:
+                try:
+                    _conv_doc = await self._session.get_conversation(
+                        tenant_id, conversation_id,
+                    )
+                    _conv_override = (_conv_doc or {}).get("conversation_agent_override")
+                except Exception:
+                    pass  # Non-fatal — override is best-effort
+
             route = router.resolve(
                 tenant_id=tenant_id,
                 intent=intent,
@@ -550,6 +561,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 tenant_tier=tier.value if hasattr(tier, "value") else str(tier),
                 staff_domain_tags=staff_domain_tags,
                 intent_confidence_threshold=float(_ict or 0.0),
+                user_message=customer_message,
+                conversation_agent_override=_conv_override,
             )
             trace.set_route_decision(
                 route.target.value, route.agent_id, route.fallback_from,
