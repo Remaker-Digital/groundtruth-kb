@@ -384,7 +384,7 @@ def serve(ctx: click.Context, port: int, host: str) -> None:
     try:
         from groundtruth_kb.web import create_app
     except ImportError as exc:
-        click.echo("Web UI requires extra dependencies: pip install groundtruth-kb[web]")
+        click.echo("Web UI requires extra dependencies. Install with [web] extra.")
         raise SystemExit(1) from exc
 
     import os
@@ -392,7 +392,7 @@ def serve(ctx: click.Context, port: int, host: str) -> None:
     try:
         import uvicorn
     except ImportError as exc:
-        click.echo("Web UI requires uvicorn: pip install groundtruth-kb[web]")
+        click.echo("Web UI requires uvicorn. Install with [web] extra.")
         raise SystemExit(1) from exc
 
     config = _resolve_config(ctx)

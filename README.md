@@ -22,7 +22,8 @@ history. No UPDATE, no DELETE — every change is a new version.
 ## Quick start
 
 ```bash
-pip install groundtruth-kb
+# Install from GitHub (not published to PyPI)
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
 
 # Initialize a new project
 gt init my-project
@@ -31,7 +32,7 @@ gt init my-project
 gt --config my-project/groundtruth.toml seed --example
 
 # Open the web UI (requires [web] extra)
-pip install groundtruth-kb[web]
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
 gt --config my-project/groundtruth.toml serve
 # Visit http://localhost:8090
 ```
