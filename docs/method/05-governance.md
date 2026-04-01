@@ -84,8 +84,15 @@ Assertions are the continuous monitoring layer. Where gates enforce rules at tra
 | Type | Check | Example |
 |------|-------|---------|
 | `grep` | Pattern exists in file | "rate_limit" appears in config.py |
-| `glob` | File exists | tests/test_auth.py is present |
+| `glob` | File matching pattern exists | tests/test_auth.py is present |
 | `grep_absent` | Pattern does NOT exist in file | No hardcoded API keys in source |
+| `file_exists` | Single file exists | src/config.py is a file |
+| `count` | Pattern count with operator | Exactly 8 save fields in presets.py |
+| `json_path` | Value at path in JSON/TOML | pyproject.toml version is "1.0.0" |
+| `all_of` | All children pass (AND) | Config file exists AND has required key |
+| `any_of` | At least one child passes (OR) | Has .toml or .yaml config |
+
+For full field reference and examples, see [Assertion Language Reference](../reference/assertion-language.md).
 
 ### When assertions run
 
