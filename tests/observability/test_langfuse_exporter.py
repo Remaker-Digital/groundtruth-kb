@@ -28,7 +28,10 @@ from src.observability.langfuse_exporter import (
     _CONTENT_BEARING_FIELDS,
     _hash_id,
     _prompt_version_hash,
+    _prompt_field_band,
+    _scrub_for_export,
     build_lane1_payload,
+    build_lane2_payload,
 )
 
 
@@ -551,3 +554,328 @@ class TestHashSaltFailClosed:
         from src.observability.langfuse_exporter import _hash_id
 
         assert _hash_id("conv-123") == _hash_id("conv-123")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: PII scrubber tests (S251)
+# ---------------------------------------------------------------------------
+
+
+class TestPiiScrubber:
+    """Verify the union PII scrubber covers all pattern classes."""
+
+    def test_scrub_email(self):
+        assert _scrub_for_export("contact john@example.com") == "contact [EMAIL]"
+
+    def test_scrub_phone_us(self):
+        assert "[PHONE]" in _scrub_for_export("call (555) 123-4567 now")
+
+    def test_scrub_phone_dashed(self):
+        assert "[PHONE]" in _scrub_for_export("reach me at 555-123-4567")
+
+    def test_scrub_order_hash(self):
+        assert _scrub_for_export("order #12345 status") == "order [ORDER] status"
+
+    def test_scrub_order_prefix(self):
+        assert "[ORDER]" in _scrub_for_export("check ORD-98765")
+
+    def test_scrub_shopify_token(self):
+        assert _scrub_for_export("token shpat_abc123def") == "token [SHOPIFY_TOKEN]"
+
+    def test_scrub_stripe_key(self):
+        assert _scrub_for_export("key sk_live_abc123") == "key [STRIPE_KEY]"
+
+    def test_scrub_ar_api_key(self):
+        assert _scrub_for_export("key ar_spa_test123") == "key [API_KEY]"
+
+    def test_scrub_clean_passthrough(self):
+        clean = "how do I return a widget?"
+        assert _scrub_for_export(clean) == clean
+
+    def test_scrub_multiple_patterns(self):
+        mixed = "email john@test.com phone 555-123-4567 order #12345"
+        result = _scrub_for_export(mixed)
+        assert "[EMAIL]" in result
+        assert "[PHONE]" in result
+        assert "[ORDER]" in result
+        assert "john@test.com" not in result
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Prompt field band tests (S251)
+# ---------------------------------------------------------------------------
+
+
+class TestPromptFieldBand:
+    """Verify bucketing avoids exact-count fingerprinting."""
+
+    def test_band_none(self):
+        assert _prompt_field_band(0) == "none"
+
+    def test_band_few(self):
+        assert _prompt_field_band(1) == "few"
+        assert _prompt_field_band(3) == "few"
+
+    def test_band_moderate(self):
+        assert _prompt_field_band(4) == "moderate"
+        assert _prompt_field_band(6) == "moderate"
+
+    def test_band_extensive(self):
+        assert _prompt_field_band(7) == "extensive"
+        assert _prompt_field_band(15) == "extensive"
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Lane 2 payload tests (S251)
+# ---------------------------------------------------------------------------
+
+
+@patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
+class TestBuildLane2Payload:
+    """Verify Lane 2 payload structure, content exclusion, and ZK compliance."""
+
+    def test_lane2_superset_of_lane1(self, sample_trace):
+        """Every Lane 1 key must appear in Lane 2."""
+        lane1 = build_lane1_payload(sample_trace)
+        lane2 = build_lane2_payload(sample_trace)
+        for key in lane1:
+            assert key in lane2, f"Lane 1 key '{key}' missing from Lane 2"
+
+    def test_lane2_has_enriched_fields(self, sample_trace):
+        """Lane 2 includes fields not in Lane 1."""
+        lane2 = build_lane2_payload(sample_trace)
+        enriched_keys = {
+            "message_index", "timestamp", "profile_factors_used",
+            "profile_data_sources", "profile_is_stale", "profile_is_empty",
+            "knowledge_sources", "knowledge_query_scrubbed",
+            "memory_signal_count", "memory_signals",
+            "memory_consent_status", "memory_history_depth_days",
+            "tenant_prompt_field_band", "custom_instructions_present",
+            "config_version", "total_cost_estimate",
+            "response_language", "was_escalated",
+        }
+        for key in enriched_keys:
+            assert key in lane2, f"Expected Lane 2 key '{key}' missing"
+
+    def test_lane2_knowledge_sources_stripped(self, sample_trace):
+        """Knowledge sources have no title or matched_query."""
+        lane2 = build_lane2_payload(sample_trace)
+        for ks in lane2["knowledge_sources"]:
+            assert "title" not in ks
+            assert "matched_query" not in ks
+            assert "entry_id_hash" in ks
+            assert "entry_type" in ks
+            assert "relevance_score" in ks
+
+    def test_lane2_entry_id_hashed(self, sample_trace):
+        """entry_id is hashed, not raw."""
+        lane2 = build_lane2_payload(sample_trace)
+        for ks in lane2["knowledge_sources"]:
+            assert ks["entry_id_hash"] != "kb-1"
+            assert ks["entry_id_hash"] != "kb-2"
+            assert len(ks["entry_id_hash"]) == 16
+
+    def test_lane2_memory_signals_stripped(self, sample_trace):
+        """Memory signals have no chunk_summary or source_conversation_id."""
+        lane2 = build_lane2_payload(sample_trace)
+        for ms in lane2["memory_signals"]:
+            assert "chunk_summary" not in ms
+            assert "source_conversation_id" not in ms
+            assert "layer" in ms
+            assert "similarity_score" in ms
+            assert "signal_type" in ms
+
+    def test_lane2_knowledge_query_scrubbed(self):
+        """knowledge_query is PII-scrubbed before export."""
+        trace = ResponseDecisionTrace(
+            knowledge_query="my email is john@test.com order #12345",
+        )
+        lane2 = build_lane2_payload(trace)
+        assert "john@test.com" not in lane2["knowledge_query_scrubbed"]
+        assert "[EMAIL]" in lane2["knowledge_query_scrubbed"]
+        assert "[ORDER]" in lane2["knowledge_query_scrubbed"]
+
+    def test_lane2_zk_compliance_stringify_scan(self, sample_trace):
+        """Serialize entire Lane 2 payload — no prohibited content appears."""
+        import json as json_mod
+
+        lane2 = build_lane2_payload(sample_trace)
+        serialized = json_mod.dumps(lane2, default=str)
+
+        # These strings are on the fixture trace but must NOT appear in export
+        prohibited = [
+            "Return Policy Details",  # knowledge_sources[].title
+            "Widget Pro Max",          # knowledge_sources[].title
+            "how to return",           # knowledge_sources[].matched_query
+            "widget specs",            # knowledge_sources[].matched_query
+            "Customer previously asked about refunds",  # memory chunk_summary
+            "conv-old",                # memory source_conversation_id
+            "Customer requested manager",  # escalation_reason
+            "conv-abc-123",            # raw conversation_id
+            "tenant-xyz-789",          # raw tenant_id
+            "cust-secret-456",         # raw customer_id
+        ]
+        for text in prohibited:
+            assert text not in serialized, f"Prohibited content leaked: {text}"
+
+    def test_lane2_adversarial_zk(self):
+        """PII-laden trace fields don't leak through Lane 2."""
+        import json as json_mod
+
+        trace = ResponseDecisionTrace(
+            conversation_id="conv-123",
+            tenant_id="tenant-456",
+            customer_id="cust-789",
+            knowledge_query="john.doe@evil.com wants refund on #99999",
+            escalation_reason="Customer john.doe@evil.com is angry about order #99999",
+        )
+        trace.knowledge_sources.append(KnowledgeSource(
+            entry_id="kb-secret",
+            title="Internal: Customer john.doe@evil.com refund case",
+            relevance_score=0.95,
+            matched_query="john.doe@evil.com refund",
+        ))
+        trace.memory_signals.append(MemorySignal(
+            layer=2,
+            source_conversation_id="conv-private-session",
+            chunk_summary="Customer SSN is 123-45-6789",
+            similarity_score=0.9,
+        ))
+
+        lane2 = build_lane2_payload(trace)
+        serialized = json_mod.dumps(lane2, default=str)
+
+        assert "john.doe@evil.com" not in serialized
+        assert "conv-private-session" not in serialized
+        assert "123-45-6789" not in serialized
+        assert "Internal: Customer" not in serialized
+        assert "conv-123" not in serialized
+        assert "tenant-456" not in serialized
+        assert "cust-789" not in serialized
+
+    def test_lane2_was_escalated_bool(self, sample_trace):
+        """was_escalated is exported as boolean."""
+        lane2 = build_lane2_payload(sample_trace)
+        assert isinstance(lane2["was_escalated"], bool)
+
+    def test_lane2_config_version_int(self, sample_trace):
+        """config_version is exported as integer."""
+        lane2 = build_lane2_payload(sample_trace)
+        assert isinstance(lane2["config_version"], int)
+
+    def test_lane2_response_language(self, sample_trace):
+        """response_language is exported."""
+        lane2 = build_lane2_payload(sample_trace)
+        assert lane2["response_language"] == "en"
+
+    def test_lane2_all_entry_types(self):
+        """All 5 entry types are handled correctly."""
+        trace = ResponseDecisionTrace()
+        for et in ("product", "faq", "policy", "custom", "article"):
+            trace.knowledge_sources.append(KnowledgeSource(
+                entry_id=f"kb-{et}", entry_type=et, relevance_score=0.5,
+            ))
+        lane2 = build_lane2_payload(trace)
+        types = [ks["entry_type"] for ks in lane2["knowledge_sources"]]
+        assert types == ["product", "faq", "policy", "custom", "article"]
+
+    def test_lane2_empty_trace(self):
+        """Minimal trace produces valid Lane 2 payload."""
+        trace = ResponseDecisionTrace()
+        lane2 = build_lane2_payload(trace)
+        assert lane2["knowledge_sources"] == []
+        assert lane2["memory_signals"] == []
+        assert lane2["memory_signal_count"] == 0
+        assert lane2["tenant_prompt_field_band"] == "none"
+        assert lane2["knowledge_query_scrubbed"] == ""
+
+    def test_lane2_prompt_field_band_from_trace(self):
+        """tenant_prompt_field_band is computed from config_overrides_applied."""
+        trace = ResponseDecisionTrace(
+            config_overrides_applied=["brand_name", "brand_voice", "return_policy",
+                                      "shipping_info", "escalation_keywords"],
+        )
+        lane2 = build_lane2_payload(trace)
+        assert lane2["tenant_prompt_field_band"] == "moderate"  # 5 fields
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Tenant allowlist gate tests (S251)
+# ---------------------------------------------------------------------------
+
+
+class TestTenantAllowlistGate:
+    """Verify Lane 2 is only activated for opted-in tenants."""
+
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
+    @patch("src.observability.langfuse_exporter.LANGFUSE_ENABLED", True)
+    @patch("src.observability.langfuse_exporter._get_client")
+    def test_tenant_opted_in_gets_lane2(self, mock_get_client, sample_trace):
+        """Opted-in tenant triggers Lane 2 payload."""
+        from src.observability.langfuse_exporter import export_trace
+
+        mock_client = MagicMock()
+        mock_ctx = MagicMock()
+        mock_client.start_as_current_observation.return_value = mock_ctx
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_client.return_value = mock_client
+
+        prefs = MagicMock()
+        prefs.langfuse_lane2_enabled = True
+
+        export_trace(sample_trace, trace_id="t-1", tenant_preferences=prefs)
+
+        root_call = mock_client.start_as_current_observation.call_args_list[0]
+        metadata = root_call.kwargs["metadata"]
+        # Lane 2 has enriched fields
+        assert "knowledge_sources" in metadata
+        assert "memory_signals" in metadata
+        assert "lane:2" in root_call.kwargs["tags"]
+
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
+    @patch("src.observability.langfuse_exporter.LANGFUSE_ENABLED", True)
+    @patch("src.observability.langfuse_exporter._get_client")
+    def test_tenant_opted_out_gets_lane1(self, mock_get_client, sample_trace):
+        """Opted-out tenant gets Lane 1 only."""
+        from src.observability.langfuse_exporter import export_trace
+
+        mock_client = MagicMock()
+        mock_ctx = MagicMock()
+        mock_client.start_as_current_observation.return_value = mock_ctx
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_client.return_value = mock_client
+
+        prefs = MagicMock()
+        prefs.langfuse_lane2_enabled = False
+
+        export_trace(sample_trace, trace_id="t-1", tenant_preferences=prefs)
+
+        root_call = mock_client.start_as_current_observation.call_args_list[0]
+        metadata = root_call.kwargs["metadata"]
+        # Lane 1 does NOT have enriched fields
+        assert "knowledge_sources" not in metadata
+        assert "memory_signals" not in metadata
+        assert "lane:1" in root_call.kwargs["tags"]
+
+    @patch("src.observability.langfuse_exporter._HASH_SALT", "test-salt")
+    @patch("src.observability.langfuse_exporter.LANGFUSE_ENABLED", True)
+    @patch("src.observability.langfuse_exporter._get_client")
+    def test_no_preferences_gets_lane1(self, mock_get_client, sample_trace):
+        """No preferences object defaults to Lane 1."""
+        from src.observability.langfuse_exporter import export_trace
+
+        mock_client = MagicMock()
+        mock_ctx = MagicMock()
+        mock_client.start_as_current_observation.return_value = mock_ctx
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_client.return_value = mock_client
+
+        export_trace(sample_trace, trace_id="t-1", tenant_preferences=None)
+
+        root_call = mock_client.start_as_current_observation.call_args_list[0]
+        metadata = root_call.kwargs["metadata"]
+        assert "knowledge_sources" not in metadata
+        assert "lane:1" in root_call.kwargs["tags"]

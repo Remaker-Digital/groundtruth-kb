@@ -869,7 +869,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             except Exception:
                 logger.debug("Failed to persist pipeline trace", exc_info=True)
 
-            # SPEC-1874: Langfuse trace export (Lane 1 structural, fire-and-forget)
+            # SPEC-1874: Langfuse trace export (Lane 1 + Lane 2, fire-and-forget)
             try:
                 from src.observability.langfuse_exporter import (
                     LANGFUSE_ENABLED,
@@ -882,6 +882,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         system_prompt_template=prompts.get(
                             AgentRole.RESPONSE_GENERATOR, "",
                         ),
+                        tenant_preferences=self._current_preferences,
                     )
             except Exception:
                 logger.debug("Langfuse export failed (non-blocking)", exc_info=True)

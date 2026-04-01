@@ -1217,6 +1217,12 @@ class PreferencesDocument(BaseModel):
         description="When enabled, append source titles to AI responses",
     )
 
+    # Langfuse Lane 2 observability (S251 G5, tenant opt-in)
+    langfuse_lane2_enabled: bool = Field(
+        default=False,
+        description="Enable enriched structural observability export (Lane 2) for this tenant",
+    )
+
     # Quick Action Prompt Buttons (WI #226-229)
     quick_actions: list[dict[str, Any]] = Field(
         default_factory=list,
