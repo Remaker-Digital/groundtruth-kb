@@ -170,7 +170,13 @@ TIER = os.environ.get("SEED_TIER", "professional")
 BILLING_CHANNEL = os.environ.get("SEED_BILLING_CHANNEL", "shopify")
 INTERVAL = os.environ.get("SEED_INTERVAL", "month")
 
-FQDN = os.environ.get("SEED_FQDN", "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io")
+FQDN = os.environ.get("SEED_FQDN", "")
+if not FQDN:
+    print("ERROR: SEED_FQDN environment variable is required (SPEC-0058).")
+    print("  Staging:    SEED_FQDN=<staging FQDN from .env.local STAGING_URL>")
+    print("  Production: SEED_FQDN=<production FQDN from .env.local PROD_URL>")
+    print("  Set SEED_FQDN explicitly to prevent accidental environment targeting.")
+    sys.exit(1)
 
 # Team members to create during provisioning.
 # The superadmin is the platform operator's hidden safety-net account.
