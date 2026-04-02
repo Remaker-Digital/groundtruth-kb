@@ -1385,3 +1385,177 @@ async def unarchive_conversation(
         conversation_id=conversation_id,
         archived_at=None,
     )
+
+
+# ---------------------------------------------------------------------------
+# PUT /api/admin/conversations/{conversation_id}/agent-override
+# ---------------------------------------------------------------------------
+
+
+class AgentOverrideRequest(CamelCaseModel):
+    """Request body for PUT /{conversation_id}/agent-override (SPEC-1866)."""
+
+    agent_id: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Peer agent ID to route this conversation to. Null clears the override.",
+    )
+
+
+class AgentOverrideResponse(CamelCaseModel):
+    """Response for successful agent override."""
+
+    conversation_id: str
+    agent_id: str | None = None
+    set_at: str | None = None
+    set_by: str | None = None
+
+
+@router.put(
+    "/{conversation_id}/agent-override",
+    response_model=AgentOverrideResponse,
+    summary="Set or clear conversation agent override (SPEC-1866)",
+    description=(
+        "Routes all future messages in this conversation to a specific peer "
+        "agent. The override takes highest precedence in the IntentRouter "
+        "(step 0). Pass agent_id=null to clear."
+    ),
+    responses={
+        404: {"description": "Conversation not found"},
+        422: {"description": "Agent not found, tier-gated, or no binding"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def set_agent_override(
+    conversation_id: str,
+    request: AgentOverrideRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> AgentOverrideResponse:
+    """Set or clear the conversation-level agent override (SPEC-1866).
+
+    Validation (when setting, not clearing):
+    1. Agent must exist in the PluginAgentRegistry.
+    2. Tenant tier must meet the agent's tier_gate.
+    3. Tenant must have at least one skill binding for the agent.
+    """
+    repo = _get_repo()
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
+    doc_id = doc.get("id", conversation_id)
+    now = datetime.now(timezone.utc).isoformat()
+
+    if request.agent_id is not None:
+        # --- Validate the agent ---
+        from src.agents.plugins.registry import PluginAgentRegistry
+        from src.agents.plugins.bindings import SkillBindingService
+
+        reg = PluginAgentRegistry.get_instance()
+        agent_defn = reg.get(request.agent_id)
+        if agent_defn is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Agent '{request.agent_id}' not found in registry",
+            )
+
+        # Tier-gate check
+        tier_gate = getattr(agent_defn, "tier_gate", None)
+        if tier_gate and tier_gate != "free" and ctx.tier:
+            tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+            if tier_order.get(str(ctx.tier.value if hasattr(ctx.tier, "value") else ctx.tier), 0) < tier_order.get(tier_gate, 0):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Tenant tier '{ctx.tier}' does not meet agent tier gate '{tier_gate}'",
+                )
+
+        # Overlay-enabled check — mirrors IntentRouter._try_peer_route()
+        from src.agents.plugins.overlay import resolve_effective_config
+        from src.multi_tenant.repositories.agent_overlays import TenantAgentOverlayRepository
+
+        overlay_repo = TenantAgentOverlayRepository()
+        overlay = await overlay_repo.get_overlay(ctx.tenant_id, request.agent_id)
+        config = resolve_effective_config(agent_defn, overlay=overlay)
+        if not config.enabled:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Agent '{request.agent_id}' is disabled for this tenant",
+            )
+
+        # Domain-scope check — private-scope agents require matching tags
+        if overlay:
+            visibility_scope = overlay.get("visibility_scope", "public")
+            if visibility_scope == "private":
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Agent '{request.agent_id}' is private-scoped and cannot be set as a conversation override",
+                )
+
+        # Binding check — tenant must have at least one binding for the agent
+        # Hydrate cache from Cosmos if not yet loaded (Codex P1: cold cache → false 422)
+        svc = SkillBindingService.get_instance()
+        if ctx.tenant_id not in svc._loaded_tenants:
+            await svc.load_tenant_bindings(ctx.tenant_id)
+        bindings = svc.list_bindings(ctx.tenant_id, agent_id=request.agent_id)
+        if not bindings:
+            raise HTTPException(
+                status_code=422,
+                detail=f"No skill bindings found for agent '{request.agent_id}' on this tenant",
+            )
+
+        # Apply the override
+        operations = [
+            {"op": "set", "path": "/conversation_agent_override", "value": request.agent_id},
+            {"op": "set", "path": "/conversation_agent_override_at", "value": now},
+            {"op": "set", "path": "/conversation_agent_override_by", "value": ctx.team_member_id or ctx.user_id or "admin"},
+            {"op": "set", "path": "/last_activity_at", "value": now},
+        ]
+    else:
+        # Clear the override
+        operations = [
+            {"op": "set", "path": "/conversation_agent_override", "value": None},
+            {"op": "set", "path": "/conversation_agent_override_at", "value": None},
+            {"op": "set", "path": "/conversation_agent_override_by", "value": None},
+            {"op": "set", "path": "/last_activity_at", "value": now},
+        ]
+
+    try:
+        await repo.patch(
+            tenant_id=ctx.tenant_id,
+            document_id=doc_id,
+            operations=operations,
+        )
+    except DocumentNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Conversation {conversation_id} not found",
+        )
+
+    # Audit event
+    try:
+        from src.agents.plugins.events import emit_invocation
+        emit_invocation(
+            trace_id="",
+            invoker="admin-override",
+            target_agent_id=request.agent_id or "",
+            skill_id="",
+            tenant_id=ctx.tenant_id,
+            conversation_id=conversation_id,
+            result_class="override_set" if request.agent_id else "override_cleared",
+            policy_verdict="admin_action",
+        )
+    except Exception:
+        logger.debug("Failed to emit override audit event", exc_info=True)
+
+    logger.info(
+        "Agent override %s: conv=%s agent=%s tenant=%s by=%s",
+        "set" if request.agent_id else "cleared",
+        conversation_id,
+        request.agent_id or "(none)",
+        ctx.tenant_id[:8],
+        ctx.team_member_id or ctx.user_id or "admin",
+    )
+
+    return AgentOverrideResponse(
+        conversation_id=conversation_id,
+        agent_id=request.agent_id,
+        set_at=now if request.agent_id else None,
+        set_by=(ctx.team_member_id or ctx.user_id or "admin") if request.agent_id else None,
+    )

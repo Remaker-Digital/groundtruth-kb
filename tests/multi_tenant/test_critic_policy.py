@@ -468,7 +468,8 @@ class TestHealthCheck:
         assert health.healthy is True
         assert health.replicas_available == 2
         assert health.replicas_total == 2
-        assert health.circuit_breaker_open is False
+        assert health.open_breaker_count == 0
+        assert health.total_breakers >= 0
         assert len(health.details) == 2
 
 
@@ -601,18 +602,24 @@ class TestConstructorValidation:
 
     @pytest.mark.unit
     def test_policy_exposes_circuit_breaker_state(self):
-        """get_circuit_breaker_state() returns current state string."""
+        """get_circuit_breaker_state() returns state for a tenant."""
         policy = _make_policy()
-        assert policy.get_circuit_breaker_state() == "closed"
+        # No breaker created yet for this tenant
+        assert policy.get_circuit_breaker_state("t-test") == "no_breaker"
+        # Create breaker by getting it
+        policy._get_breaker("t-test")
+        assert policy.get_circuit_breaker_state("t-test") == "closed"
 
     @pytest.mark.unit
     def test_policy_reset_circuit_breaker(self):
-        """reset_circuit_breaker() forces CLOSED."""
+        """reset_circuit_breaker() forces CLOSED for a specific tenant."""
         policy = _make_policy()
-        # Force open via internal breaker
+        tenant_id = "t-reset-test"
+        # Force open via tenant breaker
+        breaker = policy._get_breaker(tenant_id)
         for _ in range(CIRCUIT_BREAKER_FAILURE_THRESHOLD):
-            policy._circuit_breaker.record_failure()
-        assert policy.get_circuit_breaker_state() == "open"
+            breaker.record_failure()
+        assert policy.get_circuit_breaker_state(tenant_id) == "open"
 
-        policy.reset_circuit_breaker()
-        assert policy.get_circuit_breaker_state() == "closed"
+        policy.reset_circuit_breaker(tenant_id)
+        assert policy.get_circuit_breaker_state(tenant_id) == "closed"

@@ -617,11 +617,24 @@ def _resolve_env(env_name: str, tenant_id: str | None = None) -> dict:
 
 
 def _all_tenants(env_name: str) -> list[dict]:
-    """Return env dicts for the default tenant + all registered extras."""
+    """Return env dicts for the default tenant + all registered extras.
+
+    SPEC-1845 req 3: fail-fast if any tenant is missing required credentials.
+    """
     base = ENVIRONMENTS[env_name]
     envs = [base.copy()]
+    # SPEC-1845 req 3: Validate all tenant credentials before executing any phase.
+    # phase_c() consumes both api_key and widget_key for each tenant.
+    for field in ("api_key", "widget_key"):
+        if not base.get(field):
+            print(f"ERROR: SPEC-1845: No {field} for primary tenant '{base['tenant_id']}' in {env_name}")
+            _sys.exit(1)
     for key, overlay in TENANTS.items():
         if key.startswith(f"{env_name}:"):
+            for field in ("api_key", "widget_key"):
+                if not overlay.get(field):
+                    print(f"ERROR: SPEC-1845: No {field} for tenant '{overlay['tenant_id']}' ({key})")
+                    _sys.exit(1)
             e = base.copy()
             e["tenant_id"] = overlay["tenant_id"]
             e["api_key"] = overlay["api_key"]

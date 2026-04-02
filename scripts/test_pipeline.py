@@ -148,6 +148,10 @@ def _get_env_vars(args: argparse.Namespace) -> dict[str, str]:
         env_vars = {}
         if fqdn:
             env_vars["PROD_URL"] = f"https://{fqdn}"
+            # SPEC-1845: provider/shopify Playwright conftests build targets from
+            # STAGING_FQDN, not PROD_URL. Ensure both surfaces are set.
+            env_vars["STAGING_FQDN"] = f"https://{fqdn}"
+            env_vars["STAGING_URL"] = f"https://{fqdn}"
         if superadmin_key:
             env_vars["SUPERADMIN_PREVIEW_API_KEY"] = superadmin_key
         if widget_key:
@@ -182,6 +186,25 @@ def _get_env_vars(args: argparse.Namespace) -> dict[str, str]:
     except Exception as e:
         log("WARN", f"  Could not load ENVIRONMENTS: {e}")
         return {}
+
+
+def _check_required_env_vars(
+    env_vars: dict[str, str],
+    required: list[str],
+    phase_num: int,
+    phase_name: str,
+) -> PhaseResult | None:
+    """SPEC-1845 req 3: Validate required env vars before a phase runs.
+
+    Returns a WARN PhaseResult if any required var is missing, or None if all present.
+    """
+    missing = [v for v in required if not env_vars.get(v)]
+    if missing:
+        detail = ", ".join(missing)
+        log("WARN", f"  {phase_name}: missing env vars: {detail} — skipping (SPEC-1845)")
+        return PhaseResult(phase_num, phase_name, "WARN", 0.0,
+                           f"missing env vars: {detail} — SPEC-1845")
+    return None
 
 
 def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
@@ -559,6 +582,17 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
     """Run live E2E Playwright tests against the target environment."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    # Audit: e2e_live/conftest.py uses PROD_URL+SUPERADMIN_PREVIEW_API_KEY;
+    # provider/conftest.py:36 builds from STAGING_FQDN/STAGING_URL;
+    # shopify/conftest.py:48 builds from STAGING_FQDN/STAGING_URL.
+    # PROD_URL derives from STAGING_FQDN in both conftests (:43,:55).
+    # Pipeline must ensure at least one URL surface is set.
+    if not env_vars.get("PROD_URL") and not os.environ.get("STAGING_FQDN") and not os.environ.get("STAGING_URL"):
+        return PhaseResult(3, "Live E2E", "WARN", time.time() - t0,
+                           "missing PROD_URL/STAGING_FQDN/STAGING_URL — SPEC-1845")
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY"], 3, "Live E2E")
+    if skip:
+        return skip
     # S134: Playwright tests against live staging need longer per-test timeout.
     # Default --timeout=60 is insufficient: each test starts Vite dev server,
     # navigates SPA via proxy to staging, waits for real API responses.
@@ -605,6 +639,11 @@ def phase_5_tenant_isolation(args: argparse.Namespace) -> PhaseResult:
     """Run live tenant isolation verification."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    # Audit: test_tenant_isolation_live.py consumes PROD_URL, API_KEY,
+    # WIDGET_KEY, TENANT_B_API_KEY, TENANT_B_WIDGET_KEY.
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "TENANT_B_API_KEY", "TENANT_B_WIDGET_KEY", "PROD_URL"], 5, "Tenant Isolation")
+    if skip:
+        return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_tenant_isolation_live.py",
         timeout=300, prefix="  [isolation] ",
@@ -627,6 +666,10 @@ def phase_6_security_penetration(args: argparse.Namespace) -> PhaseResult:
     """Run live API security and penetration tests."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    # Audit: test_live_penetration.py consumes PROD_URL, API_KEY, WIDGET_KEY.
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 6, "Security Penetration")
+    if skip:
+        return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_live_penetration.py",
         timeout=300, prefix="  [security] ",
@@ -690,6 +733,11 @@ def phase_8_data_integrity(args: argparse.Namespace) -> PhaseResult:
     """Run live data integrity and consistency checks."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    # Audit: test_data_integrity_live.py consumes PROD_URL, API_KEY, TENANT_B_API_KEY.
+    # PREVIEW_WIDGET_KEY is declared but NOT consumed by any test.
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "TENANT_B_API_KEY", "PROD_URL"], 8, "Data Integrity")
+    if skip:
+        return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_data_integrity_live.py",
         timeout=300, prefix="  [integrity] ",
@@ -713,6 +761,10 @@ def phase_9_resilience(args: argparse.Namespace) -> PhaseResult:
     """Run live resilience and graceful degradation tests."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    # Audit: test_resilience_live.py consumes PROD_URL, API_KEY, WIDGET_KEY.
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 9, "Resilience")
+    if skip:
+        return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_resilience_live.py",
         timeout=300, prefix="  [resilience] ",
@@ -749,15 +801,13 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
 
     # SPEC-1845: Validate required env vars before running.
     # locustfile.py requires LOAD_TEST_API_KEY and LOAD_TEST_WIDGET_KEY.
-    # Pass env-specific credentials from the pipeline config.
+    # Locust also requires a target host (from conf file or PROD_URL).
     env_vars = _get_env_vars(args)
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 10, "Load Testing")
+    if skip:
+        return skip
     load_api_key = env_vars.get("SUPERADMIN_PREVIEW_API_KEY", "")
     load_widget_key = env_vars.get("PREVIEW_WIDGET_KEY", "")
-    if not load_api_key or not load_widget_key:
-        dt = time.time() - t0
-        log("WARN", "  Load Testing: LOAD_TEST_API_KEY/WIDGET_KEY not available — skipping")
-        return PhaseResult(10, "Load Testing", "WARN", dt,
-                           "missing credentials — SPEC-1845")
 
     # Bridge pipeline env vars to locust env vars
     os.environ["LOAD_TEST_API_KEY"] = load_api_key
@@ -773,9 +823,18 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
             log("SKIP", f"  Load Testing: no config file for {args.env}")
             return PhaseResult(10, "Load Testing", "SKIP", dt, "No locust config")
 
+    # SPEC-1845: Pass --host explicitly from PROD_URL. Conf files may
+    # leave host unset (locust-staging.conf) or default to localhost (locust.conf).
+    locust_host = env_vars.get("PROD_URL", "")
+    locust_cmd = [
+        sys.executable, "-m", "locust", "-f", "tests/performance/locustfile.py",
+        "--config", conf_file, "--headless",
+    ]
+    if locust_host:
+        locust_cmd.extend(["--host", locust_host])
+
     r = stream_subprocess(
-        [sys.executable, "-m", "locust", "-f", "tests/performance/locustfile.py",
-         "--config", conf_file, "--headless"],
+        locust_cmd,
         cwd=PROJECT_ROOT, timeout=300, prefix="  [locust] ",
     )
 
@@ -816,6 +875,12 @@ def phase_11_conversation_quality(args: argparse.Namespace) -> PhaseResult:
     """Run live conversation quality tests via widget API (SPEC-1649)."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    # Audit: test_conversation_quality_live.py consumes PREVIEW_WIDGET_KEY + PROD_URL
+    # (via live_api/conftest.py fixtures). SUPERADMIN_PREVIEW_API_KEY is a secondary
+    # fallback in conftest but not the primary auth surface.
+    skip = _check_required_env_vars(env_vars, ["PREVIEW_WIDGET_KEY", "PROD_URL"], 11, "Conversation Quality")
+    if skip:
+        return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/live_api/test_conversation_quality_live.py",
         timeout=300, prefix="  [conv-quality] ",
@@ -853,6 +918,10 @@ def phase_13_config_pipeline(args: argparse.Namespace) -> PhaseResult:
 
     # Pass environment-specific variables (S132 lesson: env-aware config tests)
     env_vars = _get_env_vars(args)
+    # Audit: test_config_pipeline_live.py consumes PROD_URL, API_KEY, WIDGET_KEY.
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 13, "Config Pipeline")
+    if skip:
+        return skip
 
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_config_pipeline_live.py",
@@ -876,6 +945,13 @@ def phase_13_config_pipeline(args: argparse.Namespace) -> PhaseResult:
 def phase_14_upgrade_verification(args: argparse.Namespace) -> PhaseResult:
     """Run upgrade verification multi-c against target environment."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
+    # upgrade_verification.py multi-c also uses STAGING_001_*/STAGING_002_* keys
+    # loaded directly via _load_env(). Those are validated by the script itself.
+    # Pipeline gates on the primary credentials it controls.
+    skip = _check_required_env_vars(env_vars, ["SUPERADMIN_PREVIEW_API_KEY", "PREVIEW_WIDGET_KEY", "PROD_URL"], 14, "Upgrade Verification")
+    if skip:
+        return skip
 
     r = stream_subprocess(
         [sys.executable, str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
@@ -915,6 +991,9 @@ def phase_15_external_verification(args: argparse.Namespace) -> PhaseResult:
     """Run live external URL verification tests (SPEC-1649)."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    skip = _check_required_env_vars(env_vars, ["PROD_URL"], 15, "External Verification")
+    if skip:
+        return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/live_api/test_external_urls_live.py",
         timeout=120, prefix="  [ext-verify] ",
@@ -935,6 +1014,11 @@ def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
     """Run live widget embed verification tests (SPEC-1649)."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
+    # Audit: test_widget_embed_live.py consumes PREVIEW_WIDGET_KEY + PROD_URL
+    # (via live_api/conftest.py fixtures).
+    skip = _check_required_env_vars(env_vars, ["PREVIEW_WIDGET_KEY", "PROD_URL"], 16, "Widget Embed")
+    if skip:
+        return skip
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/live_api/test_widget_embed_live.py",
         timeout=120, prefix="  [widget-embed] ",
@@ -1000,6 +1084,36 @@ def phase_18_property_tests(args: argparse.Namespace) -> PhaseResult:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
         log("FAIL", f"  Property Tests: {detail}")
         return PhaseResult(18, "Property Tests", "FAIL", dt, detail)
+
+
+# ---------------------------------------------------------------------------
+# Phase 19 — Widget Transport (PHASE-019) — P1-1b
+# Proves SSE streaming round-trip: conversation creation, message send,
+# SSE stream delivers token + done events.  Unconditional for all releases.
+# ---------------------------------------------------------------------------
+def phase_19_widget_transport(args: argparse.Namespace) -> PhaseResult:
+    """Run live widget transport tests (P1-1b: unconditional widget gate)."""
+    t0 = time.time()
+    env_vars = _get_env_vars(args)
+    skip = _check_required_env_vars(
+        env_vars, ["PREVIEW_WIDGET_KEY", "PROD_URL"], 19, "Widget Transport",
+    )
+    if skip:
+        return skip
+    passed, failed, errors, xfailed, dt, _ = _run_pytest(
+        "tests/live_api/test_widget_transport_live.py",
+        timeout=120, prefix="  [widget-transport] ",
+        extra_env=env_vars,
+    )
+
+    if failed == 0 and errors == 0 and passed > 0:
+        log("PASS", f"  Widget Transport: {passed} passed")
+        return PhaseResult(19, "Widget Transport", "PASS", dt,
+                           extra=f"[{passed}]")
+    else:
+        detail = f"{passed} passed, {failed} failed, {errors} errors"
+        log("FAIL", f"  Widget Transport: {detail}")
+        return PhaseResult(19, "Widget Transport", "FAIL", dt, detail)
 
 
 # ---------------------------------------------------------------------------
@@ -1102,20 +1216,22 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace,
 # Phases 5 → 6 → 8 → 9 → 7 (rate limiting last among security).
 # Removed phases: 4 (mocked ops), 12 (mocked UI)
 # Restored phases: 2 (data seeding), 11 (conversation quality), 15 (external verify), 16 (widget embed)
-PHASE_ORDER_ALL = [1, 2, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16, 17, 18]
+# SPEC-1845 req 4: Phase 7 (rate limiting) removed — test file does not exist.
+# Re-add Phase 7 when tests/security/test_rate_limiting_live.py is created.
+PHASE_ORDER_ALL = [1, 2, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19]
 
 PHASE_GROUPS = {
-    "live":     [1, 2, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16],
-    "security": [5, 6, 8, 9, 7],
+    "live":     [1, 2, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 19],
+    "security": [5, 6, 8, 9],
     "quality":  [17, 18],
     "all":      PHASE_ORDER_ALL,
 }
 
 # ALL remaining phases are live (SPEC-1649)
-LIVE_PHASES = {1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16}
+LIVE_PHASES = {1, 2, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 19}
 
 # Phases that MUST have a cooldown before them (heavy API consumers)
-COOLDOWN_BEFORE = {3, 5, 6, 7, 8, 9, 11, 14}
+COOLDOWN_BEFORE = {3, 5, 6, 8, 9, 11, 14}
 
 
 # ---------------------------------------------------------------------------
@@ -1294,6 +1410,39 @@ def main():
         run_summary(results, args, start_time, log_path)
         sys.exit(1)
 
+    # SPEC-1845: Centralized test file pre-check (hard-fail).
+    # Validates all referenced test files exist BEFORE any phase runs.
+    _PHASE_TEST_FILES: dict[int, list[str]] = {
+        3:  ["tests/e2e_live/"],
+        5:  ["tests/security/test_tenant_isolation_live.py"],
+        6:  ["tests/security/test_live_penetration.py"],
+        # Phase 7 removed from pipeline — SPEC-1845 req 4.
+        8:  ["tests/security/test_data_integrity_live.py"],
+        9:  ["tests/security/test_resilience_live.py"],
+        10: ["tests/performance/locustfile.py"],
+        11: ["tests/live_api/test_conversation_quality_live.py"],
+        13: ["tests/security/test_config_pipeline_live.py"],
+        15: ["tests/live_api/test_external_urls_live.py"],
+        16: ["tests/live_api/test_widget_embed_live.py"],
+        17: ["tests/fuzzing/"],
+        18: ["tests/property/"],
+        19: ["tests/live_api/test_widget_transport_live.py"],
+    }
+    missing_files = []
+    for phase_num in phases_to_run:
+        for tf in _PHASE_TEST_FILES.get(phase_num, []):
+            path = PROJECT_ROOT / tf
+            if not path.exists():
+                missing_files.append(f"Phase {phase_num}: {tf}")
+    if missing_files:
+        log("FAIL", f"SPEC-1845: {len(missing_files)} referenced test file(s) missing — aborting")
+        for mf in missing_files:
+            log("FAIL", f"  - {mf}")
+        run_summary(results, args, start_time, log_path)
+        sys.exit(1)
+    else:
+        log("PASS", f"  SPEC-1845: All referenced test files verified for {len(phases_to_run)} phases")
+
     # WI-1107: Self-provision ephemeral test tenants (SPEC-1673 compliance)
     _provisioned_tenants: list = []
     if getattr(args, "self_provision", False):
@@ -1306,7 +1455,7 @@ def main():
         3:  lambda: phase_3_live_e2e(args),
         5:  lambda: phase_5_tenant_isolation(args),
         6:  lambda: phase_6_security_penetration(args),
-        7:  lambda: phase_7_rate_limiting(args),
+        # Phase 7 removed — SPEC-1845 req 4: test file does not exist.
         8:  lambda: phase_8_data_integrity(args),
         9:  lambda: phase_9_resilience(args),
         10: lambda: phase_10_load_testing(args),
@@ -1317,6 +1466,7 @@ def main():
         16: lambda: phase_16_widget_embed(args),
         17: lambda: phase_17_api_fuzzing(args),
         18: lambda: phase_18_property_tests(args),
+        19: lambda: phase_19_widget_transport(args),
     }
 
     prev_was_live = False

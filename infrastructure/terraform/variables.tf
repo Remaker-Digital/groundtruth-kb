@@ -230,6 +230,43 @@ variable "job_image_tag" {
   default     = "latest"
 }
 
+# P1-1a: Widget canary variables
+variable "enable_canary_job" {
+  description = "Enable the widget canary Container App Job (every 5 min health check)"
+  type        = bool
+  default     = false
+}
+
+variable "canary_target_url" {
+  description = "Base URL for the widget canary to verify (e.g. https://agent-red-api-gateway...)"
+  type        = string
+  default     = ""
+}
+
+variable "canary_alert_email" {
+  description = "Email address for canary failure alerts"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_host" {
+  description = "SMTP host for canary alert emails"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_port" {
+  description = "SMTP port for canary alert emails"
+  type        = number
+  default     = 465
+}
+
+variable "smtp_user" {
+  description = "SMTP username for canary alert emails"
+  type        = string
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # Container App References (CI/CD-managed apps, data-source lookups)
 # ---------------------------------------------------------------------------

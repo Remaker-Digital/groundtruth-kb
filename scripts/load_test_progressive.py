@@ -37,9 +37,9 @@ from typing import Any
 
 STAGING_HOST = os.environ.get("STAGING_URL", "")  # SPEC-0058: No hardcoded FQDNs
 
-# Staging credentials (remaker-digital-001)
-STAGING_API_KEY = "ar_user_rema_TwjRWmhZhjo3sX1sROYKcTHGVKfks9cu"
-STAGING_WIDGET_KEY = "pk_live_c79a2bd0b3d4_96f287f39e6a217f10dc76709297c169"
+# Staging credentials from environment (SPEC-1845: no hardcoded keys)
+STAGING_API_KEY = os.environ.get("STAGING_REMAKER_USER_KEY", "")
+STAGING_WIDGET_KEY = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
 
 LOCUSTFILE = "tests/performance/locustfile.py"
 OUTPUT_DIR = Path("tests/performance/progressive-results")

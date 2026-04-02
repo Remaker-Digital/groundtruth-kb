@@ -62,6 +62,7 @@ from src.multi_tenant.tenant_recovery import recovery_verify_router
 from src.multi_tenant.communication_capture import router as capture_router
 from src.multi_tenant.email_change import router as email_change_router
 from src.multi_tenant.admin_presets_api import router as admin_presets_router
+from src.multi_tenant.admin_marketplace_api import router as admin_marketplace_router
 
 
 def register_routers(app: FastAPI) -> None:
@@ -120,3 +121,4 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(capture_router)  # SPEC-1687: communication capture
     app.include_router(email_change_router)  # SPEC-1682/1683: email change
     app.include_router(admin_presets_router)  # SPEC-1878: G6 vertical presets
+    app.include_router(admin_marketplace_router)  # SPEC-1865: agent marketplace

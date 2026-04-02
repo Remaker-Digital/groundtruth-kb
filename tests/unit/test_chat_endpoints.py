@@ -347,7 +347,7 @@ class TestSendMessage:
         import src.chat.endpoints as ep
         ep._session = mock_session
 
-        mock_session.add_customer_message = AsyncMock(
+        mock_session.add_customer_message_idempotent = AsyncMock(
             return_value=SendMessageResponse(
                 message_id="msg-001",
                 conversation_id="conv-001",
@@ -375,7 +375,7 @@ class TestSendMessage:
         import src.chat.endpoints as ep
         ep._session = mock_session
 
-        mock_session.add_customer_message = AsyncMock(
+        mock_session.add_customer_message_idempotent = AsyncMock(
             side_effect=ConversationNotFoundError("conv-x", "tenant-001")
         )
 
@@ -397,7 +397,7 @@ class TestSendMessage:
         import src.chat.endpoints as ep
         ep._session = mock_session
 
-        mock_session.add_customer_message = AsyncMock(
+        mock_session.add_customer_message_idempotent = AsyncMock(
             side_effect=ConversationNotActiveError("conv-x", "resolved")
         )
 
@@ -419,7 +419,7 @@ class TestSendMessage:
         import src.chat.endpoints as ep
         ep._session = mock_session
 
-        mock_session.add_customer_message = AsyncMock(
+        mock_session.add_customer_message_idempotent = AsyncMock(
             side_effect=TurnLimitReachedError("conv-x", 50)
         )
 
@@ -435,6 +435,60 @@ class TestSendMessage:
             )
 
         assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_send_message_in_flight_response(self, mock_ctx, mock_session):
+        """P1-2: InFlightResponseError returns structured 409 with code."""
+        import src.chat.endpoints as ep
+        from src.chat.session import InFlightResponseError
+        ep._session = mock_session
+
+        mock_session.add_customer_message_idempotent = AsyncMock(
+            side_effect=InFlightResponseError("conv-x")
+        )
+
+        app = _make_app()
+        from src.multi_tenant.middleware import get_tenant_context
+        app.dependency_overrides[get_tenant_context] = lambda: mock_ctx
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/chat/message",
+                json={"conversation_id": "conv-x", "content": "Hello"},
+            )
+
+        assert resp.status_code == 409
+        body = resp.json()
+        assert body["code"] == "in_flight_response"
+        assert "retry_after_ms" in body
+
+    @pytest.mark.asyncio
+    async def test_send_message_concurrency_exhausted(self, mock_ctx, mock_session):
+        """P1-2: ConcurrencyExhaustedError returns structured 409 with code."""
+        import src.chat.endpoints as ep
+        from src.chat.session import ConcurrencyExhaustedError
+        ep._session = mock_session
+
+        mock_session.add_customer_message_idempotent = AsyncMock(
+            side_effect=ConcurrencyExhaustedError("conv-x")
+        )
+
+        app = _make_app()
+        from src.multi_tenant.middleware import get_tenant_context
+        app.dependency_overrides[get_tenant_context] = lambda: mock_ctx
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/chat/message",
+                json={"conversation_id": "conv-x", "content": "Hello"},
+            )
+
+        assert resp.status_code == 409
+        body = resp.json()
+        assert body["code"] == "concurrency_exhausted"
+        assert "retry_after_ms" in body
 
 
 # ---------------------------------------------------------------------------

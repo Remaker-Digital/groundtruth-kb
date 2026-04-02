@@ -5,3 +5,4 @@
  */
 export { AgentListPanel } from './AgentListPanel';
 export { AgentDetailPanel } from './AgentDetailPanel';
+export { AgentMarketplace } from './AgentMarketplace';

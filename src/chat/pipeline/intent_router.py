@@ -369,6 +369,7 @@ class IntentRouter:
                     )
             else:
                 # No specific skill — check tenant has ANY binding for this agent
+                # and resolve the first enabled binding as the default skill.
                 bindings = svc.list_bindings(tenant_id, agent_id=agent_id)
                 if not bindings:
                     logger.info(
@@ -381,6 +382,15 @@ class IntentRouter:
                         confidence=confidence,
                         fallback_from=agent_id,
                     )
+                # Pick the first enabled binding as the default skill
+                # (Codex P1: skill_id=None causes dispatch denial on empty key)
+                enabled_bindings = [
+                    b for b in bindings if b.get("enabled", True)
+                ]
+                if enabled_bindings:
+                    skill_id = enabled_bindings[0].get("skill_id")
+                else:
+                    skill_id = bindings[0].get("skill_id")
 
             # All checks passed
             return RouteDecision(

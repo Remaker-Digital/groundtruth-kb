@@ -37,7 +37,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.chat.models import (
     ConsentUpdateRequest,
@@ -59,9 +59,11 @@ from src.chat.models import (
 )
 from src.chat.pipeline import ChatPipeline
 from src.chat.session import (
+    ConcurrencyExhaustedError,
     ConversationNotActiveError,
     ConversationNotFoundError,
     ConversationSession,
+    InFlightResponseError,
     TrialLimitReachedError,
     TurnLimitReachedError,
 )
@@ -85,6 +87,28 @@ _background_tasks: set[asyncio.Task] = set()
 # ---------------------------------------------------------------------------
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+
+def parse_last_event_id(request: Request) -> int:
+    """Extract last-event-id from header or query parameter.
+
+    Header (``Last-Event-ID``) is per SSE spec for native EventSource
+    reconnection.  Query param (``last_event_id``) is the fallback for
+    manual reconnection — the EventSource API does not support custom
+    headers, so the widget sends the value this way.
+
+    Header takes precedence when both are present.
+    """
+    raw = request.headers.get(
+        "last-event-id",
+        request.query_params.get("last_event_id", ""),
+    )
+    if raw:
+        try:
+            return int(raw)
+        except (ValueError, TypeError):
+            pass
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -458,7 +482,7 @@ async def send_message(
     session = _get_session()
 
     try:
-        return await session.add_customer_message(
+        return await session.add_customer_message_idempotent(
             tenant_id=ctx.tenant_id,
             request=request,
         )
@@ -469,10 +493,28 @@ async def send_message(
             status_code=409,
             detail=f"Conversation is not active (status={exc.status})",
         )
+    except InFlightResponseError:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "Response in progress",
+                "code": "in_flight_response",
+                "retry_after_ms": 2000,
+            },
+        )
     except TurnLimitReachedError as exc:
         raise HTTPException(
             status_code=422,
             detail=f"Turn limit reached ({exc.turn_count} turns)",
+        )
+    except ConcurrencyExhaustedError:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "Concurrent write conflict — please retry",
+                "code": "concurrency_exhausted",
+                "retry_after_ms": 1000,
+            },
         )
 
 
@@ -520,9 +562,10 @@ async def stream_response(
     Decision UI-5: tokens are streamed as generated. Critic validates
     post-stream. If rejected, a ``retracted`` event replaces the text.
 
-    Supports reconnection via ``Last-Event-ID`` header — if the client
-    reconnects after a disconnect, buffered events since the given ID
-    are replayed before new events start streaming.
+    Supports reconnection via ``Last-Event-ID`` header or
+    ``last_event_id`` query parameter — if the client reconnects after
+    a disconnect, buffered events since the given ID are replayed
+    before new events start streaming.
 
     WI #133: Pass ``tab_id`` query parameter for multi-tab coordination.
     Multiple tabs streaming the same conversation share one connection
@@ -642,13 +685,7 @@ async def stream_response(
             break
 
     # Check for Last-Event-ID (reconnection support)
-    last_event_id_str = request.headers.get("last-event-id", "")
-    last_event_id = 0
-    if last_event_id_str:
-        try:
-            last_event_id = int(last_event_id_str)
-        except (ValueError, TypeError):
-            pass
+    last_event_id = parse_last_event_id(request)
 
     # Extract conversation history for multi-turn context
     conversation_history = _extract_conversation_history(state, max_messages=20)
@@ -656,9 +693,41 @@ async def stream_response(
     # SPEC-1530: Generate trace_id at API entry point for end-to-end tracing
     trace_id = uuid.uuid4().hex
 
+    # P1-2: Extract last customer message_id for fan-out tracking
+    last_message_id: str | None = None
+    for msg in reversed(state.messages):
+        if msg.role == MessageRole.CUSTOMER:
+            last_message_id = msg.message_id
+            break
+
     async def event_generator():
         sse_mgr.connect(ctx.tenant_id, conversation_id, tab_id=tab_id)
         try:
+            # P1-2: If a producer is already running for this message,
+            # attach as fan-out consumer instead of invoking pipeline again.
+            if (
+                last_message_id
+                and sse_mgr.is_producer_active(conversation_id, last_message_id)
+            ):
+                async for sse_text in sse_mgr.fan_out_stream(
+                    conversation_id, last_event_id,
+                ):
+                    yield sse_text
+                return
+
+            # P1-2: If this message was recently completed, replay buffer
+            # only — do NOT re-run the pipeline. This handles reconnects
+            # that arrive after the producer finishes but before buffer expiry.
+            if (
+                last_message_id
+                and sse_mgr.is_message_completed(conversation_id, last_message_id)
+            ):
+                if last_event_id > 0:
+                    replay = sse_mgr.get_replay_events(conversation_id, last_event_id)
+                    for sse_text in replay:
+                        yield sse_text
+                return
+
             # Replay buffered events if reconnecting
             if last_event_id > 0:
                 replay = sse_mgr.get_replay_events(conversation_id, last_event_id)
@@ -689,6 +758,7 @@ async def stream_response(
 
             async for sse_text in sse_mgr.wrap_stream(
                 ctx.tenant_id, conversation_id, pipeline_events,
+                message_id=last_message_id,
             ):
                 yield sse_text
         finally:

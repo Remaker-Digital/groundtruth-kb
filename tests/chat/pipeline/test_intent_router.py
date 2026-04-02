@@ -607,3 +607,22 @@ class TestIntentConfidenceThreshold:
             intent_confidence_threshold=0.5,
         )
         assert route.target == RouteTarget.CLARIFICATION
+
+    def test_override_resolves_default_skill(self, registry, router, binding_svc):
+        """Conversation override with no skill_id resolves first enabled binding."""
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:search-products",
+        )
+        binding_svc.create_binding(
+            tenant_id="t-1", agent_id="sales",
+            skill_id="sales:cart-management",
+        )
+        route = router.resolve(
+            tenant_id="t-1", intent="greeting", confidence=0.9,
+            conversation_agent_override="sales",
+        )
+        assert route.target == RouteTarget.PEER_AGENT
+        assert route.agent_id == "sales"
+        assert route.skill_id is not None
+        assert route.skill_id != ""

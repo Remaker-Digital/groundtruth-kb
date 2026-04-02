@@ -272,17 +272,68 @@ export interface SendMessageResult {
   ok: boolean;
   /** HTTP status code — 409 means conversation is no longer active (e.g. escalated). */
   status: number;
+  /** Server-assigned message ID (present on success). */
+  message_id?: string;
+  /** Structured error code from server (e.g. "in_flight_response", "transfer_to_human"). */
+  code?: string;
+  /** Server-suggested retry delay in milliseconds. */
+  retry_after_ms?: number;
 }
 
-/** Send a customer message. */
+/**
+ * Generate a UUID v4 idempotency key.
+ * P1-2: Used by sendMessage to prevent duplicate message creation on retry.
+ */
+function generateIdempotencyKey(): string {
+  // crypto.randomUUID is available in all modern browsers and Web Workers
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older environments
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+/** Send a customer message with idempotency key for retry safety. */
 export async function sendMessage(
   conversationId: string,
   content: string,
+  idempotencyKey?: string,
 ): Promise<SendMessageResult> {
+  const key = idempotencyKey || generateIdempotencyKey();
   const resp = await request('POST', '/api/chat/message', {
     conversation_id: conversationId,
     content,
+    idempotency_key: key,
   });
+
+  // Parse structured error body for 409 responses
+  if (!resp.ok && resp.status === 409 && resp.error) {
+    try {
+      const body = JSON.parse(resp.error);
+      return {
+        ok: false,
+        status: resp.status,
+        code: body.code,
+        retry_after_ms: body.retry_after_ms,
+      };
+    } catch {
+      // Plain-text 409 (legacy path)
+      return { ok: false, status: resp.status };
+    }
+  }
+
+  if (resp.ok && resp.data) {
+    const data = resp.data as Record<string, unknown>;
+    return {
+      ok: true,
+      status: resp.status,
+      message_id: data.message_id as string | undefined,
+    };
+  }
+
   return { ok: resp.ok, status: resp.status };
 }
 

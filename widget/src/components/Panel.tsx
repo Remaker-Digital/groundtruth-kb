@@ -269,11 +269,24 @@ export const Panel: FunctionComponent<PanelProps> = ({
       timestamp: Date.now(),
     });
 
-    const result = await apiSendMessage(conversationId, content);
+    // P1-2: Generate stable idempotency key for retry safety
+    const idempotencyKey = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    let result = await apiSendMessage(conversationId, content, idempotencyKey);
+
+    // P1-2: Handle retryable 409 (in-flight response) with backoff
+    if (!result.ok && result.status === 409 && result.code === 'in_flight_response') {
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const delay = result.retry_after_ms ?? 2000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        result = await apiSendMessage(conversationId, content, idempotencyKey);
+        if (result.ok || result.code !== 'in_flight_response') break;
+      }
+    }
+
     if (!result.ok) {
-      if (result.status === 409) {
-        // Conversation is no longer active (e.g. escalated to human agent).
-        // Show a system message and disable further input.
+      if (result.status === 409 && result.code !== 'in_flight_response') {
+        // Terminal 409: conversation transferred to human agent
         store.addMessage({
           id: `msg_${Date.now()}_system`,
           role: 'system',
@@ -281,6 +294,9 @@ export const Panel: FunctionComponent<PanelProps> = ({
           timestamp: Date.now(),
         });
         store.setState({ error: null });
+      } else if (result.status === 409 && result.code === 'in_flight_response') {
+        // Retries exhausted — response still in flight
+        store.setState({ error: 'Please wait for the current response to complete' });
       } else {
         store.setState({ error: 'Failed to send message' });
       }

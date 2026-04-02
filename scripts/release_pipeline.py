@@ -264,8 +264,9 @@ def step_5_verify_both(args: argparse.Namespace) -> StepResult:
             errors.append(f"{env_name}: not configured in upgrade_verification.py")
             continue
 
-        base_url = env["base_url"]
-        api_key = os.environ.get(env.get("key_env", ""), "")
+        fqdn = env.get("fqdn", "")
+        base_url = env.get("base_url", f"https://{fqdn}" if fqdn else "")
+        api_key = env.get("api_key", "") or env.get("spa_api_key", "")
 
         # Health check
         try:
@@ -289,6 +290,84 @@ def step_5_verify_both(args: argparse.Namespace) -> StepResult:
         except Exception as exc:
             # Non-fatal — dashboard may require auth
             log("WARN", f"  {env_name}: version check skipped ({exc})")
+
+    # P1-1b: Widget transport proof (unconditional — hard deployment gate).
+    # Verify widget.js served + conversation creation + SSE stream for each env.
+    for env_name in ["staging", "production"]:
+        env = ENVIRONMENTS.get(env_name)
+        if not env:
+            continue
+        fqdn = env.get("fqdn", "")
+        base_url = env.get("base_url", f"https://{fqdn}" if fqdn else "")
+        widget_key = env.get("widget_key", "")
+        if not widget_key:
+            # P1-1b: fail-closed — missing widget key is a gate failure, not a skip
+            errors.append(f"{env_name}: widget key not configured — cannot verify transport")
+            continue
+        try:
+            import json
+            import urllib.request
+
+            headers_common = {"Content-Type": "application/json", "X-Widget-Key": widget_key}
+
+            # 1. Widget bundle reachable
+            widget_req = urllib.request.Request(f"{base_url}/widget.js")
+            with urllib.request.urlopen(widget_req, timeout=10) as resp:
+                bundle_size = len(resp.read())
+                if resp.status != 200 or bundle_size < 1000:
+                    errors.append(f"{env_name}: widget.js not served correctly (status={resp.status}, size={bundle_size})")
+                else:
+                    log("PASS", f"  {env_name}: widget.js served ({bundle_size} bytes)")
+
+            # 2. Conversation creation
+            conv_req = urllib.request.Request(
+                f"{base_url}/api/chat/conversations",
+                data=json.dumps({}).encode(),
+                headers=headers_common,
+                method="POST",
+            )
+            with urllib.request.urlopen(conv_req, timeout=15) as resp:
+                conv_data = json.loads(resp.read())
+                conv_id = conv_data.get("conversation_id", "")
+                if not conv_id:
+                    errors.append(f"{env_name}: conversation creation returned no ID")
+                else:
+                    log("PASS", f"  {env_name}: conversation created ({conv_id[:8]}...)")
+
+            # 3. Send message + SSE stream delivers token + done
+            if conv_id:
+                msg_req = urllib.request.Request(
+                    f"{base_url}/api/chat/message",
+                    data=json.dumps({"conversation_id": conv_id, "content": "health check"}).encode(),
+                    headers=headers_common,
+                    method="POST",
+                )
+                with urllib.request.urlopen(msg_req, timeout=15) as resp:
+                    if resp.status not in (200, 201):
+                        errors.append(f"{env_name}: message send failed (status={resp.status})")
+                    else:
+                        log("PASS", f"  {env_name}: message sent")
+
+                # Verify SSE stream delivers at least one token event + done
+                stream_url = f"{base_url}/api/chat/stream/{conv_id}"
+                sse_req = urllib.request.Request(stream_url, headers={"X-Widget-Key": widget_key})
+                got_token = False
+                got_done = False
+                with urllib.request.urlopen(sse_req, timeout=45) as resp:
+                    for raw_line in resp:
+                        line = raw_line.decode("utf-8", errors="replace").strip()
+                        if line.startswith("event: token"):
+                            got_token = True
+                        elif line.startswith("event: done"):
+                            got_done = True
+                            break
+                if got_token and got_done:
+                    log("PASS", f"  {env_name}: SSE stream delivered token + done")
+                else:
+                    errors.append(f"{env_name}: SSE stream incomplete (token={got_token}, done={got_done})")
+
+        except Exception as exc:
+            errors.append(f"{env_name}: widget transport proof failed: {exc}")
 
     dt = time.time() - t0
 

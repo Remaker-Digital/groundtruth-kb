@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Refresh live regression test credentials from Azure Key Vault.
+"""Refresh live regression test credentials from Azure Key Vault + tenant API.
 
-Retrieves current SUPERADMIN_PREVIEW_API_KEY from Key Vault and updates
-.env.local. The PREVIEW_WIDGET_KEY must be set manually (stored in Cosmos,
-not Key Vault — see seed_tenant.py POST-SEED STEPS).
+Retrieves SUPERADMIN_PREVIEW_API_KEY from Key Vault, then fetches
+PREVIEW_WIDGET_KEY from the tenant config API (WI-3029). Both values
+are written to .env.local.
 
 Usage:
     python scripts/refresh_test_credentials.py              # refresh from staging vault
@@ -118,6 +118,46 @@ def _write_env_local(values: dict[str, str]) -> None:
     ENV_LOCAL.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _fetch_widget_key(base_url: str, api_key: str) -> str | None:
+    """Fetch the current widget key from the tenant config API (WI-3029).
+
+    Widget keys are stored in Cosmos (PreferencesDocument.widget_key),
+    not in Key Vault. We query GET /api/config with the admin API key
+    to retrieve the current value.
+    """
+    import httpx  # noqa: delayed import
+
+    # Determine tenant ID from ENVIRONMENTS config
+    tenant_id = "remaker-digital-001"  # default primary tenant
+    try:
+        from scripts.upgrade_verification import ENVIRONMENTS
+        for env_cfg in ENVIRONMENTS.values():
+            if base_url and env_cfg.get("fqdn", "") in base_url:
+                tenant_id = env_cfg.get("tenant_id", tenant_id)
+                break
+    except ImportError:
+        pass
+
+    try:
+        with httpx.Client(timeout=15.0) as c:
+            resp = c.get(
+                f"{base_url}/api/config?tenant={tenant_id}",
+                headers={"X-API-Key": api_key},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                cfg = data.get("config", {})
+                wk = cfg.get("widget_key") or cfg.get("widgetKey")
+                if wk:
+                    return wk
+                print(f"  [WARN] /api/config returned 200 but no widget_key in config")
+            else:
+                print(f"  [WARN] /api/config returned {resp.status_code}")
+    except Exception as e:
+        print(f"  [WARN] widget key fetch failed: {e}")
+    return None
+
+
 def _verify_credentials(base_url: str, api_key: str, widget_key: str) -> dict[str, str]:
     """Run preflight probe against credentials. Returns dict of problems."""
     import httpx  # noqa: delayed import
@@ -210,7 +250,7 @@ def main() -> None:
         else:
             print("  No change (already current)")
         print(f"\n[DRY RUN] {ENV_WIDGET_KEY}:")
-        print("  Not managed by Key Vault — update manually from seed output or Cosmos.")
+        print("  Will be fetched from tenant config API (WI-3029) after API key refresh.")
         return
 
     # Write updated API key
@@ -221,14 +261,32 @@ def main() -> None:
     else:
         print(f"  {ENV_API_KEY} already current — no change")
 
-    # Widget key reminder
-    widget_key = current.get(ENV_WIDGET_KEY, "")
-    if not widget_key:
-        print(f"\n[WARNING] {ENV_WIDGET_KEY} is not set in .env.local.")
-        print("  Widget key is stored in Cosmos (PreferencesDocument.widget_key),")
-        print("  not in Key Vault. Set it manually from seed_tenant.py output.")
+    # WI-3029: Refresh widget key from tenant config API.
+    # Widget keys are stored in Cosmos (PreferencesDocument.widget_key),
+    # not in Key Vault. We fetch the current key via the admin API using
+    # the freshly-retrieved admin API key.
+    base_url = current.get(env_config["url_var"], current.get("PROD_URL", ""))
+    if base_url and new_api_key:
+        print(f"\nRefreshing {ENV_WIDGET_KEY} from tenant config API...")
+        new_widget_key = _fetch_widget_key(base_url, new_api_key)
+        if new_widget_key:
+            old_widget_key = current.get(ENV_WIDGET_KEY, "")
+            if new_widget_key != old_widget_key:
+                current[ENV_WIDGET_KEY] = new_widget_key
+                _write_env_local(current)
+                print(f"  Updated {ENV_WIDGET_KEY} in .env.local")
+            else:
+                print(f"  {ENV_WIDGET_KEY} already current — no change")
+        else:
+            print(f"  [WARNING] Could not fetch widget key from API.")
+            print(f"  Check: admin key valid, tenant config accessible.")
+    else:
+        widget_key = current.get(ENV_WIDGET_KEY, "")
+        if not widget_key:
+            print(f"\n[WARNING] {ENV_WIDGET_KEY} is not set and could not be refreshed.")
 
-    # Verify
+    # Verify — read widget_key from current dict (may have been updated above)
+    widget_key = current.get(ENV_WIDGET_KEY, "")
     base_url = current.get(env_config["url_var"], current.get("PROD_URL", ""))
     if base_url:
         print(f"\nVerifying credentials against {base_url}...")

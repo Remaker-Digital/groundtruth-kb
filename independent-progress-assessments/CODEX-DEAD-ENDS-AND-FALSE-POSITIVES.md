@@ -49,6 +49,32 @@ Purpose: preserve failed approaches, avoidable errors, and false positives so fu
 - source:
   Codex configuration review session, 2026-03-25.
 
+### 2026-04-01 - GroundTruth packaging work was initially misframed as a PyPI requirement
+
+- issue:
+  The GroundTruth closeout analysis initially treated "installable by GitHub users" as if it necessarily meant "publish on PyPI."
+- why it happened:
+  The review collapsed three different distribution contracts into one:
+  1. install from GitHub ref or tag
+  2. install from a built release artifact
+  3. install from a package index such as PyPI
+- prevention rule:
+  For packaging and distribution reviews, explicitly identify the intended contract before recommending work.
+  Do not assume PyPI unless the owner explicitly requires index-based `pip install <name>` behavior.
+- source:
+  GroundTruth closeout correction cycle and correction audit, 2026-04-01.
+
+### 2026-04-01 - Bridge dashboards can show stale "pending" state after a thread is already closed
+
+- issue:
+  Multiple April 1 review items appeared to remain pending in the conversational status summary even after Codex had already sent the substantive response and resolved the bridge thread.
+- why it happened:
+  The user-facing summary lagged the bridge record, and later protocol acknowledgements made the stale state look like live work.
+- prevention rule:
+  Before treating a "pending" item as real, verify the actual bridge thread state and canonical report rather than relying on conversational status text alone.
+- source:
+  S251 verification and OM advisory-review cycles, 2026-04-01.
+
 ---
 
 Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

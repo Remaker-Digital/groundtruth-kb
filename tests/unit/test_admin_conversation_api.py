@@ -740,3 +740,270 @@ class TestSearchConversations:
         request = SearchConversationsRequest(query="test")
         result = await search_conversations(request=request, ctx=mock_ctx)
         assert result.total_results == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: set_agent_override (SPEC-1866)
+# ---------------------------------------------------------------------------
+
+
+class TestSetAgentOverride:
+    @pytest.mark.asyncio
+    async def test_set_override_success(self, mock_ctx, mock_repo):
+        """PUT agent-override sets fields when agent passes validation."""
+        import src.multi_tenant.admin_conversation_api as mod
+
+        mod._conversation_repo = mock_repo
+        mock_repo.read.return_value = _make_conversation()
+        mock_ctx.team_member_id = "tm-001"
+
+        mock_defn = MagicMock()
+        mock_defn.tier_gate = "free"
+
+        mock_config = MagicMock()
+        mock_config.enabled = True
+
+        with (
+            patch(
+                "src.agents.plugins.registry.PluginAgentRegistry"
+            ) as MockReg,
+            patch(
+                "src.agents.plugins.bindings.SkillBindingService"
+            ) as MockSvc,
+            patch(
+                "src.agents.plugins.events.emit_invocation"
+            ),
+            patch(
+                "src.agents.plugins.overlay.resolve_effective_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "src.multi_tenant.repositories.agent_overlays.TenantAgentOverlayRepository"
+            ) as MockOverlayRepo,
+        ):
+            MockReg.get_instance.return_value.get.return_value = mock_defn
+            mock_svc = MockSvc.get_instance.return_value
+            mock_svc.list_bindings.return_value = [{"skill_id": "s1"}]
+            mock_svc._loaded_tenants = {"tenant-001"}
+            MockOverlayRepo.return_value.get_overlay = AsyncMock(
+                return_value={"enabled": True, "visibility_scope": "public"},
+            )
+
+            from src.multi_tenant.admin_conversation_api import (
+                AgentOverrideRequest,
+                set_agent_override,
+            )
+
+            request = AgentOverrideRequest(agent_id="sales_agent")
+            result = await set_agent_override(
+                "conv-001", request=request, ctx=mock_ctx,
+            )
+
+            assert result.conversation_id == "conv-001"
+            assert result.agent_id == "sales_agent"
+            assert result.set_at is not None
+            assert result.set_by == "tm-001"
+            mock_repo.patch.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_clear_override(self, mock_ctx, mock_repo):
+        """PUT agent-override with null agent_id clears the override."""
+        import src.multi_tenant.admin_conversation_api as mod
+
+        mod._conversation_repo = mock_repo
+        mock_repo.read.return_value = _make_conversation(
+            conversation_agent_override="sales_agent",
+        )
+
+        with patch(
+            "src.agents.plugins.events.emit_invocation"
+        ):
+            from src.multi_tenant.admin_conversation_api import (
+                AgentOverrideRequest,
+                set_agent_override,
+            )
+
+            request = AgentOverrideRequest(agent_id=None)
+            result = await set_agent_override(
+                "conv-001", request=request, ctx=mock_ctx,
+            )
+
+            assert result.agent_id is None
+            assert result.set_at is None
+            assert result.set_by is None
+            mock_repo.patch.assert_called_once()
+            ops = mock_repo.patch.call_args.kwargs["operations"]
+            assert any(
+                op["path"] == "/conversation_agent_override" and op["value"] is None
+                for op in ops
+            )
+
+    @pytest.mark.asyncio
+    async def test_agent_not_in_registry(self, mock_ctx, mock_repo):
+        """PUT agent-override returns 422 when agent doesn't exist."""
+        import src.multi_tenant.admin_conversation_api as mod
+
+        mod._conversation_repo = mock_repo
+        mock_repo.read.return_value = _make_conversation()
+
+        with patch(
+            "src.agents.plugins.registry.PluginAgentRegistry"
+        ) as MockReg:
+            MockReg.get_instance.return_value.get.return_value = None
+
+            from fastapi import HTTPException
+
+            from src.multi_tenant.admin_conversation_api import (
+                AgentOverrideRequest,
+                set_agent_override,
+            )
+
+            request = AgentOverrideRequest(agent_id="nonexistent_agent")
+            with pytest.raises(HTTPException) as exc_info:
+                await set_agent_override(
+                    "conv-001", request=request, ctx=mock_ctx,
+                )
+            assert exc_info.value.status_code == 422
+            assert "not found" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_no_bindings_returns_422(self, mock_ctx, mock_repo):
+        """PUT agent-override returns 422 when no skill bindings exist."""
+        import src.multi_tenant.admin_conversation_api as mod
+
+        mod._conversation_repo = mock_repo
+        mock_repo.read.return_value = _make_conversation()
+
+        mock_defn = MagicMock()
+        mock_defn.tier_gate = "free"
+
+        mock_config = MagicMock()
+        mock_config.enabled = True
+
+        with (
+            patch(
+                "src.agents.plugins.registry.PluginAgentRegistry"
+            ) as MockReg,
+            patch(
+                "src.agents.plugins.bindings.SkillBindingService"
+            ) as MockSvc,
+            patch(
+                "src.agents.plugins.overlay.resolve_effective_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "src.multi_tenant.repositories.agent_overlays.TenantAgentOverlayRepository"
+            ) as MockOverlayRepo,
+        ):
+            MockReg.get_instance.return_value.get.return_value = mock_defn
+            mock_svc = MockSvc.get_instance.return_value
+            mock_svc.list_bindings.return_value = []
+            mock_svc._loaded_tenants = {"tenant-001"}
+            MockOverlayRepo.return_value.get_overlay = AsyncMock(
+                return_value={"enabled": True, "visibility_scope": "public"},
+            )
+
+            from fastapi import HTTPException
+
+            from src.multi_tenant.admin_conversation_api import (
+                AgentOverrideRequest,
+                set_agent_override,
+            )
+
+            request = AgentOverrideRequest(agent_id="sales_agent")
+            with pytest.raises(HTTPException) as exc_info:
+                await set_agent_override(
+                    "conv-001", request=request, ctx=mock_ctx,
+                )
+            assert exc_info.value.status_code == 422
+            assert "No skill bindings" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_disabled_agent_returns_422(self, mock_ctx, mock_repo):
+        """PUT agent-override returns 422 when agent is disabled via overlay."""
+        import src.multi_tenant.admin_conversation_api as mod
+
+        mod._conversation_repo = mock_repo
+        mock_repo.read.return_value = _make_conversation()
+
+        mock_defn = MagicMock()
+        mock_defn.tier_gate = "free"
+        mock_config = MagicMock()
+        mock_config.enabled = False
+
+        with (
+            patch(
+                "src.agents.plugins.registry.PluginAgentRegistry"
+            ) as MockReg,
+            patch(
+                "src.agents.plugins.overlay.resolve_effective_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "src.multi_tenant.repositories.agent_overlays.TenantAgentOverlayRepository"
+            ) as MockOverlayRepo,
+        ):
+            MockReg.get_instance.return_value.get.return_value = mock_defn
+            MockOverlayRepo.return_value.get_overlay = AsyncMock(
+                return_value={"enabled": False},
+            )
+
+            from fastapi import HTTPException
+
+            from src.multi_tenant.admin_conversation_api import (
+                AgentOverrideRequest,
+                set_agent_override,
+            )
+
+            request = AgentOverrideRequest(agent_id="sales_agent")
+            with pytest.raises(HTTPException) as exc_info:
+                await set_agent_override(
+                    "conv-001", request=request, ctx=mock_ctx,
+                )
+            assert exc_info.value.status_code == 422
+            assert "disabled" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_private_scope_agent_returns_422(self, mock_ctx, mock_repo):
+        """PUT agent-override returns 422 for private-scope agent."""
+        import src.multi_tenant.admin_conversation_api as mod
+
+        mod._conversation_repo = mock_repo
+        mock_repo.read.return_value = _make_conversation()
+
+        mock_defn = MagicMock()
+        mock_defn.tier_gate = "free"
+        mock_config = MagicMock()
+        mock_config.enabled = True
+
+        with (
+            patch(
+                "src.agents.plugins.registry.PluginAgentRegistry"
+            ) as MockReg,
+            patch(
+                "src.agents.plugins.overlay.resolve_effective_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "src.multi_tenant.repositories.agent_overlays.TenantAgentOverlayRepository"
+            ) as MockOverlayRepo,
+        ):
+            MockReg.get_instance.return_value.get.return_value = mock_defn
+            MockOverlayRepo.return_value.get_overlay = AsyncMock(
+                return_value={"enabled": True, "visibility_scope": "private"},
+            )
+
+            from fastapi import HTTPException
+
+            from src.multi_tenant.admin_conversation_api import (
+                AgentOverrideRequest,
+                set_agent_override,
+            )
+
+            request = AgentOverrideRequest(agent_id="sales_agent")
+            with pytest.raises(HTTPException) as exc_info:
+                await set_agent_override(
+                    "conv-001", request=request, ctx=mock_ctx,
+                )
+            assert exc_info.value.status_code == 422
+            assert "private-scoped" in exc_info.value.detail

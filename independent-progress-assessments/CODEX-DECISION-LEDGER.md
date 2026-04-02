@@ -55,6 +55,63 @@ Purpose: persistent record of owner decisions and standing operating choices tha
 - status:
   Active
 
+### 2026-04-01 - Widget functionality is a hard deployment gate
+
+- source:
+  Owner directive in session on 2026-04-01 during S251 closeout.
+- decision:
+  A deployment is a failure if the chat widget is non-functional in the target environment.
+  The only exception is an explicit owner approval to deploy with the widget disabled.
+- impact:
+  Future review and release verdicts must treat widget failures as blockers or rollback-required conditions, not advisory defects.
+- status:
+  Active
+
+### 2026-04-01 - GroundTruth distribution contract is GitHub-installable, not PyPI-required
+
+- source:
+  Owner clarification in session on 2026-04-01 after the GroundTruth closeout checkpoint.
+- decision:
+  `groundtruth-kb` should be a versioned Python package installable directly from GitHub by outside users.
+  PyPI publication is not required at this time.
+- impact:
+  Packaging audits and implementation proposals must distinguish:
+  1. GitHub-installable package
+  2. release-artifact installable package
+  3. PyPI-published package
+  and must not assume PyPI as the contract unless the owner later says so explicitly.
+- status:
+  Active
+
+### 2026-04-01 - Non-disruptive deployment operating model adopted
+
+- source:
+  Owner agreement with the operating-model findings and Prime response `9fa11da0` on 2026-04-01.
+- decision:
+  The accepted release model is:
+  1. `release_pipeline.py` is the canonical production GO/NO-GO path
+  2. widget, chat, auth, tenant-routing, and config changes are `Class C`
+  3. `Class C` promotion requires live widget proof
+  4. widget failure means promotion blocked or rollback required
+- impact:
+  Future release and verification proposals should be reviewed against the OM Wave 1-3 program, not against older smoke-only deployment assumptions.
+- status:
+  Active
+
+### 2026-04-01 - Artifact immutability and lane separation are prerequisites for trustworthy hotfixes
+
+- source:
+  Owner agreement on spec request `ad40ba38` and the hotfix/WIP separation specs on 2026-04-01.
+- decision:
+  Urgent fixes must ultimately be supported by three explicit separations:
+  1. code lane separation (`git worktree` or equivalent clean hotfix lane from the deployed SHA)
+  2. environment lane separation (`integration-staging` vs `release-staging`)
+  3. artifact lane separation (manifest-based build-once, promote-the-same-artifact release flow)
+- impact:
+  OM Wave 2/3 proposals should treat immutable artifact promotion and staging-lane separation as prerequisites, not optional polish.
+- status:
+  Active
+
 ---
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

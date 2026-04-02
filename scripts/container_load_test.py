@@ -919,13 +919,8 @@ def main() -> None:
     else:
         # Fall back to staging credentials
         print("  [WARN] Self-provisioning failed, using staging credentials")
-        api_key = os.environ.get(
-            "STAGING_REMAKER_USER_KEY",
-            "ar_user_rema_TwjRWmhZhjo3sX1sROYKcTHGVKfks9cu",
-        )
-        widget_key = os.environ.get(
-            "STAGING_REMAKER_WIDGET_KEY",
-            "pk_live_c79a2bd0b3d4_96f287f39e6a217f10dc76709297c169",
+        api_key = os.environ.get("STAGING_REMAKER_USER_KEY", "")
+        widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", ""
         )
         tenant_id = ""
 

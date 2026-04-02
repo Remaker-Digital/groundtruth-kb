@@ -12,6 +12,7 @@ MEMBASE-README.md
 .env.local
 .env.*.local
 *.env
+scripts/deploy/_prod_env_vars*.txt
 secrets/
 credentials/
 logs/

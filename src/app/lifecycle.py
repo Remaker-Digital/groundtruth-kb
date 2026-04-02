@@ -635,11 +635,11 @@ async def _startup_chat_services() -> None:
         critic = None
         try:
             from src.multi_tenant.critic_policy import CriticPolicy
-            from src.chat.pipeline.constants import AGENT_URLS
-            critic_url = AGENT_URLS.get("critic-supervisor", "")
-            if critic_url:
-                critic = CriticPolicy(critic_urls=[critic_url])
-                logger.info("CriticPolicy initialized with URL: %s", critic_url)
+            from src.chat.pipeline.constants import get_critic_urls
+            critic_urls = get_critic_urls()
+            if critic_urls:
+                critic = CriticPolicy(critic_urls=critic_urls)
+                logger.info("CriticPolicy initialized with %d URL(s): %s", len(critic_urls), critic_urls)
             else:
                 logger.warning("Critic URL not configured — CriticPolicy disabled (fail-closed)")
         except Exception as exc:
@@ -677,6 +677,27 @@ async def _startup_chat_services() -> None:
                 "first-chunk billing will not be recorded.",
                 exc_info=True,
             )
+
+        # P1-5: Schedule periodic SSE buffer cleanup (every 60s).
+        # cleanup_expired_buffers() exists but was never called in production.
+        try:
+            from src.chat.sse_manager import get_sse_manager as _get_sse_mgr
+            _sse_mgr = _get_sse_mgr()
+
+            async def _buffer_cleanup_loop() -> None:
+                while True:
+                    await asyncio.sleep(60)
+                    try:
+                        removed = _sse_mgr.cleanup_expired_buffers()
+                        if removed > 0:
+                            logger.info("SSE buffer cleanup: %d expired buffers removed", removed)
+                    except Exception:
+                        logger.debug("SSE buffer cleanup error", exc_info=True)
+
+            asyncio.get_event_loop().create_task(_buffer_cleanup_loop())
+            logger.info("SSE buffer cleanup task scheduled (60s interval)")
+        except Exception:
+            logger.warning("SSE buffer cleanup scheduling failed", exc_info=True)
 
         logger.info(
             "Chat API services initialized (session + pipeline, 6 endpoints, mode=%s)",

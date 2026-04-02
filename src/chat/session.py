@@ -102,6 +102,16 @@ class TurnLimitReachedError(Exception):
         )
 
 
+class ConcurrencyExhaustedError(Exception):
+    """Raised when ETag retries are exhausted on concurrent writes."""
+
+    def __init__(self, conversation_id: str) -> None:
+        self.conversation_id = conversation_id
+        super().__init__(
+            f"Conversation {conversation_id}: max concurrent-write retries exhausted"
+        )
+
+
 class TrialLimitReachedError(Exception):
     """Raised when a trial tenant has exhausted their conversation allowance."""
 
@@ -110,6 +120,20 @@ class TrialLimitReachedError(Exception):
         self.limit = limit
         super().__init__(
             f"Trial tenant {tenant_id} has used all {limit} conversations"
+        )
+
+
+class InFlightResponseError(Exception):
+    """Raised when a customer sends a new message while the AI is still responding.
+
+    P1-2: Single in-flight response enforcement. The widget should retry
+    with the same idempotency_key after retry_after_ms.
+    """
+
+    def __init__(self, conversation_id: str) -> None:
+        self.conversation_id = conversation_id
+        super().__init__(
+            f"Conversation {conversation_id} has a pending customer message"
         )
 
 
@@ -345,6 +369,100 @@ class ConversationSession:
             turn_count=turn_count,
             accepted=True,
         )
+
+    async def add_customer_message_idempotent(
+        self,
+        tenant_id: str,
+        request: SendMessageRequest,
+        max_retries: int = 3,
+    ) -> SendMessageResponse:
+        """Append a customer message with Cosmos conditional-write idempotency.
+
+        Uses ETag/If-Match optimistic concurrency (P1-2). On conflict the
+        full read-check-append cycle re-runs against the fresh document so
+        idempotency, in-flight, and turn-limit checks are always consistent.
+
+        Falls back to :meth:`add_customer_message` when no idempotency_key
+        is provided (backward compatible with old widget versions).
+        """
+        from azure.cosmos.exceptions import CosmosAccessConditionFailedError
+
+        if not request.idempotency_key:
+            return await self.add_customer_message(tenant_id, request)
+
+        for _attempt in range(max_retries):
+            doc = await self._get_active_conversation(
+                tenant_id, request.conversation_id,
+            )
+            etag = doc.get("_etag", "")
+            messages = doc.get("messages", [])
+
+            # Idempotency check: key already appended by a prior write
+            for msg in messages:
+                meta = msg.get("metadata") or {}
+                if meta.get("idempotency_key") == request.idempotency_key:
+                    return SendMessageResponse(
+                        message_id=msg["message_id"],
+                        conversation_id=request.conversation_id,
+                        turn_count=doc.get("turn_count", 0),
+                        accepted=True,
+                    )
+
+            # In-flight check: last message is customer with no AI reply
+            if messages and messages[-1].get("role") == MessageRole.CUSTOMER.value:
+                raise InFlightResponseError(request.conversation_id)
+
+            # Turn limit check
+            turn_count = doc.get("turn_count", 0)
+            if turn_count >= MAX_TURNS:
+                raise TurnLimitReachedError(request.conversation_id, turn_count)
+
+            # Build message
+            now = datetime.now(timezone.utc).isoformat()
+            message_id = str(uuid.uuid4())
+            stored_content = request.content
+            if self._pii_scrubber:
+                stored_content = self._pii_scrubber.scrub_text(stored_content)
+
+            message_dict: dict[str, Any] = {
+                "role": MessageRole.CUSTOMER.value,
+                "content": stored_content,
+                "timestamp": now,
+                "message_id": message_id,
+                "metadata": {
+                    **(request.metadata or {}),
+                    "idempotency_key": request.idempotency_key,
+                },
+            }
+
+            messages.append(message_dict)
+            doc["messages"] = messages
+            doc["message_count"] = len(messages)
+            doc["last_activity_at"] = now
+
+            try:
+                await self._repo.replace_with_etag(
+                    tenant_id, request.conversation_id, doc, etag,
+                )
+                logger.debug(
+                    "Idempotent message appended: conv=%s msg=%s key=%s",
+                    request.conversation_id, message_id,
+                    request.idempotency_key[:8],
+                )
+                return SendMessageResponse(
+                    message_id=message_id,
+                    conversation_id=request.conversation_id,
+                    turn_count=turn_count,
+                    accepted=True,
+                )
+            except CosmosAccessConditionFailedError:
+                logger.debug(
+                    "ETag conflict on idempotent append (attempt %d): conv=%s",
+                    _attempt + 1, request.conversation_id,
+                )
+                continue
+
+        raise ConcurrencyExhaustedError(request.conversation_id)
 
     # -------------------------------------------------------------------
     # Append AI response

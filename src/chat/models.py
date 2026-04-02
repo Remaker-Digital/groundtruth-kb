@@ -188,6 +188,11 @@ class SendMessageRequest(BaseModel):
         default=None,
         description="Client metadata for this message",
     )
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Client-generated UUID for idempotent retry (P1-2)",
+    )
 
 
 class EndConversationRequest(BaseModel):

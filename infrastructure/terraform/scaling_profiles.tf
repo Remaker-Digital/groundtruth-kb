@@ -221,7 +221,77 @@ resource "azurerm_container_app_job" "archival_pipeline" {
   tags = var.tags
 }
 
+# P1-1a: Widget canary — validates widget transport every 5 minutes.
+# Checks: /health, /widget.js, conversation creation, SSE stream.
+# Sends SMTP alert on failure.
+resource "azurerm_container_app_job" "widget_canary" {
+  count = var.enable_canary_job ? 1 : 0
+
+  name                         = "agent-red-widget-canary"
+  resource_group_name          = var.resource_group_name
+  location                     = var.location
+  container_app_environment_id = azurerm_container_app_environment.main.id
+
+  replica_timeout_in_seconds = 120
+  replica_retry_limit        = 0
+
+  schedule_trigger_config {
+    cron_expression = "*/5 * * * *"
+  }
+
+  template {
+    container {
+      name   = "canary"
+      image  = "${var.container_registry}/api-gateway:${var.job_image_tag}"
+      cpu    = 0.25
+      memory = "0.5Gi"
+
+      command = ["python", "-m", "src.jobs.run_widget_canary"]
+
+      env {
+        name  = "CANARY_TARGET_URL"
+        value = var.canary_target_url
+      }
+      env {
+        name        = "CANARY_WIDGET_KEY"
+        secret_name = "canary-widget-key"
+      }
+      env {
+        name  = "ENVIRONMENT"
+        value = var.environment
+      }
+      env {
+        name  = "CANARY_ALERT_EMAIL"
+        value = var.canary_alert_email
+      }
+      env {
+        name  = "SMTP_HOST"
+        value = var.smtp_host
+      }
+      env {
+        name  = "SMTP_PORT"
+        value = tostring(var.smtp_port)
+      }
+      env {
+        name  = "SMTP_USER"
+        value = var.smtp_user
+      }
+      env {
+        name        = "SMTP_PASSWORD"
+        secret_name = "smtp-password"
+      }
+    }
+  }
+
+  tags = var.tags
+}
+
 output "scheduled_jobs_enabled" {
   description = "Whether scheduled jobs (data retention + archival) are enabled"
   value       = var.enable_scheduled_jobs
+}
+
+output "canary_job_enabled" {
+  description = "Whether the widget canary job is enabled"
+  value       = var.enable_canary_job
 }
