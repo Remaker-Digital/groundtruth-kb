@@ -197,12 +197,13 @@ class TestQualityAggregate:
 
         assert is_regression is False
 
-    def test_session_end_should_compute_aggregate(self):
-        """ConversationSession.end_conversation should compute quality_aggregate.
+    def test_session_end_calls_quality_closeout(self):
+        """ConversationSession.end_conversation calls the quality closeout helper.
 
-        This test verifies the integration point exists.
+        The shared helper computes quality_aggregate and evaluates regression.
         """
         from src.chat.session import ConversationSession
         source = inspect.getsource(ConversationSession.end_conversation)
-        if "quality_aggregate" not in source and "aggregate_conversation" not in source:
-            pytest.skip("quality_aggregate not yet computed in end_conversation (Phase 3)")
+        assert "evaluate_quality_and_alert" in source, (
+            "end_conversation must call evaluate_quality_and_alert for quality aggregate"
+        )

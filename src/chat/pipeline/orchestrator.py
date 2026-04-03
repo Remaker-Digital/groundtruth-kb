@@ -817,6 +817,27 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     sources=structured_sources or None,
                     blocks=structured_blocks,
                 )
+
+                # P3-1: Score the validated turn and persist to message metadata.
+                # Synchronous (not fire-and-forget) to avoid race with aggregate.
+                try:
+                    from src.chat.quality_scorer import quality_scorer
+                    score = quality_scorer.score_turn(
+                        ai_response=safe_text,
+                        customer_message=customer_message,
+                        knowledge_context=knowledge_context,
+                    )
+                    await self._session.patch_message_metadata(
+                        tenant_id=tenant_id,
+                        conversation_id=conversation_id,
+                        message_id=message_id,
+                        metadata_patch={"quality_score": score.model_dump()},
+                    )
+                except Exception:
+                    logger.warning(
+                        "Quality scoring failed (non-fatal): conv=%s msg=%s",
+                        conversation_id, message_id, exc_info=True,
+                    )
             else:
                 # Critic rejected -- retract streamed text, deliver fallback
                 message_id = await self._session.add_ai_message(

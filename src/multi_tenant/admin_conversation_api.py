@@ -1107,6 +1107,16 @@ async def escalate_conversation(
             exc_info=True,
         )
 
+    # P3-1: Quality aggregate + regression alert at admin escalation closeout
+    try:
+        from src.chat.quality_closeout import evaluate_quality_and_alert
+        await evaluate_quality_and_alert(ctx.tenant_id, conversation_id, repo)
+    except Exception:
+        logger.warning(
+            "Quality closeout failed (non-fatal): conv=%s", conversation_id,
+            exc_info=True,
+        )
+
     return EscalateConversationResponse(
         conversation_id=conversation_id,
         status=ConversationStatus.ESCALATED.value,
@@ -1169,6 +1179,16 @@ async def resolve_conversation(
         raise HTTPException(
             status_code=404,
             detail=f"Conversation {conversation_id} not found",
+        )
+
+    # P3-1: Quality aggregate + regression alert at resolve closeout
+    try:
+        from src.chat.quality_closeout import evaluate_quality_and_alert
+        await evaluate_quality_and_alert(ctx.tenant_id, conversation_id, repo)
+    except Exception:
+        logger.warning(
+            "Quality closeout failed (non-fatal): conv=%s", conversation_id,
+            exc_info=True,
         )
 
     logger.info(

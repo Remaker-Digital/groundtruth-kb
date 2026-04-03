@@ -612,6 +612,51 @@ class ConversationSession:
         return message_id
 
     # -------------------------------------------------------------------
+    # Patch message metadata (P3-1: quality score persistence)
+    # -------------------------------------------------------------------
+
+    async def patch_message_metadata(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        message_id: str,
+        metadata_patch: dict[str, Any],
+    ) -> None:
+        """Patch metadata on an existing message within a conversation.
+
+        Uses ETag-safe read-modify-write to merge new metadata fields
+        into the message's existing metadata dict. Non-fatal on conflict
+        (caller should catch and log).
+
+        Args:
+            tenant_id: Tenant identifier.
+            conversation_id: Conversation containing the message.
+            message_id: The specific message to patch.
+            metadata_patch: Dict of fields to merge into message metadata.
+        """
+        doc = await self._repo.get(tenant_id, conversation_id)
+        etag = doc.get("_etag", "")
+        messages = doc.get("messages", [])
+
+        for msg in messages:
+            if msg.get("message_id") == message_id:
+                existing_meta = msg.get("metadata") or {}
+                existing_meta.update(metadata_patch)
+                msg["metadata"] = existing_meta
+                break
+        else:
+            logger.warning(
+                "patch_message_metadata: message %s not found in conv %s",
+                message_id, conversation_id,
+            )
+            return
+
+        doc["messages"] = messages
+        await self._repo.replace_with_etag(
+            tenant_id, conversation_id, doc, etag,
+        )
+
+    # -------------------------------------------------------------------
     # End conversation
     # -------------------------------------------------------------------
 
@@ -680,6 +725,16 @@ class ConversationSession:
                     conversation_id,
                     tenant_id,
                 )
+
+        # P3-1: Quality aggregate + regression alert (shared closeout helper)
+        try:
+            from src.chat.quality_closeout import evaluate_quality_and_alert
+            await evaluate_quality_and_alert(tenant_id, conversation_id, self._repo)
+        except Exception:
+            logger.warning(
+                "Quality closeout failed (non-fatal): conv=%s", conversation_id,
+                exc_info=True,
+            )
 
         # Calculate duration
         duration_seconds = _calculate_duration(
@@ -932,6 +987,16 @@ class ConversationSession:
             escalation_category or "none",
             assigned_to or "unassigned",
         )
+
+        # P3-1: Quality aggregate + regression alert at escalation closeout
+        try:
+            from src.chat.quality_closeout import evaluate_quality_and_alert
+            await evaluate_quality_and_alert(tenant_id, conversation_id, self._repo)
+        except Exception:
+            logger.warning(
+                "Quality closeout failed (non-fatal): conv=%s", conversation_id,
+                exc_info=True,
+            )
 
     # -------------------------------------------------------------------
     # Resume from existing active conversation
