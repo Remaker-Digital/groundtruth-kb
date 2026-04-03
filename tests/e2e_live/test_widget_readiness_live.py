@@ -6,10 +6,17 @@ admin UI and the connected Shopify storefront. These are the browser-
 based checks that cannot be done from a Python script (complement to
 Phase-C checks C.36–C.41 in upgrade_verification.py).
 
+CRITICAL INVARIANT (S257):
+  If the configuration is Active, the widget launcher MUST be visible
+  on both the Shopify storefront and the standalone admin UI.  A deployment
+  that passes API checks but leaves the widget invisible is a failed
+  deployment.  This file encodes that gate as browser-verified assertions.
+
 Checks:
-  1. Widget launcher visible in standalone admin UI
+  0. Active config → widget key auth works (hash present on tenant doc)
+  1. Active config → widget launcher visible in standalone admin UI
   2. Widget chat panel opens in admin UI
-  3. Widget launcher visible on Shopify storefront
+  3. Active config → widget launcher visible on Shopify storefront
   4. Widget chat panel opens on storefront
   5. User can type and send a message on storefront
   6. AI response appears in the conversation
@@ -22,8 +29,10 @@ Run:
 
 from __future__ import annotations
 
+import hashlib
 import os
 
+import httpx
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -31,6 +40,7 @@ from tests.e2e_live.conftest import (
     LIVE_API_KEY,
     LIVE_SPA_BASE_URL,
     LIVE_TENANT_ID,
+    STAGING_FQDN,
     _dismiss_onboarding_modal,
 )
 
@@ -134,6 +144,112 @@ def _open_widget_panel(page: Page) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# S257 Invariant: Active Config → Widget Visible
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.timeout(60)
+class TestActiveConfigImpliesWidgetVisible:
+    """CRITICAL GATE: If the configuration is Active, the widget MUST be visible.
+
+    This test class verifies the prerequisite chain that makes widget
+    visibility possible.  Each test targets a specific link in the chain
+    so failures are immediately diagnosable:
+
+      1. activation-status → is_active == true
+      2. widget_key present in the active config
+      3. widget_key_hash present on the tenant document (widget key auth
+         returns 200, not 401 — the S254 CMK incident left hashes missing)
+
+    If any of these fail, the widget launcher will be invisible regardless
+    of whether the admin UI or storefront embed is correct.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        """Resolve the base URL for API calls."""
+        self.base_url = STAGING_FQDN
+        if not self.base_url:
+            pytest.skip("STAGING_FQDN / STAGING_URL not set")
+        if not LIVE_API_KEY:
+            pytest.skip("LIVE_API_KEY not set")
+
+    def test_activation_status_is_active(self):
+        """The tenant configuration must report is_active=true."""
+        with httpx.Client(timeout=30.0) as c:
+            resp = c.get(
+                f"{self.base_url}/api/config/activation-status"
+                f"?tenant={LIVE_TENANT_ID}",
+                headers={"X-API-Key": LIVE_API_KEY},
+            )
+        assert resp.status_code == 200, (
+            f"activation-status returned HTTP {resp.status_code}"
+        )
+        data = resp.json()
+        assert data.get("is_active") is True, (
+            f"Configuration is NOT active: {data}. "
+            "The widget will not be injected in the admin console."
+        )
+
+    def test_widget_key_present_in_config(self):
+        """The active config must contain a non-empty widget_key."""
+        with httpx.Client(timeout=30.0) as c:
+            resp = c.get(
+                f"{self.base_url}/api/config?page_type=all"
+                f"&tenant={LIVE_TENANT_ID}",
+                headers={"X-API-Key": LIVE_API_KEY},
+            )
+        assert resp.status_code == 200, (
+            f"/api/config returned HTTP {resp.status_code}"
+        )
+        config = resp.json().get("config", {})
+        widget_key = config.get("widget_key", "")
+        assert widget_key and widget_key.startswith("pk_live_"), (
+            f"widget_key is missing or invalid: '{widget_key[:20]}...'. "
+            "The widget embed code has no key to authenticate with."
+        )
+
+    def test_widget_key_auth_works(self):
+        """Widget key auth must return 200 — proves widget_key_hash exists.
+
+        This is the exact check that would have caught the S254 defect:
+        the hash was missing from the Cosmos tenant document, so widget
+        key auth returned 401 even though the key was correct and the
+        config was Active.
+        """
+        # First fetch the widget key from the admin config endpoint
+        with httpx.Client(timeout=30.0) as c:
+            admin_resp = c.get(
+                f"{self.base_url}/api/config?page_type=all"
+                f"&tenant={LIVE_TENANT_ID}",
+                headers={"X-API-Key": LIVE_API_KEY},
+            )
+        if admin_resp.status_code != 200:
+            pytest.skip("Could not fetch admin config to get widget key")
+
+        config = admin_resp.json().get("config", {})
+        widget_key = config.get("widget_key", "")
+        if not widget_key:
+            pytest.skip("No widget key in config")
+
+        # Now test widget key auth directly — this is what the embedded
+        # widget does when it loads on the storefront or admin console
+        with httpx.Client(timeout=30.0) as c:
+            widget_resp = c.get(
+                f"{self.base_url}/api/config?page_type=index",
+                headers={"X-Widget-Key": widget_key},
+            )
+        assert widget_resp.status_code == 200, (
+            f"Widget key auth returned HTTP {widget_resp.status_code}. "
+            f"This means widget_key_hash is MISSING or STALE on the "
+            f"tenant document for {LIVE_TENANT_ID}. The widget launcher "
+            f"will be invisible because its config fetch is rejected by "
+            f"the auth middleware before reaching the config handler. "
+            f"Fix: trigger config activation or run repair_widget_hash.py."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Admin UI Widget Tests
 # ---------------------------------------------------------------------------
 
@@ -161,16 +277,27 @@ class TestAdminWidgetReadiness:
         self.page = page
 
     def test_widget_launcher_visible_in_admin(self):
-        """The widget launcher (chat bubble) should be visible in the admin UI."""
-        # Wait for the widget script to load and initialize
-        self.page.wait_for_timeout(5_000)
+        """CRITICAL GATE: Active config → widget launcher MUST be visible in admin.
+
+        S257: This is the browser-verified assertion that the widget
+        launcher renders in the standalone admin UI.  It is NOT sufficient
+        to check API responses alone — the launcher must be a visible DOM
+        element that a human user can see and click.
+        """
+        # Wait for the widget script to load and initialize.
+        # The admin console's StandaloneLayout injects widget.js after the
+        # activation-status poll confirms is_active=true. A 4s retry handles
+        # the race condition where widget_key_hash self-heal hadn't completed.
+        self.page.wait_for_timeout(8_000)
         found = _find_widget_launcher(self.page)
         assert found, (
             "Widget launcher not visible in admin UI. "
             "Check: (1) activation status is_active=true, "
             "(2) widget_key present in config, "
             "(3) widget_key_hash set on tenant document, "
-            "(4) no console errors on widget.js load."
+            "(4) no console errors on widget.js load. "
+            "This is a CRITICAL deployment gate — the widget must be "
+            "visible when the configuration is Active."
         )
 
     def test_widget_chat_panel_opens_in_admin(self):
@@ -210,13 +337,21 @@ class TestStorefrontWidgetReadiness:
         page.wait_for_timeout(5_000)  # Wait for widget script to load
 
     def test_widget_launcher_visible_on_storefront(self):
-        """The widget launcher should be visible on the Shopify storefront."""
+        """CRITICAL GATE: Active config → widget launcher MUST be visible on storefront.
+
+        S257: This is the browser-verified assertion that the widget
+        launcher renders on the Shopify storefront.  A deployment is NOT
+        successful if this test fails.
+        """
         found = _find_widget_launcher(self.page)
         assert found, (
             f"Widget launcher not visible on {SHOPIFY_STORE_DOMAIN}. "
             "Check: (1) app embed is enabled in Shopify theme editor, "
             "(2) widget key is configured in the app embed settings, "
-            "(3) widget.js is served by the API gateway."
+            "(3) widget.js is served by the API gateway, "
+            "(4) widget_key_hash exists on the tenant document. "
+            "This is a CRITICAL deployment gate — the widget must be "
+            "visible when the configuration is Active."
         )
 
     def test_widget_chat_panel_opens_on_storefront(self):

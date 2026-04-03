@@ -23,6 +23,18 @@ Date | Scope | Observation | Evidence | Impact | Corrective action | Follow-up s
 
 ## Entries
 
+### 2026-04-03 - Ack breach on Phase 3 Plan v16 advisory review
+
+| Scope | Observation | Evidence | Impact | Corrective action | Follow-up status |
+|------|-------------|----------|--------|-------------------|------------------|
+| Protocol execution | The Phase 3 Plan v16 advisory-review request crossed the under-60-second acknowledgement target before Codex sent the substantive NO-GO review. | Prime message `fa4954fb-553d-469f-932b-8b997dcebe0f` was created at `2026-04-03T09:31:12.713432+00:00`; canonical wake snapshot `.claude/hooks/.codex-bridge-worker-last-context.json` was generated at `2026-04-03T09:33:46.281855+00:00` and showed `ack_breach=true`, `ack_due_at=2026-04-03T09:32:12.713432+00:00`, and `ack_overdue_seconds=93`; the thread context later showed Codex substantive review `bc4f55d4-1f06-4dcd-8606-e379e2728d89` created at `2026-04-03T09:33:53.700451+00:00` and the root request resolved at `2026-04-03T09:33:59.437683+00:00`. | The thread entered breach state before the review response landed, so the wake had to recover an already-breached request instead of handling it inside the target acknowledgement window. | When a canonical wake names a live `ack_breach` thread, inspect that thread first and send the protocol-valid acceptance or substantive disposition before local bootstrap reading, closure verification on prior threads, or other non-urgent bridge narration. | Open |
+
+### 2026-04-03 - Ack breach on Phase 3 Plan v14 advisory review
+
+| Scope | Observation | Evidence | Impact | Corrective action | Follow-up status |
+|------|-------------|----------|--------|-------------------|------------------|
+| Protocol execution | The Phase 3 Plan v14 advisory-review request crossed the under-60-second acknowledgement target before Codex sent the formal protocol acceptance. | Prime message `95369838-0f2b-4935-b413-b86b1309573c` was created at `2026-04-03T09:18:53.505590+00:00`; canonical wake snapshot `.claude/hooks/.codex-bridge-worker-last-context.json` showed `ack_breach=true`, `ack_due_at=2026-04-03T09:19:53.505590+00:00`, and `ack_overdue_seconds=81`; Codex protocol acknowledgement `e9fcfde1-30b5-484f-aaac-e6951bde85e7` was created at `2026-04-03T09:22:56.112427+00:00`; elapsed time was `00:04:02.6068370`. | The live review thread entered breach state before substantive review started cleanly, and recovery overhead was required during the wake instead of a near-real-time intake. | When the canonical wake names an explicit `ack_breach` substantive thread, send `accept_message(...)` on that thread immediately after snapshot inspection and before any closure-only handling for done-thread protocol acks. | Open |
+
 ### 2026-04-01 - Ack breach on S252 SPEC-1845 pipeline behavior v4 review
 
 | Scope | Observation | Evidence | Impact | Corrective action | Follow-up status |
