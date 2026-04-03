@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 21209,
-    "total_files": 460
+    "total_assertions": 21409,
+    "total_files": 472
   },
   "baselines": {
     "tests/agents/plugins/test_agent_extensibility_phase0.py": 71,
@@ -26,6 +26,8 @@
     "tests/agents/test_response_generator.py": 23,
     "tests/chat/pipeline/test_intent_router.py": 65,
     "tests/chat/pipeline/test_intent_router_integration.py": 38,
+    "tests/chat/pipeline/test_quality_scoring.py": 32,
+    "tests/chat/pipeline/test_stream_routing.py": 13,
     "tests/chat/pipeline/test_team_agent_chat.py": 26,
     "tests/chat/test_agent_name_extractor.py": 20,
     "tests/chat/test_blocks.py": 34,
@@ -46,6 +48,7 @@
     "tests/chat/test_sse_error_handling.py": 71,
     "tests/chat/test_sse_integration.py": 48,
     "tests/chat/test_sse_metering_multitab.py": 64,
+    "tests/chat/test_sse_reconnect.py": 13,
     "tests/chat/test_system_prompt_identity.py": 15,
     "tests/contract/test_chat_provider.py": 13,
     "tests/contract/test_no_cross_partition_queries.py": 10,
@@ -279,6 +282,7 @@
     "tests/multi_tenant/test_pipeline_resilience.py": 106,
     "tests/multi_tenant/test_preferences_repository.py": 56,
     "tests/multi_tenant/test_preset_service.py": 72,
+    "tests/multi_tenant/test_quality_alert_admin.py": 8,
     "tests/multi_tenant/test_quality_score.py": 18,
     "tests/multi_tenant/test_rate_limit_reintroduction.py": 59,
     "tests/multi_tenant/test_rbac_enforcement.py": 27,
@@ -306,6 +310,7 @@
     "tests/multi_tenant/test_s175_scaling_680.py": 70,
     "tests/multi_tenant/test_s180_provider_console_fixes.py": 21,
     "tests/multi_tenant/test_s186_regression.py": 65,
+    "tests/multi_tenant/test_schema_alias_regression.py": 18,
     "tests/multi_tenant/test_schema_provisioning_spec_verification.py": 46,
     "tests/multi_tenant/test_secret_posture_aggregation.py": 12,
     "tests/multi_tenant/test_security_middleware.py": 49,
@@ -364,6 +369,7 @@
     "tests/ops/test_dockerfile_test_coverage.py": 5,
     "tests/ops/test_hooks_specs.py": 59,
     "tests/ops/test_pre_flight_specs.py": 64,
+    "tests/ops/test_seed_preset_path.py": 18,
     "tests/ops/test_seed_tenant_specs.py": 63,
     "tests/ops/test_upgrade_verification_specs.py": 33,
     "tests/performance/test_concurrent_tenants.py": 19,
@@ -442,8 +448,12 @@
     "tests/unit/test_memory_dashboard.py": 23,
     "tests/unit/test_mock_dev_environment.py": 28,
     "tests/unit/test_profile_linkage.py": 24,
+    "tests/unit/test_refresh_test_credentials.py": 26,
+    "tests/unit/test_release_gate.py": 14,
+    "tests/unit/test_run_widget_canary.py": 25,
     "tests/unit/test_security_hardening.py": 100,
     "tests/unit/test_service_messages.py": 38,
+    "tests/unit/test_session_idempotency.py": 13,
     "tests/unit/test_shopify_billing.py": 57,
     "tests/unit/test_shopify_customer_verification.py": 10,
     "tests/unit/test_sse_manager.py": 71,
@@ -458,6 +468,7 @@
     "tests/widget/test_admin_features_batch.py": 216,
     "tests/widget/test_admin_tooltips.py": 80,
     "tests/widget/test_admin_ui_labels.py": 28,
+    "tests/widget/test_alert_config_quality.py": 9,
     "tests/widget/test_auth_interceptor.py": 11,
     "tests/widget/test_transcript_persistence.py": 11,
     "tests/widget/test_warm_up_call_site.py": 26,
@@ -465,6 +476,7 @@
     "tests/widget/test_widget_config_reactivity.py": 6,
     "tests/widget/test_widget_core.py": 191,
     "tests/widget/test_widget_forms_admin.py": 116,
-    "tests/widget/test_widget_page_layout.py": 176
+    "tests/widget/test_widget_page_layout.py": 176,
+    "tests/widget/test_widget_retry.py": 11
   }
 }

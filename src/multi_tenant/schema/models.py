@@ -90,6 +90,7 @@ class ConfigFieldType(str, Enum):
     FLOAT = "float"
     BOOLEAN = "boolean"
     ENUM = "enum"          # Single choice from a set
+    SELECT = "select"      # Dropdown selection (alias for enum in YAML configs)
     STRING_LIST = "string_list"
     OBJECT = "object"      # Nested JSON object
 
@@ -119,6 +120,7 @@ class TierGate(str, Enum):
 
     ALL = "all"                    # Starter, Professional, Enterprise
     PROFESSIONAL_PLUS = "pro+"     # Professional and Enterprise only
+    PROFESSIONAL = "professional"  # Professional and above (YAML alias)
     ENTERPRISE_ONLY = "enterprise" # Enterprise only
 
 

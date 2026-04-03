@@ -51,6 +51,7 @@ from src.chat.models import (
     IssueReportResponse,
     MessageFeedbackRequest,
     MessageFeedbackResponse,
+    MessageRole,
     SendMessageRequest,
     SendMessageResponse,
     StreamStatusResponse,
