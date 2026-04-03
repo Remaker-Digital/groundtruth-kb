@@ -144,7 +144,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
   const sseRef = useRef<SSEConnection | null>(null);
 
   // Derived state — use activeConfig for reactive preview
-  const agentName = activeConfig.widget_agent_display_name || 'AI Assistant';
+  const agentName = activeConfig.widget_agent_display_name || _locale.defaultAgentName;
   const agentTitle = activeConfig.widget_agent_title || '';
   const agentAvatarUrl = activeConfig.widget_agent_avatar_url || null;
   const logoUrl = activeConfig.widget_logo_url || null;
@@ -169,7 +169,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
     const { customerToken } = store.getState();
     const conversationId = await apiStartConversation(preChatData, customerToken);
     if (!conversationId) {
-      store.setState({ isLoading: false, error: 'Failed to start conversation' });
+      store.setState({ isLoading: false, error: _locale.errorStartConversation });
       return;
     }
 
@@ -231,7 +231,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
       store.setState({ isLoading: true });
       const newId = await apiStartConversation();
       if (!newId) {
-        store.setState({ isLoading: false, error: 'Failed to start conversation' });
+        store.setState({ isLoading: false, error: _locale.errorStartConversation });
         return;
       }
       store.setState({ conversationId: newId, isLoading: false });
@@ -290,15 +290,15 @@ export const Panel: FunctionComponent<PanelProps> = ({
         store.addMessage({
           id: `msg_${Date.now()}_system`,
           role: 'system',
-          content: 'This conversation has been transferred to a human agent. Please wait for a support team member to respond.',
+          content: _locale.escalationNotice,
           timestamp: Date.now(),
         });
         store.setState({ error: null });
       } else if (result.status === 409 && result.code === 'in_flight_response') {
         // Retries exhausted — response still in flight
-        store.setState({ error: 'Please wait for the current response to complete' });
+        store.setState({ error: _locale.waitForResponse });
       } else {
-        store.setState({ error: 'Failed to send message' });
+        store.setState({ error: _locale.errorSendMessage });
       }
       return;
     }
@@ -571,10 +571,45 @@ export const Panel: FunctionComponent<PanelProps> = ({
     }
   }, [activeConfig.widget_prechat_form]);
 
+  // ---- Keyboard handlers (WCAG 2.1 — dialog dismissal + focus trap) -------
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes the dialog
+      if (e.key === 'Escape') {
+        handleCloseWidget();
+        return;
+      }
+      // Tab/Shift+Tab containment — wrap focus within the dialog.
+      // The iframe boundary already constrains Tab in most browsers, but
+      // this explicit trap ensures WCAG 2.4.3 compliance universally.
+      if (e.key === 'Tab') {
+        const focusable = document.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), ' +
+          'a[href], [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCloseWidget]);
+
   // ---- Render -------------------------------------------------------------
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ar-panel-heading"
       style={{
         width: '100%',
         height: '100%',
@@ -820,7 +855,7 @@ const ConnectionBanner: FunctionComponent<{
           <path d="M12 2a10 10 0 0 1 10 10" />
         </svg>
       )}
-      {isError ? (message || 'An error occurred') : locale.connectionLost}
+      {isError ? (message || locale.errorGeneric) : locale.connectionLost}
     </div>
   );
 };

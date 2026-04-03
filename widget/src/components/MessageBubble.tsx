@@ -18,6 +18,7 @@
 import { FunctionComponent, VNode } from 'preact';
 import type { DesignTokens } from '@/theme/tokens';
 import type { Message } from '@/state/store';
+import type { Locale } from '@/locale/en';
 import { AnswerBlocks } from './AnswerBlocks';
 
 // ---------------------------------------------------------------------------
@@ -92,6 +93,7 @@ function extractSourceDomains(text: string): string[] {
 
 interface MessageBubbleProps {
   tokens: DesignTokens;
+  locale: Locale;
   message: Message;
   agentAvatarUrl: string | null;
   agentName: string;
@@ -119,6 +121,7 @@ function formatTime(timestamp: number): string {
 
 export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
   tokens,
+  locale,
   message,
   agentAvatarUrl,
   agentName,
@@ -263,7 +266,7 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
               }}
             >
               <RetractedIcon size={12} />
-              <span>Message revised</span>
+              <span>{locale.messageRevised}</span>
             </div>
           )}
 
@@ -400,7 +403,7 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
             <button
               type="button"
               onClick={() => onFeedback(message.id, 'positive')}
-              aria-label="Helpful"
+              aria-label={locale.feedbackHelpful}
               style={{
                 background: 'none',
                 border: 'none',
@@ -422,7 +425,7 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
             <button
               type="button"
               onClick={() => onFeedback(message.id, 'negative')}
-              aria-label="Not helpful"
+              aria-label={locale.feedbackNotHelpful}
               style={{
                 background: 'none',
                 border: 'none',

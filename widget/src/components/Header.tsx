@@ -15,6 +15,7 @@
 
 import { FunctionComponent } from 'preact';
 import type { DesignTokens } from '@/theme/tokens';
+import { focusRingColor } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
 
 // ---------------------------------------------------------------------------
@@ -56,7 +57,7 @@ export const Header: FunctionComponent<HeaderProps> = ({
   onDragStart,
 }) => {
   const displayTitle = headerText || locale.headerTitle;
-  const displaySubtitle = headerSubtitle || 'We typically reply within minutes';
+  const displaySubtitle = headerSubtitle || locale.headerSubtitleDefault;
   // Avatar initials: first 2 chars of agent name (WI-0872 consistency fix)
   const avatarInitials = agentName.slice(0, 2).toUpperCase() || 'AR';
 
@@ -127,8 +128,9 @@ export const Header: FunctionComponent<HeaderProps> = ({
           overflow: 'hidden',
         }}
       >
-        {/* Row 1: Title */}
-        <div
+        {/* Row 1: Title — h1 for WCAG heading structure, id for aria-labelledby */}
+        <h1
+          id="ar-panel-heading"
           style={{
             fontSize: tokens.fontSizeSm,
             fontWeight: tokens.fontWeightSemibold,
@@ -137,10 +139,11 @@ export const Header: FunctionComponent<HeaderProps> = ({
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            margin: 0,
           }}
         >
           {displayTitle}
-        </div>
+        </h1>
         {/* Row 2: Subtitle */}
         <div
           style={{
@@ -169,6 +172,7 @@ export const Header: FunctionComponent<HeaderProps> = ({
           }}
         >
           <span
+            aria-hidden="true"
             style={{
               width: '6px',
               height: '6px',
@@ -178,7 +182,7 @@ export const Header: FunctionComponent<HeaderProps> = ({
               flexShrink: 0,
             }}
           />
-          <span>Online</span>
+          <span>{locale.statusOnline}</span>
         </div>
       </div>
 
@@ -186,7 +190,7 @@ export const Header: FunctionComponent<HeaderProps> = ({
       {logoUrl && (
         <img
           src={logoUrl}
-          alt="Logo"
+          alt={locale.logoAlt}
           style={{
             height: '24px',
             width: 'auto',
@@ -212,9 +216,26 @@ export const Header: FunctionComponent<HeaderProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: tokens.borderRadiusSm,
-          transition: `background-color ${tokens.transitionFast}`,
+          transition: `background-color ${tokens.transitionFast}, box-shadow ${tokens.transitionFast}`,
           outline: 'none',
           opacity: 0.9,
+        }}
+        onFocus={(e) => {
+          // On gradient headers, no single-color ring can guarantee >= 3:1
+          // against all possible interior blend points (non-linear luminance).
+          // Solution: double ring — black inner + white outer (or vice versa).
+          // One band always contrasts >= 4.58:1 against ANY background.
+          // On flat headers, use focusRingColor for a clean single ring.
+          if (gradientEnd) {
+            (e.currentTarget as HTMLElement).style.boxShadow =
+              '0 0 0 2px #000000, 0 0 0 4px #FFFFFF';
+          } else {
+            (e.currentTarget as HTMLElement).style.boxShadow =
+              `0 0 0 2px ${focusRingColor(tokens.colorPrimary)}`;
+          }
+        }}
+        onBlur={(e) => {
+          (e.currentTarget as HTMLElement).style.boxShadow = 'none';
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.15)';

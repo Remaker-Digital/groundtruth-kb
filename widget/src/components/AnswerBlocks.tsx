@@ -148,7 +148,7 @@ const ActionButton: FunctionComponent<{
       backgroundColor: block.style === 'primary' ? tokens.colorPrimary : 'transparent',
       color: block.style === 'primary' ? '#fff' : tokens.colorPrimary,
       border: block.style === 'primary' ? 'none' : `1px solid ${tokens.colorPrimary}`,
-      borderRadius: tokens.borderRadiusMd,
+      borderRadius: tokens.borderRadius,
       fontFamily: tokens.fontFamily,
       fontSize: tokens.fontSizeSm,
       fontWeight: tokens.fontWeightMedium,

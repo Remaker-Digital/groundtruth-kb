@@ -290,7 +290,7 @@ export class SSEConnection {
 
       case 'retracted': {
         // Critic rejected — replace with safe fallback (Decision UI-5)
-        let fallback = 'I apologize, but I need to rephrase my response. How else can I help you?';
+        let fallback = store.getState().locale.sseRetractFallback;
         try {
           const parsed = JSON.parse(event.data);
           if (parsed.fallback_text) fallback = parsed.fallback_text;
@@ -302,7 +302,7 @@ export class SSEConnection {
       }
 
       case 'error': {
-        let errorMsg = 'An error occurred';
+        let errorMsg = store.getState().locale.sseErrorFallback;
         try {
           const parsed = JSON.parse(event.data);
           errorMsg = parsed.message || errorMsg;

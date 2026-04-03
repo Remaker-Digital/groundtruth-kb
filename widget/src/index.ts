@@ -275,6 +275,7 @@ async function init(
     render(
       h(Launcher, {
         tokens: liveTokens,
+        locale: store.getState().locale,
         position: (isMobileDevice && currentConfig.widget_mobile_position) || currentConfig.widget_position || 'bottom-right',
         offsetX: isMobileDevice
           ? (currentConfig.widget_mobile_offset_x ?? currentConfig.widget_position_offset_x ?? currentConfig.widget_offset_x ?? 20)
@@ -349,7 +350,7 @@ async function init(
           'overflow: hidden',
         ].join('; ');
 
-    iframe.setAttribute('title', 'Agent Red Chat');
+    iframe.setAttribute('title', locale.iframeTitleChat);
     iframe.setAttribute('allow', 'microphone; camera');
 
     document.body.appendChild(iframe);
@@ -610,6 +611,17 @@ async function init(
             positionResizeHandle(resizeHandle, panelIframe);
             resizeHandle.style.display = 'block';
           }
+          // Phase 2 (S254): Move focus into the iframe for keyboard users.
+          // This is the host→iframe layer of the two-layer focus management.
+          // Inside the iframe, Panel.tsx has role="dialog" + aria-modal.
+          try {
+            panelIframe.contentWindow?.focus();
+            // Focus the first interactive element (textarea or button)
+            const firstFocusable = panelIframe.contentDocument?.querySelector<HTMLElement>(
+              'textarea, button, input, [tabindex="0"]'
+            );
+            if (firstFocusable) firstFocusable.focus();
+          } catch { /* cross-origin iframe — silently skip */ }
         }
       });
     });
@@ -645,6 +657,12 @@ async function init(
     }
     store.setState({ view: 'closed' });
     hidePanel();
+    // Phase 2 (S254): Return focus to launcher for keyboard users.
+    // This is the iframe→host layer of the two-layer focus management.
+    try {
+      const launcherBtn = shadowRoot.querySelector<HTMLElement>('button');
+      if (launcherBtn) launcherBtn.focus();
+    } catch { /* noop */ }
   }
 
   function toggleWidget() {
