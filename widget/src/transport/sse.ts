@@ -42,6 +42,8 @@ interface SSEOptions {
   tenantId?: string;
   onConnectionLost?: () => void;
   onConnectionRestored?: () => void;
+  /** Called on each reconnect attempt with the current attempt number (P3-4). */
+  onReconnectAttempt?: (attempt: number) => void;
   /** Called when all reconnect attempts are exhausted (WI-0931). */
   onMaxReconnectsExhausted?: () => void;
 }
@@ -206,6 +208,31 @@ export class SSEConnection {
     }
   }
 
+  /**
+   * Retry connection after max reconnects exhausted.
+   *
+   * Unlike disconnect()+connect() or creating a new SSEConnection,
+   * this preserves lastEventId and currentStreamContent so the backend
+   * can replay buffered events from the correct position. Resets only
+   * the attempt counter and closed flag.
+   */
+  retry(): void {
+    // Close existing EventSource without marking as permanently closed
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    // Reset connection state but preserve replay position
+    this.closed = false;
+    this.reconnectAttempts = 0;
+    // lastEventId and currentStreamContent are intentionally kept
+    this.connect();
+  }
+
   // ---- Event handling ------------------------------------------------------
 
   private handleEvent(event: StreamEvent): void {
@@ -231,7 +258,7 @@ export class SSEConnection {
               streaming: true,
             };
             store.addMessage(msg);
-            store.setState({ isAgentTyping: false });
+            store.setState({ isAgentTyping: false, isStreaming: true });
           }
         } catch { /* ignore malformed stage events */ }
         break;
@@ -281,6 +308,7 @@ export class SSEConnection {
         // connection, so reconnecting after 'done' would trigger a
         // duplicate pipeline run, creating ghost messages and retractions.
         this.streamComplete = true;
+        store.setState({ isStreaming: false });
         if (this.eventSource) {
           this.eventSource.close();
           this.eventSource = null;
@@ -309,7 +337,7 @@ export class SSEConnection {
         } catch {
           errorMsg = event.data || errorMsg;
         }
-        store.setState({ error: errorMsg });
+        store.setState({ error: errorMsg, isStreaming: false });
         break;
       }
 
@@ -339,6 +367,10 @@ export class SSEConnection {
       30000, // max 30s
     );
     this.reconnectAttempts++;
+
+    if (this.options.onReconnectAttempt) {
+      this.options.onReconnectAttempt(this.reconnectAttempts);
+    }
 
     this.reconnectTimer = setTimeout(() => {
       this.connect();

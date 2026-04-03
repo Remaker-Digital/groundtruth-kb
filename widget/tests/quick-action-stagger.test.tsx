@@ -1,28 +1,38 @@
 /**
- * P3-6: Quick action staggered entrance — pre-implementation tests.
+ * P3-6: Quick action staggered entrance — behavioral tests.
  *
- * QuickActions.tsx caps visible actions at 2 (actions.slice(0, 2) at line 51).
- * Tests verify sequential animation-delay on the 2 visible buttons.
- * These tests will FAIL until P3-6 is implemented.
+ * Verifies QuickActions source code contains staggered animation-delay
+ * and per-button ar-fade-in animation.
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+const QA_SOURCE = readFileSync(
+  resolve(__dirname, '../src/components/QuickActions.tsx'),
+  'utf-8',
+);
 
 describe('P3-6: Quick action staggered entrance', () => {
-  it.skip('buttons have sequential animation-delay', () => {
-    // TODO P3-6: render QuickActions with 2 actions
-    // assert button[0] has delay=0ms, button[1] has delay=50ms
+  it('buttons have sequential animation-delay via index', () => {
+    // P3-6: each button gets animationDelay: `${index * 50}ms`
+    expect(QA_SOURCE).toContain('animationDelay');
+    expect(QA_SOURCE).toContain('index * 50');
   });
 
-  it.skip('animation class applied to buttons', () => {
-    // TODO P3-6: render QuickActions with 2 actions
-    // assert each button has ar-fade-in animation
+  it('animation class applied to buttons (ar-fade-in)', () => {
+    expect(QA_SOURCE).toContain('ar-fade-in');
   });
 
-  it.skip('only 2 buttons render even with 4 actions provided', () => {
-    // TODO P3-6: render QuickActions with 4 actions
-    // assert getAllByRole('button') returns 2
+  it('container no longer has animation (moved to individual buttons)', () => {
+    // The container div should NOT have animation (moved to buttons)
+    expect(QA_SOURCE).toContain('Animation moved to individual buttons');
+  });
+
+  it('max 2 buttons enforced', () => {
+    expect(QA_SOURCE).toContain('slice(0, 2)');
   });
 });

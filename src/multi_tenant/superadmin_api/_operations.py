@@ -310,6 +310,7 @@ class AlertHistoryItemModel(CamelCaseModel):
     rule_id: str = ""
     rule_name: str = ""
     rule_type: str = ""
+    tenant_id: str = ""
     triggered_at: str = ""
     resolved_at: str | None = None
     severity: str = "warning"
@@ -448,6 +449,7 @@ def _history_to_model(doc: dict[str, Any]) -> AlertHistoryItemModel:
         rule_id=doc.get("rule_id", ""),
         rule_name=doc.get("rule_name", ""),
         rule_type=doc.get("rule_type", ""),
+        tenant_id=doc.get("tenant_id", ""),
         triggered_at=doc.get("triggered_at", ""),
         resolved_at=doc.get("resolved_at"),
         severity=doc.get("severity", "warning"),

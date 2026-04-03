@@ -89,6 +89,12 @@ export interface Locale {
   waitForResponse: string;
   sseRetractFallback: string;
   sseErrorFallback: string;
+  // Phase 3 (S256) — connection recovery + restore UX
+  reconnectingAttempt: string;
+  connectionFailedPermanent: string;
+  retryConnection: string;
+  dismissError: string;
+  restoringConversation: string;
 }
 
 export const en: Locale = {
@@ -170,4 +176,10 @@ export const en: Locale = {
   waitForResponse: 'Please wait for the current response to complete',
   sseRetractFallback: 'I apologize, but I need to rephrase my response. How else can I help you?',
   sseErrorFallback: 'An error occurred',
+  // Phase 3 (S256) — connection recovery + restore UX
+  reconnectingAttempt: 'Reconnecting... attempt {n}',
+  connectionFailedPermanent: 'Unable to connect',
+  retryConnection: 'Retry',
+  dismissError: 'Dismiss',
+  restoringConversation: 'Loading previous conversation...',
 };

@@ -72,6 +72,7 @@ interface AlertHistoryItem {
   ruleId: string;
   ruleName: string;
   ruleType: string;
+  tenantId?: string;
   triggeredAt: string;
   resolvedAt: string | null;
   severity: string;
@@ -97,6 +98,7 @@ const RULE_TYPE_OPTIONS = [
   { value: 'circuit_breaker', label: 'Circuit Breaker' },
   { value: 'sla_breach', label: 'SLA Breach' },
   { value: 'incident', label: 'Incident' },
+  { value: 'quality_regression', label: 'Quality Regression' },
 ];
 
 const OPERATOR_OPTIONS = [
@@ -106,6 +108,7 @@ const OPERATOR_OPTIONS = [
   { value: 'lte', label: '<= (less or equal)' },
   { value: 'eq', label: '= (equal)' },
   { value: 'ne', label: '!= (not equal)' },
+  { value: 'lt_delta', label: 'Δ< (delta less than)' },
 ];
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -120,6 +123,7 @@ const TYPE_COLORS: Record<string, string> = {
   circuit_breaker: 'orange',
   sla_breach: 'red',
   incident: 'pink',
+  quality_regression: 'teal',
 };
 
 // ---------------------------------------------------------------------------
@@ -137,7 +141,7 @@ function formatDate(iso: string): string {
 
 function formatCondition(c: AlertCondition): string {
   const ops: Record<string, string> = {
-    gt: '>', lt: '<', gte: '>=', lte: '<=', eq: '=', ne: '!=',
+    gt: '>', lt: '<', gte: '>=', lte: '<=', eq: '=', ne: '!=', lt_delta: 'Δ<',
   };
   return `${c.metric || '?'} ${ops[c.operator] || c.operator} ${c.threshold}`;
 }
@@ -245,7 +249,7 @@ export function AlertConfigPage() {
           operator: formOperator || 'gt',
           threshold: formThreshold,
         },
-        notificationChannels: [],
+        notificationChannels: editingRule?.notificationChannels ?? ['email'],
         cooldownMinutes: formCooldown,
         runbookUrl: formRunbook,
       };
@@ -444,6 +448,7 @@ export function AlertConfigPage() {
                 <Table.Tr>
                   <Table.Th>Rule</Table.Th>
                   <Table.Th>Type</Table.Th>
+                  {history.some((h) => h.tenantId) && <Table.Th>Tenant</Table.Th>}
                   <Table.Th>Severity</Table.Th>
                   <Table.Th>Message</Table.Th>
                   <Table.Th>Value</Table.Th>
@@ -462,6 +467,11 @@ export function AlertConfigPage() {
                         {item.ruleType.replace(/_/g, ' ')}
                       </Badge>
                     </Table.Td>
+                    {history.some((h) => h.tenantId) && (
+                      <Table.Td>
+                        <Text size="xs" c={tokens.textSecondary}>{item.tenantId || '\u2014'}</Text>
+                      </Table.Td>
+                    )}
                     <Table.Td>
                       <Badge variant="filled" color={SEVERITY_COLORS[item.severity] ?? 'gray'} size="xs">
                         {item.severity}

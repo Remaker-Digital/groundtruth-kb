@@ -84,4 +84,9 @@ export const ja: Locale = {
   waitForResponse: '現在の応答が完了するまでお待ちください',
   sseRetractFallback: '申し訳ございませんが、回答を修正させてください。他にお手伝いできることはありますか？',
   sseErrorFallback: 'エラーが発生しました',
+  reconnectingAttempt: '再接続中... 試行 {n}',
+  connectionFailedPermanent: '接続できません',
+  retryConnection: '再試行',
+  dismissError: '閉じる',
+  restoringConversation: '前回の会話を読み込み中...',
 };

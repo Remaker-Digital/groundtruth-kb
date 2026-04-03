@@ -104,6 +104,10 @@ class AlertRuleRepository:
             return item
         return None
 
+    async def list_rules(self) -> list[dict[str, Any]]:
+        """List all alert rules (cross-partition). Alias for list_all."""
+        return await self.list_all()
+
     async def list_all(self) -> list[dict[str, Any]]:
         """List all alert rules (cross-partition)."""
         query = "SELECT * FROM c ORDER BY c.created_at DESC"
@@ -195,6 +199,7 @@ class AlertHistoryRepository:
         message: str = "",
         metric_value: float = 0,
         threshold_value: float = 0,
+        tenant_id: str = "",
     ) -> dict[str, Any]:
         """Log an alert firing event."""
         now = datetime.now(timezone.utc)
@@ -207,6 +212,7 @@ class AlertHistoryRepository:
             "rule_id": rule_id,
             "rule_name": rule_name,
             "rule_type": rule_type,
+            "tenant_id": tenant_id,
             "triggered_at": now.isoformat(),
             "resolved_at": None,
             "severity": severity,
@@ -217,7 +223,7 @@ class AlertHistoryRepository:
             "acknowledged_by": None,
         }
         result = await self._container.create_item(body=doc)
-        logger.info("Alert logged: rule=%s severity=%s", rule_name, severity)
+        logger.info("Alert logged: rule=%s severity=%s tenant=%s", rule_name, severity, tenant_id)
         return result
 
     async def list_recent(self, days: int = 7, limit: int = 100) -> list[dict[str, Any]]:
@@ -257,13 +263,33 @@ class AlertHistoryRepository:
         except CosmosResourceNotFoundError:
             return None
 
-    async def get_last_trigger_for_rule(self, rule_id: str) -> dict[str, Any] | None:
-        """Get the most recent alert for a given rule (for cooldown check)."""
-        query = (
-            "SELECT * FROM c WHERE c.rule_id = @rid "
-            "ORDER BY c.triggered_at DESC OFFSET 0 LIMIT 1"
-        )
-        params = [{"name": "@rid", "value": rule_id}]
+    async def get_last_trigger_for_rule(
+        self,
+        rule_id: str,
+        tenant_id: str = "",
+    ) -> dict[str, Any] | None:
+        """Get the most recent alert for a given rule (for cooldown check).
+
+        Args:
+            rule_id: Rule to check.
+            tenant_id: When provided, scopes the cooldown check to this
+                tenant so one tenant's alert does not suppress another's.
+        """
+        if tenant_id:
+            query = (
+                "SELECT * FROM c WHERE c.rule_id = @rid AND c.tenant_id = @tid "
+                "ORDER BY c.triggered_at DESC OFFSET 0 LIMIT 1"
+            )
+            params = [
+                {"name": "@rid", "value": rule_id},
+                {"name": "@tid", "value": tenant_id},
+            ]
+        else:
+            query = (
+                "SELECT * FROM c WHERE c.rule_id = @rid "
+                "ORDER BY c.triggered_at DESC OFFSET 0 LIMIT 1"
+            )
+            params = [{"name": "@rid", "value": rule_id}]
         items = self._container.query_items(
             query=query,
             parameters=params,

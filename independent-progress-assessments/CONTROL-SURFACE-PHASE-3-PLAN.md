@@ -399,7 +399,30 @@ Each deliverable follows the standing test-before-code cycle: write tests → ve
 
 ## Implementation Progress (Step 4)
 
-*Not started.*
+**Session S256 — all 7 deliverables implemented.**
+
+| ID | Deliverable | Status | Key changes |
+|----|-------------|--------|-------------|
+| P3-1 | Quality runtime write path | DONE (eb8f3150) | orchestrator scorer wiring, quality_closeout.py shared helper, 5 closeout paths |
+| P3-2 | Quality regression alert | DONE | AlertRuleType.QUALITY_REGRESSION, AlertType.QUALITY_DROP, tenant-scoped cooldown, channel filtering, rule seeding in lifecycle.py, admin UI (6 sub-steps) |
+| P3-3 | Restore skeleton loader | DONE | store.ts isRestoring/restoreError, RestoreSkeleton component, **wired into live restore effect** (Codex P1 fix) |
+| P3-4 | Connection recovery UX | DONE | store.ts reconnectAttempt/connectionError, SSE onReconnectAttempt callback, ConnectionBanner with attempt counter/retry/dismiss/ARIA, **retry calls connectSSE()** (Codex P1 fix) |
+| P3-5 | Stream progress indicator | DONE | store.ts isStreaming, SSE stage/done/error handlers, StreamProgress 2px animated bar |
+| P3-6 | Quick action stagger | DONE | Per-button animationDelay: ${index * 50}ms in QuickActions.tsx |
+| P3-7 | Locale keys | DONE | 5 keys × 8 locales (reconnectingAttempt, connectionFailedPermanent, retryConnection, dismissError, restoringConversation) |
+
+**Codex NO-GO fixes (INSIGHTS-2026-04-03-09-51-28):**
+- P1: Restore UX wired into live transcript-restore flow (restoreTranscript callback, retry re-runnable)
+- P1: SSE retry button calls connectSSE(conversationId)
+- P2: Removed double-count in _gather_tenant_quality_scores (current conv already in Cosmos after patch)
+
+**Additional (Codex blocker INSIGHTS-2026-04-03-07-00-45):**
+- transcript-restore.test.ts: 28 runtime regression tests covering storage helpers, store normalization, Panel branching, separator boundary
+
+**Test results:**
+- Widget: 7 files, 50 tests, ALL PASS. Build 131.01 KB. TypeScript clean.
+- Backend P3: 36 tests ALL PASS (Slice 9 + Slice 10 + Slice 9 UI).
+- Targeted regression: 790 passed (chat, multi_tenant, widget, quality_metrics dirs).
 
 ---
 

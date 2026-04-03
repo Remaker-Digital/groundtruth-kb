@@ -48,18 +48,17 @@ class TestAlertHistoryModel:
     """Alert history model must support tenant-scoped queries."""
 
     def test_alert_history_item_model_exists(self):
-        """AlertHistoryItemModel exists in the alert delivery module."""
+        """AlertHistoryItemModel exists in the superadmin API operations."""
         try:
-            from src.multi_tenant.alert_delivery import AlertHistoryItemModel
+            from src.multi_tenant.superadmin_api._operations import AlertHistoryItemModel
         except ImportError:
             pytest.skip("AlertHistoryItemModel not yet created (Phase 3 pending)")
 
         item = AlertHistoryItemModel(
             alert_id="alert-1",
             tenant_id="tenant-1",
-            alert_type="usage_80_pct",
+            rule_type="usage_80_pct",
             severity="warning",
-            title="Test",
             message="Test message",
         )
         assert item.tenant_id == "tenant-1"
@@ -67,7 +66,7 @@ class TestAlertHistoryModel:
     def test_alert_history_has_tenant_id_field(self):
         """AlertHistoryItemModel must have a tenant_id field."""
         try:
-            from src.multi_tenant.alert_delivery import AlertHistoryItemModel
+            from src.multi_tenant.superadmin_api._operations import AlertHistoryItemModel
         except ImportError:
             pytest.skip("AlertHistoryItemModel not yet created (Phase 3 pending)")
 
@@ -85,14 +84,14 @@ class TestAlertHistoryRepository:
     def test_repository_exists(self):
         """AlertHistoryRepository exists."""
         try:
-            from src.multi_tenant.repositories.alert_history import AlertHistoryRepository
+            from src.multi_tenant.repositories.alerts import AlertHistoryRepository
         except ImportError:
             pytest.skip("AlertHistoryRepository not yet created (Phase 3 pending)")
 
     def test_log_alert_accepts_tenant_id(self):
         """log_alert method accepts tenant_id parameter."""
         try:
-            from src.multi_tenant.repositories.alert_history import AlertHistoryRepository
+            from src.multi_tenant.repositories.alerts import AlertHistoryRepository
         except ImportError:
             pytest.skip("AlertHistoryRepository not yet created (Phase 3 pending)")
 
@@ -106,7 +105,7 @@ class TestAlertHistoryRepository:
     def test_get_last_trigger_accepts_tenant_id(self):
         """get_last_trigger_for_rule supports tenant-scoped filtering."""
         try:
-            from src.multi_tenant.repositories.alert_history import AlertHistoryRepository
+            from src.multi_tenant.repositories.alerts import AlertHistoryRepository
         except ImportError:
             pytest.skip("AlertHistoryRepository not yet created (Phase 3 pending)")
 

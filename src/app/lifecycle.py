@@ -1570,6 +1570,29 @@ async def _startup_alert_engine() -> None:
 
         configure_alert_engine(rule_repo, history_repo, incident_repo)
         logger.info("AlertEngine configured (5 metric collectors)")
+
+        # Seed quality regression rule if none exists
+        try:
+            rules = await rule_repo.list_all()
+            has_quality = any(
+                r.get("rule_type") == "quality_regression" for r in rules
+            )
+            if not has_quality:
+                await rule_repo.create_rule(
+                    name="Quality Regression",
+                    rule_type="quality_regression",
+                    description="Alerts when conversation quality drops below baseline",
+                    condition={
+                        "metric": "quality_overall",
+                        "operator": "lt_delta",
+                        "threshold": 0.5,
+                    },
+                    notification_channels=["email"],
+                    cooldown_minutes=60,
+                )
+                logger.info("Seeded quality_regression alert rule")
+        except Exception:
+            logger.warning("Failed to seed quality_regression rule", exc_info=True)
     except Exception:
         logger.warning(
             "AlertEngine initialization failed — "

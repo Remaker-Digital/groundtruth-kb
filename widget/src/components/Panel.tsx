@@ -88,6 +88,11 @@ const PANEL_STYLES = `
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
   }
+  @keyframes ar-stream-progress {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(150%); }
+    100% { transform: translateX(350%); }
+  }
   * {
     box-sizing: border-box;
     margin: 0;
@@ -208,13 +213,26 @@ export const Panel: FunctionComponent<PanelProps> = ({
       authType: transportCfg.authType,
       tenantId: transportCfg.tenantId,
       conversationId,
-      onConnectionLost: () => store.setState({ isReconnecting: true }),
-      onConnectionRestored: () => store.setState({ isReconnecting: false, error: null }),
+      onConnectionLost: () => store.setState({
+        isReconnecting: true,
+        connectionError: 'transient',
+      }),
+      onConnectionRestored: () => store.setState({
+        isReconnecting: false,
+        reconnectAttempt: 0,
+        connectionError: null,
+        error: null,
+      }),
+      onReconnectAttempt: (attempt: number) => store.setState({
+        reconnectAttempt: attempt,
+      }),
       // WI-0931: When all reconnect attempts fail, clear the reconnecting
       // banner and show a final error instead of leaving it stuck forever.
       onMaxReconnectsExhausted: () => store.setState({
         isReconnecting: false,
-        error: activeLocale.connectionFailed,
+        reconnectAttempt: 0,
+        connectionError: 'permanent',
+        error: activeLocale.connectionFailedPermanent,
       }),
     });
 
@@ -502,12 +520,9 @@ export const Panel: FunctionComponent<PanelProps> = ({
     };
   }, []);
 
-  // SPEC-1868: Transcript continuity — restore previous conversation on mount
-  const transcriptRestored = useRef(false);
-  useEffect(() => {
-    if (transcriptRestored.current) return;
-    transcriptRestored.current = true;
-
+  // SPEC-1868: Transcript continuity — restore previous conversation on mount.
+  // P3-3: Extracted into a callable function so the retry button can re-trigger.
+  const restoreTranscript = useCallback(() => {
     const continuity = activeConfig.widget_transcript_continuity || 'none';
     if (continuity === 'none') return;
 
@@ -516,27 +531,41 @@ export const Panel: FunctionComponent<PanelProps> = ({
     const storedId = loadTranscript(widgetKey, continuity, ttl);
     if (!storedId) return;
 
-    // Restore conversation in background
+    const store = getStore();
+    store.setState({ isRestoring: true, restoreError: null });
+
     fetchConversation(storedId).then((result) => {
       if (!result.ok) {
-        // Only clear on permanent failures (not_found, not_active).
-        // Transient errors (503, network) keep storage intact for next load.
-        if (result.reason !== 'transient') {
+        if (result.reason === 'transient') {
+          // Transient — keep storage, show retry UI
+          store.setState({ isRestoring: false, restoreError: 'transient' });
+        } else {
+          // Permanent (not_found, not_active) — clear storage
           clearTranscript(widgetKey, continuity);
+          store.setState({ isRestoring: false, restoreError: null });
         }
         return;
       }
       if (!result.data.messages || result.data.messages.length === 0) {
         clearTranscript(widgetKey, continuity);
+        store.setState({ isRestoring: false, restoreError: null });
         return;
       }
-      const store = getStore();
       store.restoreMessages(result.data.conversation_id, result.data.messages);
-      store.setState({ view: 'conversation' });
+      store.setState({ view: 'conversation', isRestoring: false, restoreError: null });
     }).catch(() => {
-      // Network-level errors are transient — do NOT clear storage
+      // Network-level errors are transient — keep storage, show retry
+      store.setState({ isRestoring: false, restoreError: 'transient' });
     });
   }, [activeConfig.widget_transcript_continuity, activeConfig.widget_transcript_ttl_hours]);
+
+  // Run restore once on mount
+  const transcriptRestored = useRef(false);
+  useEffect(() => {
+    if (transcriptRestored.current) return;
+    transcriptRestored.current = true;
+    restoreTranscript();
+  }, [restoreTranscript]);
 
   // Auto-start conversation for Shopify customers (AUTH-4).
   // When the widget opens with verified Shopify identity, skip pre-chat
@@ -641,12 +670,72 @@ export const Panel: FunctionComponent<PanelProps> = ({
         onDragStart={handleDragStart}
       />
 
-      {/* Connection status banner */}
+      {/* Connection status banner (P3-4: enhanced with attempt counter + retry/dismiss) */}
       {state.isReconnecting && (
-        <ConnectionBanner tokens={tokens} locale={activeLocale} type="reconnecting" />
+        <ConnectionBanner
+          tokens={tokens}
+          locale={activeLocale}
+          type="reconnecting"
+          reconnectAttempt={state.reconnectAttempt}
+        />
       )}
       {state.error && !state.isReconnecting && (
-        <ConnectionBanner tokens={tokens} locale={activeLocale} type="error" message={state.error} />
+        <ConnectionBanner
+          tokens={tokens}
+          locale={activeLocale}
+          type="error"
+          message={state.error}
+          connectionError={state.connectionError}
+          onRetry={() => {
+            getStore().setState({ error: null, connectionError: null, isReconnecting: true });
+            if (sseRef.current) {
+              // Reuse existing instance to preserve lastEventId + partial content
+              sseRef.current.retry();
+            }
+          }}
+          onDismiss={() => getStore().setState({ error: null, connectionError: null })}
+        />
+      )}
+
+      {/* Skeleton loader for conversation restore (P3-3) */}
+      {state.isRestoring && (
+        <RestoreSkeleton tokens={tokens} locale={activeLocale} />
+      )}
+      {state.restoreError === 'transient' && !state.isRestoring && (
+        <div
+          role="alert"
+          style={{
+            padding: `${tokens.space3} ${tokens.space4}`,
+            textAlign: 'center',
+            color: tokens.colorTextMuted,
+            fontSize: tokens.fontSizeXs,
+            fontFamily: tokens.fontFamily,
+          }}
+        >
+          <span>{activeLocale.errorGeneric}</span>
+          {' '}
+          <button
+            type="button"
+            onClick={() => { transcriptRestored.current = false; restoreTranscript(); }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: tokens.colorPrimary,
+              cursor: 'pointer',
+              fontFamily: tokens.fontFamily,
+              fontSize: tokens.fontSizeXs,
+              textDecoration: 'underline',
+              padding: 0,
+            }}
+          >
+            {activeLocale.retryConnection}
+          </button>
+        </div>
+      )}
+
+      {/* Stream progress indicator (P3-5) */}
+      {state.isStreaming && (
+        <StreamProgress tokens={tokens} />
       )}
 
       {/* Consent banner (WI #87) — shown when consent collection is enabled */}
@@ -822,11 +911,25 @@ const ConnectionBanner: FunctionComponent<{
   locale: Locale;
   type: 'reconnecting' | 'error';
   message?: string;
-}> = ({ tokens, locale, type, message }) => {
+  reconnectAttempt?: number;
+  connectionError?: 'transient' | 'permanent' | null;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}> = ({ tokens, locale, type, message, reconnectAttempt, connectionError, onRetry, onDismiss }) => {
   const isError = type === 'error';
+  const isPermanent = connectionError === 'permanent';
+
+  // P3-4: Interpolate attempt number into locale string
+  const bannerText = !isError && reconnectAttempt
+    ? locale.reconnectingAttempt.replace('{n}', String(reconnectAttempt))
+    : isError
+      ? (isPermanent ? locale.connectionFailedPermanent : (message || locale.errorGeneric))
+      : locale.connectionLost;
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -855,7 +958,111 @@ const ConnectionBanner: FunctionComponent<{
           <path d="M12 2a10 10 0 0 1 10 10" />
         </svg>
       )}
-      {isError ? (message || locale.errorGeneric) : locale.connectionLost}
+      <span>{bannerText}</span>
+      {isPermanent && onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            background: 'rgba(255,255,255,0.2)',
+            border: '1px solid rgba(255,255,255,0.4)',
+            borderRadius: '4px',
+            color: '#FFFFFF',
+            cursor: 'pointer',
+            fontSize: tokens.fontSizeXs,
+            fontFamily: tokens.fontFamily,
+            padding: `2px ${tokens.space2}`,
+            marginLeft: tokens.space2,
+          }}
+        >
+          {locale.retryConnection}
+        </button>
+      )}
+      {isError && onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label={locale.dismissError}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'rgba(255,255,255,0.7)',
+            cursor: 'pointer',
+            fontSize: '14px',
+            lineHeight: 1,
+            padding: '2px',
+            marginLeft: tokens.space2,
+          }}
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 };
+
+// ---------------------------------------------------------------------------
+// Restore skeleton loader (P3-3)
+// ---------------------------------------------------------------------------
+
+const RestoreSkeleton: FunctionComponent<{
+  tokens: DesignTokens;
+  locale: Locale;
+}> = ({ tokens, locale }) => {
+  const bubbleStyle = (isAgent: boolean, width: string) => ({
+    width,
+    height: '40px',
+    borderRadius: tokens.borderRadius,
+    background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+    backgroundSize: '200% 100%',
+    animation: 'ar-shimmer 1.5s infinite',
+    alignSelf: isAgent ? 'flex-start' : 'flex-end',
+  });
+
+  return (
+    <div
+      role="status"
+      aria-label={locale.restoringConversation}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: tokens.space3,
+        padding: `${tokens.space4} ${tokens.space4}`,
+      }}
+    >
+      <div style={bubbleStyle(true, '70%')} />
+      <div style={bubbleStyle(false, '50%')} />
+      <div style={bubbleStyle(true, '60%')} />
+      <div style={bubbleStyle(true, '45%')} />
+      <div style={{ textAlign: 'center', color: tokens.colorTextMuted, fontSize: tokens.fontSizeXs, fontFamily: tokens.fontFamily }}>
+        {locale.restoringConversation}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Stream progress indicator (P3-5)
+// ---------------------------------------------------------------------------
+
+const StreamProgress: FunctionComponent<{
+  tokens: DesignTokens;
+}> = ({ tokens }) => (
+  <div
+    style={{
+      height: '2px',
+      width: '100%',
+      overflow: 'hidden',
+      flexShrink: 0,
+    }}
+  >
+    <div
+      style={{
+        height: '100%',
+        width: '40%',
+        backgroundColor: tokens.colorPrimary,
+        animation: 'ar-stream-progress 1.2s ease-in-out infinite',
+      }}
+    />
+  </div>
+);

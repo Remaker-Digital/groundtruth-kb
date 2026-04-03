@@ -84,4 +84,9 @@ export const zh: Locale = {
   waitForResponse: '请等待当前回复完成',
   sseRetractFallback: '抱歉，我需要重新组织我的回答。还有什么可以帮您的吗？',
   sseErrorFallback: '发生错误',
+  reconnectingAttempt: '正在重新连接... 第 {n} 次尝试',
+  connectionFailedPermanent: '无法连接',
+  retryConnection: '重试',
+  dismissError: '关闭',
+  restoringConversation: '正在加载之前的对话...',
 };

@@ -84,4 +84,9 @@ export const ko: Locale = {
   waitForResponse: '현재 응답이 완료될 때까지 기다려 주세요',
   sseRetractFallback: '죄송합니다, 답변을 다시 정리하겠습니다. 다른 도움이 필요하신가요?',
   sseErrorFallback: '오류가 발생했습니다',
+  reconnectingAttempt: '재연결 중... 시도 {n}',
+  connectionFailedPermanent: '연결할 수 없습니다',
+  retryConnection: '재시도',
+  dismissError: '닫기',
+  restoringConversation: '이전 대화를 불러오는 중...',
 };

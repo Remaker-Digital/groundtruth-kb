@@ -1419,6 +1419,7 @@ class AlertRuleType(str, Enum):
     CIRCUIT_BREAKER = "circuit_breaker"
     SLA_BREACH = "sla_breach"
     INCIDENT = "incident"
+    QUALITY_REGRESSION = "quality_regression"
 
 
 class AlertSeverity(str, Enum):
@@ -1548,7 +1549,7 @@ class AlertCondition(BaseModel):
     """Condition that triggers an alert."""
 
     metric: str = ""
-    operator: str = "gt"  # gt, lt, gte, lte, eq, ne
+    operator: str = "gt"  # gt, lt, gte, lte, eq, ne, lt_delta
     threshold: float = 0
 
 
@@ -1585,6 +1586,7 @@ class AlertHistoryDocument(BaseModel):
     rule_id: str = ""
     rule_name: str = ""
     rule_type: str = ""
+    tenant_id: str = ""
     triggered_at: str = ""
     resolved_at: str | None = None
     severity: str = AlertSeverity.WARNING.value

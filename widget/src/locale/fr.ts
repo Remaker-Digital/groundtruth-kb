@@ -84,4 +84,9 @@ export const fr: Locale = {
   waitForResponse: 'Veuillez attendre la fin de la réponse en cours',
   sseRetractFallback: 'Je vous prie de m\'excuser, je dois reformuler ma réponse. Comment puis-je vous aider autrement ?',
   sseErrorFallback: 'Une erreur est survenue',
+  reconnectingAttempt: 'Reconnexion... tentative {n}',
+  connectionFailedPermanent: 'Impossible de se connecter',
+  retryConnection: 'Réessayer',
+  dismissError: 'Fermer',
+  restoringConversation: 'Chargement de la conversation précédente...',
 };

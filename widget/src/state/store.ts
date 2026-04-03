@@ -91,8 +91,18 @@ export interface WidgetState {
   view: WidgetView;
   isLoading: boolean;
   isReconnecting: boolean;
+  /** Current reconnect attempt number (P3-4). 0 when not reconnecting. */
+  reconnectAttempt: number;
+  /** Typed connection failure (P3-4). null = no error, 'transient' = retrying, 'permanent' = max retries exhausted. */
+  connectionError: 'transient' | 'permanent' | null;
   error: string | null;
   unreadCount: number;
+  /** True while restoring a previous conversation from transcript (P3-3). */
+  isRestoring: boolean;
+  /** Restore failure type (P3-3). 'transient' = can retry, null = no error. */
+  restoreError: 'transient' | null;
+  /** True while the AI is streaming a response (P3-5). */
+  isStreaming: boolean;
 
   // Pre-chat
   preChatData: PreChatData | null;
@@ -248,6 +258,11 @@ class Store {
       error: null,
       unreadCount: 0,
       restoredMessageCount: 0,
+      isRestoring: false,
+      restoreError: null,
+      isStreaming: false,
+      reconnectAttempt: 0,
+      connectionError: null,
       preChatData: null,
       isAnonymous: false,
       customerEmail: null,
@@ -287,8 +302,13 @@ export function createStore(config: WidgetConfig, locale: Locale): Store {
     view: 'closed',
     isLoading: false,
     isReconnecting: false,
+    reconnectAttempt: 0,
+    connectionError: null,
     error: null,
     unreadCount: 0,
+    isRestoring: false,
+    restoreError: null,
+    isStreaming: false,
     preChatData: null,
     isAnonymous: false,
     customerEmail: null,

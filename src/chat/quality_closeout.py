@@ -86,7 +86,8 @@ async def _evaluate_regression(
     """Evaluate quality regression using the alert rule system.
 
     Uses AlertRuleRepository to find the quality_regression rule,
-    checks tenant-scoped cooldown, detects regression, and delivers alert.
+    checks tenant-scoped cooldown, gathers historical scores for
+    detect_regression(), and delivers alert through the rule system.
     """
     try:
         from src.multi_tenant.repositories.alerts import AlertRuleRepository, AlertHistoryRepository
@@ -124,28 +125,26 @@ async def _evaluate_regression(
                 except (ValueError, TypeError):
                     pass
 
-        # Detect regression
+        # Gather historical quality scores for this tenant.
+        # The current conversation is already included because
+        # evaluate_quality_and_alert() patches quality_aggregate
+        # (Step 3) before calling _evaluate_regression().
         threshold = quality_rule.get("condition", {}).get("threshold", 0.5)
+        scores = await _gather_tenant_quality_scores(tenant_id)
+
         from src.chat.quality_regression import detect_regression
-        regression = detect_regression(
-            tenant_id=tenant_id,
-            current_score=aggregate["mean"],
-            threshold=threshold,
-        )
+        regression = detect_regression(scores, threshold=threshold)
 
         if not regression:
             return
 
         # Log alert and deliver
-        from datetime import datetime, timezone
-        severity = "critical" if regression.get("drop", 0) > 1.0 else "warning"
-
         await history_repo.log_alert(
             rule_id=rule_id,
             rule_name=quality_rule.get("name", "Quality Regression"),
             rule_type="quality_regression",
-            severity=severity,
-            message=f"Quality dropped by {regression['drop']:.2f} points (tenant: {tenant_id})",
+            severity=regression.severity,
+            message=regression.message,
             metric_value=aggregate["mean"],
             threshold_value=threshold,
             tenant_id=tenant_id,
@@ -160,17 +159,17 @@ async def _evaluate_regression(
                 Alert(
                     alert_id=f"qr-{conversation_id[:8]}",
                     tenant_id=tenant_id,
-                    alert_type=AlertType.QUALITY_DROP if hasattr(AlertType, "QUALITY_DROP") else AlertType.ESCALATION,
-                    severity=AlertSeverity(severity),
+                    alert_type=AlertType.QUALITY_DROP,
+                    severity=AlertSeverity(regression.severity),
                     title=f"Quality Regression — {tenant_id}",
-                    message=f"Mean quality score dropped to {aggregate['mean']:.2f} (threshold: {threshold})",
+                    message=regression.message,
                 ),
                 channels=channels,
             )
 
         logger.info(
             "Quality regression alert: tenant=%s conv=%s drop=%.2f severity=%s",
-            tenant_id, conversation_id, regression["drop"], severity,
+            tenant_id, conversation_id, regression.drop, regression.severity,
         )
 
     except ImportError:
@@ -181,3 +180,41 @@ async def _evaluate_regression(
             "Quality regression evaluation failed (non-fatal): tenant=%s",
             tenant_id, exc_info=True,
         )
+
+
+async def _gather_tenant_quality_scores(tenant_id: str) -> list[float]:
+    """Query quality aggregates from completed conversations for a tenant.
+
+    Uses ConversationRepository.query() to enforce tenant-scoped partition
+    key isolation. Only includes conversations with a terminal status
+    (resolved, escalated, timed_out, error) that have a persisted
+    quality_aggregate. Returns scores ordered by timestamp ascending
+    for detect_regression()'s window/baseline split.
+    """
+    try:
+        from src.multi_tenant.repositories.conversation import ConversationRepository
+
+        repo = ConversationRepository()
+        # Use the tenant-scoped query method (base.py:580) which passes
+        # partition_key=tenant_id and runs defense-in-depth isolation checks.
+        query_text = (
+            "SELECT c.quality_aggregate.mean AS score "
+            "FROM c "
+            "WHERE c.status IN ('resolved', 'escalated', 'timed_out', 'error') "
+            "AND IS_DEFINED(c.quality_aggregate) "
+            "AND c.quality_aggregate.mean > 0 "
+            "ORDER BY c._ts ASC"
+        )
+        rows = await repo.query(tenant_id, query_text)
+        scores: list[float] = []
+        for row in rows:
+            score = row.get("score")
+            if score is not None:
+                scores.append(float(score))
+        return scores
+    except Exception:
+        logger.debug(
+            "Could not gather historical quality scores for tenant=%s",
+            tenant_id, exc_info=True,
+        )
+        return []
