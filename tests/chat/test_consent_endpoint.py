@@ -63,6 +63,7 @@ class TestConsentEndpoint:
 
         mock_session = MagicMock()
         mock_session.get_state = AsyncMock(return_value=mock_state)
+        mock_session.get_conversation = AsyncMock(return_value=mock_state)
         mock_session._conversation_repo = MagicMock()
         mock_session._conversation_repo.patch = AsyncMock()
 
@@ -114,6 +115,7 @@ class TestConsentEndpoint:
 
         mock_session = MagicMock()
         mock_session.get_state = AsyncMock(return_value=mock_state)
+        mock_session.get_conversation = AsyncMock(return_value=mock_state)
         mock_session._conversation_repo = MagicMock()
         mock_session._conversation_repo.patch = AsyncMock()
 
@@ -174,6 +176,9 @@ class TestConsentEndpoint:
         from src.chat.session import ConversationNotFoundError
 
         mock_session = MagicMock()
+        mock_session.get_conversation = AsyncMock(
+            side_effect=ConversationNotFoundError("conv-999", "tenant-001"),
+        )
         mock_session.get_state = AsyncMock(
             side_effect=ConversationNotFoundError("conv-999", "tenant-001"),
         )
@@ -201,6 +206,7 @@ class TestConsentEndpoint:
 
         mock_session = MagicMock()
         mock_session.get_state = AsyncMock(return_value=mock_state)
+        mock_session.get_conversation = AsyncMock(return_value=mock_state)
         mock_session._conversation_repo = MagicMock()
         mock_session._conversation_repo.patch = AsyncMock()
 

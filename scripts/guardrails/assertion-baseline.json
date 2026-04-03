@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 21409,
-    "total_files": 472
+    "total_assertions": 21484,
+    "total_files": 477
   },
   "baselines": {
     "tests/agents/plugins/test_agent_extensibility_phase0.py": 71,
@@ -26,6 +26,7 @@
     "tests/agents/test_response_generator.py": 23,
     "tests/chat/pipeline/test_intent_router.py": 65,
     "tests/chat/pipeline/test_intent_router_integration.py": 38,
+    "tests/chat/pipeline/test_peer_agent_execution.py": 11,
     "tests/chat/pipeline/test_quality_scoring.py": 32,
     "tests/chat/pipeline/test_stream_routing.py": 13,
     "tests/chat/pipeline/test_team_agent_chat.py": 26,
@@ -346,6 +347,7 @@
     "tests/multi_tenant/test_superadmin_tier_override.py": 23,
     "tests/multi_tenant/test_support_diagnostics.py": 83,
     "tests/multi_tenant/test_system_prompt_builder.py": 110,
+    "tests/multi_tenant/test_team_domain_tags.py": 6,
     "tests/multi_tenant/test_template_loader.py": 76,
     "tests/multi_tenant/test_tenant_config.py": 77,
     "tests/multi_tenant/test_tenant_config_api.py": 29,
@@ -365,6 +367,7 @@
     "tests/multi_tenant/test_verification_runner.py": 60,
     "tests/multi_tenant/test_welcome_email.py": 36,
     "tests/multi_tenant/test_widget_origin_validation.py": 10,
+    "tests/observability/test_langfuse_env_precedence.py": 6,
     "tests/observability/test_langfuse_exporter.py": 142,
     "tests/ops/test_dockerfile_test_coverage.py": 5,
     "tests/ops/test_hooks_specs.py": 59,
@@ -470,8 +473,10 @@
     "tests/widget/test_admin_ui_labels.py": 28,
     "tests/widget/test_alert_config_quality.py": 9,
     "tests/widget/test_auth_interceptor.py": 11,
+    "tests/widget/test_locale_runtime.py": 26,
     "tests/widget/test_transcript_persistence.py": 11,
     "tests/widget/test_warm_up_call_site.py": 26,
+    "tests/widget/test_widget_a11y_behavioral.py": 26,
     "tests/widget/test_widget_components.py": 108,
     "tests/widget/test_widget_config_reactivity.py": 6,
     "tests/widget/test_widget_core.py": 191,

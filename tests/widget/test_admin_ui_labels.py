@@ -45,9 +45,9 @@ class TestConfigurationRename:
     """Verify all navigation and page titles use 'Agent configuration'."""
 
     def test_standalone_nav_label(self) -> None:
-        """Standalone sidebar nav item uses 'Agent configuration'."""
+        """Standalone sidebar nav item uses 'AI configuration'."""
         source = _read(ADMIN_STANDALONE / "layouts" / "StandaloneLayout.tsx")
-        assert "label: 'Agent configuration'" in source
+        assert "label: 'AI configuration'" in source
 
     def test_standalone_page_title(self) -> None:
         """Standalone Configuration page title is 'Agent configuration'."""
