@@ -19,6 +19,7 @@
 import { FunctionComponent } from 'preact';
 import { useState, useRef, useCallback } from 'preact/hooks';
 import type { DesignTokens } from '@/theme/tokens';
+import { focusRingColor } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
 
 // ---------------------------------------------------------------------------
@@ -135,9 +136,15 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: tokens.borderRadiusSm,
-              transition: `color ${tokens.transitionFast}`,
+              transition: `color ${tokens.transitionFast}, box-shadow ${tokens.transitionFast}`,
               outline: 'none',
               flexShrink: 0,
+            }}
+            onFocus={(e) => {
+              if (!disabled) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 2px ${focusRingColor(tokens.colorInputBarBg)}`;
+            }}
+            onBlur={(e) => {
+              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
             }}
             onMouseEnter={(e) => {
               if (!disabled) (e.currentTarget as HTMLElement).style.color = tokens.colorText;
@@ -207,9 +214,15 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            transition: `background-color ${tokens.transitionFast}, color ${tokens.transitionFast}`,
+            transition: `background-color ${tokens.transitionFast}, color ${tokens.transitionFast}, box-shadow ${tokens.transitionFast}`,
             outline: 'none',
             padding: 0,
+          }}
+          onFocus={(e) => {
+            if (canSend) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorInputBarBg)}`;
+          }}
+          onBlur={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
           }}
         >
           {isLoading ? <SpinnerIcon size={16} /> : <SendIcon size={16} />}
@@ -259,8 +272,8 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
               (e.currentTarget as HTMLElement).style.color = tokens.colorTextMuted;
             }}
           >
-            Powered by{' '}
-            <span style={{ fontWeight: 600, color: tokens.colorPrimary }}>Agent Red</span>
+            {locale.poweredByPrefix}{' '}
+            <span style={{ fontWeight: 600, color: tokens.colorPrimary }}>{locale.poweredByBrand}</span>
           </a>
         </div>
       )}

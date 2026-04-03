@@ -42,6 +42,7 @@ opentelemetry-api>=1.28.0
 opentelemetry-sdk>=1.28.0
 opentelemetry-instrumentation-fastapi>=0.49b0
 azure-monitor-opentelemetry-exporter>=1.0.0b31
+langfuse>=2.0.0,<4.0
 
 # Stripe (billing & subscriptions)
 stripe>=8.0.0

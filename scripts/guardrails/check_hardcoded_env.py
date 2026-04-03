@@ -55,9 +55,9 @@ PATTERNS = [
         ),
         "Hardcoded Key Vault FQDN",
     ),
-    # Agent Red API keys
+    # Agent Red API keys (SPEC-1845: includes ar_user_ pattern)
     (
-        re.compile(r'''["']ar_(spa|tenant|widget)_[A-Za-z0-9]{16,}["']'''),
+        re.compile(r'''["']ar_(spa|tenant|widget|user)_[A-Za-z0-9_]{16,}["']'''),
         "Hardcoded API key (ar_* prefix)",
     ),
     (

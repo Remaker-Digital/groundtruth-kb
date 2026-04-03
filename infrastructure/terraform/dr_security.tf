@@ -161,15 +161,59 @@ resource "azurerm_role_assignment" "cosmos_cmk" {
   principal_id         = azurerm_cosmosdb_account.managed[0].identity[0].principal_id
 }
 
-# Key Vault RBAC role for container apps to wrap/unwrap DEKs (SPEC-1843 / WI-1625)
-# Reuses the CMK (agent-red-cmk) as Master KEK for envelope encryption.
-# "Key Vault Crypto User" allows Get, WrapKey, UnwrapKey, plus Encrypt/Decrypt/Sign/Verify
-resource "azurerm_role_assignment" "container_app_kek" {
-  for_each = var.enable_cmk ? azurerm_container_app.apps : {}
+# ---------------------------------------------------------------------------
+# Key Vault RBAC for CI/CD-managed container apps (S251 Codex P1 remediation)
+# ---------------------------------------------------------------------------
+#
+# Container apps are managed via CI/CD, but security RBAC stays in Terraform
+# to ensure the KEK/encryption contract is version-controlled and auditable.
+#
+# KNOWN MANUAL DEPENDENCY (S251, accepted by owner):
+# The azurerm provider ~3.117 does NOT expose identity on the container_app
+# data source (returns empty list). The RBAC binding uses a manual fallback
+# principal_id from var.gateway_managed_identity_principal_id.
+#
+# AFTER GATEWAY RECREATION:
+#   1. Get new principal ID:
+#      az containerapp show -n <name> -g <rg> --query identity.principalId -o tsv
+#   2. Update staging.tfvars: gateway_managed_identity_principal_id = "<new-id>"
+#   3. Run: terraform apply -var-file=staging.tfvars
+#
+# The data source below is a forward-compatibility hook. When the azurerm
+# provider adds identity support, the local.gateway_principal_id will
+# auto-resolve without variable updates. Until then, the variable is
+# the authoritative source.
+
+data "azurerm_container_app" "gateway" {
+  count = var.gateway_container_app_name != "" ? 1 : 0
+
+  name                = var.gateway_container_app_name
+  resource_group_name = var.resource_group_name
+}
+
+locals {
+  # Prefer data source identity; fall back to explicit variable.
+  # azurerm provider ~3.117 may return empty identity list for the data source,
+  # so the fallback is essential.
+  _gateway_identity_list = (
+    var.gateway_container_app_name != ""
+    ? try(data.azurerm_container_app.gateway[0].identity, [])
+    : []
+  )
+  gateway_principal_id = (
+    length(local._gateway_identity_list) > 0
+    ? local._gateway_identity_list[0].principal_id
+    : var.gateway_managed_identity_principal_id
+  )
+}
+
+# Key Vault Crypto User — wrap/unwrap DEKs via Master KEK (SPEC-1843 / WI-1625)
+resource "azurerm_role_assignment" "gateway_kek" {
+  count = var.enable_cmk && local.gateway_principal_id != "" ? 1 : 0
 
   scope                = data.azurerm_key_vault.main.id
   role_definition_name = "Key Vault Crypto User"
-  principal_id         = each.value.identity[0].principal_id
+  principal_id         = local.gateway_principal_id
 }
 
 # ---------------------------------------------------------------------------

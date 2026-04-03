@@ -151,6 +151,13 @@ class SSEConnectionManager:
         # {conversation_id: EventBuffer} — event buffers for reconnection
         self._buffers: dict[str, EventBuffer] = {}
 
+        # P1-2: Fan-out state for duplicate/reconnecting streams
+        self._active_producers: dict[str, str] = {}  # conv_id → message_id
+        self._producer_conditions: dict[str, asyncio.Condition] = {}
+        self._producer_sequences: dict[str, int] = {}  # conv_id → latest seq
+        self._producer_done: dict[str, bool] = {}  # conv_id → finished
+        self._completed_messages: dict[str, str] = {}  # conv_id → last completed message_id
+
         # WI #132: Optional metering callback invoked on first streamed chunk.
         # Signature: callback(tenant_id: str, conversation_id: str) -> None
         self._metering_callback: Callable[[str, str], Any] | None = None
@@ -304,12 +311,78 @@ class SSEConnectionManager:
             return []
         return buf.replay_after(last_event_id)
 
+    def is_producer_active(self, conversation_id: str, message_id: str) -> bool:
+        """Check if a pipeline producer is already running for this message."""
+        return self._active_producers.get(conversation_id) == message_id
+
+    def is_message_completed(self, conversation_id: str, message_id: str) -> bool:
+        """Check if a message was recently completed (replay-only, no pipeline)."""
+        return self._completed_messages.get(conversation_id) == message_id
+
+    async def fan_out_stream(
+        self,
+        conversation_id: str,
+        last_event_id: int = 0,
+        *,
+        retry_ms: int = DEFAULT_RETRY_MS,
+    ) -> AsyncGenerator[str, None]:
+        """Attach to an active producer's buffer as a secondary consumer.
+
+        P1-2: Non-lossy fan-out using asyncio.Condition + sequence counter.
+        The consumer replays buffered events, then waits for the producer
+        to signal new events via the condition variable.
+        """
+        condition = self._producer_conditions.get(conversation_id)
+        if condition is None:
+            return
+
+        yield self.format_retry_directive(retry_ms)
+
+        # Replay buffered events first
+        buf = self._buffers.get(conversation_id)
+        consumer_seq = last_event_id
+        if buf:
+            for seq, sse_text in buf.events:
+                if seq > consumer_seq:
+                    yield f"id: {seq}\n{sse_text}"
+                    consumer_seq = seq
+
+        # Live tail: wait for producer signals
+        while True:
+            try:
+                async with condition:
+                    await asyncio.wait_for(
+                        condition.wait_for(
+                            lambda: (
+                                self._producer_sequences.get(conversation_id, 0) > consumer_seq
+                                or self._producer_done.get(conversation_id, False)
+                            )
+                        ),
+                        timeout=KEEPALIVE_INTERVAL_SECONDS,
+                    )
+            except asyncio.TimeoutError:
+                yield ":ping\n\n"
+                if self._producer_done.get(conversation_id, False):
+                    break
+                continue
+
+            # Read new events from buffer
+            if buf:
+                for seq, sse_text in buf.events:
+                    if seq > consumer_seq:
+                        yield f"id: {seq}\n{sse_text}"
+                        consumer_seq = seq
+
+            if self._producer_done.get(conversation_id, False):
+                break
+
     async def wrap_stream(
         self,
         tenant_id: str,
         conversation_id: str,
         pipeline_events: AsyncGenerator[StreamEvent, None],
         *,
+        message_id: str | None = None,
         enable_heartbeat: bool = True,
         retry_ms: int = DEFAULT_RETRY_MS,
     ) -> AsyncGenerator[str, None]:
@@ -326,10 +399,14 @@ class SSEConnectionManager:
         event (first-chunk metering) if a callback has been configured via
         :meth:`configure_metering`.
 
+        P1-2: When ``message_id`` is provided, registers this stream as
+        the active producer and signals fan-out consumers on each event.
+
         Args:
             tenant_id: Tenant identifier (for logging).
             conversation_id: Conversation identifier (for buffering).
             pipeline_events: Async generator of StreamEvent from ChatPipeline.
+            message_id: Message being processed (P1-2 fan-out tracking).
             enable_heartbeat: Whether to send keepalive pings (default True).
             retry_ms: Client-side reconnection interval in milliseconds
                 (WI #131). Sent as the SSE ``retry:`` directive. Default
@@ -342,6 +419,13 @@ class SSEConnectionManager:
         if buf is None:
             buf = EventBuffer()
             self._buffers[conversation_id] = buf
+
+        # P1-2: Register as active producer
+        if message_id:
+            self._active_producers[conversation_id] = message_id
+            self._producer_conditions[conversation_id] = asyncio.Condition()
+            self._producer_sequences[conversation_id] = 0
+            self._producer_done[conversation_id] = False
 
         # WI #131: Emit retry directive as the very first SSE line so the
         # client's EventSource sets its reconnection interval immediately.
@@ -381,6 +465,13 @@ class SSEConnectionManager:
                 sse_text = event.to_sse()
                 seq = buf.append(sse_text)
 
+                # P1-2: Signal fan-out consumers
+                if message_id and conversation_id in self._producer_conditions:
+                    cond = self._producer_conditions[conversation_id]
+                    async with cond:
+                        self._producer_sequences[conversation_id] = seq
+                        cond.notify_all()
+
                 # Prepend id: field for Last-Event-ID support
                 yield f"id: {seq}\n{sse_text}"
 
@@ -416,6 +507,17 @@ class SSEConnectionManager:
             sse_text = end.to_sse()
             seq = buf.append(sse_text)
             yield f"id: {seq}\n{sse_text}"
+        finally:
+            # P1-2: Signal producer done and clean up
+            if message_id and conversation_id in self._producer_conditions:
+                cond = self._producer_conditions[conversation_id]
+                async with cond:
+                    self._producer_done[conversation_id] = True
+                    cond.notify_all()
+                self._active_producers.pop(conversation_id, None)
+                # P1-2: Record completed message so post-completion
+                # reconnects can replay buffer without re-running pipeline
+                self._completed_messages[conversation_id] = message_id
 
     async def _with_heartbeat(
         self,
@@ -571,15 +673,21 @@ class SSEConnectionManager:
         return len(tenant_tabs.get(conversation_id, set()))
 
     def cleanup_expired_buffers(self) -> int:
-        """Remove expired event buffers. Returns the number removed.
+        """Remove expired event buffers and fan-out state. Returns count removed.
 
         Call periodically (e.g., every 60s) to prevent memory leaks.
+        P1-2: Also cleans fan-out bookkeeping for expired conversations.
         """
         expired = [
             cid for cid, buf in self._buffers.items() if buf.is_expired
         ]
         for cid in expired:
             del self._buffers[cid]
+            # P1-2: Clean fan-out state for expired conversations
+            self._producer_conditions.pop(cid, None)
+            self._producer_sequences.pop(cid, None)
+            self._producer_done.pop(cid, None)
+            self._completed_messages.pop(cid, None)
         return len(expired)
 
     def health_summary(self) -> dict[str, Any]:

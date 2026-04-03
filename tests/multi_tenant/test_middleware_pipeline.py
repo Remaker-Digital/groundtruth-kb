@@ -28,14 +28,21 @@ from tests.conftest import (
     TEST_API_KEY_ENTERPRISE,
     TEST_API_KEY_PROFESSIONAL,
     TEST_API_KEY_STARTER,
+    TEST_WIDGET_KEY,
     auth_headers_api_key,
     auth_headers_bearer,
+    auth_headers_widget_key,
     hash_test_api_key,
     make_tenant_document,
 )
+from src.multi_tenant.auth import TenantContext
 from tests.helpers.fake_tenant_repo import FakeTenantRepo, run_sync
 from src.multi_tenant.cosmos_schema import TenantStatus, TenantTier
 
+
+# Intentionally invalid token for negative auth-fallthrough tests.
+# Uses a bare constant name (not ar_* prefix) to avoid credential-scan false positives.
+TEST_INVALID_STALE_SPA_TOKEN = "test_invalid_stale_spa_token_not_real"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -556,3 +563,238 @@ class TestAuthMethodPrecedence:
         assert resp.status_code == 200
         # Health endpoint doesn't expose which auth method was used,
         # but the test proves both headers don't cause a conflict.
+
+
+# ---------------------------------------------------------------------------
+# S251: API key → widget key fallthrough tests
+# ---------------------------------------------------------------------------
+
+
+class TestApiKeyWidgetKeyFallthrough:
+    """S251: When API key auth fails and a widget key is also present,
+    fall through to widget key auth instead of returning 401.
+
+    This handles admin-embedded widgets where the admin token may be
+    stale but the widget key is valid.
+    """
+
+    @pytest.mark.unit
+    def test_invalid_api_key_with_valid_widget_key_falls_through(
+        self, app_client,
+    ):
+        """MWP-26: Invalid API key + valid widget key → widget key auth.
+
+        The widget should degrade to anonymous-customer mode, not fail.
+        /api/chat/conversations is widget-key-allowed. We check that the
+        auth layer passes (not 401) — downstream handler status may vary.
+        """
+        headers = {
+            "X-API-Key": TEST_INVALID_STALE_SPA_TOKEN,
+            "X-Widget-Key": TEST_WIDGET_KEY,
+        }
+        resp = app_client.post(
+            "/api/chat/conversations",
+            headers=headers,
+            json={"initial_message": "test"},
+        )
+        # Auth succeeded via fallthrough — should NOT be 401
+        assert resp.status_code != 401
+
+    @pytest.mark.unit
+    def test_invalid_api_key_without_widget_key_returns_401(
+        self, app_client,
+    ):
+        """MWP-27: Invalid API key without widget key → 401 (unchanged).
+
+        No fallback available — the 401 propagates normally.
+        """
+        headers = {
+            "X-API-Key": TEST_INVALID_STALE_SPA_TOKEN,
+        }
+        resp = app_client.get(
+            f"/api/config?page_type=all&tenant={STARTER_TENANT_ID}",
+            headers=headers,
+        )
+        assert resp.status_code == 401
+
+    @pytest.mark.unit
+    def test_valid_api_key_with_widget_key_uses_api_key(
+        self, app_client,
+    ):
+        """MWP-28: Valid API key + widget key → API key auth (team member).
+
+        When the API key is valid, it is used directly. The widget key
+        is never tried. This preserves Co-pilot routing.
+        """
+        headers = {
+            "X-API-Key": TEST_API_KEY_STARTER,
+            "X-Widget-Key": TEST_WIDGET_KEY,
+        }
+        resp = app_client.post(
+            f"/api/chat/conversations?tenant={STARTER_TENANT_ID}",
+            headers=headers,
+            json={"initial_message": "test"},
+        )
+        # Auth succeeded via API key — should NOT be 401
+        assert resp.status_code != 401
+
+    @pytest.mark.unit
+    def test_valid_api_key_with_widget_key_no_tenant_falls_through(
+        self, app_client,
+    ):
+        """MWP-31: Valid non-SPA API key + widget key WITHOUT ?tenant=.
+
+        This matches the pre-fix admin-widget caller shape: non-SPA key
+        without ?tenant= triggers SPEC-1644 rejection, which then falls
+        through to widget key auth. This is the real-world incident path.
+        After S251 caller-side fix, the widget now sends ?tenant=, so
+        this scenario only occurs with stale widget code.
+        """
+        headers = {
+            "X-API-Key": TEST_API_KEY_STARTER,  # Valid but no ?tenant=
+            "X-Widget-Key": TEST_WIDGET_KEY,
+        }
+        resp = app_client.post(
+            "/api/chat/conversations",  # No ?tenant= parameter
+            headers=headers,
+            json={"initial_message": "test"},
+        )
+        # Should NOT be 401 — falls through to widget key auth
+        assert resp.status_code != 401
+
+    @pytest.mark.unit
+    def test_fallthrough_still_rejects_admin_paths(
+        self, app_client,
+    ):
+        """MWP-29: Invalid API key + valid widget key on admin path → 401/403.
+
+        Widget key auth is scoped to /api/chat/*, /ws/chat/*, /api/config.
+        Fallthrough to widget key does NOT grant access to admin endpoints.
+        This proves the fallthrough cannot escalate privileges.
+        """
+        headers = {
+            "X-API-Key": TEST_INVALID_STALE_SPA_TOKEN,
+            "X-Widget-Key": TEST_WIDGET_KEY,
+        }
+        # /api/admin/tenants is NOT in widget key allowed paths
+        resp = app_client.get(
+            f"/api/admin/tenants?tenant={STARTER_TENANT_ID}",
+            headers=headers,
+        )
+        # Widget key auth should reject this path
+        assert resp.status_code in (401, 403)
+
+    @pytest.mark.unit
+    def test_fallthrough_rejects_superadmin_paths(
+        self, app_client,
+    ):
+        """MWP-30: Invalid API key + valid widget key on superadmin path → 401/403.
+
+        Codex required correction: explicit regression proving the
+        fallthrough cannot reach admin or superadmin endpoints.
+        """
+        headers = {
+            "X-API-Key": TEST_INVALID_STALE_SPA_TOKEN,
+            "X-Widget-Key": TEST_WIDGET_KEY,
+        }
+        resp = app_client.get(
+            "/api/superadmin/tenants",
+            headers=headers,
+        )
+        assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# S251: Session-token + widget-key precedence tests
+# ---------------------------------------------------------------------------
+
+
+class TestSessionTokenWidgetKeyPrecedence:
+    """S251: When both X-Session-Token and X-Widget-Key are present,
+    session token must take precedence (team member identity preserved).
+
+    Also verifies session_token query param for SSE/EventSource paths.
+    """
+
+    @pytest.mark.unit
+    def test_http_session_token_takes_precedence_over_widget_key(
+        self, app_client,
+    ):
+        """MWP-32: X-Session-Token + X-Widget-Key → session auth, not widget.
+
+        Middleware must check session token before widget key so the
+        admin-embedded widget preserves team member identity.
+        """
+        mock_ctx = TenantContext(
+            tenant_id=STARTER_TENANT_ID,
+            status="active",
+            auth_method="magic_link_session",
+            team_member_id="member-1",
+            team_member_role="admin",
+        )
+        with patch(
+            "src.multi_tenant.middleware.TenantAuthMiddleware._auth_magic_link_session",
+            new_callable=AsyncMock,
+            return_value=mock_ctx,
+        ) as mock_session:
+            headers = {
+                "X-Session-Token": "valid-session-jwt",
+                "X-Widget-Key": TEST_WIDGET_KEY,
+            }
+            resp = app_client.post(
+                f"/api/chat/conversations?tenant={STARTER_TENANT_ID}",
+                headers=headers,
+                json={"initial_message": "test"},
+            )
+            # Session auth should be tried (team member path)
+            mock_session.assert_called_once_with("valid-session-jwt")
+
+    @pytest.mark.unit
+    def test_sse_session_token_query_param_accepted(
+        self, app_client,
+    ):
+        """MWP-33: SSE ?session_token= + ?widget_key= → session auth.
+
+        EventSource cannot set headers. The middleware must accept
+        session_token as a query parameter for SSE paths.
+        """
+        mock_ctx = TenantContext(
+            tenant_id=STARTER_TENANT_ID,
+            status="active",
+            auth_method="magic_link_session",
+            team_member_id="member-1",
+            team_member_role="admin",
+        )
+        with patch(
+            "src.multi_tenant.middleware.TenantAuthMiddleware._auth_magic_link_session",
+            new_callable=AsyncMock,
+            return_value=mock_ctx,
+        ) as mock_session:
+            resp = app_client.get(
+                f"/api/chat/stream/conv-123"
+                f"?session_token=valid-session-jwt"
+                f"&widget_key={TEST_WIDGET_KEY}"
+                f"&tenant={STARTER_TENANT_ID}",
+            )
+            # Session token query param should be picked up
+            mock_session.assert_called_once_with("valid-session-jwt")
+
+    @pytest.mark.unit
+    def test_sse_api_key_still_works_as_positive_control(
+        self, app_client,
+    ):
+        """MWP-34: SSE ?api_key= + ?widget_key= + ?tenant= → API key auth.
+
+        Positive control: the existing API-key SSE path still works
+        and resolves as a team member.
+        """
+        headers: dict[str, str] = {}
+        resp = app_client.get(
+            f"/api/chat/stream/conv-123"
+            f"?api_key={TEST_API_KEY_STARTER}"
+            f"&widget_key={TEST_WIDGET_KEY}"
+            f"&tenant={STARTER_TENANT_ID}",
+            headers=headers,
+        )
+        # Should NOT be 401 — API key auth succeeds with ?tenant=
+        assert resp.status_code != 401

@@ -389,6 +389,16 @@ class ConversationMeter:
             tenant_id, conversation_id, status,
         )
 
+        # P3-1: Quality aggregate + regression alert at meter closeout
+        try:
+            from src.chat.quality_closeout import evaluate_quality_and_alert
+            await evaluate_quality_and_alert(tenant_id, conversation_id, self._conversations)
+        except Exception:
+            logger.warning(
+                "Quality closeout failed (non-fatal): conv=%s", conversation_id,
+                exc_info=True,
+            )
+
         # Read the conversation to check billability
         conv = await self._conversations.read(tenant_id, conversation_id)
         is_billable = conv.get("is_billable", False)

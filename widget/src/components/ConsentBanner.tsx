@@ -14,6 +14,7 @@
 
 import { FunctionComponent } from 'preact';
 import type { DesignTokens } from '@/theme/tokens';
+import { focusRingColor } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
 
 interface ConsentBannerProps {
@@ -31,6 +32,9 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
 }) => {
   return (
     <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -62,6 +66,14 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             border: 'none',
             borderRadius: tokens.borderRadius,
             cursor: 'pointer',
+            outline: 'none',
+            transition: `box-shadow ${tokens.transitionFast}`,
+          }}
+          onFocus={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
+          }}
+          onBlur={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
           }}
         >
           {locale.consentAccept}
@@ -79,6 +91,14 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             border: `1px solid ${tokens.colorBorder}`,
             borderRadius: tokens.borderRadius,
             cursor: 'pointer',
+            outline: 'none',
+            transition: `box-shadow ${tokens.transitionFast}`,
+          }}
+          onFocus={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
+          }}
+          onBlur={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
           }}
         >
           {locale.consentDecline}

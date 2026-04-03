@@ -60,10 +60,10 @@ export const QuickActions: FunctionComponent<QuickActionsProps> = ({
         gap: tokens.space2,
         marginTop: tokens.space4,
         padding: `0 ${tokens.space4}`,
-        animation: 'ar-fade-in 0.3s ease-out',
+        /* P3-6: Animation moved to individual buttons for staggered entrance */
       }}
     >
-      {visibleActions.map((action) => (
+      {visibleActions.map((action, index) => (
         <button
           key={action.id}
           type="button"
@@ -95,6 +95,9 @@ export const QuickActions: FunctionComponent<QuickActionsProps> = ({
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            // P3-6: Staggered entrance — 50ms delay per button
+            animation: 'ar-fade-in 0.3s ease-out both',
+            animationDelay: `${index * 50}ms`,
           }}
         >
           {action.icon && <span>{action.icon}</span>}

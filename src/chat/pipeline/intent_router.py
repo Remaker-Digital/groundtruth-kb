@@ -81,6 +81,8 @@ class IntentRouter:
         tenant_tier: str | None = None,
         staff_domain_tags: tuple[str, ...] | None = None,
         intent_confidence_threshold: float = 0.0,
+        user_message: str | None = None,
+        conversation_agent_override: str | None = None,
     ) -> RouteDecision:
         """Determine execution route from IC result + tenant config.
 
@@ -92,6 +94,27 @@ class IntentRouter:
             target_agent_id: explicit peer agent target (team members only, SPEC-1862)
             overlay_store: tenant agent overlays (agent_id -> overlay dict)
         """
+        # 0. Conversation-level agent override (SPEC-1866)
+        # Highest precedence — admin explicitly routed this conversation.
+        if conversation_agent_override:
+            decision = self._try_peer_route(
+                tenant_id=tenant_id,
+                agent_id=conversation_agent_override,
+                skill_id=None,
+                confidence=confidence,
+                overlay_store=overlay_store,
+                tenant_tier=tenant_tier,
+                staff_domain_tags=staff_domain_tags,
+            )
+            if decision.target == RouteTarget.PEER_AGENT:
+                return decision
+            # Override agent failed verification → fall through to standard routing
+            logger.info(
+                "IntentRouter: conversation override '%s' failed verification "
+                "for tenant %s — falling through",
+                conversation_agent_override, tenant_id,
+            )
+
         # 1a. Team member with explicit target → try PEER_AGENT, ERROR on failure
         if team_member_role and target_agent_id:
             decision = self._try_peer_route(
@@ -200,7 +223,38 @@ class IntentRouter:
         except Exception:
             logger.debug("Registry routing_rules lookup failed", exc_info=True)
 
-        # 5. Default → CORE_PIPELINE
+        # 5. NL escalation fallback (SPEC-1864)
+        # If user_message contains a natural language agent reference like
+        # "transfer to sales", try to extract and route to that peer agent.
+        # Only as a fallback — exact intent matching always takes precedence.
+        if user_message:
+            try:
+                from src.chat.pipeline.agent_name_extractor import extract_agent_name
+                from src.agents.plugins.registry import PluginAgentRegistry
+
+                reg = PluginAgentRegistry.get_instance()
+                nl_agent_id = extract_agent_name(user_message, reg)
+                if nl_agent_id:
+                    decision = self._try_peer_route(
+                        tenant_id=tenant_id,
+                        agent_id=nl_agent_id,
+                        skill_id=None,
+                        confidence=confidence,
+                        overlay_store=overlay_store,
+                        tenant_tier=tenant_tier,
+                        staff_domain_tags=staff_domain_tags,
+                    )
+                    if decision.target == RouteTarget.PEER_AGENT:
+                        logger.info(
+                            "IntentRouter: NL escalation '%s' → %s for tenant %s",
+                            nl_agent_id, decision.target.value, tenant_id,
+                        )
+                        return decision
+                    # NL extraction found an agent but verification failed → fall through
+            except Exception:
+                logger.debug("NL agent extraction failed", exc_info=True)
+
+        # 6. Default → CORE_PIPELINE
         return RouteDecision(
             target=RouteTarget.CORE_PIPELINE,
             confidence=confidence,
@@ -315,6 +369,7 @@ class IntentRouter:
                     )
             else:
                 # No specific skill — check tenant has ANY binding for this agent
+                # and resolve the first enabled binding as the default skill.
                 bindings = svc.list_bindings(tenant_id, agent_id=agent_id)
                 if not bindings:
                     logger.info(
@@ -327,6 +382,15 @@ class IntentRouter:
                         confidence=confidence,
                         fallback_from=agent_id,
                     )
+                # Pick the first enabled binding as the default skill
+                # (Codex P1: skill_id=None causes dispatch denial on empty key)
+                enabled_bindings = [
+                    b for b in bindings if b.get("enabled", True)
+                ]
+                if enabled_bindings:
+                    skill_id = enabled_bindings[0].get("skill_id")
+                else:
+                    skill_id = bindings[0].get("skill_id")
 
             # All checks passed
             return RouteDecision(

@@ -127,6 +127,10 @@ class CriticEscalationMixin:
             urgency = esc_result.get("urgency", "medium")
             context_summary = esc_result.get("context_summary", "")
             category = esc_result.get("category", "general_inquiry")
+
+            # S251 G5 Phase 1: record escalation for Lane 2 observability
+            trace.set_escalation(escalated=True, reason=reason)
+
             trace.add_stage(
                 "escalation-handler",
                 model=esc_result.get("model", "gpt-4o-mini"),

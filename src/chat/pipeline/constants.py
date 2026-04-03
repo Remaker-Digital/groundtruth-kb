@@ -58,6 +58,18 @@ def _build_agent_urls() -> dict[str, str]:
 
 AGENT_URLS: dict[str, str] = _build_agent_urls()
 
+
+def get_critic_urls() -> list[str]:
+    """Parse Critic/Supervisor URL(s) from config.
+
+    P1-4: Supports comma-separated URLs for multi-replica failover.
+    Single URL (no commas) returns a single-element list for backward
+    compatibility.
+    """
+    raw = AGENT_URLS.get("critic-supervisor", "")
+    return [u.strip() for u in raw.split(",") if u.strip()]
+
+
 # Agent HTTP paths
 AGENT_CLASSIFY_PATH = "/classify"
 AGENT_RETRIEVE_PATH = "/retrieve"

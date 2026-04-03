@@ -14,6 +14,8 @@
 
 import { FunctionComponent } from 'preact';
 import type { DesignTokens } from '@/theme/tokens';
+import { focusRingColor } from '@/theme/tokens';
+import type { Locale } from '@/locale/en';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -21,6 +23,7 @@ import type { DesignTokens } from '@/theme/tokens';
 
 interface LauncherProps {
   tokens: DesignTokens;
+  locale: Locale;
   position: 'bottom-right' | 'bottom-left';
   offsetX: number;
   offsetY: number;
@@ -37,6 +40,7 @@ interface LauncherProps {
 
 export const Launcher: FunctionComponent<LauncherProps> = ({
   tokens,
+  locale,
   position,
   offsetX,
   offsetY,
@@ -46,6 +50,7 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
   launcherImageUrl,
   onClick,
 }) => {
+  const ringColor = focusRingColor(tokens.colorLauncher);
   const LauncherIconComponent = launcherIcon === 'headset' ? HeadsetIcon
     : launcherIcon === 'help' ? HelpIcon
     : ChatIcon;
@@ -57,7 +62,7 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
   return (
     <button
       type="button"
-      aria-label={isOpen ? 'Close chat' : 'Open chat'}
+      aria-label={isOpen ? locale.closeChat : locale.openChat}
       aria-expanded={isOpen}
       onClick={onClick}
       style={{
@@ -76,10 +81,16 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         boxShadow: tokens.shadowLg,
-        transition: `transform ${tokens.transitionNormal}, background-color ${tokens.transitionFast}`,
+        transition: `transform ${tokens.transitionNormal}, background-color ${tokens.transitionFast}, box-shadow ${tokens.transitionFast}`,
         transform: isOpen ? 'scale(0.9)' : 'scale(1)',
         outline: 'none',
         padding: 0,
+      }}
+      onFocus={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = `${tokens.shadowLg}, 0 0 0 3px ${ringColor}`;
+      }}
+      onBlur={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = tokens.shadowLg;
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.backgroundColor = tokens.colorLauncherHover;
@@ -93,7 +104,7 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         useCustomImage ? (
           <img
             src={launcherImageUrl!}
-            alt="Chat"
+            alt={locale.chatImageAlt}
             style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '4px' }}
           />
         ) : (
@@ -104,6 +115,8 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
       {/* Unread badge */}
       {!isOpen && unreadCount > 0 && (
         <span
+          role="status"
+          aria-label={`${unreadCount} ${locale.unreadMessages}`}
           style={{
             position: 'absolute',
             top: '-4px',

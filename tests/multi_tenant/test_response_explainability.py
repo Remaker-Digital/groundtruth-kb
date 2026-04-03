@@ -936,3 +936,113 @@ class TestRE15SerializationRoundtrip:
         d1 = original.to_dict()
         d2 = ResponseDecisionTrace.from_dict(d1).to_dict()
         assert d1 == d2
+
+
+# ---------------------------------------------------------------------------
+# S251 G5 Phase 1: Instrumentation wiring verification tests
+# ---------------------------------------------------------------------------
+
+
+class TestPhase1InstrumentationWiring:
+    """Verify that DecisionTraceBuilder setters produce non-default values.
+
+    These test the builder methods wired in Phase 1, ensuring the trace
+    captures all dimensions needed for Lane 2 export.
+    """
+
+    def test_memory_signal_reaches_trace(self):
+        """add_memory_signal with correct kwargs populates the trace."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.add_memory_signal(
+            layer=2,
+            source_conversation_id="conv-old-123",
+            similarity_score=0.85,
+            signal_type="prior_conversation",
+            chunk_summary="Customer asked about returns",
+        )
+        trace = builder.build()
+        assert len(trace.memory_signals) == 1
+        sig = trace.memory_signals[0]
+        assert sig.layer == 2
+        assert sig.source_conversation_id == "conv-old-123"
+        assert sig.similarity_score == 0.85
+        assert sig.signal_type == "prior_conversation"
+        assert sig.chunk_summary == "Customer asked about returns"
+
+    def test_profile_state_set_in_trace(self):
+        """set_profile_state records stale/empty flags."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.set_profile_state(is_stale=True, is_empty=False)
+        trace = builder.build()
+        assert trace.profile_is_stale is True
+        assert trace.profile_is_empty is False
+
+    def test_profile_state_empty(self):
+        """set_profile_state records empty profile."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.set_profile_state(is_stale=False, is_empty=True)
+        trace = builder.build()
+        assert trace.profile_is_stale is False
+        assert trace.profile_is_empty is True
+
+    def test_language_set_in_trace(self):
+        """set_language records the response language."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.set_language("es")
+        trace = builder.build()
+        assert trace.response_language == "es"
+
+    def test_escalation_set_in_trace(self):
+        """set_escalation records both flag and reason."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.set_escalation(escalated=True, reason="Customer wants manager")
+        trace = builder.build()
+        assert trace.was_escalated is True
+        assert trace.escalation_reason == "Customer wants manager"
+
+    def test_consent_set_in_trace(self):
+        """set_consent records consent status."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.set_consent("granted")
+        trace = builder.build()
+        assert trace.memory_consent_status == "granted"
+
+    def test_message_index_from_constructor(self):
+        """message_index is set via constructor from conversation history length."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1", message_index=5)
+        trace = builder.build()
+        assert trace.message_index == 5
+
+    def test_knowledge_query_set_in_trace(self):
+        """set_knowledge_query records the retrieval query."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.set_knowledge_query("how do I return a widget?")
+        trace = builder.build()
+        assert trace.knowledge_query == "how do I return a widget?"
+
+    def test_knowledge_entry_type_propagated(self):
+        """add_knowledge_source records entry_type correctly."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        builder.add_knowledge_source(
+            entry_id="kb-1", title="Returns", relevance_score=0.9,
+            entry_type="faq",
+        )
+        builder.add_knowledge_source(
+            entry_id="kb-2", title="Guide", relevance_score=0.7,
+            entry_type="article",
+        )
+        trace = builder.build()
+        assert trace.knowledge_sources[0].entry_type == "faq"
+        assert trace.knowledge_sources[1].entry_type == "article"
+
+    def test_knowledge_article_type(self):
+        """'article' is a valid entry_type alongside product/faq/policy/custom."""
+        builder = DecisionTraceBuilder("conv-1", "tenant-1")
+        for et in ("product", "faq", "policy", "custom", "article"):
+            builder.add_knowledge_source(
+                entry_id=f"kb-{et}", title=et, relevance_score=0.5,
+                entry_type=et,
+            )
+        trace = builder.build()
+        types = [ks.entry_type for ks in trace.knowledge_sources]
+        assert types == ["product", "faq", "policy", "custom", "article"]

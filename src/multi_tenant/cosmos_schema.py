@@ -402,6 +402,20 @@ class ConversationDocument(BaseModel):
         description="Peer agent targeted by team member (empty = co-pilot/pipeline).",
     )
 
+    # SPEC-1866: Conversation-level agent override
+    conversation_agent_override: str | None = Field(
+        default=None,
+        description="Agent ID override for this conversation. Set by admin to route to a specific peer agent without modifying tenant config.",
+    )
+    conversation_agent_override_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when override was set.",
+    )
+    conversation_agent_override_by: str | None = Field(
+        default=None,
+        description="Admin user ID who set the override.",
+    )
+
     # Billing (Decision #24 — billable conversation definition)
     is_billable: bool = Field(default=False, description="Whether this conversation counts for billing")
     message_count: int = Field(default=0, description="Total messages in conversation")
@@ -1113,6 +1127,13 @@ class PreferencesDocument(BaseModel):
     widget_exit_intent_enabled: bool = Field(default=False, description="Auto-open widget on exit intent (desktop mouseleave)")
     widget_scroll_depth_trigger: int | None = Field(default=None, description="Auto-open widget at scroll depth percentage (1-100)")
 
+    # Transcript continuity (SPEC-1868)
+    widget_transcript_continuity: str = Field(default="none", description="Transcript continuity level: none, session (sessionStorage), persistent (localStorage+TTL)")
+    widget_transcript_ttl_hours: int = Field(default=24, description="TTL in hours for persistent transcript continuity (max 168 = 7 days)")
+
+    # Structured answer blocks (SPEC-1867)
+    structured_blocks_enabled: bool = Field(default=False, description="Enable structured answer blocks in widget (professional+ tier)")
+
     # Notifications (WI-G: email alerts)
     notification_email: str | None = Field(
         default=None,
@@ -1208,6 +1229,12 @@ class PreferencesDocument(BaseModel):
     cite_sources_in_response: bool = Field(
         default=False,
         description="When enabled, append source titles to AI responses",
+    )
+
+    # Langfuse Lane 2 observability (S251 G5, tenant opt-in)
+    langfuse_lane2_enabled: bool = Field(
+        default=False,
+        description="Enable enriched structural observability export (Lane 2) for this tenant",
     )
 
     # Quick Action Prompt Buttons (WI #226-229)
@@ -1392,6 +1419,7 @@ class AlertRuleType(str, Enum):
     CIRCUIT_BREAKER = "circuit_breaker"
     SLA_BREACH = "sla_breach"
     INCIDENT = "incident"
+    QUALITY_REGRESSION = "quality_regression"
 
 
 class AlertSeverity(str, Enum):
@@ -1521,7 +1549,7 @@ class AlertCondition(BaseModel):
     """Condition that triggers an alert."""
 
     metric: str = ""
-    operator: str = "gt"  # gt, lt, gte, lte, eq, ne
+    operator: str = "gt"  # gt, lt, gte, lte, eq, ne, lt_delta
     threshold: float = 0
 
 
@@ -1558,6 +1586,7 @@ class AlertHistoryDocument(BaseModel):
     rule_id: str = ""
     rule_name: str = ""
     rule_type: str = ""
+    tenant_id: str = ""
     triggered_at: str = ""
     resolved_at: str | None = None
     severity: str = AlertSeverity.WARNING.value

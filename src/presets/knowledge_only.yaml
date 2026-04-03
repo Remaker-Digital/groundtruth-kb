@@ -1,0 +1,61 @@
+# Knowledge Only — FAQ/docs, no commerce focus
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+id: knowledge_only
+display_name: "Knowledge Only"
+description: "FAQ and documentation assistant — answers questions from your knowledge base without commerce features"
+icon: "book-open"
+
+preferences:
+  brand_voice: "friendly and professional"
+  formality_level: "balanced"
+  response_length: "standard"
+  escalation_threshold: 0.5
+  escalation_keywords:
+    - "complaint"
+    - "speak to someone"
+    - "not helpful"
+    - "wrong answer"
+  custom_instructions: |
+    Focus on answering questions accurately from the knowledge base.
+    If the answer is not in the knowledge base, say so honestly.
+    Suggest related articles when a direct answer is not available.
+
+quick_actions:
+  - label: "Search FAQ"
+    message: "I have a question about your products or services"
+  - label: "Contact Support"
+    message: "I'd like to speak with a human support agent"
+
+widget:
+  greeting_message: "Hi! How can I help you today?"
+  input_placeholder: "Ask a question..."
+
+knowledge_seed:
+  - title: "Welcome to Our Support Center"
+    content: |
+      Welcome! Our AI assistant can help answer your questions about
+      our products, services, and policies. Simply type your question
+      and we'll do our best to help.
+
+      If we can't answer your question, we'll connect you with our
+      support team.
+    category: "general"
+  - title: "Frequently Asked Questions"
+    content: |
+      Here are some common questions our customers ask:
+
+      **How do I contact support?**
+      You can reach us through this chat, by email, or by phone
+      during business hours.
+
+      **What are your business hours?**
+      Our support team is available Monday through Friday,
+      9 AM to 5 PM in your local timezone.
+
+      **How quickly will I get a response?**
+      Chat responses are typically instant. Email responses
+      are within 24 business hours.
+    category: "general"
+
+agents_recommended: []

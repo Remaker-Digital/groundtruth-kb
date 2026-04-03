@@ -400,25 +400,47 @@ class TestVerifyDeployment:
         mock_resp.__enter__ = mock.MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = mock.MagicMock(return_value=False)
 
-        with mock.patch("urllib.request.urlopen", return_value=mock_resp):
+        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
+             mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}):
             result = deploy_ui.verify_deployment("staging")
 
         assert result["summary"]["all_ok"] is True
-        assert result["summary"]["passed"] == 5
+        assert result["summary"]["passed"] == 6  # 5 endpoints + widget_config_auth
         assert result["health"]["ok"] is True
         assert result["widget_js"]["ok"] is True
+        assert result["widget_config_auth"]["ok"] is True
 
-    def test_checks_five_endpoints(self):
+    def test_checks_six_endpoints_with_widget_key(self):
+        """With a widget key configured, 6 checks run (5 static + widget_config_auth)."""
         mock_resp = mock.MagicMock()
         mock_resp.getcode.return_value = 200
         mock_resp.__enter__ = mock.MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = mock.MagicMock(return_value=False)
 
-        with mock.patch("urllib.request.urlopen", return_value=mock_resp):
+        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
+             mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}):
             result = deploy_ui.verify_deployment("staging")
 
-        # 5 endpoint checks + 1 summary
-        assert result["summary"]["total"] == 5
+        assert result["summary"]["total"] == 6
+
+    def test_missing_widget_key_fails(self):
+        """Without a widget key, widget_config_auth fails and all_ok is False."""
+        mock_resp = mock.MagicMock()
+        mock_resp.getcode.return_value = 200
+        mock_resp.__enter__ = mock.MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = mock.MagicMock(return_value=False)
+
+        env_clean = {
+            "DEPLOY_SMOKE_WIDGET_KEY": "",
+            "STAGING_REMAKER_WIDGET_KEY": "",
+            "PRODUCTION_WIDGET_KEY": "",
+        }
+        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
+             mock.patch.dict("os.environ", env_clean, clear=False):
+            result = deploy_ui.verify_deployment("staging")
+
+        assert result["summary"]["all_ok"] is False
+        assert result["widget_config_auth"]["ok"] is False
 
     def test_http_error_marks_fail(self):
         import urllib.error
@@ -468,7 +490,8 @@ class TestCli:
         mock_resp.__enter__ = mock.MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = mock.MagicMock(return_value=False)
 
-        with mock.patch("urllib.request.urlopen", return_value=mock_resp):
+        with mock.patch("urllib.request.urlopen", return_value=mock_resp), \
+             mock.patch.dict("os.environ", {"STAGING_REMAKER_WIDGET_KEY": "pk_live_test"}):
             rc = deploy_ui.main(["verify", "--env", "staging"])
         assert rc == 0
 

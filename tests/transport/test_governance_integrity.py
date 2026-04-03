@@ -32,12 +32,20 @@ if _TOOLS_DIR not in sys.path:
 # ---------------------------------------------------------------------------
 
 
+_TRANSPORT_GATED_SPEC_IDS = frozenset({
+    "SPEC-1524", "SPEC-1525", "SPEC-1535", "SPEC-1536", "SPEC-1537", "SPEC-1802",
+})
+
+
 @pytest.fixture
 def test_db():
     """Create a temporary copy of the KB for governance gate testing.
 
-    Yields a KnowledgeDB instance backed by a temp file. Cleaned up after test.
+    Yields a KnowledgeDB instance with the transport evidence gate active,
+    backed by a temp copy of the production KB. Cleaned up after test.
     """
+    from groundtruth_kb.gates import GateRegistry
+    from groundtruth_kb.gates_transport import TransportEvidenceGate
     import db as kb_db
 
     src_db = _PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"
@@ -45,7 +53,12 @@ def test_db():
     tmp_db = Path(tmp_dir) / "test_knowledge.db"
     shutil.copy2(src_db, tmp_db)
 
-    instance = kb_db.KnowledgeDB(str(tmp_db))
+    gate = TransportEvidenceGate(
+        spec_ids=_TRANSPORT_GATED_SPEC_IDS,
+        project_root=_PROJECT_ROOT,
+    )
+    registry = GateRegistry(_gates=[gate])
+    instance = kb_db.KnowledgeDB(str(tmp_db), gate_registry=registry)
     yield instance
 
     # Cleanup
@@ -55,8 +68,7 @@ def test_db():
 @pytest.fixture
 def transport_gated_spec_id():
     """Return one of the transport-gated spec IDs for testing."""
-    import db as kb_db
-    return next(iter(kb_db._TRANSPORT_GATED_SPECS))
+    return next(iter(_TRANSPORT_GATED_SPEC_IDS))
 
 
 @pytest.fixture
@@ -152,12 +164,10 @@ class TestGovernanceGateAllowsReal:
 
     def test_allows_pass_with_real_file(self, test_db, transport_gated_spec_id):
         """insert_test with pass and a real file that exists on disk must succeed."""
-        # _resolve_test_file resolves relative to DB_PATH.parent.parent (tools/)
-        # so we need a path relative to tools/, not repo root
-        real_file = "../tests/transport/test_governance_integrity.py"
-        import db as kb_db
-        resolved = kb_db._resolve_test_file(real_file)
-        assert resolved is not None and resolved.is_file(), (
+        # Gate resolves relative to project_root (_PROJECT_ROOT)
+        real_file = "tests/transport/test_governance_integrity.py"
+        resolved = _PROJECT_ROOT / real_file
+        assert resolved.is_file(), (
             f"Test file {real_file} must resolve to an existing file (got {resolved})"
         )
 

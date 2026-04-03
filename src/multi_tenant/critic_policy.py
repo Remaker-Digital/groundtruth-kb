@@ -160,7 +160,8 @@ class CriticHealthStatus:
     healthy: bool
     replicas_available: int
     replicas_total: int
-    circuit_breaker_open: bool
+    open_breaker_count: int  # P1-3: per-tenant breaker count
+    total_breakers: int  # P1-3: total instantiated breakers
     last_check_at: str
     details: dict[str, bool]  # {replica_url: is_healthy}
 
@@ -320,10 +321,19 @@ class CriticPolicy:
         self._critic_urls = critic_urls
         self._conversations = conversation_repo
         self._audit = audit_repo
-        self._circuit_breaker = CircuitBreaker()
+        # P1-3: Per-tenant circuit breaker isolation (replaces global breaker)
+        self._breakers: dict[str, CircuitBreaker] = {}
 
         # Shared async HTTP client with connection pooling
         self._http_client: httpx.AsyncClient | None = None
+
+    def _get_breaker(self, tenant_id: str) -> CircuitBreaker:
+        """Get or create a circuit breaker for the given tenant (P1-3)."""
+        breaker = self._breakers.get(tenant_id)
+        if breaker is None:
+            breaker = CircuitBreaker()
+            self._breakers[tenant_id] = breaker
+        return breaker
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Lazy-initialize the shared HTTP client."""
@@ -390,9 +400,10 @@ class CriticPolicy:
         """
         request_id = f"critic-{conversation_id}-{int(time.time() * 1000)}"
         start_time = time.monotonic()
+        breaker = self._get_breaker(tenant_id)
 
-        # Check circuit breaker first
-        if self._circuit_breaker.is_open:
+        # Check circuit breaker first (P1-3: per-tenant)
+        if breaker.is_open:
             result = CriticResult(
                 approved=False,
                 verdict=None,
@@ -428,7 +439,7 @@ class CriticPolicy:
                 )
 
                 # Critic responded — record success for circuit breaker
-                self._circuit_breaker.record_success()
+                breaker.record_success()
 
                 # Update conversation record
                 await self._update_conversation(
@@ -450,7 +461,7 @@ class CriticPolicy:
                     "Critic replica %d/%d failed: url=%s error=%s elapsed=%.0fms",
                     i + 1, len(self._critic_urls), base_url, last_error, elapsed,
                 )
-                self._circuit_breaker.record_failure()
+                breaker.record_failure()
                 continue
 
             except Exception as exc:
@@ -460,7 +471,7 @@ class CriticPolicy:
                     "Unexpected error from Critic replica %d/%d: url=%s elapsed=%.0fms",
                     i + 1, len(self._critic_urls), base_url, elapsed,
                 )
-                self._circuit_breaker.record_failure()
+                breaker.record_failure()
                 continue
 
         # All replicas failed — fail CLOSED
@@ -641,7 +652,7 @@ class CriticPolicy:
                     payload={
                         "reason": "critic_unavailable",
                         "block_reason": result.block_reason.value if result.block_reason else "unknown",
-                        "circuit_breaker_state": self._circuit_breaker.state.value,
+                        "circuit_breaker_state": self._get_breaker(tenant_id).state.value,
                         "request_id": result.request_id,
                     },
                     conversation_id=conversation_id,
@@ -724,11 +735,15 @@ class CriticPolicy:
 
         now = datetime.now(timezone.utc).isoformat()
 
+        # P1-3: Per-tenant breaker counts
+        open_count = sum(1 for b in self._breakers.values() if b.is_open)
+
         return CriticHealthStatus(
             healthy=available > 0,
             replicas_available=available,
             replicas_total=len(self._critic_urls),
-            circuit_breaker_open=self._circuit_breaker.is_open,
+            open_breaker_count=open_count,
+            total_breakers=len(self._breakers),
             last_check_at=now,
             details=details,
         )
@@ -790,15 +805,22 @@ class CriticPolicy:
     # Circuit breaker management
     # -------------------------------------------------------------------
 
-    def get_circuit_breaker_state(self) -> str:
-        """Get the current circuit breaker state as a string."""
-        return self._circuit_breaker.state.value
+    def get_circuit_breaker_state(self, tenant_id: str | None = None) -> str:
+        """Get circuit breaker state for a tenant, or 'no_breaker' if none exists."""
+        if tenant_id and tenant_id in self._breakers:
+            return self._breakers[tenant_id].state.value
+        return "no_breaker"
 
-    def reset_circuit_breaker(self) -> None:
-        """Force-reset the circuit breaker to CLOSED.
+    def reset_circuit_breaker(self, tenant_id: str | None = None) -> None:
+        """Force-reset circuit breaker(s) to CLOSED.
 
-        Use this after manually verifying Critic recovery. Should only
-        be called by admin operations, not by automated code.
+        If tenant_id is provided, resets only that tenant's breaker.
+        If None, resets all breakers. Admin operations only.
         """
-        self._circuit_breaker.reset()
-        logger.info("Critic circuit breaker manually reset to CLOSED")
+        if tenant_id and tenant_id in self._breakers:
+            self._breakers[tenant_id].reset()
+            logger.info("Critic breaker reset for tenant=%s", tenant_id[:8])
+        else:
+            for tid, breaker in self._breakers.items():
+                breaker.reset()
+            logger.info("All Critic breakers reset (%d tenants)", len(self._breakers))

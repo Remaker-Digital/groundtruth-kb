@@ -181,7 +181,7 @@ export const OfflineForm: FunctionComponent<OfflineFormProps> = ({
         {/* Name */}
         <FieldGroup
           tokens={tokens}
-          label="Name"
+          label={locale.offlineFormName}
           required
           error={errors.name}
         >
@@ -196,7 +196,7 @@ export const OfflineForm: FunctionComponent<OfflineFormProps> = ({
         {/* Email */}
         <FieldGroup
           tokens={tokens}
-          label="Email"
+          label={locale.offlineFormEmail}
           required
           error={errors.email}
         >
@@ -211,7 +211,7 @@ export const OfflineForm: FunctionComponent<OfflineFormProps> = ({
         {/* Message */}
         <FieldGroup
           tokens={tokens}
-          label="Message"
+          label={locale.offlineFormMessage}
           required
           error={errors.message}
         >

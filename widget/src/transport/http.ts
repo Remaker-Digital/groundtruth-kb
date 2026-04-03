@@ -32,6 +32,14 @@ export interface TransportConfig {
    *  When present, the middleware identifies the caller as a team member,
    *  enabling Co-pilot routing and agent access enforcement. */
   authToken?: string;
+  /** Auth type: determines which header carries the auth token.
+   *  'api_key' → X-API-Key, 'session_token' → X-Session-Token.
+   *  Default: 'api_key' for backward compatibility. */
+  authType?: 'api_key' | 'session_token';
+  /** Tenant ID for SPEC-1644 partition-scoped auth.
+   *  When set, appended as ?tenant= to API calls so the middleware can
+   *  scope non-SPA API key lookups to a single Cosmos partition. */
+  tenantId?: string;
 }
 
 let _config: TransportConfig | null = null;
@@ -81,21 +89,31 @@ async function request<T>(
   body?: unknown,
   options?: RequestOptions,
 ): Promise<ApiResponse<T>> {
-  const { apiBaseUrl, widgetKey, authToken } = getTransportConfig();
-  const url = `${apiBaseUrl}${path}`;
+  const { apiBaseUrl, widgetKey, authToken, authType, tenantId } = getTransportConfig();
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryBaseDelay = options?.retryBaseDelayMs ?? 1000;
+
+  // Build URL with ?tenant= for SPEC-1644 partition-scoped auth
+  let url = `${apiBaseUrl}${path}`;
+  if (tenantId && !url.includes('tenant=')) {
+    url += url.includes('?') ? `&tenant=${tenantId}` : `?tenant=${tenantId}`;
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Widget-Key': widgetKey,
   };
 
-  // When loaded in admin console, include the admin's auth credential.
-  // Middleware checks X-API-Key before X-Widget-Key, so the caller is
+  // When loaded in admin console, include the admin's auth credential
+  // using the correct header based on auth type. Middleware checks
+  // X-API-Key / X-Session-Token before X-Widget-Key, so the caller is
   // authenticated as a team member with role-based routing.
   if (authToken) {
-    headers['X-API-Key'] = authToken;
+    if (authType === 'session_token') {
+      headers['X-Session-Token'] = authToken;
+    } else {
+      headers['X-API-Key'] = authToken;
+    }
   }
 
   let lastError: ApiResponse<T> | null = null;
@@ -254,17 +272,68 @@ export interface SendMessageResult {
   ok: boolean;
   /** HTTP status code — 409 means conversation is no longer active (e.g. escalated). */
   status: number;
+  /** Server-assigned message ID (present on success). */
+  message_id?: string;
+  /** Structured error code from server (e.g. "in_flight_response", "transfer_to_human"). */
+  code?: string;
+  /** Server-suggested retry delay in milliseconds. */
+  retry_after_ms?: number;
 }
 
-/** Send a customer message. */
+/**
+ * Generate a UUID v4 idempotency key.
+ * P1-2: Used by sendMessage to prevent duplicate message creation on retry.
+ */
+function generateIdempotencyKey(): string {
+  // crypto.randomUUID is available in all modern browsers and Web Workers
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older environments
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+/** Send a customer message with idempotency key for retry safety. */
 export async function sendMessage(
   conversationId: string,
   content: string,
+  idempotencyKey?: string,
 ): Promise<SendMessageResult> {
+  const key = idempotencyKey || generateIdempotencyKey();
   const resp = await request('POST', '/api/chat/message', {
     conversation_id: conversationId,
     content,
+    idempotency_key: key,
   });
+
+  // Parse structured error body for 409 responses
+  if (!resp.ok && resp.status === 409 && resp.error) {
+    try {
+      const body = JSON.parse(resp.error);
+      return {
+        ok: false,
+        status: resp.status,
+        code: body.code,
+        retry_after_ms: body.retry_after_ms,
+      };
+    } catch {
+      // Plain-text 409 (legacy path)
+      return { ok: false, status: resp.status };
+    }
+  }
+
+  if (resp.ok && resp.data) {
+    const data = resp.data as Record<string, unknown>;
+    return {
+      ok: true,
+      status: resp.status,
+      message_id: data.message_id as string | undefined,
+    };
+  }
+
   return { ok: resp.ok, status: resp.status };
 }
 
@@ -359,4 +428,53 @@ export async function verifyOtp(
     return { verified: true, customerToken: resp.data.customer_token ?? null };
   }
   return { verified: false, customerToken: null };
+}
+
+// ---------------------------------------------------------------------------
+// Transcript restore (SPEC-1868)
+// ---------------------------------------------------------------------------
+
+interface BackendMessage {
+  message_id: string;
+  role: string;
+  content: string;
+  timestamp: string; // ISO 8601
+  metadata?: Record<string, unknown>;
+}
+
+interface ConversationRestoreResponse {
+  conversation_id: string;
+  status: string;
+  messages: BackendMessage[];
+}
+
+export type RestoreResult =
+  | { ok: true; data: ConversationRestoreResponse }
+  | { ok: false; reason: 'not_found' | 'not_active' | 'transient' };
+
+/**
+ * Fetch a conversation for transcript restoration.
+ *
+ * Returns a discriminated result so callers can distinguish
+ * permanent failures (clear storage) from transient ones (keep storage).
+ */
+export async function fetchConversation(
+  conversationId: string,
+): Promise<RestoreResult> {
+  const resp = await request<ConversationRestoreResponse>(
+    'GET', `/api/chat/conversations/${conversationId}`,
+  );
+  if (!resp.ok || !resp.data) {
+    // 404/403 = conversation gone, clear storage
+    if (resp.status === 404 || resp.status === 403) {
+      return { ok: false, reason: 'not_found' };
+    }
+    // 5xx / network error = transient, keep storage
+    return { ok: false, reason: 'transient' };
+  }
+  // Status policy: restore only active conversations
+  if (resp.data.status !== 'active') {
+    return { ok: false, reason: 'not_active' };
+  }
+  return { ok: true, data: resp.data };
 }

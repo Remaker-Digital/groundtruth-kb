@@ -10,9 +10,11 @@
 import { MessageBubble } from './MessageBubble';
 import type { Message } from '@/state/store';
 import { resolveTokens } from '@/theme/tokens';
+import { en } from '@/locale/en';
 
 // Default tokens for stories (light mode, Agent Red brand)
 const tokens = resolveTokens({} as any);
+const locale = en;
 
 const makeMessage = (overrides: Partial<Message>): Message => ({
   id: 'msg-001',
@@ -30,6 +32,7 @@ export default {
 export const UserMessage = () => (
   <MessageBubble
     tokens={tokens}
+    locale={locale}
     message={makeMessage({ role: 'customer', content: 'Hello, I need help with my order.' })}
     agentAvatarUrl={null}
     agentName="Agent Red"
@@ -40,6 +43,7 @@ export const UserMessage = () => (
 export const AgentMessage = () => (
   <MessageBubble
     tokens={tokens}
+    locale={locale}
     message={makeMessage({ role: 'agent', content: 'I can help you with that! What is your order number?' })}
     agentAvatarUrl={null}
     agentName="Agent Red"
@@ -50,6 +54,7 @@ export const AgentMessage = () => (
 export const LongMessage = () => (
   <MessageBubble
     tokens={tokens}
+    locale={locale}
     message={makeMessage({
       role: 'agent',
       content: 'A'.repeat(500) + ' — this tests overflow handling for very long messages.',
@@ -63,6 +68,7 @@ export const LongMessage = () => (
 export const StreamingMessage = () => (
   <MessageBubble
     tokens={tokens}
+    locale={locale}
     message={makeMessage({ role: 'agent', content: 'Looking up your order...', streaming: true })}
     agentAvatarUrl={null}
     agentName="Agent Red"
@@ -73,6 +79,7 @@ export const StreamingMessage = () => (
 export const RetractedMessage = () => (
   <MessageBubble
     tokens={tokens}
+    locale={locale}
     message={makeMessage({ role: 'agent', content: 'This message was retracted.', retracted: true })}
     agentAvatarUrl={null}
     agentName="Agent Red"
@@ -83,6 +90,7 @@ export const RetractedMessage = () => (
 export const SystemMessage = () => (
   <MessageBubble
     tokens={tokens}
+    locale={locale}
     message={makeMessage({ role: 'system', content: 'Conversation has been escalated to a human agent.' })}
     agentAvatarUrl={null}
     agentName="Agent Red"
@@ -93,6 +101,7 @@ export const SystemMessage = () => (
 export const MessageWithMarkdownLink = () => (
   <MessageBubble
     tokens={tokens}
+    locale={locale}
     message={makeMessage({
       role: 'agent',
       content: 'Please visit [our help center](https://help.example.com) for more information.',

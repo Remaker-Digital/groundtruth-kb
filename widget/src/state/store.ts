@@ -32,7 +32,15 @@ export interface Message {
   feedbackRating?: 'positive' | 'negative' | null;
   /** Structured source attribution from validated event (B1). */
   sources?: Array<{ title: string; url?: string }>;
+  /** Structured answer blocks from validated event (SPEC-1867). */
+  blocks?: AnswerBlock[];
 }
+
+/** Structured answer block types (SPEC-1867, v1 — product cards deferred). */
+export type AnswerBlock =
+  | { type: 'steps'; title?: string; items: string[] }
+  | { type: 'faq'; items: Array<{ question: string; answer: string }> }
+  | { type: 'action'; label: string; url: string; style?: 'primary' | 'secondary' };
 
 export interface PreChatData {
   [fieldName: string]: string;
@@ -76,13 +84,25 @@ export interface WidgetState {
   conversationId: string | null;
   messages: Message[];
   isAgentTyping: boolean;
+  /** Number of messages restored from a previous session (SPEC-1868). */
+  restoredMessageCount: number;
 
   // UI
   view: WidgetView;
   isLoading: boolean;
   isReconnecting: boolean;
+  /** Current reconnect attempt number (P3-4). 0 when not reconnecting. */
+  reconnectAttempt: number;
+  /** Typed connection failure (P3-4). null = no error, 'transient' = retrying, 'permanent' = max retries exhausted. */
+  connectionError: 'transient' | 'permanent' | null;
   error: string | null;
   unreadCount: number;
+  /** True while restoring a previous conversation from transcript (P3-3). */
+  isRestoring: boolean;
+  /** Restore failure type (P3-3). 'transient' = can retry, null = no error. */
+  restoreError: 'transient' | null;
+  /** True while the AI is streaming a response (P3-5). */
+  isStreaming: boolean;
 
   // Pre-chat
   preChatData: PreChatData | null;
@@ -142,6 +162,7 @@ class Store {
     content: string,
     streaming: boolean,
     sources?: Array<{ title: string; url?: string }>,
+    blocks?: AnswerBlock[],
   ): void {
     const messages = [...this.state.messages];
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -151,6 +172,7 @@ class Store {
           content,
           streaming,
           ...(sources ? { sources } : {}),
+          ...(blocks ? { blocks } : {}),
         };
         break;
       }
@@ -177,6 +199,55 @@ class Store {
     this.notify();
   }
 
+  /**
+   * Restore messages from a previous session (SPEC-1868).
+   * Normalizes backend message shape to widget Message shape:
+   *   - role: ai/human_agent → agent
+   *   - timestamp: ISO string → epoch milliseconds
+   *   - message_id → id
+   *   - metadata.sources → sources
+   */
+  restoreMessages(
+    conversationId: string,
+    backendMessages: Array<{
+      message_id: string;
+      role: string;
+      content: string;
+      timestamp: string;
+      metadata?: Record<string, unknown>;
+    }>,
+  ): void {
+    const normalized: Message[] = backendMessages.map((m) => {
+      // Role mapping (Codex F1): ai → agent, human_agent → agent
+      let role: Message['role'] = 'system';
+      if (m.role === 'customer') role = 'customer';
+      else if (m.role === 'ai' || m.role === 'human_agent') role = 'agent';
+      else if (m.role === 'system') role = 'system';
+
+      // Source extraction from metadata
+      let sources: Array<{ title: string; url?: string }> | undefined;
+      if (m.metadata && Array.isArray(m.metadata.sources)) {
+        sources = m.metadata.sources as Array<{ title: string; url?: string }>;
+      }
+
+      return {
+        id: m.message_id,
+        role,
+        content: m.content,
+        timestamp: new Date(m.timestamp).getTime(),
+        sources,
+      };
+    });
+
+    this.state = {
+      ...this.state,
+      conversationId,
+      messages: normalized,
+      restoredMessageCount: normalized.length,
+    };
+    this.notify();
+  }
+
   /** Reset conversation state for a new conversation. */
   resetConversation(): void {
     this.state = {
@@ -186,6 +257,12 @@ class Store {
       isAgentTyping: false,
       error: null,
       unreadCount: 0,
+      restoredMessageCount: 0,
+      isRestoring: false,
+      restoreError: null,
+      isStreaming: false,
+      reconnectAttempt: 0,
+      connectionError: null,
       preChatData: null,
       isAnonymous: false,
       customerEmail: null,
@@ -221,11 +298,17 @@ export function createStore(config: WidgetConfig, locale: Locale): Store {
     conversationId: null,
     messages: [],
     isAgentTyping: false,
+    restoredMessageCount: 0,
     view: 'closed',
     isLoading: false,
     isReconnecting: false,
+    reconnectAttempt: 0,
+    connectionError: null,
     error: null,
     unreadCount: 0,
+    isRestoring: false,
+    restoreError: null,
+    isStreaming: false,
     preChatData: null,
     isAnonymous: false,
     customerEmail: null,

@@ -188,6 +188,11 @@ class SendMessageRequest(BaseModel):
         default=None,
         description="Client metadata for this message",
     )
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Client-generated UUID for idempotent retry (P1-2)",
+    )
 
 
 class EndConversationRequest(BaseModel):
@@ -458,6 +463,7 @@ def validated_event(
     conversation_id: str,
     message_id: str,
     sources: list[dict[str, str]] | None = None,
+    blocks: list[dict] | None = None,
 ) -> StreamEvent:
     """Create a validated event — Critic approved the response.
 
@@ -465,6 +471,9 @@ def validated_event(
         sources: Optional structured source attribution (B1). Each entry
             has ``title`` and optionally ``url``. Included only when
             ``cite_sources_in_response`` is enabled and KR returned sources.
+        blocks: Optional structured answer blocks (SPEC-1867). Each entry
+            has ``type`` and type-specific fields. Included only when
+            ``structured_blocks_enabled`` is true and tier >= professional.
     """
     data: dict = {
         "conversation_id": conversation_id,
@@ -473,6 +482,8 @@ def validated_event(
     }
     if sources:
         data["sources"] = sources
+    if blocks:
+        data["blocks"] = blocks
     return StreamEvent(event=StreamEventType.VALIDATED, data=data)
 
 

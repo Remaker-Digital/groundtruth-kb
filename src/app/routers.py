@@ -1,6 +1,6 @@
 """Router registration for Agent Red Customer Experience.
 
-Imports all 32 API routers and provides a single function to register
+Imports all 45 API routers and provides a single function to register
 them on the FastAPI application instance.
 
 R1 refactoring — session 31.
@@ -51,6 +51,8 @@ from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
 from src.multi_tenant.admin_contact_api import router as admin_contact_router
 from src.multi_tenant.superadmin_contact_api import router as superadmin_contact_router
 from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
+from src.multi_tenant.admin_preview_api import router as admin_preview_router
+from src.multi_tenant.admin_knowledge_score_api import router as admin_knowledge_score_router
 from src.multi_tenant.admin_fine_tuning_api import router as admin_fine_tuning_router
 from src.multi_tenant.admin_agent_api import router as admin_agent_router
 from src.multi_tenant.widget_otp_verification import router as widget_otp_router
@@ -59,10 +61,12 @@ from src.multi_tenant.tenant_recovery import router as tenant_recovery_router
 from src.multi_tenant.tenant_recovery import recovery_verify_router
 from src.multi_tenant.communication_capture import router as capture_router
 from src.multi_tenant.email_change import router as email_change_router
+from src.multi_tenant.admin_presets_api import router as admin_presets_router
+from src.multi_tenant.admin_marketplace_api import router as admin_marketplace_router
 
 
 def register_routers(app: FastAPI) -> None:
-    """Register all 43 API routers on the FastAPI application.
+    """Register all 46 API routers on the FastAPI application.
 
     This mirrors the router registration block from main.py lines 186-209.
     """
@@ -78,7 +82,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(chat_router)
     app.include_router(admin_inbox_router)
     app.include_router(admin_ingestion_router)  # Must be before knowledge router (shared prefix, specific routes first)
+    app.include_router(admin_knowledge_score_router)  # Must be before knowledge router (shared /api/admin/knowledge prefix)
     app.include_router(admin_knowledge_router)
+    app.include_router(admin_preview_router)  # SPEC-1872: conversation preview (SSE)
     app.include_router(admin_analytics_router)
     app.include_router(admin_team_router)
     app.include_router(admin_gdpr_router)
@@ -114,3 +120,5 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(recovery_verify_router)  # SPEC-1677: unauthenticated
     app.include_router(capture_router)  # SPEC-1687: communication capture
     app.include_router(email_change_router)  # SPEC-1682/1683: email change
+    app.include_router(admin_presets_router)  # SPEC-1878: G6 vertical presets
+    app.include_router(admin_marketplace_router)  # SPEC-1865: agent marketplace

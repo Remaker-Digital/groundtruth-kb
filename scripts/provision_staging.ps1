@@ -135,6 +135,7 @@ az containerapp create `
     USE_AGENT_CONTAINERS=false `
     NATS_URL=ws://agent-red-staging-nats `
     GRACEFUL_SHUTDOWN_TIMEOUT=60 `
+    MASTER_KEK_KEY_ID=https://kv-agentred-staging.vault.azure.net/keys/agent-red-cmk `
   --subscription $SUBSCRIPTION `
   --output table
 
@@ -153,9 +154,16 @@ az role assignment create `
   --scope "/subscriptions/$SUBSCRIPTION/resourceGroups/agentred-prod-rg/providers/Microsoft.ContainerRegistry/registries/acragentredeastus2" `
   --output table
 
-# Key Vault Secrets Officer
+# Key Vault Secrets User (least privilege — read-only secret access)
 az role assignment create `
-  --role "Key Vault Secrets Officer" `
+  --role "Key Vault Secrets User" `
+  --assignee $GATEWAY_ID `
+  --scope "/subscriptions/$SUBSCRIPTION/resourceGroups/$RG/providers/Microsoft.KeyVault/vaults/kv-agentred-staging" `
+  --output table
+
+# Key Vault Crypto User (wrap/unwrap DEKs via Master KEK — SPEC-1843 / WI-1625)
+az role assignment create `
+  --role "Key Vault Crypto User" `
   --assignee $GATEWAY_ID `
   --scope "/subscriptions/$SUBSCRIPTION/resourceGroups/$RG/providers/Microsoft.KeyVault/vaults/kv-agentred-staging" `
   --output table

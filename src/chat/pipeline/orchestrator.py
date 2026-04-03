@@ -288,6 +288,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             conversation_id=conversation_id,
             tenant_id=tenant_id,
             customer_id=customer_id or "",
+            message_index=len(conversation_history) if conversation_history else 0,
         )
         tier = tenant.tier or TenantTier.STARTER
 
@@ -351,6 +352,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 AgentRole.RESPONSE_GENERATOR, tenant, preferences, profile,
             )
             trace.set_profile_context(prompt_trace)
+
+            # S251 G5 Phase 1: record response language for Lane 2
+            trace.set_language(getattr(preferences, "primary_language", "en"))
 
             # ---------------------------------------------------------------
             # Layer 4: Fine-tuned model selection + A/B routing (WI #93-96)
@@ -478,6 +482,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
 
             intent_result, knowledge_result = await asyncio.gather(ic_task, kr_task)
 
+            # S251 G5 Phase 1: record the query sent to knowledge retrieval
+            trace.set_knowledge_query(tokenized_message)
+
             # Process IC result
             intent = intent_result.get("intent", "general_inquiry")
             confidence = intent_result.get("confidence", 0.0)
@@ -533,6 +540,17 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             _ict = getattr(
                 self._current_preferences, "intent_confidence_threshold", 0.0
             )
+            # S251 SPEC-1866: conversation-level agent override
+            _conv_override = None
+            if hasattr(self, "_session") and self._session:
+                try:
+                    _conv_doc = await self._session.get_conversation(
+                        tenant_id, conversation_id,
+                    )
+                    _conv_override = (_conv_doc or {}).get("conversation_agent_override")
+                except Exception:
+                    pass  # Non-fatal — override is best-effort
+
             route = router.resolve(
                 tenant_id=tenant_id,
                 intent=intent,
@@ -543,6 +561,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 tenant_tier=tier.value if hasattr(tier, "value") else str(tier),
                 staff_domain_tags=staff_domain_tags,
                 intent_confidence_threshold=float(_ict or 0.0),
+                user_message=customer_message,
+                conversation_agent_override=_conv_override,
             )
             trace.set_route_decision(
                 route.target.value, route.agent_id, route.fallback_from,
@@ -625,7 +645,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     entry_id=source.get("id", ""),
                     title=source.get("title", ""),
                     relevance_score=source.get("score", 0.0),
-                    entry_type=source.get("type", ""),
+                    entry_type=source.get("entry_type", source.get("type", "")),
                 )
             kr_stage_idx = 1 if len(budget.stages) >= 2 else 0
             trace.add_stage(
@@ -778,10 +798,46 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                            if structured_sources else {}),
                     },
                 )
+                # SPEC-1867: Structured answer blocks (tier-gated)
+                structured_blocks: list[dict] | None = None
+                if (
+                    prefs
+                    and getattr(prefs, "structured_blocks_enabled", False)
+                    and tier
+                    and tier.value in ("professional", "enterprise")
+                ):
+                    try:
+                        from src.chat.blocks import extract_blocks
+                        structured_blocks = extract_blocks(safe_text) or None
+                    except Exception:
+                        pass  # Block extraction failure is non-fatal
+
                 yield validated_event(
                     conversation_id, message_id,
                     sources=structured_sources or None,
+                    blocks=structured_blocks,
                 )
+
+                # P3-1: Score the validated turn and persist to message metadata.
+                # Synchronous (not fire-and-forget) to avoid race with aggregate.
+                try:
+                    from src.chat.quality_scorer import quality_scorer
+                    score = quality_scorer.score_turn(
+                        ai_response=safe_text,
+                        customer_message=customer_message,
+                        knowledge_context=knowledge_context,
+                    )
+                    await self._session.patch_message_metadata(
+                        tenant_id=tenant_id,
+                        conversation_id=conversation_id,
+                        message_id=message_id,
+                        metadata_patch={"quality_score": score.model_dump()},
+                    )
+                except Exception:
+                    logger.warning(
+                        "Quality scoring failed (non-fatal): conv=%s msg=%s",
+                        conversation_id, message_id, exc_info=True,
+                    )
             else:
                 # Critic rejected -- retract streamed text, deliver fallback
                 message_id = await self._session.add_ai_message(
@@ -847,7 +903,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             except Exception:
                 logger.debug("Failed to persist pipeline trace", exc_info=True)
 
-            # SPEC-1874: Langfuse trace export (Lane 1 structural, fire-and-forget)
+            # SPEC-1874: Langfuse trace export (Lane 1 + Lane 2, fire-and-forget)
             try:
                 from src.observability.langfuse_exporter import (
                     LANGFUSE_ENABLED,
@@ -860,6 +916,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         system_prompt_template=prompts.get(
                             AgentRole.RESPONSE_GENERATOR, "",
                         ),
+                        tenant_preferences=self._current_preferences,
                     )
             except Exception:
                 logger.debug("Langfuse export failed (non-blocking)", exc_info=True)
@@ -1300,9 +1357,18 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 self._profile_cache[cache_key] = None
                 return None
 
+        # S251 G5 Phase 1: record profile state for Lane 2 observability
+        if profile:
+            is_stale = getattr(profile, "is_stale", False)
+            is_empty = not getattr(profile, "name", None) and not getattr(profile, "email", None)
+            trace.set_profile_state(is_stale=is_stale, is_empty=is_empty)
+        else:
+            trace.set_profile_state(is_stale=False, is_empty=True)
+
         # Layer 2: semantic history search (consent-gated)
         if profile and self._vectorizer:
             consent = getattr(profile, "consent_status", ConsentStatus.NOT_ASKED)
+            trace.set_consent(consent.value if hasattr(consent, "value") else str(consent))
             if consent == ConsentStatus.GRANTED:
                 try:
                     history_results = await self._vectorizer.search_history(
@@ -1318,10 +1384,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         )
                         for result in history_results:
                             trace.add_memory_signal(
-                                source="conversation_history",
-                                content_preview=result.get("chunk_text", "")[:80],
-                                relevance_score=result.get("score", 0.0),
-                                age_days=result.get("age_days", 0),
+                                layer=2,
+                                source_conversation_id=result.get("conversation_id", ""),
+                                similarity_score=result.get("score", 0.0),
+                                signal_type="prior_conversation",
+                                chunk_summary=result.get("chunk_text", "")[:80],
                             )
                 except Exception:
                     logger.debug(

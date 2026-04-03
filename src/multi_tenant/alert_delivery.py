@@ -155,6 +155,7 @@ class AlertType(str, Enum):
     TEAM_INVITE = "team_invite"
     OUTAGE_NOTIFICATION = "outage_notification"
     ESCALATION = "escalation"
+    QUALITY_DROP = "quality_drop"
 
 
 class AlertSeverity(str, Enum):
@@ -179,6 +180,7 @@ _DEFAULT_SEVERITY: dict[AlertType, AlertSeverity] = {
     AlertType.TEAM_INVITE: AlertSeverity.INFO,
     AlertType.OUTAGE_NOTIFICATION: AlertSeverity.CRITICAL,
     AlertType.ESCALATION: AlertSeverity.WARNING,
+    AlertType.QUALITY_DROP: AlertSeverity.WARNING,
 }
 
 
@@ -1001,8 +1003,12 @@ class AlertDeliveryService:
         """Return the names of all registered channels (plus 'log')."""
         return [ch.name for ch in self._channels] + [self._log_channel.name]
 
-    async def deliver_alert(self, alert: Alert) -> DeliveryResult:
-        """Route an alert to all registered delivery channels.
+    async def deliver_alert(
+        self,
+        alert: Alert,
+        channels: list[str] | None = None,
+    ) -> DeliveryResult:
+        """Route an alert to registered delivery channels.
 
         Each channel is attempted independently — a failure in one
         channel does not prevent delivery to others. The log channel
@@ -1010,11 +1016,18 @@ class AlertDeliveryService:
 
         Args:
             alert: The alert to deliver.
+            channels: Optional list of channel names to deliver to. If
+                provided, only matching channels are used. The log channel
+                is always included as a fallback regardless.
 
         Returns:
             DeliveryResult with per-channel outcomes.
         """
-        all_channels = list(self._channels) + [self._log_channel]
+        if channels is not None:
+            filtered = [ch for ch in self._channels if ch.name in channels]
+        else:
+            filtered = list(self._channels)
+        all_channels = filtered + [self._log_channel]
         results: list[ChannelResult] = []
 
         for channel in all_channels:

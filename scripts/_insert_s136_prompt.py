@@ -26,7 +26,7 @@ Resume the closed-loop quality cycle on the **Inbox page**:
 tests/e2e_live/test_inbox_live.py already exists from S116 (5 basic tests). The new tests should significantly expand it following the SPEC-1652 pattern established for Dashboard/Navbar/Sidebar.
 
 ## Test environment
-SUPERADMIN_PREVIEW_API_KEY=ar_user_stag_qejkqo2vSBoS-QceOJ8eg4wS0Gy82G5H
+SUPERADMIN_PREVIEW_API_KEY=(set from environment, SPEC-1845)
 PROD_URL=https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
 LIVE_TENANT_ID=staging-001
 

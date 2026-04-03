@@ -156,3 +156,20 @@ export {
   useCreateBinding,
   useDeleteBinding,
 } from './useAgents';
+
+// Quality — Knowledge Score + Gap Review + Preview (Track B Phase 2)
+export {
+  useKnowledgeScore,
+  useGapReview,
+  usePreviewChat,
+  usePreviewTrace,
+} from './useQuality';
+export type {
+  ScoreFactors,
+  KnowledgeScoreResponse,
+  GapCluster,
+  GapReviewResponse,
+  PreviewSSEEvent,
+  PreviewChatState,
+  PreviewTraceResponse,
+} from './useQuality';

@@ -501,9 +501,9 @@ class TestMessageBubble:
         )
 
     def test_spec_1201_retracted_label(self) -> None:
-        """SPEC-1201: Retracted messages show 'Message revised' label."""
-        assert "Message revised" in self.SRC, (
-            "MessageBubble should display 'Message revised' label for retracted messages"
+        """SPEC-1201: Retracted messages show locale-driven 'Message revised' label."""
+        assert "locale.messageRevised" in self.SRC, (
+            "MessageBubble must use locale.messageRevised for retracted messages (not hardcoded English)"
         )
 
     def test_spec_1201_retracted_conditional(self) -> None:

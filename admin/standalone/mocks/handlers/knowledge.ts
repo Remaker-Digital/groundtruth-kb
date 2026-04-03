@@ -45,6 +45,82 @@ export function registerKnowledgeHandlers(): void {
     return { status: 200, body: { suggestions: [] } };
   });
 
+  // Knowledge Score (SPEC-1873) — MUST be before /:id
+  GET('/api/admin/knowledge/score', (_req: MockRequest): MockResponse => {
+    return {
+      status: 200,
+      body: {
+        score: 74.2,
+        factors: {
+          coverage: 0.82,
+          relevance: 0.71,
+          escalationRate: 0.12,
+          freshness: 0.65,
+        },
+        totalConversations: 342,
+        unansweredCount: 28,
+        kbEntryCount: 156,
+        freshEntryCount: 101,
+        trend: {
+          direction: 'up',
+          delta: 3.1,
+          previous: 71.1,
+        },
+      },
+    };
+  });
+
+  // Gap Review (SPEC-1873) — MUST be before /:id
+  GET('/api/admin/knowledge/gaps/review', (_req: MockRequest): MockResponse => {
+    return {
+      status: 200,
+      body: {
+        tenantId: 'demo-tenant-001',
+        since: '2026-03-01T00:00:00Z',
+        until: '2026-03-31T00:00:00Z',
+        totalGaps: 28,
+        clusters: [
+          {
+            intent: 'return_policy',
+            sampleQuestion: 'What is your return policy for opened items?',
+            frequency: 8,
+            lastOccurrence: '2026-03-30T14:22:00Z',
+            suggestedAction: 'Add KB article covering opened-item return conditions',
+            priorityScore: 0.85,
+            conversationIds: ['conv-001', 'conv-003', 'conv-009', 'conv-015', 'conv-022', 'conv-028', 'conv-031', 'conv-044'],
+          },
+          {
+            intent: 'shipping_international',
+            sampleQuestion: 'Do you ship to Canada? How long does it take?',
+            frequency: 5,
+            lastOccurrence: '2026-03-29T09:15:00Z',
+            suggestedAction: 'Create international shipping FAQ with country-specific timelines',
+            priorityScore: 0.72,
+            conversationIds: ['conv-007', 'conv-012', 'conv-019', 'conv-033', 'conv-041'],
+          },
+          {
+            intent: 'warranty_claim',
+            sampleQuestion: 'How do I file a warranty claim for a defective product?',
+            frequency: 3,
+            lastOccurrence: '2026-03-28T16:45:00Z',
+            suggestedAction: 'Add warranty claim process documentation',
+            priorityScore: 0.58,
+            conversationIds: ['conv-005', 'conv-018', 'conv-037'],
+          },
+          {
+            intent: 'bulk_discount',
+            sampleQuestion: 'Are there discounts for bulk orders over 50 units?',
+            frequency: 2,
+            lastOccurrence: '2026-03-25T11:30:00Z',
+            suggestedAction: 'Document bulk pricing tiers and contact process',
+            priorityScore: 0.35,
+            conversationIds: ['conv-014', 'conv-039'],
+          },
+        ],
+      },
+    };
+  });
+
   GET('/api/admin/knowledge/:id', (req: MockRequest): MockResponse => {
     const article = s().articles.find((a: Record<string, unknown>) => a.id === req.params.id);
     if (!article) return { status: 404, body: { detail: 'Article not found' } };
@@ -128,4 +204,5 @@ export function registerKnowledgeHandlers(): void {
   GET('/api/admin/knowledge/ingest/status', (_req: MockRequest): MockResponse => {
     return { status: 200, body: { job_id: 'mock-job-001', status: 'completed', progress: 100 } };
   });
+
 }

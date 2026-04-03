@@ -18,6 +18,7 @@
 import { FunctionComponent, JSX } from 'preact';
 import { useRef, useEffect, useState, useCallback } from 'preact/hooks';
 import type { DesignTokens, QuickActionButton } from '@/theme/tokens';
+import { focusRingColor } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
 import type { Message } from '@/state/store';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -71,6 +72,8 @@ interface MessageListProps {
   onQuickAction?: (promptTemplate: string) => void;
   /** Callback for per-message feedback (SPEC-1836). */
   onMessageFeedback?: (messageId: string, rating: 'positive' | 'negative') => void;
+  /** Number of messages restored from previous session (SPEC-1868). */
+  restoredMessageCount?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +132,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
   quickActions,
   onQuickAction,
   onMessageFeedback,
+  restoredMessageCount = 0,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -175,6 +179,8 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
       elements.push(
         <div
           key={`day-${msg.timestamp}`}
+          role="separator"
+          aria-label={getDayLabel(msg.timestamp, locale)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -203,6 +209,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
       <MessageBubble
         key={msg.id}
         tokens={tokens}
+        locale={locale}
         message={msg}
         agentName={agentName}
         agentAvatarUrl={agentAvatarUrl}
@@ -210,6 +217,34 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
         onFeedback={onMessageFeedback}
       />,
     );
+
+    // SPEC-1868: Separator between restored and new messages
+    if (restoredMessageCount > 0 && i === restoredMessageCount - 1 && i < messages.length - 1) {
+      elements.push(
+        <div
+          key="restored-separator"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: tokens.space2,
+            padding: `${tokens.space2} ${tokens.space4}`,
+          }}
+        >
+          <div style={{ flex: 1, height: '1px', backgroundColor: tokens.colorBorder }} />
+          <span
+            style={{
+              fontSize: tokens.fontSizeXs,
+              fontFamily: tokens.fontFamily,
+              color: tokens.colorTextMuted,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {locale.previousConversation}
+          </span>
+          <div style={{ flex: 1, height: '1px', backgroundColor: tokens.colorBorder }} />
+        </div>,
+      );
+    }
   }
 
   return (
@@ -221,10 +256,34 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
         backgroundColor: tokens.colorBackground,
       }}
     >
+
+      {/* Visually-hidden live region for screen reader announcements.
+          Messages are announced here only AFTER streaming completes,
+          avoiding the empty-node-then-mutate problem with aria-live on
+          the scroll container (SSE inserts empty bubble then fills it). */}
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+          clip: 'rect(0,0,0,0)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {messages.length > 0 && !messages[messages.length - 1].streaming
+          ? messages[messages.length - 1].content
+          : ''}
+      </div>
+
       <div
         ref={scrollRef}
         className="ar-message-scroll"
         onScroll={handleScroll}
+        role="log"
+        aria-label={locale.conversationMessages}
         style={{
           height: '100%',
           overflowY: 'auto',
@@ -372,6 +431,13 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
             alignItems: 'center',
             gap: tokens.space1,
             outline: 'none',
+            transition: `box-shadow ${tokens.transitionFast}`,
+          }}
+          onFocus={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow = `${tokens.shadowMd}, 0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
+          }}
+          onBlur={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow = tokens.shadowMd;
           }}
         >
           <ChevronDownIcon size={12} />

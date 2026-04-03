@@ -36,8 +36,14 @@ interface SSEOptions {
   conversationId: string;
   /** Optional admin auth token for team member identification. */
   authToken?: string;
+  /** Auth type: 'api_key' or 'session_token'. Default: 'api_key'. */
+  authType?: 'api_key' | 'session_token';
+  /** Tenant ID for SPEC-1644 partition-scoped auth. */
+  tenantId?: string;
   onConnectionLost?: () => void;
   onConnectionRestored?: () => void;
+  /** Called on each reconnect attempt with the current attempt number (P3-4). */
+  onReconnectAttempt?: (attempt: number) => void;
   /** Called when all reconnect attempts are exhausted (WI-0931). */
   onMaxReconnectsExhausted?: () => void;
 }
@@ -106,10 +112,21 @@ export class SSEConnection {
     // as a query parameter. The backend accepts both header and query param.
     url.searchParams.set('widget_key', this.options.widgetKey);
 
+    // SPEC-1644: Append tenant for partition-scoped auth
+    if (this.options.tenantId) {
+      url.searchParams.set('tenant', this.options.tenantId);
+    }
+
     // Pass admin auth token for team member identification (SPEC-1562).
-    // Middleware checks api_key query param before widget_key.
+    // Use the correct query param based on auth type:
+    //   api_key → middleware checks api_key before widget_key
+    //   session_token → middleware checks X-Session-Token header (via query param)
     if (this.options.authToken) {
-      url.searchParams.set('api_key', this.options.authToken);
+      if (this.options.authType === 'session_token') {
+        url.searchParams.set('session_token', this.options.authToken);
+      } else {
+        url.searchParams.set('api_key', this.options.authToken);
+      }
     }
 
     // WI #133: Pass tab_id for multi-tab coordination. The backend tracks
@@ -191,6 +208,31 @@ export class SSEConnection {
     }
   }
 
+  /**
+   * Retry connection after max reconnects exhausted.
+   *
+   * Unlike disconnect()+connect() or creating a new SSEConnection,
+   * this preserves lastEventId and currentStreamContent so the backend
+   * can replay buffered events from the correct position. Resets only
+   * the attempt counter and closed flag.
+   */
+  retry(): void {
+    // Close existing EventSource without marking as permanently closed
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    // Reset connection state but preserve replay position
+    this.closed = false;
+    this.reconnectAttempts = 0;
+    // lastEventId and currentStreamContent are intentionally kept
+    this.connect();
+  }
+
   // ---- Event handling ------------------------------------------------------
 
   private handleEvent(event: StreamEvent): void {
@@ -216,7 +258,7 @@ export class SSEConnection {
               streaming: true,
             };
             store.addMessage(msg);
-            store.setState({ isAgentTyping: false });
+            store.setState({ isAgentTyping: false, isStreaming: true });
           }
         } catch { /* ignore malformed stage events */ }
         break;
@@ -238,14 +280,19 @@ export class SSEConnection {
       case 'validated': {
         // Critic approved — mark the streaming message as complete.
         // B1: pass structured sources when present in validated payload.
+        // SPEC-1867: pass structured blocks when present.
         let validatedSources: Array<{ title: string; url?: string }> | undefined;
+        let validatedBlocks: import('@/state/store').AnswerBlock[] | undefined;
         try {
           const payload = JSON.parse(event.data);
           if (Array.isArray(payload.sources)) {
             validatedSources = payload.sources;
           }
-        } catch { /* raw data — no sources */ }
-        store.updateLastAgentMessage(this.currentStreamContent, false, validatedSources);
+          if (Array.isArray(payload.blocks)) {
+            validatedBlocks = payload.blocks;
+          }
+        } catch { /* raw data — no sources/blocks */ }
+        store.updateLastAgentMessage(this.currentStreamContent, false, validatedSources, validatedBlocks);
         this.currentStreamContent = '';
         break;
       }
@@ -261,6 +308,7 @@ export class SSEConnection {
         // connection, so reconnecting after 'done' would trigger a
         // duplicate pipeline run, creating ghost messages and retractions.
         this.streamComplete = true;
+        store.setState({ isStreaming: false });
         if (this.eventSource) {
           this.eventSource.close();
           this.eventSource = null;
@@ -270,7 +318,7 @@ export class SSEConnection {
 
       case 'retracted': {
         // Critic rejected — replace with safe fallback (Decision UI-5)
-        let fallback = 'I apologize, but I need to rephrase my response. How else can I help you?';
+        let fallback = store.getState().locale.sseRetractFallback;
         try {
           const parsed = JSON.parse(event.data);
           if (parsed.fallback_text) fallback = parsed.fallback_text;
@@ -282,14 +330,14 @@ export class SSEConnection {
       }
 
       case 'error': {
-        let errorMsg = 'An error occurred';
+        let errorMsg = store.getState().locale.sseErrorFallback;
         try {
           const parsed = JSON.parse(event.data);
           errorMsg = parsed.message || errorMsg;
         } catch {
           errorMsg = event.data || errorMsg;
         }
-        store.setState({ error: errorMsg });
+        store.setState({ error: errorMsg, isStreaming: false });
         break;
       }
 
@@ -319,6 +367,10 @@ export class SSEConnection {
       30000, // max 30s
     );
     this.reconnectAttempts++;
+
+    if (this.options.onReconnectAttempt) {
+      this.options.onReconnectAttempt(this.reconnectAttempts);
+    }
 
     this.reconnectTimer = setTimeout(() => {
       this.connect();

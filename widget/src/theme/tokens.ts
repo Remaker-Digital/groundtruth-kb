@@ -168,6 +168,11 @@ export interface WidgetConfig {
   widget_panel_width?: 'compact' | 'standard' | 'wide' | null;
   widget_panel_height?: 'short' | 'standard' | 'tall' | null;
   widget_locale?: 'auto' | 'en' | 'es' | 'fr' | 'de' | 'pt' | 'ja' | 'zh' | 'ko' | null;
+  // Transcript continuity (SPEC-1868)
+  widget_transcript_continuity?: 'none' | 'session' | 'persistent' | null;
+  widget_transcript_ttl_hours?: number | null;
+  // Structured answer blocks (SPEC-1867)
+  structured_blocks_enabled?: boolean | null;
   // Non-widget fields used for display
   brand_name?: string | null;
   // Quick action buttons for the current page context (WI #228)
@@ -224,6 +229,41 @@ function luminance(hex: string): number {
  *  get white text — matching user expectations over strict WCAG min-contrast. */
 function contrastText(bgHex: string): string {
   return luminance(bgHex) > 0.36 ? '#1A1A1A' : '#FFFFFF';
+}
+
+/** Choose black or white for a WCAG-safe focus ring against a background.
+ *
+ *  Unlike contrastText() (tuned for aesthetics, threshold 0.36), this uses
+ *  the optimal luminance switchover (0.1791) where both black and white
+ *  achieve >= 4.58:1 contrast. Guarantees >= 3:1 for ALL backgrounds,
+ *  satisfying WCAG 2.4.7 (focus visible) + 1.4.11 (non-text contrast).
+ *
+ *  Phase 2 control surface closeout (S254). */
+export function focusRingColor(bgHex: string): string {
+  return luminance(bgHex) > 0.1791 ? '#000000' : '#FFFFFF';
+}
+
+/** Choose a focus ring color that passes 3:1 against both gradient endpoints.
+ *
+ *  NOTE: This does NOT guarantee 3:1 at all interior blend points because
+ *  contrast ratio is non-linear (gamma 2.4). For guaranteed universal
+ *  visibility on gradients, use a double ring instead:
+ *    boxShadow: '0 0 0 2px #000, 0 0 0 4px #fff'
+ *  See Header.tsx for the canonical gradient focus-ring pattern.
+ *
+ *  This helper is still useful for cases where both endpoints are known
+ *  to be in the same luminance range (both light or both dark).
+ *
+ *  Phase 2 control surface closeout (S255). */
+export function focusRingColorGradient(startHex: string, endHex: string): string {
+  const contrastRatio = (fg: string, bg: string): number => {
+    const l1 = Math.max(luminance(fg), luminance(bg));
+    const l2 = Math.min(luminance(fg), luminance(bg));
+    return (l1 + 0.05) / (l2 + 0.05);
+  };
+  const blackMin = Math.min(contrastRatio('#000000', startHex), contrastRatio('#000000', endHex));
+  const whiteMin = Math.min(contrastRatio('#FFFFFF', startHex), contrastRatio('#FFFFFF', endHex));
+  return blackMin >= whiteMin ? '#000000' : '#FFFFFF';
 }
 
 // ---------------------------------------------------------------------------

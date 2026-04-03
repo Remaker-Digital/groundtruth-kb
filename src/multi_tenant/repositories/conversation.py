@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from azure.core import MatchConditions
+
 from src.multi_tenant.cosmos_schema import (
     COLLECTION_CONVERSATIONS,
     ConversationStatus,
@@ -222,6 +224,29 @@ class ConversationRepository(TenantScopedRepository):
 
         body = await self._pre_write(doc, tenant_id)
         result = await self._container.replace_item(item=conversation_id, body=body)
+        return await self._post_read(result, tenant_id)
+
+    async def replace_with_etag(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        doc: dict[str, Any],
+        etag: str,
+    ) -> dict[str, Any]:
+        """Conditional replace — fails if document changed since read.
+
+        Uses Cosmos ETag/If-Match for optimistic concurrency (P1-2).
+        Raises ``azure.cosmos.exceptions.CosmosAccessConditionFailedError``
+        if the document was modified by another writer.
+        """
+        self._validate_tenant_id(tenant_id)
+        body = await self._pre_write(doc, tenant_id)
+        result = await self._container.replace_item(
+            item=conversation_id,
+            body=body,
+            etag=etag,
+            match_condition=MatchConditions.IfNotModified,
+        )
         return await self._post_read(result, tenant_id)
 
     async def end_conversation(

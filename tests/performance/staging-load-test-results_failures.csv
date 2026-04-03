@@ -1,7 +1,1 @@
 Method,Name,Error,Occurrences
-GET,/api/chat/conversations/{id} [state],CatchResponseError('State failed: 429'),3
-GET,/api/analytics/summary,HTTPError('429 Client Error: Too Many Requests for url: /api/analytics/summary'),1
-POST,/api/chat/conversations [start],CatchResponseError('Start failed: 429'),3
-POST,/api/chat/conversations/{id}/end [end],CatchResponseError('End failed: 429'),1
-GET,/api/config [get],HTTPError('429 Client Error: Too Many Requests for url: /api/config [get]'),1
-POST,/api/chat/message [send],CatchResponseError('Message failed: 429'),4

@@ -67,6 +67,9 @@ def _load_fields_from_yaml(
     for raw in raw_fields:
         # Resolve sentinels in validation.allowed_values
         validation_data = raw.get("validation", {})
+        # Normalize YAML alias: validation.options → allowed_values (SELECT fields)
+        if "options" in validation_data and "allowed_values" not in validation_data:
+            validation_data["allowed_values"] = validation_data.pop("options")
         if "allowed_values" in validation_data:
             validation_data["allowed_values"] = _resolve_sentinel(
                 validation_data["allowed_values"]
@@ -152,6 +155,7 @@ def get_fields_for_tier(tier: TenantTier) -> dict[str, ConfigFieldDefinition]:
     }
     gate_rank = {
         TierGate.ALL: 0,
+        TierGate.PROFESSIONAL: 1,
         TierGate.PROFESSIONAL_PLUS: 1,
         TierGate.ENTERPRISE_ONLY: 2,
     }

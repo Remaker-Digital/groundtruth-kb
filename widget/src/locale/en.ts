@@ -62,6 +62,39 @@ export interface Locale {
   consentPrompt: string;
   consentAccept: string;
   consentDecline: string;
+  // Phase 2 (S254) — WCAG AA + locale completeness
+  openChat: string;
+  closeChat: string;
+  chatImageAlt: string;
+  logoAlt: string;
+  headerSubtitleDefault: string;
+  statusOnline: string;
+  feedbackHelpful: string;
+  feedbackNotHelpful: string;
+  messageRevised: string;
+  previousConversation: string;
+  iframeTitleChat: string;
+  conversationMessages: string;
+  unreadMessages: string;
+  defaultAgentName: string;
+  poweredByPrefix: string;
+  poweredByBrand: string;
+  offlineFormName: string;
+  offlineFormEmail: string;
+  offlineFormMessage: string;
+  errorStartConversation: string;
+  errorSendMessage: string;
+  errorGeneric: string;
+  escalationNotice: string;
+  waitForResponse: string;
+  sseRetractFallback: string;
+  sseErrorFallback: string;
+  // Phase 3 (S256) — connection recovery + restore UX
+  reconnectingAttempt: string;
+  connectionFailedPermanent: string;
+  retryConnection: string;
+  dismissError: string;
+  restoringConversation: string;
 }
 
 export const en: Locale = {
@@ -116,4 +149,37 @@ export const en: Locale = {
   consentPrompt: 'We use your conversation history to provide personalized support. You can change this at any time.',
   consentAccept: 'Allow',
   consentDecline: 'No thanks',
+  // Phase 2 (S254) — WCAG AA + locale completeness
+  openChat: 'Open chat',
+  closeChat: 'Close chat',
+  chatImageAlt: 'Chat',
+  logoAlt: 'Logo',
+  headerSubtitleDefault: 'We typically reply within minutes',
+  statusOnline: 'Online',
+  feedbackHelpful: 'Helpful',
+  feedbackNotHelpful: 'Not helpful',
+  messageRevised: 'Message revised',
+  previousConversation: 'Previous conversation',
+  iframeTitleChat: 'Agent Red Chat',
+  conversationMessages: 'Conversation messages',
+  unreadMessages: 'unread messages',
+  defaultAgentName: 'AI Assistant',
+  poweredByPrefix: 'Powered by',
+  poweredByBrand: 'Agent Red',
+  offlineFormName: 'Name',
+  offlineFormEmail: 'Email',
+  offlineFormMessage: 'Message',
+  errorStartConversation: 'Failed to start conversation',
+  errorSendMessage: 'Failed to send message',
+  errorGeneric: 'An error occurred',
+  escalationNotice: 'This conversation has been transferred to a human agent. Please wait for a support team member to respond.',
+  waitForResponse: 'Please wait for the current response to complete',
+  sseRetractFallback: 'I apologize, but I need to rephrase my response. How else can I help you?',
+  sseErrorFallback: 'An error occurred',
+  // Phase 3 (S256) — connection recovery + restore UX
+  reconnectingAttempt: 'Reconnecting... attempt {n}',
+  connectionFailedPermanent: 'Unable to connect',
+  retryConnection: 'Retry',
+  dismissError: 'Dismiss',
+  restoringConversation: 'Loading previous conversation...',
 };

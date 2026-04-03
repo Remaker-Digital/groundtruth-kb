@@ -35,6 +35,7 @@ from src.chat.models import (
 from src.chat.sse_manager import (
     BUFFER_EXPIRY_SECONDS,
     DEFAULT_RETRY_MS,
+    EventBuffer,
     KEEPALIVE_INTERVAL_SECONDS,
     MAX_BUFFERED_EVENTS,
     SSEConnectionManager,
@@ -216,6 +217,118 @@ class TestSSEReconnection:
     def test_default_retry_ms(self):
         """Default SSE retry interval is reasonable for reconnection."""
         assert DEFAULT_RETRY_MS == 3000  # 3 seconds
+
+    def test_replay_accepts_query_param_fallback(self):
+        """P0-2: parse_last_event_id reads query param when header is absent.
+
+        Exercises the production function from endpoints.py, not an
+        inline re-implementation.
+        """
+        from starlette.datastructures import Headers, QueryParams
+        from starlette.requests import Request
+
+        from src.chat.endpoints import parse_last_event_id
+
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/chat/stream/test",
+            "headers": [],
+            "query_string": b"last_event_id=42",
+        }
+        request = Request(scope)
+
+        assert parse_last_event_id(request) == 42
+
+    def test_replay_header_takes_precedence_over_query_param(self):
+        """P0-2: parse_last_event_id prefers header over query param."""
+        from src.chat.endpoints import parse_last_event_id
+        from starlette.requests import Request
+
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/chat/stream/test",
+            "headers": [(b"last-event-id", b"99")],
+            "query_string": b"last_event_id=42",
+        }
+        request = Request(scope)
+
+        assert parse_last_event_id(request) == 99
+
+    def test_replay_returns_zero_when_absent(self):
+        """P0-2: parse_last_event_id returns 0 when neither source present."""
+        from src.chat.endpoints import parse_last_event_id
+        from starlette.requests import Request
+
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/chat/stream/test",
+            "headers": [],
+            "query_string": b"",
+        }
+        request = Request(scope)
+
+        assert parse_last_event_id(request) == 0
+
+
+# ---------------------------------------------------------------------------
+# P1-2: Fan-out and completed-message tracking
+# ---------------------------------------------------------------------------
+
+
+class TestSSEFanOutState:
+    """P1-2: SSE manager fan-out state management."""
+
+    def test_is_message_completed_tracks_finished_producers(self):
+        """After producer finishes, is_message_completed returns True."""
+        mgr = SSEConnectionManager()
+        conv_id = "conv-fanout-test"
+        msg_id = "msg-001"
+
+        # Initially not completed
+        assert mgr.is_message_completed(conv_id, msg_id) is False
+
+        # Simulate producer completion
+        mgr._completed_messages[conv_id] = msg_id
+        assert mgr.is_message_completed(conv_id, msg_id) is True
+
+        # Different message_id is not completed
+        assert mgr.is_message_completed(conv_id, "msg-002") is False
+
+    def test_cleanup_removes_fan_out_state(self):
+        """cleanup_expired_buffers also removes fan-out bookkeeping."""
+        import time
+        mgr = SSEConnectionManager()
+        conv_id = "conv-cleanup-test"
+
+        # Set up fan-out state
+        mgr._completed_messages[conv_id] = "msg-001"
+        mgr._producer_done[conv_id] = True
+        mgr._producer_sequences[conv_id] = 5
+
+        # Create an expired buffer
+        buf = EventBuffer()
+        buf.last_activity = time.monotonic() - BUFFER_EXPIRY_SECONDS - 1
+        mgr._buffers[conv_id] = buf
+
+        removed = mgr.cleanup_expired_buffers()
+        assert removed == 1
+        assert conv_id not in mgr._completed_messages
+        assert conv_id not in mgr._producer_done
+        assert conv_id not in mgr._producer_sequences
+
+    def test_is_producer_active_tracks_running_producers(self):
+        """is_producer_active returns True only for matching message_id."""
+        mgr = SSEConnectionManager()
+        conv_id = "conv-active-test"
+
+        assert mgr.is_producer_active(conv_id, "msg-001") is False
+
+        mgr._active_producers[conv_id] = "msg-001"
+        assert mgr.is_producer_active(conv_id, "msg-001") is True
+        assert mgr.is_producer_active(conv_id, "msg-002") is False
 
 
 # ---------------------------------------------------------------------------

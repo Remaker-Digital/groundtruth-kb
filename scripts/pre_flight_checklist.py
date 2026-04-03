@@ -710,7 +710,10 @@ def compute_verdict(all_results: dict[str, list[AssertionResult]]) -> str:
     if c_fails > 0:
         return "ROLLBACK REQUIRED — Phase C post-deploy failures"
     if d_fails > 0:
-        return "DEPLOYMENT LIVE BUT DEFECTIVE — Phase D tenant provisioning failures"
+        # S251 OM-3: Widget/chat failures are deployment failures, not advisory.
+        # The chat widget is the core product surface. A broken widget means
+        # the deployment is FAILED, not "live but defective."
+        return "ROLLBACK REQUIRED — Phase D widget/chat critical-path failures"
     return "DEPLOYMENT VERIFIED"
 
 

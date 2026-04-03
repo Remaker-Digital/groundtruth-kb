@@ -1,0 +1,17 @@
+# Agent Red Customer Experience — Local Development Dependencies
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Install from the Agent Red repo root:
+#   cd <path-to>/Agent Red Customer Engagement
+#   pip install -r requirements-local.txt
+# These are development-only dependencies that are NOT shipped in production
+# Docker images. They require sibling repos to be cloned locally.
+
+# Test dependencies (includes production deps)
+-r requirements-test.txt
+
+# GroundTruth KB — extracted specification-driven governance toolkit.
+# The [web] extra provides FastAPI/Jinja2/Uvicorn for the KB web UI.
+# Default: install from GitHub (same version as requirements-test.txt).
+# Override: for local GT development, replace with: -e ../groundtruth-kb[web]
+groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1

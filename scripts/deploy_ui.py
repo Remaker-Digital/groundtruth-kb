@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Deploy UI components independently without a full system build.
+"""Deploy UI components independently — SMOKE HELPER ONLY (S251 OM-1).
+
+WARNING: This script is a UI deployment smoke helper. Its verify command
+proves static asset reachability and widget config auth, but it does NOT
+prove end-to-end widget conversation readiness. The canonical production
+GO/NO-GO path is: scripts/release_pipeline.py
 
 Implements SPEC-1705: Local UI development and staging deployment without
 full build. Uses Dockerfile.ui to overlay only the UI dist directories on
@@ -381,8 +386,42 @@ def verify_deployment(env: str) -> dict:
             results[name] = {"url": url, "status": 0, "ok": False, "error": str(e)}
             logger.warning("  [FAIL] %s -> %s", name, e)
 
-    passed = sum(1 for r in results.values() if r["ok"])
-    total = len(results)
+    # Widget config auth check — verifies widget key auth works on /api/config
+    # (S251: the exact failure mode diagnosed when the admin widget returned 401)
+    # Environment-specific key resolution (mirrors deploy.py pattern)
+    widget_key = os.environ.get("DEPLOY_SMOKE_WIDGET_KEY", "")
+    if not widget_key:
+        if env == "staging":
+            widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
+        elif env == "production":
+            widget_key = os.environ.get("PRODUCTION_WIDGET_KEY", "")
+
+    if widget_key:
+        config_url = f"{base_url}/api/config?page_type=all"
+        try:
+            req = urllib.request.Request(config_url, method="GET")
+            req.add_header("X-Widget-Key", widget_key)
+            req.add_header("User-Agent", "deploy-ui-verify/1.0")
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                status = resp.getcode()
+                results["widget_config_auth"] = {"url": config_url, "status": status, "ok": status == 200}
+                logger.info("  [%s] widget_config_auth -> %d", "OK" if status == 200 else "FAIL", status)
+        except urllib.error.HTTPError as e:
+            results["widget_config_auth"] = {"url": config_url, "status": e.code, "ok": False}
+            logger.warning("  [FAIL] widget_config_auth -> HTTP %d", e.code)
+        except Exception as e:
+            results["widget_config_auth"] = {"url": config_url, "status": 0, "ok": False, "error": str(e)}
+            logger.warning("  [FAIL] widget_config_auth -> %s", e)
+    else:
+        # No widget key = hard fail (not a skip). Widget verification is mandatory.
+        results["widget_config_auth"] = {
+            "url": f"{base_url}/api/config", "status": 0, "ok": False,
+            "error": "No widget key configured (set DEPLOY_SMOKE_WIDGET_KEY or environment-specific key)",
+        }
+        logger.warning("  [FAIL] widget_config_auth — no widget key configured")
+
+    passed = sum(1 for k, r in results.items() if k != "summary" and isinstance(r, dict) and r.get("ok"))
+    total = sum(1 for k, r in results.items() if k != "summary" and isinstance(r, dict))
     results["summary"] = {"passed": passed, "total": total, "all_ok": passed == total}
     logger.info("Verification: %d/%d passed", passed, total)
     return results

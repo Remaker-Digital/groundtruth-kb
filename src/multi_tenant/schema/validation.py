@@ -31,6 +31,7 @@ _TIER_RANK = {
 _GATE_RANK = {
     TierGate.ALL: 0,
     TierGate.PROFESSIONAL_PLUS: 1,
+    TierGate.PROFESSIONAL: 1,       # YAML alias — same rank as pro+
     TierGate.ENTERPRISE_ONLY: 2,
 }
 
@@ -96,7 +97,7 @@ def validate_field(
     if field.field_type == ConfigFieldType.BOOLEAN:
         return _validate_boolean(field_name, value)
 
-    if field.field_type == ConfigFieldType.ENUM:
+    if field.field_type in (ConfigFieldType.ENUM, ConfigFieldType.SELECT):
         return _validate_enum(field_name, value, rules)
 
     if field.field_type == ConfigFieldType.STRING_LIST:

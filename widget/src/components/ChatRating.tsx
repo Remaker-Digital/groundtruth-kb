@@ -157,12 +157,14 @@ export const ChatRating: FunctionComponent<ChatRatingProps> = ({
       >
         <RatingButton
           tokens={tokens}
+          locale={locale}
           type="positive"
           selected={selectedRating === 'positive'}
           onClick={() => handleRate('positive')}
         />
         <RatingButton
           tokens={tokens}
+          locale={locale}
           type="negative"
           selected={selectedRating === 'negative'}
           onClick={() => handleRate('negative')}
@@ -233,17 +235,18 @@ export const ChatRating: FunctionComponent<ChatRatingProps> = ({
 
 const RatingButton: FunctionComponent<{
   tokens: DesignTokens;
+  locale: Locale;
   type: 'positive' | 'negative';
   selected: boolean;
   onClick: () => void;
-}> = ({ tokens, type, selected, onClick }) => {
+}> = ({ tokens, locale, type, selected, onClick }) => {
   const isPositive = type === 'positive';
 
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={isPositive ? 'Helpful' : 'Not helpful'}
+      aria-label={isPositive ? locale.feedbackHelpful : locale.feedbackNotHelpful}
       style={{
         width: '56px',
         height: '56px',

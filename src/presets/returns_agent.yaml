@@ -1,0 +1,83 @@
+# Returns & Exchanges Agent — post-purchase support
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+id: returns_agent
+display_name: "Returns & Exchanges"
+description: "Post-purchase support: returns, exchanges, order status tracking"
+icon: "package-return"
+
+preferences:
+  brand_voice: "professional and empathetic"
+  formality_level: "formal"
+  response_length: "standard"
+  escalation_threshold: 0.4
+  escalation_keywords:
+    - "refund"
+    - "fraud"
+    - "complaint"
+    - "lawyer"
+    - "BBB"
+    - "chargeback"
+  custom_instructions: |
+    Focus on resolving return and exchange requests efficiently.
+    Always confirm the order number before proceeding.
+    Offer alternatives (exchange, store credit) before processing refunds.
+    Be empathetic — customers reaching out about returns are often frustrated.
+
+quick_actions:
+  - label: "Start a Return"
+    message: "I'd like to return an item from my recent order"
+  - label: "Track My Order"
+    message: "Where is my order? I'd like to check the shipping status"
+  - label: "Exchange an Item"
+    message: "I'd like to exchange an item for a different size or color"
+
+widget:
+  greeting_message: "Hi! Need help with a return or exchange? I'm here to help."
+  input_placeholder: "Ask about returns, exchanges, or order status..."
+
+knowledge_seed:
+  - title: "Return Policy"
+    content: |
+      We accept returns within 30 days of purchase for most items.
+      Items must be in original condition with tags attached.
+
+      **How to start a return:**
+      1. Have your order number ready
+      2. Tell us which item(s) you'd like to return
+      3. We'll provide a prepaid return label
+      4. Ship the item back within 7 days
+
+      **Exceptions:**
+      - Sale items are final sale unless defective
+      - Personalized items cannot be returned
+      - Gift cards are non-refundable
+
+      Refunds are processed within 5-7 business days after
+      we receive your return.
+    category: "policies"
+  - title: "Exchange Process"
+    content: |
+      We're happy to exchange items for a different size, color,
+      or style.
+
+      **How exchanges work:**
+      1. Request an exchange through this chat or email
+      2. We'll confirm availability of your desired item
+      3. Ship the original item back using our prepaid label
+      4. Your new item ships as soon as we receive the return
+
+      **Price differences:**
+      - If the new item costs more, we'll charge the difference
+      - If it costs less, we'll refund the difference
+
+      Exchanges are typically completed within 7-10 business days.
+    category: "processes"
+
+agents_recommended:
+  - agent_id: sales
+    tier_required: professional
+    reason: "Order lookup and cart management"
+  - agent_id: schedule
+    tier_required: professional
+    reason: "Follow-up scheduling for pending returns"

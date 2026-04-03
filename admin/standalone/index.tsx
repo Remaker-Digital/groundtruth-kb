@@ -44,6 +44,8 @@ import { QuickActionsPage } from './pages/QuickActions';
 import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
 import { AgentsPage } from './pages/Agents';
 import { IntegrationsPage } from './pages/Integrations';
+import { KnowledgeScorePage } from './pages/KnowledgeScore';
+import { ConversationPreviewPage } from './pages/ConversationPreview';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { TwoFaChallenge } from './components/TwoFaChallenge';
 
@@ -284,6 +286,16 @@ const App: React.FC = () => {
             <Route path="/integrations" element={
               <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
                 <IntegrationsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/knowledge-score" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <KnowledgeScorePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/preview" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <ConversationPreviewPage />
               </ProtectedRoute>
             } />
             <Route path="/memory-privacy" element={

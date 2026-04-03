@@ -13,6 +13,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { resolve } from 'path';
@@ -23,6 +24,11 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
     },
+  },
+  test: {
+    environment: 'happy-dom',
+    include: ['tests/**/*.test.{ts,tsx}'],
+    globals: true,
   },
   build: {
     lib: {

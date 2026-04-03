@@ -559,7 +559,11 @@ async def _startup_envelope_encryption() -> None:
     """Initialize the EnvelopeEncryptionService (SPEC-1843 / WI-1631).
 
     In dev mode (no MASTER_KEK_KEY_ID), uses an in-memory test KEK.
-    In production, connects to Azure Key Vault for the Master KEK.
+    In staging/production, connects to Azure Key Vault for the Master KEK.
+
+    Fail-closed (S251): In non-development environments, missing
+    MASTER_KEK_KEY_ID is a fatal startup error. This prevents silent
+    degradation to insecure dev-mode encryption in production.
     """
     from src.multi_tenant.envelope_encryption import (
         EnvelopeEncryptionService,
@@ -568,7 +572,21 @@ async def _startup_envelope_encryption() -> None:
 
     kek_key_id = os.environ.get("MASTER_KEK_KEY_ID")
     vault_url = os.environ.get("AZURE_KEYVAULT_URL")
+    environment = os.environ.get("ENVIRONMENT", "development").lower().strip()
     dev_mode = not kek_key_id
+
+    # S251 fail-closed: refuse to start without KEK in non-dev environments
+    if dev_mode and environment in ("staging", "production"):
+        logger.critical(
+            "MASTER_KEK_KEY_ID is not set in %s environment. "
+            "Refusing to start — field-level encryption would fall back to "
+            "insecure dev-mode KEK. Set MASTER_KEK_KEY_ID to the Key Vault "
+            "key versionless ID (e.g., https://<vault>/keys/agent-red-cmk).",
+            environment,
+        )
+        raise RuntimeError(
+            f"MASTER_KEK_KEY_ID required in {environment} environment"
+        )
 
     try:
         svc = EnvelopeEncryptionService(
@@ -617,11 +635,11 @@ async def _startup_chat_services() -> None:
         critic = None
         try:
             from src.multi_tenant.critic_policy import CriticPolicy
-            from src.chat.pipeline.constants import AGENT_URLS
-            critic_url = AGENT_URLS.get("critic-supervisor", "")
-            if critic_url:
-                critic = CriticPolicy(critic_urls=[critic_url])
-                logger.info("CriticPolicy initialized with URL: %s", critic_url)
+            from src.chat.pipeline.constants import get_critic_urls
+            critic_urls = get_critic_urls()
+            if critic_urls:
+                critic = CriticPolicy(critic_urls=critic_urls)
+                logger.info("CriticPolicy initialized with %d URL(s): %s", len(critic_urls), critic_urls)
             else:
                 logger.warning("Critic URL not configured — CriticPolicy disabled (fail-closed)")
         except Exception as exc:
@@ -659,6 +677,27 @@ async def _startup_chat_services() -> None:
                 "first-chunk billing will not be recorded.",
                 exc_info=True,
             )
+
+        # P1-5: Schedule periodic SSE buffer cleanup (every 60s).
+        # cleanup_expired_buffers() exists but was never called in production.
+        try:
+            from src.chat.sse_manager import get_sse_manager as _get_sse_mgr
+            _sse_mgr = _get_sse_mgr()
+
+            async def _buffer_cleanup_loop() -> None:
+                while True:
+                    await asyncio.sleep(60)
+                    try:
+                        removed = _sse_mgr.cleanup_expired_buffers()
+                        if removed > 0:
+                            logger.info("SSE buffer cleanup: %d expired buffers removed", removed)
+                    except Exception:
+                        logger.debug("SSE buffer cleanup error", exc_info=True)
+
+            asyncio.get_event_loop().create_task(_buffer_cleanup_loop())
+            logger.info("SSE buffer cleanup task scheduled (60s interval)")
+        except Exception:
+            logger.warning("SSE buffer cleanup scheduling failed", exc_info=True)
 
         logger.info(
             "Chat API services initialized (session + pipeline, 6 endpoints, mode=%s)",
@@ -1531,6 +1570,29 @@ async def _startup_alert_engine() -> None:
 
         configure_alert_engine(rule_repo, history_repo, incident_repo)
         logger.info("AlertEngine configured (5 metric collectors)")
+
+        # Seed quality regression rule if none exists
+        try:
+            rules = await rule_repo.list_all()
+            has_quality = any(
+                r.get("rule_type") == "quality_regression" for r in rules
+            )
+            if not has_quality:
+                await rule_repo.create_rule(
+                    name="Quality Regression",
+                    rule_type="quality_regression",
+                    description="Alerts when conversation quality drops below baseline",
+                    condition={
+                        "metric": "quality_overall",
+                        "operator": "lt_delta",
+                        "threshold": 0.5,
+                    },
+                    notification_channels=["email"],
+                    cooldown_minutes=60,
+                )
+                logger.info("Seeded quality_regression alert rule")
+        except Exception:
+            logger.warning("Failed to seed quality_regression rule", exc_info=True)
     except Exception:
         logger.warning(
             "AlertEngine initialization failed — "

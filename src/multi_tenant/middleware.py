@@ -237,8 +237,9 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         6. Store TenantContext in request.state.tenant_context.
         7. Forward to route handler.
 
-    Widget key auth (Decision UI-6) is scoped to /api/chat/* and
-    /ws/chat/* paths only. Requests to other paths with a widget key
+    Widget key auth (Decision UI-6) is scoped to /api/chat/*,
+    /ws/chat/*, and /api/config (read-only, required for widget
+    initialization). Requests to other paths with a widget key
     are rejected.
 
     On authentication failure, returns a JSON error response without
@@ -392,7 +393,41 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             api_key = request.query_params.get("api_key")
         if api_key:
             url_tenant = request.query_params.get("tenant")
-            return await self._auth_api_key(api_key, url_tenant)
+            try:
+                return await self._auth_api_key(api_key, url_tenant)
+            except AuthenticationError:
+                # S251 fallthrough: if a widget key is also present, fall
+                # through to widget key auth instead of returning 401.
+                # This handles admin-embedded widgets where the admin token
+                # may be stale but the widget key is still valid. The widget
+                # degrades to anonymous-customer mode (no team member context).
+                # Security: widget key auth is MORE restrictive (scoped to
+                # /api/chat/*, /ws/chat/*, /api/config only), so this cannot
+                # escalate privileges.
+                widget_key_fallback = (
+                    request.headers.get(WIDGET_KEY_HEADER)
+                    or request.query_params.get("widget_key")
+                    or request.query_params.get("key")
+                )
+                if widget_key_fallback:
+                    logger.warning(
+                        "API key auth failed with widget key present — "
+                        "falling through to widget key auth (path=%s)",
+                        request.url.path,
+                    )
+                else:
+                    raise  # No widget key fallback — propagate the 401
+
+        # Try magic link session token (X-Session-Token header or query param)
+        # S251: Moved BEFORE widget key so admin-embedded widgets with both
+        # X-Session-Token and X-Widget-Key resolve as team members, not
+        # anonymous widget users. SSE/EventSource passes session_token as
+        # a query param since browsers cannot set custom headers.
+        session_token = request.headers.get("X-Session-Token")
+        if not session_token:
+            session_token = request.query_params.get("session_token")
+        if session_token:
+            return await self._auth_magic_link_session(session_token)
 
         # Try publishable widget key (X-Widget-Key header or query param)
         widget_key = request.headers.get(WIDGET_KEY_HEADER)
@@ -409,11 +444,6 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if widget_key:
             origin = request.headers.get("origin") or request.headers.get("referer")
             return await self._auth_widget_key(widget_key, request.url.path, origin)
-
-        # Try magic link session token (X-Session-Token header)
-        session_token = request.headers.get("X-Session-Token")
-        if session_token:
-            return await self._auth_magic_link_session(session_token)
 
         # Try internal verification token (SPEC-1846: cloud-native verification)
         verification_token = request.headers.get(VERIFICATION_TOKEN_HEADER)

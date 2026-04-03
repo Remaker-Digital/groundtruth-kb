@@ -1661,6 +1661,54 @@ fields:
     pii_classification: none
     injected_in_prompt: false
 
+  - field_name: widget_transcript_continuity
+    display_name: Transcript continuity
+    field_type: select
+    validation:
+      options: ["none", "session", "persistent"]
+    platform_default: "none"
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 26
+    tooltip: Persist chat transcripts across page reloads or browser sessions.
+    description: "Controls whether chat transcripts persist when the customer navigates away. 'none': fresh conversation each visit. 'session': survives page reload (lost on tab close). 'persistent': survives browser close (expires after TTL)."
+    doc_link: "https://agentredcx.com/docs/configuration/widget-behavior#transcript-continuity"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_transcript_ttl_hours
+    display_name: Transcript TTL (hours)
+    field_type: integer
+    validation:
+      min: 1
+      max: 168
+    platform_default: 24
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 27
+    tooltip: How long persistent transcripts are retained before expiring (1-168 hours).
+    description: "Only applies when transcript continuity is set to 'persistent'. After this TTL expires, the stored conversation ID is cleared and the customer starts a fresh conversation. Maximum is 168 hours (7 days). GDPR-friendly: automatic expiry without manual intervention."
+    doc_link: "https://agentredcx.com/docs/configuration/widget-behavior#transcript-ttl"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: structured_blocks_enabled
+    display_name: Structured answer blocks
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: professional
+    onboarding_step: 9
+    step_order: 28
+    tooltip: Render AI responses as structured blocks (step lists, FAQ accordions, action buttons) when detected.
+    description: "When enabled, the AI response pipeline detects structural patterns in responses (numbered steps, Q&A pairs, call-to-action links) and renders them as interactive blocks in the widget. Text content is always preserved as fallback. Requires Professional tier or higher."
+    doc_link: "https://agentredcx.com/docs/configuration/widget-behavior#structured-blocks"
+    affects_agents: ["response-generator"]
+    pii_classification: none
+    injected_in_prompt: false
+
   - field_name: custom_instructions
     display_name: Custom AI instructions
     field_type: text

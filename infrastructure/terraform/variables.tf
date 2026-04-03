@@ -230,6 +230,89 @@ variable "job_image_tag" {
   default     = "latest"
 }
 
+# P1-1a: Widget canary variables
+variable "enable_canary_job" {
+  description = "Enable the widget canary Container App Job (every 5 min health check)"
+  type        = bool
+  default     = false
+}
+
+variable "canary_target_url" {
+  description = "Base URL for the widget canary to verify (e.g. https://agent-red-api-gateway...)"
+  type        = string
+  default     = ""
+}
+
+variable "canary_alert_email" {
+  description = "Email address for canary failure alerts"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_host" {
+  description = "SMTP host for canary alert emails"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_port" {
+  description = "SMTP port for canary alert emails"
+  type        = number
+  default     = 465
+}
+
+variable "smtp_user" {
+  description = "SMTP username for canary alert emails"
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Container App References (CI/CD-managed apps, data-source lookups)
+# ---------------------------------------------------------------------------
+
+variable "gateway_container_app_name" {
+  description = "Name of the CI/CD-managed API Gateway container app (for data-source lookups)"
+  type        = string
+  default     = ""
+}
+
+variable "gateway_managed_identity_principal_id" {
+  description = "System-assigned Managed Identity principal ID of the CI/CD-managed gateway (for RBAC assignments). Get via: az containerapp show -n <name> -g <rg> --query identity.principalId -o tsv"
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Langfuse Observability (G1 Lane 2, SPEC-1874)
+# ---------------------------------------------------------------------------
+
+variable "enable_langfuse" {
+  description = "Enable Langfuse observability (Lane 1 structural export, api-gateway only)"
+  type        = bool
+  default     = false
+}
+
+variable "langfuse_host" {
+  description = "Langfuse Cloud host URL"
+  type        = string
+  default     = "https://us.cloud.langfuse.com"
+}
+
+variable "langfuse_public_key" {
+  description = "Langfuse project public key (from Cloud dashboard, required when enable_langfuse=true)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "langfuse_secret_key" {
+  description = "Langfuse project secret key (from Cloud dashboard, required when enable_langfuse=true)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # Tags
 # ---------------------------------------------------------------------------

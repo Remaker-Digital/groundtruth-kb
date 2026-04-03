@@ -6,6 +6,14 @@
 
 ---
 
+## Canonical Production Approval Path (S251 OM-1)
+
+> **The only script that may yield a production GO is `scripts/release_pipeline.py`.**
+>
+> Helper scripts (`deploy_orchestrator.py`, `deploy_ui.py`, `deploy.py`) are smoke
+> tools for rapid staging iteration. Their exit codes MUST NOT be used as the basis
+> for production promotion decisions.
+
 ## Purpose
 
 Builds all application artifacts, creates a container image, and deploys to the target environment. This procedure ensures **no stale or missing build artifacts** are packaged into the Docker image by enforcing verification gates after every build step.
