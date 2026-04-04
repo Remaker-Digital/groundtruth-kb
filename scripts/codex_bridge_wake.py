@@ -85,39 +85,6 @@ def _append_agent_log(agent: str, message: str) -> None:
         fh.write(line)
 
 
-def _auto_accept_new_items(bridge, agent: str, new_items: list[dict]) -> list[dict]:
-    accepted: list[dict] = []
-    for item in new_items:
-        if item.get("message_kind") == "protocol_ack":
-            continue
-        if item.get("sender") not in {"codex", "prime"}:
-            continue
-        result = bridge.accept_message(
-            message_id=item["id"],
-            agent=agent,
-            note=(
-                f"{agent} bridge wake loaded thread context immediately and "
-                "queued substantive processing."
-            ),
-            payload_json=json.dumps({
-                "wake_path": "fallback-wake",
-                "wake_ack": True,
-            }),
-        )
-        if result.get("ok"):
-            accepted.append(item)
-            _append_agent_log(
-                agent,
-                f"auto-accepted on wake: {item['id']} -> {result.get('response_message_id')}",
-            )
-        else:
-            _append_agent_log(
-                agent,
-                f"auto-accept skipped: {item['id']} status={result.get('status')}",
-            )
-    return accepted
-
-
 def _load_state(agent: str) -> dict:
     try:
         return json.loads(_state_file(agent).read_text(encoding="utf-8"))
@@ -259,18 +226,16 @@ def main() -> int:
         with _FileLock(_lock_file(args.agent)):
             state = _load_state(args.agent)
             new_items = bridge.list_inbox(agent=args.agent, status="new", limit=100).get("items", [])
-            accepted_now = _auto_accept_new_items(bridge, args.agent, new_items)
             claimed = bridge.list_inbox(agent=args.agent, status="claimed", limit=100).get("items", [])
             due_claimed = [
                 item for item in claimed if claimed_item_due(args.agent, item, state, args.cadence_minutes)
             ]
-            immediate_claimed = accepted_now + due_claimed
             contexts = build_contexts(
                 bridge,
                 agent=args.agent,
                 explicit_refs=args.message_id,
-                new_items=[],
-                due_claimed=immediate_claimed,
+                new_items=new_items,
+                due_claimed=due_claimed,
                 project_dir=PROJECT_DIR,
                 log_fn=lambda message: _append_agent_log(args.agent, message),
             )
@@ -278,16 +243,16 @@ def main() -> int:
             batch = select_dispatch_batch(
                 contexts,
                 new_items,
-                immediate_claimed,
+                due_claimed,
                 max_targets=args.max_dispatch_targets,
             )
             batch_contexts = batch["contexts"]
             batch_new_items = batch["new_items"]
-            batch_immediate_claimed = batch["due_claimed"]
+            batch_due_claimed = batch["due_claimed"]
             wake_targets = set(batch["target_ids"])
             deferred_targets = batch["deferred_ids"]
 
-            if not batch_new_items and not batch_immediate_claimed and not batch_contexts:
+            if not batch_new_items and not batch_due_claimed and not batch_contexts:
                 _append_agent_log(args.agent, "no pending bridge work; exiting")
                 return 0
 
@@ -301,7 +266,7 @@ def main() -> int:
                 trigger=args.trigger,
                 contexts=batch_contexts,
                 new_items=batch_new_items,
-                due_claimed=batch_immediate_claimed,
+                due_claimed=batch_due_claimed,
             )
             HOOKS_DIR.mkdir(parents=True, exist_ok=True)
             _last_context_file(args.agent).write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -309,7 +274,7 @@ def main() -> int:
                 args.agent,
                 _last_context_file(args.agent),
                 batch_new_items,
-                batch_immediate_claimed,
+                batch_due_claimed,
                 batch_contexts,
                 project_dir=PROJECT_DIR,
             )
@@ -333,7 +298,7 @@ def main() -> int:
             )
             _append_agent_log(
                 args.agent,
-                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} claimed_or_immediate={len(batch_immediate_claimed)} contexts={len(batch_contexts)}",
+                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} claimed={len(batch_due_claimed)} contexts={len(batch_contexts)}",
             )
             if completed.returncode != 0:
                 return completed.returncode

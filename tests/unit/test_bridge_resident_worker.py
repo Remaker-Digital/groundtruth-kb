@@ -64,6 +64,28 @@ def test_resident_worker_should_defer_only_for_same_busy_targets(tmp_path) -> No
     assert other_state == "busy-other-targets"
 
 
+def test_resident_worker_is_healthy_for_recent_noop_worker(tmp_path) -> None:
+    now = datetime(2026, 3, 29, 2, 0, tzinfo=timezone.utc)
+    (tmp_path / ".bridge-worker-codex-health.json").write_text(
+        json.dumps(
+            {
+                "status": "noop",
+                "updated_at": (now - timedelta(seconds=5)).isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    healthy, state = resident_worker.resident_worker_is_healthy(
+        "codex",
+        hooks_dir=tmp_path,
+        now=now,
+    )
+
+    assert healthy is True
+    assert state == "noop"
+
+
 def test_explicit_refs_for_filters_to_relevant_agent_events() -> None:
     event_batch = {
         "notified": True,
