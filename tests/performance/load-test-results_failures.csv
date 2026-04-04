@@ -1,0 +1,13 @@
+Method,Name,Error,Occurrences
+GET,/api/dashboard/usage/daily,"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",7
+GET,/api/analytics/intents,"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",3
+GET,/api/dashboard/usage,CatchResponseError('Dashboard failed: 0'),12
+GET,/api/config [get],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",2
+POST,/api/chat/conversations [start],CatchResponseError('Start failed: 0'),14
+GET,/api/audit [recent],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",2
+GET,/api/admin/conversations [list],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",5
+GET,/api/admin/knowledge [list],"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",7
+GET,/ready [readiness],CatchResponseError('Readiness check failed: 0'),5
+GET,/health [liveness],CatchResponseError('Health check failed: 0'),8
+GET,/api/analytics/summary,"ConnectionRefusedError(10061, '[WinError 10061] No connection could be made because the target machine actively refused it.')",7
+GET,/api/tenants/lookup [billing health],CatchResponseError('Billing health failed: 0'),4

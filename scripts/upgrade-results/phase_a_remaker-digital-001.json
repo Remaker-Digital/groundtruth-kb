@@ -1,20 +1,194 @@
 {
-  "A1_version": "1.98.24",
-  "A2_status": "?",
+  "A1_version": "1.98.80",
+  "A2_status": "active",
   "A3_activation": {
-    "is_active": null,
-    "is_configured": null,
-    "has_pending_changes": null,
-    "active_version": null
+    "is_active": true,
+    "is_configured": true,
+    "has_pending_changes": true,
+    "active_version": 40
   },
-  "A4_conversation_count": "?",
-  "A5_status_breakdown": {},
-  "A6_kb_count": "?",
-  "A7_team_count": 0,
-  "A8_team_members": [],
-  "A9_draft_status": 401,
-  "A10_config_keys": [
-    "error"
+  "A4_conversation_count": 902,
+  "A5_status_breakdown": {
+    "http_status": 404,
+    "note": "analytics may need params"
+  },
+  "A6_kb_count": 264,
+  "A7_team_count": 41,
+  "A8_team_members": [
+    {
+      "displayName": "DoubleClick e2e-te",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "<script>alert(\"xss\")</script>",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "Alex Johnson",
+      "role": "viewer"
+    },
+    {
+      "displayName": "Maria Garcia",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "James Williams",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "Sarah Chen",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "DoubleClick e2e-te",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "<script>alert(\"xss\")</script>",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    }
   ],
-  "A11_widget_key_exists": null
+  "A9_draft_status": 200,
+  "A10_config_keys": [
+    "config",
+    "from_cache",
+    "quick_actions",
+    "state",
+    "tenant_id",
+    "tier",
+    "version"
+  ],
+  "A11_widget_key_exists": true
 }

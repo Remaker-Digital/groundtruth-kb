@@ -3,7 +3,7 @@
     "id": "C.1",
     "description": "Version updated",
     "status": "PASS",
-    "detail": "expected=1.93.0, got=1.93.0"
+    "detail": "expected=1.98.80, got=1.98.80"
   },
   {
     "id": "C.2",
@@ -21,7 +21,7 @@
     "id": "C.4",
     "description": "Conversation count not decreased",
     "status": "PASS",
-    "detail": "0 vs 0 (growth OK)"
+    "detail": "2 vs 2 (growth OK)"
   },
   {
     "id": "C.5",
@@ -74,8 +74,8 @@
   {
     "id": "C.13",
     "description": "Regression tests",
-    "status": "PASS",
-    "detail": "SKIP \u2014 requires local pytest run"
+    "status": "SKIP",
+    "detail": "requires local pytest run"
   },
   {
     "id": "C.14",
@@ -152,8 +152,8 @@
   {
     "id": "C.26",
     "description": "Avatar upload",
-    "status": "PASS",
-    "detail": "SKIP \u2014 requires multipart file upload"
+    "status": "SKIP",
+    "detail": "requires multipart file upload"
   },
   {
     "id": "C.27",
@@ -194,19 +194,55 @@
   {
     "id": "C.33",
     "description": "Unit test count gate",
-    "status": "PASS",
-    "detail": "SKIP \u2014 requires local pytest"
+    "status": "SKIP",
+    "detail": "requires local pytest"
   },
   {
     "id": "C.34",
     "description": "Evaluation framework loads",
-    "status": "PASS",
-    "detail": "SKIP \u2014 requires local Python"
+    "status": "SKIP",
+    "detail": "requires local Python"
   },
   {
     "id": "C.35",
     "description": "Critic rule integrity",
+    "status": "SKIP",
+    "detail": "requires local Python"
+  },
+  {
+    "id": "C.36",
+    "description": "Widget JS bundle served",
     "status": "PASS",
-    "detail": "SKIP \u2014 requires local Python"
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.37",
+    "description": "Widget config auth (admin widget)",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.38",
+    "description": "Widget creates conversation",
+    "status": "PASS",
+    "detail": "HTTP 201, conv=9f0029ae-381..."
+  },
+  {
+    "id": "C.39",
+    "description": "Widget sends message",
+    "status": "PASS",
+    "detail": "HTTP 200, msg_id=1ce95185-f74..."
+  },
+  {
+    "id": "C.40",
+    "description": "AI response received",
+    "status": "FAIL",
+    "detail": "timeout \u2014 no AI response within 30s"
+  },
+  {
+    "id": "C.41",
+    "description": "Test conversation ended",
+    "status": "PASS",
+    "detail": "HTTP 200"
   }
 ]
