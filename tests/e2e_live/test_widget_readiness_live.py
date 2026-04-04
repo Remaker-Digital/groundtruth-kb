@@ -48,16 +48,17 @@ from tests.e2e_live.conftest import (
 # Configuration
 # ---------------------------------------------------------------------------
 
-SHOPIFY_STORE_DOMAIN = "blanco-9939.myshopify.com"
+# SPEC-0058: No hardcoded FQDNs — all URLs from env vars.
+# Shopify domain and password are environment-specific.  The test pipeline
+# sets these via _get_env_vars() or the runner exports them before launch.
+SHOPIFY_STORE_DOMAIN = os.environ.get("SHOPIFY_STORE_DOMAIN", "")
 SHOPIFY_STORE_PASSWORD = os.environ.get("SHOPIFY_STORE_PASSWORD", "")
 
-# Production gateway — for storefront widget verification
+# Gateway FQDN — resolved from the same env vars the rest of the live
+# suite uses.  No hardcoded fallback to avoid staging/production confusion.
 API_GATEWAY_FQDN = os.environ.get(
     "API_GATEWAY_FQDN",
-    os.environ.get(
-        "CONTAINER_APP_FQDN",
-        "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-    ),
+    os.environ.get("CONTAINER_APP_FQDN", ""),
 )
 
 # Timeout for widget elements to appear (ms)
@@ -322,6 +323,12 @@ class TestStorefrontWidgetReadiness:
     @pytest.fixture(autouse=True)
     def _setup_storefront(self, page: Page):
         """Navigate to the Shopify storefront, handling password gate."""
+        if not SHOPIFY_STORE_DOMAIN:
+            pytest.skip(
+                "SHOPIFY_STORE_DOMAIN not set — storefront tests require an "
+                "env-configured domain (no hardcoded fallback per SPEC-0058)"
+            )
+
         self.page = page
 
         # First visit — check for password gate

@@ -1028,7 +1028,7 @@ def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
         "tests/e2e_live/test_widget_readiness_live.py::TestActiveConfigImpliesWidgetVisible",
     ]
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        " ".join(test_paths),
+        test_paths,
         timeout=120, prefix="  [widget-embed] ",
         extra_env=env_vars,
     )
