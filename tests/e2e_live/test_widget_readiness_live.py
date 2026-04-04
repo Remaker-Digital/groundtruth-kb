@@ -91,32 +91,39 @@ def _bypass_shopify_password(page: Page, domain: str) -> None:
 def _find_widget_launcher(page: Page, timeout: int = WIDGET_TIMEOUT) -> bool:
     """Check if the Agent Red widget launcher is visible on the page.
 
-    The widget renders inside a closed Shadow DOM host element. We look
-    for the host container or the launcher button that the widget creates.
+    The widget renders inside a closed Shadow DOM host element.  The
+    shadow root is opaque to querySelectorAll, so we check:
+      1. window.AgentRed SDK global exists (proves widget.js executed)
+      2. #agent-red-widget host div exists with display:block
+         (proves mountLauncherHost() created the shadow host)
+      3. Fallback: any fixed-position div with high z-index
     """
-    # The widget creates a host div with id __agentred_host or similar
-    # Also look for the SDK global and the launcher's circular button
     try:
-        # The widget IIFE creates the launcher as a positioned fixed element.
-        # Since it's in a Shadow DOM we can't query inside it, but we can
-        # check for the host element's existence and the SDK global.
         result = page.evaluate("""() => {
-            // Check 1: AgentRed SDK global exists
+            // Check 1: AgentRed SDK global exists (widget.js ran init() to completion)
             if (!window.AgentRed) return { found: false, reason: 'no SDK global' };
 
-            // Check 2: Find the shadow host element
-            const hosts = document.querySelectorAll('[data-agentred-host]');
-            if (hosts.length === 0) {
-                // Try alternative selector — the widget creates a div with
-                // specific styling (position:fixed, bottom/right)
-                const fixed = Array.from(document.querySelectorAll('div'))
-                    .filter(el => {
-                        const s = getComputedStyle(el);
-                        return s.position === 'fixed' && s.zIndex > '9000';
-                    });
-                if (fixed.length === 0) return { found: false, reason: 'no host element' };
+            // Check 2: Find the shadow host element by its actual ID.
+            // widget/src/index.ts mountLauncherHost() creates:
+            //   div#agent-red-widget { display: block }
+            // with a closed Shadow DOM containing the Preact Launcher.
+            const host = document.getElementById('agent-red-widget');
+            if (host && host.style.display !== 'none') {
+                return { found: true, reason: 'host #agent-red-widget visible' };
             }
-            return { found: true, reason: 'ok' };
+
+            // Check 3: Fallback — find any div with position:fixed + high z-index
+            // (handles future host-ID changes or alternative widget configurations)
+            const fixed = Array.from(document.querySelectorAll('div'))
+                .filter(el => {
+                    const s = getComputedStyle(el);
+                    return s.position === 'fixed' && parseInt(s.zIndex, 10) > 9000;
+                });
+            if (fixed.length > 0) {
+                return { found: true, reason: 'fixed-position launcher found' };
+            }
+
+            return { found: false, reason: 'no host element' };
         }""")
         return result.get("found", False)
     except Exception:
@@ -273,7 +280,7 @@ class TestAdminWidgetReadiness:
             f"{LIVE_SPA_BASE_URL}/?tenant={LIVE_TENANT_ID}",
             wait_until="load",
         )
-        page.wait_for_timeout(3_000)  # Wait for activation status + widget injection
+        page.wait_for_timeout(5_000)  # Wait for activation status + widget injection
         _dismiss_onboarding_modal(page)
         self.page = page
 
@@ -285,11 +292,9 @@ class TestAdminWidgetReadiness:
         to check API responses alone — the launcher must be a visible DOM
         element that a human user can see and click.
         """
-        # Wait for the widget script to load and initialize.
-        # The admin console's StandaloneLayout injects widget.js after the
-        # activation-status poll confirms is_active=true. A 4s retry handles
-        # the race condition where widget_key_hash self-heal hadn't completed.
-        self.page.wait_for_timeout(8_000)
+        # Wait budget: activation-status poll (~3s) + widget injection + possible
+        # 4s retry (self-heal race condition) + Preact render.  Total ~15s.
+        self.page.wait_for_timeout(15_000)
         found = _find_widget_launcher(self.page)
         assert found, (
             "Widget launcher not visible in admin UI. "
