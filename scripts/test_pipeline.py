@@ -1020,16 +1020,22 @@ def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
     if skip:
         return skip
 
-    # S257: Run the Active→Visible invariant tests (API-level) alongside the
-    # existing embed checks.  TestActiveConfigImpliesWidgetVisible asserts:
-    #   is_active=true → widget_key present → widget key auth 200 (hash exists)
+    # S257: Three tiers of widget verification — ALL must pass for the gate:
+    #   Tier 1: API-level embed checks (bundle served, config returns, CORS)
+    #   Tier 2: API-level precondition checks (is_active, widget_key, hash)
+    #   Tier 3: Browser-visible checks (Playwright confirms launcher DOM exists)
+    #
+    # Tier 3 is the CANONICAL visual gate.  Without it, an API that returns
+    # 200 but a widget that fails to render would pass the gate — which is
+    # exactly the S254/S257 defect that went undetected.
     test_paths = [
         "tests/live_api/test_widget_embed_live.py",
         "tests/e2e_live/test_widget_readiness_live.py::TestActiveConfigImpliesWidgetVisible",
+        "tests/e2e_live/test_widget_readiness_live.py::TestAdminWidgetReadiness",
     ]
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         test_paths,
-        timeout=120, prefix="  [widget-embed] ",
+        timeout=180, prefix="  [widget-embed] ",
         extra_env=env_vars,
     )
 
