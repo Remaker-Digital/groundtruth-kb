@@ -17,6 +17,12 @@ Engineering discipline for AI-powered systems — from specification to producti
 | 09 | [Adoption & Promotion](09-adoption.md) | Upstream/downstream model, managed files, update procedures |
 | 10 | [KB Tooling](10-tooling.md) | Installation, CLI commands, web UI, configuration |
 
+## Architecture documents
+
+| Document | Description |
+|----------|-------------|
+| [Product Architecture](../architecture/product-split.md) | groundtruth-kb vs groundtruth-project-kit scope split |
+
 ## Prerequisites
 
 - Familiarity with software engineering fundamentals (version control, testing, CI/CD)

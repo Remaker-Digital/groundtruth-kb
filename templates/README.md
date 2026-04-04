@@ -3,9 +3,13 @@
 Reference templates for GroundTruth projects. Copy these into your project
 and customize for your needs.
 
-These templates are **project-owned after copying** — GroundTruth does not
-manage or overwrite them after initial setup. See the
-[Adoption guide](../docs/method/09-adoption.md) for the managed vs
+These templates are **generic starting points** that become project-owned
+after copying — GroundTruth does not manage or overwrite them after initial
+setup.  Project-specific customization (bridge runtimes, cloud deployment,
+dual-agent configuration) is planned for
+[groundtruth-project-kit](../docs/architecture/product-split.md).
+
+See the [Adoption guide](../docs/method/09-adoption.md) for the managed vs
 project-owned boundary.
 
 ## Contents
@@ -60,3 +64,8 @@ project's values:
 - `{{VERSION}}` — current version
 - `{{ENVIRONMENT_DESCRIPTION}}` — deployment environment summary
 - `{{TEST_STATUS}}` — current test pass/fail counts
+
+The manual placeholder approach is intentional for groundtruth-kb.
+Automated profile-based customization (e.g., `gt project init --profile
+dual-agent-webapp`) is a planned [groundtruth-project-kit](../docs/architecture/product-split.md)
+capability.
