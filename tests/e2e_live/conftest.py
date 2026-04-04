@@ -110,7 +110,7 @@ NAV_ITEMS: dict[str, str | None] = {
     "Dashboard": "Dashboard",
     "Inbox": "Inbox",
     "Team members": "Team members",
-    "Agent configuration": "Configuration",
+    "AI configuration": "Configuration",
     "Knowledge base": "Knowledge",
     "Quick actions": "Quick actions",
     "Widget configuration": "Widget",
@@ -559,8 +559,8 @@ def shared_team_page(shared_admin_page: Page) -> Page:
 
 @pytest.fixture(scope="class")
 def shared_config_page(shared_admin_page: Page) -> Page:
-    """Class-scoped Agent configuration page."""
-    return _navigate_admin_to(shared_admin_page, "Agent configuration", "Configuration")
+    """Class-scoped AI configuration page."""
+    return _navigate_admin_to(shared_admin_page, "AI configuration", "Configuration")
 
 
 @pytest.fixture(scope="class")
@@ -699,8 +699,8 @@ def live_team_page(live_admin_page: Page) -> Page:
 
 @pytest.fixture()
 def live_config_page(live_admin_page: Page) -> Page:
-    """Navigate to the Agent configuration page with real data."""
-    return _navigate_admin_to(live_admin_page, "Agent configuration", "Configuration")
+    """Navigate to the AI configuration page with real data."""
+    return _navigate_admin_to(live_admin_page, "AI configuration", "Configuration")
 
 
 @pytest.fixture()

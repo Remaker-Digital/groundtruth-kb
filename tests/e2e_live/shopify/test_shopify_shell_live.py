@@ -300,7 +300,7 @@ class TestNavigationItems:
     def test_navigation_item_labels(self, shared_shopify_page: Page):
         """Navigation items have the expected labels."""
         expected_labels = [
-            "Dashboard", "Inbox", "Agent configuration",
+            "Dashboard", "Inbox", "AI configuration",
             "Knowledge Base", "Widget configuration",
             "Billing", "Settings",
         ]

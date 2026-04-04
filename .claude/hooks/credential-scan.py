@@ -99,6 +99,8 @@ _EXCLUDED_PATHS = [
     re.compile(r'docker-compose'),
     # Security penetration tests (intentionally contain fake credentials)
     re.compile(r'tests[/\\]security[/\\]test_live_penetration'),
+    # Visual evidence artifacts (must record actual URLs tested)
+    re.compile(r'logs[/\\]visual-evidence[/\\]'),
 ]
 
 

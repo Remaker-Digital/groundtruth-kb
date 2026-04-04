@@ -227,7 +227,7 @@ class TestConfigGroupNavItems:
     """EL-sidebar-007..010: Four configuration nav items."""
 
     CONFIG_ITEMS = [
-        "Agent configuration",
+        "AI configuration",
         "Knowledge base",
         "Quick actions",
         "Widget configuration",
@@ -251,7 +251,7 @@ class TestConfigGroupNavItems:
         )
 
     @pytest.mark.parametrize("label,expected_path", [
-        ("Agent configuration", "/configuration"),
+        ("AI configuration", "/configuration"),
         ("Knowledge base", "/knowledge-base"),
         ("Quick actions", "/quick-actions"),
         ("Widget configuration", "/widget"),
@@ -830,7 +830,7 @@ class TestNavIcons:
 
     ALL_NAV_LABELS = [
         "Dashboard", "Inbox", "Team members",
-        "Agent configuration", "Knowledge base", "Quick actions",
+        "AI configuration", "Knowledge base", "Quick actions",
         "Widget configuration", "Integrations", "Memory & privacy",
         "Account & billing",
     ]
@@ -914,7 +914,7 @@ class TestSidebarIntegrity:
 
     ALL_NAV_LABELS = [
         "Dashboard", "Inbox", "Team members",
-        "Agent configuration", "Knowledge base", "Quick actions",
+        "AI configuration", "Knowledge base", "Quick actions",
         "Widget configuration", "Setup wizard",
         "Integrations", "Memory & privacy", "Account & billing",
     ]

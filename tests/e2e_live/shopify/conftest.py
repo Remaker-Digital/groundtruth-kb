@@ -62,7 +62,7 @@ TEST_SHOP_DOMAIN = "test-store.myshopify.com"
 SHOPIFY_NAV_ITEMS = [
     ("Dashboard", "/"),
     ("Inbox", "/inbox"),
-    ("Agent configuration", "/configuration"),
+    ("AI configuration", "/configuration"),
     ("Knowledge Base", "/knowledge-base"),
     ("Widget configuration", "/widget"),
     ("Billing", "/billing"),
@@ -169,18 +169,79 @@ def _setup_shopify_mocks(page: Page) -> None:
 
     page.route("**/api/tenants/lookup*", handle_tenant_lookup)
 
-    # 3. Intercept activation status — mark tenant as activated
+    # 3. Intercept activation status — mark tenant as activated.
+    #    Must include is_active: true (SPA widget injection depends on it)
+    #    and all fields the layout polls for status display.
     def handle_activation_status(route: Route) -> None:
         route.fulfill(
             status=200,
             content_type="application/json",
             body=json.dumps({
-                "is_configured": True,
+                "has_pending_changes": False,
+                "active_version": 1,
                 "active_activated_at": "2026-01-01T00:00:00Z",
+                "draft_version": None,
+                "is_configured": True,
+                "is_active": True,
+                "can_activate": False,
             }),
         )
 
     page.route("**/api/config/activation-status*", handle_activation_status)
+
+    # 4. Intercept /api/config — return a minimal valid config.
+    #    Without this, the SPA's Bearer token auth fails (401) and triggers
+    #    window.location.reload() → infinite reload loop → empty page.
+    def handle_config(route: Route) -> None:
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "tenant_id": "staging-001",
+                "tier": "starter",
+                "version": 1,
+                "config": {
+                    "brand_name": "Test Store",
+                    "brand_voice": "friendly",
+                    "widget_primary_color": "#ff3621",
+                    "widget_position": "bottom-right",
+                    "widget_key": "pk_live_mock_test_key_for_e2e",
+                },
+                "state": "active",
+            }),
+        )
+
+    page.route("**/api/config?*", handle_config)
+    page.route("**/api/config", handle_config)
+
+    # 5. Intercept remaining /api/admin/* calls — return empty-but-valid
+    #    responses to prevent 401→reload cycle.  Shared components show
+    #    empty/loading states which is acceptable (component behavior is
+    #    tested by the standalone admin suite).
+    def handle_admin_api(route: Route) -> None:
+        url = route.request.url
+        # Return appropriate empty structures based on endpoint pattern
+        if "/conversations" in url:
+            body = {"conversations": [], "total": 0}
+        elif "/team" in url and "/whoami" in url:
+            body = {"role": "superadmin", "email": "test@example.com"}
+        elif "/team" in url:
+            body = {"members": []}
+        elif "/quality" in url:
+            body = {"score": 0, "factors": []}
+        elif "/quick-actions" in url:
+            body = {"actions": []}
+        elif "/knowledge" in url:
+            body = {"sources": [], "total": 0}
+        else:
+            body = {}
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(body),
+        )
+
+    page.route("**/api/admin/**", handle_admin_api)
 
 
 def _create_shopify_page(page: Page, path: str = "/") -> Page:
@@ -268,9 +329,47 @@ def _setup_shared_shopify_page(context, page, path="/"):
 
     def handle_activation_status(route):
         route.fulfill(status=200, content_type="application/json",
-                      body=_json.dumps({"is_configured": True,
-                                        "active_activated_at": "2026-01-01T00:00:00Z"}))
+                      body=_json.dumps({
+                          "has_pending_changes": False, "active_version": 1,
+                          "active_activated_at": "2026-01-01T00:00:00Z",
+                          "draft_version": None, "is_configured": True,
+                          "is_active": True, "can_activate": False,
+                      }))
     page.route("**/api/config/activation-status*", handle_activation_status)
+
+    # Mock /api/config to prevent 401→reload cycle (Bearer token is fake)
+    def handle_config(route):
+        route.fulfill(status=200, content_type="application/json",
+                      body=_json.dumps({
+                          "tenant_id": "staging-001", "tier": "starter", "version": 1,
+                          "config": {"brand_name": "Test Store", "brand_voice": "friendly",
+                                     "widget_primary_color": "#ff3621",
+                                     "widget_key": "pk_live_mock_test_key_for_e2e"},
+                          "state": "active",
+                      }))
+    page.route("**/api/config?*", handle_config)
+    page.route("**/api/config", handle_config)
+
+    # Mock /api/admin/* to prevent 401→reload cycle
+    def handle_admin_api(route):
+        url = route.request.url
+        if "/conversations" in url:
+            body = {"conversations": [], "total": 0}
+        elif "/team" in url and "/whoami" in url:
+            body = {"role": "superadmin", "email": "test@example.com"}
+        elif "/team" in url:
+            body = {"members": []}
+        elif "/quality" in url:
+            body = {"score": 0, "factors": []}
+        elif "/quick-actions" in url:
+            body = {"actions": []}
+        elif "/knowledge" in url:
+            body = {"sources": [], "total": 0}
+        else:
+            body = {}
+        route.fulfill(status=200, content_type="application/json",
+                      body=_json.dumps(body))
+    page.route("**/api/admin/**", handle_admin_api)
 
     page.goto(f"{SHOPIFY_BASE_URL}{path}?shop={TEST_SHOP_DOMAIN}", wait_until="load")
     page.wait_for_timeout(3_000)

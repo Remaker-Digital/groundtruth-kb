@@ -286,8 +286,8 @@ class TestMobileLayout:
         if burger.is_visible():
             burger.click()
             live_admin_page.wait_for_timeout(500)
-            # Try to click Agent configuration in the opened sidebar
-            nav_link = live_admin_page.get_by_text("Agent configuration", exact=True).first
+            # Try to click AI configuration in the opened sidebar
+            nav_link = live_admin_page.get_by_text("AI configuration", exact=True).first
             if nav_link.is_visible():
                 nav_link.click()
                 live_admin_page.wait_for_timeout(1000)

@@ -61,7 +61,7 @@ MAX_PAGE_LOAD_SECS = 30
 SHOPIFY_PAGES = [
     ("/", "Dashboard"),
     ("/inbox", "Conversation Inbox"),
-    ("/configuration", "Agent configuration"),
+    ("/configuration", "AI configuration"),
     ("/knowledge-base", "Knowledge Base"),
     ("/widget", "Widget configuration"),
     ("/billing", "Billing"),

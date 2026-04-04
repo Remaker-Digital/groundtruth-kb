@@ -38,7 +38,7 @@ class TestPageLoading:
         assert shared_team_page.locator("text=Team members").first.is_visible()
 
     def test_configuration_loads(self, shared_config_page: Page):
-        """Agent configuration page loads with real config data."""
+        """AI configuration page loads with real config data."""
         heading = shared_config_page.locator("text=Configuration").first
         assert heading.is_visible()
 

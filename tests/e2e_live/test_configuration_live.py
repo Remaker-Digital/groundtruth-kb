@@ -196,7 +196,7 @@ class TestPageHeader:
     """[EL-config-001..002] Page title and subtitle."""
 
     def test_page_title(self, shared_config_page: Page):
-        """[EL-config-001/A,B] Page heading shows 'Configuration' or 'Agent configuration'."""
+        """[EL-config-001/A,B] Page heading shows 'Configuration' or 'AI configuration'."""
         _wait_for_config_data(shared_config_page)
         if _is_rate_limited(shared_config_page):
             pytest.skip("Rate limited")

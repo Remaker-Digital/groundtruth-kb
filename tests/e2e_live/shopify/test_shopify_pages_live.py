@@ -106,10 +106,10 @@ class TestConfigurationPage:
     """Agent Configuration — ConfigEditor in Polaris Page."""
 
     def test_configuration_page_title(self, shared_shopify_configuration: Page):
-        """Configuration page renders 'Agent configuration' heading."""
+        """Configuration page renders 'AI configuration' heading."""
         text = _body_text(shared_shopify_configuration)
-        assert "Agent configuration" in text or "agent configuration" in text.lower(), (
-            "Configuration page must show 'Agent configuration' heading"
+        assert "AI configuration" in text or "agent configuration" in text.lower(), (
+            "Configuration page must show 'AI configuration' heading"
         )
 
     def test_polaris_page_wrapper(self, shared_shopify_configuration: Page):
