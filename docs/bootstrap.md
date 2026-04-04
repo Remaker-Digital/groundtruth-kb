@@ -1,6 +1,17 @@
-# Bootstrap Guide
+# Getting Started with groundtruth-kb
 
-A step-by-step walkthrough from zero to a working GroundTruth project. By the end, you will have a knowledge database with specifications, tests, and governance rules — all verified by assertions.
+A step-by-step walkthrough for adding the GroundTruth knowledge database and governance toolkit to your project. By the end, you will have a knowledge database with specifications, tests, and governance rules — all verified by assertions.
+
+## What this guide covers (and does not)
+
+**This guide covers** setting up the core groundtruth-kb toolkit:
+install, init, seed, specifications, tests, assertions, web UI,
+process templates, and CI/CD.
+
+**This guide does NOT cover** full project scaffolding, infrastructure
+provisioning, dual-agent runtime configuration, bridge setup, or cloud
+deployment.  Those capabilities are planned for a separate
+[groundtruth-project-kit](architecture/product-split.md) package.
 
 ## Prerequisites
 
@@ -177,4 +188,5 @@ This gives you a GitHub Actions workflow that runs pytest, ruff, and `gt assert`
 - Read the [Method Overview](method/01-overview.md) to understand the full GroundTruth workflow
 - Read the [Specifications guide](method/02-specifications.md) to learn how to write effective specs
 - Read the [Adoption guide](method/09-adoption.md) to understand the upstream/downstream model
+- Read the [Product Architecture](architecture/product-split.md) to see how groundtruth-kb fits into the broader ecosystem
 - Add more specifications as your project grows — the knowledge database scales with you

@@ -19,6 +19,12 @@ GroundTruth implements a method for managing AI system quality:
 Everything is stored in an append-only SQLite database with full version
 history. No UPDATE, no DELETE — every change is a new version.
 
+groundtruth-kb is the **core toolkit** — it manages the knowledge database,
+governance gates, and assertions.  It does not scaffold full projects,
+provision infrastructure, or configure agent runtimes.  See the
+[product architecture](docs/architecture/product-split.md) for the
+planned ecosystem.
+
 ## Quick start
 
 ```bash
@@ -50,6 +56,10 @@ This project is in early development. The toolkit is extracted from a
 production system where it has managed 2,000+ specifications and 11,000+
 tests. The extraction and packaging for standalone use is in progress.
 
+A companion package, **groundtruth-project-kit**, is planned for project
+scaffolding, environment doctor, and bootstrap profiles.  See the
+[product architecture](docs/architecture/product-split.md) for details.
+
 ## Documentation
 
 The [method documentation](docs/method/README.md) describes the engineering discipline behind GroundTruth:
@@ -65,17 +75,19 @@ The [method documentation](docs/method/README.md) describes the engineering disc
 - [Adoption & Promotion](docs/method/09-adoption.md) — upstream/downstream model, update procedures
 - [KB Tooling](docs/method/10-tooling.md) — CLI commands, web UI, Python API, configuration
 
-## Bootstrap Guide
+## Getting Started
 
-New to GroundTruth? The [bootstrap guide](docs/bootstrap.md) walks you through
-the full setup: install, init, first spec, first test, assertions, web UI,
-templates, and CI/CD — in 10 steps.
+New to GroundTruth? The [getting started guide](docs/bootstrap.md) walks you
+through setting up the core toolkit in your project: install, init, first spec,
+first test, assertions, web UI, templates, and CI/CD — in 10 steps.
 
 ## Process Templates
 
 The [templates/](templates/README.md) directory contains reference templates for
 setting up a GroundTruth project: rules files, state files, hooks, and agent
 configuration. Copy them into your project and customize the placeholders.
+Project-specific customization (bridge runtimes, cloud deploy, dual-agent
+configuration) is planned for [groundtruth-project-kit](docs/architecture/product-split.md).
 
 ## Contributing
 
