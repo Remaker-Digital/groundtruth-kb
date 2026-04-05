@@ -147,48 +147,55 @@ def main() -> int:
         return 1
     print()
 
-    # Step 2: Send test messages
+    # Step 2: Send test messages via canonical send_message() API
+    # (raw SQL inserts bypass validation — malformed messages must go through
+    #  send_message so they get properly marked 'invalid' by the runtime)
     print("Step 2: Sending test messages...")
 
-    conn = sqlite3.connect(str(db_path))
-    now = _now_iso()
+    from prime_bridge_runtime import send_message
 
-    # Valid message
-    valid_id = str(uuid.uuid4())
-    valid_thread = str(uuid.uuid4())
-    conn.execute('''INSERT INTO messages (id, sender, recipient, subject, body, status, correlation_id,
-        created_at, thread_id, message_kind, artifact_refs, expected_response, response_window,
-        action_items, schema_version, priority, tags, validation_errors)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 2, 2, '[]', '[]')''',
-        (valid_id, args.sender, args.recipient,
-         'AUTONOMY-PROOF: Bridge round-trip test',
-         'This is an autonomy proof test. Please acknowledge receipt.',
-         'new', None, now, valid_thread, 'substantive',
-         json.dumps([{"type": "file", "path": "CLAUDE.md", "note": "valid ref"}]),
-         'acknowledgement', 'immediate',
-         json.dumps(["Acknowledge receipt of this autonomy proof test"])))
-    print(f"  Valid message:    {valid_id[:12]}...")
+    valid_subject = "AUTONOMY-PROOF: Bridge round-trip test"
+    valid_result = send_message(
+        sender=args.sender,
+        recipient=args.recipient,
+        subject=valid_subject,
+        body="This is an autonomy proof test. Please acknowledge receipt.",
+        payload_json=json.dumps({
+            "artifact_refs": [{"type": "file", "path": "CLAUDE.md", "note": "valid ref"}],
+            "expected_response": "acknowledgement",
+            "response_window": "immediate",
+            "action_items": ["Acknowledge receipt of this autonomy proof test"],
+            "message_kind": "substantive",
+        }),
+    )
+    valid_id = valid_result["id"]
+    print(f"  Valid message:    {valid_id[:12]}... (status={valid_result['status']})")
 
-    # Malformed message (noise)
     malformed_id = None
+    malformed_subject = "AUTONOMY-PROOF-MALFORMED: Bad artifact refs"
     if not args.skip_malformed:
-        malformed_id = str(uuid.uuid4())
-        malformed_thread = str(uuid.uuid4())
-        conn.execute('''INSERT INTO messages (id, sender, recipient, subject, body, status, correlation_id,
-            created_at, thread_id, message_kind, artifact_refs, expected_response, response_window,
-            action_items, schema_version, priority, tags, validation_errors)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 2, 3, '[]', '[]')''',
-            (malformed_id, args.sender, args.recipient,
-             'AUTONOMY-PROOF-MALFORMED: Bad artifact refs',
-             'This message has malformed artifact refs. Must not crash worker.',
-             'new', None, now, malformed_thread, 'substantive',
-             json.dumps([{"type": "file", "path": "C:\\Nonexistent\\Path\\crash.md", "note": "bad ref"}]),
-             'acknowledgement', 'immediate',
-             json.dumps(["This should not crash the worker"])))
-        print(f"  Malformed noise:  {malformed_id[:12]}...")
+        malformed_result = send_message(
+            sender=args.sender,
+            recipient=args.recipient,
+            subject=malformed_subject,
+            body="This message has malformed artifact refs. Must not crash worker.",
+            payload_json=json.dumps({
+                "artifact_refs": [{"type": "file", "path": "C:\\Nonexistent\\Path\\crash.md", "note": "bad ref"}],
+                "expected_response": "acknowledgement",
+                "response_window": "immediate",
+                "action_items": ["This should not crash the worker"],
+                "message_kind": "substantive",
+            }),
+            priority=3,
+        )
+        malformed_id = malformed_result["id"]
+        malformed_status = malformed_result["status"]
+        print(f"  Malformed noise:  {malformed_id[:12]}... (status={malformed_status})")
+        if malformed_status == "invalid":
+            print("  OK: malformed message correctly marked 'invalid' by runtime validation")
+        else:
+            print(f"  WARN: malformed message has status '{malformed_status}' — expected 'invalid'")
 
-    conn.commit()
-    conn.close()
     print()
 
     # Step 3: Wait for processing

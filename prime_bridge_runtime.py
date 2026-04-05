@@ -130,6 +130,11 @@ def _thread_id_for(
     return _canonical_thread_id(conn, correlation_id) or message_id
 
 
+def _is_absolute_path(p: str) -> bool:
+    """Detect absolute paths (Windows drive letters or Unix root)."""
+    return bool(p) and (p.startswith("/") or (len(p) >= 3 and p[1] == ":" and p[2] in ("/", "\\")))
+
+
 def _normalize_artifact_refs(value: Any) -> list[Any]:
     if not isinstance(value, list):
         return []
@@ -233,6 +238,14 @@ def _validate_message_contract(
             errors.append("missing artifact_refs")
         if not action_items:
             errors.append("missing action_items")
+
+    # Validate artifact ref paths: absolute paths are invalid (they break
+    # rglob and are non-portable). Refs must use repo-relative paths.
+    for ref in artifact_refs:
+        if isinstance(ref, dict):
+            ref_path = str(ref.get("path", ""))
+            if ref_path and (_is_absolute_path(ref_path)):
+                errors.append(f"artifact_refs contains absolute path: {ref_path[:60]}")
 
     return errors
 
