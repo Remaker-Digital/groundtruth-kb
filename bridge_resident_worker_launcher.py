@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 """
-SessionStart launcher for bridge_resident_worker.py.
+Bridge worker health-check and recovery fallback.
 
-Ensures a detached resident worker process is running for the selected agent.
-Designed for use in Claude hook commands (returns JSON {} by default).
+Phase B (S259): The canonical runtime is Windows Scheduled Tasks, not this
+script.  When called from a SessionStart hook, this script:
+
+  1. Checks if the worker is already healthy (scheduled task running).
+  2. If healthy, reports OK and exits.
+  3. If not healthy, attempts to start the scheduled task.
+  4. If the scheduled task is not registered, falls back to detached process
+     launch (legacy behavior) and logs a warning.
+
+Install the scheduled tasks first:
+  scripts/register_bridge_runtime_tasks.ps1
 """
 
 from __future__ import annotations
@@ -209,12 +218,47 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _try_start_scheduled_task(agent: str) -> bool:
+    """Try to start the Windows Scheduled Task for the bridge worker.
+
+    Returns True if the task exists and was started (or is already running).
+    Returns False if the task is not registered.
+    """
+    if os.name != "nt":
+        return False
+    task_name = f"AgentRedBridgeResidentWorker-{agent}"
+    try:
+        result = subprocess.run(
+            ["schtasks.exe", "/Run", "/TN", task_name],
+            capture_output=True, text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _scheduled_task_exists(agent: str) -> bool:
+    """Check if the Windows Scheduled Task is registered."""
+    if os.name != "nt":
+        return False
+    task_name = f"AgentRedBridgeResidentWorker-{agent}"
+    try:
+        result = subprocess.run(
+            ["schtasks.exe", "/Query", "/TN", task_name],
+            capture_output=True, text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def main() -> int:
     _consume_stdin_if_present()
     args = build_parser().parse_args()
 
     project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", Path(__file__).resolve().parent))
 
+    # Step 1: Check if worker is already healthy
     running = _discover_running_worker(project_dir, args.agent)
     if running:
         payload = {"ok": True, "running": True, **running}
@@ -224,6 +268,21 @@ def main() -> int:
             print("{}")
         return 0
 
+    # Step 2 (Phase B): Try scheduled task first — canonical runtime
+    if _scheduled_task_exists(args.agent):
+        _try_start_scheduled_task(args.agent)
+        # Wait briefly for health to appear
+        time.sleep(3)
+        running = _discover_running_worker(project_dir, args.agent)
+        if running:
+            payload = {"ok": True, "running": True, "source": "scheduled-task", **running}
+            if args.json_output:
+                print(json.dumps(payload))
+            else:
+                print("{}")
+            return 0
+
+    # Step 3: Fallback — detached process launch (legacy, pre-Phase B)
     try:
         new_pid = _start_detached(
             project_dir,
@@ -247,7 +306,7 @@ def main() -> int:
         if not running:
             raise RuntimeError("resident worker did not publish healthy state after launch")
 
-        payload = {"ok": True, "running": True, **running}
+        payload = {"ok": True, "running": True, "source": "detached-fallback", **running}
         if args.json_output:
             print(json.dumps(payload))
         else:

@@ -301,7 +301,7 @@ def resident_worker_is_healthy(
             return True, "busy"
         return False, "busy-stale"
 
-    if status in {"idle", "running", "noop"}:
+    if status in {"idle", "running", "noop", "recovering"}:
         if updated_at is None:
             return False, "missing-updated-at"
         age = (now_value - updated_at).total_seconds()
@@ -427,6 +427,7 @@ def run(args: argparse.Namespace) -> int:
             _save_state(args.agent, state)
             _write_health(args.agent, status="idle", last_event_id=last_event_id)
             startup_scan_pending = True
+            consecutive_errors = 0  # Phase C: track repeated failures
 
             while True:
                 try:
@@ -549,6 +550,8 @@ def run(args: argparse.Namespace) -> int:
                             f"worker made no bridge progress: targets={','.join(targets)}",
                         )
                     post_status = "running" if completed.returncode == 0 and made_progress else "idle" if completed.returncode == 0 else "error"
+                    if completed.returncode == 0:
+                        consecutive_errors = 0  # Phase C: reset on success
                     _write_health(
                         args.agent,
                         status=post_status,
@@ -563,14 +566,27 @@ def run(args: argparse.Namespace) -> int:
                     if completed.returncode != 0:
                         time.sleep(args.error_backoff_seconds)
                 except Exception as exc:
-                    _append_log(args.agent, f"loop error: {exc}")
-                    _write_health(
-                        args.agent,
-                        status="error",
-                        last_event_id=last_event_id,
-                        last_error=str(exc),
-                    )
-                    time.sleep(args.error_backoff_seconds)
+                    consecutive_errors += 1
+                    _append_log(args.agent, f"loop error ({consecutive_errors}): {exc}")
+                    # Phase C: Distinguish message-level from worker-level failure.
+                    # A single context/dispatch error should not permanently stop the worker.
+                    if consecutive_errors >= 5:
+                        _write_health(
+                            args.agent,
+                            status="error",
+                            last_event_id=last_event_id,
+                            last_error=f"repeated error ({consecutive_errors}x): {exc}",
+                        )
+                        # Longer backoff for repeated failures
+                        time.sleep(args.error_backoff_seconds * min(consecutive_errors, 12))
+                    else:
+                        _write_health(
+                            args.agent,
+                            status="recovering",
+                            last_event_id=last_event_id,
+                            last_error=str(exc),
+                        )
+                        time.sleep(args.error_backoff_seconds)
     except OSError:
         _append_log(args.agent, "resident worker lock busy; another run is active")
         return 0

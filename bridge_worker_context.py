@@ -62,14 +62,34 @@ def clean_path_candidate(raw: str) -> str:
 
 
 def resolve_artifact_name(name: str, *, project_dir: Path = PROJECT_DIR) -> Path | None:
-    candidate = Path(name)
-    if candidate.is_absolute() and candidate.exists():
-        return candidate.resolve()
-    if not candidate.is_absolute():
-        direct = (project_dir / candidate).resolve()
-        if direct.exists():
-            return direct
+    """Resolve an artifact name to a file path.
 
+    Three resolution strategies:
+      (a) Absolute path → direct existence check only (never rglob).
+      (b) Relative path → try project_dir join, then rglob search.
+      (c) Malformed / unparseable → return None.
+
+    Bridge autonomy Phase A (S259): absolute paths must never be passed
+    to Path.rglob() — it raises ValueError on non-relative patterns.
+    """
+    if not name or not name.strip():
+        return None
+
+    candidate = Path(name)
+
+    # (a) Absolute path — direct check only, no rglob search.
+    if candidate.is_absolute():
+        if candidate.exists():
+            return candidate.resolve()
+        return None
+
+    # (b) Relative path — try direct join first.
+    direct = (project_dir / candidate).resolve()
+    if direct.exists():
+        return direct
+
+    # (b cont.) Fall back to rglob search in known directories.
+    # Only filename-like patterns are safe for rglob.
     search_roots = [
         project_dir / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX",
         project_dir / "independent-progress-assessments",
@@ -79,7 +99,11 @@ def resolve_artifact_name(name: str, *, project_dir: Path = PROJECT_DIR) -> Path
     for root in search_roots:
         if not root.exists():
             continue
-        root_matches = list(root.rglob(name))
+        try:
+            root_matches = list(root.rglob(name))
+        except (ValueError, OSError):
+            # Non-relative pattern, invalid chars, or OS-level path error.
+            continue
         for match in root_matches:
             if match.is_file() and match not in matches:
                 matches.append(match)
@@ -333,26 +357,35 @@ def build_contexts(
 
     contexts: list[dict[str, Any]] = []
     for message_id, reasons in sorted(reasons_by_id.items()):
-        context = _worker_context(bridge, message_id, agent=agent)
-        if context is None:
-            continue
-        thread_sla = context.get("thread_sla") or {}
-        for risk_type in thread_sla.get("risk_types", []):
-            reasons.add(risk_type)
-        canonical = context.get("canonical_message") or {}
-        if canonical.get("status") == "invalid":
-            reasons.add("invalid")
-        context["wake_reasons"] = sorted(reasons)
-        context["referenced_artifacts"] = discover_artifacts(context, project_dir=project_dir)
-        latest_worker = context.get(
-            "latest_non_protocol_codex_message"
-            if agent == "codex"
-            else "latest_non_protocol_prime_message"
-        )
-        context["already_reviewed_hint"] = bool(
-            latest_worker and latest_worker.get("id") != context["canonical_message"]["id"]
-        )
-        contexts.append(context)
+        # Phase A: isolate context-build failures per thread.
+        # One bad message/artifact must not stop all autonomous bridge work.
+        try:
+            context = _worker_context(bridge, message_id, agent=agent)
+            if context is None:
+                continue
+            thread_sla = context.get("thread_sla") or {}
+            for risk_type in thread_sla.get("risk_types", []):
+                reasons.add(risk_type)
+            canonical = context.get("canonical_message") or {}
+            if canonical.get("status") == "invalid":
+                reasons.add("invalid")
+            context["wake_reasons"] = sorted(reasons)
+            context["referenced_artifacts"] = discover_artifacts(context, project_dir=project_dir)
+            latest_worker = context.get(
+                "latest_non_protocol_codex_message"
+                if agent == "codex"
+                else "latest_non_protocol_prime_message"
+            )
+            context["already_reviewed_hint"] = bool(
+                latest_worker and latest_worker.get("id") != context["canonical_message"]["id"]
+            )
+            contexts.append(context)
+        except Exception as exc:
+            if log_fn is not None:
+                log_fn(
+                    f"context-build failed for message {message_id}: {exc!r} — "
+                    "skipping this thread, continuing with remaining targets"
+                )
     return contexts
 
 
