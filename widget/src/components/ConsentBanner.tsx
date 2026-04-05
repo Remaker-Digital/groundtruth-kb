@@ -70,7 +70,8 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             transition: `box-shadow ${tokens.transitionFast}`,
           }}
           onFocus={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
+            // Only show focus ring for keyboard navigation (S259 D5 fix).
+            if (e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
           }}
           onBlur={(e) => {
             (e.currentTarget as HTMLElement).style.boxShadow = 'none';
@@ -95,7 +96,8 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             transition: `box-shadow ${tokens.transitionFast}`,
           }}
           onFocus={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
+            // Only show focus ring for keyboard navigation (S259 D5 fix).
+            if (e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
           }}
           onBlur={(e) => {
             (e.currentTarget as HTMLElement).style.boxShadow = 'none';

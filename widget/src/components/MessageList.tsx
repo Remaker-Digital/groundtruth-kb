@@ -434,7 +434,8 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
             transition: `box-shadow ${tokens.transitionFast}`,
           }}
           onFocus={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = `${tokens.shadowMd}, 0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
+            // Only show focus ring for keyboard navigation (S259 D5 fix).
+            if (e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `${tokens.shadowMd}, 0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
           }}
           onBlur={(e) => {
             (e.currentTarget as HTMLElement).style.boxShadow = tokens.shadowMd;

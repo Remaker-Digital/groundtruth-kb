@@ -569,12 +569,31 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             if route.target == RouteTarget.ESCALATION:
-                async for event in self._handle_escalation(
-                    tenant_id, conversation_id, customer_message,
-                    prompts[AgentRole.ESCALATION_HANDLER], budget, trace,
-                ):
-                    yield event
-                return
+                # WI-3030 S259: If escalation was already sent via email-bridge,
+                # skip re-escalation and process the message through the normal
+                # AI pipeline instead.  The chat continues after async escalation.
+                _already_escalated = False
+                try:
+                    _raw_conv = await self._session._get_conversation(
+                        tenant_id, conversation_id,
+                    )
+                    _already_escalated = _raw_conv.get("escalation_sent", False)
+                except Exception:
+                    pass  # Non-fatal — default to allowing escalation
+
+                if _already_escalated:
+                    logger.info(
+                        "Skipping re-escalation (already sent): conv=%s",
+                        conversation_id[:8],
+                    )
+                    # Fall through to normal KR/RG pipeline below
+                else:
+                    async for event in self._handle_escalation(
+                        tenant_id, conversation_id, customer_message,
+                        prompts[AgentRole.ESCALATION_HANDLER], budget, trace,
+                    ):
+                        yield event
+                    return
 
             if route.target == RouteTarget.CO_PILOT:
                 async for event in self._handle_co_pilot(

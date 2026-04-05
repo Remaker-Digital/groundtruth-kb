@@ -136,11 +136,9 @@ const PRIMARY_LANGUAGES = [
   { value: 'en', label: 'English' },
 ];
 
-/** Supported languages — English (available), Spanish/French (coming soon). */
+/** Supported languages — only languages with full support are listed (S259 D6). */
 const LANGUAGES = [
   { value: 'en', label: 'English', disabled: false },
-  { value: 'es', label: 'Spanish (coming soon)', disabled: true },
-  { value: 'fr', label: 'French (coming soon)', disabled: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -378,6 +376,10 @@ export const ConfigurationPage: React.FC = () => {
   const { deleteNamed, loading: deletingNamed } = useDeleteNamedConfig(apiFetch);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
+
+  // S259 D8: Sortable columns for saved configurations table.
+  const [configSortKey, setConfigSortKey] = useState<'name' | 'createdAt' | 'fieldCount'>('createdAt');
+  const [configSortDir, setConfigSortDir] = useState<'asc' | 'desc'>('desc');
 
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
@@ -649,11 +651,34 @@ export const ConfigurationPage: React.FC = () => {
         </Alert>
       )}
 
-      {/* Saved Configurations (WI #266 delete, WI #267 timestamps) */}
+      {/* Saved Configurations (WI #266 delete, WI #267 timestamps, S259 D8 sorting) */}
       {(() => {
         const configs = namedResult.data?.configs ?? [];
         if (namedResult.loading && !namedResult.data) return null;
         const activeConfig = configs.find((c) => c.isActive);
+
+        // S259 D8: Sortable columns — default: most recent first.
+        type SortKey = 'name' | 'createdAt' | 'fieldCount';
+        const sortedConfigs = [...configs].sort((a, b) => {
+          const key = configSortKey;
+          const dir = configSortDir === 'asc' ? 1 : -1;
+          if (key === 'name') return dir * a.name.localeCompare(b.name);
+          if (key === 'fieldCount') return dir * ((a.fieldCount ?? 0) - (b.fieldCount ?? 0));
+          // createdAt — default
+          return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        });
+
+        const toggleSort = (key: SortKey) => {
+          if (configSortKey === key) {
+            setConfigSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+          } else {
+            setConfigSortKey(key);
+            setConfigSortDir(key === 'createdAt' ? 'desc' : 'asc');
+          }
+        };
+        const sortArrow = (key: SortKey) =>
+          configSortKey === key ? (configSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+
         return (
           <Paper p="lg" radius="md" withBorder>
             <Group justify="space-between" mb={configs.length > 0 ? 'md' : 0}>
@@ -679,14 +704,14 @@ export const ConfigurationPage: React.FC = () => {
               <Table verticalSpacing="xs" highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Name</Table.Th>
-                    <Table.Th>Saved</Table.Th>
-                    <Table.Th>Fields</Table.Th>
+                    <Table.Th style={{ cursor: 'pointer' }} onClick={() => toggleSort('name')}>Name{sortArrow('name')}</Table.Th>
+                    <Table.Th style={{ cursor: 'pointer' }} onClick={() => toggleSort('createdAt')}>Saved{sortArrow('createdAt')}</Table.Th>
+                    <Table.Th style={{ cursor: 'pointer' }} onClick={() => toggleSort('fieldCount')}>Fields{sortArrow('fieldCount')}</Table.Th>
                     <Table.Th style={{ width: 140, textAlign: 'right' }}>Actions</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {configs.map((c) => (
+                  {sortedConfigs.map((c) => (
                     <Table.Tr key={c.name}>
                       <Table.Td>
                         <Group gap={8} wrap="nowrap">

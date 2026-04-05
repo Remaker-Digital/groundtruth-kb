@@ -119,6 +119,9 @@ export interface WidgetState {
   // Consent (WI #87)
   consentCollected: boolean;
 
+  // S259 D14: Admin context — suppress consent banner for admin users.
+  isAdminContext: boolean;
+
   // Runtime overrides (WI-0819)
   tokenOverrides: Partial<DesignTokens> | null;
 }
@@ -316,6 +319,7 @@ export function createStore(config: WidgetConfig, locale: Locale): Store {
     otpError: null,
     shopifyCustomer: null,
     consentCollected: false,
+    isAdminContext: false,
     tokenOverrides: null,
   });
   return _store;

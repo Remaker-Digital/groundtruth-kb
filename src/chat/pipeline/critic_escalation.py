@@ -150,6 +150,27 @@ class CriticEscalationMixin:
             reason = "Customer requested human agent"
             category = "general_inquiry"
 
+        # WI-3030 v2.1: Check for customer email BEFORE escalating.
+        # If email is missing, ask for it and defer — do NOT mark as ESCALATED
+        # until the email bridge can actually fire.
+        customer_email: str | None = None
+        conv_doc: dict[str, Any] | None = None
+        try:
+            conv_doc = await self._session._get_conversation(tenant_id, conversation_id)
+            customer_email = conv_doc.get("identity_email")
+        except Exception:
+            logger.debug("Could not read conversation for identity_email")
+
+        if not customer_email:
+            yield token_event(
+                "I'd like to connect you with a human representative who can help with this. "
+                "Could you share your email address so they can follow up with you directly?",
+                1,
+            )
+            yield validated_event(conversation_id, "escalation_email_required")
+            yield done_event(conversation_id, 0)
+            return
+
         # Auto-assign to best-fit team member
         assigned_agent_id: str | None = None
         try:
@@ -158,15 +179,6 @@ class CriticEscalationMixin:
             )
         except Exception as exc:
             logger.warning("Auto-assign failed: %s — proceeding without assignment", exc)
-
-        # Escalate the conversation in the session
-        await self._session.escalate_conversation(
-            tenant_id=tenant_id,
-            conversation_id=conversation_id,
-            escalation_reason=reason,
-            escalation_category=category,
-            assigned_to=assigned_agent_id,
-        )
 
         # Resolve escalation notification recipients:
         #   1. Assigned agent's email (extracted from doc ID {tenant}:{email})
@@ -185,16 +197,62 @@ class CriticEscalationMixin:
             except Exception:
                 logger.debug("Superadmin lookup failed — escalation alert will use tenant notification email")
 
-        # Fire-and-forget: notify escalation recipient
+        # NOW escalate the conversation — only after email + assignment are resolved
+        await self._session.escalate_conversation(
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            escalation_reason=reason,
+            escalation_category=category,
+            assigned_to=assigned_agent_id,
+        )
+
+        # WI-3030 v2.1: Async email-bridge — await dispatch, then set
+        # escalation_sent as a DELIVERY-STATE flag (not an intent marker).
+        email_bridge_sent = False
+        try:
+            from src.chat.escalation_email import send_escalation_emails
+            from src.multi_tenant.repository import TenantRepository
+
+            store_name = "Support"
+            try:
+                tenant_repo = TenantRepository()
+                tenant_doc = await tenant_repo.read(tenant_id)
+                store_name = tenant_doc.get("store_name") or tenant_doc.get("name") or "Support"
+            except Exception:
+                pass
+
+            messages = conv_doc.get("messages", []) if conv_doc else []
+            agent_email = recipient_emails[0] if recipient_emails else ""
+
+            if agent_email and customer_email:
+                logger.info(
+                    "Sending email-bridge escalation: tenant=%s conv=%s customer=%s agent=%s",
+                    tenant_id, conversation_id[:8], customer_email, agent_email,
+                )
+                results = await send_escalation_emails(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    customer_email=customer_email,
+                    agent_email=agent_email,
+                    messages=messages,
+                    store_name=store_name,
+                    reason=reason,
+                    category=category,
+                    urgency=urgency,
+                )
+                if results.get("agent") not in ("failed", "skipped"):
+                    email_bridge_sent = True
+            else:
+                logger.warning(
+                    "Email-bridge incomplete: customer=%s agent=%s — alert only",
+                    customer_email or "missing", agent_email or "missing",
+                )
+        except Exception:
+            logger.warning("Email-bridge dispatch failed", exc_info=True)
+
+        # Legacy alert (dashboard + webhook) — fire-and-forget
         try:
             from src.multi_tenant.alert_delivery import send_escalation_alert
-
-            logger.info(
-                "Firing escalation alert: tenant=%s conversation=%s reason=%s urgency=%s category=%s assigned=%s recipients=%s",
-                tenant_id, conversation_id, reason[:80], urgency,
-                category, assigned_agent_id or "unassigned",
-                recipient_emails or ["tenant-default"],
-            )
             asyncio.ensure_future(
                 send_escalation_alert(
                     tenant_id=tenant_id,
@@ -208,14 +266,36 @@ class CriticEscalationMixin:
                 )
             )
         except Exception:
-            logger.debug("Escalation alert skipped (alert service not configured)")
+            logger.debug("Legacy escalation alert skipped")
 
-        # Yield escalation system message as a token event
+        # Set delivery-state flag — only true when email dispatch succeeded
+        try:
+            from datetime import datetime, timezone as tz
+            await self._session._repo.patch_conversation(
+                tenant_id, conversation_id,
+                {
+                    "escalation_sent": email_bridge_sent,
+                    "escalated_via_email_at": (
+                        datetime.now(tz.utc).isoformat() if email_bridge_sent else None
+                    ),
+                },
+            )
+        except Exception:
+            logger.debug("Failed to set escalation_sent flag", exc_info=True)
+
+        # Yield the owner-specified escalation messages
         escalation_msg = (
-            "I'm connecting you with a member of our support team. "
-            "A human agent will be with you shortly."
+            "I have escalated your request to a human representative "
+            "who will respond directly via email. Please check your "
+            "spam folder if you don't see an email from us soon."
         )
         yield token_event(escalation_msg, 1)
+
+        continuation_msg = (
+            "While we wait for a human to respond, is there anything "
+            "else I can help you with?"
+        )
+        yield token_event(continuation_msg, 2)
         yield validated_event(conversation_id, "escalation")
         yield done_event(conversation_id, 0)
 

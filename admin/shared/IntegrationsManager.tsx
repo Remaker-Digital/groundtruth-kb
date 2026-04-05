@@ -702,7 +702,7 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
 
       {/* Integration cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {items.map((integration) => (
+        {items.filter((i) => !i.comingSoon).map((integration) => (
           <div key={integration.type}>
             <IntegrationCard
               integration={integration}

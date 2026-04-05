@@ -482,6 +482,17 @@ class ConversationDocument(BaseModel):
         description="Number of OTP verification attempts in this conversation (rate limit: 3)",
     )
 
+    # Async email-bridge escalation (WI-3030 S259)
+    escalation_sent: bool = Field(
+        default=False,
+        description="Whether the async email-bridge escalation has been sent. "
+        "Prevents re-escalation on subsequent messages in the same conversation.",
+    )
+    escalated_via_email_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when the escalation emails were sent.",
+    )
+
     # Test Mode (C2 — controlled rollout)
     is_test_mode: bool = Field(
         default=False,

@@ -738,10 +738,12 @@ export const Panel: FunctionComponent<PanelProps> = ({
         <StreamProgress tokens={tokens} />
       )}
 
-      {/* Consent banner (WI #87) — shown when consent collection is enabled */}
+      {/* Consent banner (WI #87) — shown when consent collection is enabled.
+          S259 D14: Admin users have implicit consent — banner suppressed. */}
       {state.view === 'conversation'
         && (activeConfig as Record<string, unknown>).consent_collection_enabled === true
         && !state.consentCollected
+        && !state.isAdminContext
         && state.conversationId && (
         <ConsentBanner
           tokens={tokens}

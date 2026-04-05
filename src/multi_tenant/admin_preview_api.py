@@ -136,13 +136,16 @@ async def preview_chat(
     except Exception:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    # Conversation Preview is the safe sandbox: use draft config if pending
+    # changes exist, otherwise fall back to active.  This lets admins test
+    # configuration changes *before* activating them (owner decision S259).
     try:
-        prefs_doc = await prefs_repo.get_active(ctx.tenant_id)
+        prefs_doc = await prefs_repo._get_draft_or_active(ctx.tenant_id)
     except Exception:
         prefs_doc = None
 
     if not prefs_doc:
-        raise HTTPException(status_code=400, detail="No active configuration. Activate your agent first.")
+        raise HTTPException(status_code=400, detail="No configuration found. Save your agent configuration first.")
 
     # Apply config overrides (temporary, not persisted)
     if body.config_overrides and prefs_doc:

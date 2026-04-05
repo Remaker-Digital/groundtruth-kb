@@ -323,7 +323,9 @@ class ConversationSession:
             ConversationNotActiveError: Conversation is not in ACTIVE status.
             TurnLimitReachedError: Conversation has reached MAX_TURNS.
         """
-        doc = await self._get_active_conversation(tenant_id, request.conversation_id)
+        # WI-3030 v2.1: Use _get_writable_conversation so customers can
+        # continue chatting after async email-bridge escalation.
+        doc = await self._get_writable_conversation(tenant_id, request.conversation_id)
 
         turn_count = doc.get("turn_count", 0)
         if turn_count >= MAX_TURNS:
@@ -391,7 +393,9 @@ class ConversationSession:
             return await self.add_customer_message(tenant_id, request)
 
         for _attempt in range(max_retries):
-            doc = await self._get_active_conversation(
+            # WI-3030 v2.1: Use _get_writable_conversation so customers
+            # can continue chatting after async email-bridge escalation.
+            doc = await self._get_writable_conversation(
                 tenant_id, request.conversation_id,
             )
             etag = doc.get("_etag", "")
@@ -843,12 +847,13 @@ class ConversationSession:
     ) -> str | None:
         """Find an active escalation_agent who handles the given category.
 
-        Selects the agent with the fewest unresolved escalations who is
-        still below their ``max_concurrent_conversations`` cap.  Falls
-        back to agents handling ``general_inquiry`` if no exact match.
+        Returns the first matching agent's document ID, or falls back to
+        agents handling ``general_inquiry``.  Returns ``None`` if no
+        suitable agent is available.
 
-        Returns the member's document ID, or ``None`` if no suitable
-        agent is available.
+        WI-3030 S259: Simplified for async email-bridge model — no
+        concurrency caps or workload balancing needed since the agent
+        responds via email, not live chat.
         """
         if not self._team_repo:
             logger.debug("No team_repo configured — cannot auto-assign")
@@ -876,28 +881,7 @@ class ConversationSession:
         if not candidates:
             return None
 
-        # Score each candidate by current workload
-        best_id: str | None = None
-        best_count = float("inf")
-
-        for member in candidates:
-            member_id = member["id"]
-            cap = member.get("max_concurrent_conversations", 5)
-
-            count = await self._repo.count_filtered(
-                tenant_id,
-                status=ConversationStatus.ESCALATED,
-                assigned_to=member_id,
-            )
-
-            if count >= cap:
-                continue  # at capacity
-
-            if count < best_count:
-                best_count = count
-                best_id = member_id
-
-        return best_id
+        return candidates[0]["id"]
 
     async def find_superadmin_email(self, tenant_id: str) -> str | None:
         """Return the email address of the tenant's superadmin.
@@ -1086,6 +1070,27 @@ class ConversationSession:
         doc = await self._get_conversation(tenant_id, conversation_id)
         status = doc.get("status", "")
         if status != ConversationStatus.ACTIVE.value:
+            raise ConversationNotActiveError(conversation_id, status)
+        return doc
+
+    async def _get_writable_conversation(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+    ) -> dict[str, Any]:
+        """Read a conversation that accepts customer messages.
+
+        ACTIVE and ESCALATED conversations are writable.  ESCALATED
+        conversations continue the AI chat while the async email-bridge
+        handles human follow-up separately (WI-3030 v2.1).
+        """
+        doc = await self._get_conversation(tenant_id, conversation_id)
+        status = doc.get("status", "")
+        writable_statuses = {
+            ConversationStatus.ACTIVE.value,
+            ConversationStatus.ESCALATED.value,
+        }
+        if status not in writable_statuses:
             raise ConversationNotActiveError(conversation_id, status)
         return doc
 

@@ -141,7 +141,8 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
               flexShrink: 0,
             }}
             onFocus={(e) => {
-              if (!disabled) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 2px ${focusRingColor(tokens.colorInputBarBg)}`;
+              // Only show focus ring for keyboard navigation (S259 D5 fix).
+              if (!disabled && e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 2px ${focusRingColor(tokens.colorInputBarBg)}`;
             }}
             onBlur={(e) => {
               (e.currentTarget as HTMLElement).style.boxShadow = 'none';
@@ -219,7 +220,8 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
             padding: 0,
           }}
           onFocus={(e) => {
-            if (canSend) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorInputBarBg)}`;
+            // Only show focus ring for keyboard navigation (S259 D5 fix).
+            if (canSend && e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorInputBarBg)}`;
           }}
           onBlur={(e) => {
             (e.currentTarget as HTMLElement).style.boxShadow = 'none';

@@ -221,17 +221,21 @@ export const Header: FunctionComponent<HeaderProps> = ({
           opacity: 0.9,
         }}
         onFocus={(e) => {
-          // On gradient headers, no single-color ring can guarantee >= 3:1
-          // against all possible interior blend points (non-linear luminance).
-          // Solution: double ring — black inner + white outer (or vice versa).
-          // One band always contrasts >= 4.58:1 against ANY background.
-          // On flat headers, use focusRingColor for a clean single ring.
-          if (gradientEnd) {
-            (e.currentTarget as HTMLElement).style.boxShadow =
-              '0 0 0 2px #000000, 0 0 0 4px #FFFFFF';
-          } else {
-            (e.currentTarget as HTMLElement).style.boxShadow =
-              `0 0 0 2px ${focusRingColor(tokens.colorPrimary)}`;
+          // Only show focus ring for keyboard navigation (S259 D5 fix).
+          // Mouse clicks should not leave a visible ring.
+          if (e.currentTarget.matches(':focus-visible')) {
+            // On gradient headers, no single-color ring can guarantee >= 3:1
+            // against all possible interior blend points (non-linear luminance).
+            // Solution: double ring — black inner + white outer (or vice versa).
+            // One band always contrasts >= 4.58:1 against ANY background.
+            // On flat headers, use focusRingColor for a clean single ring.
+            if (gradientEnd) {
+              (e.currentTarget as HTMLElement).style.boxShadow =
+                '0 0 0 2px #000000, 0 0 0 4px #FFFFFF';
+            } else {
+              (e.currentTarget as HTMLElement).style.boxShadow =
+                `0 0 0 2px ${focusRingColor(tokens.colorPrimary)}`;
+            }
           }
         }}
         onBlur={(e) => {
