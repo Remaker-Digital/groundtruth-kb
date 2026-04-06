@@ -11,6 +11,25 @@ AR-specific behavior:
   - TransportEvidenceGate is auto-wired from groundtruth.toml for all
     KnowledgeDB() callers (preserves default governance enforcement)
 
+KnowledgeDB API surface (forwarded from groundtruth_kb.db.KnowledgeDB):
+  Specs:      insert_spec, update_spec, get_spec, list_specs, count_specs
+  Tests:      insert_test, update_test, get_test, list_tests, get_tests_for_spec
+  Work items: insert_work_item, update_work_item, list_work_items, get_open_work_items, work_item
+  Test plans: insert_test_plan, update_test_plan, test_plan, insert_test_plan_phase
+  Procedures: insert_procedure, update_procedure, procedure
+  Documents:  insert_document, update_document
+  Testable:   insert_testable_element, testable_element, testable_elements
+  Assertions: run_all_assertions, validate_dcl_constraints
+  ADR/DCL:    ADR-* specs use type=architecture_decision, DCL-* use type=design_constraint
+  Transport:  _TRANSPORT_GATED_SPECS, TransportEvidenceGateError,
+              _validate_transport_test_pass, _validate_transport_spec_verification
+  Backlog:    insert_backlog_snapshot, backlog_snapshot
+  Coverage:   insert_test_coverage
+  Prompts:    insert_session_prompt, get_next_session_prompt, consume_session_prompt
+  Config:     insert_environment_config, environment_config
+  Scores:     insert_quality_score
+  Summaries:  get_summary
+
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
