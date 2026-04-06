@@ -12,7 +12,6 @@ Behavior:
   substantive work.
 - Treats breach notifications and invalid-message notifications as direct wake
   signals for the responsible agent.
-- Auto-resolves pure protocol acknowledgements ("Accepted:" / "Negotiation:").
 - Persists last processed notification event ID to disk.
 - Uses a file lock to prevent duplicate pollers per agent.
 
@@ -35,12 +34,7 @@ import msvcrt
 from bridge_worker_context import DEFAULT_MAX_DISPATCH_TARGETS
 from bridge_resident_worker import resident_worker_should_defer
 
-BREACH_EVENT_TYPES = {
-    "thread.ack_breach",
-    "thread.response_window_breach",
-    "thread.claimed_silence_breach",
-}
-DIRECT_WAKE_EVENT_TYPES = BREACH_EVENT_TYPES | {"message.invalid"}
+DIRECT_WAKE_EVENT_TYPES = {"message.failed"}
 SUBSTANTIVE_WAKE_COOLDOWN_SECONDS = 5 * 60
 
 
@@ -130,23 +124,6 @@ def _append_log(path: Path, message: str) -> None:
         pass
 
 
-def _is_protocol_ack(item: dict) -> bool:
-    if item.get("message_kind") == "protocol_ack":
-        return True
-    subject = (item.get("subject") or "").strip().lower()
-    payload = item.get("payload") or {}
-    tags = set(item.get("tags") or [])
-    response_type = str(payload.get("response_type", "")).lower()
-
-    if subject.startswith("accepted:") or subject.startswith("negotiation:"):
-        return True
-    if response_type in {"accepted", "negotiation"}:
-        return True
-    if "protocol" in tags and ("accepted" in tags or "negotiation" in tags):
-        return True
-    return False
-
-
 def _launch_agent_wake(
     agent: str,
     project_dir: Path,
@@ -214,9 +191,7 @@ def _notification_message_ref(event: dict) -> str | None:
 def _notification_should_wake(agent: str, event: dict) -> bool:
     event_type = str(event.get("event_type") or "")
     details = event.get("details") or {}
-    if event_type in BREACH_EVENT_TYPES:
-        return details.get("current_assignee") == agent
-    if event_type == "message.invalid":
+    if event_type == "message.failed":
         return details.get("sender") == agent
     return False
 
@@ -241,7 +216,7 @@ def _should_wake_substantive_item(
     cooldown_seconds: int = SUBSTANTIVE_WAKE_COOLDOWN_SECONDS,
 ) -> bool:
     message_id = str(item.get("id") or "")
-    if not message_id or item.get("status") == "invalid":
+    if not message_id or item.get("status") == "failed":
         return False
     last_wake = _last_wake_at(state, message_id)
     if last_wake is None:
@@ -291,8 +266,7 @@ def _handle_notification_batch(
     log_file: Path,
 ) -> dict:
     summary = {
-        "breach_events": 0,
-        "invalid_events": 0,
+        "failed_events": 0,
         "wake_refs": [],
     }
 
@@ -305,10 +279,8 @@ def _handle_notification_batch(
         if not message_ref:
             continue
 
-        if event_type in BREACH_EVENT_TYPES:
-            summary["breach_events"] += 1
-        elif event_type == "message.invalid":
-            summary["invalid_events"] += 1
+        if event_type == "message.failed":
+            summary["failed_events"] += 1
 
         details = event.get("details") or {}
         _append_log(
@@ -336,9 +308,7 @@ def _handle_inbox(
     """
     Handle new inbox items for `agent`.
 
-    - Protocol acks are claimed and auto-resolved.
-    - Non-ack peer messages are surfaced for explicit accept/negotiation,
-      never auto-accepted.
+    - Peer messages are surfaced for a substantive reply, never auto-accepted.
     - Invalid inbox items remain visible in runtime reporting, but are not
       surfaced as fresh actionable work.
     - Repeated wake for the same unresolved substantive item is suppressed for
@@ -347,14 +317,13 @@ def _handle_inbox(
     summary = {
         "detected": 0,
         "surfaced": 0,
-        "resolved_acks": 0,
-        "invalid_inbox": 0,
+        "failed_inbox": 0,
         "readonly_skips": 0,
         "resident_deferrals": 0,
         "errors": 0,
         "wake_candidates": [],
     }
-    inbox = bridge.list_inbox(agent=agent, status="new", limit=100)
+    inbox = bridge.list_inbox(agent=agent, status="pending", limit=100)
     items = inbox.get("items", [])
     wake_candidates: list[str] = []
 
@@ -368,8 +337,8 @@ def _handle_inbox(
             continue
         summary["detected"] += 1
 
-        if item.get("status") == "invalid":
-            summary["invalid_inbox"] += 1
+        if item.get("status") == "failed":
+            summary["failed_inbox"] += 1
             _append_log(
                 log_file,
                 f"invalid substantive item ignored for wake: {message_id} :: {subject}",
@@ -380,32 +349,18 @@ def _handle_inbox(
             summary["readonly_skips"] += 1
             _append_log(
                 log_file,
-                f"detected (read-only mode, no auto-ack): {message_id} :: {subject}",
+                f"detected (read-only mode, no auto-response): {message_id} :: {subject}",
             )
-            if not _is_protocol_ack(item):
-                if not _should_wake_substantive_item(item, state):
-                    _append_log(
-                        log_file,
-                        f"suppressed repeat wake: {message_id} :: {subject}",
-                    )
-                    continue
-                wake_candidates.append(message_id)
+            if not _should_wake_substantive_item(item, state):
+                _append_log(
+                    log_file,
+                    f"suppressed repeat wake: {message_id} :: {subject}",
+                )
+                continue
+            wake_candidates.append(message_id)
             continue
 
         try:
-            if _is_protocol_ack(item):
-                claimed = bridge.claim_message(message_id=message_id, agent=agent)
-                if claimed.get("claimed"):
-                    bridge.resolve_message(
-                        message_id=message_id,
-                        agent=agent,
-                        outcome="done",
-                        resolution="Auto-resolved by periodic bridge poller (protocol acknowledgement).",
-                    )
-                    summary["resolved_acks"] += 1
-                    _append_log(log_file, f"resolved ack: {message_id} :: {subject}")
-                continue
-
             if not _should_wake_substantive_item(item, state):
                 _append_log(log_file, f"suppressed repeat wake: {message_id} :: {subject}")
                 continue
@@ -510,7 +465,7 @@ def run(args: argparse.Namespace) -> int:
                 wake_candidates = sorted(
                     set(handled["wake_candidates"]) | set(signals["wake_refs"])
                 )
-                trigger = "poller-breach" if signals["breach_events"] else "poller-notification"
+                trigger = "poller-notification"
                 wake_launched = 0
                 resident_worker_should_defer, resident_worker_state = _resident_worker_should_defer_wake(
                     args.agent,
@@ -535,8 +490,7 @@ def run(args: argparse.Namespace) -> int:
                         _record_wake_launch(state, launched_ids)
                         wake_launched = len(launched_ids)
                 handled["wake_launched"] = wake_launched
-                handled["signal_breach_events"] = signals["breach_events"]
-                handled["signal_invalid_events"] = signals["invalid_events"]
+                handled["signal_failed_events"] = signals["failed_events"]
                 _checkpoint()
                 print(
                     json.dumps(
@@ -594,7 +548,7 @@ def run(args: argparse.Namespace) -> int:
                     wake_candidates = sorted(
                         set(handled["wake_candidates"]) | set(signals["wake_refs"])
                     )
-                    trigger = "poller-breach" if signals["breach_events"] else "poller-notification"
+                    trigger = "poller-notification"
                     resident_worker_should_defer, resident_worker_state = _resident_worker_should_defer_wake(
                         args.agent,
                         wake_candidates,
@@ -622,15 +576,11 @@ def run(args: argparse.Namespace) -> int:
                             handled["wake_launched"] = 0
                     else:
                         handled["wake_launched"] = 0
-                    handled["signal_breach_events"] = signals["breach_events"]
-                    handled["signal_invalid_events"] = signals["invalid_events"]
+                    handled["signal_failed_events"] = signals["failed_events"]
                     if (
                         handled["detected"]
                         or handled["surfaced"]
-                        or handled["invalid_inbox"]
-                        or handled["resolved_acks"]
-                        or handled["signal_breach_events"]
-                        or handled["signal_invalid_events"]
+                        or handled["signal_failed_events"]
                         or handled["readonly_skips"]
                         or handled["resident_deferrals"]
                         or handled["errors"]
@@ -641,10 +591,7 @@ def run(args: argparse.Namespace) -> int:
                             "cycle: "
                             f"detected={handled['detected']} "
                             f"surfaced={handled['surfaced']} "
-                            f"invalid_inbox={handled['invalid_inbox']} "
-                            f"resolved_acks={handled['resolved_acks']} "
-                            f"signal_breach_events={handled['signal_breach_events']} "
-                            f"signal_invalid_events={handled['signal_invalid_events']} "
+                            f"signal_failed_events={handled['signal_failed_events']} "
                             f"readonly_skips={handled['readonly_skips']} "
                             f"resident_deferrals={handled['resident_deferrals']} "
                             f"wake_launched={handled['wake_launched']} "

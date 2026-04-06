@@ -1,7 +1,18 @@
+"""Prime Bridge Runtime — Synchronous Dialog Model (v3).
+
+Synchronous inter-agent message bridge between Codex and Prime Builder.
+Three message states: pending → completed | failed.
+Thread state derived from messages at query time (no cached threads table).
+Non-blocking persistent retry for unresolved exchanges.
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import site
 import sqlite3
 import time
@@ -30,7 +41,7 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 mcp = FastMCP(
     name="prime-bridge",
     instructions=(
-        "Asynchronous local message bridge between Codex and Prime Builder "
+        "Synchronous local message bridge between Codex and Prime Builder "
         "with long-poll notification support."
     ),
 )
@@ -39,31 +50,24 @@ Agent = Literal["codex", "prime", "owner", "any"]
 PeerAgent = Literal["codex", "prime"]
 
 PEER_AGENTS = {"codex", "prime"}
-ACTIONABLE_INBOX_STATUSES = ("new", "pending")
-CLAIMABLE_STATUSES = ("new", "pending")
-FINAL_STATUSES = {"done", "blocked", "superseded"}
+ACTIONABLE_INBOX_STATUSES = ("pending",)
+FINAL_STATUSES = {"completed", "failed"}
 STRUCTURED_RESPONSE_TYPES = {
     "advisory_review",
     "go_no_go",
-    "acknowledgement",
     "status_update",
     "task_handoff",
-    "negotiation",
     "correction",
     "escalation",
 }
-STRUCTURED_RESPONSE_WINDOWS = {"immediate", "short", "session", "async"}
-SCHEMA_VERSION_LEGACY = 1
-SCHEMA_VERSION_CURRENT = 2
-ACK_DEADLINE_SECONDS = 60
-CLAIMED_THREAD_SILENCE_SECONDS = 10 * 60
-RESPONSE_WINDOW_SECONDS = {
-    "immediate": 2 * 60,
-    "short": 10 * 60,
-    "session": 8 * 60 * 60,
-    "async": 24 * 60 * 60,
-}
-REPLY_LIKE_RESPONSE_TYPES = {"accepted", "negotiation", "status_update", "correction"}
+SCHEMA_VERSION_CURRENT = 3
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE_SECONDS = 60
+
+
+# ---------------------------------------------------------------------------
+# Utility helpers
+# ---------------------------------------------------------------------------
 
 
 def _now() -> str:
@@ -103,10 +107,33 @@ def _peer_collaboration_message(sender: str, recipient: str) -> bool:
     return sender in PEER_AGENTS and recipient in PEER_AGENTS
 
 
+def _is_absolute_path(p: str) -> bool:
+    """Detect absolute paths (Windows drive letters or Unix root)."""
+    return bool(p) and (
+        p.startswith("/") or (len(p) >= 3 and p[1] == ":" and p[2] in ("/", "\\"))
+    )
+
+
+def _normalize_artifact_refs(value: Any) -> list[Any]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, (str, dict))]
+
+
+def _normalize_action_items(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+# ---------------------------------------------------------------------------
+# Thread ID resolution (from messages, no threads table)
+# ---------------------------------------------------------------------------
+
+
 def _canonical_thread_id(conn: sqlite3.Connection, correlation_id: str | None) -> str | None:
     if not correlation_id:
         return None
-
     row = conn.execute(
         """
         SELECT COALESCE(NULLIF(thread_id, ''), id) AS canonical_thread_id
@@ -130,53 +157,9 @@ def _thread_id_for(
     return _canonical_thread_id(conn, correlation_id) or message_id
 
 
-def _is_absolute_path(p: str) -> bool:
-    """Detect absolute paths (Windows drive letters or Unix root)."""
-    return bool(p) and (p.startswith("/") or (len(p) >= 3 and p[1] == ":" and p[2] in ("/", "\\")))
-
-
-def _normalize_artifact_refs(value: Any) -> list[Any]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, (str, dict))]
-
-
-def _normalize_action_items(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
-
-
-def _extract_structured_fields(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "artifact_refs": _normalize_artifact_refs(payload.get("artifact_refs")),
-        "expected_response": str(payload.get("expected_response", "") or "").strip(),
-        "response_window": str(payload.get("response_window", "") or "").strip(),
-        "action_items": _normalize_action_items(payload.get("action_items")),
-    }
-
-
-def _response_window_seconds(response_window: str) -> int | None:
-    return RESPONSE_WINDOW_SECONDS.get((response_window or "").strip().lower())
-
-
-def _reply_like_peer_message(
-    *,
-    sender: str,
-    recipient: str,
-    message_kind: str,
-    payload: dict[str, Any],
-    structured: dict[str, Any],
-) -> bool:
-    if not _peer_collaboration_message(sender, recipient):
-        return False
-    if message_kind in {"protocol_ack", "status_update"}:
-        return True
-
-    response_type = str(payload.get("response_type", "") or "").strip().lower()
-    if response_type in REPLY_LIKE_RESPONSE_TYPES:
-        return True
-    return False
+# ---------------------------------------------------------------------------
+# Message kind inference
+# ---------------------------------------------------------------------------
 
 
 def _infer_message_kind(
@@ -185,7 +168,6 @@ def _infer_message_kind(
     subject: str,
     payload: dict[str, Any],
     tags: list[str],
-    expected_response: str,
 ) -> str:
     response_type = str(payload.get("response_type", "") or "").lower()
     subject_lower = (subject or "").strip().lower()
@@ -198,11 +180,16 @@ def _infer_message_kind(
         or ("protocol" in tag_set and ("accepted" in tag_set or "negotiation" in tag_set))
     ):
         return "protocol_ack"
-    if expected_response == "status_update" or response_type == "status_update":
+    if response_type == "status_update":
         return "status_update"
     if "system" in tag_set or sender == "owner":
         return "system"
     return "substantive"
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
 
 
 def _validate_message_contract(
@@ -210,41 +197,35 @@ def _validate_message_contract(
     sender: str,
     recipient: str,
     message_kind: str,
-    structured: dict[str, Any],
+    payload: dict[str, Any],
 ) -> list[str]:
     if not _peer_collaboration_message(sender, recipient):
         return []
+    if sender == recipient:
+        return [f"self-addressed peer messages are not allowed: sender and recipient are both {sender}"]
     if message_kind == "protocol_ack":
-        return []
+        return ["protocol acknowledgements are no longer supported; send a substantive reply instead"]
 
     errors: list[str] = []
-    expected_response = structured["expected_response"]
-    response_window = structured["response_window"]
-    artifact_refs = structured["artifact_refs"]
-    action_items = structured["action_items"]
+    expected_response = str(payload.get("expected_response", "") or "").strip()
+    artifact_refs = _normalize_artifact_refs(payload.get("artifact_refs"))
+    action_items = _normalize_action_items(payload.get("action_items"))
 
     if not expected_response:
-        errors.append("missing expected_response")
+        errors.append("missing expected_response in payload")
     elif expected_response not in STRUCTURED_RESPONSE_TYPES:
         errors.append(f"invalid expected_response: {expected_response}")
 
-    if not response_window:
-        errors.append("missing response_window")
-    elif response_window not in STRUCTURED_RESPONSE_WINDOWS:
-        errors.append(f"invalid response_window: {response_window}")
-
-    if message_kind == "substantive":
+    if message_kind in ("substantive", "status_update"):
         if not artifact_refs:
-            errors.append("missing artifact_refs")
+            errors.append("missing artifact_refs in payload")
         if not action_items:
-            errors.append("missing action_items")
+            errors.append("missing action_items in payload")
 
-    # Validate artifact ref paths: absolute paths are invalid (they break
-    # rglob and are non-portable). Refs must use repo-relative paths.
     for ref in artifact_refs:
         if isinstance(ref, dict):
             ref_path = str(ref.get("path", ""))
-            if ref_path and (_is_absolute_path(ref_path)):
+            if ref_path and _is_absolute_path(ref_path):
                 errors.append(f"artifact_refs contains absolute path: {ref_path[:60]}")
 
     return errors
@@ -258,19 +239,13 @@ def _validate_thread_correlation(
     correlation_id: str | None,
     message_kind: str,
     payload: dict[str, Any],
-    structured: dict[str, Any],
 ) -> list[str]:
     if not _peer_collaboration_message(sender, recipient):
         return []
 
-    reply_like = _reply_like_peer_message(
-        sender=sender,
-        recipient=recipient,
-        message_kind=message_kind,
-        payload=payload,
-        structured=structured,
-    )
-    if reply_like and not correlation_id:
+    is_reply = bool(correlation_id)
+    response_type = str(payload.get("response_type", "") or "").lower()
+    if response_type in {"status_update", "correction"} and not correlation_id:
         return ["missing correlation_id for reply-like peer message"]
     if not correlation_id:
         return []
@@ -279,21 +254,7 @@ def _validate_thread_correlation(
     if not thread_id:
         return [f"unknown correlation_id: {correlation_id}"]
 
-    row = conn.execute(
-        "SELECT participants FROM threads WHERE thread_id = ?",
-        (thread_id,),
-    ).fetchone()
-    if row is None:
-        rebuilt = _upsert_thread_state(conn, thread_id, emit_notifications=False)
-        if rebuilt is not None:
-            row = conn.execute(
-                "SELECT participants FROM threads WHERE thread_id = ?",
-                (thread_id,),
-            ).fetchone()
-    if row is None:
-        return [f"unknown correlation_id: {correlation_id}"]
-
-    participants = _loads_json(row["participants"], list, [])
+    participants = _thread_participants(conn, thread_id)
     if sender in PEER_AGENTS and sender not in participants:
         return [f"correlation_id not linked to sender thread: {correlation_id}"]
     if recipient in PEER_AGENTS and recipient not in participants:
@@ -301,17 +262,28 @@ def _validate_thread_correlation(
     return []
 
 
-def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
-    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
-    return {str(row[1]) for row in rows}
+def _thread_participants(conn: sqlite3.Connection, thread_id: str) -> set[str]:
+    """Derive participants from messages (no threads table)."""
+    rows = conn.execute(
+        "SELECT DISTINCT sender, recipient FROM messages WHERE thread_id = ?",
+        (thread_id,),
+    ).fetchall()
+    participants = set()
+    for row in rows:
+        if row["sender"] in PEER_AGENTS:
+            participants.add(row["sender"])
+        if row["recipient"] in PEER_AGENTS:
+            participants.add(row["recipient"])
+    return participants
 
 
-def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
-    if column not in _table_columns(conn, table):
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+# ---------------------------------------------------------------------------
+# Thread state derivation (replaces cached threads table)
+# ---------------------------------------------------------------------------
 
 
-def _compute_thread_snapshot(conn: sqlite3.Connection, thread_id: str) -> dict[str, Any] | None:
+def _derive_thread_state(conn: sqlite3.Connection, thread_id: str) -> dict[str, Any] | None:
+    """Compute thread state from messages. Replaces the old threads table cache."""
     rows = conn.execute(
         "SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at ASC",
         (thread_id,),
@@ -321,29 +293,12 @@ def _compute_thread_snapshot(conn: sqlite3.Connection, thread_id: str) -> dict[s
 
     items = [_row_to_dict(row) for row in rows]
     root = items[0]
+    latest = items[-1]
     substantive = [
-        item
-        for item in items
+        item for item in items
         if item.get("message_kind") in {"substantive", "status_update", "system"}
     ]
-    latest = items[-1]
     latest_substantive = substantive[-1] if substantive else root
-    latest_claimed = next(
-        (
-            item
-            for item in reversed(items)
-            if item.get("status") == "claimed" and item.get("claimed_by") in PEER_AGENTS
-        ),
-        None,
-    )
-    latest_final = next(
-        (
-            item
-            for item in reversed(items)
-            if item.get("status") in FINAL_STATUSES
-        ),
-        None,
-    )
     participants = sorted(
         {
             party
@@ -352,34 +307,23 @@ def _compute_thread_snapshot(conn: sqlite3.Connection, thread_id: str) -> dict[s
             if party in PEER_AGENTS
         }
     )
-    if latest_final is not None:
-        current_status = latest_final.get("status") or "done"
+
+    latest_status = latest_substantive.get("status") or latest.get("status", "pending")
+    if latest_status in FINAL_STATUSES:
         current_assignee = None
-        current_claimed_at = None
-    elif latest_claimed is not None:
-        current_status = "claimed"
-        current_assignee = latest_claimed.get("claimed_by")
-        current_claimed_at = latest_claimed.get("claimed_at")
     else:
-        current_status = latest_substantive.get("status") or latest.get("status") or "new"
-        current_assignee = latest_substantive.get("claimed_by")
-        current_claimed_at = latest_substantive.get("claimed_at")
-    if not current_assignee and current_status not in FINAL_STATUSES:
         recipient = latest_substantive.get("recipient")
         current_assignee = recipient if recipient in PEER_AGENTS else None
 
     return {
         "thread_id": thread_id,
         "root_message_id": root["id"],
-        "status": current_status,
+        "status": latest_status,
         "current_assignee": current_assignee,
-        "current_claimed_at": current_claimed_at,
         "last_message_id": latest["id"],
         "last_substantive_message_id": latest_substantive["id"],
         "last_substantive_sender": latest_substantive.get("sender"),
         "last_substantive_at": latest_substantive.get("created_at"),
-        "expected_response": latest_substantive.get("expected_response", ""),
-        "response_window": latest_substantive.get("response_window", ""),
         "artifact_refs": latest_substantive.get("artifact_refs", []),
         "latest_summary": latest_substantive.get("subject", ""),
         "participants": participants,
@@ -387,15 +331,6 @@ def _compute_thread_snapshot(conn: sqlite3.Connection, thread_id: str) -> dict[s
         "created_at": root.get("created_at") or _now(),
         "updated_at": latest.get("created_at") or _now(),
     }
-
-
-def _thread_row_to_dict(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
-    item = dict(row)
-    if not isinstance(item.get("artifact_refs"), list):
-        item["artifact_refs"] = _loads_json(item.get("artifact_refs"), list, [])
-    if not isinstance(item.get("participants"), list):
-        item["participants"] = _loads_json(item.get("participants"), list, [])
-    return item
 
 
 def _thread_items(conn: sqlite3.Connection, thread_id: str) -> list[dict[str, Any]]:
@@ -406,531 +341,16 @@ def _thread_items(conn: sqlite3.Connection, thread_id: str) -> list[dict[str, An
     return [_row_to_dict(row) for row in rows]
 
 
-def _thread_sla_snapshot(
-    conn: sqlite3.Connection,
-    thread: sqlite3.Row | dict[str, Any],
-    *,
-    now: datetime | None = None,
-    silence_seconds: int = CLAIMED_THREAD_SILENCE_SECONDS,
-) -> dict[str, Any]:
-    thread_item = _thread_row_to_dict(thread)
-    items = _thread_items(conn, thread_item["thread_id"])
-    now = now or datetime.now(timezone.utc)
-
-    latest_substantive = next(
-        (
-            item
-            for item in reversed(items)
-            if item.get("message_kind") in {"substantive", "status_update", "system"}
-        ),
-        None,
-    )
-    assignee = thread_item.get("current_assignee")
-    current_status = thread_item.get("status")
-    sla_eligible = current_status not in FINAL_STATUSES and current_status != "invalid"
-    latest_request = None
-    latest_assignee_response = None
-    if assignee in PEER_AGENTS:
-        latest_request = next(
-            (
-                item
-                for item in reversed(items)
-                if item.get("sender") != assignee
-                and item.get("sender") in PEER_AGENTS
-                and item.get("recipient") in PEER_AGENTS
-                and item.get("message_kind") in {"substantive", "status_update", "system"}
-            ),
-            None,
-        )
-        if latest_request is not None:
-            request_at = _parse_iso(latest_request.get("created_at"))
-            latest_assignee_response = next(
-                (
-                    item
-                    for item in items
-                    if item.get("sender") == assignee
-                    and (request_at is None or (_parse_iso(item.get("created_at")) or now) > request_at)
-                ),
-                None,
-            )
-
-    ack_breach = False
-    ack_overdue_seconds = 0
-    ack_due_at = None
-    response_window_breach = False
-    response_overdue_seconds = 0
-    response_due_at = None
-    if latest_request is not None and latest_assignee_response is None and sla_eligible:
-        request_at = _parse_iso(latest_request.get("created_at"))
-        if request_at is not None:
-            age_seconds = int((now - request_at).total_seconds())
-            ack_due_at = (request_at.timestamp() + ACK_DEADLINE_SECONDS)
-            if age_seconds > ACK_DEADLINE_SECONDS:
-                ack_breach = True
-                ack_overdue_seconds = age_seconds - ACK_DEADLINE_SECONDS
-            window_seconds = _response_window_seconds(
-                latest_request.get("response_window") or thread_item.get("response_window", "")
-            )
-            if window_seconds is not None:
-                response_due_at = request_at.timestamp() + window_seconds
-                if age_seconds > window_seconds:
-                    response_window_breach = True
-                    response_overdue_seconds = age_seconds - window_seconds
-
-    silence_breach = False
-    silence_overdue_seconds = 0
-    silence_due_at = None
-    last_assignee_activity_at = None
-    if current_status == "claimed" and assignee in PEER_AGENTS:
-        baseline = _parse_iso(thread_item.get("current_claimed_at"))
-        latest_assignee_activity_at = next(
-            (
-                _parse_iso(item.get("created_at"))
-                for item in reversed(items)
-                if item.get("sender") == assignee and not _message_is_protocol_ack(item)
-            ),
-            None,
-        )
-        if latest_assignee_activity_at is not None and (
-            baseline is None or latest_assignee_activity_at > baseline
-        ):
-            baseline = latest_assignee_activity_at
-        if baseline is not None:
-            silence_seconds_elapsed = int((now - baseline).total_seconds())
-            silence_due_at = baseline.timestamp() + silence_seconds
-            if silence_seconds_elapsed > silence_seconds:
-                silence_breach = True
-                silence_overdue_seconds = silence_seconds_elapsed - silence_seconds
-
-    risk_types: list[str] = []
-    if ack_breach:
-        risk_types.append("ack_breach")
-    if response_window_breach:
-        risk_types.append("response_window_breach")
-    if silence_breach:
-        risk_types.append("claimed_thread_silence_breach")
-
-    return {
-        "thread_id": thread_item["thread_id"],
-        "responsible_agent": assignee,
-        "latest_substantive_message_id": latest_substantive.get("id") if latest_substantive else None,
-        "latest_request_message_id": latest_request.get("id") if latest_request else None,
-        "latest_assignee_response_message_id": latest_assignee_response.get("id") if latest_assignee_response else None,
-        "ack_breach": ack_breach,
-        "ack_due_at": datetime.fromtimestamp(ack_due_at, tz=timezone.utc).isoformat() if ack_due_at else None,
-        "ack_overdue_seconds": ack_overdue_seconds,
-        "response_window_breach": response_window_breach,
-        "response_due_at": datetime.fromtimestamp(response_due_at, tz=timezone.utc).isoformat()
-        if response_due_at
-        else None,
-        "response_overdue_seconds": response_overdue_seconds,
-        "claimed_thread_silence_breach": silence_breach,
-        "silence_due_at": datetime.fromtimestamp(silence_due_at, tz=timezone.utc).isoformat()
-        if silence_due_at
-        else None,
-        "silence_overdue_seconds": silence_overdue_seconds,
-        "last_assignee_activity_at": last_assignee_activity_at.isoformat()
-        if last_assignee_activity_at
-        else None,
-        "risk_types": risk_types,
-    }
+# ---------------------------------------------------------------------------
+# Row conversion
+# ---------------------------------------------------------------------------
 
 
-def _queue_thread_breach_notifications(
-    conn: sqlite3.Connection,
-    snapshot: dict[str, Any],
-) -> None:
-    thread_row = conn.execute(
-        """
-        SELECT ack_breach_notified_at, response_breach_notified_at, silence_breach_notified_at
-        FROM threads
-        WHERE thread_id = ?
-        """,
-        (snapshot["thread_id"],),
-    ).fetchone()
-    if thread_row is None:
-        return
-
-    sla = _thread_sla_snapshot(conn, snapshot)
-    thread_item = _thread_row_to_dict(snapshot)
-    now = _now()
-    checks = [
-        (
-            "ack_breach",
-            sla["ack_breach"],
-            "ack_breach_notified_at",
-            "thread.ack_breach",
-            {
-                "thread_id": snapshot["thread_id"],
-                "current_assignee": snapshot.get("current_assignee"),
-                "latest_request_message_id": sla.get("latest_request_message_id"),
-                "ack_due_at": sla.get("ack_due_at"),
-                "ack_overdue_seconds": sla.get("ack_overdue_seconds"),
-            },
-        ),
-        (
-            "response_window_breach",
-            sla["response_window_breach"],
-            "response_breach_notified_at",
-            "thread.response_window_breach",
-            {
-                "thread_id": snapshot["thread_id"],
-                "current_assignee": snapshot.get("current_assignee"),
-                "latest_request_message_id": sla.get("latest_request_message_id"),
-                "response_window": snapshot.get("response_window"),
-                "response_due_at": sla.get("response_due_at"),
-                "response_overdue_seconds": sla.get("response_overdue_seconds"),
-            },
-        ),
-        (
-            "claimed_thread_silence_breach",
-            sla["claimed_thread_silence_breach"],
-            "silence_breach_notified_at",
-            "thread.claimed_silence_breach",
-            {
-                "thread_id": snapshot["thread_id"],
-                "current_assignee": snapshot.get("current_assignee"),
-                "last_assignee_activity_at": sla.get("last_assignee_activity_at"),
-                "silence_due_at": sla.get("silence_due_at"),
-                "silence_overdue_seconds": sla.get("silence_overdue_seconds"),
-            },
-        ),
-    ]
-
-    updates: dict[str, Any] = {}
-    for _, active, column, event_type, details in checks:
-        notified_at = thread_row[column]
-        if active and not notified_at:
-            for agent in thread_item.get("participants", []):
-                _queue_notification(
-                    conn,
-                    agent,
-                    event_type,
-                    snapshot.get("last_substantive_message_id"),
-                    snapshot.get("latest_summary", ""),
-                    details,
-                )
-            updates[column] = now
-        elif not active and notified_at:
-            updates[column] = None
-
-    if updates:
-        assignments = ", ".join(f"{column} = ?" for column in updates)
-        conn.execute(
-            f"UPDATE threads SET {assignments} WHERE thread_id = ?",
-            (*updates.values(), snapshot["thread_id"]),
-        )
-
-
-def _queue_thread_update_notifications(
-    conn: sqlite3.Connection,
-    previous: dict[str, Any] | None,
-    current: dict[str, Any],
-) -> None:
-    changed = previous is None or any(
-        previous.get(key) != current.get(key)
-        for key in (
-            "status",
-            "current_assignee",
-            "current_claimed_at",
-            "last_substantive_at",
-            "last_substantive_message_id",
-        )
-    )
-    if not changed:
-        return
-
-    details = {
-        "thread_id": current["thread_id"],
-        "status": current["status"],
-        "current_assignee": current["current_assignee"],
-        "last_substantive_message_id": current["last_substantive_message_id"],
-        "last_substantive_at": current["last_substantive_at"],
-    }
-    for agent in current.get("participants", []):
-        _queue_notification(
-            conn,
-            agent,
-            "thread.updated",
-            current.get("last_substantive_message_id"),
-            current.get("latest_summary", ""),
-            details,
-        )
-
-
-def _upsert_thread_state(
-    conn: sqlite3.Connection,
-    thread_id: str,
-    *,
-    emit_notifications: bool,
-) -> dict[str, Any] | None:
-    snapshot = _compute_thread_snapshot(conn, thread_id)
-    if snapshot is None:
-        return None
-
-    previous_row = conn.execute(
-        "SELECT * FROM threads WHERE thread_id = ?",
-        (thread_id,),
-    ).fetchone()
-    previous = None
-    if previous_row is not None:
-        previous = dict(previous_row)
-        previous["artifact_refs"] = _loads_json(previous.get("artifact_refs"), list, [])
-        previous["participants"] = _loads_json(previous.get("participants"), list, [])
-
-    conn.execute(
-        """
-        INSERT INTO threads (
-            thread_id,
-            root_message_id,
-            status,
-            current_assignee,
-            current_claimed_at,
-            last_message_id,
-            last_substantive_message_id,
-            last_substantive_sender,
-            last_substantive_at,
-            expected_response,
-            response_window,
-            artifact_refs,
-            latest_summary,
-            participants,
-            message_count,
-            created_at,
-            updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(thread_id) DO UPDATE SET
-            root_message_id = excluded.root_message_id,
-            status = excluded.status,
-            current_assignee = excluded.current_assignee,
-            current_claimed_at = excluded.current_claimed_at,
-            last_message_id = excluded.last_message_id,
-            last_substantive_message_id = excluded.last_substantive_message_id,
-            last_substantive_sender = excluded.last_substantive_sender,
-            last_substantive_at = excluded.last_substantive_at,
-            expected_response = excluded.expected_response,
-            response_window = excluded.response_window,
-            artifact_refs = excluded.artifact_refs,
-            latest_summary = excluded.latest_summary,
-            participants = excluded.participants,
-            message_count = excluded.message_count,
-            updated_at = excluded.updated_at
-        """,
-        (
-            snapshot["thread_id"],
-            snapshot["root_message_id"],
-            snapshot["status"],
-            snapshot["current_assignee"],
-            snapshot["current_claimed_at"],
-            snapshot["last_message_id"],
-            snapshot["last_substantive_message_id"],
-            snapshot["last_substantive_sender"],
-            snapshot["last_substantive_at"],
-            snapshot["expected_response"],
-            snapshot["response_window"],
-            json.dumps(snapshot["artifact_refs"]),
-            snapshot["latest_summary"],
-            json.dumps(snapshot["participants"]),
-            snapshot["message_count"],
-            snapshot["created_at"],
-            snapshot["updated_at"],
-        ),
-    )
-
-    if emit_notifications:
-        _queue_thread_update_notifications(conn, previous, snapshot)
-        _queue_thread_breach_notifications(conn, snapshot)
-    return snapshot
-
-
-def _backfill_messages(conn: sqlite3.Connection) -> None:
-    rows = conn.execute("SELECT * FROM messages ORDER BY created_at ASC").fetchall()
-    for row in rows:
-        item = dict(row)
-        payload = _loads_json(item.get("payload"), dict, {})
-        tags = _loads_json(item.get("tags"), list, [])
-        structured = _extract_structured_fields(payload)
-        thread_id = _thread_id_for(conn, item["id"], item.get("correlation_id"))
-        message_kind = _infer_message_kind(
-            sender=str(item.get("sender", "")),
-            subject=str(item.get("subject", "")),
-            payload=payload,
-            tags=tags,
-            expected_response=structured["expected_response"],
-        )
-        conn.execute(
-            """
-            UPDATE messages
-            SET thread_id = ?,
-                message_kind = COALESCE(NULLIF(message_kind, ''), ?),
-                schema_version = COALESCE(schema_version, ?),
-                artifact_refs = COALESCE(NULLIF(artifact_refs, ''), ?),
-                expected_response = COALESCE(NULLIF(expected_response, ''), ?),
-                response_window = COALESCE(NULLIF(response_window, ''), ?),
-                action_items = COALESCE(NULLIF(action_items, ''), ?),
-                validation_errors = COALESCE(NULLIF(validation_errors, ''), '[]')
-            WHERE id = ?
-            """,
-            (
-                thread_id,
-                message_kind,
-                SCHEMA_VERSION_LEGACY,
-                json.dumps(structured["artifact_refs"]),
-                structured["expected_response"],
-                structured["response_window"],
-                json.dumps(structured["action_items"]),
-                item["id"],
-            ),
-        )
-
-
-def _backfill_threads(conn: sqlite3.Connection) -> None:
-    rows = conn.execute(
-        "SELECT DISTINCT thread_id FROM messages WHERE thread_id IS NOT NULL AND thread_id != ''"
-    ).fetchall()
-    for row in rows:
-        _upsert_thread_state(conn, str(row[0]), emit_notifications=False)
-
-
-def _ensure_schema(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS messages (
-            id TEXT PRIMARY KEY,
-            sender TEXT NOT NULL,
-            recipient TEXT NOT NULL,
-            subject TEXT NOT NULL,
-            body TEXT NOT NULL,
-            payload TEXT NOT NULL DEFAULT '{}',
-            tags TEXT NOT NULL DEFAULT '[]',
-            priority INTEGER NOT NULL DEFAULT 2,
-            status TEXT NOT NULL DEFAULT 'new',
-            correlation_id TEXT,
-            created_at TEXT NOT NULL,
-            claimed_by TEXT,
-            claimed_at TEXT,
-            resolved_at TEXT,
-            resolution TEXT,
-            schema_version INTEGER NOT NULL DEFAULT 1,
-            thread_id TEXT,
-            message_kind TEXT NOT NULL DEFAULT 'substantive',
-            artifact_refs TEXT NOT NULL DEFAULT '[]',
-            expected_response TEXT NOT NULL DEFAULT '',
-            response_window TEXT NOT NULL DEFAULT '',
-            action_items TEXT NOT NULL DEFAULT '[]',
-            validation_errors TEXT NOT NULL DEFAULT '[]'
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_messages_inbox
-        ON messages(recipient, status, priority DESC, created_at ASC)
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS notifications (
-            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent TEXT NOT NULL,
-            event_type TEXT NOT NULL,
-            message_id TEXT,
-            subject TEXT NOT NULL DEFAULT '',
-            details TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_notifications_agent_event
-        ON notifications(agent, event_id)
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS threads (
-            thread_id TEXT PRIMARY KEY,
-            root_message_id TEXT NOT NULL,
-            status TEXT NOT NULL,
-            current_assignee TEXT,
-            current_claimed_at TEXT,
-            last_message_id TEXT,
-            last_substantive_message_id TEXT,
-            last_substantive_sender TEXT,
-            last_substantive_at TEXT,
-            expected_response TEXT NOT NULL DEFAULT '',
-            response_window TEXT NOT NULL DEFAULT '',
-            artifact_refs TEXT NOT NULL DEFAULT '[]',
-            latest_summary TEXT NOT NULL DEFAULT '',
-            participants TEXT NOT NULL DEFAULT '[]',
-            message_count INTEGER NOT NULL DEFAULT 0,
-            ack_breach_notified_at TEXT,
-            response_breach_notified_at TEXT,
-            silence_breach_notified_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_threads_status_assignee
-        ON threads(status, current_assignee, updated_at DESC)
-        """
-    )
-    _ensure_column(conn, "messages", "schema_version", "INTEGER NOT NULL DEFAULT 1")
-    _ensure_column(conn, "messages", "thread_id", "TEXT")
-    _ensure_column(conn, "messages", "message_kind", "TEXT NOT NULL DEFAULT 'substantive'")
-    _ensure_column(conn, "messages", "artifact_refs", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "messages", "expected_response", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "messages", "response_window", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "messages", "action_items", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "messages", "validation_errors", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "threads", "ack_breach_notified_at", "TEXT")
-    _ensure_column(conn, "threads", "response_breach_notified_at", "TEXT")
-    _ensure_column(conn, "threads", "silence_breach_notified_at", "TEXT")
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_messages_thread
-        ON messages(thread_id, created_at ASC)
-        """
-    )
-    user_version = int(conn.execute("PRAGMA user_version").fetchone()[0] or 0)
-    thread_count = int(conn.execute("SELECT COUNT(*) FROM threads").fetchone()[0] or 0)
-    message_count = int(conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0] or 0)
-    null_thread_count = int(
-        conn.execute(
-            "SELECT COUNT(*) FROM messages WHERE thread_id IS NULL OR thread_id = ''"
-        ).fetchone()[0] or 0
-    )
-    if user_version < SCHEMA_VERSION_CURRENT:
-        _backfill_messages(conn)
-        _backfill_threads(conn)
-        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION_CURRENT}")
-    elif null_thread_count > 0:
-        _backfill_messages(conn)
-        _backfill_threads(conn)
-    elif thread_count == 0 and message_count > 0:
-        _backfill_threads(conn)
-
-
-def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    _ensure_schema(conn)
-    conn.commit()
-    return conn
-
-
-def _row_to_dict(row: sqlite3.Row) -> dict:
+def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
     item["payload"] = _loads_json(item.get("payload"), dict, {})
     item["tags"] = _loads_json(item.get("tags"), list, [])
     item["artifact_refs"] = _loads_json(item.get("artifact_refs"), list, [])
-    item["action_items"] = _loads_json(item.get("action_items"), list, [])
-    item["validation_errors"] = _loads_json(item.get("validation_errors"), list, [])
     return item
 
 
@@ -949,7 +369,6 @@ def _message_is_protocol_ack(item: dict) -> bool:
     payload = item.get("payload") or {}
     tags = set(item.get("tags") or [])
     response_type = str(payload.get("response_type", "")).lower()
-
     if subject.startswith("accepted:") or subject.startswith("negotiation:"):
         return True
     if response_type in {"accepted", "negotiation"}:
@@ -963,6 +382,11 @@ def _notification_targets(recipient: str) -> list[str]:
     if recipient == "any":
         return ["codex", "prime"]
     return [recipient]
+
+
+# ---------------------------------------------------------------------------
+# Notification queue
+# ---------------------------------------------------------------------------
 
 
 def _queue_notification(
@@ -983,6 +407,11 @@ def _queue_notification(
     return int(cur.lastrowid)
 
 
+# ---------------------------------------------------------------------------
+# Message insert
+# ---------------------------------------------------------------------------
+
+
 def _insert_message(
     conn: sqlite3.Connection,
     sender: Agent,
@@ -994,19 +423,17 @@ def _insert_message(
     priority: int,
     correlation_id: str | None,
 ) -> tuple[str, str, list[str], list[int]]:
-    structured = _extract_structured_fields(payload)
     message_kind = _infer_message_kind(
         sender=sender,
         subject=subject,
         payload=payload,
         tags=tags,
-        expected_response=structured["expected_response"],
     )
     validation_errors = _validate_message_contract(
         sender=sender,
         recipient=recipient,
         message_kind=message_kind,
-        structured=structured,
+        payload=payload,
     )
     validation_errors.extend(
         _validate_thread_correlation(
@@ -1016,20 +443,24 @@ def _insert_message(
             correlation_id=correlation_id,
             message_kind=message_kind,
             payload=payload,
-            structured=structured,
         )
     )
-    status = "invalid" if validation_errors else "new"
+
+    status = "failed" if validation_errors else "pending"
+    if validation_errors:
+        payload["validation_errors"] = validation_errors
+
     message_id = str(uuid.uuid4())
     thread_id = _thread_id_for(conn, message_id, correlation_id)
+    artifact_refs = _normalize_artifact_refs(payload.get("artifact_refs"))
+
     conn.execute(
         """
         INSERT INTO messages (
             id, sender, recipient, subject, body, payload, tags,
             priority, status, correlation_id, created_at, schema_version,
-            thread_id, message_kind, artifact_refs, expected_response,
-            response_window, action_items, validation_errors
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            thread_id, message_kind, artifact_refs
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             message_id,
@@ -1046,15 +477,12 @@ def _insert_message(
             SCHEMA_VERSION_CURRENT,
             thread_id,
             message_kind,
-            json.dumps(structured["artifact_refs"]),
-            structured["expected_response"],
-            structured["response_window"],
-            json.dumps(structured["action_items"]),
-            json.dumps(validation_errors),
+            json.dumps(artifact_refs),
         ),
     )
+
     event_ids = []
-    event_type = "message.invalid" if validation_errors else "message.new"
+    event_type = "message.failed" if validation_errors else "message.new"
     targets = _notification_targets(recipient)
     if validation_errors and sender in PEER_AGENTS and sender not in targets:
         targets.append(sender)
@@ -1078,67 +506,230 @@ def _insert_message(
                 },
             )
         )
-    _upsert_thread_state(conn, thread_id, emit_notifications=True)
+
     return message_id, status, validation_errors, event_ids
 
 
-def _claim_message_in_txn(
-    conn: sqlite3.Connection,
-    message_id: str,
-    agent: PeerAgent,
-) -> tuple[bool, str, sqlite3.Row | None]:
-    row = conn.execute(
-        "SELECT * FROM messages WHERE id = ?",
-        (message_id,),
-    ).fetchone()
-    if row is None:
-        return False, "missing", None
-    if not _recipient_matches(agent, row["recipient"]):
-        return False, "wrong-recipient", row
-    if row["status"] == "claimed" and row["claimed_by"] == agent:
-        return True, "already-claimed", row
-    if row["status"] == "invalid":
-        return False, "invalid", row
-    if row["status"] not in CLAIMABLE_STATUSES:
-        return False, row["status"], row
+# ---------------------------------------------------------------------------
+# Schema & migration
+# ---------------------------------------------------------------------------
 
-    claimed_at = _now()
-    cur = conn.execute(
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
         """
-        UPDATE messages
-        SET status = 'claimed', claimed_by = ?, claimed_at = ?
-        WHERE id = ? AND status IN ('new', 'pending')
-        """,
-        (agent, claimed_at, message_id),
-    )
-    if cur.rowcount != 1:
-        current = conn.execute(
-            "SELECT * FROM messages WHERE id = ?",
-            (message_id,),
-        ).fetchone()
-        return False, "race-lost", current
-
-    claimed = conn.execute(
-        "SELECT * FROM messages WHERE id = ?",
-        (message_id,),
-    ).fetchone()
-    if row["sender"] in PEER_AGENTS:
-        _queue_notification(
-            conn,
-            row["sender"],
-            "message.claimed",
-            message_id,
-            row["subject"],
-            {"claimed_by": agent, "claimed_at": claimed_at, "thread_id": _thread_correlation_id(row)},
+        CREATE TABLE IF NOT EXISTS messages (
+            id TEXT PRIMARY KEY,
+            sender TEXT NOT NULL,
+            recipient TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            payload TEXT NOT NULL DEFAULT '{}',
+            tags TEXT NOT NULL DEFAULT '[]',
+            priority INTEGER NOT NULL DEFAULT 2,
+            status TEXT NOT NULL DEFAULT 'pending',
+            correlation_id TEXT,
+            thread_id TEXT,
+            created_at TEXT NOT NULL,
+            resolved_at TEXT,
+            resolution TEXT,
+            schema_version INTEGER NOT NULL DEFAULT 3,
+            message_kind TEXT NOT NULL DEFAULT 'substantive',
+            artifact_refs TEXT NOT NULL DEFAULT '[]'
         )
-    _upsert_thread_state(conn, _thread_correlation_id(row), emit_notifications=True)
-    return True, "claimed", claimed
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_messages_inbox
+        ON messages(recipient, status, priority DESC, created_at ASC)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_messages_thread
+        ON messages(thread_id, created_at ASC)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_messages_thread_covering
+        ON messages(thread_id, created_at, status, sender, recipient)
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notifications (
+            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            message_id TEXT,
+            subject TEXT NOT NULL DEFAULT '',
+            details TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_notifications_agent_event
+        ON notifications(agent, event_id)
+        """
+    )
+
+    user_version = int(conn.execute("PRAGMA user_version").fetchone()[0] or 0)
+    if user_version < SCHEMA_VERSION_CURRENT:
+        _migrate_to_v3(conn, user_version)
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION_CURRENT}")
+
+
+def _migrate_to_v3(conn: sqlite3.Connection, from_version: int) -> None:
+    """One-time migration: collapse 7 states → 3, merge structured fields into payload, drop threads."""
+    columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(messages)").fetchall()
+    }
+    if not columns:
+        return  # Fresh DB, no migration needed
+
+    # Back up the DB file before destructive migration
+    if DB_PATH.exists():
+        backup_path = DB_PATH.with_suffix(f".v{from_version}.bak")
+        if not backup_path.exists():
+            shutil.copy2(DB_PATH, backup_path)
+
+    # Phase 1: Merge structured fields into payload JSON for each row
+    has_expected_response = "expected_response" in columns
+    has_response_window = "response_window" in columns
+    has_action_items = "action_items" in columns
+    has_validation_errors = "validation_errors" in columns
+
+    if any([has_expected_response, has_response_window, has_action_items, has_validation_errors]):
+        rows = conn.execute("SELECT id, payload, expected_response, response_window, action_items, validation_errors FROM messages").fetchall()
+        for row in rows:
+            payload = _loads_json(row["payload"], dict, {})
+            changed = False
+            if has_expected_response and row["expected_response"]:
+                er = str(row["expected_response"]).strip()
+                if er and "expected_response" not in payload:
+                    payload["expected_response"] = er
+                    changed = True
+            if has_response_window and row["response_window"]:
+                rw = str(row["response_window"]).strip()
+                if rw and "response_window" not in payload:
+                    payload["response_window"] = rw
+                    changed = True
+            if has_action_items:
+                ai = _loads_json(row["action_items"], list, [])
+                if ai and "action_items" not in payload:
+                    payload["action_items"] = ai
+                    changed = True
+            if has_validation_errors:
+                ve = _loads_json(row["validation_errors"], list, [])
+                if ve and "validation_errors" not in payload:
+                    payload["validation_errors"] = ve
+                    changed = True
+            if changed:
+                conn.execute(
+                    "UPDATE messages SET payload = ? WHERE id = ?",
+                    (json.dumps(payload), row["id"]),
+                )
+
+    # Phase 2: Map statuses
+    status_map = {
+        "new": "pending",
+        "pending": "pending",
+        "claimed": "pending",
+        "done": "completed",
+        "blocked": "failed",
+        "superseded": "failed",
+        "invalid": "failed",
+    }
+    for old_status, new_status in status_map.items():
+        conn.execute(
+            "UPDATE messages SET status = ? WHERE status = ?",
+            (new_status, old_status),
+        )
+
+    # Phase 3: Update schema_version
+    conn.execute(f"UPDATE messages SET schema_version = {SCHEMA_VERSION_CURRENT}")
+
+    # Phase 4: Drop deprecated columns by recreating the table
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS messages_v3 (
+            id TEXT PRIMARY KEY,
+            sender TEXT NOT NULL,
+            recipient TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            payload TEXT NOT NULL DEFAULT '{}',
+            tags TEXT NOT NULL DEFAULT '[]',
+            priority INTEGER NOT NULL DEFAULT 2,
+            status TEXT NOT NULL DEFAULT 'pending',
+            correlation_id TEXT,
+            thread_id TEXT,
+            created_at TEXT NOT NULL,
+            resolved_at TEXT,
+            resolution TEXT,
+            schema_version INTEGER NOT NULL DEFAULT 3,
+            message_kind TEXT NOT NULL DEFAULT 'substantive',
+            artifact_refs TEXT NOT NULL DEFAULT '[]'
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO messages_v3
+            (id, sender, recipient, subject, body, payload, tags, priority,
+             status, correlation_id, thread_id, created_at, resolved_at,
+             resolution, schema_version, message_kind, artifact_refs)
+        SELECT id, sender, recipient, subject, body, payload, tags, priority,
+               status, correlation_id, thread_id, created_at, resolved_at,
+               resolution, schema_version, message_kind, artifact_refs
+        FROM messages
+        """
+    )
+    conn.execute("DROP TABLE messages")
+    conn.execute("ALTER TABLE messages_v3 RENAME TO messages")
+
+    # Recreate indexes after table replacement
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_inbox ON messages(recipient, status, priority DESC, created_at ASC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id, created_at ASC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_thread_covering ON messages(thread_id, created_at, status, sender, recipient)"
+    )
+
+    # Phase 5: Drop threads table
+    conn.execute("DROP TABLE IF EXISTS threads")
+
+    # Phase 6: Clean up stale notification event types
+    conn.execute(
+        "DELETE FROM notifications WHERE event_type IN ('message.claimed', 'thread.ack_breach', 'thread.response_window_breach', 'thread.updated')"
+    )
+
+
+def _conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_schema(conn)
+    conn.commit()
+    return conn
+
+
+# ---------------------------------------------------------------------------
+# Notification helpers
+# ---------------------------------------------------------------------------
 
 
 def _list_notifications(agent: str, after_event_id: int, limit: int) -> list[dict]:
     if limit < 1 or limit > 200:
         raise ValueError("limit must be between 1 and 200")
-
     with _conn() as conn:
         rows = conn.execute(
             """
@@ -1149,7 +740,6 @@ def _list_notifications(agent: str, after_event_id: int, limit: int) -> list[dic
             """,
             (agent, after_event_id, limit),
         ).fetchall()
-
     items = []
     for row in rows:
         item = dict(row)
@@ -1162,35 +752,29 @@ def _latest_notification_event_id(agent: str | None = None) -> int:
     with _conn() as conn:
         if agent:
             row = conn.execute(
-                """
-                SELECT COALESCE(MAX(event_id), 0) AS max_event_id
-                FROM notifications
-                WHERE agent = ?
-                """,
+                "SELECT COALESCE(MAX(event_id), 0) AS max_event_id FROM notifications WHERE agent = ?",
                 (agent,),
             ).fetchone()
         else:
             row = conn.execute(
-                """
-                SELECT COALESCE(MAX(event_id), 0) AS max_event_id
-                FROM notifications
-                """
+                "SELECT COALESCE(MAX(event_id), 0) AS max_event_id FROM notifications"
             ).fetchone()
     if row is None:
         return 0
     return int(row["max_event_id"] or 0)
 
 
+# ---------------------------------------------------------------------------
+# Context builders (used by workers)
+# ---------------------------------------------------------------------------
+
+
 def resolve_message_reference(
     message_ref: str,
     recipient: Literal["codex", "prime"] | None = None,
 ) -> dict | None:
-    """
-    Resolve a full bridge message row from an exact ID or a unique short-id prefix.
-    """
     if not message_ref:
         return None
-
     with _conn() as conn:
         if recipient:
             exact_row = conn.execute(
@@ -1222,12 +806,7 @@ def resolve_message_reference(
             ).fetchall()
         else:
             rows = conn.execute(
-                """
-                SELECT * FROM messages
-                WHERE id LIKE ?
-                ORDER BY created_at DESC
-                LIMIT 3
-                """,
+                "SELECT * FROM messages WHERE id LIKE ? ORDER BY created_at DESC LIMIT 3",
                 (like_ref,),
             ).fetchall()
 
@@ -1244,16 +823,10 @@ def get_thread_messages(
     resolved = resolve_message_reference(message_ref, recipient=recipient)
     if resolved is None:
         return []
-
     thread_id = resolved.get("thread_id") or resolved.get("correlation_id") or resolved["id"]
     with _conn() as conn:
         rows = conn.execute(
-            """
-            SELECT * FROM messages
-            WHERE thread_id = ?
-            ORDER BY created_at ASC
-            LIMIT ?
-            """,
+            "SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at ASC LIMIT ?",
             (thread_id, limit),
         ).fetchall()
     return [_row_to_dict(row) for row in rows]
@@ -1268,50 +841,29 @@ def describe_thread_context(
     if resolved is None:
         return None
 
-    thread_messages = get_thread_messages(
-        resolved["id"],
-        recipient=recipient,
-        limit=limit,
-    )
-
+    thread_messages = get_thread_messages(resolved["id"], recipient=recipient, limit=limit)
     non_protocol = [item for item in thread_messages if not _message_is_protocol_ack(item)]
     latest_non_protocol_codex = next(
-        (
-            item
-            for item in reversed(non_protocol)
-            if item.get("sender") == "codex"
-        ),
+        (item for item in reversed(non_protocol) if item.get("sender") == "codex"),
         None,
     )
     latest_non_protocol_prime = next(
-        (
-            item
-            for item in reversed(non_protocol)
-            if item.get("sender") == "prime"
-        ),
+        (item for item in reversed(non_protocol) if item.get("sender") == "prime"),
         None,
     )
     terminal_messages = [
         item for item in thread_messages if item.get("status") in FINAL_STATUSES
     ]
 
-    thread_state = None
-    thread_sla = None
+    thread_id = resolved.get("thread_id") or resolved["id"]
     with _conn() as conn:
-        thread_row = conn.execute(
-            "SELECT * FROM threads WHERE thread_id = ?",
-            (resolved.get("thread_id") or resolved["id"],),
-        ).fetchone()
-        if thread_row is not None:
-            thread_state = _thread_row_to_dict(thread_row)
-            thread_sla = _thread_sla_snapshot(conn, thread_state)
+        thread_state = _derive_thread_state(conn, thread_id)
 
     return {
         "requested_ref": message_ref,
         "canonical_message": resolved,
-        "thread_correlation_id": resolved.get("thread_id") or resolved.get("correlation_id") or resolved["id"],
+        "thread_correlation_id": thread_id,
         "thread_state": thread_state,
-        "thread_sla": thread_sla,
         "thread_messages": thread_messages,
         "latest_thread_message": thread_messages[-1] if thread_messages else resolved,
         "latest_non_protocol_codex_message": latest_non_protocol_codex,
@@ -1332,12 +884,12 @@ def build_worker_event_payload(
 
     canonical = context.get("canonical_message") or {}
     thread_state = context.get("thread_state") or {}
+    canonical_payload = canonical.get("payload") or {}
     return {
         "requested_ref": context.get("requested_ref", message_ref),
         "thread_correlation_id": context.get("thread_correlation_id"),
         "canonical_message": canonical,
         "thread_state": thread_state,
-        "thread_sla": context.get("thread_sla"),
         "thread_messages": context.get("thread_messages", []),
         "latest_thread_message": context.get("latest_thread_message"),
         "latest_non_protocol_codex_message": context.get("latest_non_protocol_codex_message"),
@@ -1345,121 +897,16 @@ def build_worker_event_payload(
         "terminal_messages": context.get("terminal_messages", []),
         "already_resolved": context.get("already_resolved", False),
         "artifact_refs": canonical.get("artifact_refs", []),
-        "expected_response": canonical.get("expected_response", ""),
-        "response_window": canonical.get("response_window", ""),
-        "action_items": canonical.get("action_items", []),
+        "expected_response": canonical_payload.get("expected_response", ""),
+        "action_items": canonical_payload.get("action_items", []),
         "latest_summary": thread_state.get("latest_summary", ""),
         "participants": thread_state.get("participants", []),
     }
 
 
-@mcp.tool()
-def send_correction_message(
-    sender: PeerAgent,
-    invalid_message_id: str,
-    guidance: str,
-    artifact_refs_json: str = "[]",
-    priority: int = 1,
-) -> dict:
-    if sender not in PEER_AGENTS:
-        raise ValueError("sender must be one of: codex, prime")
-    if priority < 0 or priority > 3:
-        raise ValueError("priority must be between 0 and 3")
-
-    artifact_refs = json.loads(_normalize_json(artifact_refs_json, list))
-    guidance_text = (guidance or "").strip()
-
-    with _conn() as conn:
-        invalid_row = conn.execute(
-            "SELECT * FROM messages WHERE id = ?",
-            (invalid_message_id,),
-        ).fetchone()
-        if invalid_row is None:
-            return {
-                "ok": False,
-                "id": None,
-                "status": "missing",
-                "validation_errors": [f"unknown invalid_message_id: {invalid_message_id}"],
-                "notification_event_ids": [],
-            }
-        if invalid_row["status"] != "invalid":
-            return {
-                "ok": False,
-                "id": invalid_message_id,
-                "status": str(invalid_row["status"]),
-                "validation_errors": [f"message is not invalid: {invalid_message_id}"],
-                "notification_event_ids": [],
-            }
-        if invalid_row["sender"] not in PEER_AGENTS or invalid_row["recipient"] not in PEER_AGENTS:
-            return {
-                "ok": False,
-                "id": invalid_message_id,
-                "status": "unsupported",
-                "validation_errors": ["correction helper only supports peer-to-peer invalid messages"],
-                "notification_event_ids": [],
-            }
-
-        recipient = str(invalid_row["sender"])
-        thread_id = _thread_correlation_id(invalid_row)
-        correction_rows = conn.execute(
-            """
-            SELECT * FROM messages
-            WHERE thread_id = ? AND sender = ? AND recipient = ?
-            ORDER BY created_at DESC
-            """,
-            (thread_id, sender, recipient),
-        ).fetchall()
-        for row in correction_rows:
-            row_dict = _row_to_dict(row)
-            payload = row_dict.get("payload") or {}
-            if row_dict.get("status") != "invalid" and str(payload.get("response_type", "")).lower() == "correction":
-                return {
-                    "ok": True,
-                    "id": row_dict["id"],
-                    "status": row_dict["status"],
-                    "validation_errors": row_dict.get("validation_errors", []),
-                    "notification_event_ids": [],
-                    "deduped": True,
-                }
-
-        subject = f"Correction: invalid bridge message {invalid_message_id}"
-        body = guidance_text or (
-            "This message was not processed because the bridge persisted it as invalid. "
-            "Please review the thread and resend only if further bridge work is still needed."
-        )
-        payload = {
-            "response_type": "correction",
-            "expected_response": "acknowledgement",
-            "response_window": "short",
-            "artifact_refs": artifact_refs,
-            "action_items": [
-                "Acknowledge receipt of this correction guidance",
-                "Resend the original request only if further bridge action is still needed",
-            ],
-            "invalid_message_id": invalid_message_id,
-        }
-        tags = ["bridge-sync", "correction", "system"]
-        message_id, status, validation_errors, event_ids = _insert_message(
-            conn,
-            sender,
-            recipient,
-            subject,
-            body,
-            payload,
-            tags,
-            priority,
-            invalid_message_id,
-        )
-        conn.commit()
-
-    return {
-        "ok": True,
-        "id": message_id,
-        "status": status,
-        "validation_errors": validation_errors,
-        "notification_event_ids": event_ids,
-        "deduped": False,
-    }
+# ===========================================================================
+# MCP Tools (public API)
+# ===========================================================================
 
 
 @mcp.tool()
@@ -1473,6 +920,7 @@ def send_message(
     priority: int = 2,
     correlation_id: str | None = None,
 ) -> dict:
+    """Send a message through the bridge."""
     if recipient not in {"codex", "prime", "any"}:
         raise ValueError("recipient must be one of: codex, prime, any")
     if sender not in {"codex", "prime", "owner"}:
@@ -1507,22 +955,110 @@ def send_message(
 
 
 @mcp.tool()
+def send_correction_message(
+    sender: PeerAgent,
+    failed_message_id: str,
+    guidance: str,
+    artifact_refs_json: str = "[]",
+    priority: int = 1,
+) -> dict:
+    """Send a correction for a failed (formerly invalid) message."""
+    if sender not in PEER_AGENTS:
+        raise ValueError("sender must be one of: codex, prime")
+    if priority < 0 or priority > 3:
+        raise ValueError("priority must be between 0 and 3")
+
+    artifact_refs = json.loads(_normalize_json(artifact_refs_json, list))
+    guidance_text = (guidance or "").strip()
+
+    with _conn() as conn:
+        failed_row = conn.execute(
+            "SELECT * FROM messages WHERE id = ?",
+            (failed_message_id,),
+        ).fetchone()
+        if failed_row is None:
+            return {
+                "ok": False, "id": None, "status": "missing",
+                "validation_errors": [f"unknown failed_message_id: {failed_message_id}"],
+                "notification_event_ids": [],
+            }
+        if failed_row["status"] != "failed":
+            return {
+                "ok": False, "id": failed_message_id,
+                "status": str(failed_row["status"]),
+                "validation_errors": [f"message is not failed: {failed_message_id}"],
+                "notification_event_ids": [],
+            }
+        if failed_row["sender"] not in PEER_AGENTS or failed_row["recipient"] not in PEER_AGENTS:
+            return {
+                "ok": False, "id": failed_message_id, "status": "unsupported",
+                "validation_errors": ["correction helper only supports peer-to-peer failed messages"],
+                "notification_event_ids": [],
+            }
+
+        recipient = str(failed_row["sender"])
+        thread_id = _thread_correlation_id(failed_row)
+
+        # Dedup: check if correction already sent
+        correction_rows = conn.execute(
+            "SELECT * FROM messages WHERE thread_id = ? AND sender = ? AND recipient = ? ORDER BY created_at DESC",
+            (thread_id, sender, recipient),
+        ).fetchall()
+        for row in correction_rows:
+            row_dict = _row_to_dict(row)
+            payload = row_dict.get("payload") or {}
+            if row_dict.get("status") != "failed" and str(payload.get("response_type", "")).lower() == "correction":
+                return {
+                    "ok": True, "id": row_dict["id"], "status": row_dict["status"],
+                    "validation_errors": [], "notification_event_ids": [], "deduped": True,
+                }
+
+        subject = f"Correction: failed bridge message {failed_message_id}"
+        body = guidance_text or (
+            "This message was not processed because the bridge persisted it as failed. "
+            "Please review the thread and resend only if further bridge work is still needed."
+        )
+        payload = {
+            "response_type": "correction",
+            "expected_response": "status_update",
+            "artifact_refs": artifact_refs,
+            "action_items": [
+                "Send a substantive follow-up only if further bridge action is still needed",
+                "Resend the original request only if the thread still needs work after reviewing this correction",
+            ],
+            "failed_message_id": failed_message_id,
+        }
+        tags = ["bridge-sync", "correction", "system"]
+        message_id, status, validation_errors, event_ids = _insert_message(
+            conn, sender, recipient, subject, body, payload, tags, priority, failed_message_id,
+        )
+        conn.commit()
+
+    return {
+        "ok": True,
+        "id": message_id,
+        "status": status,
+        "validation_errors": validation_errors,
+        "notification_event_ids": event_ids,
+        "deduped": False,
+    }
+
+
+@mcp.tool()
 def list_inbox(
     agent: PeerAgent,
-    status: Literal["new", "invalid", "pending", "claimed", "done", "blocked", "superseded", "all"] = "new",
+    status: Literal["pending", "completed", "failed", "all"] = "pending",
     limit: int = 20,
 ) -> dict:
+    """List messages for an agent's inbox."""
     if limit < 1 or limit > 200:
         raise ValueError("limit must be between 1 and 200")
 
     where = "(recipient = ? OR recipient = 'any')"
     params: list[object] = [agent]
     if status != "all":
-        if status == "new":
-            where += " AND status IN ('new', 'pending')"
-        else:
-            where += " AND status = ?"
-            params.append(status)
+        where += " AND status = ?"
+        params.append(status)
     params.append(limit)
 
     with _conn() as conn:
@@ -1541,176 +1077,55 @@ def list_inbox(
 
 
 @mcp.tool()
-def claim_next(agent: Literal["codex", "prime"]) -> dict:
+def list_stale_outbound(
+    sender: PeerAgent,
+    older_than_seconds: int = 180,
+    limit: int = 500,
+) -> dict:
+    """List pending messages sent BY this agent that are older than a threshold.
+
+    Used by the autonomous retry sweep to find outbound messages that haven't
+    received a peer response. Unlike list_inbox (which is recipient-facing and
+    capped at 200), this is sender-facing and supports higher limits.
+    """
+    if older_than_seconds < 1:
+        raise ValueError("older_than_seconds must be at least 1")
+    if limit < 1 or limit > 2000:
+        raise ValueError("limit must be between 1 and 2000")
+
+    cutoff = datetime.now(timezone.utc)
     with _conn() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute(
+        rows = conn.execute(
             """
             SELECT * FROM messages
-            WHERE (recipient = ? OR recipient = 'any') AND status IN ('new', 'pending')
-            ORDER BY priority DESC, created_at ASC
-            LIMIT 1
+            WHERE sender = ? AND status = 'pending'
+            ORDER BY created_at ASC
+            LIMIT ?
             """,
-            (agent,),
-        ).fetchone()
+            (sender, limit),
+        ).fetchall()
 
-        if row is None:
-            conn.commit()
-            return {"claimed": False}
+    items = []
+    for row in rows:
+        item = _row_to_dict(row)
+        created_at = _parse_iso(item.get("created_at"))
+        if created_at is None:
+            continue
+        age_seconds = (cutoff - created_at).total_seconds()
+        if age_seconds >= older_than_seconds:
+            items.append(item)
 
-        ok, status, claimed = _claim_message_in_txn(conn, row["id"], agent)
-        conn.commit()
-
-    return {
-        "claimed": ok,
-        "status": status,
-        "item": _row_to_dict(claimed) if claimed is not None else None,
-    }
-
-
-@mcp.tool()
-def claim_message(message_id: str, agent: Literal["codex", "prime"]) -> dict:
-    with _conn() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        ok, status, claimed = _claim_message_in_txn(conn, message_id, agent)
-        conn.commit()
-
-    return {
-        "claimed": ok,
-        "status": status,
-        "item": _row_to_dict(claimed) if claimed is not None else None,
-    }
-
-
-@mcp.tool()
-def accept_message(
-    message_id: str,
-    agent: PeerAgent,
-    note: str = "",
-    payload_json: str = "{}",
-) -> dict:
-    payload = json.loads(_normalize_json(payload_json, dict))
-    with _conn() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        ok, status, row = _claim_message_in_txn(conn, message_id, agent)
-        if not ok or row is None:
-            conn.commit()
-            return {
-                "ok": False,
-                "message_id": message_id,
-                "status": status,
-                "response_message_id": None,
-            }
-        if row["sender"] not in {"codex", "prime"}:
-            conn.commit()
-            return {
-                "ok": False,
-                "message_id": message_id,
-                "status": "unsupported-sender",
-                "response_message_id": None,
-            }
-
-        response_body = note or (
-            f"{agent} accepted this task and will proceed without waiting for owner "
-            "approval unless a new blocker appears."
-        )
-        response_payload = {
-            "response_type": "accepted",
-            "accepted_by": agent,
-            "accepted_message_id": message_id,
-            "claim_status": status,
-            **payload,
-        }
-        response_message_id, response_status, validation_errors, event_ids = _insert_message(
-            conn,
-            agent,
-            row["sender"],
-            f"Accepted: {row['subject']}",
-            response_body,
-            response_payload,
-            ["protocol", "accepted", "bridge-sync"],
-            row["priority"],
-            _thread_correlation_id(row),
-        )
-        conn.commit()
-
-    return {
-        "ok": True,
-        "message_id": message_id,
-        "status": status,
-        "response_message_id": response_message_id,
-        "response_status": response_status,
-        "validation_errors": validation_errors,
-        "notification_event_ids": event_ids,
-    }
-
-
-@mcp.tool()
-def negotiate_message(
-    message_id: str,
-    agent: PeerAgent,
-    body: str,
-    payload_json: str = "{}",
-) -> dict:
-    payload = json.loads(_normalize_json(payload_json, dict))
-    with _conn() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        ok, status, row = _claim_message_in_txn(conn, message_id, agent)
-        if not ok or row is None:
-            conn.commit()
-            return {
-                "ok": False,
-                "message_id": message_id,
-                "status": status,
-                "response_message_id": None,
-            }
-        if row["sender"] not in {"codex", "prime"}:
-            conn.commit()
-            return {
-                "ok": False,
-                "message_id": message_id,
-                "status": "unsupported-sender",
-                "response_message_id": None,
-            }
-
-        response_payload = {
-            "response_type": "negotiation",
-            "negotiated_by": agent,
-            "negotiated_message_id": message_id,
-            "claim_status": status,
-            **payload,
-        }
-        response_message_id, response_status, validation_errors, event_ids = _insert_message(
-            conn,
-            agent,
-            row["sender"],
-            f"Negotiation: {row['subject']}",
-            body,
-            response_payload,
-            ["protocol", "negotiation", "bridge-sync"],
-            row["priority"],
-            _thread_correlation_id(row),
-        )
-        conn.commit()
-
-    return {
-        "ok": True,
-        "message_id": message_id,
-        "status": status,
-        "response_message_id": response_message_id,
-        "response_status": response_status,
-        "validation_errors": validation_errors,
-        "notification_event_ids": event_ids,
-    }
+    return {"count": len(items), "items": items}
 
 
 @mcp.tool()
 def resolve_message(
     message_id: str,
     agent: Literal["codex", "prime", "owner"],
-    outcome: Literal["done", "blocked", "superseded"] = "done",
+    outcome: Literal["completed", "failed"] = "completed",
     resolution: str = "",
 ) -> dict:
+    """Mark a message as completed or failed."""
     with _conn() as conn:
         row = conn.execute(
             "SELECT * FROM messages WHERE id = ?",
@@ -1719,13 +1134,18 @@ def resolve_message(
         if row is None:
             return {"ok": False, "id": message_id, "status": "missing"}
 
+        row_dict = _row_to_dict(row)
+        allowed = (
+            agent == "owner"
+            or row_dict.get("recipient") == agent
+            or row_dict.get("recipient") == "any"
+        )
+        if not allowed:
+            return {"ok": False, "id": message_id, "status": "forbidden"}
+
         cur = conn.execute(
-            """
-            UPDATE messages
-            SET status = ?, resolution = ?, resolved_at = ?
-            WHERE id = ? AND (claimed_by = ? OR ? = 'owner')
-            """,
-            (outcome, resolution, _now(), message_id, agent, agent),
+            "UPDATE messages SET status = ?, resolution = ?, resolved_at = ? WHERE id = ?",
+            (outcome, resolution, _now(), message_id),
         )
         if cur.rowcount == 1 and row["sender"] in PEER_AGENTS:
             _queue_notification(
@@ -1741,7 +1161,6 @@ def resolve_message(
                     "thread_id": _thread_correlation_id(row),
                 },
             )
-            _upsert_thread_state(conn, _thread_correlation_id(row), emit_notifications=True)
         conn.commit()
 
     return {
@@ -1752,11 +1171,119 @@ def resolve_message(
 
 
 @mcp.tool()
+def retry_pending_message(
+    message_id: str,
+    agent: PeerAgent,
+) -> dict:
+    """Non-blocking persistent retry: re-queue notification for a pending message.
+
+    Increments retry metadata in the payload. Caps at MAX_RETRIES to prevent storms.
+    """
+    with _conn() as conn:
+        row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+        if row is None:
+            return {"ok": False, "id": message_id, "reason": "missing"}
+        if row["status"] != "pending":
+            return {"ok": False, "id": message_id, "reason": f"status is {row['status']}, not pending"}
+        if not _recipient_matches(agent, row["recipient"]):
+            return {"ok": False, "id": message_id, "reason": "wrong recipient"}
+
+        payload = _loads_json(row["payload"], dict, {})
+        retry = payload.get("_retry", {"count": 0, "max": MAX_RETRIES})
+        if retry.get("count", 0) >= retry.get("max", MAX_RETRIES):
+            return {"ok": False, "id": message_id, "reason": "max retries exceeded", "retry_count": retry["count"]}
+
+        retry["count"] = retry.get("count", 0) + 1
+        retry["last_at"] = _now()
+        retry["max"] = retry.get("max", MAX_RETRIES)
+        payload["_retry"] = retry
+        conn.execute(
+            "UPDATE messages SET payload = ? WHERE id = ?",
+            (json.dumps(payload), message_id),
+        )
+
+        event_id = _queue_notification(
+            conn,
+            row["recipient"] if row["recipient"] != "any" else agent,
+            "message.new",
+            message_id,
+            row["subject"],
+            {
+                "sender": row["sender"],
+                "recipient": row["recipient"],
+                "retry_count": retry["count"],
+                "thread_id": row["thread_id"],
+            },
+        )
+        conn.commit()
+
+    return {
+        "ok": True,
+        "id": message_id,
+        "retry_count": retry["count"],
+        "notification_event_id": event_id,
+    }
+
+
+@mcp.tool()
+def clear_failed_messages(
+    agent: PeerAgent,
+    older_than_minutes: int = 60,
+    limit: int = 50,
+    resolution: str = "auto-cleared",
+) -> dict:
+    """Bulk-clear old failed messages."""
+    if older_than_minutes < 1 or older_than_minutes > 10080:
+        raise ValueError("older_than_minutes must be between 1 and 10080")
+    if limit < 1 or limit > 200:
+        raise ValueError("limit must be between 1 and 200")
+
+    with _conn() as conn:
+        cutoff = datetime.now(timezone.utc)
+        rows = conn.execute(
+            """
+            SELECT * FROM messages
+            WHERE (recipient = ? OR recipient = 'any') AND status = 'failed'
+            ORDER BY created_at ASC
+            LIMIT ?
+            """,
+            (agent, limit * 2),
+        ).fetchall()
+
+        cleared_items = []
+        for row in rows:
+            created_at = _parse_iso(row["created_at"])
+            if created_at is None:
+                continue
+            age_minutes = (cutoff - created_at).total_seconds() / 60
+            if age_minutes < older_than_minutes:
+                continue
+            conn.execute(
+                "UPDATE messages SET status = 'failed', resolution = ?, resolved_at = ? WHERE id = ?",
+                (resolution, _now(), row["id"]),
+            )
+            cleared_items.append(_row_to_dict(row))
+            if len(cleared_items) >= limit:
+                break
+        conn.commit()
+
+    return {
+        "ok": True,
+        "agent": agent,
+        "older_than_minutes": older_than_minutes,
+        "cleared_count": len(cleared_items),
+        "cleared_ids": [item["id"] for item in cleared_items],
+        "cleared_items": cleared_items,
+    }
+
+
+@mcp.tool()
 def list_notifications(
     agent: PeerAgent,
     after_event_id: int = 0,
     limit: int = 20,
 ) -> dict:
+    """List notifications for an agent."""
     items = _list_notifications(agent, after_event_id, limit)
     last_event_id = items[-1]["event_id"] if items else after_event_id
     return {"count": len(items), "last_event_id": last_event_id, "items": items}
@@ -1764,6 +1291,7 @@ def list_notifications(
 
 @mcp.tool()
 def get_latest_notification_event_id(agent: PeerAgent | None = None) -> dict:
+    """Get the latest notification event ID."""
     return {
         "agent": agent,
         "last_event_id": _latest_notification_event_id(agent),
@@ -1778,6 +1306,7 @@ def wait_for_notifications(
     poll_interval_ms: int = 100,
     limit: int = 20,
 ) -> dict:
+    """Long-poll for new notifications."""
     if timeout_seconds < 1 or timeout_seconds > 60:
         raise ValueError("timeout_seconds must be between 1 and 60")
     if poll_interval_ms < 50 or poll_interval_ms > 2000:
@@ -1805,12 +1334,14 @@ def wait_for_notifications(
 
 @mcp.tool()
 def get_thread(thread_ref: str, agent: PeerAgent | None = None) -> dict:
+    """Get full thread context."""
     context = describe_thread_context(thread_ref, recipient=agent)
     return {"ok": context is not None, "thread": context}
 
 
 @mcp.tool()
 def get_worker_event_payload(thread_ref: str, agent: PeerAgent | None = None) -> dict:
+    """Get thread context structured for worker dispatch."""
     context = build_worker_event_payload(thread_ref, recipient=agent)
     return {"ok": context is not None, "context": context}
 
@@ -1818,174 +1349,46 @@ def get_worker_event_payload(thread_ref: str, agent: PeerAgent | None = None) ->
 @mcp.tool()
 def list_threads(
     agent: PeerAgent,
-    status: Literal["open", "claimed", "final", "all"] = "open",
+    status: Literal["open", "final", "all"] = "open",
     limit: int = 20,
 ) -> dict:
+    """List threads for an agent, derived from messages."""
     if limit < 1 or limit > 200:
         raise ValueError("limit must be between 1 and 200")
 
     with _conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM threads ORDER BY updated_at DESC LIMIT ?",
-            (max(limit * 5, limit),),
-        ).fetchall()
-
-    items = []
-    for row in rows:
-        item = _thread_row_to_dict(row)
-        if agent not in item["participants"]:
-            continue
-        if status == "claimed" and item.get("status") != "claimed":
-            continue
-        if status == "final" and item.get("status") not in FINAL_STATUSES:
-            continue
-        if status == "open" and item.get("status") in FINAL_STATUSES:
-            continue
-        items.append(item)
-        if len(items) >= limit:
-            break
-    return {"count": len(items), "items": items}
-
-
-@mcp.tool()
-def list_threads_at_risk(
-    agent: PeerAgent,
-    silence_minutes: int = 10,
-    limit: int = 20,
-) -> dict:
-    if silence_minutes < 1 or silence_minutes > 240:
-        raise ValueError("silence_minutes must be between 1 and 240")
-
-    items = []
-    with _conn() as conn:
-        rows = conn.execute(
+        thread_ids_rows = conn.execute(
             """
-            SELECT * FROM threads
-            ORDER BY updated_at ASC
-            LIMIT ?
+            SELECT DISTINCT thread_id FROM messages
+            WHERE thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY thread_id
             """,
-            (limit * 10,),
         ).fetchall()
-        for row in rows:
-            item = _thread_row_to_dict(row)
-            if (
-                item.get("status") in FINAL_STATUSES
-                or item.get("status") == "invalid"
-                or agent not in item["participants"]
-            ):
+
+        items = []
+        for tid_row in thread_ids_rows:
+            thread_id = tid_row["thread_id"]
+            state = _derive_thread_state(conn, thread_id)
+            if state is None:
                 continue
-            sla = _thread_sla_snapshot(conn, item, silence_seconds=silence_minutes * 60)
-            if sla.get("responsible_agent") != agent or not sla.get("risk_types"):
+            if agent not in state["participants"]:
                 continue
-            item["risk_types"] = sla["risk_types"]
-            item["ack_overdue_seconds"] = sla["ack_overdue_seconds"]
-            item["response_overdue_seconds"] = sla["response_overdue_seconds"]
-            item["silence_overdue_seconds"] = sla["silence_overdue_seconds"]
-            item["sla"] = sla
-            items.append(item)
+            if status == "final" and state["status"] not in FINAL_STATUSES:
+                continue
+            if status == "open" and state["status"] in FINAL_STATUSES:
+                continue
+            items.append(state)
             if len(items) >= limit:
                 break
+
+    # Sort by most recently updated first
+    items.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
     return {"count": len(items), "items": items}
-
-
-@mcp.tool()
-def bridge_sla_report(
-    agent: PeerAgent,
-    silence_minutes: int = 10,
-    limit: int = 20,
-) -> dict:
-    if silence_minutes < 1 or silence_minutes > 240:
-        raise ValueError("silence_minutes must be between 1 and 240")
-    if limit < 1 or limit > 200:
-        raise ValueError("limit must be between 1 and 200")
-
-    with _conn() as conn:
-        thread_rows = conn.execute(
-            "SELECT * FROM threads ORDER BY updated_at DESC"
-        ).fetchall()
-        invalid_rows = conn.execute(
-            """
-            SELECT * FROM messages
-            WHERE (recipient = ? OR recipient = 'any') AND status = 'invalid'
-            ORDER BY priority DESC, created_at ASC
-            LIMIT ?
-            """,
-            (agent, limit),
-        ).fetchall()
-
-        ack_breaches: list[dict[str, Any]] = []
-        response_breaches: list[dict[str, Any]] = []
-        silence_breaches: list[dict[str, Any]] = []
-        at_risk_items: list[dict[str, Any]] = []
-        open_threads = 0
-        claimed_threads = 0
-        responsible_threads = 0
-
-        for row in thread_rows:
-            item = _thread_row_to_dict(row)
-            if (
-                agent not in item["participants"]
-                or item.get("status") in FINAL_STATUSES
-                or item.get("status") == "invalid"
-            ):
-                continue
-            sla = _thread_sla_snapshot(conn, item, silence_seconds=silence_minutes * 60)
-            if sla.get("responsible_agent") != agent:
-                continue
-            responsible_threads += 1
-            if item.get("status") == "claimed":
-                claimed_threads += 1
-            else:
-                open_threads += 1
-
-            enriched = {
-                "thread_id": item["thread_id"],
-                "status": item["status"],
-                "current_assignee": item.get("current_assignee"),
-                "latest_summary": item.get("latest_summary", ""),
-                "updated_at": item.get("updated_at"),
-                "artifact_refs": item.get("artifact_refs", []),
-                "risk_types": sla["risk_types"],
-                "sla": sla,
-            }
-            if sla["ack_breach"]:
-                ack_breaches.append(enriched)
-            if sla["response_window_breach"]:
-                response_breaches.append(enriched)
-            if sla["claimed_thread_silence_breach"]:
-                silence_breaches.append(enriched)
-            if sla["risk_types"]:
-                at_risk_items.append(enriched)
-
-    risk_items = sorted(
-        at_risk_items,
-        key=lambda item: (
-            -len(item.get("risk_types", [])),
-            -(item.get("sla", {}).get("silence_overdue_seconds", 0)),
-            -(item.get("sla", {}).get("response_overdue_seconds", 0)),
-            -(item.get("sla", {}).get("ack_overdue_seconds", 0)),
-        ),
-    )
-
-    return {
-        "agent": agent,
-        "ack_deadline_seconds": ACK_DEADLINE_SECONDS,
-        "claimed_thread_silence_seconds": silence_minutes * 60,
-        "response_windows_seconds": RESPONSE_WINDOW_SECONDS,
-        "responsible_open_threads": responsible_threads,
-        "claimed_threads": claimed_threads,
-        "unclaimed_open_threads": open_threads,
-        "ack_breach_count": len(ack_breaches),
-        "response_window_breach_count": len(response_breaches),
-        "claimed_thread_silence_breach_count": len(silence_breaches),
-        "invalid_inbox_count": len(invalid_rows),
-        "invalid_messages": [_row_to_dict(row) for row in invalid_rows],
-        "at_risk_threads": risk_items[:limit],
-    }
 
 
 @mcp.resource("bridge://health")
 def health() -> str:
+    """Health check: message counts + notification summary."""
     with _conn() as conn:
         message_rows = conn.execute(
             "SELECT status, COUNT(*) AS n FROM messages GROUP BY status"
@@ -1993,42 +1396,32 @@ def health() -> str:
         notification_rows = conn.execute(
             "SELECT agent, COUNT(*) AS n FROM notifications GROUP BY agent"
         ).fetchall()
-        thread_rows = conn.execute(
-            "SELECT status, COUNT(*) AS n FROM threads GROUP BY status"
-        ).fetchall()
         max_event_id = conn.execute(
             "SELECT COALESCE(MAX(event_id), 0) AS max_event_id FROM notifications"
         ).fetchone()["max_event_id"]
-        sla_by_agent = {
-            agent: bridge_sla_report(agent=agent, silence_minutes=10, limit=10)
-            for agent in sorted(PEER_AGENTS)
-        }
+        pending_by_agent = conn.execute(
+            """
+            SELECT recipient, COUNT(*) AS n FROM messages
+            WHERE status = 'pending'
+            GROUP BY recipient
+            """
+        ).fetchall()
 
     return json.dumps(
         {
             "db_path": str(DB_PATH),
             "schema_version_current": SCHEMA_VERSION_CURRENT,
             "features": [
+                "synchronous-dialog",
                 "notifications-long-poll",
-                "explicit-claim",
-                "thread-state",
-                "message-kinds",
-                "invalid-state",
+                "substantive-replies-only",
+                "non-blocking-retry",
+                "thread-derived-from-messages",
             ],
             "max_event_id": max_event_id,
             "messages": {row["status"]: row["n"] for row in message_rows},
             "notifications": {row["agent"]: row["n"] for row in notification_rows},
-            "threads": {row["status"]: row["n"] for row in thread_rows},
-            "sla": {
-                agent: {
-                    "responsible_open_threads": report["responsible_open_threads"],
-                    "ack_breach_count": report["ack_breach_count"],
-                    "response_window_breach_count": report["response_window_breach_count"],
-                    "claimed_thread_silence_breach_count": report["claimed_thread_silence_breach_count"],
-                    "invalid_inbox_count": report["invalid_inbox_count"],
-                }
-                for agent, report in sla_by_agent.items()
-            },
+            "pending_by_agent": {row["recipient"]: row["n"] for row in pending_by_agent},
         },
         indent=2,
     )

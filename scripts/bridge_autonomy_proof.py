@@ -5,7 +5,7 @@ Proves the bridge is truly autonomous by executing a round-trip scenario:
 
   1. Send a valid substantive message from prime to codex
   2. Inject a malformed message (noise) at the same time
-  3. Wait for codex to claim and process the valid message
+  3. Wait for codex to send a substantive reply and resolve the valid message
   4. Verify the malformed message did NOT block processing
   5. Report pass/fail
 
@@ -77,17 +77,17 @@ def _send_test_message(bridge, *, sender: str, recipient: str, malformed: bool =
             "note": "AUTONOMY-PROOF: valid relative artifact ref"
         }])
         subject = "AUTONOMY-PROOF: Bridge round-trip test"
-        body = "This is an autonomy proof test message. Please acknowledge receipt by sending a protocol acknowledgement."
+        body = "This is an autonomy proof test message. Reply with a short substantive status update confirming the bridge processed this thread."
 
-    action_items = json.dumps(["Acknowledge receipt of this autonomy proof test message"])
+    action_items = json.dumps(["Send a short substantive reply confirming the bridge processed this thread"])
 
     bridge.send_message(
         sender=sender,
         recipient=recipient,
         subject=subject,
         body=body,
-        expected_response="acknowledgement",
-        response_window="immediate",
+        expected_response="status_update",
+        response_window="short",
         artifact_refs=artifact_refs,
         action_items=action_items,
         correlation_id=None,
@@ -110,7 +110,7 @@ def _find_message_by_subject(bridge, *, recipient: str, subject_prefix: str) -> 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Bridge autonomy proof harness")
-    parser.add_argument("--timeout", type=int, default=90, help="Max seconds to wait for processing")
+    parser.add_argument("--timeout", type=int, default=240, help="Max seconds to wait for processing")
     parser.add_argument("--skip-malformed", action="store_true", help="Skip the malformed message injection")
     parser.add_argument("--sender", default="prime", choices=["prime", "codex"])
     parser.add_argument("--recipient", default="codex", choices=["prime", "codex"])
@@ -159,12 +159,12 @@ def main() -> int:
         sender=args.sender,
         recipient=args.recipient,
         subject=valid_subject,
-        body="This is an autonomy proof test. Please acknowledge receipt.",
+        body="This is an autonomy proof test. Reply with a short substantive status update confirming the bridge processed this thread.",
         payload_json=json.dumps({
             "artifact_refs": [{"type": "file", "path": "CLAUDE.md", "note": "valid ref"}],
-            "expected_response": "acknowledgement",
-            "response_window": "immediate",
-            "action_items": ["Acknowledge receipt of this autonomy proof test"],
+            "expected_response": "status_update",
+            "response_window": "short",
+            "action_items": ["Send a short substantive reply confirming the bridge processed this thread"],
             "message_kind": "substantive",
         }),
     )
@@ -181,8 +181,8 @@ def main() -> int:
             body="This message has malformed artifact refs. Must not crash worker.",
             payload_json=json.dumps({
                 "artifact_refs": [{"type": "file", "path": "C:\\Nonexistent\\Path\\crash.md", "note": "bad ref"}],
-                "expected_response": "acknowledgement",
-                "response_window": "immediate",
+                "expected_response": "status_update",
+                "response_window": "short",
                 "action_items": ["This should not crash the worker"],
                 "message_kind": "substantive",
             }),
@@ -199,7 +199,7 @@ def main() -> int:
     print()
 
     # Step 3: Wait for processing
-    print(f"Step 3: Waiting up to {args.timeout}s for {args.recipient} to process...")
+    print(f"Step 3: Waiting up to {args.timeout}s for {args.recipient} to reply substantively...")
     deadline = time.monotonic() + args.timeout
     valid_processed = False
     malformed_crashed_worker = False
@@ -208,11 +208,43 @@ def main() -> int:
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
 
-        # Check valid message status
-        row = conn.execute("SELECT status, claimed_by FROM messages WHERE id=?", (valid_id,)).fetchone()
-        if row and row["status"] in ("claimed", "done"):
-            valid_processed = True
-            print(f"  Valid message: {row['status']} by {row['claimed_by']}")
+        # Check for a substantive recipient reply plus closure of the original request.
+        row = conn.execute(
+            "SELECT status, thread_id, created_at FROM messages WHERE id=?",
+            (valid_id,),
+        ).fetchone()
+        if row:
+            thread_id = row["thread_id"] or valid_id
+            replies = conn.execute(
+                """
+                SELECT id, status, subject, created_at
+                FROM messages
+                WHERE thread_id = ?
+                  AND sender = ?
+                  AND recipient = ?
+                  AND message_kind = 'substantive'
+                  AND status != 'invalid'
+                ORDER BY created_at DESC
+                """,
+                (thread_id, args.recipient, args.sender),
+            ).fetchall()
+            request_created_at = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+            reply = next(
+                (
+                    item
+                    for item in replies
+                    if item["id"] != valid_id
+                    and datetime.fromisoformat(item["created_at"].replace("Z", "+00:00")) > request_created_at
+                ),
+                None,
+            )
+            if reply and row["status"] in ("done", "blocked", "superseded"):
+                valid_processed = True
+                print(
+                    "  Valid thread: "
+                    f"request_status={row['status']} reply_id={reply['id'][:12]}... "
+                    f"reply_status={reply['status']} subject={reply['subject']}"
+                )
 
         # Check worker health
         health = _check_worker_health(args.recipient)
@@ -241,9 +273,9 @@ def main() -> int:
     passed = True
 
     if valid_processed:
-        print("[PASS] Valid message was processed by the recipient worker")
+        print("[PASS] Valid message received a substantive reply and the original request was closed")
     else:
-        print("[FAIL] Valid message was NOT processed within timeout")
+        print("[FAIL] Valid message did not receive a substantive reply within timeout")
         passed = False
 
     if malformed_id:

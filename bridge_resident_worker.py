@@ -19,7 +19,7 @@ from bridge_worker_context import (
     build_context_snapshot,
     build_contexts,
     build_prompt,
-    claimed_item_due,
+    context_requires_action,
     repair_terminal_thread_outputs,
     select_dispatch_batch,
 )
@@ -27,15 +27,16 @@ from bridge_worker_context import (
 
 HOOKS_DIR = PROJECT_DIR / ".claude" / "hooks"
 DIRECT_CONTEXT_EVENT_TYPES = {
-    "message.invalid",
+    "message.failed",
     "message.resolved",
-    "thread.updated",
-    "thread.ack_breach",
-    "thread.response_window_breach",
-    "thread.claimed_silence_breach",
 }
 BUSY_GRACE_SECONDS = 60
 HEALTHY_IDLE_SECONDS = 90
+FAILED_RESIDUE_MAX_AGE_MINUTES = 15
+FAILED_RESIDUE_CLEANUP_INTERVAL_SECONDS = 10 * 60
+FAILED_RESIDUE_CLEANUP_LIMIT = 200
+RETRY_SWEEP_INTERVAL_SECONDS = 5 * 60
+RETRY_STALE_THRESHOLD_SECONDS = 3 * 60
 
 
 def _now() -> datetime:
@@ -179,16 +180,21 @@ def _explicit_refs_for(agent: str, event_batch: dict[str, Any]) -> list[str]:
         event_type = str(event.get("event_type") or "")
         details = event.get("details") or {}
         if event_type in DIRECT_CONTEXT_EVENT_TYPES:
-            if event_type.startswith("thread.") and details.get("current_assignee") not in {None, agent}:
-                continue
-            if event_type == "message.invalid" and details.get("sender") != agent:
+            if event_type == "message.failed" and details.get("sender") != agent:
                 continue
         elif event.get("agent") != agent:
             continue
         ref = _notification_message_ref(event)
         if ref:
             refs.append(ref)
-    return sorted(set(refs))
+    deduped_refs: list[str] = []
+    seen: set[str] = set()
+    for ref in refs:
+        if ref in seen:
+            continue
+        seen.add(ref)
+        deduped_refs.append(ref)
+    return deduped_refs
 
 
 def _invoke_codex(prompt: str, timeout_seconds: int) -> subprocess.CompletedProcess[str]:
@@ -364,6 +370,109 @@ def _record_dispatch(state: dict[str, Any], message_ids: list[str], trigger: str
     state["last_trigger"] = trigger
 
 
+def _maybe_clear_failed_residue(
+    agent: str,
+    bridge: Any,
+    state: dict[str, Any],
+    *,
+    log_fn,
+    force: bool = False,
+) -> int:
+    last_cleanup_at = _parse_iso(state.get("last_failed_cleanup_at"))
+    now = _now()
+    if (
+        not force
+        and last_cleanup_at is not None
+        and (now - last_cleanup_at).total_seconds() < FAILED_RESIDUE_CLEANUP_INTERVAL_SECONDS
+    ):
+        return 0
+
+    cleaner = getattr(bridge, "clear_failed_messages", None)
+    if not callable(cleaner):
+        state["last_failed_cleanup_at"] = now.isoformat()
+        return 0
+
+    try:
+        result = cleaner(
+            agent=agent,
+            older_than_minutes=FAILED_RESIDUE_MAX_AGE_MINUTES,
+            limit=FAILED_RESIDUE_CLEANUP_LIMIT,
+        )
+    except Exception as exc:
+        log_fn(f"failed residue cleanup error: {exc}")
+        return 0
+
+    state["last_failed_cleanup_at"] = now.isoformat()
+    cleared_count = int((result or {}).get("cleared_count", 0) or 0)
+    if cleared_count > 0:
+        log_fn(
+            f"cleared historical failed residue: agent={agent} cleared_count={cleared_count}",
+        )
+    return cleared_count
+
+
+def _maybe_retry_stale_pending(
+    agent: str,
+    bridge: Any,
+    state: dict[str, Any],
+    *,
+    log_fn,
+) -> int:
+    """Autonomous persistent retry: re-queue notifications for stale pending outbound messages.
+
+    This is the background driver for the owner's "non-blocking persistent retry"
+    requirement. It runs each poll cycle and retries any pending message sent BY
+    this agent that has been pending longer than RETRY_STALE_THRESHOLD_SECONDS
+    without a peer response.
+    """
+    last_retry_at = _parse_iso(state.get("last_retry_sweep_at"))
+    now = _now()
+    if (
+        last_retry_at is not None
+        and (now - last_retry_at).total_seconds() < RETRY_SWEEP_INTERVAL_SECONDS
+    ):
+        return 0
+
+    state["last_retry_sweep_at"] = now.isoformat()
+
+    # Find pending messages sent BY this agent (outbound) that are stale.
+    # Uses list_stale_outbound (sender-facing, high limit) instead of
+    # list_inbox (recipient-facing, capped at 200) so all stale outbound
+    # messages are visible regardless of inbox size.
+    retrier = getattr(bridge, "retry_pending_message", None)
+    stale_lister = getattr(bridge, "list_stale_outbound", None)
+    if not callable(retrier) or not callable(stale_lister):
+        return 0
+
+    peer = "codex" if agent == "prime" else "prime"
+    stale_result = stale_lister(
+        sender=agent,
+        older_than_seconds=RETRY_STALE_THRESHOLD_SECONDS,
+        limit=500,
+    )
+    items = stale_result.get("items", [])
+    retried = 0
+
+    for item in items:
+        message_id = item.get("id")
+        if not message_id:
+            continue
+
+        try:
+            result = retrier(message_id=message_id, agent=peer)
+            if result.get("ok"):
+                retried += 1
+                log_fn(f"autonomous retry: message={message_id} retry_count={result.get('retry_count')}")
+            elif "max retries exceeded" in str(result.get("reason", "")):
+                log_fn(f"autonomous retry exhausted: message={message_id}")
+        except Exception as exc:
+            log_fn(f"autonomous retry error: message={message_id} error={exc}")
+
+    if retried > 0:
+        log_fn(f"autonomous retry sweep: {retried} message(s) re-queued")
+    return retried
+
+
 def _capture_target_state(
     bridge: Any,
     agent: str,
@@ -382,7 +491,6 @@ def _capture_target_state(
         thread_messages = payload.get("thread_messages") or []
         snapshot[target_id] = {
             "canonical_status": canonical.get("status"),
-            "claimed_by": canonical.get("claimed_by"),
             "resolved_at": canonical.get("resolved_at"),
             "latest_thread_message_id": latest.get("id"),
             "message_count": len(thread_messages),
@@ -451,35 +559,54 @@ def run(args: argparse.Namespace) -> int:
                         last_event_id = max(last_event_id, int(event_batch.get("last_event_id", last_event_id)))
 
                     state["last_event_id"] = last_event_id
+                    _maybe_clear_failed_residue(
+                        args.agent,
+                        bridge,
+                        state,
+                        log_fn=lambda message: _append_log(args.agent, message),
+                    )
+                    _maybe_retry_stale_pending(
+                        args.agent,
+                        bridge,
+                        state,
+                        log_fn=lambda message: _append_log(args.agent, message),
+                    )
                     explicit_refs = _explicit_refs_for(args.agent, event_batch)
-                    new_items = bridge.list_inbox(agent=args.agent, status="new", limit=100).get("items", [])
-                    claimed = bridge.list_inbox(agent=args.agent, status="claimed", limit=100).get("items", [])
-                    due_claimed = [
-                        item for item in claimed if claimed_item_due(args.agent, item, state, args.cadence_minutes)
-                    ]
+                    new_items = bridge.list_inbox(agent=args.agent, status="pending", limit=100).get("items", [])
                     contexts = build_contexts(
                         bridge,
                         agent=args.agent,
                         explicit_refs=explicit_refs,
                         new_items=new_items,
-                        due_claimed=due_claimed,
+                        due_claimed=[],
                         project_dir=PROJECT_DIR,
                         log_fn=lambda message: _append_log(args.agent, message),
+                        max_contexts=args.max_dispatch_targets,
                     )
+                    pending_ids = {
+                        str(item.get("id") or "").strip()
+                        for item in new_items
+                        if str(item.get("id") or "").strip()
+                    }
+                    contexts = [
+                        context
+                        for context in contexts
+                        if str((context.get("canonical_message") or {}).get("id") or "").strip() in pending_ids
+                        or context_requires_action(args.agent, context)
+                    ]
 
                     batch = select_dispatch_batch(
                         contexts,
                         new_items,
-                        due_claimed,
+                        [],
                         max_targets=args.max_dispatch_targets,
                     )
                     batch_contexts = batch["contexts"]
                     batch_new_items = batch["new_items"]
-                    batch_due_claimed = batch["due_claimed"]
                     targets = batch["target_ids"]
                     deferred_targets = batch["deferred_ids"]
 
-                    if not batch_new_items and not batch_due_claimed and not batch_contexts:
+                    if not batch_new_items and not batch_contexts:
                         _save_state(args.agent, state)
                         _write_health(args.agent, status="idle", last_event_id=last_event_id)
                         continue
@@ -490,11 +617,26 @@ def run(args: argparse.Namespace) -> int:
                             f"dispatch batch capped at {args.max_dispatch_targets}; deferred_targets={','.join(deferred_targets)}",
                         )
 
+                    pre_repair_count = repair_terminal_thread_outputs(
+                        bridge,
+                        agent=args.agent,
+                        target_refs=targets,
+                        project_dir=PROJECT_DIR,
+                        log_fn=lambda message: _append_log(args.agent, message),
+                    )
+                    if pre_repair_count > 0:
+                        _append_log(
+                            args.agent,
+                            f"pre-dispatch terminal repair handled {pre_repair_count} target(s); re-evaluating queue",
+                        )
+                        _write_health(args.agent, status="running", last_event_id=last_event_id)
+                        continue
+
                     payload = build_context_snapshot(
                         trigger="resident-worker",
                         contexts=batch_contexts,
                         new_items=batch_new_items,
-                        due_claimed=batch_due_claimed,
+                        due_claimed=[],
                     )
                     HOOKS_DIR.mkdir(parents=True, exist_ok=True)
                     _last_context_file(args.agent).write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -503,7 +645,7 @@ def run(args: argparse.Namespace) -> int:
                         args.agent,
                         _last_context_file(args.agent),
                         batch_new_items,
-                        batch_due_claimed,
+                        [],
                         batch_contexts,
                         project_dir=PROJECT_DIR,
                     )
@@ -522,7 +664,7 @@ def run(args: argparse.Namespace) -> int:
                     )
                     _append_log(
                         args.agent,
-                        f"dispatching resident worker run: targets={','.join(targets)} new={len(batch_new_items)} claimed={len(batch_due_claimed)} contexts={len(batch_contexts)}",
+                        f"dispatching resident worker run: targets={','.join(targets)} new={len(batch_new_items)} contexts={len(batch_contexts)}",
                     )
                     pre_dispatch_state = _capture_target_state(bridge, args.agent, targets)
 

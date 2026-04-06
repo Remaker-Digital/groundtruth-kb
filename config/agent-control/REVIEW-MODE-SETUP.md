@@ -33,10 +33,9 @@ When the local hooks support review mode, the active mode should:
 
 ## Session Start (Two-Phase)
 
-**Phase A — Bridge sweep (first, within 60 seconds):**
-1. Query bridge for unresolved messages addressed to this agent.
-2. Check `list_threads_at_risk()` and `bridge_sla_report()`.
-3. Acknowledge, claim, or negotiate each live message per protocol.
+**Phase A — Bridge sweep (first priority):**
+1. Query bridge for pending messages addressed to this agent via `list_inbox(agent=..., status="pending")`.
+2. Process or reply to each pending message substantively.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 4. `AGENTS.md`

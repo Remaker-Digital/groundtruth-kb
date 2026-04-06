@@ -12,16 +12,21 @@ from pathlib import Path
 
 import msvcrt
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from bridge_worker_context import (
     DEFAULT_MAX_DISPATCH_TARGETS,
     PROJECT_DIR,
     build_context_snapshot,
     build_contexts,
     build_prompt,
-    claimed_item_due,
+    context_requires_action,
     repair_terminal_thread_outputs,
     select_dispatch_batch,
 )
+from bridge_resident_worker import _maybe_clear_failed_residue
 
 HOOKS_DIR = PROJECT_DIR / ".claude" / "hooks"
 
@@ -225,11 +230,14 @@ def main() -> int:
     try:
         with _FileLock(_lock_file(args.agent)):
             state = _load_state(args.agent)
-            new_items = bridge.list_inbox(agent=args.agent, status="new", limit=100).get("items", [])
-            claimed = bridge.list_inbox(agent=args.agent, status="claimed", limit=100).get("items", [])
-            due_claimed = [
-                item for item in claimed if claimed_item_due(args.agent, item, state, args.cadence_minutes)
-            ]
+            _maybe_clear_failed_residue(
+                args.agent,
+                bridge,
+                state,
+                log_fn=lambda message: _append_agent_log(args.agent, message),
+            )
+            new_items = bridge.list_inbox(agent=args.agent, status="pending", limit=100).get("items", [])
+            due_claimed: list[dict[str, object]] = []
             contexts = build_contexts(
                 bridge,
                 agent=args.agent,
@@ -238,7 +246,19 @@ def main() -> int:
                 due_claimed=due_claimed,
                 project_dir=PROJECT_DIR,
                 log_fn=lambda message: _append_agent_log(args.agent, message),
+                max_contexts=args.max_dispatch_targets,
             )
+            pending_ids = {
+                str(item.get("id") or "").strip()
+                for item in list(new_items) + list(due_claimed)
+                if str(item.get("id") or "").strip()
+            }
+            contexts = [
+                context
+                for context in contexts
+                if str((context.get("canonical_message") or {}).get("id") or "").strip() in pending_ids
+                or context_requires_action(args.agent, context)
+            ]
 
             batch = select_dispatch_batch(
                 contexts,
@@ -261,6 +281,20 @@ def main() -> int:
                     args.agent,
                     f"wake batch capped at {args.max_dispatch_targets}; deferred_targets={','.join(deferred_targets)}",
                 )
+
+            pre_repair_count = repair_terminal_thread_outputs(
+                bridge,
+                agent=args.agent,
+                target_refs=sorted(wake_targets),
+                project_dir=PROJECT_DIR,
+                log_fn=lambda message: _append_agent_log(args.agent, message),
+            )
+            if pre_repair_count > 0:
+                _append_agent_log(
+                    args.agent,
+                    f"pre-dispatch terminal repair handled {pre_repair_count} target(s); re-evaluate bridge queue before heavy worker execution",
+                )
+                return 0
 
             payload = build_context_snapshot(
                 trigger=args.trigger,
@@ -298,7 +332,7 @@ def main() -> int:
             )
             _append_agent_log(
                 args.agent,
-                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} claimed={len(batch_due_claimed)} contexts={len(batch_contexts)}",
+                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} followups={len(batch_due_claimed)} contexts={len(batch_contexts)}",
             )
             if completed.returncode != 0:
                 return completed.returncode

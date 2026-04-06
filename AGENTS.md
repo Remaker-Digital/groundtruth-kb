@@ -26,11 +26,10 @@ YOU MUST NOT delete or modify files which you have not created without explicit 
 
 ## Startup Checklist (Every Session)
 
-**Phase A — Bridge sweep (first, within 60 seconds):**
-1. Query bridge for unresolved messages addressed to this agent.
-2. Check `list_threads_at_risk()` and `bridge_sla_report()`.
-3. Acknowledge, claim, or negotiate each live message per protocol.
-4. Report sweep count: "Bridge sweep: N messages processed."
+**Phase A — Bridge sweep (first priority):**
+1. Query bridge for pending messages addressed to this agent via `list_inbox(agent=..., status="pending")`.
+2. Process or reply to each pending message substantively.
+3. Report sweep count: "Bridge sweep: N messages processed."
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 5. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
