@@ -263,7 +263,6 @@ def build_prompt(
     agent: str,
     snapshot_path: Path,
     new_items: list[dict[str, Any]],
-    claimed_items: list[dict[str, Any]],
     contexts: list[dict[str, Any]],
     *,
     project_dir: Path = PROJECT_DIR,
@@ -283,7 +282,6 @@ Canonical bridge snapshot:
 {snapshot_path}
 
 Pending new inbox count: {len(new_items)}
-Pending follow-up poll count: {len(claimed_items)}
 
 Target thread summaries:
 {context_lines}
@@ -307,13 +305,11 @@ def build_context_snapshot(
     trigger: str,
     contexts: list[dict[str, Any]],
     new_items: list[dict[str, Any]],
-    due_claimed: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
         "generated_at": _now().isoformat(),
         "trigger": trigger,
         "new_inbox_ids": [item["id"] for item in new_items],
-        "followup_poll_ids": [item["id"] for item in due_claimed],
         "contexts": contexts,
     }
 
@@ -321,7 +317,6 @@ def build_context_snapshot(
 def select_dispatch_batch(
     contexts: list[dict[str, Any]],
     new_items: list[dict[str, Any]],
-    due_claimed: list[dict[str, Any]],
     *,
     max_targets: int = DEFAULT_MAX_DISPATCH_TARGETS,
 ) -> dict[str, Any]:
@@ -337,7 +332,7 @@ def select_dispatch_batch(
             context_order.append(canonical_id)
 
     ordered_ids: list[str] = []
-    for item in list(new_items) + list(due_claimed):
+    for item in new_items:
         message_id = str(item.get("id") or "").strip()
         if message_id and message_id not in ordered_ids:
             ordered_ids.append(message_id)
@@ -351,7 +346,6 @@ def select_dispatch_batch(
     return {
         "contexts": [context_by_id[message_id] for message_id in selected_ids if message_id in context_by_id],
         "new_items": [item for item in new_items if str(item.get("id") or "").strip() in selected_set],
-        "due_claimed": [item for item in due_claimed if str(item.get("id") or "").strip() in selected_set],
         "target_ids": selected_ids,
         "deferred_ids": ordered_ids[max_targets:],
     }
@@ -379,7 +373,6 @@ def build_contexts(
     agent: str,
     explicit_refs: list[str],
     new_items: list[dict[str, Any]],
-    due_claimed: list[dict[str, Any]],
     project_dir: Path = PROJECT_DIR,
     log_fn: Callable[[str], None] | None = None,
     max_contexts: int | None = None,
@@ -391,8 +384,6 @@ def build_contexts(
 
     for item in new_items:
         reasons_by_id.setdefault(item["id"], set()).add("new")
-    for item in due_claimed:
-        reasons_by_id.setdefault(item["id"], set()).add("followup-poll")
     for message_ref in explicit_refs:
         context = _worker_context(bridge, message_ref, agent=agent)
         if context is None:
@@ -542,7 +533,6 @@ def repair_terminal_thread_outputs(
         agent=agent,
         explicit_refs=target_refs,
         new_items=[],
-        due_claimed=[],
         project_dir=project_dir,
         log_fn=log_fn,
     )

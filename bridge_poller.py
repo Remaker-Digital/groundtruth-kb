@@ -10,8 +10,7 @@ Behavior:
 - Polls notifications with wait_for_notifications() in a timed loop.
 - Detects new peer messages and wakes follow-up handling without auto-accepting
   substantive work.
-- Treats breach notifications and invalid-message notifications as direct wake
-  signals for the responsible agent.
+- Treats message.failed notifications as direct wake signals for the sending agent.
 - Persists last processed notification event ID to disk.
 - Uses a file lock to prevent duplicate pollers per agent.
 

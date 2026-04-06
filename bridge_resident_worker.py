@@ -578,7 +578,6 @@ def run(args: argparse.Namespace) -> int:
                         agent=args.agent,
                         explicit_refs=explicit_refs,
                         new_items=new_items,
-                        due_claimed=[],
                         project_dir=PROJECT_DIR,
                         log_fn=lambda message: _append_log(args.agent, message),
                         max_contexts=args.max_dispatch_targets,
@@ -598,7 +597,6 @@ def run(args: argparse.Namespace) -> int:
                     batch = select_dispatch_batch(
                         contexts,
                         new_items,
-                        [],
                         max_targets=args.max_dispatch_targets,
                     )
                     batch_contexts = batch["contexts"]
@@ -636,7 +634,6 @@ def run(args: argparse.Namespace) -> int:
                         trigger="resident-worker",
                         contexts=batch_contexts,
                         new_items=batch_new_items,
-                        due_claimed=[],
                     )
                     HOOKS_DIR.mkdir(parents=True, exist_ok=True)
                     _last_context_file(args.agent).write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -645,7 +642,6 @@ def run(args: argparse.Namespace) -> int:
                         args.agent,
                         _last_context_file(args.agent),
                         batch_new_items,
-                        [],
                         batch_contexts,
                         project_dir=PROJECT_DIR,
                     )

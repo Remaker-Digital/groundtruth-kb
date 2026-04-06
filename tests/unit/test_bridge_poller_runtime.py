@@ -550,3 +550,76 @@ def test_resolve_message_with_new_outcomes(tmp_path: Path, monkeypatch) -> None:
 
     assert result["ok"] is True
     assert result["status"] == "completed"
+
+
+# ---------------------------------------------------------------------------
+# v3 contract enforcement tests (Codex residual from S261)
+# ---------------------------------------------------------------------------
+
+
+def test_self_addressed_peer_message_rejected(tmp_path: Path, monkeypatch) -> None:
+    """Peer messages where sender == recipient must be rejected."""
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    result = runtime.send_message(
+        sender="codex",
+        recipient="codex",
+        subject="Self-addressed message",
+        body="This should fail validation.",
+        payload_json=_valid_payload(),
+    )
+
+    assert result["status"] == "failed"
+    assert any("self-addressed" in e for e in result["validation_errors"])
+
+
+def test_status_update_reply_without_correlation_id_rejected(tmp_path: Path, monkeypatch) -> None:
+    """A peer status_update with response_type but no correlation_id must fail."""
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    result = runtime.send_message(
+        sender="prime",
+        recipient="codex",
+        subject="Uncorrelated status update",
+        body="status update without thread context",
+        payload_json=json.dumps({
+            "expected_response": "status_update",
+            "response_type": "status_update",
+            "artifact_refs": ["CLAUDE.md"],
+            "action_items": ["acknowledge status"],
+        }),
+    )
+
+    assert result["status"] == "failed"
+    assert any("missing correlation_id" in e for e in result["validation_errors"])
+
+
+def test_correction_reply_satisfies_context_requires_action() -> None:
+    """A correction (message_kind=system) from the agent must satisfy context_requires_action."""
+    from bridge_worker_context import context_requires_action
+
+    context = {
+        "canonical_message": {
+            "id": "m-request",
+            "status": "pending",
+            "sender": "prime",
+            "recipient": "codex",
+            "subject": "Review request",
+            "expected_response": "advisory_review",
+            "created_at": "2026-04-05T10:00:00+00:00",
+        },
+        "thread_messages": [
+            {
+                "id": "m-correction",
+                "sender": "codex",
+                "recipient": "prime",
+                "message_kind": "system",
+                "status": "pending",
+                "created_at": "2026-04-05T10:01:00+00:00",
+            },
+        ],
+    }
+
+    assert context_requires_action("codex", context) is False

@@ -123,7 +123,7 @@ def test_build_contexts_prefers_structured_artifact_refs(tmp_path) -> None:
         agent="codex",
         explicit_refs=["m-1"],
         new_items=[{"id": "m-1"}],
-        due_claimed=[],
+
         project_dir=tmp_path,
     )
 
@@ -160,7 +160,7 @@ def test_build_contexts_accepts_wrapped_runtime_payload(tmp_path) -> None:
         agent="codex",
         explicit_refs=["m-1"],
         new_items=[],
-        due_claimed=[],
+
         project_dir=tmp_path,
     )
 
@@ -195,7 +195,7 @@ def test_build_contexts_preserves_new_then_explicit_order(tmp_path) -> None:
         agent="codex",
         explicit_refs=["m-explicit"],
         new_items=[{"id": "m-new"}],
-        due_claimed=[],
+
         project_dir=tmp_path,
     )
 
@@ -240,7 +240,7 @@ def test_build_contexts_caps_context_building_to_dispatch_window(tmp_path) -> No
         agent="codex",
         explicit_refs=[],
         new_items=[{"id": "m-1"}, {"id": "m-2"}, {"id": "m-3"}],
-        due_claimed=[],
+
         project_dir=tmp_path,
         max_contexts=2,
     )
@@ -257,7 +257,6 @@ def test_build_prompt_scopes_work_and_requires_structured_corrections(tmp_path) 
         "codex",
         snapshot,
         [{"id": "m-1"}],
-        [],
         [
             {
                 "canonical_message": {"id": "m-1", "status": "failed", "subject": "Malformed request"},
@@ -467,13 +466,11 @@ def test_select_dispatch_batch_caps_targets_and_preserves_order() -> None:
         {"canonical_message": {"id": "m-2"}},
         {"canonical_message": {"id": "m-3"}},
     ]
-    new_items = [{"id": "m-2"}, {"id": "m-4"}]
-    due_claimed = [{"id": "m-3"}, {"id": "m-5"}]
+    new_items = [{"id": "m-2"}, {"id": "m-4"}, {"id": "m-3"}, {"id": "m-5"}]
 
     batch = context_builder.select_dispatch_batch(
         contexts,
         new_items,
-        due_claimed,
         max_targets=2,
     )
 
@@ -481,4 +478,4 @@ def test_select_dispatch_batch_caps_targets_and_preserves_order() -> None:
     assert batch["deferred_ids"] == ["m-3", "m-5", "m-1"]
     assert [item["canonical_message"]["id"] for item in batch["contexts"]] == ["m-2"]
     assert batch["new_items"] == [{"id": "m-2"}, {"id": "m-4"}]
-    assert batch["due_claimed"] == []
+    assert "due_claimed" not in batch  # v3: no claimed state

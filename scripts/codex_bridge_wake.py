@@ -237,20 +237,18 @@ def main() -> int:
                 log_fn=lambda message: _append_agent_log(args.agent, message),
             )
             new_items = bridge.list_inbox(agent=args.agent, status="pending", limit=100).get("items", [])
-            due_claimed: list[dict[str, object]] = []
             contexts = build_contexts(
                 bridge,
                 agent=args.agent,
                 explicit_refs=args.message_id,
                 new_items=new_items,
-                due_claimed=due_claimed,
                 project_dir=PROJECT_DIR,
                 log_fn=lambda message: _append_agent_log(args.agent, message),
                 max_contexts=args.max_dispatch_targets,
             )
             pending_ids = {
                 str(item.get("id") or "").strip()
-                for item in list(new_items) + list(due_claimed)
+                for item in new_items
                 if str(item.get("id") or "").strip()
             }
             contexts = [
@@ -263,16 +261,14 @@ def main() -> int:
             batch = select_dispatch_batch(
                 contexts,
                 new_items,
-                due_claimed,
                 max_targets=args.max_dispatch_targets,
             )
             batch_contexts = batch["contexts"]
             batch_new_items = batch["new_items"]
-            batch_due_claimed = batch["due_claimed"]
             wake_targets = set(batch["target_ids"])
             deferred_targets = batch["deferred_ids"]
 
-            if not batch_new_items and not batch_due_claimed and not batch_contexts:
+            if not batch_new_items and not batch_contexts:
                 _append_agent_log(args.agent, "no pending bridge work; exiting")
                 return 0
 
@@ -300,7 +296,6 @@ def main() -> int:
                 trigger=args.trigger,
                 contexts=batch_contexts,
                 new_items=batch_new_items,
-                due_claimed=batch_due_claimed,
             )
             HOOKS_DIR.mkdir(parents=True, exist_ok=True)
             _last_context_file(args.agent).write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -308,7 +303,6 @@ def main() -> int:
                 args.agent,
                 _last_context_file(args.agent),
                 batch_new_items,
-                batch_due_claimed,
                 batch_contexts,
                 project_dir=PROJECT_DIR,
             )
@@ -332,7 +326,7 @@ def main() -> int:
             )
             _append_agent_log(
                 args.agent,
-                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} followups={len(batch_due_claimed)} contexts={len(batch_contexts)}",
+                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} contexts={len(batch_contexts)}",
             )
             if completed.returncode != 0:
                 return completed.returncode
