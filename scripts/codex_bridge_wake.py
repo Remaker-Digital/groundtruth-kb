@@ -164,19 +164,15 @@ def _invoke_codex(codex_exe: Path, prompt: str, timeout_seconds: int) -> subproc
     _append_agent_log("codex", f"launching codex exec: {codex_exe}")
     popen_kwargs: dict[str, object] = {
         "cwd": str(PROJECT_DIR),
-        "capture_output": True,
         "text": True,
         "timeout": timeout_seconds,
     }
     if os.name == "nt":
-        # pythonw.exe runs without a console, but codex.exe is a console app.
-        # Without CREATE_NO_WINDOW, Windows allocates a visible terminal host.
-        popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
     completed = subprocess.run(
         cmd,
         **popen_kwargs,
     )
-    _last_stdout_file("codex").write_text(completed.stdout or "", encoding="utf-8")
     if completed.stderr:
         _append_agent_log("codex", f"codex exec stderr: {completed.stderr.strip()}")
     return completed

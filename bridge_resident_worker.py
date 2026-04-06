@@ -214,14 +214,12 @@ def _invoke_codex(prompt: str, timeout_seconds: int) -> subprocess.CompletedProc
     ]
     popen_kwargs: dict[str, object] = {
         "cwd": str(PROJECT_DIR),
-        "capture_output": True,
         "text": True,
         "timeout": timeout_seconds,
     }
     if os.name == "nt":
-        popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
     completed = subprocess.run(cmd, **popen_kwargs)
-    _last_stdout_file("codex").write_text(completed.stdout or "", encoding="utf-8")
     return completed
 
 
@@ -628,6 +626,7 @@ def run(args: argparse.Namespace) -> int:
                             f"pre-dispatch terminal repair handled {pre_repair_count} target(s); re-evaluating queue",
                         )
                         _write_health(args.agent, status="running", last_event_id=last_event_id)
+                        startup_scan_pending = True  # force immediate inbox re-scan
                         continue
 
                     payload = build_context_snapshot(
