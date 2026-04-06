@@ -22,6 +22,7 @@ from src.multi_tenant.middleware import get_tenant_context
 
 from src.multi_tenant.pipeline_metrics import get_aggregator
 from src.multi_tenant.superadmin_api import _monolith as _state
+from src.multi_tenant.superadmin_api._pii_mask import mask_brand, mask_email
 
 router = _state.router
 
@@ -427,7 +428,7 @@ async def get_tenant_comparison(
 
     # Fetch tenant display info from directory
     # SPEC-1843 v6 / WI-1641: brand_name and customer_email restored
-    # (tenancy management data — operator needs human-readable identification).
+    # (tenancy management data). ZK masking applied (S262).
     tenant_info: dict[str, dict[str, Any]] = {}
     if _state._tenant_repo is not None:
         try:
@@ -453,12 +454,9 @@ async def get_tenant_comparison(
     for tid in all_tenant_ids:
         info = tenant_info.get(tid, {})
         metrics = tenant_metrics.get(tid)
-        # SPEC-1843 v6: brand_name and email are tenancy management data
-        # (operator needs human-readable tenant identification).
-        # Priority: brand_name > email > tenant_id (WI-1641 restoration).
         display = (
-            info.get("brand_name")
-            or info.get("customer_email")
+            mask_brand(info.get("brand_name"))
+            or mask_email(info.get("customer_email"))
             or tid
         )
         t_tier = info.get("tier")
