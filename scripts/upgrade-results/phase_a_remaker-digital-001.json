@@ -1,13 +1,13 @@
 {
-  "A1_version": "1.98.80",
+  "A1_version": "1.98.83",
   "A2_status": "active",
   "A3_activation": {
     "is_active": true,
     "is_configured": true,
-    "has_pending_changes": true,
-    "active_version": 44
+    "has_pending_changes": false,
+    "active_version": 47
   },
-  "A4_conversation_count": 837,
+  "A4_conversation_count": 832,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
