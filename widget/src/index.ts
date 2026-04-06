@@ -210,7 +210,7 @@ async function init(
     || document.querySelector('script[data-widget-key]');
   const _authType = scriptEl?.getAttribute('data-auth-type') || '';
   const _authToken = scriptEl?.getAttribute('data-auth-token') || '';
-  if (_authType === 'session_token' && _authToken) {
+  if ((_authType === 'session_token' || _authType === 'api_key') && _authToken) {
     store.setState({ isAdminContext: true });
   }
 

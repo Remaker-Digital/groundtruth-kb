@@ -51,7 +51,7 @@ const INTEGRATIONS = [
     status: null,
     tierGate: 'professional',
     tierMet: true,
-    comingSoon: true,
+    comingSoon: false,
   },
   {
     type: 'google_analytics',
@@ -62,7 +62,7 @@ const INTEGRATIONS = [
     status: null,
     tierGate: null,
     tierMet: true,
-    comingSoon: true,
+    comingSoon: false,
   },
 ];
 

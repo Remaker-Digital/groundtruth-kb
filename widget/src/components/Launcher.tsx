@@ -60,8 +60,11 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
     : { left: `${offsetX}px`, right: 'auto' };
 
   return (
+    <>
+    <style>{`.ar-launcher:focus-visible { box-shadow: ${tokens.shadowLg}, 0 0 0 3px ${ringColor} !important; }`}</style>
     <button
       type="button"
+      className="ar-launcher"
       aria-label={isOpen ? locale.closeChat : locale.openChat}
       aria-expanded={isOpen}
       onClick={onClick}
@@ -85,15 +88,6 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         transform: isOpen ? 'scale(0.9)' : 'scale(1)',
         outline: 'none',
         padding: 0,
-      }}
-      onFocus={(e) => {
-        // Only show focus ring for keyboard navigation (S259 D5 fix).
-        if (e.currentTarget.matches(':focus-visible')) {
-          (e.currentTarget as HTMLElement).style.boxShadow = `${tokens.shadowLg}, 0 0 0 3px ${ringColor}`;
-        }
-      }}
-      onBlur={(e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow = tokens.shadowLg;
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.backgroundColor = tokens.colorLauncherHover;
@@ -143,6 +137,7 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         </span>
       )}
     </button>
+    </>
   );
 };
 

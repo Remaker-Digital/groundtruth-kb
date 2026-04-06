@@ -17,7 +17,7 @@
  */
 
 import { FunctionComponent } from 'preact';
-import { useState, useRef, useCallback } from 'preact/hooks';
+import { useState, useRef, useCallback, useMemo } from 'preact/hooks';
 import type { DesignTokens } from '@/theme/tokens';
 import { focusRingColor } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
@@ -102,6 +102,8 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
     target.style.height = `${Math.min(scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
   }, []);
 
+  const inputBarRingColor = useMemo(() => focusRingColor(tokens.colorInputBarBg), [tokens.colorInputBarBg]);
+
   return (
     <div
       style={{
@@ -110,6 +112,10 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
         flexShrink: 0,
       }}
     >
+      <style>{`
+        .ar-input-attach:focus-visible { box-shadow: 0 0 0 2px ${inputBarRingColor} !important; }
+        .ar-input-send:focus-visible { box-shadow: 0 0 0 3px ${inputBarRingColor} !important; }
+      `}</style>
       {/* Input row — visible container with surface background */}
       <div
         style={{
@@ -124,6 +130,7 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
         {fileUploadEnabled && (
           <button
             type="button"
+            className="ar-input-attach"
             aria-label={locale.attachFile}
             disabled={disabled}
             style={{
@@ -139,13 +146,6 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
               transition: `color ${tokens.transitionFast}, box-shadow ${tokens.transitionFast}`,
               outline: 'none',
               flexShrink: 0,
-            }}
-            onFocus={(e) => {
-              // Only show focus ring for keyboard navigation (S259 D5 fix).
-              if (!disabled && e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 2px ${focusRingColor(tokens.colorInputBarBg)}`;
-            }}
-            onBlur={(e) => {
-              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
             }}
             onMouseEnter={(e) => {
               if (!disabled) (e.currentTarget as HTMLElement).style.color = tokens.colorText;
@@ -200,6 +200,7 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
         {/* Send button */}
         <button
           type="button"
+          className="ar-input-send"
           aria-label={locale.sendButton}
           onClick={handleSend}
           disabled={!canSend}
@@ -218,13 +219,6 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
             transition: `background-color ${tokens.transitionFast}, color ${tokens.transitionFast}, box-shadow ${tokens.transitionFast}`,
             outline: 'none',
             padding: 0,
-          }}
-          onFocus={(e) => {
-            // Only show focus ring for keyboard navigation (S259 D5 fix).
-            if (canSend && e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorInputBarBg)}`;
-          }}
-          onBlur={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
           }}
         >
           {isLoading ? <SpinnerIcon size={16} /> : <SendIcon size={16} />}

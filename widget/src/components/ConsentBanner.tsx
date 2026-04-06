@@ -30,6 +30,8 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
   onAccept,
   onDecline,
 }) => {
+  const ringColor = focusRingColor(tokens.colorSurface);
+
   return (
     <div
       role="alert"
@@ -49,12 +51,14 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
         flexShrink: 0,
       }}
     >
+      <style>{`.ar-consent-btn:focus-visible { box-shadow: 0 0 0 3px ${ringColor} !important; }`}</style>
       <div style={{ lineHeight: '1.4' }}>
         {locale.consentPrompt}
       </div>
       <div style={{ display: 'flex', gap: tokens.space2 }}>
         <button
           type="button"
+          className="ar-consent-btn"
           onClick={onAccept}
           style={{
             padding: `${tokens.space1} ${tokens.space3}`,
@@ -69,18 +73,12 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             outline: 'none',
             transition: `box-shadow ${tokens.transitionFast}`,
           }}
-          onFocus={(e) => {
-            // Only show focus ring for keyboard navigation (S259 D5 fix).
-            if (e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
-          }}
-          onBlur={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-          }}
         >
           {locale.consentAccept}
         </button>
         <button
           type="button"
+          className="ar-consent-btn"
           onClick={onDecline}
           style={{
             padding: `${tokens.space1} ${tokens.space3}`,
@@ -94,13 +92,6 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             cursor: 'pointer',
             outline: 'none',
             transition: `box-shadow ${tokens.transitionFast}`,
-          }}
-          onFocus={(e) => {
-            // Only show focus ring for keyboard navigation (S259 D5 fix).
-            if (e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
-          }}
-          onBlur={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
           }}
         >
           {locale.consentDecline}

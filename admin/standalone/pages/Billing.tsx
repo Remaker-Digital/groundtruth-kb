@@ -539,7 +539,7 @@ export const BillingPage: React.FC = () => {
                   <Button
                     color="action"
                     fullWidth
-                    onClick={() => onNotify('Add-on checkout coming soon.', 'info')}
+                    onClick={() => onNotify('Add-on checkout is not yet available.', 'info')}
                   >
                     Subscribe
                   </Button>

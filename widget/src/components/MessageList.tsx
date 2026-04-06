@@ -407,9 +407,11 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
       </div>
 
       {/* Scroll-to-bottom button */}
+      <style>{`.ar-scroll-btn:focus-visible { box-shadow: ${tokens.shadowMd}, 0 0 0 3px ${focusRingColor(tokens.colorSurface)} !important; }`}</style>
       {showScrollBtn && (
         <button
           type="button"
+          className="ar-scroll-btn"
           aria-label={locale.scrollToBottom}
           onClick={scrollToBottom}
           style={{
@@ -432,13 +434,6 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
             gap: tokens.space1,
             outline: 'none',
             transition: `box-shadow ${tokens.transitionFast}`,
-          }}
-          onFocus={(e) => {
-            // Only show focus ring for keyboard navigation (S259 D5 fix).
-            if (e.currentTarget.matches(':focus-visible')) (e.currentTarget as HTMLElement).style.boxShadow = `${tokens.shadowMd}, 0 0 0 3px ${focusRingColor(tokens.colorSurface)}`;
-          }}
-          onBlur={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = tokens.shadowMd;
           }}
         >
           <ChevronDownIcon size={12} />

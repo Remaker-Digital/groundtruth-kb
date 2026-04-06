@@ -900,11 +900,15 @@ export function WidgetPage() {
   // Dispatch draft config to the live widget on this page (SPEC-1551).
   // The widget exposes window.AgentRed.setConfigPartial() which reactively
   // updates the launcher and panel, giving merchants a real-time preview.
+  // WI-3039: Color fields are excluded — color changes apply only after activation.
+  const COLOR_PREVIEW_KEYS = ['widget_primary_color', 'widget_launcher_color', 'widget_header_gradient_end'];
   useEffect(() => {
     if (!initialized) return;
     const sdk = (window as any).AgentRed;
     if (sdk?.setConfigPartial) {
-      sdk.setConfigPartial(widgetConfigToApiFields(config));
+      const fields = widgetConfigToApiFields(config);
+      for (const key of COLOR_PREVIEW_KEYS) delete fields[key];
+      sdk.setConfigPartial(fields);
     }
   }, [config, initialized]);
 
