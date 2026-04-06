@@ -100,7 +100,7 @@ class CriticEscalationMixin:
     # Escalation handling
     # -------------------------------------------------------------------
 
-    async def _handle_escalation(
+    async def _run_escalation_side_effects(
         self,
         tenant_id: str,
         conversation_id: str,
@@ -108,51 +108,54 @@ class CriticEscalationMixin:
         system_prompt: str,
         budget: PipelineTimeoutBudget,
         trace: DecisionTraceBuilder,
-    ) -> AsyncGenerator[StreamEvent, None]:
-        """Handle escalation: call Escalation agent, update session."""
+    ) -> dict[str, Any]:
+        """Execute escalation side-effects without yielding SSE events.
+
+        WI-3030 Phase 2: Extracted from _handle_escalation so the orchestrator
+        can run the normal KR→RG→Critic pipeline first, then fire escalation
+        side-effects and yield the notice after the AI answer.
+
+        Returns a dict with:
+            email_required (bool): True if customer email is missing
+            email_prompt (str): Message asking for email (when email_required)
+            escalation_msg (str): Primary escalation notice
+            continuation_msg (str): Continuation offer
+            email_bridge_sent (bool): Whether email dispatch succeeded
+            reason (str): Escalation reason from agent
+            category (str): Escalation category
+            urgency (str): Escalation urgency
+        """
         from src.multi_tenant.pipeline_resilience import PipelineTimeoutError
 
-        yield stage_event("escalation-handler", "started")
-
+        reason = "Customer requested human agent"
         urgency = "medium"
         context_summary = ""
+        category = "general_inquiry"
 
         try:
             esc_result = await budget.execute_with_budget(
                 "escalation-handler",
                 self._call_escalation_handler(customer_message, system_prompt),
             )
-
-            reason = esc_result.get("reason", "Customer requested human agent")
-            urgency = esc_result.get("urgency", "medium")
+            reason = esc_result.get("reason", reason)
+            urgency = esc_result.get("urgency", urgency)
             context_summary = esc_result.get("context_summary", "")
-            category = esc_result.get("category", "general_inquiry")
+            category = esc_result.get("category", category)
 
-            # S251 G5 Phase 1: record escalation for Lane 2 observability
             trace.set_escalation(escalated=True, reason=reason)
-
             trace.add_stage(
                 "escalation-handler",
                 model=esc_result.get("model", "gpt-4o-mini"),
                 latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
             )
-
-            yield stage_event(
-                "escalation-handler", "completed",
-                latency_ms=int(budget.stages[-1].elapsed_ms) if budget.stages else None,
-            )
-
         except (PipelineTimeoutError, Exception) as exc:
             logger.warning(
                 "Escalation agent failed: conv=%s error=%s — proceeding with default",
                 conversation_id, exc,
             )
-            reason = "Customer requested human agent"
-            category = "general_inquiry"
+            trace.set_escalation(escalated=True, reason=reason)
 
-        # WI-3030 v2.1: Check for customer email BEFORE escalating.
-        # If email is missing, ask for it and defer — do NOT mark as ESCALATED
-        # until the email bridge can actually fire.
+        # Check for customer email BEFORE escalating.
         customer_email: str | None = None
         conv_doc: dict[str, Any] | None = None
         try:
@@ -162,14 +165,20 @@ class CriticEscalationMixin:
             logger.debug("Could not read conversation for identity_email")
 
         if not customer_email:
-            yield token_event(
-                "I'd like to connect you with a human representative who can help with this. "
-                "Could you share your email address so they can follow up with you directly?",
-                1,
-            )
-            yield validated_event(conversation_id, "escalation_email_required")
-            yield done_event(conversation_id, 0)
-            return
+            return {
+                "email_required": True,
+                "email_prompt": (
+                    "I'd like to connect you with a human representative who can "
+                    "help with this. Could you share your email address so they "
+                    "can follow up with you directly?"
+                ),
+                "escalation_msg": "",
+                "continuation_msg": "",
+                "email_bridge_sent": False,
+                "reason": reason,
+                "category": category,
+                "urgency": urgency,
+            }
 
         # Auto-assign to best-fit team member
         assigned_agent_id: str | None = None
@@ -180,9 +189,7 @@ class CriticEscalationMixin:
         except Exception as exc:
             logger.warning("Auto-assign failed: %s — proceeding without assignment", exc)
 
-        # Resolve escalation notification recipients:
-        #   1. Assigned agent's email (extracted from doc ID {tenant}:{email})
-        #   2. Fallback: superadmin's email
+        # Resolve escalation notification recipients
         recipient_emails: list[str] = []
         if assigned_agent_id and ":" in assigned_agent_id:
             agent_email = assigned_agent_id.split(":", 1)[1]
@@ -195,9 +202,9 @@ class CriticEscalationMixin:
                 if superadmin_email:
                     recipient_emails = [superadmin_email]
             except Exception:
-                logger.debug("Superadmin lookup failed — escalation alert will use tenant notification email")
+                logger.debug("Superadmin lookup failed")
 
-        # NOW escalate the conversation — only after email + assignment are resolved
+        # Escalate the conversation
         await self._session.escalate_conversation(
             tenant_id=tenant_id,
             conversation_id=conversation_id,
@@ -206,8 +213,7 @@ class CriticEscalationMixin:
             assigned_to=assigned_agent_id,
         )
 
-        # WI-3030 v2.1: Async email-bridge — await dispatch, then set
-        # escalation_sent as a DELIVERY-STATE flag (not an intent marker).
+        # Async email-bridge dispatch
         email_bridge_sent = False
         try:
             from src.chat.escalation_email import send_escalation_emails
@@ -250,7 +256,7 @@ class CriticEscalationMixin:
         except Exception:
             logger.warning("Email-bridge dispatch failed", exc_info=True)
 
-        # Legacy alert (dashboard + webhook) — fire-and-forget
+        # Legacy alert (fire-and-forget)
         try:
             from src.multi_tenant.alert_delivery import send_escalation_alert
             asyncio.ensure_future(
@@ -268,7 +274,7 @@ class CriticEscalationMixin:
         except Exception:
             logger.debug("Legacy escalation alert skipped")
 
-        # Set delivery-state flag — only true when email dispatch succeeded
+        # Set delivery-state flag
         try:
             from datetime import datetime, timezone as tz
             await self._session._repo.patch_conversation(
@@ -283,19 +289,59 @@ class CriticEscalationMixin:
         except Exception:
             logger.debug("Failed to set escalation_sent flag", exc_info=True)
 
-        # Yield the owner-specified escalation messages
-        escalation_msg = (
-            "I have escalated your request to a human representative "
-            "who will respond directly via email. Please check your "
-            "spam folder if you don't see an email from us soon."
-        )
-        yield token_event(escalation_msg, 1)
+        return {
+            "email_required": False,
+            "email_prompt": "",
+            "escalation_msg": (
+                "I've also escalated your request to a human representative "
+                "who will follow up via email. Please check your spam folder "
+                "if you don't hear from us soon."
+            ),
+            "continuation_msg": (
+                "Is there anything else I can help you with in the meantime?"
+            ),
+            "email_bridge_sent": email_bridge_sent,
+            "reason": reason,
+            "category": category,
+            "urgency": urgency,
+        }
 
-        continuation_msg = (
-            "While we wait for a human to respond, is there anything "
-            "else I can help you with?"
+    async def _handle_escalation(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        customer_message: str,
+        system_prompt: str,
+        budget: PipelineTimeoutBudget,
+        trace: DecisionTraceBuilder,
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """Handle escalation: call Escalation agent, update session.
+
+        Delegates to _run_escalation_side_effects() and yields SSE events.
+        Retained for backwards compatibility with direct-escalation callers.
+        """
+        yield stage_event("escalation-handler", "started")
+
+        result = await self._run_escalation_side_effects(
+            tenant_id, conversation_id, customer_message,
+            system_prompt, budget, trace,
         )
-        yield token_event(continuation_msg, 2)
+
+        # Emit stage completion (budget was updated by side-effects)
+        esc_stages = [s for s in budget.stages if s.stage == "escalation-handler"]
+        yield stage_event(
+            "escalation-handler", "completed",
+            latency_ms=int(esc_stages[-1].elapsed_ms) if esc_stages else None,
+        )
+
+        if result["email_required"]:
+            yield token_event(result["email_prompt"], 1)
+            yield validated_event(conversation_id, "escalation_email_required")
+            yield done_event(conversation_id, 0)
+            return
+
+        yield token_event(result["escalation_msg"], 1)
+        yield token_event(result["continuation_msg"], 2)
         yield validated_event(conversation_id, "escalation")
         yield done_event(conversation_id, 0)
 

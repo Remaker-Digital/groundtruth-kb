@@ -568,10 +568,12 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 route.target.value, route.agent_id, route.fallback_from,
             )
 
+            # WI-3030 Phase 2: When escalation is detected, answer the
+            # customer's question first via the normal KR→RG→Critic pipeline,
+            # then fire escalation side-effects and append the notice.
+            _escalation_pending = False
+
             if route.target == RouteTarget.ESCALATION:
-                # WI-3030 S259: If escalation was already sent via email-bridge,
-                # skip re-escalation and process the message through the normal
-                # AI pipeline instead.  The chat continues after async escalation.
                 _already_escalated = False
                 try:
                     _raw_conv = await self._session._get_conversation(
@@ -586,14 +588,13 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         "Skipping re-escalation (already sent): conv=%s",
                         conversation_id[:8],
                     )
-                    # Fall through to normal KR/RG pipeline below
                 else:
-                    async for event in self._handle_escalation(
-                        tenant_id, conversation_id, customer_message,
-                        prompts[AgentRole.ESCALATION_HANDLER], budget, trace,
-                    ):
-                        yield event
-                    return
+                    _escalation_pending = True
+                    logger.info(
+                        "Escalation pending — answering question first: conv=%s",
+                        conversation_id[:8],
+                    )
+                # Fall through to normal KR/RG pipeline in both cases
 
             if route.target == RouteTarget.CO_PILOT:
                 async for event in self._handle_co_pilot(
@@ -881,6 +882,55 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 )
 
             # ---------------------------------------------------------------
+            # Phase 4b: Post-response escalation (WI-3030 Phase 2)
+            #
+            # When escalation was pending, the AI answered the question
+            # first via the normal pipeline above.  Now fire escalation
+            # side-effects (email-bridge, conversation status, alerts)
+            # and append the escalation notice to the stream.
+            # ---------------------------------------------------------------
+            if _escalation_pending:
+                yield stage_event(
+                    "escalation-handler", "started",
+                    trace_id=trace_id,
+                    elapsed_ms=int(budget.elapsed_ms),
+                )
+
+                esc_result = await self._run_escalation_side_effects(
+                    tenant_id, conversation_id, customer_message,
+                    prompts[AgentRole.ESCALATION_HANDLER], budget, trace,
+                )
+
+                esc_stages = [
+                    s for s in budget.stages if s.stage == "escalation-handler"
+                ]
+                yield stage_event(
+                    "escalation-handler", "completed",
+                    latency_ms=int(esc_stages[-1].elapsed_ms) if esc_stages else None,
+                    trace_id=trace_id,
+                    elapsed_ms=int(budget.elapsed_ms),
+                )
+
+                if esc_result["email_required"]:
+                    sequence += 1
+                    yield token_event(
+                        "\n\n" + esc_result["email_prompt"], sequence,
+                    )
+                    yield validated_event(
+                        conversation_id, "escalation_email_required",
+                    )
+                else:
+                    sequence += 1
+                    yield token_event(
+                        "\n\n" + esc_result["escalation_msg"], sequence,
+                    )
+                    sequence += 1
+                    yield token_event(
+                        " " + esc_result["continuation_msg"], sequence,
+                    )
+                    yield validated_event(conversation_id, "escalation")
+
+            # ---------------------------------------------------------------
             # Phase 5: Analytics (fire-and-forget)
             # ---------------------------------------------------------------
             self._create_background_task(
@@ -912,6 +962,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 "model_used": response_model,
                 "route_target": route.target.value,
                 "route_agent_id": route.agent_id,
+                "escalation_pending": _escalation_pending,
             }
             try:
                 await self._session.update_conversation_metadata(
