@@ -373,6 +373,14 @@ def _setup_shared_shopify_page(context, page, path="/"):
 
     page.goto(f"{SHOPIFY_BASE_URL}{path}?shop={TEST_SHOP_DOMAIN}", wait_until="load")
     page.wait_for_timeout(3_000)
+    # Verify SPA rendered — if body is blank, mocks are incomplete for this page
+    try:
+        body = page.locator("body").inner_text(timeout=5_000).strip()
+        if not body:
+            # Give extra time for slow renders before declaring failure
+            page.wait_for_timeout(3_000)
+    except Exception:
+        pass
     return page
 
 

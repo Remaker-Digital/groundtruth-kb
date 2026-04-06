@@ -33,16 +33,18 @@ When the local hooks support review mode, the active mode should:
 
 ## Session Start (Two-Phase)
 
-**Phase A — Bridge sweep (first priority):**
+**Phase A — Bridge sweep and Prime handshake (first priority):**
 1. Query bridge for pending messages addressed to this agent via `list_inbox(agent=..., status="pending")`.
 2. Process or reply to each pending message substantively.
+3. Run `python codex_session_prime_handshake.py` to send Prime the required request: `"Report your current operating state"`.
+4. Wait for the reply before proceeding with session work.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
-4. `AGENTS.md`
-5. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
-6. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
-7. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
-8. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
+5. `AGENTS.md`
+6. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
+7. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
+8. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
+9. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
 
 ## Deliverables
 
@@ -55,4 +57,3 @@ Use:
 ---
 
 Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-

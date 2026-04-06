@@ -21,7 +21,7 @@
     "id": "C.4",
     "description": "Conversation count not decreased",
     "status": "PASS",
-    "detail": "1085 vs 902 (growth OK)"
+    "detail": "1024 vs 837 (growth OK)"
   },
   {
     "id": "C.5",
@@ -225,19 +225,19 @@
     "id": "C.38",
     "description": "Widget creates conversation",
     "status": "PASS",
-    "detail": "HTTP 201, conv=4d211519-371..."
+    "detail": "HTTP 201, conv=9f864cf6-796..."
   },
   {
     "id": "C.39",
     "description": "Widget sends message",
     "status": "PASS",
-    "detail": "HTTP 200, msg_id=b451c704-217..."
+    "detail": "HTTP 200, msg_id=13e868b9-cf2..."
   },
   {
     "id": "C.40",
     "description": "AI response received",
-    "status": "FAIL",
-    "detail": "timeout \u2014 no AI response within 30s"
+    "status": "PASS",
+    "detail": "SSE stream complete: 81 tokens in 6.5s"
   },
   {
     "id": "C.41",

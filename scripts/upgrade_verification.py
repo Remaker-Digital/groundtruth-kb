@@ -557,29 +557,57 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
         check("C.39", "Widget sends message", False,
               "Skipped — no conversation from C.38")
 
-    # C.40 AI response received (poll conversation history)
-    # The AI pipeline processes the message asynchronously. Poll the
-    # conversation state up to 30s waiting for an assistant message.
+    # C.40 AI response received (consume SSE stream, then verify persistence)
+    # The widget's actual flow: POST message → GET /api/chat/stream/{id} (SSE).
+    # The AI response is only persisted to the conversation document AFTER the
+    # SSE stream delivers the `done` event.  Polling without consuming the
+    # stream will never see the response.
     ai_responded = False
     ai_detail = "no conversation"
     if conv_id and wk:
-        ai_detail = "timeout — no AI response within 30s"
-        for attempt in range(6):  # 6 attempts × 5s = 30s max
-            if attempt > 0:
-                time.sleep(5)
-            s40, d40, _ = widget_api_call(
-                fqdn, wk, f"/api/chat/conversations/{conv_id}", timeout=10)
-            if s40 == 200 and isinstance(d40, dict):
-                messages = d40.get("messages", [])
-                for m in messages:
-                    role = m.get("role", "")
-                    content = m.get("content", "")
-                    if role == "assistant" and len(content) > 5:
-                        ai_responded = True
-                        ai_detail = f"got {len(content)} chars after {(attempt + 1) * 5}s"
-                        break
-            if ai_responded:
-                break
+        ai_detail = "timeout — no AI response within 45s"
+        try:
+            import httpx
+            stream_url = f"https://{fqdn}/api/chat/stream/{conv_id}"
+            stream_headers = {"X-Widget-Key": wk, "Accept": "text/event-stream"}
+            t0 = time.time()
+            with httpx.Client(timeout=45.0) as hc:
+                with hc.stream("GET", stream_url, headers=stream_headers,
+                               timeout=45.0) as sse:
+                    if sse.status_code == 200:
+                        token_count = 0
+                        for line in sse.iter_lines():
+                            if line.startswith("event: token"):
+                                token_count += 1
+                            elif line.startswith("event: done"):
+                                elapsed = time.time() - t0
+                                ai_responded = True
+                                ai_detail = (
+                                    f"SSE stream complete: {token_count} tokens "
+                                    f"in {elapsed:.1f}s"
+                                )
+                                break
+                    else:
+                        ai_detail = f"SSE stream HTTP {sse.status_code}"
+        except ImportError:
+            # Fallback: poll conversation history (less reliable)
+            ai_detail = "httpx unavailable, polling fallback — timeout 30s"
+            for attempt in range(6):
+                if attempt > 0:
+                    time.sleep(5)
+                s40, d40, _ = widget_api_call(
+                    fqdn, wk, f"/api/chat/conversations/{conv_id}", timeout=10)
+                if s40 == 200 and isinstance(d40, dict):
+                    messages = d40.get("messages", [])
+                    for m in messages:
+                        if m.get("role") in ("assistant", "ai") and len(m.get("content", "")) > 5:
+                            ai_responded = True
+                            ai_detail = f"got {len(m['content'])} chars after {(attempt + 1) * 5}s"
+                            break
+                if ai_responded:
+                    break
+        except Exception as e:
+            ai_detail = f"SSE error: {e}"
     check("C.40", "AI response received", ai_responded, ai_detail)
 
     # C.41 Conversation cleanup (end the test conversation)

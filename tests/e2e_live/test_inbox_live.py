@@ -899,7 +899,7 @@ class TestEscalationModal:
         if escalate_btn.count() == 0:
             # Try tooltip-based ActionIcon — look for orange icon buttons
             escalate_btn = shared_inbox_page.locator(
-                "button:has-text("Escalate")"
+                'button:has-text("Escalate")'
             )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"
@@ -934,7 +934,7 @@ class TestEscalationModal:
             "button:has-text('Escalate'), "
             "[aria-label*='Escalate' i], "
             "[title*='Escalate' i], "
-            "button:has-text("Escalate")"
+            'button:has-text("Escalate")'
         )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"
@@ -973,7 +973,7 @@ class TestEscalationModal:
             "button:has-text('Escalate'), "
             "[aria-label*='Escalate' i], "
             "[title*='Escalate' i], "
-            "button:has-text("Escalate")"
+            'button:has-text("Escalate")'
         )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"
@@ -1163,7 +1163,7 @@ class TestConversationActions:
             "button:has-text('Escalate'), "
             "[aria-label*='Escalate' i], "
             "[title*='Escalate' i], "
-            "button:has-text("Escalate")"
+            'button:has-text("Escalate")'
         )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"
