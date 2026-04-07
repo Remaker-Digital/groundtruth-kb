@@ -924,6 +924,21 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     yield token_event(
                         "\n\n" + esc_result["escalation_msg"], sequence,
                     )
+                    # SPEC-1880: WhatsApp escalation deep-link
+                    wa_phone = getattr(preferences, "whatsapp_business_phone", None) or (
+                        preferences.get("whatsapp_business_phone") if isinstance(preferences, dict) else None
+                    )
+                    if wa_phone and tier in (TenantTier.PROFESSIONAL, TenantTier.ENTERPRISE):
+                        import urllib.parse
+                        wa_text = urllib.parse.quote(
+                            f"Hi, I need help with my conversation (ref: {conversation_id[:8]})"
+                        )
+                        wa_link = f"https://wa.me/{wa_phone.lstrip('+')}?text={wa_text}"
+                        sequence += 1
+                        yield token_event(
+                            f"\n\nYou can also continue this conversation on WhatsApp: {wa_link}",
+                            sequence,
+                        )
                     sequence += 1
                     yield token_event(
                         " " + esc_result["continuation_msg"], sequence,
