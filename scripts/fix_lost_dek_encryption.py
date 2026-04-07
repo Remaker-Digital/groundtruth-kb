@@ -7,12 +7,13 @@ and lost when the script exited. A subsequent DEK provisioning step stored NEW
 RSA-wrapped DEKs in KV, but these don't match the DEKs used to encrypt the data.
 
 Two-phase remediation with HARDCODED INCIDENT SCOPE:
-    Phase 1 (--inventory): Read specific documents by ID from the hardcoded
-        incident allowlist. Outputs evidence-only JSON (current field values,
-        _etag, document state). NO container scans, NO vault scans, NO heuristics.
+    Phase 1 (--inventory): Read EXACT documents by hardcoded document ID from
+        the incident allowlist. Every query uses partition_key + WHERE c.id=@id.
+        Outputs evidence JSON (current field values, _etag, restore_to values).
+        NO container scans, NO vault scans, NO SELECT * FROM c, NO heuristics.
     Phase 2 (--execute <inventory.json>): Apply fixes using the reviewed inventory.
-        Only touches documents listed in the inventory. DEK cleanup is a SEPARATE
-        manual step documented in the inventory output.
+        Only touches documents whose document_id is in the hardcoded allowlist.
+        DEK cleanup is a SEPARATE manual step documented in the inventory output.
 
 Incident scope (hardcoded from S263/S264 investigation):
     - Tenants: remaker-digital-001, test-customer-001
@@ -90,9 +91,38 @@ TENANT_RESTORE: dict[str, dict[str, str]] = {
     },
 }
 
+# Exact document IDs for team_members (format: {tenant_id}:{email}).
+# For remaker-digital-001, CUSTOMER_EMAIL defaults to mike@remakerdigital.com
+# (same as superadmin email), so only one document exists (second upsert wins).
+# For test-customer-001, CUSTOMER_EMAIL is test-customer@remakerdigital.com,
+# so two distinct documents exist.
+AFFECTED_TEAM_MEMBER_IDS: dict[str, list[str]] = {
+    "remaker-digital-001": [
+        "remaker-digital-001:mike@remakerdigital.com",
+    ],
+    "test-customer-001": [
+        "test-customer-001:mike@remakerdigital.com",
+        "test-customer-001:test-customer@remakerdigital.com",
+    ],
+}
+
+# Restore values keyed by exact document ID (from seed_tenant.py).
+# remaker-digital-001:mike@... — last seed upsert wins → Account Administrator.
+# test-customer-001:mike@... — superadmin → Owner.
+# test-customer-001:test-customer@... — admin → Account Administrator.
 TEAM_MEMBER_RESTORE: dict[str, dict[str, str]] = {
-    "remaker-digital-001": {"email": "mike@remakerdigital.com", "display_name": "Mike"},
-    "test-customer-001": {"email": "test-customer@remakerdigital.com", "display_name": "Test Customer"},
+    "remaker-digital-001:mike@remakerdigital.com": {
+        "email": "mike@remakerdigital.com",
+        "display_name": "Account Administrator",
+    },
+    "test-customer-001:mike@remakerdigital.com": {
+        "email": "mike@remakerdigital.com",
+        "display_name": "Owner",
+    },
+    "test-customer-001:test-customer@remakerdigital.com": {
+        "email": "test-customer@remakerdigital.com",
+        "display_name": "Account Administrator",
+    },
 }
 
 
@@ -152,21 +182,32 @@ async def build_inventory() -> dict:
             "fields": fields,
         })
 
-    # Read specific team_member documents by partition key
+    # Read exact team_member documents by document ID (no partition scan)
     tm_container = db.get_container_client("team_members")
     for tid in AFFECTED_TENANT_IDS:
-        items = list(tm_container.query_items(
-            query="SELECT * FROM c",
-            partition_key=tid,
-        ))
-        for doc in items:
+        for doc_id in AFFECTED_TEAM_MEMBER_IDS[tid]:
+            items = list(tm_container.query_items(
+                query="SELECT * FROM c WHERE c.id=@id",
+                parameters=[{"name": "@id", "value": doc_id}],
+                partition_key=tid,
+            ))
+            if not items:
+                logger.warning("Team member %s not found in database", doc_id)
+                inventory["team_member_evidence"].append({
+                    "tenant_id": tid, "document_id": doc_id,
+                    "status": "NOT_FOUND",
+                })
+                continue
+
+            doc = items[0]
+            restore_values = TEAM_MEMBER_RESTORE[doc_id]
             fields = {}
             for field in TEAM_MEMBER_FIELDS:
                 current = doc.get(field, "")
                 fields[field] = {
                     "current_value": current,
                     "current_length": len(current),
-                    "restore_to": TEAM_MEMBER_RESTORE.get(tid, {}).get(field, ""),
+                    "restore_to": restore_values[field],
                 }
 
             inventory["team_member_evidence"].append({
@@ -245,13 +286,20 @@ async def execute_from_inventory(inventory_path: str) -> dict:
             logger.error("Error fixing tenant %s: %s", tid, e)
             results["errors"].append(f"tenant {tid}: {e}")
 
-    # Restore team_member documents
+    # Restore team_member documents (by exact document ID)
     tm_container = db.get_container_client("team_members")
     for entry in inventory.get("team_member_evidence", []):
+        if entry.get("status") == "NOT_FOUND":
+            continue
         tid = entry["tenant_id"]
+        doc_id = entry["document_id"]
         if tid not in AFFECTED_TENANT_IDS:
             logger.error("SAFETY: team_member tenant %s not in allowlist. Skipping.", tid)
             results["errors"].append(f"team_member tenant {tid} not in allowlist")
+            continue
+        if doc_id not in TEAM_MEMBER_RESTORE:
+            logger.error("SAFETY: team_member %s not in document-ID allowlist. Skipping.", doc_id)
+            results["errors"].append(f"team_member {doc_id} not in document-ID allowlist")
             continue
 
         try:
