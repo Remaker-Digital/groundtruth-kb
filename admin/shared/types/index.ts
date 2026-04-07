@@ -192,6 +192,7 @@ export interface InboxConversation {
   // Customer identity (AUTH-5 / P0-AUTH-FIX)
   customerVerified: boolean;
   identityEmail: string | null;
+  identityPhone: string | null; // SPEC-1879
   // Pipeline trace (SPEC-1530)
   pipelineTrace: PipelineTrace | null;
 }

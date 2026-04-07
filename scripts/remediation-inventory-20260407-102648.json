@@ -1,0 +1,119 @@
+{
+  "generated_at": "2026-04-07T17:26:46.505034+00:00",
+  "database": "agentred",
+  "incident_scope": {
+    "tenant_ids": [
+      "remaker-digital-001",
+      "test-customer-001"
+    ],
+    "dek_secrets": [
+      "tenant-remaker-digital-001-dek",
+      "tenant-test-customer-001-dek"
+    ],
+    "note": "DEK secret cleanup is manual (az keyvault secret delete). Not automated."
+  },
+  "tenant_evidence": [
+    {
+      "tenant_id": "remaker-digital-001",
+      "document_id": "remaker-digital-001",
+      "partition_key": "remaker-digital-001",
+      "_etag": "\"2e002070-0000-0100-0000-69d448350000\"",
+      "fields": {
+        "customer_email": {
+          "current_value": "Bq90zpEq85lrJJRfIviL1qbRBGxFF2vmELWuAHJXQjbWXuVomh3nuXi8mVF2jk2cEm/X",
+          "current_length": 68,
+          "restore_to": "mike@remakerdigital.com"
+        },
+        "shopify_shop_domain": {
+          "current_value": "NjJd+0VCasE9Sk+bM4pJ0mwENK+K6vD0Jd40MDJol7Zoh2bnAdBbJb3eMYSTbAuCVHzKin0=",
+          "current_length": 72,
+          "restore_to": "blanco-9939.myshopify.com"
+        },
+        "brand_name": {
+          "current_value": "",
+          "current_length": 0,
+          "restore_to": ""
+        }
+      }
+    },
+    {
+      "tenant_id": "test-customer-001",
+      "document_id": "test-customer-001",
+      "partition_key": "test-customer-001",
+      "_etag": "\"2f00513e-0000-0100-0000-69d4aad30000\"",
+      "fields": {
+        "customer_email": {
+          "current_value": "Ggf1BMJAvl6u9SI1qMPCZAXBx2yFQqnHxi8D1WbpdU4g2urXn/zAFrUjDlnwpazGk9iG+9hDyToTYxKC",
+          "current_length": 80,
+          "restore_to": "test-customer@remakerdigital.com"
+        },
+        "shopify_shop_domain": {
+          "current_value": "",
+          "current_length": 0,
+          "restore_to": ""
+        },
+        "brand_name": {
+          "current_value": "",
+          "current_length": 0,
+          "restore_to": ""
+        }
+      }
+    }
+  ],
+  "team_member_evidence": [
+    {
+      "tenant_id": "remaker-digital-001",
+      "document_id": "remaker-digital-001:mike@remakerdigital.com",
+      "partition_key": "remaker-digital-001",
+      "_etag": "\"50008aa2-0000-0100-0000-69d448360000\"",
+      "fields": {
+        "email": {
+          "current_value": "ZRnjSbcIPM7u8RW4w4LXei5HMzL8djy6D9QAS+qQH3gv/iPDTciFsMhc6SX20ZKkAJhn",
+          "current_length": 68,
+          "restore_to": "mike@remakerdigital.com"
+        },
+        "display_name": {
+          "current_value": "YDXiudpsYZCQmjkve4Yp8BcXRSH4FBC284GeHKNtbptcNJ/WLlZZtD0cJDhgXMYRfw==",
+          "current_length": 68,
+          "restore_to": "Account Administrator"
+        }
+      }
+    },
+    {
+      "tenant_id": "test-customer-001",
+      "document_id": "test-customer-001:mike@remakerdigital.com",
+      "partition_key": "test-customer-001",
+      "_etag": "\"52008f4f-0000-0100-0000-69d4aad40000\"",
+      "fields": {
+        "email": {
+          "current_value": "axPENwT8lCn146QkH/Ga8jsgufoiu+qDWcQwQ4BhyXPbyo9qgdyYNdLsJKXh6zByUx17",
+          "current_length": 68,
+          "restore_to": "mike@remakerdigital.com"
+        },
+        "display_name": {
+          "current_value": "kGItLdkEEFDapbdD+GXbVO+F9GROo2syHD4WcokP7znS",
+          "current_length": 44,
+          "restore_to": "Owner"
+        }
+      }
+    },
+    {
+      "tenant_id": "test-customer-001",
+      "document_id": "test-customer-001:test-customer@remakerdigital.com",
+      "partition_key": "test-customer-001",
+      "_etag": "\"5200934f-0000-0100-0000-69d4aad40000\"",
+      "fields": {
+        "email": {
+          "current_value": "+7IAFhNSHy8xJZ5paHMxYfYC9obpQsEP8bUN6zp3rpeFUjmF/FYS6/+fZQtySTK+6kS5t989YQg2FHkD",
+          "current_length": 80,
+          "restore_to": "test-customer@remakerdigital.com"
+        },
+        "display_name": {
+          "current_value": "Y1J35qaRkBB/ytDs8QE7Y4slCHtFnBqaJm/h9MPXuYQiR/Aa71O8z6Kh30Jc+PnaLw==",
+          "current_length": 68,
+          "restore_to": "Account Administrator"
+        }
+      }
+    }
+  ]
+}
