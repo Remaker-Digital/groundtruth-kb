@@ -53,6 +53,8 @@ All new work in this repository must include:
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
+For each session: Proceed with all priorities autonomously without pausing for approval. Before implementing anything prepare an implementation proposal. After implementing anything, prepare a post-implementation report. Have all implementation proposals and post-implementation reports reviewed by Loyal Opposition (Codex). DO NOT proceed with implementation work before receiving reports from Loyal Opposition (Codex) and taking action on all valid contents of those reports.
+
 ---
 
 ## Artifacts and Change Control
