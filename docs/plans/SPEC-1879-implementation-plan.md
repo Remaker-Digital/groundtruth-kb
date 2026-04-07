@@ -83,14 +83,45 @@ Phone as **verified contact method** (v1), NOT full phone-primary identity. Narr
 - [x] Professional+ tier gate
 - [x] No plaintext code storage
 
-## Phase 2: Identity Preprocessor Phone Flow (future, pending Phase 1 GO)
+## Phase 2A: Conversation-Scoped Phone Capture (Track A — owner approved, pending Codex GO)
+
+**Track:** A (narrow conversation-scoped). No session/token/canonical changes.
+
+### Phase 2A File Manifest (2 files)
 
 | File | Change |
 |------|--------|
-| `src/chat/identity_preprocessor.py` | Phone extraction + SMS OTP in-conversation flow |
+| `src/chat/identity_preprocessor.py` | Dual-state email/SMS preprocessor: phone detection (E.164), SMS OTP send/verify, per-conversation throttling, phone_verified field |
+| `src/multi_tenant/customer_profile_service.py` | Phone in asserted_identity (conversation-sourced, no canonical linking) |
+
+### Phase 2A Explicit Exclusions
+
+- NO customer_verified=True from phone-only verification (uses separate phone_verified field)
+- NO session.py changes (no phone in _resolve_customer_id or _resolve_canonical_customer_id)
+- NO endpoints.py changes (no phone token decoding, no X-Customer-Phone-Token)
+- NO phone-based customer_token issuance
+- NO ContactAttribute(PHONE) linkage or canonical phone lookup
+- NO phone-based cache warm-up
+
+### Phase 2A Assurance Model
+
+Phone SMS OTP verification sets `phone_verified=True` (NEW conversation-scoped field). Does NOT set `customer_verified=True`. Identity priority preserved: Shopify HMAC > email OTP > phone OTP. Phone success persists identity_phone and asserted_identity phone only.
+
+### Phase 2A Dual-State Preprocessor
+
+- Email OTP pending (`identity_otp_sent_at`) and SMS OTP pending (`identity_sms_sent_at`) are independent state machines
+- If both pending: email takes precedence for 6-digit code verification
+- Phone detection only runs if no email collected AND no OTP of either kind is pending
+- Per-conversation SMS throttling: `identity_sms_attempts` max 3, enforced
+- Phone extraction: strict E.164 only (`^\+[1-9]\d{1,14}$`), no fuzzy parsing
+
+## Phase 2B: Phone Token + Session Redesign (future — requires ADR-004 + assurance model redesign)
+
+| File | Change |
+|------|--------|
 | `src/chat/session.py` | Profile resolution: customer_id > email > phone |
-| `src/chat/endpoints.py` | X-Customer-Phone-Token header, cache warmup |
-| `src/multi_tenant/customer_profile_service.py` | Phone in asserted_identity enrichment |
+| `src/chat/endpoints.py` | X-Customer-Phone-Token header, phone token decoding, cache warmup |
+| `src/multi_tenant/widget_otp_verification.py` | Re-introduce phone customer_token issuance with reviewed assurance model |
 
 ## Phase 3: Widget Phone OTP Component (future)
 

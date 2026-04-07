@@ -18,7 +18,11 @@ The preprocessor reads/writes ConversationDocument fields:
 - identity_email: str | None
 - identity_otp_sent_at: str | None
 - identity_otp_attempts: int
-- customer_verified: bool
+- customer_verified: bool (email/Shopify — NOT set by phone OTP)
+- identity_phone: str | None (SPEC-1879)
+- identity_sms_sent_at: str | None (SPEC-1879)
+- identity_sms_attempts: int (SPEC-1879)
+- phone_verified: bool (SPEC-1879 Phase 2A — weaker assurance than customer_verified)
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -33,6 +37,11 @@ from datetime import datetime, timezone
 from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+# E.164 phone: strict match (starts with +, 2-15 digits)
+_PHONE_STRICT_PATTERN = re.compile(r"^\+[1-9]\d{1,14}$")
+# Flexible: phone embedded in a short message like "my phone is +15551234567"
+_PHONE_EXTRACT_PATTERN = re.compile(r"(\+[1-9]\d{1,14})")
 
 # Strict email regex: entire message is a single email address
 _EMAIL_STRICT_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -71,8 +80,13 @@ class IdentityAction:
         "otp_invalid",
         "otp_rate_limited",
         "skip_verification",
+        "phone_received",
+        "sms_otp_received",
+        "sms_otp_invalid",
+        "sms_otp_rate_limited",
     ]
     email: str | None = None
+    phone: str | None = None
     system_message: str | None = None
 
 
@@ -214,6 +228,150 @@ def _extract_email(content: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Phone extraction (SPEC-1879 Phase 2A)
+# ---------------------------------------------------------------------------
+
+
+def _extract_phone(content: str) -> str | None:
+    """Extract an E.164 phone number from a customer message.
+
+    Uses a two-tier strategy mirroring _extract_email:
+    1. **Strict match** — entire message is a single E.164 phone number.
+    2. **Flexible extraction** — phone embedded in a short sentence like
+       "my phone is +15551234567" (only if message < 200 chars and
+       exactly one phone found).
+
+    Returns the phone string if exactly one is found, or None.
+    """
+    stripped = content.strip()
+
+    # Tier 1: strict — entire message is E.164 phone
+    if _PHONE_STRICT_PATTERN.match(stripped):
+        return stripped
+
+    # Tier 2: flexible — extract from sentence (short messages only)
+    if len(stripped) > _MAX_EMAIL_MSG_LENGTH:
+        return None
+
+    matches = _PHONE_EXTRACT_PATTERN.findall(stripped)
+    if len(matches) == 1:
+        return matches[0]
+
+    return None  # Zero or multiple phones — ambiguous
+
+
+# ---------------------------------------------------------------------------
+# SMS OTP helpers (SPEC-1879 Phase 2A — reuses Phase 1 infrastructure)
+# ---------------------------------------------------------------------------
+
+
+_SMS_OTP_TOKEN_TYPE = "widget_otp_sms"
+_SMS_OTP_TTL = 600  # 10 minutes
+_MAX_SMS_OTP_ATTEMPTS = 3
+
+
+async def _send_sms_otp_for_conversation(phone: str, tenant_id: str) -> bool:
+    """Generate and send an SMS OTP code for in-conversation phone verification.
+
+    Reuses the same Cosmos DB verification_tokens collection and SMS sending
+    logic as widget_otp_verification.py Phase 1 endpoints.
+
+    Returns True if SMS OTP was sent successfully, False otherwise.
+    """
+    try:
+        from src.multi_tenant.repositories import VerificationTokenRepository
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+        from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
+        from src.multi_tenant.sms_verification import hash_code, _send_sms
+
+        # Generate 6-digit code
+        otp_code = str(secrets.randbelow(10**_OTP_LENGTH)).zfill(_OTP_LENGTH)
+
+        token_repo = VerificationTokenRepository()
+        token_id = f"otp:{tenant_id}:{phone}"
+
+        # Delete existing token (replace, not stack)
+        try:
+            await token_repo.delete_token(token_id, _SMS_OTP_TOKEN_TYPE)
+        except Exception:
+            pass
+
+        # Create token document
+        await token_repo.create_token(
+            token_id=token_id,
+            token_type=_SMS_OTP_TOKEN_TYPE,
+            tenant_id=tenant_id,
+            email=phone,  # Reuse email field for phone (token schema)
+            ttl=_SMS_OTP_TTL,
+        )
+
+        # Store hashed OTP code
+        container = get_cosmos_manager().get_container(COLLECTION_VERIFICATION_TOKENS)
+        await container.patch_item(
+            item=token_id,
+            partition_key=_SMS_OTP_TOKEN_TYPE,
+            patch_operations=[
+                {"op": "add", "path": "/otp_code_hash", "value": hash_code(otp_code)},
+                {"op": "add", "path": "/customer_name", "value": ""},
+            ],
+        )
+
+        # Send the SMS
+        await _send_sms(phone, otp_code)
+
+        logger.info("In-conversation SMS OTP sent: tenant=%s phone=%s***", tenant_id[:8], phone[:6])
+        return True
+
+    except Exception as exc:
+        logger.error("Failed to send in-conversation SMS OTP: %s", exc)
+        return False
+
+
+async def _verify_sms_otp_for_conversation(phone: str, code: str, tenant_id: str) -> bool:
+    """Verify a 6-digit SMS OTP code for in-conversation phone verification.
+
+    Uses SHA-256 hash comparison (constant-time) matching Phase 1 security.
+    Returns True if the code is valid and consumed, False otherwise.
+    """
+    try:
+        from src.multi_tenant.repositories import VerificationTokenRepository
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+        from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
+        from src.multi_tenant.sms_verification import hash_code
+
+        token_id = f"otp:{tenant_id}:{phone}"
+        container = get_cosmos_manager().get_container(COLLECTION_VERIFICATION_TOKENS)
+
+        try:
+            doc = await container.read_item(
+                item=token_id,
+                partition_key=_SMS_OTP_TOKEN_TYPE,
+            )
+        except Exception:
+            return False
+
+        if doc.get("used"):
+            return False
+
+        # Constant-time hash comparison (Codex security requirement)
+        stored_hash = doc.get("otp_code_hash", "")
+        submitted_hash = hash_code(code.strip())
+        if not secrets.compare_digest(submitted_hash, stored_hash):
+            return False
+
+        # Mark token as consumed
+        token_repo = VerificationTokenRepository()
+        await token_repo.consume_token(token_id, _SMS_OTP_TOKEN_TYPE)
+
+        logger.info("In-conversation SMS OTP verified: tenant=%s phone=%s***", tenant_id[:8], phone[:6])
+        return True
+
+    except Exception as exc:
+        logger.error("In-conversation SMS OTP verification error: %s", exc)
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Main preprocessor
 # ---------------------------------------------------------------------------
 
@@ -341,6 +499,96 @@ async def preprocess_identity(
         # Not a code or skip phrase -- pass through to AI (it knows OTP is pending)
         return IdentityAction(action="none")
 
+    # -- State: SMS OTP pending (SPEC-1879 Phase 2A) -------------------------
+    # Only enters SMS state machine if email OTP is NOT pending (email takes
+    # precedence per dual-state design).
+
+    sms_sent_at = conv_doc.get("identity_sms_sent_at")
+    sms_attempts = conv_doc.get("identity_sms_attempts", 0)
+    identity_phone = conv_doc.get("identity_phone")
+
+    if sms_sent_at and not otp_sent_at:
+        # Skip phrases
+        if content_stripped.lower() in _SKIP_PHRASES:
+            return IdentityAction(
+                action="skip_verification",
+                system_message=(
+                    "No problem! Just so you know, without verification "
+                    "I won't be able to access order details, account info, "
+                    "or loyalty rewards. I can still help with general questions."
+                ),
+            )
+
+        # Check for 6-digit SMS OTP code
+        if _OTP_PATTERN.match(content_stripped):
+            # Rate limit check (per-conversation SMS throttling)
+            if sms_attempts >= _MAX_SMS_OTP_ATTEMPTS:
+                return IdentityAction(
+                    action="sms_otp_rate_limited",
+                    system_message=(
+                        "You've reached the maximum number of SMS verification "
+                        "attempts. Please start a new conversation to try again."
+                    ),
+                )
+
+            # Increment attempt counter
+            try:
+                await conv_repo.patch(
+                    tenant_id,
+                    conversation_id,
+                    operations=[
+                        {"op": "set", "path": "/identity_sms_attempts", "value": sms_attempts + 1},
+                        {"op": "set", "path": "/updated_at", "value": datetime.now(timezone.utc).isoformat()},
+                    ],
+                )
+            except Exception as exc:
+                logger.warning("Failed to increment SMS OTP attempts: %s", exc)
+
+            # Validate SMS OTP
+            is_valid = await _verify_sms_otp_for_conversation(
+                phone=identity_phone or "",
+                code=content_stripped,
+                tenant_id=tenant_id,
+            )
+
+            if is_valid:
+                # Mark phone as verified (phone_verified, NOT customer_verified)
+                try:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    await conv_repo.patch(
+                        tenant_id,
+                        conversation_id,
+                        operations=[
+                            {"op": "set", "path": "/phone_verified", "value": True},
+                            {"op": "set", "path": "/updated_at", "value": now_iso},
+                        ],
+                    )
+                except Exception as exc:
+                    logger.error("Failed to mark phone verified: %s", exc)
+
+                # Mask phone for display (show country code + last 3 digits)
+                masked_phone = identity_phone[:3] + "***" + identity_phone[-3:] if identity_phone and len(identity_phone) > 6 else identity_phone or ""
+
+                return IdentityAction(
+                    action="sms_otp_received",
+                    phone=identity_phone,
+                    system_message=(
+                        f"Phone {masked_phone} verified! "
+                        f"Thanks for confirming your phone number."
+                    ),
+                )
+            else:
+                return IdentityAction(
+                    action="sms_otp_invalid",
+                    system_message=(
+                        "That code doesn't look right. Please check your SMS "
+                        "and try again, or say 'skip' to continue as a guest."
+                    ),
+                )
+
+        # Not a code or skip phrase — pass through
+        return IdentityAction(action="none")
+
     # -- State: No OTP sent yet -- check for email address ------------------
 
     email = _extract_email(content_stripped)
@@ -386,6 +634,52 @@ async def preprocess_identity(
                 f"or say 'skip' to continue as a guest."
             ),
         )
+
+    # -- State: No email found -- check for phone (SPEC-1879 Phase 2A) -----
+    # Phone detection only runs if no email collected AND no OTP pending
+
+    if not identity_email and not otp_sent_at and not sms_sent_at:
+        phone = _extract_phone(content_stripped)
+        if phone:
+            # Send SMS OTP
+            sent = await _send_sms_otp_for_conversation(phone=phone, tenant_id=tenant_id)
+            if not sent:
+                return IdentityAction(
+                    action="none",
+                    system_message=(
+                        "I wasn't able to send a verification code right now. "
+                        "Let me help you with what I can in the meantime."
+                    ),
+                )
+
+            # Update conversation with phone + SMS OTP timestamp
+            try:
+                now_iso = datetime.now(timezone.utc).isoformat()
+                await conv_repo.patch(
+                    tenant_id,
+                    conversation_id,
+                    operations=[
+                        {"op": "set", "path": "/identity_phone", "value": phone},
+                        {"op": "set", "path": "/identity_sms_sent_at", "value": now_iso},
+                        {"op": "set", "path": "/identity_sms_attempts", "value": 0},
+                        {"op": "set", "path": "/updated_at", "value": now_iso},
+                    ],
+                )
+            except Exception as exc:
+                logger.warning("Failed to update conversation with identity phone: %s", exc)
+
+            # Mask phone for display
+            masked_phone = phone[:3] + "***" + phone[-3:] if len(phone) > 6 else phone
+
+            return IdentityAction(
+                action="phone_received",
+                phone=phone,
+                system_message=(
+                    f"I've sent a verification code to {masked_phone}. "
+                    f"Please enter the 6-digit code when you receive it, "
+                    f"or say 'skip' to continue as a guest."
+                ),
+            )
 
     # -- Default: not an identity-related message ---------------------------
 

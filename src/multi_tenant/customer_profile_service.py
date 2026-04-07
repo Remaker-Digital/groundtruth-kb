@@ -74,11 +74,14 @@ _EMAIL_PATTERN = re.compile(
     r"\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b"
 )
 
+# E.164 phone extraction (SPEC-1879 Phase 2A)
+_PHONE_PATTERN = re.compile(r"(\+[1-9]\d{1,14})")
+
 
 def extract_identity_from_text(text: str) -> dict[str, str]:
-    """Extract name and/or email from a customer message.
+    """Extract name, email, and/or phone from a customer message.
 
-    Returns a dict with optional 'name' and 'email' keys.
+    Returns a dict with optional 'name', 'email', and 'phone' keys.
     Only extracts values that look like genuine self-identification,
     not product names or other entities.
     """
@@ -101,6 +104,11 @@ def extract_identity_from_text(text: str) -> dict[str, str]:
     email_match = _EMAIL_PATTERN.search(text)
     if email_match:
         result["email"] = email_match.group(1)
+
+    # Extract phone (SPEC-1879 Phase 2A — E.164 only)
+    phone_match = _PHONE_PATTERN.search(text)
+    if phone_match:
+        result["phone"] = phone_match.group(1)
 
     return result
 
@@ -411,6 +419,11 @@ class CustomerProfileService:
             # Only update email if not already set
             if "email" in extracted and not existing.get("email"):
                 existing["email"] = extracted["email"]
+                changed = True
+
+            # Only update phone if not already set (SPEC-1879 Phase 2A)
+            if "phone" in extracted and not existing.get("phone"):
+                existing["phone"] = extracted["phone"]
                 changed = True
 
             if changed:
