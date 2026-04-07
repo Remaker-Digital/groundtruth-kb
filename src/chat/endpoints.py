@@ -678,12 +678,16 @@ async def stream_response(
     except Exception as exc:
         logger.warning("Identity preprocessor error (non-fatal): %s", exc)
 
-    # Extract customer_id from conversation state
-    customer_id: str | None = None
-    for msg in reversed(state.messages):
-        if msg.metadata and msg.metadata.get("customer_id"):
-            customer_id = msg.metadata["customer_id"]
-            break
+    # ADR-004: Prefer canonical_customer_id for profile lookups.
+    # Falls back to legacy customer_id from metadata for old conversations.
+    customer_id: str | None = getattr(state, "canonical_customer_id", None)
+    if not customer_id:
+        customer_id = getattr(state, "customer_id", None)
+    if not customer_id:
+        for msg in reversed(state.messages):
+            if msg.metadata and msg.metadata.get("customer_id"):
+                customer_id = msg.metadata["customer_id"]
+                break
 
     # Check for Last-Event-ID (reconnection support)
     last_event_id = parse_last_event_id(request)

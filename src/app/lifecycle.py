@@ -622,9 +622,13 @@ async def _startup_chat_services() -> None:
 
         conv_repo = ConversationRepository()
         team_repo = TeamMemberRepository()
+        # ADR-004: Wire customer profile repository for canonical identity resolution
+        from src.multi_tenant.repositories.customer import CustomerProfileRepository
+        customer_repo = CustomerProfileRepository()
         session = configure_conversation_session(
             conversation_repo=conv_repo,
             team_repo=team_repo,
+            customer_profile_repo=customer_repo,
         )
 
         # WI #207: Create KnowledgeBaseRepository for direct retrieval
