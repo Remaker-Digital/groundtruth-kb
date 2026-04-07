@@ -30,6 +30,7 @@ import { MessageList } from './MessageList';
 import { InputBar } from './InputBar';
 import { PreChatForm } from './PreChatForm';
 import { OtpVerification } from './OtpVerification';
+import { PhoneOtpVerification } from './PhoneOtpVerification';
 import { ChatRating } from './ChatRating';
 import { OfflineForm } from './OfflineForm';
 import { IssueReport } from './IssueReport';
@@ -40,6 +41,8 @@ import {
   reportIssue as apiReportIssue,
   sendOtp as apiSendOtp,
   verifyOtp as apiVerifyOtp,
+  sendPhoneOtp as apiSendPhoneOtp,
+  verifyPhoneOtp as apiVerifyPhoneOtp,
   submitConsent as apiSubmitConsent,
   fetchConversation,
   getTransportConfig,
@@ -443,6 +446,45 @@ export const Panel: FunctionComponent<PanelProps> = ({
     const store = getStore();
     const { preChatData } = store.getState();
     // Customer has email from pre-chat but didn't verify — partial identity
+    beginConversation(preChatData || undefined);
+  }, [beginConversation]);
+
+  /** Verify phone SMS OTP code (SPEC-1879 Phase 3). */
+  const handlePhoneOtpVerify = useCallback(async (code: string) => {
+    const store = getStore();
+    const { customerPhone, preChatData } = store.getState();
+    if (!customerPhone) return;
+
+    store.setState({ isLoading: true, phoneOtpError: null });
+
+    const result = await apiVerifyPhoneOtp(customerPhone, code);
+
+    if (result.verified) {
+      store.setState({ isLoading: false });
+      // Phone verified — start conversation (no customer_token for phone in Phase 2A)
+      beginConversation(preChatData || undefined);
+    } else {
+      store.setState({
+        isLoading: false,
+        phoneOtpError: activeLocale.phoneOtpInvalid,
+      });
+    }
+  }, [beginConversation, activeLocale]);
+
+  /** Resend phone SMS OTP code (SPEC-1879 Phase 3). */
+  const handlePhoneOtpResend = useCallback(async () => {
+    const store = getStore();
+    const { customerPhone, preChatData } = store.getState();
+    if (!customerPhone) return;
+
+    await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
+    store.setState({ phoneOtpError: null });
+  }, []);
+
+  /** Skip phone OTP verification (SPEC-1879, optional mode only). */
+  const handlePhoneOtpSkip = useCallback(() => {
+    const store = getStore();
+    const { preChatData } = store.getState();
     beginConversation(preChatData || undefined);
   }, [beginConversation]);
 
@@ -858,6 +900,22 @@ export const Panel: FunctionComponent<PanelProps> = ({
             onResend={handleOtpResend}
             isLoading={state.isLoading}
             error={state.otpError ?? undefined}
+          />
+        </div>
+      )}
+
+      {/* Phone SMS OTP verification (SPEC-1879 Phase 3) */}
+      {state.view === 'phone_otp' && state.customerPhone && (
+        <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
+          <PhoneOtpVerification
+            tokens={tokens}
+            locale={activeLocale}
+            phone={state.customerPhone}
+            onVerify={handlePhoneOtpVerify}
+            onSkip={handlePhoneOtpSkip}
+            onResend={handlePhoneOtpResend}
+            isLoading={state.isLoading}
+            error={state.phoneOtpError ?? undefined}
           />
         </div>
       )}

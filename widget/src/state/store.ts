@@ -66,6 +66,7 @@ export type WidgetView =
   | 'closed'           // Launcher button only
   | 'prechat'          // Pre-chat form (if configured)
   | 'otp'              // OTP email verification (AUTH-3)
+  | 'phone_otp'        // SMS OTP phone verification (SPEC-1879)
   | 'conversation'     // Active chat
   | 'rating'           // Post-chat rating prompt
   | 'offline_form'     // Leave-a-message form
@@ -112,6 +113,10 @@ export interface WidgetState {
   customerEmail: string | null;
   customerToken: string | null;
   otpError: string | null;
+  /** SPEC-1879: Phone number for SMS OTP verification. */
+  customerPhone: string | null;
+  /** SPEC-1879: Phone OTP error message. */
+  phoneOtpError: string | null;
 
   // Shopify customer passthrough (AUTH-4)
   shopifyCustomer: ShopifyCustomer | null;
@@ -271,6 +276,8 @@ class Store {
       customerEmail: null,
       customerToken: null,
       otpError: null,
+      customerPhone: null,
+      phoneOtpError: null,
       // NOTE: shopifyCustomer is NOT reset — it persists for the browser session
     };
     this.notify();
@@ -317,6 +324,8 @@ export function createStore(config: WidgetConfig, locale: Locale): Store {
     customerEmail: null,
     customerToken: null,
     otpError: null,
+    customerPhone: null,
+    phoneOtpError: null,
     shopifyCustomer: null,
     consentCollected: false,
     isAdminContext: false,

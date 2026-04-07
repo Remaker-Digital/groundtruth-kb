@@ -59,6 +59,9 @@ export interface Locale {
   otpResend: string;
   otpSkip: string;
   otpInvalid: string;
+  phoneOtpPrompt: string;
+  phoneOtpResend: string;
+  phoneOtpInvalid: string;
   consentPrompt: string;
   consentAccept: string;
   consentDecline: string;
@@ -146,6 +149,9 @@ export const en: Locale = {
   otpResend: 'Resend code',
   otpSkip: 'Continue without verifying',
   otpInvalid: 'Invalid code. Please try again.',
+  phoneOtpPrompt: 'Enter the code we sent to your phone.',
+  phoneOtpResend: 'Resend SMS code',
+  phoneOtpInvalid: 'Invalid code. Please check your SMS and try again.',
   consentPrompt: 'We use your conversation history to provide personalized support. You can change this at any time.',
   consentAccept: 'Allow',
   consentDecline: 'No thanks',

@@ -431,6 +431,37 @@ export async function verifyOtp(
 }
 
 // ---------------------------------------------------------------------------
+// SMS OTP (SPEC-1879 Phase 3)
+// ---------------------------------------------------------------------------
+
+/** Send a 6-digit OTP code via SMS to the customer's phone. */
+export async function sendPhoneOtp(
+  phone: string,
+  name?: string,
+): Promise<boolean> {
+  const resp = await request<{ sent: boolean }>('POST', '/api/chat/otp/send-sms', {
+    phone,
+    name: name ?? '',
+  });
+  return resp.ok;
+}
+
+/** Verify a 6-digit SMS OTP code. Returns verified phone on success. */
+export async function verifyPhoneOtp(
+  phone: string,
+  code: string,
+): Promise<{ verified: boolean; phone: string | null }> {
+  const resp = await request<{ verified: boolean; phone: string | null }>(
+    'POST', '/api/chat/otp/verify-sms',
+    { phone, code },
+  );
+  if (resp.ok && resp.data?.verified) {
+    return { verified: true, phone: resp.data.phone ?? null };
+  }
+  return { verified: false, phone: null };
+}
+
+// ---------------------------------------------------------------------------
 // Transcript restore (SPEC-1868)
 // ---------------------------------------------------------------------------
 
