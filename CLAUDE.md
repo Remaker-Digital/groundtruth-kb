@@ -53,7 +53,13 @@ All new work in this repository must include:
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
-For each session: Proceed with all priorities autonomously without pausing for approval. Before implementing anything prepare an implementation proposal. After implementing anything, prepare a post-implementation report. Have all implementation proposals and post-implementation reports reviewed by Loyal Opposition (Codex). DO NOT proceed with implementation work before receiving reports from Loyal Opposition (Codex) and taking action on all valid contents of those reports.
+**operating procedure.** 
+- Have your Loyal Opposition review every implementation proposal before you implement anything. 
+- Have your Loyal Opposition review the post-implementation report you produce after every implementation work session. 
+- Do not proceed to the next task or step without a GO agreement from your Loyal Opposition. 
+- If your Loyal Opposition stops responding, investigate and resolve the blockage. 
+- Do not delete post-implementation reports. 
+- Before you deploy any build, ask this question: Is Agent Red ready for a full production deployment?
 
 ---
 
