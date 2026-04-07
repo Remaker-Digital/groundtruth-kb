@@ -163,6 +163,28 @@ async def migrate_tenant(
 
 async def main(args: argparse.Namespace) -> None:
     """Run migration for specified or all tenants."""
+    # Load environment variables from .env.local
+    env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env.local")
+    if os.path.exists(env_file):
+        with open(env_file, encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+        logger.info("Loaded env from %s", env_file)
+
+    # Initialize Cosmos DB connection (lightweight — only connect, don't create containers)
+    from src.multi_tenant.cosmos_client import get_cosmos_manager
+    manager = get_cosmos_manager()
+    try:
+        await manager.initialize()
+    except Exception as exc:
+        # Container creation may fail for newer containers not in this DB.
+        # The migration only needs customer_profiles + conversations.
+        logger.warning("Cosmos init partial failure (non-fatal): %s", str(exc)[:100])
+    logger.info("Cosmos DB connected")
+
     if args.tenant:
         tenant_ids = [args.tenant]
     else:
