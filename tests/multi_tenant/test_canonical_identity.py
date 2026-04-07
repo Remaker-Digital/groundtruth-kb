@@ -193,6 +193,7 @@ class TestCanonicalRepository:
     def repo(self) -> CustomerProfileRepository:
         r = CustomerProfileRepository()
         r.read = AsyncMock()
+        r.create = AsyncMock(side_effect=lambda tid, doc: doc.model_dump() if hasattr(doc, "model_dump") else doc)
         r.upsert = AsyncMock(side_effect=lambda tid, doc: doc.model_dump() if hasattr(doc, "model_dump") else doc)
         r.query = AsyncMock(return_value=[])
         r.patch = AsyncMock(return_value={})
@@ -248,6 +249,9 @@ class TestCanonicalRepository:
     @pytest.mark.asyncio
     async def test_cid_10_link_attribute_success(self, repo: CustomerProfileRepository) -> None:
         cid = generate_canonical_id()
+        # read returns the profile (for get_by_canonical_id)
+        mock_profile = {"id": f"{TENANT}:{cid}", "canonical_id": cid, "contact_attributes": []}
+        repo.read = AsyncMock(return_value=mock_profile)
         # No existing profile claims this attribute
         repo.query = AsyncMock(return_value=[])
         attr = _make_attr(
@@ -277,6 +281,8 @@ class TestCanonicalRepository:
     async def test_cid_11_link_same_profile_ok(self, repo: CustomerProfileRepository) -> None:
         """Re-linking an attribute to the same profile should succeed."""
         cid = generate_canonical_id()
+        mock_profile = {"id": f"{TENANT}:{cid}", "canonical_id": cid, "contact_attributes": []}
+        repo.read = AsyncMock(return_value=mock_profile)
         repo.query = AsyncMock(return_value=[{"canonical_id": cid}])
         attr = _make_attr(value="existing@example.com")
 
@@ -287,6 +293,7 @@ class TestCanonicalRepository:
     async def test_cid_12_unlink_attribute(self, repo: CustomerProfileRepository) -> None:
         cid = generate_canonical_id()
         repo.read = AsyncMock(return_value={
+            "id": f"{TENANT}:{cid}",
             "canonical_id": cid,
             "contact_attributes": [
                 {"attribute_type": "email", "value": "a@b.com"},

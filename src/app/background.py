@@ -1146,6 +1146,7 @@ async def _vectorization_scanner_loop() -> None:
                     for conv in unvectorized:
                         conv_id = conv.get("conversation_id") or conv.get("id")
                         customer_id = conv.get("customer_id")
+                        canonical_cid = conv.get("canonical_customer_id")
                         messages = conv.get("messages", [])
 
                         if not conv_id or not customer_id:
@@ -1177,6 +1178,7 @@ async def _vectorization_scanner_loop() -> None:
                                 customer_id=customer_id,
                                 conversation_id=conv_id,
                                 messages=messages,
+                                canonical_customer_id=canonical_cid,
                                 consent_status=consent,
                             )
 

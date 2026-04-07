@@ -1205,7 +1205,9 @@ async def _resolve_canonical_customer_id(
         if canonical:
             return canonical, legacy_id
 
-        # Auto-create profile for new Shopify customer
+        # Auto-create profile for new Shopify customer.
+        # If a concurrent request already created a profile for the same
+        # attribute, the create will 409 — re-resolve to get the winner's ID.
         canonical = generate_canonical_id()
         attrs = [ContactAttribute(
             attribute_type=ContactAttributeType.SHOPIFY_CUSTOMER_GID,
@@ -1214,7 +1216,6 @@ async def _resolve_canonical_customer_id(
             source="shopify_session",
             added_at=now,
         )]
-        # If visitor also provided email, link it as unverified
         if visitor.email:
             attrs.append(ContactAttribute(
                 attribute_type=ContactAttributeType.EMAIL,
@@ -1223,9 +1224,15 @@ async def _resolve_canonical_customer_id(
                 source="shopify_session",
                 added_at=now,
             ))
-        await customer_repo.create_profile_with_canonical_id(
-            tenant_id, canonical, contact_attributes=attrs,
-        )
+        try:
+            await customer_repo.create_profile_with_canonical_id(
+                tenant_id, canonical, contact_attributes=attrs,
+            )
+        except Exception:
+            # 409 Conflict or other — re-resolve (concurrent writer won)
+            canonical = await customer_repo.resolve_by_attribute(
+                tenant_id, ContactAttributeType.SHOPIFY_CUSTOMER_GID, visitor.customer_id,
+            )
         return canonical, legacy_id
 
     # 3. Email lookup
@@ -1236,19 +1243,25 @@ async def _resolve_canonical_customer_id(
         if canonical:
             return canonical, legacy_id
 
-        # Auto-create profile for new email customer
+        # Auto-create profile for new email customer.
+        # Same concurrent-writer guard as Shopify path above.
         canonical = generate_canonical_id()
-        await customer_repo.create_profile_with_canonical_id(
-            tenant_id, canonical, contact_attributes=[
-                ContactAttribute(
-                    attribute_type=ContactAttributeType.EMAIL,
-                    value=visitor.email,
-                    verified=False,
-                    source="self_asserted",
-                    added_at=now,
-                ),
-            ],
-        )
+        try:
+            await customer_repo.create_profile_with_canonical_id(
+                tenant_id, canonical, contact_attributes=[
+                    ContactAttribute(
+                        attribute_type=ContactAttributeType.EMAIL,
+                        value=visitor.email,
+                        verified=False,
+                        source="self_asserted",
+                        added_at=now,
+                    ),
+                ],
+            )
+        except Exception:
+            canonical = await customer_repo.resolve_by_attribute(
+                tenant_id, ContactAttributeType.EMAIL, visitor.email,
+            )
         return canonical, legacy_id
 
     # 4. Anonymous — no canonical_id

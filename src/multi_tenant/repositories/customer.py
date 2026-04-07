@@ -36,9 +36,12 @@ class CustomerProfileRepository(TenantScopedRepository):
 
     # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
     # Per architecture plan section 4.1.3: customer PII + preferences
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK.
+    # contact_attributes is EXCLUDED — it contains identity claims used
+    # as lookup keys (ARRAY_CONTAINS queries). Encrypting it would break
+    # resolve_by_attribute() and all cross-channel identity resolution.
     _encryption_fields = frozenset({
         "name", "email", "phone", "address", "notes", "preferences",
-        "contact_attributes",
     })
 
     def __init__(self) -> None:
@@ -104,15 +107,26 @@ class CustomerProfileRepository(TenantScopedRepository):
     async def get_by_canonical_id(
         self, tenant_id: str, canonical_id: str,
     ) -> dict[str, Any] | None:
-        """Get a customer profile by canonical_id (O(1) point read).
+        """Get a customer profile by canonical_id.
 
-        Document ID format: {tenant_id}:{canonical_id}
+        Attempts O(1) point read first ({tenant_id}:{canonical_id}),
+        then falls back to query for migrated profiles whose document ID
+        still uses the legacy format ({tenant_id}:{old_customer_id}).
         """
+        # Attempt 1: point read at canonical doc ID
         doc_id = f"{tenant_id}:{canonical_id}"
         try:
             return await self.read(tenant_id, doc_id)
         except DocumentNotFoundError:
-            return None
+            pass
+
+        # Attempt 2: query fallback for migrated docs with legacy ID format
+        results = await self.query(
+            tenant_id=tenant_id,
+            query_text="SELECT * FROM c WHERE c.canonical_id = @cid",
+            parameters=[{"name": "@cid", "value": canonical_id}],
+        )
+        return results[0] if results else None
 
     async def resolve_by_attribute(
         self, tenant_id: str, attr_type: str | ContactAttributeType, value: str,
@@ -147,6 +161,9 @@ class CustomerProfileRepository(TenantScopedRepository):
 
         The canonical_id becomes both the customer_id (for backward compat)
         and the canonical_id field.  Document ID: {tenant_id}:{canonical_id}.
+
+        Uses create (not upsert) so a 409 Conflict is raised if a
+        concurrent writer already created a profile with this ID.
         """
         now = datetime.now(timezone.utc).isoformat()
         profile = CustomerProfileDocument(
@@ -158,7 +175,7 @@ class CustomerProfileRepository(TenantScopedRepository):
             created_at=now,
             updated_at=now,
         )
-        return await self.upsert(tenant_id, profile)
+        return await self.create(tenant_id, profile)
 
     async def link_attribute(
         self, tenant_id: str, canonical_id: str,
@@ -179,7 +196,15 @@ class CustomerProfileRepository(TenantScopedRepository):
                 f"is already linked to {existing}"
             )
 
-        doc_id = f"{tenant_id}:{canonical_id}"
+        # Look up actual doc ID (may be legacy format for migrated profiles)
+        profile = await self.get_by_canonical_id(tenant_id, canonical_id)
+        if not profile:
+            raise DocumentNotFoundError(
+                COLLECTION_CUSTOMER_PROFILES,
+                f"{tenant_id}:{canonical_id}",
+                tenant_id,
+            )
+        doc_id = profile.get("id", f"{tenant_id}:{canonical_id}")
         now = datetime.now(timezone.utc).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
@@ -206,7 +231,11 @@ class CustomerProfileRepository(TenantScopedRepository):
         """
         profile = await self.get_by_canonical_id(tenant_id, canonical_id)
         if not profile:
-            raise DocumentNotFoundError(f"Profile {canonical_id} not found")
+            raise DocumentNotFoundError(
+                COLLECTION_CUSTOMER_PROFILES,
+                f"{tenant_id}:{canonical_id}",
+                tenant_id,
+            )
 
         attr_type_str = attr_type.value if isinstance(attr_type, ContactAttributeType) else attr_type
         attrs = profile.get("contact_attributes", [])
@@ -217,10 +246,12 @@ class CustomerProfileRepository(TenantScopedRepository):
         if len(filtered) == len(attrs):
             raise ValueError(f"Attribute {attr_type_str}={value} not found on {canonical_id}")
 
+        # Use actual document ID from profile (may be legacy format for migrated docs)
+        doc_id = profile.get("id", f"{tenant_id}:{canonical_id}")
         now = datetime.now(timezone.utc).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
-            document_id=f"{tenant_id}:{canonical_id}",
+            document_id=doc_id,
             operations=[
                 {"op": "set", "path": "/contact_attributes", "value": filtered},
                 {"op": "set", "path": "/updated_at", "value": now},
