@@ -394,7 +394,7 @@ def verify_deployment(env: str) -> dict:
         if env == "staging":
             widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
         elif env == "production":
-            widget_key = os.environ.get("PRODUCTION_WIDGET_KEY", "")
+            widget_key = os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or os.environ.get("PRODUCTION_WIDGET_KEY", "")
 
     if widget_key:
         config_url = f"{base_url}/api/config?page_type=all"

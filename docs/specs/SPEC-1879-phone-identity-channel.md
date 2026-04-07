@@ -1,10 +1,10 @@
 # SPEC-1879: Phone Identity Channel — SMS OTP via Azure Communication Services
 
-**Status:** specified (v2)
+**Status:** specified (v3)
 **Type:** requirement
 **Tags:** INV-1, identity, phone, ACS, professional+
-**Changed by:** S266
-**Change reason:** Flesh out spec body per Codex advisory (Finding 6). Incorporates all Codex requirements from 4 advisory reviews.
+**Changed by:** S267
+**Change reason:** Phase-scope requirements per Codex NO-GO (P1-1). Requirements now split into Phase 1 (active) and Later Phases (deferred) to eliminate contradictory sources of truth for the phase boundary.
 
 ## Description
 
@@ -12,17 +12,25 @@ Customers verify identity via SMS OTP through ACS as a parallel channel alongsid
 
 ## Requirements
 
+### Phase 1 — Additive Groundwork (Active)
+
 1. E.164 phone normalization before any identity claim or canonical lookup
 2. SMS OTP via existing SmsVerificationService (ACS) — not a parallel stack
 3. Hashed token storage (SHA-256) with 10-minute TTL — reuse sms_verification.hash_code()
-4. Request throttling (3 per 5 min per IP) and attempt throttling (3 per conversation)
+4. Request throttling (3 per 5 min per IP) — Phase 1 guard is IP-rate-limit only; per-conversation attempt throttling (3 per conversation) deferred to Phase 2
 5. Single-use token consumption with constant-time hash comparison
-6. ContactAttribute(PHONE, verified=True) linkage via existing CustomerRepository
-7. Professional+ tier gate (starter tier blocked)
-8. Widget pre-chat phone collection + PhoneOtpVerification component
-9. In-conversation phone detection (identity_preprocessor.py) + SMS OTP flow
-10. Admin inbox displays identity_phone when identity_email absent
-11. Escalation gate accepts identity_phone OR identity_email (v1: email still required for escalation)
+6. Professional+ tier gate (starter tier blocked)
+7. ConversationDocument schema fields (identity_phone, identity_sms_sent_at, identity_sms_attempts)
+8. Admin API and TypeScript types include identity_phone (prep-only — no population path in Phase 1)
+
+### Later Phases — Deferred (NOT active until phase-specific Codex GO)
+
+9. ContactAttribute(PHONE, verified=True) linkage via existing CustomerRepository (requires ADR-004 resolution)
+10. Widget pre-chat phone collection + PhoneOtpVerification component
+11. In-conversation phone detection (identity_preprocessor.py) + SMS OTP flow
+12. Admin inbox displays identity_phone when identity_email absent
+13. Escalation gate accepts identity_phone OR identity_email (v1: email still required for escalation)
+14. Phone customer_token issuance (requires reviewed phone-aware session/endpoint path)
 
 ## Security Boundary
 

@@ -296,7 +296,7 @@ def verify_chat_conversation(fqdn: str, environment: str) -> bool:
         if environment == "staging":
             widget_key = os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
         elif environment == "production":
-            widget_key = os.environ.get("PRODUCTION_WIDGET_KEY", "")
+            widget_key = os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or os.environ.get("PRODUCTION_WIDGET_KEY", "")
 
     if not widget_key:
         log("  [FAIL] Chat smoke test: no widget key configured")

@@ -532,12 +532,17 @@ class SmsVerifyRequest(BaseModel):
 
 
 class SmsVerifyResponse(BaseModel):
-    """Response after SMS OTP verification."""
+    """Response after SMS OTP verification.
+
+    Phase 1 constraint: does NOT return a customer_token. The verified phone
+    is confirmed but no chat-usable token is minted until a phone-aware
+    session/endpoint path is reviewed in a later phase (Codex P1-2 blocker).
+    """
 
     verified: bool = Field(description="Whether the code was valid")
-    customer_token: str | None = Field(
+    phone: str | None = Field(
         default=None,
-        description="Short-lived session token for verified customers",
+        description="Verified phone number (E.164) — returned only on success",
     )
 
 
@@ -660,8 +665,8 @@ async def send_sms_otp(
     response_model=SmsVerifyResponse,
     summary="Verify SMS OTP code (SPEC-1879)",
     description="Verifies the 6-digit SMS code entered by the customer. "
-    "Returns a short-lived customer session token on success. "
-    "Does NOT link ContactAttribute — additive groundwork only.",
+    "Returns verified status and phone on success. "
+    "Phase 1: no customer_token, no ContactAttribute linkage.",
 )
 async def verify_sms_otp(
     body: SmsVerifyRequest,
@@ -669,9 +674,10 @@ async def verify_sms_otp(
 ) -> SmsVerifyResponse:
     """Verify a 6-digit SMS OTP code submitted by the customer.
 
-    On success, returns a short-lived customer_token with identity_type=phone.
-    Phase 1 constraint: does NOT link ContactAttribute(PHONE) to canonical
-    profile (deferred pending ADR-004 resolution).
+    On success, returns verified=True and the normalized phone number.
+    Phase 1 constraint: does NOT mint a customer_token or link
+    ContactAttribute(PHONE). Token issuance deferred to a later phase
+    with a reviewed phone-aware session/endpoint path.
     """
     try:
         phone = normalize_e164(body.phone)
@@ -714,12 +720,11 @@ async def verify_sms_otp(
         # Mark token as consumed (single-use)
         await token_repo.consume_token(token_id, _SMS_OTP_TOKEN_TYPE)
 
-        # Generate customer token with phone identity
-        customer_token = _generate_customer_token_phone(
-            tenant_id=ctx.tenant_id,
-            phone=phone,
-            name=doc.get("customer_name", ""),
-        )
+        # Phase 1: return verified status + phone only.
+        # No customer_token minted — current chat runtime treats any valid
+        # customer_token as customer_verified=True which would skip identity
+        # collection (Codex P1-2 blocker). Token issuance deferred to a
+        # later phase with a reviewed phone-aware session path.
 
         logger.info(
             "SMS OTP verified: tenant=%s phone=%s***",
@@ -728,7 +733,7 @@ async def verify_sms_otp(
 
         return SmsVerifyResponse(
             verified=True,
-            customer_token=customer_token,
+            phone=phone,
         )
 
     except Exception:
@@ -736,40 +741,3 @@ async def verify_sms_otp(
         return SmsVerifyResponse(verified=False)
 
 
-def _generate_customer_token_phone(
-    *,
-    tenant_id: str,
-    phone: str,
-    name: str,
-) -> str:
-    """Generate a customer session token for phone-verified identity.
-
-    Same structure as _generate_customer_token but with phone + identity_type.
-    """
-    import hashlib
-    import hmac
-    import json
-    import time
-
-    secret = os.environ.get("CUSTOMER_TOKEN_SECRET", "agentred-customer-token-default")
-    expires_at = int(time.time()) + (2 * 60 * 60)  # 2 hours
-
-    payload = json.dumps({
-        "tenant_id": tenant_id,
-        "phone": phone,
-        "name": name,
-        "identity_type": "phone",
-        "exp": expires_at,
-    }, separators=(",", ":"), sort_keys=True)
-
-    sig = hmac.new(
-        secret.encode(),
-        payload.encode(),
-        hashlib.sha256,
-    ).hexdigest()[:32]
-
-    import base64
-
-    encoded_payload = base64.urlsafe_b64encode(payload.encode()).decode()
-
-    return f"{encoded_payload}.{sig}"

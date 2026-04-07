@@ -23,6 +23,7 @@ Phone as **verified contact method** (v1), NOT full phone-primary identity. Narr
 
 ### Phase 1 Explicit Exclusions
 
+- NO customer_token issuance from verify-sms (current runtime sets customer_verified=True for any valid token, skipping identity collection — Codex P1-2)
 - NO ContactAttribute(PHONE) linkage to canonical profiles
 - NO CustomerRepository.link_attribute() calls
 - NO find_or_create_by_attribute() for phone
@@ -52,14 +53,17 @@ Phone as **verified contact method** (v1), NOT full phone-primary identity. Narr
    - `POST /api/chat/otp/verify-sms`:
      - Constant-time hash comparison
      - Single-use token consumption
-     - Generate customer token with `phone` + `identity_type: "phone"` payload
-     - **Does NOT link ContactAttribute** — returns verified token only
+     - Returns `verified: true` + normalized phone (E.164) on success
+     - **Does NOT mint customer_token** — current chat runtime would treat any valid token as customer_verified=True, skipping identity collection (Codex P1-2). Token issuance deferred to later phase with reviewed phone-aware session path.
+     - **Does NOT link ContactAttribute** — deferred pending ADR-004
 
-4. **Admin API** (admin_conversation_api.py):
+4. **Admin API** (admin_conversation_api.py) — prep-only:
    - Add `identity_phone` to conversation list/detail response models
+   - No population path in Phase 1 — field will be null until identity_preprocessor phone flow (Phase 2)
 
-5. **TypeScript types** (admin/shared/types/index.ts):
+5. **TypeScript types** (admin/shared/types/index.ts) — prep-only:
    - Add `identityPhone?: string` to conversation types
+   - No UI display changes in Phase 1
 
 ### Phase 1 Reuse (no new modules)
 
@@ -73,7 +77,8 @@ Phone as **verified contact method** (v1), NOT full phone-primary identity. Narr
 - [x] E.164 normalization before OTP send
 - [x] Hashed token storage (SHA-256, not plaintext)
 - [x] 10-minute TTL on verification tokens
-- [x] Request throttling (3 per 5 min per IP)
+- [x] Request throttling (3 per 5 min per IP) — Phase 1 guard is IP-rate-limit only
+- [ ] Per-conversation SMS attempt throttling (deferred to Phase 2; Codex non-blocking note)
 - [x] Single-use token consumption
 - [x] Professional+ tier gate
 - [x] No plaintext code storage
