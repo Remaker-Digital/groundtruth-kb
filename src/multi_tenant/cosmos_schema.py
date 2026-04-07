@@ -917,7 +917,11 @@ class MemoryVectorDocument(BaseModel):
 
     id: str = Field(description="Document ID (= chunk ID)")
     tenant_id: str = Field(description="Partition key")
-    customer_id: str = Field(description="Tokenized customer identifier")
+    customer_id: str = Field(description="Tokenized customer identifier (legacy)")
+    canonical_customer_id: str | None = Field(
+        default=None,
+        description="Stable canonical customer ID (cid_<uuid4>) per ADR-004.",
+    )
     conversation_id: str = Field(description="Source conversation ID")
 
     # Chunk content

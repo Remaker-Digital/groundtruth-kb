@@ -317,10 +317,13 @@ class ConversationVectorizer:
         chunk_ids: list[str] = []
         for idx, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
             chunk_id = f"{conversation_id}:chunk-{idx}"
+            # ADR-004: Populate canonical_customer_id for new vectors.
+            canonical_cid = customer_id if customer_id.startswith("cid_") else None
             doc = MemoryVectorDocument(
                 id=chunk_id,
                 tenant_id=tenant_id,
                 customer_id=customer_id,
+                canonical_customer_id=canonical_cid,
                 conversation_id=conversation_id,
                 chunk_text=chunk_text,
                 chunk_index=idx,
