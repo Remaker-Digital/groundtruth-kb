@@ -87,14 +87,21 @@ async def _get_or_create_tenant_dek(
         logger.error("Encryption or secret service not initialized")
         return None
 
-    # Check if DEK already exists
+    # Check if DEK already exists and is valid (unwrappable with current KEK)
     existing = await secret_svc.get_secret(tenant_id, TenantSecretType.DEK)
     if existing is not None:
-        wrapped_dek = base64.b64decode(existing)
-        # Pre-warm the cache by unwrapping
-        await svc.unwrap_key_async(wrapped_dek, tenant_id)
-        logger.info("Existing DEK found for tenant %s", tenant_id)
-        return wrapped_dek
+        try:
+            wrapped_dek = base64.b64decode(existing)
+            # Pre-warm the cache by unwrapping
+            await svc.unwrap_key_async(wrapped_dek, tenant_id)
+            logger.info("Existing DEK found for tenant %s", tenant_id)
+            return wrapped_dek
+        except Exception as exc:
+            # DEK is stale (e.g., wrapped with old CMK) — recreate
+            logger.warning(
+                "Existing DEK for %s is invalid (will recreate): %s",
+                tenant_id, str(exc)[:80],
+            )
 
     if dry_run:
         logger.info("[DRY RUN] Would create DEK for tenant %s", tenant_id)
