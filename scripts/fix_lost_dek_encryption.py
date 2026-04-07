@@ -6,19 +6,31 @@ AZURE_KEYVAULT_URL absent from .env.local). DEKs were created in-memory (dev sto
 and lost when the script exited. A subsequent DEK provisioning step stored NEW
 RSA-wrapped DEKs in KV, but these don't match the DEKs used to encrypt the data.
 
-Two-phase remediation:
-    Phase 1 (--inventory): Discover affected tenants/documents/fields and DEK secrets.
-        Outputs a machine-readable JSON inventory file. No writes.
-    Phase 2 (--execute <inventory.json>): Apply fixes using the reviewed inventory
-        as an explicit allowlist. Only touches items listed in the inventory.
+Two-phase remediation with HARDCODED INCIDENT SCOPE:
+    Phase 1 (--inventory): Read specific documents by ID from the hardcoded
+        incident allowlist. Outputs evidence-only JSON (current field values,
+        _etag, document state). NO container scans, NO vault scans, NO heuristics.
+    Phase 2 (--execute <inventory.json>): Apply fixes using the reviewed inventory.
+        Only touches documents listed in the inventory. DEK cleanup is a SEPARATE
+        manual step documented in the inventory output.
+
+Incident scope (hardcoded from S263/S264 investigation):
+    - Tenants: remaker-digital-001, test-customer-001
+    - DEK secrets: tenant-remaker-digital-001-dek, tenant-test-customer-001-dek
+    - Collections: tenants (customer_email, shopify_shop_domain, brand_name),
+                   team_members (email, display_name)
 
 Usage:
-    # Phase 1 — produce inventory (always safe, read-only):
+    # Phase 1 — capture evidence (read-only, no scans):
     COSMOS_DB_DATABASE=agentred python scripts/fix_lost_dek_encryption.py --inventory --force
 
     # Phase 2 — apply fixes from reviewed inventory:
     COSMOS_DB_DATABASE=agentred python scripts/fix_lost_dek_encryption.py \
         --execute remediation-inventory-*.json --force
+
+    # Phase 3 (manual) — delete orphaned DEK secrets via az CLI:
+    #   az keyvault secret delete --vault-name <vault> --name tenant-remaker-digital-001-dek
+    #   az keyvault secret delete --vault-name <vault> --name tenant-test-customer-001-dek
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -26,7 +38,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import base64
 import json
 import logging
 import os
@@ -47,9 +58,26 @@ if os.path.exists(_env_local):
 
 logger = logging.getLogger("fix_lost_dek")
 
-# Known plaintext values for seeded tenants (from seed_tenant.py).
-# Tenants not in this map will have encrypted fields cleared to empty string.
-KNOWN_PLAINTEXT: dict[str, dict[str, str]] = {
+# ──────────────────────────────────────────────────────────────────────
+# HARDCODED INCIDENT ALLOWLIST — no runtime discovery
+# ──────────────────────────────────────────────────────────────────────
+
+# Exact tenant IDs affected by S263 dev-mode encryption incident.
+# These are the only two tenants that existed when the migration ran.
+AFFECTED_TENANT_IDS = ["remaker-digital-001", "test-customer-001"]
+
+# Exact DEK secret names created during S263 (convention: tenant-{id}-dek).
+AFFECTED_DEK_SECRETS = [
+    "tenant-remaker-digital-001-dek",
+    "tenant-test-customer-001-dek",
+]
+
+# Fields encrypted by the S263 migration in each collection.
+TENANT_FIELDS = ["customer_email", "shopify_shop_domain", "brand_name"]
+TEAM_MEMBER_FIELDS = ["email", "display_name"]
+
+# Authoritative restoration values from seed_tenant.py.
+TENANT_RESTORE: dict[str, dict[str, str]] = {
     "remaker-digital-001": {
         "customer_email": "mike@remakerdigital.com",
         "shopify_shop_domain": "blanco-9939.myshopify.com",
@@ -62,33 +90,18 @@ KNOWN_PLAINTEXT: dict[str, dict[str, str]] = {
     },
 }
 
-KNOWN_TEAM_MEMBER_PLAINTEXT: dict[str, dict[str, str]] = {
+TEAM_MEMBER_RESTORE: dict[str, dict[str, str]] = {
     "remaker-digital-001": {"email": "mike@remakerdigital.com", "display_name": "Mike"},
     "test-customer-001": {"email": "test-customer@remakerdigital.com", "display_name": "Test Customer"},
 }
 
-# Fields that were encrypted by the S263 migration (tenants + team_members collections only).
-TENANT_ENCRYPTED_FIELDS = ["customer_email", "shopify_shop_domain", "brand_name"]
-TEAM_MEMBER_ENCRYPTED_FIELDS = ["email", "display_name"]
-
-
-def _looks_encrypted(value: str) -> bool:
-    """Check if value looks like base64 AES-256-GCM ciphertext."""
-    if not value or len(value) < 20:
-        return False
-    try:
-        raw = base64.b64decode(value)
-        return len(raw) >= 29  # nonce(12) + min ct + tag(16)
-    except Exception:
-        return False
-
 
 # ──────────────────────────────────────────────────────────────────────
-# Phase 1: Inventory (read-only discovery)
+# Phase 1: Evidence-only inventory (read-only, no scans)
 # ──────────────────────────────────────────────────────────────────────
 
 async def build_inventory() -> dict:
-    """Scan for affected documents and DEK secrets. Returns inventory dict."""
+    """Read exact documents from the hardcoded allowlist. No scans."""
     from azure.cosmos import CosmosClient
 
     client = CosmosClient(os.environ["COSMOS_DB_ENDPOINT"], os.environ["COSMOS_DB_KEY"])
@@ -97,177 +110,133 @@ async def build_inventory() -> dict:
     inventory = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "database": os.environ["COSMOS_DB_DATABASE"],
-        "affected_tenants": [],
-        "affected_team_members": [],
-        "stale_dek_secrets": [],
-        "summary": {"tenant_docs": 0, "team_member_docs": 0, "fields": 0, "dek_secrets": 0},
+        "incident_scope": {
+            "tenant_ids": AFFECTED_TENANT_IDS,
+            "dek_secrets": AFFECTED_DEK_SECRETS,
+            "note": "DEK secret cleanup is manual (az keyvault secret delete). Not automated.",
+        },
+        "tenant_evidence": [],
+        "team_member_evidence": [],
     }
 
-    # Scan tenants collection
+    # Read specific tenant documents by partition key (no cross-partition query)
     container = db.get_container_client("tenants")
-    all_tenants = list(container.query_items(
-        query="SELECT * FROM c",
-        enable_cross_partition_query=True,
-    ))
-    for doc in all_tenants:
-        tid = doc["id"]
-        affected_fields = {}
-        for field in TENANT_ENCRYPTED_FIELDS:
-            current = doc.get(field, "")
-            if _looks_encrypted(current):
-                plaintext = KNOWN_PLAINTEXT.get(tid, {}).get(field, "")
-                affected_fields[field] = {
-                    "ciphertext_length": len(current),
-                    "restoration_value": plaintext,
-                    "restoration_source": "known_plaintext" if tid in KNOWN_PLAINTEXT else "clear_to_empty",
-                }
-        if affected_fields:
-            inventory["affected_tenants"].append({
-                "tenant_id": tid,
-                "document_id": doc["id"],
-                "partition_key": tid,
-                "fields": affected_fields,
+    for tid in AFFECTED_TENANT_IDS:
+        items = list(container.query_items(
+            query="SELECT * FROM c WHERE c.id=@id",
+            parameters=[{"name": "@id", "value": tid}],
+            partition_key=tid,
+        ))
+        if not items:
+            logger.warning("Tenant %s not found in database", tid)
+            inventory["tenant_evidence"].append({
+                "tenant_id": tid, "status": "NOT_FOUND",
             })
-            inventory["summary"]["tenant_docs"] += 1
-            inventory["summary"]["fields"] += len(affected_fields)
+            continue
 
-    # Scan team_members collection
+        doc = items[0]
+        fields = {}
+        for field in TENANT_FIELDS:
+            current = doc.get(field, "")
+            fields[field] = {
+                "current_value": current,
+                "current_length": len(current),
+                "restore_to": TENANT_RESTORE[tid][field],
+            }
+
+        inventory["tenant_evidence"].append({
+            "tenant_id": tid,
+            "document_id": doc["id"],
+            "partition_key": tid,
+            "_etag": doc.get("_etag", ""),
+            "fields": fields,
+        })
+
+    # Read specific team_member documents by partition key
     tm_container = db.get_container_client("team_members")
-    for tenant_entry in inventory["affected_tenants"]:
-        tid = tenant_entry["tenant_id"]
+    for tid in AFFECTED_TENANT_IDS:
         items = list(tm_container.query_items(
             query="SELECT * FROM c",
             partition_key=tid,
         ))
         for doc in items:
-            affected_fields = {}
-            for field in TEAM_MEMBER_ENCRYPTED_FIELDS:
+            fields = {}
+            for field in TEAM_MEMBER_FIELDS:
                 current = doc.get(field, "")
-                if _looks_encrypted(current):
-                    plaintext = KNOWN_TEAM_MEMBER_PLAINTEXT.get(tid, {}).get(field, "")
-                    affected_fields[field] = {
-                        "ciphertext_length": len(current),
-                        "restoration_value": plaintext,
-                        "restoration_source": "known_plaintext" if tid in KNOWN_TEAM_MEMBER_PLAINTEXT else "clear_to_empty",
-                    }
-            if affected_fields:
-                inventory["affected_team_members"].append({
-                    "tenant_id": tid,
-                    "document_id": doc["id"],
-                    "partition_key": tid,
-                    "fields": affected_fields,
-                })
-                inventory["summary"]["team_member_docs"] += 1
-                inventory["summary"]["fields"] += len(affected_fields)
+                fields[field] = {
+                    "current_value": current,
+                    "current_length": len(current),
+                    "restore_to": TEAM_MEMBER_RESTORE.get(tid, {}).get(field, ""),
+                }
 
-    # Also scan team_members for tenants NOT in affected_tenants (belt-and-suspenders)
-    affected_tids = {t["tenant_id"] for t in inventory["affected_tenants"]}
-    for tid, pt in KNOWN_TEAM_MEMBER_PLAINTEXT.items():
-        if tid not in affected_tids:
-            items = list(tm_container.query_items(
-                query="SELECT * FROM c", partition_key=tid,
-            ))
-            for doc in items:
-                affected_fields = {}
-                for field in TEAM_MEMBER_ENCRYPTED_FIELDS:
-                    current = doc.get(field, "")
-                    if _looks_encrypted(current):
-                        affected_fields[field] = {
-                            "ciphertext_length": len(current),
-                            "restoration_value": pt.get(field, ""),
-                            "restoration_source": "known_plaintext",
-                        }
-                if affected_fields:
-                    inventory["affected_team_members"].append({
-                        "tenant_id": tid, "document_id": doc["id"],
-                        "partition_key": tid, "fields": affected_fields,
-                    })
-                    inventory["summary"]["team_member_docs"] += 1
-                    inventory["summary"]["fields"] += len(affected_fields)
-
-    # Scan KV for stale DEK secrets
-    try:
-        from azure.identity.aio import DefaultAzureCredential
-        from azure.keyvault.secrets.aio import SecretClient
-
-        vault_url = os.environ.get("PRODUCTION_AZURE_KEYVAULT_URL",
-                                   os.environ.get("AZURE_KEYVAULT_URL", ""))
-        if vault_url:
-            cred = DefaultAzureCredential()
-            kv_client = SecretClient(vault_url=vault_url, credential=cred)
-            try:
-                async for prop in kv_client.list_properties_of_secrets():
-                    if prop.name.startswith("tenant-") and prop.name.endswith("-dek"):
-                        inventory["stale_dek_secrets"].append({
-                            "secret_name": prop.name,
-                            "vault_url": vault_url,
-                            "created": prop.created_on.isoformat() if prop.created_on else None,
-                        })
-                        inventory["summary"]["dek_secrets"] += 1
-            finally:
-                await kv_client.close()
-                await cred.close()
-        else:
-            logger.warning("No AZURE_KEYVAULT_URL set — skipping DEK secret scan")
-    except Exception as e:
-        logger.warning("KV scan failed (credentials may be stale): %s", e)
-        inventory["stale_dek_secrets"] = [{"error": str(e)}]
+            inventory["team_member_evidence"].append({
+                "tenant_id": tid,
+                "document_id": doc["id"],
+                "partition_key": tid,
+                "_etag": doc.get("_etag", ""),
+                "fields": fields,
+            })
 
     return inventory
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Phase 2: Execute from reviewed inventory (explicit allowlist)
+# Phase 2: Execute from reviewed inventory
 # ──────────────────────────────────────────────────────────────────────
 
 async def execute_from_inventory(inventory_path: str) -> dict:
-    """Apply fixes using a reviewed inventory file as the explicit allowlist."""
+    """Apply restoration using a reviewed inventory as the allowlist."""
     with open(inventory_path) as f:
         inventory = json.load(f)
 
     from azure.cosmos import CosmosClient
 
-    client = CosmosClient(os.environ["COSMOS_DB_ENDPOINT"], os.environ["COSMOS_DB_KEY"])
-    db = client.get_database_client(os.environ["COSMOS_DB_DATABASE"])
-
-    # Verify inventory matches current database
-    if inventory["database"] != os.environ["COSMOS_DB_DATABASE"]:
+    # Safety: verify target database matches inventory
+    target_db = os.environ["COSMOS_DB_DATABASE"]
+    if inventory["database"] != target_db:
         logger.error(
-            "SAFETY: Inventory was generated for database '%s' but current target is '%s'. Aborting.",
-            inventory["database"], os.environ["COSMOS_DB_DATABASE"],
+            "SAFETY: Inventory for '%s' but target is '%s'. Aborting.",
+            inventory["database"], target_db,
         )
         sys.exit(1)
 
-    results = {"tenants_fixed": 0, "team_members_fixed": 0, "fields_fixed": 0, "deks_deleted": 0, "errors": []}
+    client = CosmosClient(os.environ["COSMOS_DB_ENDPOINT"], os.environ["COSMOS_DB_KEY"])
+    db = client.get_database_client(target_db)
 
-    # Fix tenants — only those listed in inventory
+    results = {"tenants_fixed": 0, "team_members_fixed": 0, "fields_fixed": 0, "errors": []}
+
+    # Restore tenant documents
     container = db.get_container_client("tenants")
-    for entry in inventory.get("affected_tenants", []):
+    for entry in inventory.get("tenant_evidence", []):
+        if entry.get("status") == "NOT_FOUND":
+            continue
         tid = entry["tenant_id"]
-        doc_id = entry["document_id"]
-        pk = entry["partition_key"]
+        # Safety: only process tenants in the hardcoded allowlist
+        if tid not in AFFECTED_TENANT_IDS:
+            logger.error("SAFETY: tenant %s not in incident allowlist. Skipping.", tid)
+            results["errors"].append(f"tenant {tid} not in allowlist")
+            continue
+
         try:
             items = list(container.query_items(
                 query="SELECT * FROM c WHERE c.id=@id",
-                parameters=[{"name": "@id", "value": doc_id}],
-                partition_key=pk,
+                parameters=[{"name": "@id", "value": entry["document_id"]}],
+                partition_key=entry["partition_key"],
             ))
             if not items:
-                logger.warning("Tenant doc %s not found — skipping", doc_id)
-                results["errors"].append(f"tenant {doc_id} not found")
+                results["errors"].append(f"tenant {tid} not found")
                 continue
 
             doc = items[0]
             changed = False
-            for field, field_info in entry["fields"].items():
+            for field, info in entry["fields"].items():
+                restore_value = info["restore_to"]
                 current = doc.get(field, "")
-                if _looks_encrypted(current):
-                    doc[field] = field_info["restoration_value"]
+                if current != restore_value:
+                    doc[field] = restore_value
                     changed = True
                     results["fields_fixed"] += 1
-                    logger.info("  tenants/%s.%s: restored (%s)", tid, field, field_info["restoration_source"])
-                else:
-                    logger.info("  tenants/%s.%s: already plaintext — skipping", tid, field)
+                    logger.info("  tenants/%s.%s: restored", tid, field)
 
             if changed:
                 container.replace_item(item=doc["id"], body=doc)
@@ -276,68 +245,46 @@ async def execute_from_inventory(inventory_path: str) -> dict:
             logger.error("Error fixing tenant %s: %s", tid, e)
             results["errors"].append(f"tenant {tid}: {e}")
 
-    # Fix team_members — only those listed in inventory
+    # Restore team_member documents
     tm_container = db.get_container_client("team_members")
-    for entry in inventory.get("affected_team_members", []):
+    for entry in inventory.get("team_member_evidence", []):
         tid = entry["tenant_id"]
-        doc_id = entry["document_id"]
-        pk = entry["partition_key"]
+        if tid not in AFFECTED_TENANT_IDS:
+            logger.error("SAFETY: team_member tenant %s not in allowlist. Skipping.", tid)
+            results["errors"].append(f"team_member tenant {tid} not in allowlist")
+            continue
+
         try:
             items = list(tm_container.query_items(
                 query="SELECT * FROM c WHERE c.id=@id",
-                parameters=[{"name": "@id", "value": doc_id}],
-                partition_key=pk,
+                parameters=[{"name": "@id", "value": entry["document_id"]}],
+                partition_key=entry["partition_key"],
             ))
             if not items:
-                logger.warning("Team member doc %s not found — skipping", doc_id)
-                results["errors"].append(f"team_member {doc_id} not found")
+                results["errors"].append(f"team_member {entry['document_id']} not found")
                 continue
 
             doc = items[0]
             changed = False
-            for field, field_info in entry["fields"].items():
+            for field, info in entry["fields"].items():
+                restore_value = info["restore_to"]
                 current = doc.get(field, "")
-                if _looks_encrypted(current):
-                    doc[field] = field_info["restoration_value"]
+                if current != restore_value:
+                    doc[field] = restore_value
                     changed = True
                     results["fields_fixed"] += 1
-                    logger.info("  team_members/%s/%s.%s: restored", tid, doc_id[:12], field)
-                else:
-                    logger.info("  team_members/%s/%s.%s: already plaintext", tid, doc_id[:12], field)
+                    logger.info("  team_members/%s/%s.%s: restored", tid, doc["id"][:12], field)
 
             if changed:
                 tm_container.replace_item(item=doc["id"], body=doc)
                 results["team_members_fixed"] += 1
         except Exception as e:
-            logger.error("Error fixing team member %s/%s: %s", tid, doc_id, e)
-            results["errors"].append(f"team_member {tid}/{doc_id}: {e}")
+            logger.error("Error fixing team_member %s: %s", tid, e)
+            results["errors"].append(f"team_member {tid}: {e}")
 
-    # Delete DEK secrets — only those listed in inventory
-    dek_entries = [e for e in inventory.get("stale_dek_secrets", []) if "secret_name" in e]
-    if dek_entries:
-        try:
-            from azure.identity.aio import DefaultAzureCredential
-            from azure.keyvault.secrets.aio import SecretClient
-
-            vault_url = dek_entries[0]["vault_url"]
-            cred = DefaultAzureCredential()
-            kv_client = SecretClient(vault_url=vault_url, credential=cred)
-            try:
-                for entry in dek_entries:
-                    secret_name = entry["secret_name"]
-                    try:
-                        await kv_client.delete_secret(secret_name)
-                        results["deks_deleted"] += 1
-                        logger.info("  Deleted DEK secret: %s", secret_name)
-                    except Exception as e:
-                        logger.error("Error deleting DEK %s: %s", secret_name, e)
-                        results["errors"].append(f"dek {secret_name}: {e}")
-            finally:
-                await kv_client.close()
-                await cred.close()
-        except Exception as e:
-            logger.error("KV cleanup failed: %s", e)
-            results["errors"].append(f"kv_cleanup: {e}")
+    logger.info("NOTE: DEK secret cleanup is manual. Run:")
+    for name in AFFECTED_DEK_SECRETS:
+        logger.info("  az keyvault secret delete --vault-name <vault> --name %s", name)
 
     return results
 
@@ -360,7 +307,8 @@ async def main_async(args: argparse.Namespace) -> None:
             sys.exit(1)
 
     if args.inventory:
-        logger.info("Phase 1: Building inventory of affected documents and DEK secrets...")
+        logger.info("Phase 1: Capturing evidence for %d tenants (no scans)...",
+                     len(AFFECTED_TENANT_IDS))
         inventory = await build_inventory()
 
         filename = f"remediation-inventory-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
@@ -369,28 +317,26 @@ async def main_async(args: argparse.Namespace) -> None:
             json.dump(inventory, f, indent=2)
 
         logger.info("Inventory written to: %s", filepath)
-        logger.info("Summary: %d tenant docs, %d team_member docs, %d fields, %d DEK secrets",
-                     inventory["summary"]["tenant_docs"],
-                     inventory["summary"]["team_member_docs"],
-                     inventory["summary"]["fields"],
-                     inventory["summary"]["dek_secrets"])
-        logger.info("REVIEW this inventory, then run with --execute %s --force", filename)
+        logger.info("Tenants: %d evidence records", len(inventory["tenant_evidence"]))
+        logger.info("Team members: %d evidence records", len(inventory["team_member_evidence"]))
+        logger.info("REVIEW this inventory, then run --execute %s --force", filename)
 
     elif args.execute:
         if not os.path.exists(args.execute):
             logger.error("Inventory file not found: %s", args.execute)
             sys.exit(1)
 
-        logger.info("Phase 2: Executing remediation from inventory: %s", args.execute)
+        logger.info("Phase 2: Executing from inventory: %s", args.execute)
         results = await execute_from_inventory(args.execute)
 
-        logger.info("Results: %d tenants fixed, %d team_members fixed, %d fields restored, %d DEKs deleted",
+        logger.info("Results: %d tenants, %d team_members, %d fields restored",
                      results["tenants_fixed"], results["team_members_fixed"],
-                     results["fields_fixed"], results["deks_deleted"])
+                     results["fields_fixed"])
         if results["errors"]:
             logger.warning("Errors: %s", results["errors"])
             sys.exit(1)
-        logger.info("DONE. Re-run encryption migration with correct env vars to re-encrypt.")
+        logger.info("Phase 3: Delete orphaned DEK secrets manually (see output above).")
+        logger.info("Phase 4: Re-run encryption migration with correct env vars.")
 
     else:
         logger.error("Specify --inventory (Phase 1) or --execute <file> (Phase 2).")
@@ -398,12 +344,12 @@ async def main_async(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fix lost-DEK encrypted fields (two-phase)")
+    parser = argparse.ArgumentParser(description="Fix lost-DEK encrypted fields")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--inventory", action="store_true",
-                       help="Phase 1: discover affected items and output JSON inventory")
+                       help="Phase 1: capture evidence from hardcoded allowlist (read-only)")
     group.add_argument("--execute", type=str, metavar="INVENTORY_FILE",
-                       help="Phase 2: apply fixes from a reviewed inventory file")
+                       help="Phase 2: apply fixes from reviewed inventory")
     parser.add_argument("--force", action="store_true",
                         help="Required for production database")
     args = parser.parse_args()
