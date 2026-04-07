@@ -800,6 +800,7 @@ export function InboxPage() {
           archivedAt: null,
           customerVerified: false,
           identityEmail: null,
+          identityPhone: null,
           pipelineTrace: null,
         };
       }
