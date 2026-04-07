@@ -235,6 +235,21 @@ class PiiClassification(str, Enum):
     SENSITIVE = "sensitive"   # Special category (health, financial)
 
 
+class ContactAttributeType(str, Enum):
+    """Types of contact attributes that can be linked to a canonical identity.
+
+    ADR-004: Contact means are attributes of an identity, not the identity
+    itself.  A customer's canonical_id never changes; these attributes can
+    be added, changed, or removed without altering the canonical identity.
+    """
+
+    EMAIL = "email"
+    PHONE = "phone"
+    SHOPIFY_CUSTOMER_GID = "shopify_customer_gid"
+    STRIPE_CUSTOMER_ID = "stripe_customer_id"
+    EXTERNAL_ID = "external_id"
+
+
 class ConfigState(str, Enum):
     """Activation state of a preferences document.
 
@@ -376,7 +391,13 @@ class ConversationDocument(BaseModel):
 
     # Conversation lifecycle
     status: ConversationStatus = Field(description="Current conversation status")
-    customer_id: str | None = Field(default=None, description="End-customer identifier (tokenized)")
+    customer_id: str | None = Field(default=None, description="End-customer identifier (tokenized, legacy)")
+
+    # ADR-004: Canonical customer identity
+    canonical_customer_id: str | None = Field(
+        default=None,
+        description="Stable canonical customer ID (cid_<uuid4>) per ADR-004. Populated on new conversations; old conversations may have only customer_id.",
+    )
 
     # Conversation type (SPEC-1561 — Co-pilot admin conversations)
     conversation_type: str = Field(
@@ -601,19 +622,63 @@ class IdempotencyKeyDocument(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ContactAttribute(BaseModel):
+    """A linked contact method for a canonical customer identity (ADR-004).
+
+    Each attribute represents one way to reach or identify a customer.
+    Multiple attributes can be linked to the same canonical_id, enabling
+    cross-channel identity resolution (e.g., same customer via email,
+    phone, and Shopify).
+    """
+
+    attribute_type: ContactAttributeType = Field(
+        description="Contact channel type (email, phone, shopify_customer_gid, ...)",
+    )
+    value: str = Field(
+        description="The contact value (email address, phone number, external ID)",
+    )
+    verified: bool = Field(
+        default=False,
+        description="Whether this attribute has been cryptographically verified (OTP, HMAC)",
+    )
+    source: str = Field(
+        default="",
+        description="How the attribute was collected: 'shopify_hmac', 'otp', 'admin', 'integration', 'self_asserted'",
+    )
+    added_at: str = Field(
+        default="",
+        description="ISO 8601 timestamp when this attribute was linked",
+    )
+
+
 class CustomerProfileDocument(BaseModel):
-    """Layer 1 customer profile (Decision #28).
+    """Layer 1 customer profile (Decision #28, ADR-004).
 
     Structured profile with 6 data sources, injected into every
     conversation as ~250 tokens of context.
+
+    ADR-004: The primary key is ``canonical_id`` (format: cid_<uuid4>),
+    an internally generated stable identifier.  Contact methods (email,
+    phone, Shopify GID) are stored in ``contact_attributes`` and can be
+    added/changed/removed without altering the canonical identity.
 
     Partition key: /tenant_id
     Unique key: /customer_id within a partition
     """
 
-    id: str = Field(description="Document ID (= tenant_id:customer_id)")
+    id: str = Field(description="Document ID (= tenant_id:canonical_id)")
     tenant_id: str = Field(description="Partition key")
-    customer_id: str = Field(description="Tokenized customer identifier")
+    customer_id: str = Field(description="Tokenized customer identifier (legacy — use canonical_id for new code)")
+
+    # ADR-004: Canonical identity
+    canonical_id: str = Field(
+        default="",
+        description="Stable internal customer ID (format: cid_<uuid4>). Primary identity key per ADR-004.",
+    )
+    contact_attributes: list[ContactAttribute] = Field(
+        default_factory=list,
+        description="Linked contact methods (email, phone, Shopify GID, etc.) per ADR-004.",
+    )
 
     # Data source 1: Purchase history
     purchase_history: list[dict[str, Any]] = Field(
