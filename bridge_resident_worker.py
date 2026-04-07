@@ -28,7 +28,10 @@ from bridge_worker_context import (
 HOOKS_DIR = PROJECT_DIR / ".claude" / "hooks"
 DIRECT_CONTEXT_EVENT_TYPES = {
     "message.failed",
-    "message.resolved",
+    # "message.resolved" intentionally excluded — resolution is informational,
+    # not actionable. Including it caused an echo loop: resolved → worker wakes
+    # → repair_terminal_thread_outputs sends reply → notification → loop.
+    # Aligned with bridge_poller.py DIRECT_WAKE_EVENT_TYPES which also excludes it.
 }
 BUSY_GRACE_SECONDS = 60
 HEALTHY_IDLE_SECONDS = 90
