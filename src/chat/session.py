@@ -1206,8 +1206,6 @@ async def _resolve_canonical_customer_id(
             return canonical, legacy_id
 
         # Auto-create profile for new Shopify customer.
-        # If a concurrent request already created a profile for the same
-        # attribute, the create will 409 — re-resolve to get the winner's ID.
         canonical = generate_canonical_id()
         attrs = [ContactAttribute(
             attribute_type=ContactAttributeType.SHOPIFY_CUSTOMER_GID,
@@ -1224,16 +1222,18 @@ async def _resolve_canonical_customer_id(
                 source="shopify_session",
                 added_at=now,
             ))
-        try:
-            await customer_repo.create_profile_with_canonical_id(
-                tenant_id, canonical, contact_attributes=attrs,
-            )
-        except Exception:
-            # 409 Conflict or other — re-resolve (concurrent writer won)
-            canonical = await customer_repo.resolve_by_attribute(
-                tenant_id, ContactAttributeType.SHOPIFY_CUSTOMER_GID, visitor.customer_id,
-            )
-        return canonical, legacy_id
+        await customer_repo.create_profile_with_canonical_id(
+            tenant_id, canonical, contact_attributes=attrs,
+        )
+        # Post-create race guard: re-resolve to detect concurrent writes.
+        # If another writer created a profile for the same attribute,
+        # the query returns the earlier writer's canonical_id.  We keep
+        # the first-writer-wins profile and orphan ours (it will have no
+        # conversations linked and can be cleaned up asynchronously).
+        winner = await customer_repo.resolve_by_attribute(
+            tenant_id, ContactAttributeType.SHOPIFY_CUSTOMER_GID, visitor.customer_id,
+        )
+        return (winner or canonical), legacy_id
 
     # 3. Email lookup
     if visitor.email:
@@ -1244,25 +1244,23 @@ async def _resolve_canonical_customer_id(
             return canonical, legacy_id
 
         # Auto-create profile for new email customer.
-        # Same concurrent-writer guard as Shopify path above.
         canonical = generate_canonical_id()
-        try:
-            await customer_repo.create_profile_with_canonical_id(
-                tenant_id, canonical, contact_attributes=[
-                    ContactAttribute(
-                        attribute_type=ContactAttributeType.EMAIL,
-                        value=visitor.email,
-                        verified=False,
-                        source="self_asserted",
-                        added_at=now,
-                    ),
-                ],
-            )
-        except Exception:
-            canonical = await customer_repo.resolve_by_attribute(
-                tenant_id, ContactAttributeType.EMAIL, visitor.email,
-            )
-        return canonical, legacy_id
+        await customer_repo.create_profile_with_canonical_id(
+            tenant_id, canonical, contact_attributes=[
+                ContactAttribute(
+                    attribute_type=ContactAttributeType.EMAIL,
+                    value=visitor.email,
+                    verified=False,
+                    source="self_asserted",
+                    added_at=now,
+                ),
+            ],
+        )
+        # Post-create race guard (same pattern as Shopify path)
+        winner = await customer_repo.resolve_by_attribute(
+            tenant_id, ContactAttributeType.EMAIL, visitor.email,
+        )
+        return (winner or canonical), legacy_id
 
     # 4. Anonymous — no canonical_id
     return None, None

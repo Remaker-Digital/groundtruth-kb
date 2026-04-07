@@ -1163,7 +1163,7 @@ async def _vectorization_scanner_loop() -> None:
                                 consent = ConsentStatus.NOT_ASKED
                                 try:
                                     profile = await profile_repo.read(
-                                        tid, f"profile:{customer_id}",
+                                        tid, f"{tid}:{customer_id}",
                                     )
                                     if profile:
                                         consent = ConsentStatus(
