@@ -174,6 +174,20 @@ async def main(args: argparse.Namespace) -> None:
                     os.environ.setdefault(k.strip(), v.strip())
         logger.info("Loaded env from %s", env_file)
 
+    # Safety: verify the target database to prevent accidental cross-environment writes.
+    # .env.local may point to production (agentred) while you intend to migrate staging
+    # (agentred-staging). Always confirm with --db flag or COSMOS_DB_DATABASE env var.
+    db_name = os.environ.get("COSMOS_DB_DATABASE", "")
+    logger.info("Target database: %s", db_name or "(not set)")
+    if not args.dry_run and not args.force:
+        if "staging" not in db_name and "dev" not in db_name:
+            logger.error(
+                "SAFETY GATE: COSMOS_DB_DATABASE=%s looks like production. "
+                "Pass --force to confirm, or set COSMOS_DB_DATABASE to the staging DB name.",
+                db_name,
+            )
+            return
+
     # Initialize Cosmos DB connection (lightweight — only connect, don't create containers)
     from src.multi_tenant.cosmos_client import get_cosmos_manager
     manager = get_cosmos_manager()
@@ -230,5 +244,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ADR-004 Canonical Identity Migration")
     parser.add_argument("--dry-run", action="store_true", help="Log changes without applying")
     parser.add_argument("--tenant", type=str, help="Migrate a specific tenant only")
+    parser.add_argument("--force", action="store_true", help="Bypass production database safety gate")
     args = parser.parse_args()
     asyncio.run(main(args))
