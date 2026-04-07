@@ -104,11 +104,11 @@ async def _probe_key_vault() -> _ProbeResult:
     start = time.monotonic()
     try:
         import os
-        kv_url = os.environ.get("KEY_VAULT_URL", "")
+        kv_url = os.environ.get("AZURE_KEYVAULT_URL", "") or os.environ.get("KEY_VAULT_URL", "")
         elapsed = (time.monotonic() - start) * 1000
         if kv_url:
-            return _ProbeResult("key_vault", True, elapsed, "KEY_VAULT_URL configured")
-        return _ProbeResult("key_vault", False, elapsed, "KEY_VAULT_URL not set")
+            return _ProbeResult("key_vault", True, elapsed, "AZURE_KEYVAULT_URL configured")
+        return _ProbeResult("key_vault", False, elapsed, "AZURE_KEYVAULT_URL not set")
     except Exception as exc:
         elapsed = (time.monotonic() - start) * 1000
         return _ProbeResult("key_vault", False, elapsed, str(exc))
