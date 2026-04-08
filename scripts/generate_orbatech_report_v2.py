@@ -490,6 +490,13 @@ doc.add_paragraph(
     "\u2588\u2588\u2588\u25a1\u25a1 Developing, \u2588\u2588\u25a1\u25a1\u25a1 Basic, "
     "\u2588\u25a1\u25a1\u25a1\u25a1 Minimal/None."
 )
+doc.add_paragraph(
+    "Note: This matrix is a directional market scan, not an audit-grade comparison. "
+    "Competitor data is derived from publicly available vendor documentation and may "
+    "not reflect the latest product changes. Scores are approximate and intended to "
+    "illustrate relative positioning, not to serve as definitive benchmarks.",
+    style='Intense Quote'
+)
 
 # 8.1 Tenant Provisioning
 doc.add_heading('8.1 Tenant Provisioning', level=2)
@@ -498,49 +505,49 @@ doc.add_paragraph(
     "activated on the platform. Mature provisioning includes self-service signup, automated "
     "configuration, trial management, and programmatic API access."
 )
-add_table(doc, ["Platform", "Self-Service Signup", "Admin Provisioning", "API Provisioning",
+add_table(doc, ["Platform", "Self-Service Signup", "Admin Provisioning", "Admin/Config APIs",
                 "Trial Management", "Assessment"], [
     ["OrbaTech",
      "None. No public registration endpoint.",
      "Manual via seed data (SeedInitialAdminAccount.cs) and admin test data dashboard (/test-data-dashboard). "
      "TenantManagementService provides CRUD operations.",
-     "None. No provisioning API exposed.",
+     "None. No admin configuration API exposed.",
      "None. No trial/freemium tier.",
      "Basic. Manual provisioning only."],
     ["Salesforce\u2020",
      "Yes (developer edition). Enterprise via sales.",
      "Full admin console. Sandbox provisioning.",
-     "Yes. Salesforce Metadata API, Tooling API.",
+     "Yes. Metadata API and Tooling API for in-org configuration and customization.",
      "30-day trials. Sandbox environments.",
      "Mature. Full lifecycle automation."],
     ["HubSpot\u2020",
      "Yes. Free-tier self-service.",
      "Full admin portal. Team/role setup.",
-     "Yes. HubSpot API for account management.",
+     "Yes. Account info and user provisioning APIs for in-account administration.",
      "14-day trials for paid tiers.",
      "Mature. Freemium-driven onboarding."],
     ["Zoho\u2020",
      "Yes. Free-tier self-service.",
      "Admin console with org hierarchy.",
-     "Yes. Zoho REST APIs.",
+     "Yes. REST APIs for in-org user and role management.",
      "15-day trials.",
      "Good. Self-service with admin tools."],
     ["Pipedrive\u2020",
      "Yes. Self-service signup.",
      "Admin settings for team management.",
-     "Yes. REST API.",
+     "Yes. REST API for in-account configuration.",
      "14-day trial.",
      "Good. Sales-team focused."],
     ["Freshsales\u2020",
      "Yes. Free-tier self-service.",
      "Admin console.",
-     "Yes. REST API.",
+     "Yes. REST API for in-account administration.",
      "21-day trial.",
      "Good. Simple onboarding flow."],
     ["Monday CRM\u2020",
      "Yes. Self-service.",
      "Admin dashboard.",
-     "Yes. GraphQL API.",
+     "Yes. GraphQL API for in-account data and app management.",
      "14-day trial.",
      "Good. Visual onboarding."],
 ])
@@ -609,8 +616,10 @@ add_table(doc, ["Platform", "SOC-2", "HIPAA", "GDPR", "Other Certifications",
      "No.", "No.", "No.",
      "None. No compliance certifications or privacy tooling visible in repo.",
      "No audit logging infrastructure. Basic API security (APISecurityContext.cs).",
-     "No data export or deletion tooling for GDPR/PIPEDA compliance.",
-     "None. No compliance readiness."],
+     "Account-level personal data export (PersonalData.json) and self-deletion flow exist "
+     "via ASP.NET Core Identity pages. No tenant-wide CRM data export, bulk deletion, "
+     "audit logging, or formal compliance posture.",
+     "Minimal. Account-level privacy pages only."],
     ["Salesforce\u2020",
      "Yes (Type II).", "Yes (BAA available).", "Yes.",
      "ISO 27001, ISO 27018, FedRAMP, PCI DSS, C5.",
@@ -732,7 +741,8 @@ doc.add_paragraph(
 add_table(doc, ["Platform", "API Documentation", "Developer Guides", "Architecture Docs",
                 "User Guides", "Knowledge Base", "Assessment"], [
     ["OrbaTech",
-     "None. No API documentation. Stored procedures have inline comments only.",
+     "Dev-only Swagger/OpenAPI surface for mapped controllers (auto-generated, not maintained). "
+     "No published partner/user API documentation or integration guide.",
      "README covers: GitHub Actions csproj cleanup, .NET user secrets setup, EF Core migrations, "
      "test data generation. Scattered readme.txt files in DB/ER/, DB/SP/, EmailService/.",
      "None. No architecture decision records, no design documents.",
@@ -1261,17 +1271,19 @@ doc.add_heading('C.3 Revision History', level=2)
 add_table(doc, ["Version", "Date", "Changes"], [
     ["1.0", "April 7, 2026", "Initial evaluation report."],
     ["2.0", "April 7, 2026",
-     "Revised per Loyal Opposition (Codex) review: (1) Corrected testing assessment to "
-     "acknowledge existing test project with xUnit/bUnit/Testcontainers/FsCheck. "
-     "(2) Corrected multi-tenant section to acknowledge existing EF Core global query "
-     "filters and identify IgnoreQueryFilters() bypass pattern as the actual risk. "
-     "(3) Corrected attachment security finding to acknowledge existing path traversal "
-     "protection in AttachmentService. (4) Rephrased code review finding to avoid "
-     "unsupported inference about PR workflow. (5) Added Annex C to separate repo-backed "
-     "findings from external market research. (6) Added Section 8: Detailed Feature "
-     "Comparison Matrix covering provisioning, billing, compliance, integrations, "
-     "documentation, and architecture. (7) Added two additional competitors (Freshsales, "
-     "Monday CRM). (8) Updated Testing score from 2/10 to 4/10."],
+     "Revised per Codex review round 1: (1) Corrected testing assessment. "
+     "(2) Corrected EF Core global query filters. (3) Corrected attachment security. "
+     "(4) Rephrased code review finding. (5) Added Annex C. (6) Added Section 8 "
+     "feature matrix. (7) Added Freshsales and Monday CRM. (8) Testing score 2\u219210."],
+    ["2.1", "April 7, 2026",
+     "Revised per Codex review round 2: (1) Renamed 'API Provisioning' column to "
+     "'Admin/Config APIs' to distinguish in-tenant configuration APIs from top-level "
+     "tenant creation (P1 finding). (2) Corrected OrbaTech documentation row to "
+     "acknowledge dev-only Swagger/OpenAPI surface for mapped controllers. "
+     "(3) Corrected OrbaTech compliance row to acknowledge account-level personal "
+     "data export and self-deletion pages (ASP.NET Core Identity). (4) Added "
+     "directional market scan disclaimer to Section 8. (5) Section 8 explicitly "
+     "labeled as directional research, not audit-grade comparison."],
 ])
 doc.add_page_break()
 
