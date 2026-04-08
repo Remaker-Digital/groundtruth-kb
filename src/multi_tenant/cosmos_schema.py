@@ -301,8 +301,16 @@ class TenantDocument(BaseModel):
     shopify_shop_domain: str | None = Field(default=None, description="*.myshopify.com")
     shopify_subscription_id: str | None = Field(default=None, description="Shopify gid://...")
 
+    # Display name (SPEC-1881: human-readable tenant label for SPA)
+    display_name: str | None = Field(
+        default=None,
+        description="Human-readable tenant name for operator-facing surfaces. "
+        "Default: {contact_email}-001. Unique across tenants.",
+    )
+
     # Contact (PII: direct)
     customer_email: str | None = Field(default=None, description="Primary contact email")
+    customer_phone: str | None = Field(default=None, description="Primary contact phone (E.164)")
 
     # GDPR consent (Decision #10)
     consent_status: ConsentStatus = Field(

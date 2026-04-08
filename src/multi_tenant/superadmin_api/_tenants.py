@@ -41,6 +41,7 @@ class TenantSummaryItem(CamelCaseModel):
     """
 
     tenant_id: str
+    display_name: str | None = None
     status: str
     tier: str | None = None
     billing_channel: str | None = None
