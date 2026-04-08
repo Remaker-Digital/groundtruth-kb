@@ -199,7 +199,7 @@ class TestEscalationSentFlag:
     async def test_escalation_sent_true_with_email(self):
         """escalation_sent=True when email bridge sends successfully."""
         mixin = _build_mixin(_make_conv_doc(identity_email="customer@example.com"))
-        result = await mixin._run_escalation_side_effects(
+        await mixin._run_escalation_side_effects(
             tenant_id=TENANT_ID,
             conversation_id=CONV_ID,
             customer_message="I need help",
@@ -221,7 +221,7 @@ class TestEscalationSentFlag:
             identity_phone="+14155551234",
             phone_verified=True,
         ))
-        result = await mixin._run_escalation_side_effects(
+        await mixin._run_escalation_side_effects(
             tenant_id=TENANT_ID,
             conversation_id=CONV_ID,
             customer_message="I need help",

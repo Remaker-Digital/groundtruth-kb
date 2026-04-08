@@ -31,7 +31,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from src.multi_tenant.entitlement_service import get_entitlement_service
+from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS, get_entitlement_service
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,6 @@ STRIPE_FEE_FIXED = 0.30
 STRIPE_TAX_FEE = 0.50  # Per Stripe Tax transaction
 
 # Re-export from entitlement config for backward compat (used by performance tests)
-from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS
-
 TIER_PRICING: dict[str, dict] = FROZEN_ENTITLEMENTS["pricing"]
 
 
