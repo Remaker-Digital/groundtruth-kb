@@ -20,10 +20,9 @@ from typing import Any
 
 import pytest
 
-from agntcy_app_sdk.semantic.message import Message
-
 from src.agents.base import (
     AgentRedBaseAgent,
+    Message,
     make_error_response,
     make_request,
     make_response,

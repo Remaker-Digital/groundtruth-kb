@@ -4,8 +4,12 @@ import json
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-import bridge_resident_worker as resident_worker
+# Bridge modules live at repo root — ensure it's on sys.path for CI
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+import bridge_resident_worker as resident_worker  # noqa: E402
 
 
 def test_resident_worker_is_healthy_for_recent_busy_worker(tmp_path) -> None:
