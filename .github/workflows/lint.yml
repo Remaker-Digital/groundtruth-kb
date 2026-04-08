@@ -16,7 +16,7 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/lint.yml'
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'src/**'
       - 'tests/**'
@@ -44,12 +44,12 @@ jobs:
       - name: Ruff check (blocking — E/F only, SPEC-1697)
         # E = pycodestyle errors, F = pyflakes (undefined names, unused imports).
         # These are the highest-signal rules and MUST pass.
-        run: ruff check src/ tests/ --select E,F --output-format=github --statistics
+        run: ruff check src/ tests/ --select E,F --output-format=github
 
       - name: Ruff check (advisory — all configured rules)
         # Full rule set including I, UP, B, SIM — advisory until backlog cleared.
         continue-on-error: true
-        run: ruff check src/ tests/ --output-format=github --statistics
+        run: ruff check src/ tests/ --output-format=github
 
       - name: Ruff format check
         continue-on-error: true
