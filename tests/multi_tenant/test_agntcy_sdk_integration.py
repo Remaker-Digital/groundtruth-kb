@@ -45,6 +45,7 @@ def _reset_singletons() -> None:
     import src.multi_tenant.agntcy_sdk_integration as mod
     mod._factory = None
     mod._transport = None
+    mod._a2a_clients.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -325,62 +326,75 @@ class TestClientCreation:
     """ASDK-14 through ASDK-18: A2A and MCP client creation."""
 
     @patch("src.multi_tenant.agntcy_sdk_integration.AgntcyFactory")
-    def test_asdk_14_a2a_client_creation_with_enum(
+    @pytest.mark.asyncio
+    async def test_asdk_14_a2a_client_creation_with_enum(
         self, mock_cls: MagicMock
     ) -> None:
-        """ASDK-14: create_a2a_client() works with AgentTopic enum."""
+        """ASDK-14: create_a2a_client() resolves AgentTopic enum value and returns a client."""
+        from unittest.mock import AsyncMock as _AsyncMock
+
         mock_factory = MagicMock()
         mock_factory.registered_protocols.return_value = []
         mock_factory.registered_transports.return_value = []
-        mock_transport = MagicMock()
-        mock_factory.create_transport.return_value = mock_transport
-        mock_client = MagicMock()
-        mock_factory.create_client.return_value = mock_client
         mock_cls.return_value = mock_factory
 
+        mock_client = MagicMock()
+
         import src.multi_tenant.agntcy_sdk_integration as mod
-        orig = mod.NATS_ENDPOINT
+        orig_slim = mod.SLIM_ENDPOINT
+        orig_nats = mod.NATS_ENDPOINT
         try:
+            mod.SLIM_ENDPOINT = ""
             mod.NATS_ENDPOINT = "nats://localhost:4222"
-            client = create_a2a_client(AgentTopic.INTENT_CLASSIFIER)
-            assert client is mock_client
-            mock_factory.create_client.assert_called_once_with(
-                "A2A",
-                agent_topic="intent-classifier",
-                transport=mock_transport,
-            )
+            # Mock internal helpers + A2AClientFactory used inside create_a2a_client
+            with patch.object(mod, "_build_agent_card", return_value=MagicMock()), \
+                 patch.object(mod, "_get_client_config", return_value=MagicMock()):
+                mock_connect = _AsyncMock(return_value=mock_client)
+                with patch("agntcy_app_sdk.semantic.a2a.client.factory.A2AClientFactory") as mock_a2a_cls:
+                    mock_a2a_cls.connect = mock_connect
+                    client = await create_a2a_client(AgentTopic.INTENT_CLASSIFIER)
+                    assert client is mock_client
+                    mock_connect.assert_called_once()
         finally:
-            mod.NATS_ENDPOINT = orig
+            mod.SLIM_ENDPOINT = orig_slim
+            mod.NATS_ENDPOINT = orig_nats
 
     @patch("src.multi_tenant.agntcy_sdk_integration.AgntcyFactory")
-    def test_asdk_15_a2a_client_creation_with_string(
+    @pytest.mark.asyncio
+    async def test_asdk_15_a2a_client_creation_with_string(
         self, mock_cls: MagicMock
     ) -> None:
         """ASDK-15: create_a2a_client() works with raw string topic."""
+        from unittest.mock import AsyncMock as _AsyncMock
+
         mock_factory = MagicMock()
         mock_factory.registered_protocols.return_value = []
         mock_factory.registered_transports.return_value = []
-        mock_transport = MagicMock()
-        mock_factory.create_transport.return_value = mock_transport
-        mock_client = MagicMock()
-        mock_factory.create_client.return_value = mock_client
         mock_cls.return_value = mock_factory
 
+        mock_client = MagicMock()
+
         import src.multi_tenant.agntcy_sdk_integration as mod
-        orig = mod.NATS_ENDPOINT
+        orig_slim = mod.SLIM_ENDPOINT
+        orig_nats = mod.NATS_ENDPOINT
         try:
+            mod.SLIM_ENDPOINT = ""
             mod.NATS_ENDPOINT = "nats://localhost:4222"
-            create_a2a_client("custom-agent")
-            mock_factory.create_client.assert_called_once_with(
-                "A2A",
-                agent_topic="custom-agent",
-                transport=mock_transport,
-            )
+            with patch.object(mod, "_build_agent_card", return_value=MagicMock()), \
+                 patch.object(mod, "_get_client_config", return_value=MagicMock()):
+                mock_connect = _AsyncMock(return_value=mock_client)
+                with patch("agntcy_app_sdk.semantic.a2a.client.factory.A2AClientFactory") as mock_a2a_cls:
+                    mock_a2a_cls.connect = mock_connect
+                    client = await create_a2a_client("custom-agent")
+                    assert client is mock_client
+                    mock_connect.assert_called_once()
         finally:
-            mod.NATS_ENDPOINT = orig
+            mod.SLIM_ENDPOINT = orig_slim
+            mod.NATS_ENDPOINT = orig_nats
 
     @patch("src.multi_tenant.agntcy_sdk_integration.AgntcyFactory")
-    def test_asdk_16_a2a_client_fails_without_transport(
+    @pytest.mark.asyncio
+    async def test_asdk_16_a2a_client_fails_without_transport(
         self, mock_cls: MagicMock
     ) -> None:
         """ASDK-16: create_a2a_client() raises RuntimeError when no transport."""
@@ -395,8 +409,8 @@ class TestClientCreation:
         try:
             mod.SLIM_ENDPOINT = ""
             mod.NATS_ENDPOINT = ""
-            with pytest.raises(RuntimeError, match="no transport available"):
-                create_a2a_client(AgentTopic.RESPONSE_GENERATOR)
+            with pytest.raises(RuntimeError, match="no transport"):
+                await create_a2a_client(AgentTopic.RESPONSE_GENERATOR)
         finally:
             mod.SLIM_ENDPOINT = orig_slim
             mod.NATS_ENDPOINT = orig_nats

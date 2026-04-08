@@ -52,7 +52,8 @@ class TestSDKStatusReporting:
         mock_transport = MagicMock()
         type(mock_transport).__name__ = "SLIMTransport"
         with patch("src.multi_tenant.agntcy_sdk_integration._transport", mock_transport), \
-             patch("src.multi_tenant.agntcy_sdk_integration._factory", MagicMock()):
+             patch("src.multi_tenant.agntcy_sdk_integration._factory", MagicMock()), \
+             patch("src.multi_tenant.agntcy_sdk_integration._transport_setup_ok", True):
             from src.multi_tenant.agntcy_sdk_integration import get_sdk_status
             status = get_sdk_status()
             assert status["transport_active"] is True
@@ -87,13 +88,15 @@ class TestReadyEndpointTransportEnforcement:
         assert "503" in health_src
 
     def test_ready_does_not_503_in_development(self):
-        """In development, /ready should not enforce transport requirement."""
+        """DCL-002: /ready enforces transport for ALL environments."""
         from pathlib import Path
 
         health_src = Path("src/app/health.py").read_text(encoding="utf-8")
 
-        # Verify environment check exists (staging/production only)
-        assert 'environment in ("staging", "production")' in health_src
+        # SPEC-1802 / DCL-002: transport enforcement applies to ALL environments
+        # (no environment-specific gating). Verify the 503 path exists.
+        assert "transport_active" in health_src
+        assert "not_ready" in health_src
 
 
 class TestFailLoudDispatchBehavior:

@@ -25,7 +25,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import stripe
 
-from tests.helpers.fake_tenant_repo import FakeTenantRepo, run_sync
+from tests.helpers.fake_tenant_repo import FakeDomainIndexRepo, FakeTenantRepo, run_sync
 
 
 # ---------------------------------------------------------------------------
@@ -140,11 +140,13 @@ def _fake_provisioning_repo():
 
     Ensures provisioning functions (provision_tenant, get_tenant, etc.)
     read and write from an in-memory store instead of Cosmos DB.
+    Includes FakeDomainIndexRepo for SPEC-1644 domain lookups.
     """
     from src.integrations.provisioning import configure_provisioning_repo
 
     repo = FakeTenantRepo()
-    configure_provisioning_repo(repo, team_repo=None)
+    domain_index = FakeDomainIndexRepo()
+    configure_provisioning_repo(repo, team_repo=None, domain_index_repo=domain_index)
     yield repo
     configure_provisioning_repo(None, team_repo=None)
 
