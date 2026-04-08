@@ -20,7 +20,6 @@ import pytest
 
 from src.integrations.stripe_catalog import (
     AddonCatalog,
-    PackCatalog,
     StripeCatalog,
     TierCatalog,
     load_catalog,

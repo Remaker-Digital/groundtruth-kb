@@ -16,9 +16,9 @@ review workflow.
 from __future__ import annotations
 
 import logging
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)

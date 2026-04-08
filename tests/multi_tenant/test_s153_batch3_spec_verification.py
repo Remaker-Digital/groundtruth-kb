@@ -27,7 +27,6 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 
-import pytest
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

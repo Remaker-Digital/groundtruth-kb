@@ -151,19 +151,21 @@ async def list_tiers(
     tiers = []
     for tier_id, info in TIER_FEATURES.items():
         tier_order = TIER_ORDER.get(tier_id, 0)
-        tiers.append(TierInfo(
-            tier_id=tier_id,
-            label=info["label"],
-            description=info["description"],
-            monthly_price=info["monthly_price"],
-            annual_price=info["annual_price"],
-            included_conversations=info["included_conversations"],
-            overage_per_conversation=info["overage_per_conversation"],
-            features=info["features"],
-            is_current=(tier_id == current),
-            is_upgrade=(tier_order > current_order),
-            is_downgrade=(tier_order < current_order),
-        ))
+        tiers.append(
+            TierInfo(
+                tier_id=tier_id,
+                label=info["label"],
+                description=info["description"],
+                monthly_price=info["monthly_price"],
+                annual_price=info["annual_price"],
+                included_conversations=info["included_conversations"],
+                overage_per_conversation=info["overage_per_conversation"],
+                features=info["features"],
+                is_current=(tier_id == current),
+                is_upgrade=(tier_order > current_order),
+                is_downgrade=(tier_order < current_order),
+            )
+        )
 
     return TierListResponse(current_tier=current, tiers=tiers)
 
@@ -200,7 +202,8 @@ async def preview_upgrade(
     if direction == "upgrade":
         message = (
             f"Upgrade from {current_info['label']} to {target_info['label']}: "
-            f"+${diff}/mo. You'll gain {target_info['included_conversations'] - current_info['included_conversations']} "
+            f"+${diff}/mo. You'll gain "
+            f"{target_info['included_conversations'] - current_info['included_conversations']} "
             f"more included conversations."
         )
     else:
@@ -296,7 +299,10 @@ async def initiate_upgrade(
 
         logger.info(
             "Tier upgrade initiated: tenant=%s from=%s to=%s session=%s",
-            ctx.tenant_id[:8], current, body.target_tier, session.id[:20],
+            ctx.tenant_id[:8],
+            current,
+            body.target_tier,
+            session.id[:20],
         )
 
         return UpgradeResponse(

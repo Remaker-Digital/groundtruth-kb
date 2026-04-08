@@ -10,7 +10,6 @@ rotation, and API contract shapes.
 SPEC-1706 mock-based testing -- zero-backend UI development.
 """
 
-import pytest
 from playwright.sync_api import Page
 
 from tests.e2e_mock.conftest import (
@@ -18,7 +17,6 @@ from tests.e2e_mock.conftest import (
     get_api_json,
     main_text,
     navigate_and_settle,
-    post_api_json,
     dismiss_onboarding_if_present,
 )
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import importlib
 
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -39,10 +38,7 @@ class TestSDKImports:
         """A2A protocol types must be importable (used by agent_dispatch.py)."""
         from a2a.types import (
             Message,
-            MessageSendParams,
             Role,
-            SendMessageRequest,
-            TextPart,
         )
         assert Message is not None
         assert Role is not None

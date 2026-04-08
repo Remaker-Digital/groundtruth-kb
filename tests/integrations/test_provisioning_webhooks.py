@@ -24,7 +24,6 @@ import pytest
 
 from src.integrations.provisioning import (
     BillingChannel,
-    TenantRecord,
     TenantStatus,
     _GRACE_PERIOD,
     activate_tenant,

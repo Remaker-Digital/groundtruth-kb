@@ -108,10 +108,7 @@ class ShopifySyncRequest(BaseModel):
     """Request body for POST /api/admin/profiles/{customer_id}/sync."""
 
     shopify_data: dict[str, Any] = Field(
-        description=(
-            "Normalized Shopify data dict with optional keys: "
-            "orders, cart, customer"
-        ),
+        description=("Normalized Shopify data dict with optional keys: orders, cart, customer"),
     )
 
 
@@ -201,7 +198,10 @@ router = APIRouter(prefix="/api/admin/profiles", tags=["admin-profiles"])
     "",
     response_model=ProfileListResponse,
     summary="List customer profiles",
-    description="Returns a paginated list of customer profiles. Supports filtering by consent status, ordered by most recently updated first.",
+    description=(
+        "Returns a paginated list of customer profiles. Supports filtering by consent status, ordered by most recently "
+        "updated first."
+    ),
     responses={
         400: {"description": "Invalid consent_status filter value"},
         503: {"description": "Admin profile repository not initialized"},
@@ -227,8 +227,7 @@ async def list_profiles(
     if consent_status is not None and consent_status not in VALID_CONSENT_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid consent_status '{consent_status}'. "
-            f"Valid values: {sorted(VALID_CONSENT_STATUSES)}",
+            detail=f"Invalid consent_status '{consent_status}'. Valid values: {sorted(VALID_CONSENT_STATUSES)}",
         )
 
     # Build query conditions
@@ -246,11 +245,7 @@ async def list_profiles(
     total = await repo.query_count(ctx.tenant_id, count_query, params)
 
     # Page query with OFFSET/LIMIT
-    page_query = (
-        f"SELECT * FROM c WHERE 1=1{where} "
-        f"ORDER BY c.updated_at DESC "
-        f"OFFSET {offset} LIMIT {limit}"
-    )
+    page_query = f"SELECT * FROM c WHERE 1=1{where} ORDER BY c.updated_at DESC OFFSET {offset} LIMIT {limit}"
     profiles_raw = await repo.query(ctx.tenant_id, page_query, params)
 
     profiles = [
@@ -300,7 +295,9 @@ async def list_profiles(
     "/{customer_id}",
     response_model=CustomerProfileResponse,
     summary="Get customer profile",
-    description="Returns the full Layer 1 profile for a single customer including all 6 data sources and consent status.",
+    description=(
+        "Returns the full Layer 1 profile for a single customer including all 6 data sources and consent status."
+    ),
     responses={
         404: {"description": "Customer profile not found"},
         503: {"description": "Admin profile services not initialized"},
@@ -365,7 +362,10 @@ async def get_profile(
     "/{customer_id}/consent",
     response_model=ConsentUpdateResponse,
     summary="Update customer consent",
-    description="Updates a customer's GDPR consent status for Persistent Customer Memory. Setting to 'denied' may trigger deletion of Layer 2-4 data.",
+    description=(
+        "Updates a customer's GDPR consent status for Persistent Customer Memory. Setting to 'denied' may trigger "
+        "deletion of Layer 2-4 data."
+    ),
     responses={
         400: {"description": "Invalid consent_status value"},
         404: {"description": "Customer profile not found"},
@@ -387,8 +387,7 @@ async def update_consent(
     if request.consent_status not in VALID_CONSENT_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid consent_status '{request.consent_status}'. "
-            f"Valid values: {sorted(VALID_CONSENT_STATUSES)}",
+            detail=f"Invalid consent_status '{request.consent_status}'. Valid values: {sorted(VALID_CONSENT_STATUSES)}",
         )
 
     service = _get_service()
@@ -402,9 +401,7 @@ async def update_consent(
         )
 
     previous = (
-        existing.consent_status.value
-        if hasattr(existing.consent_status, "value")
-        else str(existing.consent_status)
+        existing.consent_status.value if hasattr(existing.consent_status, "value") else str(existing.consent_status)
     )
 
     new_status = ConsentStatus(request.consent_status)
@@ -435,7 +432,10 @@ async def update_consent(
     "/{customer_id}/sync",
     response_model=ShopifySyncResponse,
     summary="Trigger Shopify data sync",
-    description="Accepts normalized Shopify data and merges it into the customer's Layer 1 profile. This is the admin-initiated equivalent of the automatic webhook-driven sync.",
+    description=(
+        "Accepts normalized Shopify data and merges it into the customer's Layer 1 profile. This is the "
+        "admin-initiated equivalent of the automatic webhook-driven sync."
+    ),
     responses={
         503: {"description": "Admin profile services not initialized"},
     },
@@ -486,7 +486,10 @@ async def sync_shopify_data(
     "/{customer_id}",
     response_model=ProfileDeleteResponse,
     summary="Delete customer profile",
-    description="Removes the Layer 1 customer profile document for GDPR right to erasure. Does not automatically delete Layer 2-4 data; use the GDPR deletion API for comprehensive erasure.",
+    description=(
+        "Removes the Layer 1 customer profile document for GDPR right to erasure. Does not automatically delete Layer "
+        "2-4 data; use the GDPR deletion API for comprehensive erasure."
+    ),
     responses={
         404: {"description": "Customer profile not found"},
         503: {"description": "Admin profile services not initialized"},

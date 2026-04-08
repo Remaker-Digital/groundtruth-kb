@@ -9,7 +9,6 @@ WI-1628: DEK provisioning during tenant creation
 WI-1631: Lifecycle wiring
 """
 import inspect
-import os
 
 import pytest
 
@@ -215,7 +214,6 @@ class TestPreWritePostReadRoundtrip:
         wrapped_dek = svc.create_tenant_dek_sync("t-roundtrip")
 
         # Pre-populate DEK cache (normally done by _get_tenant_dek)
-        import time
         _dek_cache["t-roundtrip"] = _DekCacheEntry(
             raw_dek=svc._unwrap_key(wrapped_dek, "t-roundtrip"),
             wrapped_dek=wrapped_dek,
@@ -245,7 +243,6 @@ class TestPreWritePostReadRoundtrip:
 
         svc = get_envelope_encryption_service()
         wrapped_dek = svc.create_tenant_dek_sync("t-roundtrip-list")
-        import time
         _dek_cache["t-roundtrip-list"] = _DekCacheEntry(
             raw_dek=svc._unwrap_key(wrapped_dek, "t-roundtrip-list"),
             wrapped_dek=wrapped_dek,
@@ -284,7 +281,6 @@ class TestPreWritePostReadRoundtrip:
 
         svc = get_envelope_encryption_service()
         wrapped_dek = svc.create_tenant_dek_sync("t-roundtrip-dict")
-        import time
         _dek_cache["t-roundtrip-dict"] = _DekCacheEntry(
             raw_dek=svc._unwrap_key(wrapped_dek, "t-roundtrip-dict"),
             wrapped_dek=wrapped_dek,

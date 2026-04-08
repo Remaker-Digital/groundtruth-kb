@@ -30,7 +30,6 @@ import pytest
 
 from src.multi_tenant.cosmos_schema import (
     COLLECTION_CONVERSATIONS,
-    ConversationDocument,
     ConversationStatus,
 )
 from src.multi_tenant.repositories.conversation import ConversationRepository

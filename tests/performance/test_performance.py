@@ -23,8 +23,6 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -39,16 +37,13 @@ from src.multi_tenant.pipeline_resilience import (
     ServiceCircuitBreaker,
     ServiceCircuitBreakerRegistry,
     ServiceUnavailableError,
-    StageResult,
     call_with_breaker,
 )
 from src.multi_tenant.sla_monitoring import (
     LATENCY_WINDOW_SECONDS,
     MAX_SAMPLES_PER_TENANT,
     SLA_TARGETS,
-    LatencyPercentiles,
     PlatformSLASummary,
-    SLAComplianceResult,
     SLAMonitoringService,
     _percentile,
 )
@@ -552,8 +547,8 @@ class TestStreamingSSE:
         # Buffer some events
         buf = mgr._buffers["conv-1"]
         seq1 = buf.append("event: token\ndata: A\n\n")
-        seq2 = buf.append("event: token\ndata: B\n\n")
-        seq3 = buf.append("event: done\ndata: {}\n\n")
+        buf.append("event: token\ndata: B\n\n")
+        buf.append("event: done\ndata: {}\n\n")
 
         # Client disconnects and reconnects with Last-Event-ID = seq1
         events = mgr.get_replay_events("conv-1", seq1)

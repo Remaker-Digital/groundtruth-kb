@@ -17,8 +17,6 @@ from src.multi_tenant.admin_ingestion_api import (
     router,
     StartIngestionRequest,
     IngestionJobResponse,
-    CategoryTemplateResponse,
-    TemplateApplyResponse,
 )
 
 

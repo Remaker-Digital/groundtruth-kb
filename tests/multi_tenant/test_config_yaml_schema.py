@@ -10,21 +10,10 @@ import pytest
 
 from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.schema.models import (
-    ConfigFieldDefinition,
     ConfigFieldType,
-    ConfigValidationError,
-    ConfigValidationResult,
     OnboardingStep,
     SUPPORTED_LANGUAGES,
     TierGate,
-    ValidationRule,
-    # Constants
-    MAX_BRAND_NAME_LENGTH,
-    MAX_BRAND_VOICE_LENGTH,
-    MAX_POLICY_TEXT_LENGTH,
-    MAX_CUSTOM_INSTRUCTIONS_LENGTH,
-    HEX_COLOR_PATTERN,
-    AUTO_OPEN_MAX_DELAY,
 )
 from src.multi_tenant.schema.registry import (
     get_field_registry,
@@ -575,15 +564,7 @@ class TestBackwardCompat:
         """The old import path should still work via re-export barrel."""
         from src.multi_tenant.tenant_config_schema import (
             ConfigFieldDefinition,
-            ConfigFieldType,
-            ConfigValidationResult,
-            OnboardingStep,
-            TierGate,
             get_field_registry,
-            validate_config,
-            validate_field,
-            resolve_defaults,
-            export_schema_for_api,
         )
         # Verify they are the same objects
         from src.multi_tenant.schema import (

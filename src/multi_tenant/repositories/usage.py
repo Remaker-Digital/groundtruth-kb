@@ -11,7 +11,6 @@ from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
     COLLECTION_USAGE,
-    TIER_DEFAULTS,
     IdempotencyKeyDocument,
     PackBalanceDocument,
     TenantTier,

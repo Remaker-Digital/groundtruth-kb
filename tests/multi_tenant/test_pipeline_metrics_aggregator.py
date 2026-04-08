@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
 
 from src.multi_tenant.pipeline_metrics import (
     AgentMetrics,

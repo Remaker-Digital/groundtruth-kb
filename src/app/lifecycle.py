@@ -39,7 +39,6 @@ from src.multi_tenant.nats_isolation import (
 from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
 from src.multi_tenant.otel_tracing import (
     configure_logging as configure_tenant_logging,
-    configure_tracing,
 )
 from src.multi_tenant.pipeline_resilience import get_circuit_breaker_registry
 from src.multi_tenant.repository import TenantRepository
@@ -63,6 +62,7 @@ logger = logging.getLogger(__name__)
 # The first process to start writes the secret; all others read it.
 # The file is in /tmp (container-local, not shared across replicas).
 _VERIFICATION_SECRET_PATH = "/tmp/.agent-red-verification-secret"
+
 
 def _ensure_verification_secret() -> str:
     """Ensure INTERNAL_VERIFICATION_SECRET is set consistently across all workers.
@@ -103,13 +103,14 @@ def _ensure_verification_secret() -> str:
     logger.info("Generated INTERNAL_VERIFICATION_SECRET (written to shared file)")
     return secret
 
-_ensure_verification_secret()
 
+_ensure_verification_secret()
 
 
 # =========================================================================
 # Middleware registration
 # =========================================================================
+
 
 def register_middleware(app: FastAPI) -> None:
     """Register all middleware on *app* in the correct order.
@@ -212,6 +213,7 @@ def register_middleware(app: FastAPI) -> None:
 # Startup handlers (defined at module level for direct test imports)
 # =========================================================================
 
+
 async def _startup_verification_secret() -> None:
     """Ensure INTERNAL_VERIFICATION_SECRET is available in this worker (SPEC-1846).
 
@@ -220,6 +222,7 @@ async def _startup_verification_secret() -> None:
     """
     secret = _ensure_verification_secret()
     import hashlib as _hl
+
     fp = _hl.sha256(secret.encode()).hexdigest()[:12]
     logger.info("INTERNAL_VERIFICATION_SECRET ready: fp=%s pid=%d", fp, os.getpid())
 
@@ -238,7 +241,8 @@ async def _startup_cosmos_db() -> None:
     except Exception as exc:
         logger.warning(
             "Cosmos DB initialization failed — database operations will be "
-            "unavailable until connection is established: %s", exc,
+            "unavailable until connection is established: %s",
+            exc,
         )
 
 
@@ -258,6 +262,7 @@ async def _startup_tenant_resolution() -> None:
         # Per-user API key resolution: looks up team member by key hash,
         # then fetches the associated tenant document.
         from src.multi_tenant.repository import TeamMemberRepository
+
         team_repo = TeamMemberRepository()
 
         # SPEC-1644: Cross-partition user key resolution removed.
@@ -283,6 +288,7 @@ async def _startup_tenant_resolution() -> None:
         # Resolves ar_spa_* keys from the platform_admins collection,
         # completely isolated from all tenant team_members collections.
         from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
+
         platform_admin_repo = PlatformAdminRepository()
 
         async def resolve_spa_api_key(key_hash: str) -> dict | None:
@@ -293,13 +299,15 @@ async def _startup_tenant_resolution() -> None:
         # These closures read within a single Cosmos partition — no
         # cross-partition scan.  The caller must already know the tenant.
         async def verify_api_key_in_partition(
-            tenant_id: str, key_hash: str,
+            tenant_id: str,
+            key_hash: str,
         ) -> dict | None:
             """Verify a tenant API key hash within one partition."""
             return await tenant_repo.verify_key_hash(tenant_id, key_hash)
 
         async def verify_user_key_in_partition(
-            tenant_id: str, key_hash: str,
+            tenant_id: str,
+            key_hash: str,
         ) -> dict | None:
             """Verify a per-user API key hash within one partition."""
             member = await team_repo.verify_user_key_hash(tenant_id, key_hash)
@@ -313,7 +321,8 @@ async def _startup_tenant_resolution() -> None:
             except Exception:
                 logger.warning(
                     "User key resolved to member %s but tenant %s not found",
-                    member.get("email"), tenant_id,
+                    member.get("email"),
+                    tenant_id,
                 )
                 return None
             return {"team_member": member, "tenant": tenant}
@@ -330,6 +339,7 @@ async def _startup_tenant_resolution() -> None:
 
         # SPEC-1644: Domain index for O(1) lookups (no cross-partition queries)
         from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+
         domain_index_repo = DomainIndexRepository()
 
         async def resolve_by_shop_domain(shop_domain: str) -> dict | None:
@@ -359,8 +369,10 @@ async def _startup_tenant_resolution() -> None:
         )
         # Wire Cosmos DB as the primary persistence layer for provisioning
         from src.integrations.provisioning import configure_provisioning_repo
+
         configure_provisioning_repo(
-            tenant_repo, team_repo=team_repo,
+            tenant_repo,
+            team_repo=team_repo,
             domain_index_repo=domain_index_repo,
         )
         logger.info("Tenant resolution configured (Cosmos DB-backed, quad auth, domain index)")
@@ -368,12 +380,14 @@ async def _startup_tenant_resolution() -> None:
         logger.warning(
             "Tenant resolution configuration failed — auth middleware will "
             "reject authenticated requests until Cosmos DB is available. "
-            "Error: %s", exc,
+            "Error: %s",
+            exc,
         )
         # Best-effort: even if full resolution fails, try to wire the SPA
         # resolver so the platform admin console is not locked out.
         try:
             from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
+
             _pa_repo = PlatformAdminRepository()
 
             async def _fallback_spa_key(key_hash: str) -> dict | None:
@@ -388,8 +402,7 @@ async def _startup_tenant_resolution() -> None:
                 resolve_by_spa_key_hash=_fallback_spa_key,
             )
             logger.info(
-                "Fallback SPA-only auth configured — platform admin console "
-                "available, merchant auth unavailable."
+                "Fallback SPA-only auth configured — platform admin console available, merchant auth unavailable."
             )
         except Exception as inner:
             logger.error("Fallback SPA auth also failed: %s", inner)
@@ -446,8 +459,7 @@ async def _startup_conversation_meter() -> None:
         logger.info("ConversationMeter singleton configured")
     except Exception:
         logger.warning(
-            "ConversationMeter initialization failed — metering and "
-            "dashboard services will be unavailable.",
+            "ConversationMeter initialization failed — metering and dashboard services will be unavailable.",
             exc_info=True,
         )
 
@@ -488,8 +500,7 @@ async def _startup_tracing() -> None:
 
     if result["configured"]:
         logger.info(
-            "OpenTelemetry tracing configured with Application Insights "
-            "(sampling_rate=%.2f)",
+            "OpenTelemetry tracing configured with Application Insights (sampling_rate=%.2f)",
             result["sampling_rate"],
         )
     else:
@@ -528,6 +539,7 @@ async def _startup_agntcy_sdk() -> None:
             get_sdk_status,
             init_agntcy_sdk,
         )
+
         logger.info("AGNTCY SDK startup: import OK, calling init_agntcy_sdk()...")
         await init_agntcy_sdk()
         status = get_sdk_status()
@@ -584,9 +596,7 @@ async def _startup_envelope_encryption() -> None:
             "key versionless ID (e.g., https://<vault>/keys/agent-red-cmk).",
             environment,
         )
-        raise RuntimeError(
-            f"MASTER_KEK_KEY_ID required in {environment} environment"
-        )
+        raise RuntimeError(f"MASTER_KEK_KEY_ID required in {environment} environment")
 
     try:
         svc = EnvelopeEncryptionService(
@@ -598,10 +608,7 @@ async def _startup_envelope_encryption() -> None:
         mode_label = "DEV MODE" if dev_mode else f"KEK={kek_key_id}"
         logger.info("EnvelopeEncryptionService initialized (%s)", mode_label)
     except Exception:
-        logger.warning(
-            "EnvelopeEncryptionService initialization failed — "
-            "field-level encryption unavailable"
-        )
+        logger.warning("EnvelopeEncryptionService initialization failed — field-level encryption unavailable")
 
 
 async def _startup_chat_services() -> None:
@@ -624,6 +631,7 @@ async def _startup_chat_services() -> None:
         team_repo = TeamMemberRepository()
         # ADR-004: Wire customer profile repository for canonical identity resolution
         from src.multi_tenant.repositories.customer import CustomerProfileRepository
+
         customer_repo = CustomerProfileRepository()
         session = configure_conversation_session(
             conversation_repo=conv_repo,
@@ -640,6 +648,7 @@ async def _startup_chat_services() -> None:
         try:
             from src.multi_tenant.critic_policy import CriticPolicy
             from src.chat.pipeline.constants import get_critic_urls
+
             critic_urls = get_critic_urls()
             if critic_urls:
                 critic = CriticPolicy(critic_urls=critic_urls)
@@ -677,8 +686,7 @@ async def _startup_chat_services() -> None:
             logger.info("SSE first-chunk metering callback configured")
         except Exception:
             logger.warning(
-                "SSE metering callback configuration failed — "
-                "first-chunk billing will not be recorded.",
+                "SSE metering callback configuration failed — first-chunk billing will not be recorded.",
                 exc_info=True,
             )
 
@@ -686,6 +694,7 @@ async def _startup_chat_services() -> None:
         # cleanup_expired_buffers() exists but was never called in production.
         try:
             from src.chat.sse_manager import get_sse_manager as _get_sse_mgr
+
             _sse_mgr = _get_sse_mgr()
 
             async def _buffer_cleanup_loop() -> None:
@@ -709,8 +718,7 @@ async def _startup_chat_services() -> None:
         )
     except Exception:
         logger.warning(
-            "Chat API service initialization failed — chat endpoints will "
-            "return 503 until dependencies are available.",
+            "Chat API service initialization failed — chat endpoints will return 503 until dependencies are available.",
             exc_info=True,
         )
 
@@ -755,14 +763,15 @@ async def _startup_knowledge_vectorizer() -> None:
         # Create OpenAI client for embeddings (same pattern as chat pipeline)
         openai_client = None
         from src.chat.pipeline import USE_AGENT_CONTAINERS as _use_containers
+
         if not _use_containers:
             try:
                 from src.chat.pipeline import _create_openai_client
+
                 openai_client = _create_openai_client()
             except Exception:
                 logger.warning(
-                    "Azure OpenAI client creation failed for KB vectorizer — "
-                    "embeddings will use dev-mode zero vectors."
+                    "Azure OpenAI client creation failed for KB vectorizer — embeddings will use dev-mode zero vectors."
                 )
 
         vectorizer.configure(
@@ -772,8 +781,8 @@ async def _startup_knowledge_vectorizer() -> None:
         logger.info("Knowledge Base vectorizer configured (hybrid retrieval enabled)")
     except Exception as exc:
         logger.warning(
-            "Knowledge Base vectorizer initialization failed — "
-            "KB retrieval will be unavailable: %s", exc,
+            "Knowledge Base vectorizer initialization failed — KB retrieval will be unavailable: %s",
+            exc,
         )
 
 
@@ -795,9 +804,11 @@ async def _startup_conversation_vectorizer() -> None:
         # Create OpenAI client for embeddings (same pattern as KB vectorizer)
         openai_client = None
         from src.chat.pipeline import USE_AGENT_CONTAINERS as _use_containers
+
         if not _use_containers:
             try:
                 from src.chat.pipeline import _create_openai_client
+
                 openai_client = _create_openai_client()
             except Exception:
                 logger.warning(
@@ -815,8 +826,8 @@ async def _startup_conversation_vectorizer() -> None:
         logger.info("ConversationVectorizer configured (Layer 2 memory)")
     except Exception as exc:
         logger.warning(
-            "ConversationVectorizer initialization failed — "
-            "Layer 2 memory vectorization unavailable: %s", exc,
+            "ConversationVectorizer initialization failed — Layer 2 memory vectorization unavailable: %s",
+            exc,
         )
 
 
@@ -843,6 +854,7 @@ async def _startup_admin_knowledge_services() -> None:
 
         # Configure conflict scanner
         from src.multi_tenant.kb_conflict_scanner import get_conflict_scanner
+
         scanner = get_conflict_scanner()
         scanner.configure(kb_repo=kb_repo)
 
@@ -907,23 +919,26 @@ async def _startup_embed_unembedded_kb() -> None:
                 if count > 0:
                     logger.info(
                         "Auto-embedded %d KB entries for tenant=%s",
-                        count, tenant_id[:8],
+                        count,
+                        tenant_id[:8],
                     )
             except Exception as exc:
                 logger.warning(
                     "Auto-embedding failed for tenant=%s: %s",
-                    tenant_id[:8], exc,
+                    tenant_id[:8],
+                    exc,
                 )
 
         if total_embedded > 0:
             logger.info(
                 "KB auto-embedding complete: %d entries across %d tenants",
-                total_embedded, len(tenant_ids),
+                total_embedded,
+                len(tenant_ids),
             )
     except Exception as exc:
         logger.warning(
-            "KB auto-embedding startup task failed — "
-            "unembedded entries will use BM25-only retrieval: %s", exc,
+            "KB auto-embedding startup task failed — unembedded entries will use BM25-only retrieval: %s",
+            exc,
         )
 
 
@@ -1024,6 +1039,7 @@ async def _startup_admin_gdpr_services() -> None:
         from src.integrations.shopify_gdpr_webhooks import configure_shopify_gdpr_services  # noqa: E402
 
         from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+
         configure_shopify_gdpr_services(
             export_service=export_service,
             deletion_service=deletion_service,
@@ -1033,8 +1049,7 @@ async def _startup_admin_gdpr_services() -> None:
         logger.info("Shopify GDPR webhooks initialized (3 endpoints)")
     except Exception:
         logger.warning(
-            "Admin GDPR initialization failed — GDPR endpoints "
-            "will return 503 until dependencies are available."
+            "Admin GDPR initialization failed — GDPR endpoints will return 503 until dependencies are available."
         )
 
 
@@ -1054,8 +1069,7 @@ async def _startup_admin_audit_services() -> None:
         logger.info("Admin audit log API initialized (2 endpoints)")
     except Exception:
         logger.warning(
-            "Admin audit log initialization failed — audit endpoints "
-            "will return 503 until dependencies are available."
+            "Admin audit log initialization failed — audit endpoints will return 503 until dependencies are available."
         )
 
 
@@ -1130,8 +1144,7 @@ async def _startup_admin_apikey_services() -> None:
         logger.info("Admin API key management initialized (4 endpoints)")
     except Exception:
         logger.warning(
-            "Admin API key initialization failed — API key endpoints "
-            "will return 503 until dependencies are available."
+            "Admin API key initialization failed — API key endpoints will return 503 until dependencies are available."
         )
 
 
@@ -1157,6 +1170,7 @@ async def _startup_superadmin_services() -> None:
         nats_mgr = None
         try:
             from src.multi_tenant.nats_isolation import get_nats_manager
+
             nats_mgr = get_nats_manager()
         except Exception:
             logger.debug("NATS manager not available for superadmin API")
@@ -1177,6 +1191,7 @@ async def _startup_superadmin_services() -> None:
                 AlertRuleRepository,
                 AlertHistoryRepository,
             )
+
             incident_repo = IncidentRepository()
             alert_rule_repo = AlertRuleRepository()
             alert_history_repo = AlertHistoryRepository()
@@ -1187,6 +1202,7 @@ async def _startup_superadmin_services() -> None:
         pa_repo = None
         try:
             from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
+
             pa_repo = PlatformAdminRepository()
         except Exception:
             logger.debug("PlatformAdminRepository not available for superadmin API")
@@ -1209,6 +1225,7 @@ async def _startup_superadmin_services() -> None:
         # SPEC-1678: Wire SPA recovery module with same repos
         try:
             from src.multi_tenant.spa_recovery import configure_spa_recovery
+
             configure_spa_recovery(
                 platform_admin_repo=pa_repo,
                 audit_repo=AuditLogRepository(),
@@ -1221,6 +1238,7 @@ async def _startup_superadmin_services() -> None:
         try:
             from src.multi_tenant.tenant_recovery import configure_tenant_recovery
             from src.multi_tenant.repositories.verification import VerificationTokenRepository
+
             configure_tenant_recovery(
                 tenant_repo=TenantRepository(),
                 verification_repo=VerificationTokenRepository(),
@@ -1278,10 +1296,7 @@ async def _startup_copilot_knowledge() -> None:
         configure_copilot_knowledge_service(admin_doc_repo=repo)
         logger.info("Co-Pilot Knowledge services initialized (admin_documentation_vectors container)")
     except Exception:
-        logger.warning(
-            "Co-Pilot Knowledge initialization failed — "
-            "knowledge management endpoints will return 503."
-        )
+        logger.warning("Co-Pilot Knowledge initialization failed — knowledge management endpoints will return 503.")
 
 
 async def _startup_copilot_docs_ingestion() -> None:
@@ -1429,7 +1444,10 @@ async def _startup_copilot_docs_ingestion() -> None:
     if created or updated:
         logger.info(
             "Co-Pilot docs auto-ingestion complete: %d created, %d updated, %d skipped, %d errors",
-            created, updated, skipped, errors,
+            created,
+            updated,
+            skipped,
+            errors,
         )
 
         # Trigger background re-embedding for new/updated documents
@@ -1471,7 +1489,10 @@ async def _embed_copilot_docs() -> None:
         embedded = 0
         for doc in needs_embed:
             try:
-                text = f"[{doc.get('document_category', 'general').upper()}] {doc['title']}\nTags: {', '.join(doc.get('tags', []))}\n{doc.get('content', '')}"
+                category = doc.get('document_category', 'general').upper()
+                tags = ', '.join(doc.get('tags', []))
+                content = doc.get('content', '')
+                text = f"[{category}] {doc['title']}\nTags: {tags}\n{content}"
                 # Truncate to 8000 chars for token limits
                 text = text[:8000]
 
@@ -1506,10 +1527,7 @@ async def _startup_pipeline_observatory() -> None:
         configure_pipeline_observatory(enabled=True)
         logger.info("Pipeline Observatory enabled")
     except Exception:
-        logger.warning(
-            "Pipeline Observatory initialization failed — "
-            "observatory endpoints will return empty results."
-        )
+        logger.warning("Pipeline Observatory initialization failed — observatory endpoints will return empty results.")
 
     # SPEC-1584: Wire PipelineMetricsAggregator with Cosmos client
     try:
@@ -1521,8 +1539,7 @@ async def _startup_pipeline_observatory() -> None:
         logger.info("Pipeline metrics aggregator configured")
     except Exception:
         logger.debug(
-            "Pipeline metrics aggregator not configured — "
-            "metrics will return zero values.",
+            "Pipeline metrics aggregator not configured — metrics will return zero values.",
             exc_info=True,
         )
 
@@ -1542,10 +1559,7 @@ async def _startup_status_api() -> None:
         configure_status_api(incident_repo=IncidentRepository())
         logger.info("Public status API initialized (1 endpoint, no auth)")
     except Exception:
-        logger.warning(
-            "Public status API initialization failed — "
-            "status page will report operational."
-        )
+        logger.warning("Public status API initialization failed — status page will report operational.")
 
 
 async def _startup_alert_engine() -> None:
@@ -1568,6 +1582,7 @@ async def _startup_alert_engine() -> None:
         incident_repo = None
         try:
             from src.multi_tenant.repositories.incidents import IncidentRepository
+
             incident_repo = IncidentRepository()
         except Exception:
             pass
@@ -1578,9 +1593,7 @@ async def _startup_alert_engine() -> None:
         # Seed quality regression rule if none exists
         try:
             rules = await rule_repo.list_all()
-            has_quality = any(
-                r.get("rule_type") == "quality_regression" for r in rules
-            )
+            has_quality = any(r.get("rule_type") == "quality_regression" for r in rules)
             if not has_quality:
                 await rule_repo.create_rule(
                     name="Quality Regression",
@@ -1598,10 +1611,7 @@ async def _startup_alert_engine() -> None:
         except Exception:
             logger.warning("Failed to seed quality_regression rule", exc_info=True)
     except Exception:
-        logger.warning(
-            "AlertEngine initialization failed — "
-            "alert evaluation will be unavailable."
-        )
+        logger.warning("AlertEngine initialization failed — alert evaluation will be unavailable.")
 
 
 async def _startup_mfa_service() -> None:
@@ -1624,10 +1634,7 @@ async def _startup_mfa_service() -> None:
         )
         logger.info("MfaTotpService configured")
     except Exception:
-        logger.warning(
-            "MfaTotpService initialization failed — "
-            "MFA will be unavailable."
-        )
+        logger.warning("MfaTotpService initialization failed — MFA will be unavailable.")
 
 
 async def _startup_pattern_service() -> None:
@@ -1644,10 +1651,7 @@ async def _startup_pattern_service() -> None:
         service.configure()
         logger.info("PatternExtractionService initialized (Layer 3, dev mode)")
     except Exception:
-        logger.warning(
-            "PatternExtractionService initialization failed — Layer 3 "
-            "pattern learning unavailable."
-        )
+        logger.warning("PatternExtractionService initialization failed — Layer 3 pattern learning unavailable.")
 
 
 async def _startup_fine_tuning_service() -> None:
@@ -1665,10 +1669,7 @@ async def _startup_fine_tuning_service() -> None:
         service.configure()
         logger.info("FineTuningPipelineService initialized (Layer 4, dev mode)")
     except Exception:
-        logger.warning(
-            "FineTuningPipelineService initialization failed — Layer 4 "
-            "fine-tuning pipeline unavailable."
-        )
+        logger.warning("FineTuningPipelineService initialization failed — Layer 4 fine-tuning pipeline unavailable.")
 
 
 async def _startup_key_rotation() -> None:
@@ -1760,10 +1761,7 @@ async def _startup_data_retention() -> None:
         configure_retention_service(retention_service)
         logger.info("Data retention enforcement service initialized")
     except Exception:
-        logger.warning(
-            "Data retention service initialization failed — automated "
-            "retention enforcement unavailable."
-        )
+        logger.warning("Data retention service initialization failed — automated retention enforcement unavailable.")
 
 
 async def _startup_archival_pipeline() -> None:
@@ -1809,12 +1807,12 @@ async def _startup_archival_pipeline() -> None:
             blob_client=blob_client,
         )
         configure_archival_service(archival_service)
-        logger.info("Archival pipeline service initialized (blob_client: %s)", "connected" if blob_client else "none — dry-run mode")
-    except Exception:
-        logger.warning(
-            "Archival pipeline service initialization failed — "
-            "archival operations unavailable."
+        logger.info(
+            "Archival pipeline service initialized (blob_client: %s)",
+            "connected" if blob_client else "none — dry-run mode",
         )
+    except Exception:
+        logger.warning("Archival pipeline service initialization failed — archival operations unavailable.")
 
 
 async def _startup_alert_delivery() -> None:
@@ -1850,10 +1848,7 @@ async def _startup_alert_delivery() -> None:
             audit_repo = AuditLogRepository()
             service.register_channel(DashboardAlertChannel(audit_repo))
         except Exception:
-            logger.warning(
-                "DashboardAlertChannel not registered — "
-                "audit log repository unavailable."
-            )
+            logger.warning("DashboardAlertChannel not registered — audit log repository unavailable.")
 
         # Email channel — uses preferences + tenant repos for recipient lookup
         prefs_repo = None
@@ -1864,10 +1859,7 @@ async def _startup_alert_delivery() -> None:
                 EmailAlertChannel(prefs_repo, tenant_repo),
             )
         except Exception:
-            logger.warning(
-                "EmailAlertChannel not registered — "
-                "Cosmos DB may not be available."
-            )
+            logger.warning("EmailAlertChannel not registered — Cosmos DB may not be available.")
 
         # Webhook channel — POSTs alerts to merchant webhook URLs
         try:
@@ -1875,10 +1867,7 @@ async def _startup_alert_delivery() -> None:
                 prefs_repo = PreferencesRepository()
             service.register_channel(WebhookAlertChannel(prefs_repo))
         except Exception:
-            logger.warning(
-                "WebhookAlertChannel not registered — "
-                "preferences repository unavailable."
-            )
+            logger.warning("WebhookAlertChannel not registered — preferences repository unavailable.")
 
         configure_alert_service(service)
         logger.info(
@@ -1887,10 +1876,7 @@ async def _startup_alert_delivery() -> None:
             service.get_registered_channels(),
         )
     except Exception:
-        logger.warning(
-            "Alert delivery service initialization failed — "
-            "alerts will be logged only."
-        )
+        logger.warning("Alert delivery service initialization failed — alerts will be logged only.")
 
 
 async def _startup_activation_service() -> None:
@@ -1940,8 +1926,7 @@ async def _startup_migration_check() -> None:
         pending = await runner.check_pending()
         if pending:
             logger.warning(
-                "Schema migrations pending: %s. "
-                "Run 'python -m src.migrations.apply' to apply.",
+                "Schema migrations pending: %s. Run 'python -m src.migrations.apply' to apply.",
                 [m.VERSION for m in pending],
             )
         else:
@@ -1953,6 +1938,7 @@ async def _startup_migration_check() -> None:
 # =========================================================================
 # Shutdown handlers (defined at module level for direct test imports)
 # =========================================================================
+
 
 async def _shutdown_nats() -> None:
     """Drain and close NATS connection on application shutdown."""
@@ -1999,6 +1985,7 @@ async def _startup_pre_auth_cleanup() -> None:
     """Start the pre-auth rate limiter cleanup background task (SPEC-1623)."""
     try:
         from src.multi_tenant.security_hardening import start_pre_auth_cleanup
+
         await start_pre_auth_cleanup()
     except Exception:
         logger.warning("Pre-auth cleanup task failed to start", exc_info=True)
@@ -2008,6 +1995,7 @@ async def _shutdown_pre_auth_cleanup() -> None:
     """Stop the pre-auth rate limiter cleanup background task."""
     try:
         from src.multi_tenant.security_hardening import stop_pre_auth_cleanup
+
         await stop_pre_auth_cleanup()
     except Exception:
         pass
@@ -2053,6 +2041,7 @@ async def _startup_redis_rate_limiter() -> None:
             RedisRateLimitBackend,
             set_rate_limit_backend,
         )
+
         backend = RedisRateLimitBackend(client, key_prefix="agentred:rl:")
         set_rate_limit_backend(backend)
         logger.info("Redis rate limiter connected: %s", redis_url.split("@")[-1])
@@ -2097,8 +2086,7 @@ async def _startup_entitlement_service() -> None:
                 redis_client.ping()
             except Exception:
                 logger.warning(
-                    "EntitlementService: Redis unavailable — "
-                    "cache layer disabled",
+                    "EntitlementService: Redis unavailable — cache layer disabled",
                     exc_info=True,
                 )
                 redis_client = None
@@ -2111,8 +2099,7 @@ async def _startup_entitlement_service() -> None:
         )
     except Exception:
         logger.warning(
-            "EntitlementService startup failed — "
-            "frozen fallback will be used",
+            "EntitlementService startup failed — frozen fallback will be used",
             exc_info=True,
         )
 
@@ -2139,53 +2126,55 @@ def register_startup_handlers(app: FastAPI | None = None) -> None:
     executed by the lifespan context manager (SPEC-1623).
     """
     _lifecycle_startup_handlers.clear()
-    _lifecycle_startup_handlers.extend([
-        _startup_verification_secret,
-        _startup_cosmos_db,
-        _startup_tenant_resolution,
-        _startup_config_processor,
-        _startup_conversation_meter,
-        _startup_dashboard_services,
-        _startup_tracing,
-        _startup_circuit_breakers,
-        _startup_nats,
-        _startup_agntcy_sdk,
-        _startup_secret_service,
-        _startup_envelope_encryption,
-        _startup_chat_services,
-        _startup_admin_inbox_services,
-        _startup_knowledge_vectorizer,
-        _startup_conversation_vectorizer,
-        _startup_admin_knowledge_services,
-        _startup_embed_unembedded_kb,
-        _startup_admin_analytics_services,
-        _startup_admin_team_services,
-        _startup_admin_gdpr_services,
-        _startup_admin_audit_services,
-        _startup_admin_quick_action_services,
-        _startup_admin_profile_services,
-        _startup_admin_apikey_services,
-        _startup_superadmin_services,
-        _startup_contact_messages,
-        _startup_copilot_knowledge,
-        _startup_copilot_docs_ingestion,
-        _startup_pipeline_observatory,
-        _startup_status_api,
-        _startup_alert_engine,
-        _startup_mfa_service,
-        _startup_pattern_service,
-        _startup_fine_tuning_service,
-        _startup_key_rotation,
-        _startup_trial_service,
-        _startup_data_retention,
-        _startup_archival_pipeline,
-        _startup_alert_delivery,
-        _startup_activation_service,
-        _startup_migration_check,
-        _startup_pre_auth_cleanup,
-        _startup_redis_rate_limiter,
-        _startup_entitlement_service,
-    ])
+    _lifecycle_startup_handlers.extend(
+        [
+            _startup_verification_secret,
+            _startup_cosmos_db,
+            _startup_tenant_resolution,
+            _startup_config_processor,
+            _startup_conversation_meter,
+            _startup_dashboard_services,
+            _startup_tracing,
+            _startup_circuit_breakers,
+            _startup_nats,
+            _startup_agntcy_sdk,
+            _startup_secret_service,
+            _startup_envelope_encryption,
+            _startup_chat_services,
+            _startup_admin_inbox_services,
+            _startup_knowledge_vectorizer,
+            _startup_conversation_vectorizer,
+            _startup_admin_knowledge_services,
+            _startup_embed_unembedded_kb,
+            _startup_admin_analytics_services,
+            _startup_admin_team_services,
+            _startup_admin_gdpr_services,
+            _startup_admin_audit_services,
+            _startup_admin_quick_action_services,
+            _startup_admin_profile_services,
+            _startup_admin_apikey_services,
+            _startup_superadmin_services,
+            _startup_contact_messages,
+            _startup_copilot_knowledge,
+            _startup_copilot_docs_ingestion,
+            _startup_pipeline_observatory,
+            _startup_status_api,
+            _startup_alert_engine,
+            _startup_mfa_service,
+            _startup_pattern_service,
+            _startup_fine_tuning_service,
+            _startup_key_rotation,
+            _startup_trial_service,
+            _startup_data_retention,
+            _startup_archival_pipeline,
+            _startup_alert_delivery,
+            _startup_activation_service,
+            _startup_migration_check,
+            _startup_pre_auth_cleanup,
+            _startup_redis_rate_limiter,
+            _startup_entitlement_service,
+        ]
+    )
 
 
 def register_shutdown_handlers(app: FastAPI | None = None) -> None:
@@ -2195,15 +2184,17 @@ def register_shutdown_handlers(app: FastAPI | None = None) -> None:
     is no longer used (SPEC-1623).
     """
     _lifecycle_shutdown_handlers.clear()
-    _lifecycle_shutdown_handlers.extend([
-        _shutdown_nats,
-        _shutdown_agntcy_sdk,
-        _shutdown_cosmos_db,
-        _shutdown_secret_service,
-        _shutdown_chat_pipeline,
-        _shutdown_pre_auth_cleanup,
-        _shutdown_cache_invalidation,
-    ])
+    _lifecycle_shutdown_handlers.extend(
+        [
+            _shutdown_nats,
+            _shutdown_agntcy_sdk,
+            _shutdown_cosmos_db,
+            _shutdown_secret_service,
+            _shutdown_chat_pipeline,
+            _shutdown_pre_auth_cleanup,
+            _shutdown_cache_invalidation,
+        ]
+    )
 
 
 def build_app_lifespan():

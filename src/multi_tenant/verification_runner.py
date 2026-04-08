@@ -24,7 +24,7 @@ import asyncio
 import logging
 import os
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -641,7 +641,7 @@ class VerificationRunner:
         code, headers = await self._http_options("/health")
         has_cors = "access-control-allow-origin" in headers
         if has_cors:
-            return CheckResult(status="pass", detail=f"CORS headers present")
+            return CheckResult(status="pass", detail="CORS headers present")
         return CheckResult(status="fail", detail="No CORS headers in preflight response")
 
     async def _check_rate_limit_headers(self) -> CheckResult:

@@ -20,7 +20,6 @@ from __future__ import annotations
 import pytest
 
 from src.multi_tenant.cosmos_schema import TenantTier
-from src.multi_tenant.schema.models import TierGate
 from src.multi_tenant.schema.registry import (
     get_field_registry,
     get_fields_for_tier,

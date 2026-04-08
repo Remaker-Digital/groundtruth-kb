@@ -14,15 +14,13 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import os
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 from src.multi_tenant.cosmos_schema import (
     RATE_LIMIT_RPM_DEFAULT,
@@ -166,7 +164,7 @@ class TestRateLimitDisabled:
 
             register_middleware(app)
 
-        middleware_types = [type(m).__name__ for m in getattr(app, "user_middleware", [])]
+        [type(m).__name__ for m in getattr(app, "user_middleware", [])]
         # Starlette stores middleware specs differently — check via
         # the cls attribute of Middleware objects
         middleware_classes = []

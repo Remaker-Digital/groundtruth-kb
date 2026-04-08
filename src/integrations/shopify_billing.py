@@ -43,7 +43,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.multi_tenant.entitlement_service import get_entitlement_service
@@ -104,6 +104,8 @@ def _get_shopify_pricing(tier: str) -> dict[str, Any]:
         "included_conversations": int(pricing.get("included_conversations", 0)),
         "capped_amount": Decimal(str(pricing.get("capped_amount", 0))),
     }
+
+
 VALID_INTERVALS = frozenset({"month", "year"})
 
 # ---------------------------------------------------------------------------
@@ -289,9 +291,7 @@ _shop_subscriptions: dict[str, dict[str, Any]] = {}
 def _get_tier_pricing(tier: str) -> dict[str, Any]:
     """Get pricing config for a tier, raising ValueError if invalid."""
     if tier not in VALID_TIERS:
-        raise ValueError(
-            f"Invalid tier '{tier}'. Must be one of: {sorted(VALID_TIERS)}"
-        )
+        raise ValueError(f"Invalid tier '{tier}'. Must be one of: {sorted(VALID_TIERS)}")
     return _get_shopify_pricing(tier)
 
 
@@ -338,9 +338,7 @@ async def create_subscription(
     pricing = _get_tier_pricing(tier)
 
     if interval not in VALID_INTERVALS:
-        raise ValueError(
-            f"Invalid interval '{interval}'. Must be 'month' or 'year'."
-        )
+        raise ValueError(f"Invalid interval '{interval}'. Must be 'month' or 'year'.")
 
     shopify_interval = _INTERVAL_MAP[interval]
 
@@ -356,10 +354,7 @@ async def create_subscription(
 
     # Build the return URL for post-approval redirect
     if return_url is None:
-        return_url = (
-            f"{_BASE_URL}/api/shopify/billing/confirm"
-            f"?shop={shop_domain}&tier={tier}&interval={interval}"
-        )
+        return_url = f"{_BASE_URL}/api/shopify/billing/confirm?shop={shop_domain}&tier={tier}&interval={interval}"
 
     # Build line items
     #
@@ -385,22 +380,24 @@ async def create_subscription(
     if interval == "month":
         # Add usage-based overage line item (monthly only)
         overage_cap = pricing["capped_amount"]
-        line_items.append({
-            "plan": {
-                "appUsagePricingDetails": {
-                    "cappedAmount": {
-                        "amount": str(overage_cap),
-                        "currencyCode": "USD",
+        line_items.append(
+            {
+                "plan": {
+                    "appUsagePricingDetails": {
+                        "cappedAmount": {
+                            "amount": str(overage_cap),
+                            "currencyCode": "USD",
+                        },
+                        "terms": (
+                            f"Overage billing: ${pricing['overage_rate']} per conversation "
+                            f"beyond {pricing['included_conversations']:,} included conversations "
+                            f"per billing cycle. Maximum overage charge: "
+                            f"${overage_cap} per cycle."
+                        ),
                     },
-                    "terms": (
-                        f"Overage billing: ${pricing['overage_rate']} per conversation "
-                        f"beyond {pricing['included_conversations']:,} included conversations "
-                        f"per billing cycle. Maximum overage charge: "
-                        f"${overage_cap} per cycle."
-                    ),
                 },
-            },
-        })
+            }
+        )
     else:
         # Annual plan — no usage line item
         # TODO (Phase 2.2): Handle annual overage via one-time app charges
@@ -501,12 +498,14 @@ async def _auto_enable_shopify_mcp(tenant_id: str, shop_domain: str) -> None:
         )
         logger.info(
             "Auto-enabled Shopify Storefront MCP: tenant=%s shop=%s",
-            tenant_id, shop_domain,
+            tenant_id,
+            shop_domain,
         )
     except Exception:
         logger.warning(
             "Failed to auto-enable Shopify MCP (non-fatal): tenant=%s shop=%s",
-            tenant_id, shop_domain,
+            tenant_id,
+            shop_domain,
             exc_info=True,
         )
 
@@ -559,11 +558,13 @@ async def confirm_subscription(
 
     # Update local tracking
     if shop_domain in _shop_subscriptions:
-        _shop_subscriptions[shop_domain].update({
-            "subscription_id": active_sub["id"],
-            "usage_line_item_id": usage_line_item_id,
-            "status": "active",
-        })
+        _shop_subscriptions[shop_domain].update(
+            {
+                "subscription_id": active_sub["id"],
+                "usage_line_item_id": usage_line_item_id,
+                "status": "active",
+            }
+        )
     else:
         _shop_subscriptions[shop_domain] = {
             "subscription_id": active_sub["id"],
@@ -652,16 +653,12 @@ async def record_shopify_usage(
     """
     sub_info = _shop_subscriptions.get(shop_domain)
     if not sub_info:
-        raise ValueError(
-            f"No subscription found for shop '{shop_domain}'. "
-            "Merchant must subscribe first."
-        )
+        raise ValueError(f"No subscription found for shop '{shop_domain}'. Merchant must subscribe first.")
 
     usage_line_item_id = sub_info.get("usage_line_item_id")
     if not usage_line_item_id:
         raise ValueError(
-            f"No usage line item found for shop '{shop_domain}'. "
-            "Subscription may not have a usage component."
+            f"No usage line item found for shop '{shop_domain}'. Subscription may not have a usage component."
         )
 
     pricing = sub_info.get("pricing", {})
@@ -786,7 +783,10 @@ async def get_billing_status(shop_domain: str) -> dict[str, Any]:
     response_model=SubscribeResponse,
     status_code=200,
     summary="Create a Shopify app subscription",
-    description="Creates a Shopify app subscription for a merchant. The merchant will be redirected to Shopify's confirmation page to approve the charge.",
+    description=(
+        "Creates a Shopify app subscription for a merchant. The merchant will be redirected to Shopify's confirmation "
+        "page to approve the charge."
+    ),
     responses={
         400: {"description": "Invalid tier or billing interval"},
         502: {"description": "Shopify GraphQL API error during subscription creation"},
@@ -839,7 +839,10 @@ async def subscribe_endpoint(body: SubscribeRequest) -> SubscribeResponse:
     "/confirm",
     status_code=200,
     summary="Handle Shopify post-approval redirect",
-    description="Handles Shopify's post-approval redirect after a merchant approves the subscription charge. Confirms the subscription is active and provisions the tenant.",
+    description=(
+        "Handles Shopify's post-approval redirect after a merchant approves the subscription charge. Confirms the "
+        "subscription is active and provisions the tenant."
+    ),
     responses={
         400: {"description": "Missing shop query parameter"},
         502: {"description": "Shopify API error during subscription confirmation"},
@@ -895,7 +898,10 @@ async def confirm_endpoint(request: Request) -> JSONResponse:
     response_model=BillingStatusResponse,
     status_code=200,
     summary="Get Shopify merchant billing status",
-    description="Returns the current billing status for a Shopify merchant, including active subscription details and line items.",
+    description=(
+        "Returns the current billing status for a Shopify merchant, including active subscription details and line "
+        "items."
+    ),
     responses={
         400: {"description": "Missing shop query parameter"},
         502: {"description": "Shopify API error during status retrieval"},

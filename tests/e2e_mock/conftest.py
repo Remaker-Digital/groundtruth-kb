@@ -8,13 +8,12 @@ reset between mutation tests.
 import os
 import re
 import subprocess
-import sys
 import time
 from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
-from playwright.sync_api import Page, BrowserContext
+from playwright.sync_api import Page
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ADMIN_STANDALONE = PROJECT_ROOT / "admin" / "standalone"

@@ -20,8 +20,7 @@ Work Items #73-74 (Decision #25).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -30,11 +29,8 @@ from fastapi.testclient import TestClient
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import TenantTier, TenantStatus
 from src.multi_tenant.usage_dashboard_api import (
-    ConversationDetailResponse,
-    ConversationListResponse,
     ConversationSummary,
     DailyVolumeEntry,
-    DailyVolumeResponse,
     UsageDashboardResponse,
     configure_dashboard_services,
     router,

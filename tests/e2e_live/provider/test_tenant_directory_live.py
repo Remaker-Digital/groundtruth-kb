@@ -15,7 +15,6 @@ API: GET  /api/superadmin/tenants
 """
 
 import re
-import time
 
 import pytest
 from playwright.sync_api import Page
@@ -253,7 +252,7 @@ class TestTenantTableRows:
         """When no tenants match filters, shows 'No tenants found'."""
         if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify empty state")
-        text = _main_text(shared_tenant_directory_page).lower()
+        _main_text(shared_tenant_directory_page).lower()
         # Only check if actually empty
         rows = shared_tenant_directory_page.locator("main table tbody tr")
         if rows.count() == 1:
@@ -822,7 +821,6 @@ class TestTenantActionMenuExpanded:
         # 'Remove Expiry' only appears when tenant has an expiry date set
         items = ["resend welcome", "set expiry", "extend 30"]
         found = sum(1 for item in items if item in body_text)
-        has_remove = "remove expiry" in body_text
         assert found >= 3, (
             f"Expected at least 3 menu items (Resend Welcome, Set Expiry, Extend 30 Days), found {found}/3"
         )

@@ -1,12 +1,11 @@
 """Inspect Widget page DOM to identify actual elements for E2E test fixes."""
-import json
 import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent.parent))
 
-from playwright.sync_api import sync_playwright
-from tests.e2e.conftest import AdminApiMocker, ADMIN_VITE_PORT
+from playwright.sync_api import sync_playwright  # noqa: E402
+from tests.e2e.conftest import AdminApiMocker, ADMIN_VITE_PORT  # noqa: E402
 
 p = sync_playwright().start()
 browser = p.chromium.launch(headless=True)

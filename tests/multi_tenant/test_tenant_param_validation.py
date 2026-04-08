@@ -20,9 +20,7 @@ Run:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import Request
 from starlette.testclient import TestClient
 

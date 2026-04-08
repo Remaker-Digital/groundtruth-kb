@@ -14,7 +14,6 @@ API: GET /api/superadmin/dashboard
 """
 
 import re
-import time
 
 import pytest
 from playwright.sync_api import Page
@@ -444,7 +443,7 @@ class TestTenantDistribution:
             pytest.skip("Rate limited — cannot verify distribution cards")
         text = _main_text(shared_health_dashboard_page).lower()
         labels = ["total tenants", "by status", "by tier"]
-        found = sum(1 for l in labels if l in text)
+        found = sum(1 for label in labels if label in text)
         assert found >= 2, (
             f"Expected 3 distribution card labels, found {found}/3"
         )

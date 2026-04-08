@@ -75,11 +75,9 @@ except ImportError:
     AsyncAzureOpenAI = None  # type: ignore[assignment,misc]
 
 from src.multi_tenant.cosmos_schema import (
-    AuditEventType,
     ConsentStatus,
     PreferencesDocument,
     TenantTier,
-    TIER_DEFAULTS,
 )
 
 logger = logging.getLogger(__name__)

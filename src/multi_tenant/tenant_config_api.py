@@ -75,7 +75,6 @@ from src.multi_tenant.tenant_config_processor import (
 )
 from src.multi_tenant.tenant_config_schema import (
     export_schema_for_api,
-    resolve_defaults,
 )
 
 logger = logging.getLogger(__name__)
@@ -340,7 +339,8 @@ async def _resolve_quick_actions(
     except Exception:
         logger.warning(
             "Quick action resolution failed for tenant=%s",
-            tenant_id[:8], exc_info=True,
+            tenant_id[:8],
+            exc_info=True,
         )
         return []
 
@@ -362,20 +362,14 @@ async def _resolve_quick_actions(
     # Pass 1: exact handle match
     if page_handle:
         for asgn in assignments:
-            if (
-                asgn.get("page_type") == page_type
-                and asgn.get("page_handle") == page_handle
-            ):
+            if asgn.get("page_type") == page_type and asgn.get("page_handle") == page_handle:
                 match = asgn
                 break
 
     # Pass 2: page type (no handle)
     if match is None:
         for asgn in assignments:
-            if (
-                asgn.get("page_type") == page_type
-                and not asgn.get("page_handle")
-            ):
+            if asgn.get("page_type") == page_type and not asgn.get("page_handle"):
                 match = asgn
                 break
 
@@ -395,12 +389,14 @@ async def _resolve_quick_actions(
         action_id = match.get(slot_key)
         if action_id and action_id in action_map:
             a = action_map[action_id]
-            result.append(QuickActionForWidget(
-                id=a.get("id", ""),
-                label=a.get("label", ""),
-                prompt_template=a.get("prompt_template", ""),
-                icon=a.get("icon"),
-            ))
+            result.append(
+                QuickActionForWidget(
+                    id=a.get("id", ""),
+                    label=a.get("label", ""),
+                    prompt_template=a.get("prompt_template", ""),
+                    icon=a.get("icon"),
+                )
+            )
 
     return result
 
@@ -409,7 +405,7 @@ async def _resolve_quick_actions(
 # AI-generated greeting (widget_greeting_mode='ai_generated')
 # ---------------------------------------------------------------------------
 
-import random
+import random  # noqa: E402
 
 # Greeting templates — varied, brand-aware, time-of-day-aware.
 # Each template may use {brand}, {time_greeting}, and {page_hint}.
@@ -525,6 +521,7 @@ router = APIRouter(prefix="/api/config", tags=["configuration"])
 # 1. GET /api/config — Current resolved config
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "",
     response_model=ConfigResponse,
@@ -608,14 +605,18 @@ async def get_config(
     if response_config.get("widget_greeting_mode") == "ai_generated":
         response_config = dict(response_config)  # Don't mutate cached config
         response_config["widget_greeting_message"] = _generate_ai_greeting(
-            response_config, page_type,
+            response_config,
+            page_type,
         )
 
     # --- Quick action resolution (WI #227) ---
     quick_actions: list[QuickActionForWidget] | None = None
     if page_type is not None:
         quick_actions = await _resolve_quick_actions(
-            ctx.tenant_id, result.config, page_type, page_handle,
+            ctx.tenant_id,
+            result.config,
+            page_type,
+            page_handle,
         )
 
     return ConfigResponse(
@@ -632,6 +633,7 @@ async def get_config(
 # ---------------------------------------------------------------------------
 # 2. PUT /api/config — Partial config update
 # ---------------------------------------------------------------------------
+
 
 @router.put(
     "",
@@ -703,11 +705,15 @@ async def update_config(
 # 3. POST /api/config/validate — Dry-run validation
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/validate",
     response_model=ConfigValidateResponse,
     summary="Validate configuration changes",
-    description="Validates proposed configuration changes without persisting. Use for live preview and feedback in the merchant UI before committing.",
+    description=(
+        "Validates proposed configuration changes without persisting. Use for live preview and feedback in the "
+        "merchant UI before committing."
+    ),
 )
 async def validate_config_endpoint(
     body: ConfigValidateRequest,
@@ -734,6 +740,7 @@ async def validate_config_endpoint(
 # ---------------------------------------------------------------------------
 # 4. POST /api/config/reset — Reset to tier defaults
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/reset",
@@ -774,11 +781,15 @@ async def reset_config(
 # 5. GET /api/config/diff — Overrides vs. defaults
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/diff",
     response_model=ConfigDiffResponse,
     summary="Get config overrides vs defaults",
-    description="Shows fields where the tenant's config differs from tier defaults. Useful for understanding what has been customized.",
+    description=(
+        "Shows fields where the tenant's config differs from tier defaults. Useful for understanding what has been "
+        "customized."
+    ),
 )
 async def get_config_diff(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -801,17 +812,19 @@ async def get_config_diff(
     )
 
 
-
-
 # ---------------------------------------------------------------------------
 # 6. GET /api/config/schema — Full field schema for UI rendering
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/schema",
     response_model=ConfigSchemaResponse,
     summary="Get configuration field schema",
-    description="Returns field metadata (types, validation rules, defaults, tooltips) organized by configuration section. Fields are filtered by the tenant's tier.",
+    description=(
+        "Returns field metadata (types, validation rules, defaults, tooltips) organized by configuration section. "
+        "Fields are filtered by the tenant's tier."
+    ),
 )
 async def get_config_schema(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -836,17 +849,19 @@ async def get_config_schema(
     )
 
 
-
-
 # ---------------------------------------------------------------------------
 # 8. GET /api/config/versions — Version history
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/versions",
     response_model=ConfigVersionListResponse,
     summary="List configuration versions",
-    description="Returns up to 20 most recent configuration versions, newest first, with version number, timestamp, and creator.",
+    description=(
+        "Returns up to 20 most recent configuration versions, newest first, with version number, timestamp, and "
+        "creator."
+    ),
 )
 async def list_config_versions(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -872,11 +887,15 @@ async def list_config_versions(
 # 9. GET /api/config/versions/{version} — Specific historical version
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/versions/{version}",
     response_model=ConfigResponse,
     summary="Get specific configuration version",
-    description="Returns the resolved configuration as it was at a specific historical version, merged with current tier defaults.",
+    description=(
+        "Returns the resolved configuration as it was at a specific historical version, merged with current tier "
+        "defaults."
+    ),
     responses={
         404: {"description": "Configuration version not found"},
     },
@@ -913,11 +932,15 @@ async def get_config_version(
 # 10. GET /api/config/named — List named configurations (C3)
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/named",
     response_model=NamedConfigListResponse,
     summary="List named configurations",
-    description="Returns all named configurations for the tenant. Named configs are saved snapshots that can be activated to switch the live AI behavior.",
+    description=(
+        "Returns all named configurations for the tenant. Named configs are saved snapshots that can be activated to "
+        "switch the live AI behavior."
+    ),
 )
 async def list_named_configs(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -937,11 +960,14 @@ async def list_named_configs(
 # 11. POST /api/config/named — Save current config as named (C3)
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/named",
     response_model=ConfigUpdateResponse,
     summary="Save configuration as named",
-    description="Saves the current resolved configuration as a named snapshot. Use names like 'Holiday Mode', 'Sale Mode', etc.",
+    description=(
+        "Saves the current resolved configuration as a named snapshot. Use names like 'Holiday Mode', 'Sale Mode', etc."
+    ),
     responses={
         400: {"description": "Invalid or missing name"},
     },
@@ -984,6 +1010,7 @@ async def save_named_config(
 # ---------------------------------------------------------------------------
 # 12. POST /api/config/named/{name}/activate — Activate a named config (C3)
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/named/{name}/activate",
@@ -1045,11 +1072,15 @@ async def activate_named_config(
 # 13. DELETE /api/config/named/{name} — Delete a named config (C3)
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/named/{name}",
     response_model=NamedConfigDeleteResponse,
     summary="Delete named configuration",
-    description="Deletes a named configuration. The 'Default' configuration cannot be deleted. The underlying version history is preserved.",
+    description=(
+        "Deletes a named configuration. The 'Default' configuration cannot be deleted. The underlying version history "
+        "is preserved."
+    ),
     responses={
         400: {"description": "Cannot delete Default configuration"},
         404: {"description": "Named configuration not found"},
@@ -1092,11 +1123,15 @@ async def delete_named_config(
 # 14. GET /api/config/widget-appearances — List named widget appearances (C4)
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/widget-appearances",
     response_model=NamedConfigListResponse,
     summary="List named widget appearances",
-    description="Returns all named widget appearances. These are saved snapshots of widget_* visual fields that can be switched independently from AI behavior configs.",
+    description=(
+        "Returns all named widget appearances. These are saved snapshots of widget_* visual fields that can be "
+        "switched independently from AI behavior configs."
+    ),
 )
 async def list_widget_appearances(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -1116,11 +1151,15 @@ async def list_widget_appearances(
 # 15. POST /api/config/widget-appearances — Save current appearance as named (C4)
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/widget-appearances",
     response_model=ConfigUpdateResponse,
     summary="Save widget appearance as named",
-    description="Saves the current widget appearance fields as a named snapshot. Only widget_* visual/behavior fields are included.",
+    description=(
+        "Saves the current widget appearance fields as a named snapshot. Only widget_* visual/behavior fields are "
+        "included."
+    ),
     responses={
         400: {"description": "Invalid or missing name"},
     },
@@ -1163,6 +1202,7 @@ async def save_widget_appearance(
 # ---------------------------------------------------------------------------
 # 16. POST /api/config/widget-appearances/{name}/activate (C4)
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/widget-appearances/{name}/activate",
@@ -1224,6 +1264,7 @@ async def activate_widget_appearance(
 # 17. DELETE /api/config/widget-appearances/{name} (C4)
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/widget-appearances/{name}",
     response_model=NamedConfigDeleteResponse,
@@ -1271,6 +1312,7 @@ async def delete_widget_appearance(
 # 18. POST /api/config/rollback — Roll back to a previous version
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/rollback",
     response_model=ConfigRollbackResponse,
@@ -1303,7 +1345,9 @@ async def rollback_config(
 
     # Get the target version's content
     version_result = await processor.get_version(
-        ctx.tenant_id, tier, body.target_version,
+        ctx.tenant_id,
+        tier,
+        body.target_version,
     )
     if version_result is None:
         raise HTTPException(
@@ -1327,16 +1371,14 @@ async def rollback_config(
         from_version=current.version,
         to_version=body.target_version,
         new_version=draft_result.version,
-        message=(
-            f"Version {body.target_version} loaded as draft. "
-            f"Activate to apply."
-        ),
+        message=(f"Version {body.target_version} loaded as draft. Activate to apply."),
     )
 
 
 # ---------------------------------------------------------------------------
 # 19. GET /api/config/activation-status — Lightweight activation state
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/activation-status",
@@ -1372,9 +1414,7 @@ async def get_activation_status(
             brand_voice = active.get("brand_voice")
             widget_key = active.get("widget_key")
             is_configured = bool(
-                brand_name and str(brand_name).strip()
-                and brand_voice and str(brand_voice).strip()
-                and widget_key
+                brand_name and str(brand_name).strip() and brand_voice and str(brand_voice).strip() and widget_key
             )
 
             # Self-heal: ensure widget_key_hash exists on the tenant doc.
@@ -1404,11 +1444,7 @@ async def get_activation_status(
         d_brand = doc.get("brand_name")
         d_voice = doc.get("brand_voice")
         d_wkey = doc.get("widget_key")
-        can_activate = bool(
-            d_brand and str(d_brand).strip()
-            and d_voice and str(d_voice).strip()
-            and d_wkey
-        )
+        can_activate = bool(d_brand and str(d_brand).strip() and d_voice and str(d_voice).strip() and d_wkey)
 
     return ActivationStatusResponse(
         has_pending_changes=draft_state.has_pending_changes,
@@ -1499,7 +1535,8 @@ async def deactivate_config(
 
     logger.info(
         "Tenant %s configuration deactivated at %s",
-        ctx.tenant_id[:8], now,
+        ctx.tenant_id[:8],
+        now,
     )
 
     return DeactivateConfigResponse(
@@ -1512,6 +1549,7 @@ async def deactivate_config(
 # ---------------------------------------------------------------------------
 # 20. GET /api/config/draft — Full draft state + diff vs active
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/draft",
@@ -1550,6 +1588,7 @@ async def get_draft_state(
 # 20b. GET /api/config/draft/preflight — Pre-activation validation (D35)
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/draft/preflight",
     response_model=PreflightResponse,
@@ -1583,6 +1622,7 @@ async def preflight_check(
 # ---------------------------------------------------------------------------
 # 21. POST /api/config/draft/activate — Validate and activate the draft
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/draft/activate",
@@ -1638,6 +1678,7 @@ async def activate_draft(
 # 22. POST /api/config/draft/discard — Discard all draft changes
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/draft/discard",
     response_model=DiscardResponse,
@@ -1668,6 +1709,7 @@ async def discard_draft(
 # ---------------------------------------------------------------------------
 # 23. POST /api/config/restore — Restore previous activation snapshot
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/restore",

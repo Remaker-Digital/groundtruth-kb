@@ -8,14 +8,11 @@ priority scoring, trend computation, and suggested actions.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-import pytest
 
 from src.multi_tenant.knowledge_score import (
-    RELEVANCE_THRESHOLD,
     GapCluster,
-    KnowledgeScoreBreakdown,
     classify_unanswered,
     cluster_gaps,
     compute_knowledge_score,

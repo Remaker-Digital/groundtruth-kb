@@ -40,7 +40,7 @@ import time
 from collections import defaultdict
 from typing import Any, Callable
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
@@ -50,7 +50,6 @@ from src.multi_tenant.auth import (
     WIDGET_KEY_HEADER,
     AuthenticationError,
     TenantContext,
-    TenantInactiveError,
     extract_bearer_token,
     extract_shop_domain,
     hash_api_key,
@@ -59,17 +58,14 @@ from src.multi_tenant.auth import (
     is_user_api_key,
     is_widget_key_allowed_path,
     validate_tenant_status,
-    verify_api_key,
     verify_shopify_session_token,
     verify_spa_api_key,
-    verify_user_api_key,
     verify_verification_token,
     verify_widget_key,
 )
 from src.multi_tenant.magic_link_auth import verify_magic_link_session_token
 from src.multi_tenant.cosmos_schema import (
     PLATFORM_ADMIN_TENANT_ID,
-    TIER_DEFAULTS,
     TeamMemberRole,
     TenantStatus,
     TenantTier,
@@ -277,7 +273,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 status_code=exc.status_code,
                 content={"error": exc.message},
             )
-        except Exception as exc:
+        except Exception:
             # Record failure for brute-force protection (SPEC-1621)
             from src.multi_tenant.security_hardening import get_pre_auth_limiter
             get_pre_auth_limiter().record_failure(client_ip)

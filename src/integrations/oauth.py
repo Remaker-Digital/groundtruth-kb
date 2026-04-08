@@ -19,8 +19,8 @@ import time
 from typing import Any
 from urllib.parse import urlencode
 
-from src.integrations.manifest import AuthConfig, AuthType
-from src.integrations.models import AuthenticationError, IntegrationError
+from src.integrations.manifest import AuthConfig
+from src.integrations.models import AuthenticationError
 
 logger = logging.getLogger(__name__)
 

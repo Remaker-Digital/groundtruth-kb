@@ -146,7 +146,7 @@ def create_agent_app(
         Accepts JSON payload directly (without A2A Message envelope)
         for HTTP-based invocation from the orchestrator or tests.
         """
-        body = await request.json()
+        await request.json()
 
         # Build an A2A Message from the HTTP request
         msg = Message(

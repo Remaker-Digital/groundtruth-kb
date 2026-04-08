@@ -14,7 +14,6 @@ import time
 import pytest
 
 from src.integrations.sync_manager import (
-    ECHO_MARKER_TTL_SECONDS,
     BidirectionalSyncManager,
     EchoMarkerStore,
 )

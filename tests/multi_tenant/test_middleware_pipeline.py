@@ -15,23 +15,17 @@ Work Item: P0 launch-blocker tests.
 from __future__ import annotations
 
 import time
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import jwt
 import pytest
 
 from tests.conftest import (
-    ENTERPRISE_TENANT_ID,
-    PROFESSIONAL_TENANT_ID,
     STARTER_TENANT_ID,
-    TEST_API_KEY_ENTERPRISE,
-    TEST_API_KEY_PROFESSIONAL,
     TEST_API_KEY_STARTER,
     TEST_WIDGET_KEY,
     auth_headers_api_key,
     auth_headers_bearer,
-    auth_headers_widget_key,
     hash_test_api_key,
     make_tenant_document,
 )
@@ -390,9 +384,6 @@ class TestFullStack:
         We verify this by checking the middleware chain order.
         """
         import src.main as main_mod
-        from src.multi_tenant.middleware import TenantAuthMiddleware
-        from src.multi_tenant.pipeline_resilience import TenantConcurrencyMiddleware
-        from src.multi_tenant.otel_tracing import CorrelationMiddleware
 
         stack = main_mod.app.middleware_stack
         middleware_types: list[str] = []
@@ -741,7 +732,7 @@ class TestSessionTokenWidgetKeyPrecedence:
                 "X-Session-Token": "valid-session-jwt",
                 "X-Widget-Key": TEST_WIDGET_KEY,
             }
-            resp = app_client.post(
+            app_client.post(
                 f"/api/chat/conversations?tenant={STARTER_TENANT_ID}",
                 headers=headers,
                 json={"initial_message": "test"},
@@ -770,7 +761,7 @@ class TestSessionTokenWidgetKeyPrecedence:
             new_callable=AsyncMock,
             return_value=mock_ctx,
         ) as mock_session:
-            resp = app_client.get(
+            app_client.get(
                 f"/api/chat/stream/conv-123"
                 f"?session_token=valid-session-jwt"
                 f"&widget_key={TEST_WIDGET_KEY}"

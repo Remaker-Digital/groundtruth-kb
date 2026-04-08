@@ -22,7 +22,6 @@ Architecture references:
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 

@@ -568,7 +568,6 @@ async def close_agntcy_sdk() -> None:
     if _transport is not None:
         try:
             # SDK transports may have sync or async close(); handle both
-            import asyncio
             import inspect
 
             if inspect.iscoroutinefunction(getattr(_transport, "close", None)):

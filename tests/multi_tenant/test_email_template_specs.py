@@ -18,7 +18,7 @@ Covers 19 specs across 6 email modules:
 from __future__ import annotations
 
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -78,7 +78,6 @@ class TestEmailVerificationSpecs:
         """SPEC-1304: Subject is '[Agent Red] Verify Your Email Address'."""
         # The subject is hardcoded in the request_verification function.
         # We verify the string constant matches.
-        expected_subject = "[Agent Red] Verify Your Email Address"
         # Read the source to confirm the subject is used
         from src.multi_tenant.email_verification import _VERIFY_EMAIL_BODY
 

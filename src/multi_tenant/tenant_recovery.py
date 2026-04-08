@@ -28,7 +28,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -137,7 +137,6 @@ async def activate_recovery_address(
     request: Request,
 ) -> RecoveryActionResponse:
     """Activate or update the recovery address for a tenant."""
-    from src.multi_tenant.middleware import require_platform_admin
     ctx = getattr(request.state, "tenant_context", None)
 
     if _tenant_repo is None:

@@ -27,7 +27,6 @@ from src.multi_tenant.cosmos_schema import (
     ConversationDocument,
     ConversationStatus,
 )
-from src.multi_tenant.repositories.conversation import ConversationRepository
 
 # ---------------------------------------------------------------------------
 # Test constants

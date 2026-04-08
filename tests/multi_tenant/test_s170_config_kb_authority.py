@@ -12,16 +12,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from src.multi_tenant.cosmos_schema import (
-    BillingChannel,
     PreferencesDocument,
-    TenantDocument,
-    TenantStatus,
-    TenantTier,
 )
 from src.multi_tenant.system_prompt_builder import (
     AgentRole,
@@ -33,7 +29,6 @@ from src.multi_tenant.kb_conflict_scanner import (
     ConflictType,
     KBConflictScanner,
     _CONFIG_POLICY_FIELDS,
-    _detect_factual_conflicts,
     _filter_articles_by_keywords,
     _generate_resolution,
 )

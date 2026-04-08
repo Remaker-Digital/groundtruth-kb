@@ -19,7 +19,6 @@ import time
 from typing import Any, TypeVar
 
 from azure.cosmos.exceptions import (
-    CosmosHttpResponseError,
     CosmosResourceExistsError,
     CosmosResourceNotFoundError,
 )

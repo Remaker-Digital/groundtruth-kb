@@ -25,7 +25,7 @@ Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights re
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -282,7 +282,7 @@ class TestLazyBackfill:
         prefs_repo = AsyncMock()
         svc = _make_service(prefs_repo=prefs_repo)
 
-        result = await svc._ensure_config_state(old_doc, TENANT_ID)
+        await svc._ensure_config_state(old_doc, TENANT_ID)
 
         # Verify the patch was called
         prefs_repo.patch.assert_called_once()

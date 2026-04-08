@@ -11,10 +11,8 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from src.multi_tenant.log_retention import (
-    ARCHIVE_PATH_TEMPLATE,
     DEFAULT_RETENTION_DAYS,
     build_archive_path,
     compute_cutoff_date,

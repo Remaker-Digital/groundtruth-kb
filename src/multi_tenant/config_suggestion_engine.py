@@ -21,7 +21,6 @@ Each suggestion has a confidence score (0.0-1.0).
 from __future__ import annotations
 
 import logging
-import re
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
@@ -191,12 +190,6 @@ class ConfigSuggestionEngine:
     def _extract_brand_name(articles: list[dict[str, Any]]) -> Suggestion | None:
         """Extract likely brand name from article titles and metadata."""
         # Count words in titles (excluding common stop words)
-        stop_words = {
-            "the", "a", "an", "and", "or", "for", "to", "in", "of", "on",
-            "is", "how", "what", "why", "when", "our", "your", "my", "we",
-            "i", "you", "it", "do", "does", "can", "will", "with", "about",
-            "guide", "policy", "faq", "help", "information", "instructions",
-        }
 
         word_counts: Counter = Counter()
         for article in articles:

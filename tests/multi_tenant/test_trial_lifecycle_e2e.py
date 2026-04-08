@@ -11,14 +11,12 @@ Master Test Plan: §4 Gap Register — Trial Lifecycle E2E (1.0-required)
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.multi_tenant.cosmos_schema import (
-    TIER_DEFAULTS,
     AuditEventType,
     BillingChannel,
     TenantStatus,
@@ -33,7 +31,6 @@ from src.multi_tenant.trial_management import (
     TrialConversionResult,
     TrialManagementService,
     TrialScanResult,
-    TrialStatusCode,
 )
 
 
@@ -372,7 +369,7 @@ class TestDemoDataSeeding:
         service = _make_service(repos)
 
         # seed_demo_data calls conversation_repo.create for each demo conversation
-        result = await service.provision_trial(
+        await service.provision_trial(
             customer_email="demo@example.com",
             seed_demo_data=True,
         )

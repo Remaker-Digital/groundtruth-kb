@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 class TestOTELExporterConfiguration:
@@ -205,7 +204,6 @@ class TestCustomMetrics:
 
     def test_record_request_duration(self):
         """SPEC-1834 req 6: request_duration_ms histogram records values."""
-        import src.multi_tenant.otel_application_insights as mod
         from src.multi_tenant.otel_application_insights import (
             configure_metrics,
             record_request_duration,
@@ -300,7 +298,6 @@ class TestBatchExportInterval:
 
     def test_batch_processor_uses_5s_interval(self):
         """SPEC-1834 req 8: BatchSpanProcessor configured with 5000ms interval."""
-        from unittest.mock import call
 
         from src.multi_tenant.otel_tracing import configure_tracing
 

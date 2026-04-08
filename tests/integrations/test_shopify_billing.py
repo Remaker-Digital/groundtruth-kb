@@ -413,7 +413,7 @@ class TestDecimalQuantizeToCents:
 
         # 7 conversations * $0.025 = $0.175 → quantized to $0.18 (banker's rounding)
         # or $0.17 depending on rounding mode — verify it has 2 decimal places
-        result = await record_shopify_usage(
+        await record_shopify_usage(
             shop_domain="quantize-store.myshopify.com",
             overage_count=7,
             idempotency_key="key-quantize",

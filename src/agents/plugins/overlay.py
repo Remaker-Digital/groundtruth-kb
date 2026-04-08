@@ -13,13 +13,12 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from src.agents.plugins.registry import (
     PluginAgentDefinition,
     PluginAgentRegistry,
-    SkillDefinition,
 )
 
 logger = logging.getLogger(__name__)

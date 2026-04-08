@@ -10,9 +10,8 @@ Covers:
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 HOOKS_DIR = PROJECT_ROOT / ".claude" / "hooks"
@@ -70,13 +69,12 @@ class TestAssertionCheckHook:
 
 # Import scheduler functions directly (it's on Windows so msvcrt is available)
 sys.path.insert(0, str(HOOKS_DIR))
-from scheduler import (
+from scheduler import (  # noqa: E402
     _FileLock,
     load_state,
     mark_done,
     parse_groups,
     remove_group,
-    save_state,
     should_trigger,
 )
 

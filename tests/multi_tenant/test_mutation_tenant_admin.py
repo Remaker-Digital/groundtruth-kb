@@ -7,9 +7,8 @@ All endpoints require tenant admin authentication.
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
 
 from tests.conftest import STARTER_TENANT_ID
 from tests.multi_tenant.conftest import MutationTestBase

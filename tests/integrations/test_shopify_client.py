@@ -17,7 +17,6 @@ All network calls are mocked via httpx.AsyncClient.post.
 
 from __future__ import annotations
 
-import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx

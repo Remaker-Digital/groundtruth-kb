@@ -7,7 +7,6 @@ SLATrends, AbuseDetection, MfaSettings.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
-import re
 
 import pytest
 from playwright.sync_api import Page
@@ -124,7 +123,7 @@ class TestBillingHealthTitle:
             pytest.skip("Rate limited")
         text = _main_text(shared_billing_health_page).lower()
         labels = ["total tenants", "needing review", "webhook"]
-        found = sum(1 for l in labels if l in text)
+        found = sum(1 for label in labels if label in text)
         assert found >= 1, f"Expected billing summary cards, found {found}/3"
 
 
@@ -231,7 +230,7 @@ class TestSLATrendsCharts:
         if _is_rate_limited(shared_sla_trends_page):
             pytest.skip("Rate limited")
         text = _main_text(shared_sla_trends_page).lower()
-        has_latency = any(l in text for l in ["latency", "p50", "p95", "p99", "ms"])
+        has_latency = any(label in text for label in ["latency", "p50", "p95", "p99", "ms"])
         assert has_latency, "Must show latency data"
 
     def test_recharts_svg(self, shared_sla_trends_page: Page):
@@ -273,7 +272,7 @@ class TestAbuseDetectionTitle:
             pytest.skip("Rate limited")
         text = _main_text(shared_abuse_detection_page).lower()
         labels = ["scanned", "flagged", "high-risk", "high risk", "abuse"]
-        found = sum(1 for l in labels if l in text)
+        found = sum(1 for label in labels if label in text)
         # On fresh staging, abuse detection may show zero values but still render cards
         assert found >= 1, "Must show abuse detection summary or page content"
 

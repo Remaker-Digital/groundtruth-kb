@@ -193,7 +193,7 @@ class TestNatsDisconnection:
         if r.status_code == 503:
             # Verify it's a well-formed error, not a crash
             try:
-                data = r.json()
+                r.json()
             except json.JSONDecodeError:
                 pass  # Plain text 503 is acceptable
 
@@ -245,7 +245,7 @@ class TestCircuitBreaker:
 
     def test_rf15_health_may_report_circuit_breakers(self, health_data):
         """RF-15: /health may report circuit breaker states."""
-        health_str = json.dumps(health_data).lower()
+        json.dumps(health_data).lower()
         # Circuit breaker reporting is optional — just verify /health is well-formed
         assert isinstance(health_data, dict)
 

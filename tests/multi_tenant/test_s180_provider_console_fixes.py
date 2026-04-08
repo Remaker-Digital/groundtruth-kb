@@ -162,7 +162,7 @@ class TestSupportDiagnosticsEmailLookup:
             return_value=mock_repo,
         ):
             client = TestClient(app, raise_server_exceptions=False)
-            response = client.get(
+            client.get(
                 "/api/superadmin/diagnostics/test@example.com",
             )
             mock_repo.find_by_customer_email.assert_called_once_with("test@example.com")
@@ -247,7 +247,7 @@ class TestSupportDiagnosticsEmailLookup:
             return_value=mock_audit,
         ):
             client = TestClient(app, raise_server_exceptions=False)
-            response = client.get(
+            client.get(
                 "/api/superadmin/diagnostics/admin@shop.com/errors",
             )
             mock_repo.find_by_customer_email.assert_called_once_with("admin@shop.com")
@@ -268,7 +268,6 @@ class TestTenantComparisonDisplayNames:
 
     def _mock_tenant_repo(self, tenant_docs):
         """Create a mock tenant repo that yields given documents."""
-        from src.multi_tenant.superadmin_api import _monolith as _state
 
         async def mock_query_items(**kwargs):
             for doc in tenant_docs:

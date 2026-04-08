@@ -7,12 +7,11 @@ Test IDs: MEXE-01 → MEXE-20
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.multi_tenant.mutation_executor import (
-    MUTATION_LOG_COLLECTION,
     MUTATION_LOG_TTL_SECONDS,
     MutationExecutor,
     MutationLogDocument,

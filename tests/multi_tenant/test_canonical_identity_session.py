@@ -17,9 +17,7 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -30,7 +28,6 @@ from src.chat.models import (
 from src.chat.session import (
     ConversationSession,
     _resolve_canonical_customer_id,
-    _resolve_customer_id,
 )
 from src.multi_tenant.cosmos_schema import ContactAttributeType
 
@@ -212,7 +209,7 @@ class TestStartConversationCanonicalId:
             visitor=_visitor(email="test@example.com"),
         )
 
-        result = await session.start_conversation(TENANT, request)
+        await session.start_conversation(TENANT, request)
 
         # Verify the created document has canonical_customer_id
         conv_repo.create.assert_awaited_once()
@@ -231,7 +228,7 @@ class TestStartConversationCanonicalId:
             visitor=_visitor(email="legacy@example.com"),
         )
 
-        result = await session.start_conversation(TENANT, request)
+        await session.start_conversation(TENANT, request)
 
         conv_repo.create.assert_awaited_once()
         created_doc = conv_repo.create.call_args.args[1]

@@ -21,7 +21,7 @@ Run with:
 import pytest
 from playwright.sync_api import Page, expect
 
-from .conftest import AdminApiMocker, MOCK_CONFIG, MOCK_CONFIG_WITH_DRAFT, setup_admin_page
+from .conftest import AdminApiMocker, MOCK_CONFIG_WITH_DRAFT, setup_admin_page
 
 pytestmark = pytest.mark.e2e
 
@@ -362,8 +362,8 @@ class TestNamedConfigManagement:
         # Verify named configs exist first
         has_named = "Default" in page_text or "Holiday" in page_text or "Black Friday" in page_text
         # Look for delete controls
-        delete_btn = admin_config_page.locator("button[aria-label*='delete'], button[aria-label*='Delete'], button[aria-label*='remove']")
-        trash_icon = admin_config_page.locator("svg.tabler-icon-trash, [data-testid*='delete']")
+        admin_config_page.locator("button[aria-label*='delete'], button[aria-label*='Delete'], button[aria-label*='remove']")
+        admin_config_page.locator("svg.tabler-icon-trash, [data-testid*='delete']")
         # Named configs should be present (delete is available as an action on them)
         assert has_named, \
             "Named configurations should be present (Delete is an action on them)"

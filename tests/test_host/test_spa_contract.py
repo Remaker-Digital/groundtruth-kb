@@ -17,7 +17,6 @@ derived from snake_case Python model via response transform.
 
 from __future__ import annotations
 
-import pytest
 
 from test_host.cosmos_writer import CosmosWriter, RunState, TestResult
 

@@ -7,7 +7,6 @@ Test IDs: MPOL-01 → MPOL-15
 
 from __future__ import annotations
 
-import pytest
 
 from src.multi_tenant.mutation_policy import (
     MutationPolicy,

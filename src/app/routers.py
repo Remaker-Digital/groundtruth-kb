@@ -82,7 +82,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(chat_router)
     app.include_router(admin_inbox_router)
     app.include_router(admin_ingestion_router)  # Must be before knowledge router (shared prefix, specific routes first)
-    app.include_router(admin_knowledge_score_router)  # Must be before knowledge router (shared /api/admin/knowledge prefix)
+    app.include_router(
+        admin_knowledge_score_router
+    )  # Must be before knowledge router (shared /api/admin/knowledge prefix)
     app.include_router(admin_knowledge_router)
     app.include_router(admin_preview_router)  # SPEC-1872: conversation preview (SSE)
     app.include_router(admin_analytics_router)

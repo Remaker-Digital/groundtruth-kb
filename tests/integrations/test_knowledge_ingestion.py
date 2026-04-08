@@ -16,13 +16,9 @@ import pytest
 from src.integrations.knowledge_ingestion import (
     ContentFormat,
     ContentNormalizer,
-    IngestionResult,
     KnowledgeIngestionPipeline,
     SyncResult,
     chunk_text,
-    DEFAULT_CHUNK_SIZE,
-    DEFAULT_CHUNK_OVERLAP,
-    CHARS_PER_TOKEN,
 )
 
 

@@ -13,8 +13,6 @@ Covers: configure_chat_services, _get_session, _get_pipeline,
 
 from __future__ import annotations
 
-import asyncio
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -35,7 +33,6 @@ from src.chat.models import (
     ConversationStartResponse,
     ConversationStateResponse,
     EndConversationResponse,
-    IssueReportResponse,
     MessageRole,
     SendMessageResponse,
     WebSocketMessage,
@@ -66,6 +63,7 @@ def mock_ctx():
     ctx.tenant_id = "tenant-001"
     ctx.tier = TenantTier.STARTER
     ctx.status = "active"
+    ctx.team_member_role = None
     return ctx
 
 
@@ -711,7 +709,7 @@ class TestReportIssue:
         import src.chat.endpoints as ep
         ep._session = mock_session
 
-        mock_session.get_state = AsyncMock(
+        mock_session.get_conversation = AsyncMock(
             side_effect=ConversationNotFoundError("conv-x", "tenant-001")
         )
 

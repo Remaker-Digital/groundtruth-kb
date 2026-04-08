@@ -31,7 +31,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any
 
 import stripe
 from fastapi import APIRouter, HTTPException
@@ -55,9 +54,7 @@ def _get_client() -> stripe.StripeClient:
     if _stripe_client is None:
         api_key = os.environ.get("STRIPE_SECRET_KEY", "")
         if not api_key:
-            raise RuntimeError(
-                "STRIPE_SECRET_KEY is not set — cannot report usage."
-            )
+            raise RuntimeError("STRIPE_SECRET_KEY is not set — cannot report usage.")
         _stripe_client = stripe.StripeClient(api_key)
     return _stripe_client
 
@@ -227,21 +224,22 @@ async def record_conversation(
             # reported now includes pack-consumed + previously-reported.
             new_reported_total = counter["reported"] + billable_overage
             event_identifier = f"{stripe_customer_id}_overage_{new_reported_total}"
-            client.v1.billing.meter_events.create({
-                "event_name": "conversation_overage",
-                "payload": {
-                    "stripe_customer_id": stripe_customer_id,
-                    "value": str(billable_overage),
-                },
-                "timestamp": int(time.time()),
-                "identifier": event_identifier,
-            })
+            client.v1.billing.meter_events.create(
+                {
+                    "event_name": "conversation_overage",
+                    "payload": {
+                        "stripe_customer_id": stripe_customer_id,
+                        "value": str(billable_overage),
+                    },
+                    "timestamp": int(time.time()),
+                    "identifier": event_identifier,
+                }
+            )
             counter["reported"] = new_reported_total
             meter_event_sent = True
 
             logger.info(
-                "Meter event sent: customer=%s billable_overage=%d "
-                "pack_consumed=%d total=%d included=%d",
+                "Meter event sent: customer=%s billable_overage=%d pack_consumed=%d total=%d included=%d",
                 stripe_customer_id,
                 billable_overage,
                 pack_consumed,
@@ -260,7 +258,7 @@ async def record_conversation(
     # overage_conversations = conversations billed (or pending billing) to
     # Stripe this period, excluding those absorbed by pack balance.
     # This equals counter["reported"] minus what packs absorbed.
-    billed_overage = counter["reported"] - pack_consumed if pack_consumed > 0 else counter["reported"]
+    counter["reported"] - pack_consumed if pack_consumed > 0 else counter["reported"]
     # Simpler: it's just the billable overage from THIS call.
     # But for the summary view, report cumulative billable = reported total.
     return RecordConversationResponse(
@@ -339,7 +337,10 @@ def reset_usage(stripe_customer_id: str) -> None:
     response_model=RecordConversationResponse,
     status_code=200,
     summary="Record conversation usage",
-    description="Records conversation usage for a customer. Called internally by the conversation pipeline to track consumption against the tier allowance, pack balance, and overage.",
+    description=(
+        "Records conversation usage for a customer. Called internally by the conversation pipeline to track "
+        "consumption against the tier allowance, pack balance, and overage."
+    ),
     responses={
         400: {"description": "Invalid tier or request parameters"},
     },
@@ -366,7 +367,10 @@ async def record_usage_endpoint(body: RecordConversationRequest) -> RecordConver
     response_model=UsageSummaryResponse,
     status_code=200,
     summary="Get customer usage summary",
-    description="Returns the current billing period usage summary for a customer, including total conversations, included allowance, pack balance, and overage details.",
+    description=(
+        "Returns the current billing period usage summary for a customer, including total conversations, included "
+        "allowance, pack balance, and overage details."
+    ),
     responses={
         400: {"description": "Invalid tier parameter"},
     },

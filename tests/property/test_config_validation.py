@@ -12,13 +12,12 @@ Tests verify invariants of the validation system:
 from __future__ import annotations
 
 import pytest
-from hypothesis import given, assume, settings
+from hypothesis import given, assume
 from hypothesis import strategies as st
 
 from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.schema.models import (
     ConfigFieldType,
-    TierGate,
     HEX_COLOR_PATTERN,
 )
 from src.multi_tenant.schema.registry import get_field_registry

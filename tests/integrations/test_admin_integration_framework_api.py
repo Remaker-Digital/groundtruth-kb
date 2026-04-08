@@ -9,7 +9,7 @@ event logs with pagination, action config + HITL updates, OAuth callback.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -101,7 +101,6 @@ class TestSetupInstructions:
 
     def test_oauth_setup_includes_steps_and_scopes(self):
         _register_zendesk()
-        from src.multi_tenant.admin_integration_framework_api import get_setup_instructions
 
         # We'll test the core logic directly since the endpoint
         # depends on TenantContext which requires full app setup

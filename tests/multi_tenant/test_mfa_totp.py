@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pyotp
@@ -27,11 +27,9 @@ import pytest
 from src.multi_tenant.mfa_totp import (
     MfaTotpService,
     _MFA_JWT_SECRET,
-    _MFA_TOKEN_LIFETIME_HOURS,
     _TOTP_DIGITS,
     _TOTP_INTERVAL,
     _TOTP_ISSUER,
-    _TOTP_VALID_WINDOW,
     configure_mfa_service,
     create_mfa_session_token,
     generate_backup_codes,

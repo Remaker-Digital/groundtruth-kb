@@ -16,67 +16,48 @@ Run:
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.multi_tenant.cosmos_schema import (
     BillingChannel,
     ConsentStatus,
-    CustomerProfileDocument,
-    MemoryVectorDocument,
     TenantDocument,
     TenantStatus,
     TenantTier,
-    TIER_DEFAULTS,
 )
 from src.multi_tenant.customer_profile_service import (
     CustomerProfileService,
-    STALE_PROFILE_DAYS,
-    get_profile_service,
 )
 from src.multi_tenant.conversation_vectorizer import (
     ConversationVectorizer,
     chunk_transcript,
-    CHUNK_TARGET_TOKENS,
-    CHUNK_MIN_TOKENS,
-    EMBEDDING_DIMENSIONS,
-    DEFAULT_TOP_K,
-    MAX_TOP_K,
 )
 from src.multi_tenant.response_explainability import (
     DecisionTraceBuilder,
     ResponseDecisionTrace,
-    KnowledgeSource,
-    MemorySignal,
-    StageAttribution,
 )
 from src.multi_tenant.system_prompt_builder import (
     SystemPromptBuilder,
     AgentRole,
-    get_prompt_builder,
 )
 
 from tests.persistent_memory.fixtures import (
     TENANT_STARTER,
     TENANT_PROFESSIONAL,
     TENANT_ENTERPRISE,
-    TENANT_OTHER,
     CUSTOMER_RETURNING,
     CUSTOMER_NEW,
     CUSTOMER_STALE,
     CUSTOMER_DENIED_CONSENT,
-    CUSTOMER_CASUAL,
     CUSTOMER_ENTERPRISE,
-    SAMPLE_PURCHASES,
     SAMPLE_SHOPIFY_SYNC_DATA,
     make_profile,
     make_conversation_messages,
     make_vector_results,
     make_preferences,
-    make_bulk_conversations,
 )
 
 

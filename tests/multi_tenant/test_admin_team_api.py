@@ -13,8 +13,7 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -23,15 +22,10 @@ from src.multi_tenant.admin_team_api import (
     PROTECTED_ROLES,
     VALID_ROLES,
     CreateTeamMemberRequest,
-    DeleteTeamMemberResponse,
-    RotateKeyResponse,
-    TeamListResponse,
-    TeamMemberResponse,
     UpdateTeamMemberRequest,
     WhoamiResponse,
     _build_member_response,
     configure_admin_team_services,
-    router,
     whoami,
 )
 from src.multi_tenant.auth import generate_user_api_key, hash_api_key
@@ -736,7 +730,7 @@ class TestRotateUserApiKey:
 
         self.repo.read.return_value = _make_member_doc("alice@test.com", "admin")
         ctx = _ctx(role=TeamMemberRole.ADMIN)
-        result = await rotate_user_api_key(f"{TENANT_ID}:alice@test.com", ctx=ctx)
+        await rotate_user_api_key(f"{TENANT_ID}:alice@test.com", ctx=ctx)
 
         # Verify the patch includes new hash
         patch_call = self.repo.patch.call_args

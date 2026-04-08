@@ -14,7 +14,7 @@ Module under test: src/chat/pipeline/orchestrator.py, src/chat/endpoints.py
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -173,7 +173,6 @@ class TestGetHttpClientLock:
         """Under contention, the lock should prevent duplicate clients."""
         pipeline = _make_pipeline()
         creation_count = 0
-        original_init = pipeline._http_client
 
         # Patch to track how many times a client is actually created
         import httpx

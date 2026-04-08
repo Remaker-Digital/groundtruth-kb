@@ -16,8 +16,6 @@ Test plan reference: §5.9 (COMPREHENSIVE-TEST-PLAN.md)
 
 from __future__ import annotations
 
-import hashlib
-import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

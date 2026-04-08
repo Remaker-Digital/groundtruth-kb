@@ -129,7 +129,8 @@ async def _hydrate_sla_from_cosmos() -> None:
             injected = monitor.hydrate_from_snapshots(snapshots)
             logger.info(
                 "SLA hydration complete: %d snapshots → %d synthetic samples",
-                len(snapshots), injected,
+                len(snapshots),
+                injected,
             )
         else:
             logger.info("SLA hydration: no snapshots found (first run or empty collection)")
@@ -164,7 +165,8 @@ async def _maybe_compute_daily_rollup(
             )
             logger.info(
                 "SLA daily rollup saved for %s (%d hourly snapshots)",
-                yesterday, len(hourly),
+                yesterday,
+                len(hourly),
             )
         else:
             logger.debug("No hourly snapshots for %s — skipping daily rollup", yesterday)
@@ -195,7 +197,9 @@ async def _sla_snapshot_loop() -> None:
             snapshot_data = monitor.create_snapshot_data()
             period_end = now_utc
             period_start = now_utc.replace(
-                minute=0, second=0, microsecond=0,
+                minute=0,
+                second=0,
+                microsecond=0,
             )
 
             await repo.save_hourly_snapshot(
@@ -275,8 +279,7 @@ async def _alert_evaluation_loop() -> None:
 
             if result.get("alerts_fired", 0) > 0:
                 logger.info(
-                    "Alert evaluation: %d rules evaluated, %d alerts fired, "
-                    "%d skipped (cooldown), %d errors",
+                    "Alert evaluation: %d rules evaluated, %d alerts fired, %d skipped (cooldown), %d errors",
                     result["rules_evaluated"],
                     result["alerts_fired"],
                     result["skipped_cooldown"],
@@ -344,9 +347,7 @@ async def _recover_orphaned_jobs() -> None:
         from src.multi_tenant.cosmos_schema import IngestionJobStatus
 
         repo = IngestionJobRepository()
-        cutoff = (
-            datetime.now(timezone.utc) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)
-        ).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)).isoformat()
 
         orphans = await repo.get_orphaned_running(cutoff)
         for job in orphans:
@@ -358,12 +359,17 @@ async def _recover_orphaned_jobs() -> None:
                     [
                         {"op": "set", "path": "/status", "value": IngestionJobStatus.FAILED.value},
                         {"op": "set", "path": "/completed_at", "value": now},
-                        {"op": "set", "path": "/error_message", "value": "Orphaned job recovered after container restart"},
+                        {
+                            "op": "set",
+                            "path": "/error_message",
+                            "value": "Orphaned job recovered after container restart",
+                        },
                     ],
                 )
                 logger.info(
                     "Recovered orphaned ingestion job %s (tenant %s)",
-                    job["id"][:8], job["tenant_id"][:8],
+                    job["id"][:8],
+                    job["tenant_id"][:8],
                 )
             except Exception:
                 logger.warning("Failed to recover orphaned job %s", job.get("id", "?")[:8], exc_info=True)
@@ -411,14 +417,11 @@ async def _ingestion_processor_loop() -> None:
             from src.multi_tenant.cosmos_schema import IngestionJobStatus
 
             repo = IngestionJobRepository()
-            cutoff = (
-                datetime.now(timezone.utc)
-                - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)
-            ).isoformat()
+            cutoff = (datetime.now(timezone.utc) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)).isoformat()
             orphans = await repo.get_orphaned_running(cutoff)
             for job in orphans:
                 try:
-                    now = datetime.now(timezone.utc).isoformat()
+                    datetime.now(timezone.utc).isoformat()
                     await repo.patch(
                         job["tenant_id"],
                         job["id"],
@@ -433,8 +436,7 @@ async def _ingestion_processor_loop() -> None:
                         ],
                     )
                     logger.warning(
-                        "Reset stale ingestion job %s to PENDING "
-                        "(was RUNNING for >%d min)",
+                        "Reset stale ingestion job %s to PENDING (was RUNNING for >%d min)",
                         job["id"][:8],
                         _INGESTION_ORPHAN_MINUTES,
                     )
@@ -523,7 +525,8 @@ async def _archival_sweep_loop() -> None:
                     to_archive = min(excess, _ARCHIVAL_BATCH_SIZE)
 
                     candidates = await conv_repo.list_oldest_archivable(
-                        tid, limit=to_archive,
+                        tid,
+                        limit=to_archive,
                     )
 
                     now = datetime.now(timezone.utc).isoformat()
@@ -551,22 +554,26 @@ async def _archival_sweep_loop() -> None:
 
                     if archived_count > 0:
                         logger.info(
-                            "Auto-archival: archived %d conversations for tenant %s "
-                            "(was %d, limit %d)",
-                            archived_count, tid[:8], count, _MAX_NON_ARCHIVED,
+                            "Auto-archival: archived %d conversations for tenant %s (was %d, limit %d)",
+                            archived_count,
+                            tid[:8],
+                            count,
+                            _MAX_NON_ARCHIVED,
                         )
                         total_archived += archived_count
 
                 except Exception:
                     logger.debug(
                         "Archival sweep failed for tenant %s",
-                        tid[:8], exc_info=True,
+                        tid[:8],
+                        exc_info=True,
                     )
 
             if total_archived > 0:
                 logger.info(
                     "Archival sweep: archived %d conversations across %d tenants",
-                    total_archived, len(tenant_ids),
+                    total_archived,
+                    len(tenant_ids),
                 )
         except Exception:
             logger.debug("Archival sweep cycle failed", exc_info=True)
@@ -737,9 +744,7 @@ async def _trial_warning_loop() -> None:
             warnings_sent = 0
 
             for days, tier_label in _WARNING_TIERS:
-                within_iso = (
-                    datetime.now(timezone.utc) + timedelta(days=days)
-                ).isoformat()
+                within_iso = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
 
                 try:
                     expiring = await tenant_repo.list_expiring_trials(within_iso)
@@ -975,9 +980,7 @@ async def _expiry_warning_loop() -> None:
             warnings_sent = 0
 
             for days, tier_label in _EXPIRY_WARNING_TIERS:
-                within_iso = (
-                    datetime.now(timezone.utc) + timedelta(days=days)
-                ).isoformat()
+                within_iso = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
 
                 try:
                     expiring = await tenant_repo.list_expiring_tenants(within_iso)
@@ -1131,14 +1134,19 @@ async def _vectorization_scanner_loop() -> None:
                     try:
                         prefs = await prefs_repo.read(tid, f"preferences:{tid}")
                         if prefs:
-                            consent_required = prefs.get(
-                                "consent_collection_enabled", False,
-                            ) is True
+                            consent_required = (
+                                prefs.get(
+                                    "consent_collection_enabled",
+                                    False,
+                                )
+                                is True
+                            )
                     except Exception:
                         pass  # Preferences not found → default (no consent required)
 
                     unvectorized = await conv_repo.list_unvectorized_ended(
-                        tid, limit=_VECTORIZATION_BATCH_SIZE,
+                        tid,
+                        limit=_VECTORIZATION_BATCH_SIZE,
                     )
                     if not unvectorized:
                         continue
@@ -1165,12 +1173,11 @@ async def _vectorization_scanner_loop() -> None:
                                     # ADR-004: prefer canonical_customer_id for profile lookup
                                     profile_key = canonical_cid or customer_id
                                     profile = await profile_repo.read(
-                                        tid, f"{tid}:{profile_key}",
+                                        tid,
+                                        f"{tid}:{profile_key}",
                                     )
                                     if profile:
-                                        consent = ConsentStatus(
-                                            profile.get("consent_status", "not_asked")
-                                        )
+                                        consent = ConsentStatus(profile.get("consent_status", "not_asked"))
                                 except Exception:
                                     pass  # Profile not found → NOT_ASKED
 
@@ -1216,7 +1223,8 @@ async def _vectorization_scanner_loop() -> None:
             if total_vectorized > 0:
                 logger.info(
                     "Vectorization scanner: processed %d conversations across %d tenants",
-                    total_vectorized, len(tenant_ids),
+                    total_vectorized,
+                    len(tenant_ids),
                 )
         except RuntimeError:
             # ConversationVectorizer not configured — skip this cycle
@@ -1297,12 +1305,15 @@ async def _website_refresh_loop() -> None:
                     )
                     logger.info(
                         "Website refresh: queued crawl for tenant=%s source=%s domain=%s",
-                        tenant_id[:8], source_id[:8], source.get("domain", "?"),
+                        tenant_id[:8],
+                        source_id[:8],
+                        source.get("domain", "?"),
                     )
                 except Exception:
                     logger.debug(
                         "Website refresh: failed to queue crawl for %s/%s",
-                        tenant_id[:8], source_id[:8],
+                        tenant_id[:8],
+                        source_id[:8],
                         exc_info=True,
                     )
 

@@ -17,12 +17,10 @@ import pytest
 
 from src.multi_tenant.document_parser import (
     CHARS_PER_TOKEN,
-    DEFAULT_CHUNK_OVERLAP,
     DEFAULT_CHUNK_SIZE,
     MAX_PDF_SIZE,
     MAX_TEXT_SIZE,
     MAX_URL_SIZE,
-    MIN_CHUNK_SIZE,
     ParseResult,
     ParsedChunk,
     _get_overlap,

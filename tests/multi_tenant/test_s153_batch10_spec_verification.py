@@ -3,11 +3,9 @@
 Specs verified against production interfaces.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-import json
 import re
 from pathlib import Path
 
-import pytest
 
 # ── Paths ──────────────────────────────────────────────────────────────
 SRC = Path(__file__).resolve().parents[2] / "src"
@@ -130,7 +128,7 @@ class TestSpec0849NoEffortEstimatesDup3:
     def test_quality_governance_present(self):
         src = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
         # GOV-17 exists
-        lines = [l for l in src.splitlines() if "17" in l and "Quality" in l]
+        lines = [line for line in src.splitlines() if "17" in line and "Quality" in line]
         assert len(lines) > 0, "GOV-17 Quality first must exist"
 
 

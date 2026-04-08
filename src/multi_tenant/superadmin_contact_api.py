@@ -28,7 +28,6 @@ from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.cosmos_schema import (
-    COLLECTION_CONTACT_MESSAGES,
     ContactMessageDocument,
 )
 from src.multi_tenant.middleware import require_platform_admin

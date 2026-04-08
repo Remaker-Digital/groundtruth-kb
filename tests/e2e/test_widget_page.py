@@ -673,7 +673,7 @@ class TestWidgetAutoOpen:
         """
         page_text = admin_widget_page.text_content("body") or ""
         auto_open_label = admin_widget_page.locator("text=Auto")
-        delay_label = admin_widget_page.locator("text=delay")
+        admin_widget_page.locator("text=delay")
         # Auto-open may be configured through behavior section
         has_auto_open = ("auto" in page_text.lower() and "open" in page_text.lower()) or \
                        "auto-open" in page_text.lower() or \

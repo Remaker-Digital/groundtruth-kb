@@ -7,14 +7,11 @@ Test IDs: CACHE-01 → CACHE-15
 
 from __future__ import annotations
 
-import asyncio
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from src.multi_tenant.mcp_credential_cache import (
-    DEFAULT_TTL_SECONDS,
     McpCredentialCache,
     _CacheEntry,
     get_credential_cache,
@@ -268,6 +265,6 @@ class TestMcpCredentialCacheStats:
         """CACHE-15b: get_credential_cache returns singleton."""
         with patch("src.multi_tenant.mcp_credential_cache._credential_cache", None):
             c1 = get_credential_cache()
-            c2 = get_credential_cache()
+            get_credential_cache()
             # Can't compare directly due to patch; verify it returns something
             assert isinstance(c1, McpCredentialCache)

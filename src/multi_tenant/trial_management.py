@@ -76,11 +76,11 @@ DEMO_CONVERSATION_COUNT = 5
 class TrialStatusCode(str, Enum):
     """Status of a trial tenant."""
 
-    ACTIVE = "active"               # Trial in progress
-    EXPIRING_SOON = "expiring_soon" # < 3 days remaining
-    EXPIRED = "expired"             # Trial period ended
-    CONVERTED = "converted"         # Upgraded to paid tier
-    CAP_REACHED = "cap_reached"     # Conversation limit hit
+    ACTIVE = "active"  # Trial in progress
+    EXPIRING_SOON = "expiring_soon"  # < 3 days remaining
+    EXPIRED = "expired"  # Trial period ended
+    CONVERTED = "converted"  # Upgraded to paid tier
+    CAP_REACHED = "cap_reached"  # Conversation limit hit
 
 
 @dataclass(frozen=True)
@@ -89,17 +89,17 @@ class TrialStatus:
 
     tenant_id: str
     status: TrialStatusCode
-    trial_started_at: str          # ISO 8601
-    trial_expires_at: str          # ISO 8601
+    trial_started_at: str  # ISO 8601
+    trial_expires_at: str  # ISO 8601
     days_remaining: int
     hours_remaining: int
     conversation_limit: int
     conversations_used: int
     conversations_remaining: int
     usage_percent: float
-    model: str                     # AI model used for trial
+    model: str  # AI model used for trial
     tier_after_expiry: str | None  # Recommended upgrade tier
-    can_send_message: bool         # Whether new conversations are allowed
+    can_send_message: bool  # Whether new conversations are allowed
 
 
 @dataclass(frozen=True)
@@ -112,7 +112,7 @@ class TrialConversionResult:
     billing_channel: str
     data_preserved: bool
     conversations_carried_over: int
-    converted_at: str              # ISO 8601
+    converted_at: str  # ISO 8601
 
 
 @dataclass
@@ -226,8 +226,12 @@ class TrialManagementService:
             "consent_status": ConsentStatus.NOT_ASKED.value,
             "trial_expires_at": expires_at.isoformat(),
             "trial_conversation_limit": conversation_limit,
-            "rate_limit_rpm": (await get_entitlement_service().get_tier_config(TenantTier.TRIAL.value)).get("rate_limit_rpm"),
-            "max_concurrent": (await get_entitlement_service().get_tier_config(TenantTier.TRIAL.value)).get("max_concurrent"),
+            "rate_limit_rpm": (await get_entitlement_service().get_tier_config(TenantTier.TRIAL.value)).get(
+                "rate_limit_rpm"
+            ),
+            "max_concurrent": (await get_entitlement_service().get_tier_config(TenantTier.TRIAL.value)).get(
+                "max_concurrent"
+            ),
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         }
@@ -239,6 +243,7 @@ class TrialManagementService:
         if shopify_shop_domain:
             try:
                 from src.multi_tenant.repositories.domain_index import DomainIndexRepository
+
                 domain_index = DomainIndexRepository()
                 await domain_index.upsert(shopify_shop_domain, tenant_id, "shopify")
             except Exception:
@@ -316,7 +321,8 @@ class TrialManagementService:
             except (ValueError, TypeError):
                 logger.warning(
                     "Invalid trial_expires_at for tenant=%s: %s",
-                    tenant.get("tenant_id"), expires_at_str,
+                    tenant.get("tenant_id"),
+                    expires_at_str,
                 )
                 continue
 
@@ -465,9 +471,7 @@ class TrialManagementService:
 
         previous_tier = tenant.get("tier", "unknown")
         if previous_tier != TenantTier.TRIAL.value:
-            raise ValueError(
-                f"Tenant {tenant_id} is not a trial (tier={previous_tier})"
-            )
+            raise ValueError(f"Tenant {tenant_id} is not a trial (tier={previous_tier})")
 
         new_tier_value = new_tier.value if isinstance(new_tier, TenantTier) else new_tier
         channel_value = billing_channel.value if isinstance(billing_channel, BillingChannel) else billing_channel
@@ -531,7 +535,11 @@ class TrialManagementService:
 
         logger.info(
             "Trial converted: tenant=%s %s→%s channel=%s conversations=%d",
-            tenant_id, previous_tier, new_tier_value, channel_value, conversations_used,
+            tenant_id,
+            previous_tier,
+            new_tier_value,
+            channel_value,
+            conversations_used,
         )
 
         return TrialConversionResult(
@@ -599,7 +607,10 @@ class TrialManagementService:
 
         logger.info(
             "Demo data seeded: tenant=%s conversations=%d profiles=%d articles=%d",
-            tenant_id, conversations_seeded, profiles_seeded, articles_seeded,
+            tenant_id,
+            conversations_seeded,
+            profiles_seeded,
+            articles_seeded,
         )
 
         return DemoDataResult(
@@ -658,9 +669,7 @@ class TrialManagementService:
         hours_remaining = max(0, int(remaining.total_seconds() // 3600))
 
         # Get conversation usage
-        conversation_limit = tenant.get(
-            "trial_conversation_limit", DEFAULT_TRIAL_CONVERSATION_LIMIT
-        )
+        conversation_limit = tenant.get("trial_conversation_limit", DEFAULT_TRIAL_CONVERSATION_LIMIT)
         conversations_used = await self._get_trial_conversation_count(tenant_id)
         conversations_remaining = max(0, conversation_limit - conversations_used)
         usage_pct = (conversations_used / conversation_limit * 100) if conversation_limit > 0 else 0.0
@@ -679,8 +688,7 @@ class TrialManagementService:
             status_code = TrialStatusCode.ACTIVE
 
         can_send = (
-            status_code in (TrialStatusCode.ACTIVE, TrialStatusCode.EXPIRING_SOON)
-            and conversations_remaining > 0
+            status_code in (TrialStatusCode.ACTIVE, TrialStatusCode.EXPIRING_SOON) and conversations_remaining > 0
         )
 
         # Recommend upgrade tier based on usage pattern
@@ -815,10 +823,7 @@ class TrialManagementService:
         """
         tier = tenant.get("tier")
         status = tenant.get("status")
-        return (
-            tier == TenantTier.TRIAL.value
-            or status == TenantStatus.TRIAL_EXPIRED.value
-        )
+        return tier == TenantTier.TRIAL.value or status == TenantStatus.TRIAL_EXPIRED.value
 
     # -------------------------------------------------------------------
     # Internal helpers
@@ -834,10 +839,7 @@ class TrialManagementService:
 
         try:
             results = await self._conversations.query(
-                query=(
-                    "SELECT VALUE COUNT(1) FROM c "
-                    "WHERE c.tenant_id = @tid AND c.is_billable = true"
-                ),
+                query=("SELECT VALUE COUNT(1) FROM c WHERE c.tenant_id = @tid AND c.is_billable = true"),
                 parameters=[{"name": "@tid", "value": tenant_id}],
             )
             return results[0] if results else 0
@@ -873,11 +875,15 @@ class TrialManagementService:
                     except Exception:
                         logger.debug(
                             "Could not delete %s item %s for tenant %s",
-                            name, item.get("id"), tenant_id,
+                            name,
+                            item.get("id"),
+                            tenant_id,
                         )
             except Exception:
                 logger.warning(
-                    "Could not query %s for tenant %s cleanup", name, tenant_id,
+                    "Could not query %s for tenant %s cleanup",
+                    name,
+                    tenant_id,
                 )
 
 
@@ -886,9 +892,7 @@ class TrialManagementService:
 # ---------------------------------------------------------------------------
 
 
-def _build_demo_conversations(
-    tenant_id: str, now: datetime
-) -> list[dict[str, Any]]:
+def _build_demo_conversations(tenant_id: str, now: datetime) -> list[dict[str, Any]]:
     """Build sample conversations for demo seeding."""
     conversations = []
     demo_data = [
@@ -932,29 +936,29 @@ def _build_demo_conversations(
     for i, data in enumerate(demo_data):
         conv_id = f"system_demo_{tenant_id[:8]}_{i}"
         started = now + timedelta(hours=data["delta_hours"])
-        conversations.append({
-            "id": conv_id,
-            "tenant_id": tenant_id,
-            "conversation_id": conv_id,
-            "customer_id": f"demo_customer_{i}",
-            "customer_name": data["customer_name"],
-            "status": data["status"],
-            "is_billable": False,  # Demo conversations are not billable
-            "message_count": data["messages"],
-            "turn_count": data["messages"] // 2,
-            "topic": data["topic"],
-            "started_at": started.isoformat(),
-            "ended_at": (started + timedelta(minutes=data["messages"] * 2)).isoformat(),
-            "created_at": started.isoformat(),
-            "updated_at": started.isoformat(),
-        })
+        conversations.append(
+            {
+                "id": conv_id,
+                "tenant_id": tenant_id,
+                "conversation_id": conv_id,
+                "customer_id": f"demo_customer_{i}",
+                "customer_name": data["customer_name"],
+                "status": data["status"],
+                "is_billable": False,  # Demo conversations are not billable
+                "message_count": data["messages"],
+                "turn_count": data["messages"] // 2,
+                "topic": data["topic"],
+                "started_at": started.isoformat(),
+                "ended_at": (started + timedelta(minutes=data["messages"] * 2)).isoformat(),
+                "created_at": started.isoformat(),
+                "updated_at": started.isoformat(),
+            }
+        )
 
     return conversations
 
 
-def _build_demo_profiles(
-    tenant_id: str, now: datetime
-) -> list[dict[str, Any]]:
+def _build_demo_profiles(tenant_id: str, now: datetime) -> list[dict[str, Any]]:
     """Build sample customer profiles for demo seeding."""
     profiles = [
         {
@@ -989,9 +993,7 @@ def _build_demo_profiles(
     return profiles
 
 
-def _build_demo_knowledge_articles(
-    tenant_id: str, now: datetime
-) -> list[dict[str, Any]]:
+def _build_demo_knowledge_articles(tenant_id: str, now: datetime) -> list[dict[str, Any]]:
     """Build sample knowledge base articles for demo seeding."""
     articles = [
         {
@@ -1044,8 +1046,8 @@ def _build_demo_knowledge_articles(
 # REST API endpoints (WI #126 — trial dashboard)
 # ---------------------------------------------------------------------------
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel as PydanticBaseModel
+from fastapi import APIRouter, Depends, HTTPException  # noqa: E402
+from pydantic import BaseModel as PydanticBaseModel  # noqa: E402
 
 trial_router = APIRouter(prefix="/api/trial", tags=["trial"])
 
@@ -1067,6 +1069,7 @@ def _get_trial_service() -> TrialManagementService:
 
 
 # Response models
+
 
 class TrialStatusResponse(PydanticBaseModel):
     """Trial status response for dashboard display."""
@@ -1129,6 +1132,7 @@ class TrialConvertResponse(PydanticBaseModel):
 
 
 # Endpoints
+
 
 @trial_router.post("/provision", response_model=TrialProvisionResponse)
 async def provision_trial_endpoint(

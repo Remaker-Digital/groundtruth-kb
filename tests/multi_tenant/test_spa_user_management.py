@@ -17,19 +17,15 @@ Run:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
 
-from src.multi_tenant.auth import TenantContext, hash_api_key
+from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType, TenantStatus
 from src.multi_tenant.superadmin_api import (
-    BackupCodesResponse,
     CreateOperatorRequest,
-    CreateOperatorResponse,
-    PlatformAdminUserResponse,
     UpdateNotificationEmailRequest,
     configure_superadmin_services,
     create_platform_admin_operator,
@@ -335,7 +331,7 @@ class TestBackupCodes:
 
     @pytest.mark.asyncio
     async def test_backup_codes_stored_as_hashes(self, mock_platform_admin_repo):
-        result = await generate_backup_codes(ctx=_superadmin_ctx())
+        await generate_backup_codes(ctx=_superadmin_ctx())
         call_kwargs = mock_platform_admin_repo.update_backup_code_hashes.call_args
         stored_hashes = call_kwargs.kwargs.get("hashes") or call_kwargs[1].get("hashes") or call_kwargs[0][1]
         assert len(stored_hashes) == 8

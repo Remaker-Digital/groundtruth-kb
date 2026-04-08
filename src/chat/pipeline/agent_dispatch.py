@@ -218,7 +218,7 @@ class AgentDispatchMixin:
         per SPEC-1802 canonical dispatch (SLIM → NATS → HTTP → 503).
         Wrapped in trace_agent_operation() span (SPEC-1539).
         """
-        from src.multi_tenant.otel_tracing import record_token_usage, trace_agent_operation
+        from src.multi_tenant.otel_tracing import trace_agent_operation
 
         span = trace_agent_operation("intent-classifier", "classify")
         try:

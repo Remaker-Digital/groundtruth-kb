@@ -8,7 +8,6 @@ and per-metric normalization.
 
 from __future__ import annotations
 
-import pytest
 
 
 class TestQualityScoreComputation:

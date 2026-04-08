@@ -8,11 +8,10 @@ Endpoints are registered on the shared router from _monolith.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Body, Depends, HTTPException, Query
+from fastapi import Depends, HTTPException, Query
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
@@ -34,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Pipeline topology now sourced from registry (SPEC-1852)
-from src.multi_tenant.pipeline_metrics import get_pipeline_agents, get_pipeline_edges
+from src.multi_tenant.pipeline_metrics import get_pipeline_agents, get_pipeline_edges  # noqa: E402
 
 
 class PipelineNodeMetrics(CamelCaseModel):
@@ -484,7 +483,7 @@ async def get_tenant_comparison(
         tenants = [t for t in tenants if t.tier == tier]
 
     # Apply sorting
-    sort_field = sort_by.replace("camelCase", "")  # Accept both formats
+    sort_by.replace("camelCase", "")  # Accept both formats
     reverse = sort_order != "asc"
     try:
         tenants.sort(
@@ -1113,7 +1112,6 @@ async def create_platform_admin_operator(
             detail=f"A platform admin with email '{body.email}' already exists.",
         )
 
-    import secrets
     import uuid
 
     from src.multi_tenant.auth import generate_spa_api_key, hash_api_key

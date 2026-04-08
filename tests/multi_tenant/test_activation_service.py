@@ -20,7 +20,7 @@ Run:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,7 +32,6 @@ from src.multi_tenant.activation_service import (
     DraftSaveResult,
     DraftState,
     RestoreResult,
-    ValidationResult,
 )
 from src.multi_tenant.cosmos_schema import (
     AuditEventType,
@@ -2706,7 +2705,7 @@ class TestFirstActivationIngestionHook:
         # Since we replace the whole method, we need the outer activate()
         # code to handle the raise. Let's check if it does.
         try:
-            result = await service.activate(
+            await service.activate(
                 STARTER_TENANT_ID, TenantTier.STARTER, "admin",
             )
             # If activate catches this, activation succeeds

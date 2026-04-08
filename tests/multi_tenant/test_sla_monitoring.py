@@ -15,16 +15,13 @@ Run:
 from __future__ import annotations
 
 import time
-from unittest.mock import patch
 
-import pytest
 
 from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.sla_monitoring import (
     LATENCY_WINDOW_SECONDS,
     MAX_SAMPLES_PER_TENANT,
     SLA_TARGETS,
-    LatencyPercentiles,
     PlatformSLASummary,
     SLAComplianceResult,
     SLAMonitoringService,

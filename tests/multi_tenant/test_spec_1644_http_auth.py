@@ -22,10 +22,9 @@ from fastapi.testclient import TestClient
 # All tests in this module are adversarial security tests (SPEC-1644)
 pytestmark = [pytest.mark.security, pytest.mark.unit]
 
-from tests.conftest import (
+from tests.conftest import (  # noqa: E402
     STARTER_TENANT_ID,
     PROFESSIONAL_TENANT_ID,
-    ENTERPRISE_TENANT_ID,
     TEST_API_KEY_STARTER,
     TEST_API_KEY_PROFESSIONAL,
     TEST_SPA_KEY,

@@ -29,13 +29,10 @@ Covers:
 
 import inspect
 import json
-import os
 import sys
 from pathlib import Path
-from typing import NamedTuple
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 # Ensure scripts/ is importable
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -48,7 +45,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 _real_platform = sys.platform
 sys.platform = "linux"  # prevent the win32 stdout/stderr wrapping
 
-import pre_flight_checklist  # noqa: E402
 
 sys.platform = _real_platform  # restore immediately
 
@@ -240,7 +236,7 @@ class TestPhaseCApiCallCount:
             duration=1.0, timed_out=False,
         )
 
-        results = phase_c(
+        phase_c(
             "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
             "test-key", "test-widget", "1.60.0"
         )

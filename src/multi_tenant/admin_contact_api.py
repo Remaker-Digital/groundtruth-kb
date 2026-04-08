@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import html
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -41,6 +40,7 @@ def configure_contact_repo(repo: Any) -> None:
     """Wire the contact_messages repository at startup."""
     global _contact_repo
     _contact_repo = repo
+
 
 router = APIRouter(prefix="/api/admin", tags=["admin-contact"])
 
@@ -66,12 +66,8 @@ class ContactRequest(BaseModel):
         description="Message category.",
         json_schema_extra={"enum": VALID_TOPICS},
     )
-    subject: str = Field(
-        ..., min_length=1, max_length=200, description="Message subject line."
-    )
-    message: str = Field(
-        ..., min_length=1, max_length=5000, description="Message body."
-    )
+    subject: str = Field(..., min_length=1, max_length=200, description="Message subject line.")
+    message: str = Field(..., min_length=1, max_length=5000, description="Message body.")
 
 
 class ContactResponse(BaseModel):
@@ -127,13 +123,14 @@ def _build_html_body(
 <tr><td style="padding: 6px 12px; background: #f5f5f4; font-weight: 600; width: 140px;">Tenant ID</td>
     <td style="padding: 6px 12px; background: #f5f5f4; font-family: monospace;">{html.escape(tenant_id)}</td></tr>
 <tr><td style="padding: 6px 12px; font-weight: 600;">Tier</td>
-    <td style="padding: 6px 12px;">{html.escape(tier or 'unknown')}</td></tr>
+    <td style="padding: 6px 12px;">{html.escape(tier or "unknown")}</td></tr>
 <tr><td style="padding: 6px 12px; background: #f5f5f4; font-weight: 600;">Member Email</td>
-    <td style="padding: 6px 12px; background: #f5f5f4;">{html.escape(member_email or 'N/A')}</td></tr>
+    <td style="padding: 6px 12px; background: #f5f5f4;">{html.escape(member_email or "N/A")}</td></tr>
 <tr><td style="padding: 6px 12px; font-weight: 600;">Member Role</td>
-    <td style="padding: 6px 12px;">{html.escape(member_role or 'N/A')}</td></tr>
+    <td style="padding: 6px 12px;">{html.escape(member_role or "N/A")}</td></tr>
 <tr><td style="padding: 6px 12px; background: #f5f5f4; font-weight: 600;">Member ID</td>
-    <td style="padding: 6px 12px; background: #f5f5f4; font-family: monospace;">{html.escape(member_id or 'N/A')}</td></tr>
+    <td style="padding: 6px 12px; background: #f5f5f4;
+    font-family: monospace;">{html.escape(member_id or "N/A")}</td></tr>
 <tr><td style="padding: 6px 12px; font-weight: 600;">Topic</td>
     <td style="padding: 6px 12px;">{html.escape(topic_label)}</td></tr>
 </table>
@@ -145,7 +142,7 @@ def _build_html_body(
 
 <p style="color: #999; font-size: 11px; margin-top: 24px;">
 This message was sent from the Agent Red admin panel. Do not reply to this email —
-respond directly to the member at {html.escape(member_email or 'N/A')}.
+respond directly to the member at {html.escape(member_email or "N/A")}.
 </p>
 </body>
 </html>"""
@@ -244,8 +241,7 @@ async def send_contact_message(
     if body.topic not in VALID_TOPICS:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid topic '{body.topic}'. "
-            f"Valid values: {VALID_TOPICS}",
+            detail=f"Invalid topic '{body.topic}'. Valid values: {VALID_TOPICS}",
         )
 
     topic_label = TOPIC_LABELS.get(body.topic, body.topic)
@@ -284,8 +280,7 @@ async def send_contact_message(
             )
         except Exception:
             logger.exception(
-                "Failed to persist contact message %s for tenant=%s — "
-                "proceeding with email delivery",
+                "Failed to persist contact message %s for tenant=%s — proceeding with email delivery",
                 message_id,
                 ctx.tenant_id,
             )
@@ -316,8 +311,7 @@ async def send_contact_message(
 
     # Email failed — message is still persisted in Cosmos for manual review.
     logger.warning(
-        "Contact message %s from tenant=%s topic=%s could not be delivered "
-        "via email. Persisted for manual review.",
+        "Contact message %s from tenant=%s topic=%s could not be delivered via email. Persisted for manual review.",
         message_id,
         ctx.tenant_id,
         body.topic,

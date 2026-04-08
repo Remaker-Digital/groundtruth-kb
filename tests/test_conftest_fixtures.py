@@ -15,7 +15,6 @@ Covers 8 specs:
 
 from __future__ import annotations
 
-import inspect
 
 import tests.conftest as conftest_module
 

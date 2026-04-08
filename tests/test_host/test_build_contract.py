@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -121,7 +120,7 @@ def _extract_from_image(lines: list[str]) -> str | None:
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from test_host.suites import SUITE_CONFIGS, SuiteConfig  # noqa: E402
+from test_host.suites import SUITE_CONFIGS  # noqa: E402
 
 
 # ===========================================================================
@@ -356,7 +355,7 @@ class TestStaleInterfaceContracts:
                     if not full_path.exists():
                         missing.append(f"Suite '{name}': {arg}")
         assert not missing, (
-            f"Suite test directories missing from filesystem:\n"
+            "Suite test directories missing from filesystem:\n"
             + "\n".join(f"  - {m}" for m in missing)
         )
 
@@ -373,7 +372,7 @@ class TestStaleInterfaceContracts:
                     if not full_path.exists():
                         missing.append(f"Suite '{name}': --ignore={target}")
         assert not missing, (
-            f"Ignore targets missing from filesystem:\n"
+            "Ignore targets missing from filesystem:\n"
             + "\n".join(f"  - {m}" for m in missing)
         )
 
@@ -568,7 +567,7 @@ class TestDiagnosticHypothesisStructure:
                 if not has_comment:
                     violations.append(f"Line {i + 1}: {stripped}")
         assert not violations, (
-            f"--ignore= patterns without explanatory comments:\n"
+            "--ignore= patterns without explanatory comments:\n"
             + "\n".join(f"  - {v}" for v in violations)
         )
 

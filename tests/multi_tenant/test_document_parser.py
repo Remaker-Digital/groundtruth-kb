@@ -20,8 +20,6 @@ Test IDs follow the pattern DP-XX for traceability.
 
 from __future__ import annotations
 
-import io
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -530,7 +528,7 @@ class TestCrawlUrlRobotsCheck:
                   return_value=ParseResult(source_type="url", source_url="https://example.com")),
             patch("asyncio.sleep", new_callable=AsyncMock),
         ):
-            results = await crawl_url("https://example.com", max_pages=5)
+            await crawl_url("https://example.com", max_pages=5)
 
         # The /private/ URL should not appear in fetched URLs (except robots.txt)
         page_urls = [u for u in urls_fetched if "robots.txt" not in u]

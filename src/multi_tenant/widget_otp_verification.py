@@ -21,10 +21,9 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from src.multi_tenant.auth import TenantContext
@@ -44,7 +43,7 @@ _OTP_TOKEN_TYPE = "widget_otp"
 _SMS_OTP_TOKEN_TYPE = "widget_otp_sms"  # SPEC-1879
 
 # E.164 phone validation
-import re
+import re  # noqa: E402
 
 _E164_PATTERN = re.compile(r"^\+[1-9]\d{1,14}$")
 

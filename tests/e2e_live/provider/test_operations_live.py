@@ -334,7 +334,7 @@ class TestCopilotKnowledgeCards:
             pytest.skip("Rate limited")
         text = _main_text(shared_copilot_knowledge_page).lower()
         labels = ["total documents", "active", "embedded", "stale"]
-        found = sum(1 for l in labels if l in text)
+        found = sum(1 for label in labels if label in text)
         # Fresh staging may have no documents — accept 1+ match or empty state
         has_empty = "no documents" in text or "no data" in text or "0" in text
         assert found >= 1 or has_empty, f"Expected document stat cards or empty state, found {found}/4"

@@ -32,7 +32,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 

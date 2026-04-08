@@ -41,11 +41,9 @@ import asyncio
 import inspect
 import io
 import sys
-import textwrap
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 # ---------------------------------------------------------------------------
 # Ensure project root is on sys.path so `scripts.seed_tenant` is importable
@@ -600,7 +598,6 @@ class TestPhase5Removed:
         seed = _get_seed()
         phase_5_called = []
 
-        original_phase_5 = seed.phase_5_knowledge_base
 
         async def tracking_phase_5(*args, **kwargs):
             phase_5_called.append(True)

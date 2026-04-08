@@ -9,7 +9,6 @@ container, and that the SPA trigger endpoint handles all edge cases.
 
 from __future__ import annotations
 
-import pytest
 
 from src.multi_tenant.superadmin_api._diagnostics import (
     VALID_ENVIRONMENTS,

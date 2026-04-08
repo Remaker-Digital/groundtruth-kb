@@ -31,8 +31,6 @@ import pytest
 
 from src.multi_tenant.nats_isolation import (
     AGENT_TOPICS,
-    CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-    MESSAGE_MAX_AGE_SECONDS,
     NATSAuthorizationError,
     NATSCircuitBreaker,
     NATSHealthStatus,

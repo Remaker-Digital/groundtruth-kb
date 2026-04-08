@@ -21,10 +21,6 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page
 
-from tests.e2e.conftest import (
-    AdminApiMocker,
-    setup_admin_page,
-)
 
 # Path to the built widget bundle
 WIDGET_IIFE = (

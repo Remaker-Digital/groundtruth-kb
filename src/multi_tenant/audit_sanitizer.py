@@ -17,7 +17,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from src.multi_tenant.superadmin_api._pii_mask import mask_domain, mask_email
 
 # ── PII denylist — always stripped ─────────────────────────────────────
 # Fields that carry PII / tenant business data.  Unconditionally removed

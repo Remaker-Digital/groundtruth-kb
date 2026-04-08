@@ -10,11 +10,10 @@ Tests verify:
 """
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timezone
 
 import pytest
-from hypothesis import given, assume, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from src.multi_tenant.api_key_audit import (
@@ -23,7 +22,6 @@ from src.multi_tenant.api_key_audit import (
 )
 from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS
 from tests.property.conftest import (
-    CANONICAL_TIERS,
     api_path_strategy,
     http_method_strategy,
     http_status_strategy,

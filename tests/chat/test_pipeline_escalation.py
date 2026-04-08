@@ -13,9 +13,8 @@ Run:
 
 from __future__ import annotations
 
-import asyncio
-from typing import Any, AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -107,7 +106,7 @@ class TestPipelineEscalation:
         from src.multi_tenant.response_explainability import DecisionTraceBuilder
         trace = DecisionTraceBuilder(CONV_ID, TENANT_ID)
 
-        events = await _collect_events(
+        await _collect_events(
             pipeline._handle_escalation(
                 TENANT_ID, CONV_ID, "I want a refund!",
                 "system prompt", budget, trace,
@@ -144,7 +143,7 @@ class TestPipelineEscalation:
         from src.multi_tenant.response_explainability import DecisionTraceBuilder
         trace = DecisionTraceBuilder(CONV_ID, TENANT_ID)
 
-        events = await _collect_events(
+        await _collect_events(
             pipeline._handle_escalation(
                 TENANT_ID, CONV_ID, "My widget is broken",
                 "system prompt", budget, trace,
@@ -199,5 +198,5 @@ class TestPipelineEscalation:
         assert call_kwargs["escalation_category"] == "sales"
 
         # Done event was yielded (pipeline didn't crash)
-        event_types = [e.get("type") for e in events if isinstance(e, dict)]
+        [e.get("type") for e in events if isinstance(e, dict)]
         assert len(events) > 0  # At least stage events + token + done

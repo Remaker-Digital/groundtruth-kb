@@ -18,7 +18,7 @@ from __future__ import annotations
 import pytest
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from src.multi_tenant.repository import ConversationRepository
 

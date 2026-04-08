@@ -199,7 +199,7 @@ def _archive_test_article(page: Page, title: str) -> None:
                 # ActionIcon — find via tooltip label on parent
                 action_icons = row.locator("button")
                 for j in range(action_icons.count()):
-                    icon = action_icons.nth(j)
+                    action_icons.nth(j)
                     # Hover to reveal tooltip, but just click any non-edit icon
                     pass
                 # Try direct SVG-based approach: archive icon has specific path
@@ -631,7 +631,7 @@ class TestArticlesTable:
         ).first
         assert search_input.is_visible(), "Search input must be visible on KB page"
 
-        text_before = _text(shared_kb_page)
+        _text(shared_kb_page)
         search_input.fill("zzz_nonexistent_query_xyz")
         shared_kb_page.wait_for_timeout(1000)
         text_after = _text(shared_kb_page)

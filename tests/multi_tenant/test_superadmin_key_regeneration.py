@@ -23,8 +23,8 @@ Run:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -32,7 +32,6 @@ from fastapi import HTTPException
 from src.multi_tenant.auth import (
     SPA_API_KEY_PREFIX,
     TenantContext,
-    generate_spa_api_key,
     hash_api_key,
 )
 from src.multi_tenant.cosmos_schema import (

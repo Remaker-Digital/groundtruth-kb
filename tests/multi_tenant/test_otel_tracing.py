@@ -593,7 +593,7 @@ class TestTraceAgentOperation:
         ))
 
         with patch("src.multi_tenant.otel_tracing.trace.get_tracer", return_value=mock_tracer):
-            span = trace_agent_operation("response-generator", "generate")
+            trace_agent_operation("response-generator", "generate")
 
         mock_span.set_attribute.assert_any_call(ATTR_TENANT_ID, TENANT_ID)
         mock_span.set_attribute.assert_any_call(ATTR_CONVERSATION_ID, CONVERSATION_ID)

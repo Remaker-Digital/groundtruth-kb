@@ -16,7 +16,6 @@ Run:
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,8 +23,6 @@ import pytest
 from src.multi_tenant.admin_customer_profile_api import (
     ConsentUpdateRequest,
     ShopifySyncRequest,
-    VALID_CONSENT_STATUSES,
-    configure_admin_profile_services,
     router,
 )
 from src.multi_tenant.cosmos_schema import ConsentStatus

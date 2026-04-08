@@ -17,7 +17,6 @@ from httpx import ASGITransport, AsyncClient
 
 from src.multi_tenant.widget_otp_verification import (
     _generate_otp,
-    _OTP_TOKEN_TYPE,
     decode_customer_token,
     router,
 )

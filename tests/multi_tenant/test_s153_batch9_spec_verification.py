@@ -4,10 +4,8 @@ Specs verified against production interfaces.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 import json
-import re
 from pathlib import Path
 
-import pytest
 
 # ── Paths ──────────────────────────────────────────────────────────────
 SRC = Path(__file__).resolve().parents[2] / "src"
@@ -351,10 +349,10 @@ class TestSpec0047NoEffortTerminology:
         src = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
         # "effort" should not appear as a measurement term
         # It may appear in other contexts like "without effort" which is fine
-        lines_with_effort = [l for l in src.splitlines() if "effort" in l.lower()]
+        lines_with_effort = [line for line in src.splitlines() if "effort" in line.lower()]
         # Allow some contextual usage, but not as a metric
-        assert not any("effort estimate" in l.lower() or "level of effort" in l.lower()
-                       for l in lines_with_effort), \
+        assert not any("effort estimate" in line.lower() or "level of effort" in line.lower()
+                       for line in lines_with_effort), \
             "'effort' must not be used as a measurement term"
 
 

@@ -13,11 +13,8 @@ Run:
 
 from __future__ import annotations
 
-import ast
-import hashlib
 import inspect
 import re
-import textwrap
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -26,7 +23,7 @@ import pytest
 # All tests in this module are adversarial security tests (SPEC-1644)
 pytestmark = [pytest.mark.security, pytest.mark.unit]
 
-from src.multi_tenant.auth import hash_api_key
+from src.multi_tenant.auth import hash_api_key  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +205,6 @@ class TestMiddlewareRequiresUrlTenant:
             TenantAuthMiddleware,
             configure_tenant_resolution,
         )
-        from src.multi_tenant.auth import TenantContext, TenantStatus
 
         # Configure a mock SPA resolver
         mock_spa = AsyncMock(return_value={

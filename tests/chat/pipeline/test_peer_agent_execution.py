@@ -154,7 +154,7 @@ class TestPeerAgentExecution:
              patch("src.agents.plugins.events.emit_invocation") as mock_emit:
             MockDispatcher.return_value.dispatch_with_binding = AsyncMock(return_value=denied_result)
 
-            events = await _collect_events(
+            await _collect_events(
                 orch._handle_peer_agent(
                     tenant_id="t-001",
                     conversation_id="conv-001",

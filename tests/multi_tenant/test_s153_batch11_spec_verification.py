@@ -3,12 +3,10 @@
 Specs verified against production interfaces.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-import json
 import re
 import sqlite3
 from pathlib import Path
 
-import pytest
 
 # ── Paths ──────────────────────────────────────────────────────────────
 SRC = Path(__file__).resolve().parents[2] / "src"

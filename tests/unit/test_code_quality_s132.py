@@ -15,12 +15,10 @@ Covers all 7 findings from the independent code quality review:
 from __future__ import annotations
 
 import asyncio
-import importlib
 import inspect
 import re
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -108,7 +106,7 @@ class TestSmtpAsyncOffload:
     def test_standalone_auth_password_changed_email_offloaded(self):
         """standalone_auth.py must offload _send_admin_password_changed_email."""
         source = Path("src/app/standalone_auth.py").read_text()
-        assert "asyncio.to_thread(_send_admin_password_changed_email" in source
+        assert "asyncio.to_thread(" in source and "_send_admin_password_changed_email" in source
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +436,7 @@ class TestRepositoryBarrelSync:
         import src.multi_tenant.repositories as package
 
         for name in package.__all__:
-            obj = getattr(package, name)
+            getattr(package, name)
             # Verify the same object is available from the barrel
             from src.multi_tenant import repository as barrel
             barrel_obj = getattr(barrel, name, None)

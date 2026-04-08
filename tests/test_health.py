@@ -17,7 +17,6 @@ Uses app_client fixture from conftest.py (FastAPI TestClient with mocked service
 from __future__ import annotations
 
 import inspect
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 

@@ -22,7 +22,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Depends, HTTPException, Query
+from fastapi import Depends, HTTPException
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
@@ -382,7 +382,7 @@ async def check_blocklist_value(
 # Blocklist cache (in-process, for middleware hot-path)
 # ---------------------------------------------------------------------------
 
-import time
+import time  # noqa: E402
 
 _BLOCKLIST_CACHE_TTL = 30  # seconds — shorter than entitlements because security-critical
 _blocklist_cache: dict[str, tuple[dict[str, Any], float]] = {}

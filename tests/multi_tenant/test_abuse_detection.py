@@ -17,10 +17,8 @@ Total: 12 tests
 
 from __future__ import annotations
 
-import inspect
-from datetime import datetime, timezone, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
 
 from tests.multi_tenant.conftest import MutationTestBase
 from src.multi_tenant.auth import hash_api_key
@@ -215,7 +214,7 @@ class TestTenantRecoveryActivate(MutationTestBase):
 
     def test_happy_path_with_tenant_key(self, starter_client):
         """Tenant key also succeeds (router has no platform-admin guard)."""
-        mocks = _wire_tenant_recovery_mocks()
+        _wire_tenant_recovery_mocks()
         resp = starter_client.post(
             TENANT_RECOVERY_ACTIVATE_URL,
             json={"tenant_id": "t-test-001", "recovery_email": "r@test.com"},

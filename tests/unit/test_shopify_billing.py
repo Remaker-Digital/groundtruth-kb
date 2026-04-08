@@ -217,7 +217,7 @@ class TestCreateSubscription:
         })
 
         with patch("src.integrations.shopify_billing.get_shopify_client", return_value=mock_client):
-            result = await create_subscription(
+            await create_subscription(
                 "test.myshopify.com", "starter", "month",
                 return_url="https://example.com/callback",
             )
@@ -337,7 +337,7 @@ class TestConfirmSubscription:
             mock_prov.return_value = tenant
             mock_activate.return_value = None
 
-            result = await confirm_subscription("unknown-shop.myshopify.com")
+            await confirm_subscription("unknown-shop.myshopify.com")
 
         # Should still create a shop subscription entry
         assert "unknown-shop.myshopify.com" in _shop_subscriptions

@@ -401,7 +401,7 @@ class TestStatCardGrid:
         text = _main_text(shared_dashboard_page)
         card_labels = ["total conversations", "response time", "resolution rate",
                        "satisfaction", "escalation"]
-        found = sum(1 for l in card_labels if l in text.lower())
+        found = sum(1 for label in card_labels if label in text.lower())
         assert found >= 4, f"Only {found}/5 stat card labels found"
 
     # A3: Exactly 5 stat cards
@@ -412,7 +412,7 @@ class TestStatCardGrid:
             "total conversations", "response time", "resolution rate",
             "customer satisfaction", "escalation rate",
         ]
-        found = [l for l in card_labels if l in text.lower()]
+        found = [label for label in card_labels if label in text.lower()]
         assert len(found) == 5, f"Found {len(found)}/5 stat cards: {found}"
 
 
@@ -950,7 +950,7 @@ class TestSetupChecklistDetails:
         if "setup" not in text.lower():
             return  # Tenant is activated — checklist hidden
         assert re.search(r'\d+/4 complete', text), (
-            f"Setup progress counter 'N/4 complete' not found"
+            "Setup progress counter 'N/4 complete' not found"
         )
 
     def test_checklist_4_items(self, shared_dashboard_page: Page):

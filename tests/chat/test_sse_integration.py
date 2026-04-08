@@ -15,15 +15,10 @@ Master Test Plan: §4 Gap Register — SSE Integration (1.0-required)
 
 from __future__ import annotations
 
-import asyncio
 import json
-from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from src.chat.models import (
-    StreamEvent,
     StreamEventType,
     done_event,
     error_event,
@@ -224,7 +219,6 @@ class TestSSEReconnection:
         Exercises the production function from endpoints.py, not an
         inline re-implementation.
         """
-        from starlette.datastructures import Headers, QueryParams
         from starlette.requests import Request
 
         from src.chat.endpoints import parse_last_event_id

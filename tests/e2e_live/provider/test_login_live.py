@@ -14,7 +14,7 @@ Source: admin/provider/login/ApiKeyLogin.tsx
 import pytest
 from playwright.sync_api import Page
 
-from .conftest import STAGING_FQDN, PROVIDER_BASE_URL
+from .conftest import PROVIDER_BASE_URL
 
 
 # ---------------------------------------------------------------------------

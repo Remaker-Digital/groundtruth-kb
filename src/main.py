@@ -15,7 +15,6 @@ Usage:
 
 from __future__ import annotations
 
-import hashlib  # re-exported — used by test_forgot_password via main_mod.hashlib
 
 from src.app.factory import create_app
 from src.app.routers import register_routers
@@ -27,7 +26,19 @@ from src.app.lifecycle import (
     register_shutdown_handlers,
     build_app_lifespan,
 )
-from src.app.background import register_idle_scanner, register_sla_snapshots, register_alert_evaluation, register_ingestion_processor, register_archival_sweep, register_trial_scanner, register_trial_warning, register_expiry_scanner, register_expiry_warning, register_vectorization_scanner, register_website_refresh
+from src.app.background import (
+    register_idle_scanner,
+    register_sla_snapshots,
+    register_alert_evaluation,
+    register_ingestion_processor,
+    register_archival_sweep,
+    register_trial_scanner,
+    register_trial_warning,
+    register_expiry_scanner,
+    register_expiry_warning,
+    register_vectorization_scanner,
+    register_website_refresh,
+)
 from src.app.health import register_health_endpoints
 
 # ---------------------------------------------------------------------------

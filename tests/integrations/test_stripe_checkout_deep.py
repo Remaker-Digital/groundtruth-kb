@@ -18,10 +18,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.conftest import (
-    TEST_API_KEY_STARTER,
-    auth_headers_api_key,
-)
 from tests.helpers.fake_tenant_repo import FakeTenantRepo
 
 

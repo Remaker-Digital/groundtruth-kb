@@ -11,9 +11,8 @@ Test plan ref: COMPREHENSIVE-TEST-PLAN-S245-S255.md Slice 1
 from __future__ import annotations
 
 import os
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.jobs.run_widget_canary import (
     check_health,
@@ -236,7 +235,6 @@ class TestSendAlert:
     @patch("src.jobs.run_widget_canary.smtplib", create=True)
     def test_sends_email_when_configured(self, mock_smtplib_mod):
         """Alert sends email when SMTP env vars are set."""
-        import smtplib as real_smtplib
         with patch("smtplib.SMTP_SSL") as mock_smtp:
             mock_conn = MagicMock()
             mock_smtp.return_value.__enter__ = MagicMock(return_value=mock_conn)

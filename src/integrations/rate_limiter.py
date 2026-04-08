@@ -308,7 +308,7 @@ class RetryExecutor:
                 )
                 await asyncio.sleep(wait)
 
-            except Exception as exc:
+            except Exception:
                 # Non-retryable errors propagate immediately
                 raise
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 import difflib
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.agents.plugins.registry import PluginAgentRegistry

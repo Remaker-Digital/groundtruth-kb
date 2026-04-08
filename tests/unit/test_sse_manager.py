@@ -18,15 +18,14 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from src.chat.models import StreamEvent, StreamEventType, done_event, token_event
+from src.chat.models import token_event
 from src.chat.sse_manager import (
     BUFFER_EXPIRY_SECONDS,
     DEFAULT_RETRY_MS,
-    KEEPALIVE_INTERVAL_SECONDS,
     MAX_BUFFERED_EVENTS,
     EventBuffer,
     SSEConnectionManager,
@@ -418,7 +417,7 @@ class TestFormattingMethods:
             recoverable=True,
         )
         assert "event: error" in result
-        data_line = [l for l in result.split("\n") if l.startswith("data:")][0]
+        data_line = [line for line in result.split("\n") if line.startswith("data:")][0]
         data = json.loads(data_line.replace("data: ", ""))
         assert data["message"] == "Something failed"
         assert data["code"] == "pipeline_error"
@@ -428,7 +427,7 @@ class TestFormattingMethods:
         result = SSEConnectionManager.format_error_event(
             message="Fatal", code="fatal", recoverable=False,
         )
-        data_line = [l for l in result.split("\n") if l.startswith("data:")][0]
+        data_line = [line for line in result.split("\n") if line.startswith("data:")][0]
         data = json.loads(data_line.replace("data: ", ""))
         assert data["recoverable"] is False
 

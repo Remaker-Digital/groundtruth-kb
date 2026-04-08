@@ -119,9 +119,11 @@ def _check_stripe_ip(request: Request) -> bool:
 
     logger.warning(
         "Stripe webhook rejected: IP %s not in allowlist (enable_allowlist=%s)",
-        client_ip, _ENABLE_IP_ALLOWLIST,
+        client_ip,
+        _ENABLE_IP_ALLOWLIST,
     )
     return False
+
 
 # ---------------------------------------------------------------------------
 # Router
@@ -185,7 +187,10 @@ def _handles(event_type: str):
     "/stripe",
     status_code=200,
     summary="Receive Stripe webhook events",
-    description="Receives and processes Stripe webhook events. Verifies signature, checks for duplicates, and dispatches to the appropriate event handler.",
+    description=(
+        "Receives and processes Stripe webhook events. Verifies signature, checks for duplicates, and dispatches to "
+        "the appropriate event handler."
+    ),
     responses={
         400: {"description": "Invalid payload or signature verification failed"},
         403: {"description": "Webhook source IP not in allowlist"},
@@ -367,17 +372,11 @@ async def handle_checkout_completed(event: dict) -> dict:
         "stripe_customer_id": session.get("customer"),
         "stripe_subscription_id": session.get("subscription"),
         "customer_email": (
-            session.get("customer_details", {}).get("email")
-            if session.get("customer_details")
-            else None
+            session.get("customer_details", {}).get("email") if session.get("customer_details") else None
         ),
         "tier": metadata.get("agent_red_tier"),
         "interval": metadata.get("agent_red_interval"),
-        "addons": (
-            metadata.get("agent_red_addons", "").split(",")
-            if metadata.get("agent_red_addons")
-            else []
-        ),
+        "addons": (metadata.get("agent_red_addons", "").split(",") if metadata.get("agent_red_addons") else []),
         "checkout_session_id": session.get("id"),
         "amount_total": session.get("amount_total"),
         "currency": session.get("currency"),
@@ -482,8 +481,7 @@ async def handle_subscription_created(event: dict) -> dict:
         # been processed. This is a timing issue — the tenant will be
         # activated when the checkout event arrives.
         logger.warning(
-            "No tenant found to activate for customer=%s — "
-            "checkout.session.completed may not have been processed yet.",
+            "No tenant found to activate for customer=%s — checkout.session.completed may not have been processed yet.",
             result["stripe_customer_id"],
         )
 
@@ -514,13 +512,9 @@ async def handle_subscription_updated(event: dict) -> dict:
     if "metadata" in previous:
         prev_meta = previous["metadata"]
         if prev_meta.get("agent_red_tier") != metadata.get("agent_red_tier"):
-            changes.append(
-                f"tier: {prev_meta.get('agent_red_tier')} → {metadata.get('agent_red_tier')}"
-            )
+            changes.append(f"tier: {prev_meta.get('agent_red_tier')} → {metadata.get('agent_red_tier')}")
         if prev_meta.get("agent_red_interval") != metadata.get("agent_red_interval"):
-            changes.append(
-                f"interval: {prev_meta.get('agent_red_interval')} → {metadata.get('agent_red_interval')}"
-            )
+            changes.append(f"interval: {prev_meta.get('agent_red_interval')} → {metadata.get('agent_red_interval')}")
 
     # Detect cancel_at_period_end
     if "cancel_at_period_end" in previous:
@@ -759,8 +753,7 @@ async def handle_finalization_failed(event: dict) -> dict:
     }
 
     logger.warning(
-        "Invoice finalization failed: invoice=%s customer=%s "
-        "tax_status=%s error=%s",
+        "Invoice finalization failed: invoice=%s customer=%s tax_status=%s error=%s",
         result["stripe_invoice_id"],
         result["stripe_customer_id"],
         result["automatic_tax_status"],

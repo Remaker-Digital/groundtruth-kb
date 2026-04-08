@@ -19,7 +19,7 @@ Run with:
 import json
 
 import pytest
-from playwright.sync_api import FrameLocator, Page
+from playwright.sync_api import Page
 
 # ---------------------------------------------------------------------------
 # Marker
@@ -167,7 +167,7 @@ class TestTypographyCSS:
         """Panel body font-family should be Inter (the brand default)."""
         _open_panel(widget_page)
 
-        font = _eval_in_iframe(widget_page, """
+        _eval_in_iframe(widget_page, """
             return doc.body.style.fontFamily || 'not set';
         """)
 

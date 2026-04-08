@@ -1438,7 +1438,7 @@ class TestNegativeInviteForm:
 
         # Verify page is still stable
         live_team_page.reload(wait_until="load")
-        text = _wait_for_team_data(live_team_page)
+        _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
         final_role = ""

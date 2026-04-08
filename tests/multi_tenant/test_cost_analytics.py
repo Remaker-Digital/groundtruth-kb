@@ -193,7 +193,6 @@ class TestGetCostOverview:
             {"tenant_id": "t2", "tier": "professional"},
         ]
 
-        call_count = {"conv": 0}
 
         async def mock_count_in_period(tenant_id, since, until):
             if tenant_id == "t1":

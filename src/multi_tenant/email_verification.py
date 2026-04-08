@@ -16,11 +16,9 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-import time
-from typing import Any
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from src.multi_tenant.alert_delivery import format_branded_email
@@ -43,8 +41,11 @@ _RATE_MAX = 3  # max 3 requests per window per IP
 def _is_rate_limited(client_ip: str) -> bool:
     """Check if IP has exceeded verification request rate limit (SPEC-1694)."""
     from src.multi_tenant.security_hardening import get_rate_limit_backend
+
     return get_rate_limit_backend().is_limited(
-        f"email_verify:{client_ip}", max_requests=_RATE_MAX, window_seconds=_RATE_WINDOW,
+        f"email_verify:{client_ip}",
+        max_requests=_RATE_MAX,
+        window_seconds=_RATE_WINDOW,
     )
 
 
@@ -55,12 +56,14 @@ def _is_rate_limited(client_ip: str) -> bool:
 
 class VerifyEmailRequest(BaseModel):
     """Request body for email verification."""
+
     tenant_id: str = Field(description="Tenant ID requesting verification")
     email: str = Field(description="Email address to verify")
 
 
 class VerifyEmailResponse(BaseModel):
     """Uniform response — never reveals whether the email exists."""
+
     message: str = Field(
         default="If this email is associated with a tenant, a verification "
         "link has been sent. Please check your inbox.",
@@ -112,7 +115,8 @@ _CONFIRM_SUCCESS_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <div class="card">
-  <div class="check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>
+  <div class="check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42
+  1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>
   <h1>Email Verified</h1>
   <p>Your email address <strong>{email}</strong> has been verified for
      <span class="brand">Agent Red</span> Customer Experience.</p>
@@ -138,7 +142,9 @@ _CONFIRM_ERROR_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <div class="card">
-  <div class="icon"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg></div>
+  <div class="icon"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59
+  5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41
+  17.59 19 19 17.59 13.41 12 19 6.41z"/></svg></div>
   <h1>Verification Failed</h1>
   <p>{reason}</p>
 </div>
@@ -155,8 +161,7 @@ _CONFIRM_ERROR_HTML = """<!DOCTYPE html>
     "/request",
     response_model=VerifyEmailResponse,
     summary="Request email verification (public)",
-    description="Sends a verification email with a 10-minute link. "
-    "Rate-limited to 3 requests per 5 minutes per IP.",
+    description="Sends a verification email with a 10-minute link. Rate-limited to 3 requests per 5 minutes per IP.",
 )
 async def request_verification(
     body: VerifyEmailRequest,
@@ -172,13 +177,13 @@ async def request_verification(
 
     if _is_rate_limited(client_ip):
         logger.warning(
-            "Email verification rate limit exceeded: ip=%s", client_ip,
+            "Email verification rate limit exceeded: ip=%s",
+            client_ip,
         )
         return VerifyEmailResponse()
 
     try:
         from src.multi_tenant.repositories import (
-            PreferencesRepository,
             TenantRepository,
             VerificationTokenRepository,
         )
@@ -207,10 +212,7 @@ async def request_verification(
         # Build verification URL
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
         host = request.headers.get("host", request.url.hostname or "localhost")
-        verify_url = (
-            f"{scheme}://{host}/api/auth/verify-email/confirm"
-            f"?token={token_id}"
-        )
+        verify_url = f"{scheme}://{host}/api/auth/verify-email/confirm?token={token_id}"
 
         # Render and send email
         html_body = _VERIFY_EMAIL_BODY.format(verify_url=verify_url)
@@ -221,7 +223,8 @@ async def request_verification(
 
         logger.info(
             "Verification email sent: tenant=%s email=%s",
-            body.tenant_id, body.email,
+            body.tenant_id,
+            body.email,
         )
 
     except Exception:
@@ -235,8 +238,7 @@ async def request_verification(
     "/confirm",
     response_class=HTMLResponse,
     summary="Confirm email verification",
-    description="Validates the token and marks the email as verified. "
-    "Renders a branded confirmation page.",
+    description="Validates the token and marks the email as verified. Renders a branded confirmation page.",
 )
 async def confirm_verification(
     token: str = Query(description="Verification token from email link"),
@@ -312,7 +314,9 @@ async def confirm_verification(
             )
 
         logger.info(
-            "Email verified: tenant=%s email=%s", tenant_id, email,
+            "Email verified: tenant=%s email=%s",
+            tenant_id,
+            email,
         )
 
         return HTMLResponse(

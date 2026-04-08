@@ -21,7 +21,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.multi_tenant.auth import (
-    AUTH_EXEMPT_PREFIXES,
     AuthenticationError,
     TenantContext,
     TenantInactiveError,
@@ -32,7 +31,7 @@ from src.multi_tenant.auth import (
     validate_tenant_status,
     verify_api_key,
 )
-from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TeamMemberRole, TenantStatus, TenantTier
+from src.multi_tenant.cosmos_schema import TeamMemberRole, TenantStatus, TenantTier
 from src.multi_tenant.middleware import (
     RateLimitMiddleware,
     TenantAuthMiddleware,

@@ -7,19 +7,15 @@ and regression detection.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-import pytest
 
 from src.quality_metrics.coverage_tracking import (
     check_module_targets,
     format_coverage_display,
-    get_bottom_modules,
     load_module_targets,
     _classify_module_tier,
     check_module_regression,
-    parse_coverage_json,
 )
 
 

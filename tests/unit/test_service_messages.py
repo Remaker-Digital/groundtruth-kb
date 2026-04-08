@@ -15,9 +15,8 @@ Test artifacts: TEST-2942 through TEST-2955.
 
 from __future__ import annotations
 
-import asyncio
 from email.mime.multipart import MIMEMultipart
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -224,7 +223,6 @@ class TestServiceMessageAPI:
     async def test_send_endpoint_requires_superadmin(self):
         """TEST-2950: POST /service-messages/send requires SUPERADMIN role."""
         from src.multi_tenant.superadmin_api import (
-            ServiceMessageRequest,
             send_service_message_endpoint,
         )
         # The endpoint uses Depends(require_role(TeamMemberRole.SUPERADMIN))
@@ -254,8 +252,6 @@ class TestServiceMessageAPI:
     async def test_preview_returns_recipient_list(self):
         """TEST-2952: Preview endpoint returns filtered recipient list."""
         from src.multi_tenant.superadmin_api import (
-            ServiceMessageRecipient,
-            ServiceMessagePreviewResponse,
             _resolve_service_message_recipients,
         )
 

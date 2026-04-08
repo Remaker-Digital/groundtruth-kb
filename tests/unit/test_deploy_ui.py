@@ -7,14 +7,10 @@ build orchestration, deploy dry-run, verification, and CLI.
 """
 from __future__ import annotations
 
-import hashlib
-import json
 import pathlib
 import subprocess
 import sys
 from unittest import mock
-
-import pytest
 
 import pytest
 
@@ -257,7 +253,7 @@ class TestBuildComponent:
             deploy_ui.build_component("widget")
 
         # Should only call npm run build, not npm install
-        calls = [str(c) for c in mock_run.call_args_list]
+        [str(c) for c in mock_run.call_args_list]
         assert len(mock_run.call_args_list) == 1  # Only build, no install
         assert "npm run build" in str(mock_run.call_args_list[0])
 
@@ -547,7 +543,7 @@ class TestDockerfileUi:
         content = (deploy_ui.ROOT / "Dockerfile.ui").read_text()
         lines = content.strip().split("\n")
         # Last non-empty line should restore non-root user
-        last_line = [l.strip() for l in lines if l.strip()][-1]
+        last_line = [line.strip() for line in lines if line.strip()][-1]
         assert last_line == "USER agentred"
 
     def test_copyright_notice(self):

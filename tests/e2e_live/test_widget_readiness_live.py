@@ -29,7 +29,6 @@ Run:
 
 from __future__ import annotations
 
-import hashlib
 import os
 
 import httpx

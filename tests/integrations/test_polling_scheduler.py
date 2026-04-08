@@ -9,14 +9,10 @@ manual poll execution, stats.
 
 from __future__ import annotations
 
-import asyncio
-from typing import Any
 
 import pytest
 
 from src.integrations.polling import (
-    BASE_BACKOFF_SECONDS,
-    MAX_BACKOFF_SECONDS,
     MAX_CONSECUTIVE_FAILURES,
     PollResult,
     PollStrategy,

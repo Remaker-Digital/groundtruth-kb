@@ -23,7 +23,6 @@ from src.multi_tenant.cosmos_schema import (
     TenantDocument,
     TenantStatus,
     TenantTier,
-    TIER_DEFAULTS,
     BillingChannel,
 )
 from src.multi_tenant.system_prompt_builder import (

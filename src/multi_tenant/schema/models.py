@@ -53,26 +53,26 @@ AUTO_OPEN_MAX_DELAY = 120  # seconds
 # ---------------------------------------------------------------------------
 
 SUPPORTED_LANGUAGES: list[str] = [
-    "en",     # English
-    "es",     # Spanish
-    "fr",     # French
-    "pt",     # Portuguese
-    "de",     # German
-    "it",     # Italian
-    "nl",     # Dutch
-    "ja",     # Japanese
-    "ko",     # Korean
-    "zh",     # Chinese (Simplified)
+    "en",  # English
+    "es",  # Spanish
+    "fr",  # French
+    "pt",  # Portuguese
+    "de",  # German
+    "it",  # Italian
+    "nl",  # Dutch
+    "ja",  # Japanese
+    "ko",  # Korean
+    "zh",  # Chinese (Simplified)
     "zh-TW",  # Chinese (Traditional)
-    "ar",     # Arabic
-    "hi",     # Hindi
-    "ru",     # Russian
-    "pl",     # Polish
-    "tr",     # Turkish
-    "sv",     # Swedish
-    "da",     # Danish
-    "no",     # Norwegian
-    "fi",     # Finnish
+    "ar",  # Arabic
+    "hi",  # Hindi
+    "ru",  # Russian
+    "pl",  # Polish
+    "tr",  # Turkish
+    "sv",  # Swedish
+    "da",  # Danish
+    "no",  # Norwegian
+    "fi",  # Finnish
 ]
 
 
@@ -85,14 +85,14 @@ class ConfigFieldType(str, Enum):
     """Data type for a configuration field."""
 
     STRING = "string"
-    TEXT = "text"          # Multi-line string
+    TEXT = "text"  # Multi-line string
     INTEGER = "integer"
     FLOAT = "float"
     BOOLEAN = "boolean"
-    ENUM = "enum"          # Single choice from a set
-    SELECT = "select"      # Dropdown selection (alias for enum in YAML configs)
+    ENUM = "enum"  # Single choice from a set
+    SELECT = "select"  # Dropdown selection (alias for enum in YAML configs)
     STRING_LIST = "string_list"
-    OBJECT = "object"      # Nested JSON object
+    OBJECT = "object"  # Nested JSON object
 
 
 class OnboardingStep(int, Enum):
@@ -118,10 +118,10 @@ class OnboardingStep(int, Enum):
 class TierGate(str, Enum):
     """Which tiers can access a field."""
 
-    ALL = "all"                    # Starter, Professional, Enterprise
-    PROFESSIONAL_PLUS = "pro+"     # Professional and Enterprise only
+    ALL = "all"  # Starter, Professional, Enterprise
+    PROFESSIONAL_PLUS = "pro+"  # Professional and Enterprise only
     PROFESSIONAL = "professional"  # Professional and above (YAML alias)
-    ENTERPRISE_ONLY = "enterprise" # Enterprise only
+    ENTERPRISE_ONLY = "enterprise"  # Enterprise only
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +137,7 @@ class ValidationRule(BaseModel):
     min_value: float | None = Field(default=None, description="Minimum numeric value")
     max_value: float | None = Field(default=None, description="Maximum numeric value")
     pattern: str | None = Field(default=None, description="Regex pattern for validation")
-    allowed_values: list[str] | None = Field(
-        default=None, description="Enum: valid choices"
-    )
+    allowed_values: list[str] | None = Field(default=None, description="Enum: valid choices")
     max_items: int | None = Field(default=None, description="Max items for list fields")
     required: bool = Field(default=False, description="Whether the field must be set")
 
@@ -163,14 +161,10 @@ class ConfigFieldDefinition(BaseModel):
 
     # Type and validation
     field_type: ConfigFieldType = Field(description="Data type")
-    validation: ValidationRule = Field(
-        default_factory=ValidationRule, description="Validation constraints"
-    )
+    validation: ValidationRule = Field(default_factory=ValidationRule, description="Validation constraints")
 
     # Defaults (per tier, with platform fallback)
-    platform_default: Any = Field(
-        default=None, description="Platform-wide default (lowest priority)"
-    )
+    platform_default: Any = Field(default=None, description="Platform-wide default (lowest priority)")
     tier_defaults: dict[str, Any] = Field(
         default_factory=dict,
         description="Per-tier default overrides: {starter: ..., professional: ..., enterprise: ...}",
@@ -183,25 +177,20 @@ class ConfigFieldDefinition(BaseModel):
     )
 
     # Onboarding workflow
-    onboarding_step: OnboardingStep = Field(
-        description="Which onboarding step this field belongs to"
-    )
+    onboarding_step: OnboardingStep = Field(description="Which onboarding step this field belongs to")
     step_order: float = Field(
         default=0,
-        description="Display order within the onboarding step (supports fractional values for insertion between existing fields)",
+        description=(
+            "Display order within the onboarding step (supports fractional values for insertion between existing "
+            "fields)"
+        ),
     )
 
     # UI metadata
     tooltip: str = Field(description="Short help text shown on hover/focus")
-    description: str = Field(
-        default="", description="Longer explanation for documentation"
-    )
-    placeholder: str | None = Field(
-        default=None, description="Placeholder text for input fields"
-    )
-    doc_link: str | None = Field(
-        default=None, description="Link to relevant documentation page"
-    )
+    description: str = Field(default="", description="Longer explanation for documentation")
+    placeholder: str | None = Field(default=None, description="Placeholder text for input fields")
+    doc_link: str | None = Field(default=None, description="Link to relevant documentation page")
 
     # Agent impact -- which agents consume this field in prompt assembly
     affects_agents: list[str] = Field(

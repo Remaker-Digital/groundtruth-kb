@@ -34,7 +34,6 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -72,7 +71,6 @@ from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import (
     PreferencesDocument,
     TenantDocument,
-    TenantTier,
 )
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.repository import PreferencesRepository
@@ -227,6 +225,7 @@ def _validate_agent_access(ctx: TenantContext, agent_id: str) -> None:
     if ctx.tier is not None:
         try:
             from src.agents.plugins.registry import PluginAgentRegistry
+
             reg = PluginAgentRegistry.get_instance()
             agent_defn = reg.get(agent_id)
             if agent_defn is not None:
@@ -269,7 +268,10 @@ def _validate_agent_access(ctx: TenantContext, agent_id: str) -> None:
     response_model=ConversationStartResponse,
     status_code=201,
     summary="Start a new conversation",
-    description="Creates a new conversation and returns stream/WebSocket URLs. If an initial_message is included, it is stored as the first customer message and the pipeline is triggered.",
+    description=(
+        "Creates a new conversation and returns stream/WebSocket URLs. If an initial_message is included, it is stored "
+        "as the first customer message and the pipeline is triggered."
+    ),
     responses={
         403: {"description": "Trial conversation limit reached"},
         503: {"description": "Chat service not initialized"},
@@ -326,6 +328,7 @@ async def start_conversation(
         # Validate agent exists in registry
         try:
             from src.agents.plugins.registry import PluginAgentRegistry
+
             reg = PluginAgentRegistry.get_instance()
             if reg.get(request.target_agent_id) is None:
                 raise HTTPException(
@@ -389,6 +392,7 @@ async def start_conversation(
                 else:
                     # Create visitor from token claims
                     from src.chat.models import VisitorIdentity
+
                     request.visitor = VisitorIdentity(
                         email=payload.get("email"),
                         name=payload.get("name"),
@@ -432,10 +436,7 @@ async def start_conversation(
     # customer is still composing their first message. When execute()
     # runs, _load_customer_profile() will find a cache hit instead of
     # making a Cosmos DB round-trip.
-    customer_id_for_warmup = (
-        (request.visitor.customer_id or request.visitor.email)
-        if request.visitor else None
-    )
+    customer_id_for_warmup = (request.visitor.customer_id or request.visitor.email) if request.visitor else None
     if customer_id_for_warmup:
         try:
             pipeline = _get_pipeline()
@@ -460,7 +461,10 @@ async def start_conversation(
     "/message",
     response_model=SendMessageResponse,
     summary="Send a customer message",
-    description="Appends a customer message to an active conversation. The AI response arrives via the SSE stream endpoint, not in this HTTP response.",
+    description=(
+        "Appends a customer message to an active conversation. The AI response arrives via the SSE stream endpoint, "
+        "not in this HTTP response."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         409: {"description": "Conversation is not active"},
@@ -527,7 +531,10 @@ async def send_message(
 @router.get(
     "/stream/{conversation_id}",
     summary="SSE stream of AI response",
-    description="Server-Sent Events stream for real-time AI response delivery. Supports reconnection via Last-Event-ID header. Events include token, validated, retracted, stage, error, and done.",
+    description=(
+        "Server-Sent Events stream for real-time AI response delivery. Supports reconnection via Last-Event-ID header. "
+        "Events include token, validated, retracted, stage, error, and done."
+    ),
     responses={
         200: {"content": {"text/event-stream": {}}, "description": "SSE event stream"},
         400: {"description": "No customer message to process"},
@@ -617,7 +624,8 @@ async def stream_response(
         async def _not_configured_stream():
             yield (
                 f"event: error\n"
-                f"data: {_json.dumps({'type': 'not_configured', 'message': 'This store has not been configured yet.'})}\n\n"
+                f"data: {_json.dumps({'type': 'not_configured', 'message': 'This store has not been configured yet.'})}"
+                f"\n\n"
             )
 
         return StreamingResponse(
@@ -658,8 +666,7 @@ async def stream_response(
                 # Emit a synthetic stage event so the widget creates a
                 # message bubble before we stream the token content.
                 yield (
-                    f"event: stage\n"
-                    f"data: {_json_id.dumps({'stage': 'response-generator', 'status': 'started'})}\n\n"
+                    f"event: stage\ndata: {_json_id.dumps({'stage': 'response-generator', 'status': 'started'})}\n\n"
                 )
                 yield f"event: token\ndata: {_json_id.dumps({'text': sys_msg})}\n\n"
                 yield f"event: done\ndata: {_json_id.dumps({'reason': 'identity_preprocessor'})}\n\n"
@@ -710,12 +717,10 @@ async def stream_response(
         try:
             # P1-2: If a producer is already running for this message,
             # attach as fan-out consumer instead of invoking pipeline again.
-            if (
-                last_message_id
-                and sse_mgr.is_producer_active(conversation_id, last_message_id)
-            ):
+            if last_message_id and sse_mgr.is_producer_active(conversation_id, last_message_id):
                 async for sse_text in sse_mgr.fan_out_stream(
-                    conversation_id, last_event_id,
+                    conversation_id,
+                    last_event_id,
                 ):
                     yield sse_text
                 return
@@ -723,10 +728,7 @@ async def stream_response(
             # P1-2: If this message was recently completed, replay buffer
             # only — do NOT re-run the pipeline. This handles reconnects
             # that arrive after the producer finishes but before buffer expiry.
-            if (
-                last_message_id
-                and sse_mgr.is_message_completed(conversation_id, last_message_id)
-            ):
+            if last_message_id and sse_mgr.is_message_completed(conversation_id, last_message_id):
                 if last_event_id > 0:
                     replay = sse_mgr.get_replay_events(conversation_id, last_event_id)
                     for sse_text in replay:
@@ -754,15 +756,16 @@ async def stream_response(
                 conversation_history=conversation_history,
                 trace_id=trace_id,  # SPEC-1530: end-to-end trace
                 team_member_role=(
-                    ctx.team_member_role.value
-                    if ctx.team_member_role else None
+                    ctx.team_member_role.value if ctx.team_member_role else None
                 ),  # SPEC-1558: Co-pilot routing for team members
                 target_agent_id=getattr(state, "target_agent_id", None) or None,
                 staff_domain_tags=ctx.staff_domain_tags,
             )
 
             async for sse_text in sse_mgr.wrap_stream(
-                ctx.tenant_id, conversation_id, pipeline_events,
+                ctx.tenant_id,
+                conversation_id,
+                pipeline_events,
                 message_id=last_message_id,
             ):
                 yield sse_text
@@ -842,7 +845,10 @@ async def stream_status(
     "/conversations/{conversation_id}",
     response_model=ConversationStateResponse,
     summary="Get conversation state",
-    description="Retrieves the current state of a conversation including the full message history in chronological order. Used by the widget to restore state on page reload.",
+    description=(
+        "Retrieves the current state of a conversation including the full message history in chronological order. Used "
+        "by the widget to restore state on page reload."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         503: {"description": "Chat service not initialized"},
@@ -874,7 +880,10 @@ async def get_conversation(
     "/conversations/{conversation_id}/end",
     response_model=EndConversationResponse,
     summary="End a conversation",
-    description="Ends an active conversation with optional feedback (rating, text). The conversation is metered for billing at this point.",
+    description=(
+        "Ends an active conversation with optional feedback (rating, text). The conversation is metered for billing at "
+        "this point."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         409: {"description": "Conversation is not active"},
@@ -944,7 +953,7 @@ async def report_issue(
 
     # Verify conversation exists for this tenant
     try:
-        state = await session.get_conversation(
+        await session.get_conversation(
             tenant_id=ctx.tenant_id,
             conversation_id=conversation_id,
         )
@@ -1200,7 +1209,7 @@ async def update_consent(
     except ValueError:
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid consent_status: must be 'granted' or 'denied'",
+            detail="Invalid consent_status: must be 'granted' or 'denied'",
         )
 
     # Verify conversation exists
@@ -1232,7 +1241,8 @@ async def update_consent(
         except Exception:
             logger.warning(
                 "Failed to update customer consent on profile: tenant=%s customer=%s",
-                ctx.tenant_id, customer_id,
+                ctx.tenant_id,
+                customer_id,
             )
 
     # Also record on the conversation document
@@ -1248,7 +1258,8 @@ async def update_consent(
             )
     except Exception:
         logger.warning(
-            "Failed to record consent on conversation: conv=%s", conversation_id,
+            "Failed to record consent on conversation: conv=%s",
+            conversation_id,
         )
 
     # Audit log
@@ -1333,10 +1344,12 @@ async def websocket_chat(
                     sender_id=data.get("sender_id"),
                 )
             except (json.JSONDecodeError, ValueError):
-                await websocket.send_json({
-                    "type": "error",
-                    "data": {"message": "Invalid message format"},
-                })
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "data": {"message": "Invalid message format"},
+                    }
+                )
                 continue
 
             # Broadcast to all other connections on this conversation

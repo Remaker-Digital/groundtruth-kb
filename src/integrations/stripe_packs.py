@@ -102,10 +102,7 @@ class PurchasePackRequest(BaseModel):
     )
     tenant_id: str | None = Field(
         default=None,
-        description=(
-            "Tenant ID (UUID). The module looks up the Stripe customer ID "
-            "from the provisioning service."
-        ),
+        description=("Tenant ID (UUID). The module looks up the Stripe customer ID from the provisioning service."),
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
     stripe_customer_id: str | None = Field(
@@ -195,10 +192,7 @@ def credit_pack_balance(
     entries = _get_pack_entries(stripe_customer_id)
     entries.append(entry)
 
-    total_remaining = sum(
-        e["remaining"] for e in entries
-        if e["expires_at"] > now and e["remaining"] > 0
-    )
+    total_remaining = sum(e["remaining"] for e in entries if e["expires_at"] > now and e["remaining"] > 0)
 
     logger.info(
         "Pack credited: customer=%s pack=%s conversations=%d total_remaining=%d",
@@ -293,13 +287,15 @@ def get_pack_balance(stripe_customer_id: str) -> dict[str, Any]:
             expired_count += 1
         elif has_remaining:
             total_remaining += entry["remaining"]
-            active_packs.append({
-                "pack_id": entry["pack_id"],
-                "remaining": entry["remaining"],
-                "purchased_at": entry["purchased_at"],
-                "expires_at": entry["expires_at"],
-                "is_expired": False,
-            })
+            active_packs.append(
+                {
+                    "pack_id": entry["pack_id"],
+                    "remaining": entry["remaining"],
+                    "purchased_at": entry["purchased_at"],
+                    "expires_at": entry["expires_at"],
+                    "is_expired": False,
+                }
+            )
 
     return {
         "stripe_customer_id": stripe_customer_id,
@@ -319,7 +315,10 @@ def get_pack_balance(stripe_customer_id: str) -> dict[str, Any]:
     response_model=PurchasePackResponse,
     status_code=200,
     summary="Purchase a conversation pack",
-    description="Creates a Stripe Checkout Session for a one-time conversation pack purchase. Pack metadata is attached so the webhook handler can credit the balance on completion.",
+    description=(
+        "Creates a Stripe Checkout Session for a one-time conversation pack purchase. Pack metadata is attached so the "
+        "webhook handler can credit the balance on completion."
+    ),
     responses={
         400: {"description": "Invalid pack_id"},
         502: {"description": "Stripe API error during session creation"},
@@ -338,10 +337,7 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
     if body.pack_id not in catalog.packs:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"Invalid pack_id '{body.pack_id}'. "
-                f"Valid packs: {sorted(catalog.packs.keys())}"
-            ),
+            detail=(f"Invalid pack_id '{body.pack_id}'. Valid packs: {sorted(catalog.packs.keys())}"),
         )
 
     pack = catalog.packs[body.pack_id]
@@ -353,10 +349,7 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
     )
 
     # Build redirect URLs
-    success_url = body.success_url or (
-        f"{_BASE_URL}/api/packs/purchase/success"
-        f"?session_id={{CHECKOUT_SESSION_ID}}"
-    )
+    success_url = body.success_url or (f"{_BASE_URL}/api/packs/purchase/success?session_id={{CHECKOUT_SESSION_ID}}")
     cancel_url = body.cancel_url or f"{_BASE_URL}/api/packs/purchase/cancel"
 
     # Create Checkout Session in payment mode
@@ -413,7 +406,10 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
     response_model=PackBalanceResponse,
     status_code=200,
     summary="Get customer pack balance",
-    description="Returns the current pack balance for a customer, including active packs with remaining conversations and expiry dates.",
+    description=(
+        "Returns the current pack balance for a customer, including active packs with remaining conversations and "
+        "expiry dates."
+    ),
 )
 async def get_balance_endpoint(customer_id: str) -> PackBalanceResponse:
     """Get the current pack balance for a customer.

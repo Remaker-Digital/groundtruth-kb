@@ -22,12 +22,10 @@ SPEC-1843: Zero-knowledge architecture.
 
 from __future__ import annotations
 
-from unittest.mock import patch, AsyncMock, MagicMock
 
 import pytest
 
-from tests.conftest import STARTER_TENANT_ID, MockCosmosManager, MockContainerProxy
-from src.multi_tenant.repositories.base import EncryptedFieldPatchError
+from tests.conftest import STARTER_TENANT_ID, MockContainerProxy
 
 from tests.flows.test_flow_encryption_roundtrip import (
     _mock_encryption_service,
@@ -101,7 +99,7 @@ class TestFlowTeamMemberUpdate:
 
         repo = TeamMemberRepository()
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakeTeamDoc(
@@ -190,7 +188,7 @@ class TestFlowKnowledgeEntryUpdate:
 
         repo = KnowledgeBaseRepository()
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakeKBDoc(
@@ -281,7 +279,7 @@ class TestFlowActivationReset:
 
         repo = PreferencesRepository()
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakePrefsDoc(

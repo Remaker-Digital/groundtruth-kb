@@ -18,7 +18,6 @@ product listings, policies, and other merchant site content.
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
 from urllib.parse import urlparse
@@ -59,7 +58,7 @@ def get_tier_limits(tier: str) -> dict[str, int]:
     from src.multi_tenant.entitlement_service import get_entitlement_service
     svc = get_entitlement_service()
     # Sync path — use frozen/LRU fallback
-    config = svc.get_tier_config_sync(tier)
+    svc.get_tier_config_sync(tier)
     # website_limits may be stored as a nested key in the tier config
     # or as a separate entitlements document. Check LRU first.
     cached = svc._lru_get("entitlements:website_limits")

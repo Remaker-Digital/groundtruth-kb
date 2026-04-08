@@ -18,7 +18,7 @@ Run:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -289,7 +289,7 @@ class TestKnowledgeRetrievalEdgeCases:
         kb_repo = _mock_kb_repo([])
         agent = KnowledgeRetrievalAgent(kb_repo=kb_repo)
 
-        result = await agent.process(
+        await agent.process(
             {"message": "test"},
             {"x-tenant-id": "t-from-header"},
         )

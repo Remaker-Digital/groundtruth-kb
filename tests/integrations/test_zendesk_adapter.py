@@ -21,7 +21,6 @@ import hashlib
 import hmac
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -35,7 +34,6 @@ from src.integrations.models import (
 )
 from src.integrations.zendesk.adapter import (
     INTEGRATION_ID,
-    PRIORITY_MAP,
     REVERSE_STATUS_MAP,
     STATUS_MAP,
     ZendeskAdapter,

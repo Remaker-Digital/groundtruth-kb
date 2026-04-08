@@ -25,11 +25,11 @@ import os
 import re
 import secrets
 import time
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -69,7 +69,7 @@ def sanitize_tenant_id(tenant_id: str) -> str:
         ValueError: If tenant_id is not a valid UUID.
     """
     if not tenant_id or not _TENANT_ID_PATTERN.match(tenant_id):
-        raise ValueError(f"Invalid tenant_id format: must be UUID v4")
+        raise ValueError("Invalid tenant_id format: must be UUID v4")
     return tenant_id
 
 
@@ -132,7 +132,9 @@ def sanitize_conversation_id(conversation_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 # Patterns that could be rendered as executable in HTML contexts
-_HTML_TAG_PATTERN = re.compile(r"<(?:script|iframe|object|embed|form|input|button|link|meta|base|style)\b", re.IGNORECASE)
+_HTML_TAG_PATTERN = re.compile(
+    r"<(?:script|iframe|object|embed|form|input|button|link|meta|base|style)\b", re.IGNORECASE
+)
 _EVENT_HANDLER_PATTERN = re.compile(r"\bon\w+\s*=", re.IGNORECASE)
 _JAVASCRIPT_URI_PATTERN = re.compile(r"javascript\s*:", re.IGNORECASE)
 _DATA_URI_PATTERN = re.compile(r"data\s*:\s*text/html", re.IGNORECASE)
@@ -275,9 +277,7 @@ class InMemoryRateLimitBackend(RateLimitBackend):
         now = time.time()
         window_start = now - window_seconds
         if key in self._windows:
-            self._windows[key] = [
-                ts for ts in self._windows[key] if ts > window_start
-            ]
+            self._windows[key] = [ts for ts in self._windows[key] if ts > window_start]
         requests = self._windows.get(key, [])
         if len(requests) >= max_requests:
             return True
@@ -523,7 +523,8 @@ class PreAuthRateLimiter:
                 evicted_ip, _ = self._trackers.popitem(last=False)
                 logger.warning(
                     "Pre-auth tracker cap reached (%d), evicted oldest IP: %s",
-                    self._max_tracked_ips, evicted_ip,
+                    self._max_tracked_ips,
+                    evicted_ip,
                 )
             tracker = _AuthAttemptTracker()
             self._trackers[client_ip] = tracker
@@ -540,7 +541,9 @@ class PreAuthRateLimiter:
             tracker.blocked_until = now + self._block_seconds
             logger.warning(
                 "IP blocked for failed auth attempts: ip=%s attempts=%d blocked_for=%ds",
-                client_ip, len(tracker.timestamps), self._block_seconds,
+                client_ip,
+                len(tracker.timestamps),
+                self._block_seconds,
             )
             return True
 
@@ -587,7 +590,8 @@ class PreAuthRateLimiter:
         now = time.monotonic()
         cutoff = now - self._window_seconds
         expired = [
-            ip for ip, tracker in self._trackers.items()
+            ip
+            for ip, tracker in self._trackers.items()
             if tracker.blocked_until < now and all(t <= cutoff for t in tracker.timestamps)
         ]
         for ip in expired:
@@ -698,8 +702,7 @@ class PreAuthRateLimitMiddleware:
                 response = JSONResponse(
                     status_code=429,
                     content={
-                        "error": "Too many failed authentication attempts. "
-                        "Please try again later.",
+                        "error": "Too many failed authentication attempts. Please try again later.",
                     },
                     headers={"Retry-After": str(AUTH_BLOCK_DURATION_SECONDS)},
                 )
@@ -804,16 +807,20 @@ async def rotate_api_key(request: Request) -> KeyRotationResponse:
 
     # Store old hash for grace period (append to a list field or separate doc)
     if old_hash:
-        operations.append({
-            "op": "set",
-            "path": "/previous_api_key_hash",
-            "value": old_hash,
-        })
-        operations.append({
-            "op": "set",
-            "path": "/previous_key_valid_until",
-            "value": grace_until.isoformat(),
-        })
+        operations.append(
+            {
+                "op": "set",
+                "path": "/previous_api_key_hash",
+                "value": old_hash,
+            }
+        )
+        operations.append(
+            {
+                "op": "set",
+                "path": "/previous_key_valid_until",
+                "value": grace_until.isoformat(),
+            }
+        )
 
     await _tenant_repo.patch(tenant_id, tenant_id, operations=operations)
 
@@ -880,8 +887,7 @@ async def rotate_widget_key(request: Request) -> WidgetKeyRotationResponse:
             )
         else:
             logger.warning(
-                "No active PreferencesDocument found for widget_key update: "
-                "tenant=%s (key will sync on next activate)",
+                "No active PreferencesDocument found for widget_key update: tenant=%s (key will sync on next activate)",
                 tenant_id,
             )
     except Exception as exc:

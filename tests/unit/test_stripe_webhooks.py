@@ -12,7 +12,7 @@ Covers: stripe_webhook endpoint, signature verification, idempotency,
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -463,7 +463,7 @@ class TestHandleCheckoutCompleted:
             mock_prov.return_value = tenant
             mock_sa.return_value = "ar_user_t002_KEY"
 
-            result = await handle_checkout_completed(event)
+            await handle_checkout_completed(event)
 
         call_kwargs = mock_prov.call_args.kwargs
         assert call_kwargs["addons"] == ["addon_a", "addon_b"]
@@ -599,7 +599,7 @@ class TestHandleSubscriptionUpdated:
             )
             mock_activate.return_value = MagicMock(status=MagicMock(value="active"))
 
-            result = await handle_subscription_updated(event)
+            await handle_subscription_updated(event)
 
         mock_activate.assert_called_once()
 
@@ -764,7 +764,7 @@ class TestHandlePaymentFailed:
         }
 
         with patch("src.integrations.stripe_webhooks.flag_payment_issue") as mock_flag:
-            result = await handle_payment_failed(event)
+            await handle_payment_failed(event)
 
         mock_flag.assert_not_called()
 
@@ -814,6 +814,6 @@ class TestHandleFinalizationFailed:
         }
 
         with patch("src.integrations.stripe_webhooks.flag_payment_issue") as mock_flag:
-            result = await handle_finalization_failed(event)
+            await handle_finalization_failed(event)
 
         mock_flag.assert_not_called()

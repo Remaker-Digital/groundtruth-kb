@@ -153,7 +153,6 @@ class TestConfigSchemaRetrievalFields:
     def test_retrieval_fields_exist_in_schema(self):
         from src.multi_tenant.tenant_config_schema import (
             get_field_registry,
-            OnboardingStep,
         )
 
         fields = list(get_field_registry().values())
@@ -260,7 +259,7 @@ class TestPipelineRetrievalParams:
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
             return_value=mock_vectorizer,
         ):
-            result = await pipeline._call_knowledge_retrieval_direct("hello", "general_inquiry", "system")
+            await pipeline._call_knowledge_retrieval_direct("hello", "general_inquiry", "system")
 
         mock_vectorizer.search.assert_awaited_once()
         call_kwargs = mock_vectorizer.search.call_args[1]
@@ -287,7 +286,7 @@ class TestPipelineRetrievalParams:
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
             return_value=mock_vectorizer,
         ):
-            result = await pipeline._call_knowledge_retrieval_direct("hello", "general_inquiry", "system")
+            await pipeline._call_knowledge_retrieval_direct("hello", "general_inquiry", "system")
 
         call_kwargs = mock_vectorizer.search.call_args[1]
         assert call_kwargs["vector_weight"] == 0.5
@@ -524,7 +523,7 @@ class TestPipelineMinScoreFilter:
             "src.multi_tenant.knowledge_vectorizer.KnowledgeVectorizer.format_for_pipeline",
             side_effect=mock_format,
         ):
-            result = await pipeline._call_knowledge_retrieval_direct("test", "general", "system")
+            await pipeline._call_knowledge_retrieval_direct("test", "general", "system")
 
         # format_for_pipeline receives filtered results (only score >= 0.5)
         assert len(captured_results) == 2  # High (0.8) and Medium (0.5), not Low (0.2)

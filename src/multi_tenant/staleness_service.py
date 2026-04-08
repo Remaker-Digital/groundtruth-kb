@@ -112,7 +112,7 @@ def compute_staleness_score(
     # Content hash mismatch or missing embedding indicates drift
     has_embedding = entry.get("embedding") is not None
     content_hash = entry.get("content_hash")
-    embedded_at = entry.get("embedded_at")
+    entry.get("embedded_at")
 
     if not has_embedding:
         # Never embedded — maximum drift

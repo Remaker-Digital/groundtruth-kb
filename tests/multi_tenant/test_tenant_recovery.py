@@ -18,11 +18,9 @@ Run:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType, TenantStatus

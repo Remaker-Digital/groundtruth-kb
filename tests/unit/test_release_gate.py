@@ -13,13 +13,11 @@ Test plan ref: COMPREHENSIVE-TEST-PLAN-S245-S255.md Slice 6
 
 from __future__ import annotations
 
-import argparse
 import os
 import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
@@ -118,10 +116,10 @@ class TestReleasePipelineStep5:
         out = _run_python_check(code)
         lines = out.splitlines()
         # Filter out log lines — status is the first non-log line
-        status_line = [l for l in lines if l in ("PASS", "FAIL", "WARN")][-1]
+        status_line = [line for line in lines if line in ("PASS", "FAIL", "WARN")][-1]
         assert status_line == "FAIL"
         # Detail line should mention dry run
-        assert any("dry run" in l.lower() for l in lines)
+        assert any("dry run" in line.lower() for line in lines)
 
     def test_step5_missing_widget_key_is_failure(self):
         """Missing widget_key produces a gate failure, not a skip."""
@@ -149,8 +147,8 @@ class TestReleasePipelineStep5:
         )
         out = _run_python_check(code)
         lines = out.splitlines()
-        assert any(l == "FAIL" for l in lines)
-        assert any("widget key" in l.lower() and "cannot verify transport" in l.lower() for l in lines)
+        assert any(line == "FAIL" for line in lines)
+        assert any("widget key" in line.lower() and "cannot verify transport" in line.lower() for line in lines)
 
     def test_step5_incomplete_sse_is_failure(self):
         """SSE stream with token but no done event -> FAIL (incomplete proof)."""
@@ -217,8 +215,8 @@ class TestReleasePipelineStep5:
         )
         out = _run_python_check(code)
         lines = out.splitlines()
-        assert any(l == "FAIL" for l in lines), f"Expected FAIL, got: {lines}"
-        assert any("sse stream incomplete" in l.lower() or "done=false" in l.lower() for l in lines), (
+        assert any(line == "FAIL" for line in lines), f"Expected FAIL, got: {lines}"
+        assert any("sse stream incomplete" in line.lower() or "done=false" in line.lower() for line in lines), (
             f"Expected SSE incomplete error, got: {lines}"
         )
 

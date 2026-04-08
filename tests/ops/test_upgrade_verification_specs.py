@@ -26,7 +26,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from upgrade_verification import (
+from upgrade_verification import (  # noqa: E402
     ENVIRONMENTS,
     TENANTS,
     _all_tenants,
@@ -167,7 +167,7 @@ class TestPhaseCVerification:
             [("x-product-version", "1.60.0")],
         )
         mock_urlopen.return_value = mock_resp
-        mock_widget = _make_mock_response(201, {"conversation_id": "c1"})
+        _make_mock_response(201, {"conversation_id": "c1"})
         # widget_call uses urlopen too — it will get the same mock
         env = ENVIRONMENTS["staging"].copy()
         snapshot = {

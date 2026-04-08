@@ -33,8 +33,6 @@ from src.multi_tenant.nats_isolation import (
     CIRCUIT_BREAKER_RECOVERY_SECONDS,
     CIRCUIT_BREAKER_WINDOW_SECONDS,
     DEFAULT_RETENTION,
-    MAX_MSG_SIZE,
-    MESSAGE_MAX_AGE_SECONDS,
     NATSAuthorizationError,
     NATSCircuitBreaker,
     NATSHealthStatus,
@@ -337,7 +335,7 @@ class TestAuthorization:
     async def test_ni_21_subscribe_tenant_filtered(self, manager: TenantNATSManager) -> None:
         """NI-21: subscribe() creates subscription scoped to tenant's stream."""
         callback = AsyncMock()
-        sub = await manager.subscribe(TENANT_A, "intent-classifier", callback)
+        await manager.subscribe(TENANT_A, "intent-classifier", callback)
 
         # Verify subscribe was called with the correct tenant-scoped subject
         manager._js.subscribe.assert_awaited_once()

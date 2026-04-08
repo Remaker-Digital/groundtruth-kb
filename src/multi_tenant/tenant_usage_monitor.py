@@ -41,7 +41,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from src.multi_tenant.cosmos_schema import TenantTier
 
 logger = logging.getLogger(__name__)
 
@@ -470,12 +469,12 @@ class TenantUsageMonitor:
         """Get a health summary for the /ready endpoint."""
         total_tracked = len(self._events)
         escalated = len([
-            l for l in self._current_levels.values()
-            if l != EscalationLevel.NORMAL
+            level for level in self._current_levels.values()
+            if level != EscalationLevel.NORMAL
         ])
         throttled = len([
-            l for l in self._current_levels.values()
-            if l in (EscalationLevel.THROTTLE, EscalationLevel.ISOLATE)
+            level for level in self._current_levels.values()
+            if level in (EscalationLevel.THROTTLE, EscalationLevel.ISOLATE)
         ])
 
         return {

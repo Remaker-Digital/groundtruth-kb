@@ -15,14 +15,12 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e_mock.conftest import (
-    navigate_to,
     navigate_and_settle,
     dismiss_onboarding_if_present,
     main_text,
     assert_mock_active,
     get_api_json,
     post_api_json,
-    MOCK_TENANT,
 )
 
 
@@ -697,7 +695,8 @@ class TestMockApiIntegrity:
         assert result["success"] is True
 
     def test_x_product_version_header(self, shared_page: Page, mock_base_url: str):
-        from tests.e2e_mock.conftest import api_origin as _ao; resp = shared_page.request.get(f"{_ao(mock_base_url)}/api/health")
+        from tests.e2e_mock.conftest import api_origin as _ao
+        resp = shared_page.request.get(f"{_ao(mock_base_url)}/api/health")
         assert resp.status == 200
         version_header = resp.headers.get("x-product-version", "")
         assert "1.82.0-mock" in version_header, (

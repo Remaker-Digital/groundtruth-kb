@@ -13,7 +13,6 @@ import logging
 import os
 from typing import Any
 
-from src.chat.pipeline.constants import USE_AGENT_CONTAINERS
 from src.chat.pipeline.orchestrator import ChatPipeline
 from src.chat.session import ConversationSession
 from src.multi_tenant.conversation_meter import ConversationMeter

@@ -13,7 +13,7 @@ import logging
 import pathlib
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)

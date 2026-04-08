@@ -8,8 +8,7 @@ and cancelling test runs. Uses httpx TestClient for in-process testing.
 
 from __future__ import annotations
 
-import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient

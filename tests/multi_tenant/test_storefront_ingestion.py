@@ -23,17 +23,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.multi_tenant.cosmos_schema import (
-    COLLECTION_INGESTION_JOBS,
     IngestionJobDocument,
     IngestionJobStatus,
     IngestionJobType,
 )
 from src.multi_tenant.storefront_ingestion import (
-    MIN_CONTENT_LENGTH,
     PRODUCTS_QUERY,
     COLLECTIONS_QUERY,
     SHOP_POLICIES_QUERY,
-    SHOPIFY_MAX_PRODUCTS,
     StorefrontIngestionService,
     IngestionJobRepository,
     get_ingestion_service,
@@ -195,13 +192,13 @@ class TestIngestionJobRepository:
     async def test_create_delegates_to_repo(self):
         job = _make_job()
         self.repo._repo.create = AsyncMock(return_value={"id": job.id})
-        result = await self.repo.create(job)
+        await self.repo.create(job)
         self.repo._repo.create.assert_called_once_with(job.tenant_id, job)
 
     @pytest.mark.asyncio
     async def test_read_delegates(self):
         self.repo._repo.read = AsyncMock(return_value={"id": "j1"})
-        result = await self.repo.read("t1", "j1")
+        await self.repo.read("t1", "j1")
         self.repo._repo.read.assert_called_once_with("t1", "j1")
 
     @pytest.mark.asyncio
@@ -217,7 +214,7 @@ class TestIngestionJobRepository:
 
         async def _empty_iter(**kwargs):
             return
-            yield  # noqa: unreachable — makes this an async generator
+            yield  # makes this an async generator (unreachable by design)
 
         mock_container.query_items = MagicMock(side_effect=_empty_iter)
         self.repo._repo._container = mock_container
@@ -243,7 +240,7 @@ class TestIngestionJobRepository:
 
         async def _empty_iter(**kwargs):
             return
-            yield  # noqa: unreachable — makes this an async generator
+            yield  # makes this an async generator (unreachable by design)
 
         mock_container.query_items = MagicMock(side_effect=_empty_iter)
         self.repo._repo._container = mock_container
@@ -426,7 +423,7 @@ class TestProcessJobUrl:
 
         with (
             patch("src.multi_tenant.storefront_ingestion.StorefrontIngestionService._create_kb_article",
-                  new_callable=AsyncMock, return_value="entry-1") as mock_create,
+                  new_callable=AsyncMock, return_value="entry-1"),
             patch("src.multi_tenant.storefront_ingestion.StorefrontIngestionService._vectorize_entries",
                   new_callable=AsyncMock, return_value=1),
             patch("src.multi_tenant.document_parser.crawl_url",

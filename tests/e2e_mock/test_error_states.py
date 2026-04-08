@@ -5,7 +5,6 @@ Tests API failure handling, network timeouts, empty data states,
 and mock header verification using Playwright route interception.
 """
 import pytest
-from playwright.sync_api import Page, Route
 
 from tests.e2e_mock.conftest import navigate_and_settle, MOCK_TENANT, api_origin
 

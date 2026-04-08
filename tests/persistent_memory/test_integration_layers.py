@@ -25,29 +25,24 @@ Run:
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.multi_tenant.cosmos_schema import (
     BillingChannel,
     ConsentStatus,
-    CustomerProfileDocument,
-    MemoryVectorDocument,
     PreferencesDocument,
     TenantDocument,
     TenantStatus,
     TenantTier,
-    TIER_DEFAULTS,
 )
 from src.multi_tenant.customer_profile_service import (
     CustomerProfileService,
 )
 from src.multi_tenant.conversation_vectorizer import (
     ConversationVectorizer,
-    chunk_transcript,
 )
 from src.multi_tenant.response_explainability import (
     DecisionTraceBuilder,
@@ -65,14 +60,9 @@ from tests.persistent_memory.fixtures import (
     TENANT_OTHER,
     CUSTOMER_RETURNING,
     CUSTOMER_NEW,
-    CUSTOMER_STALE,
-    CUSTOMER_DENIED_CONSENT,
-    CUSTOMER_HIGH_VOLUME,
     make_profile,
     make_conversation_messages,
     make_vector_results,
-    make_preferences,
-    make_tenant,
 )
 
 
@@ -450,7 +440,7 @@ class TestCrossLayerIntegration:
         pro_doc = _make_tenant_doc(TENANT_PROFESSIONAL, TenantTier.PROFESSIONAL)
         prefs = _make_prefs_doc(TENANT_PROFESSIONAL)
 
-        starter_prompt = builder.build(
+        builder.build(
             agent=AgentRole.RESPONSE_GENERATOR,
             tenant=starter_doc,
             preferences=prefs,

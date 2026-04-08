@@ -19,7 +19,6 @@ from tests.e2e_mock.conftest import (
     get_api_json,
     main_text,
     navigate_and_settle,
-    post_api_json,
 )
 
 

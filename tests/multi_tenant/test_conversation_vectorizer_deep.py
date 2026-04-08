@@ -10,20 +10,15 @@ and the _compute_since_date static method.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
-import pytest
 
 from src.multi_tenant.conversation_vectorizer import (
     chunk_transcript,
     ConversationVectorizer,
-    get_vectorizer,
-    CHUNK_TARGET_TOKENS,
     CHUNK_MIN_TOKENS,
     CHARS_PER_TOKEN,
     MAX_HISTORY_TOKENS,
-    EMBEDDING_DIMENSIONS,
 )
 from src.multi_tenant.cosmos_schema import ConsentStatus, TenantTier
 

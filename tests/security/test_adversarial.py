@@ -14,7 +14,6 @@ Work Item: Adversarial/security tests (§8).
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from typing import Any
@@ -26,18 +25,13 @@ from src.multi_tenant.auth import (
     API_KEY_HEADER,
     AUTH_EXEMPT_PREFIXES,
     WIDGET_KEY_ALLOWED_PREFIXES,
-    WIDGET_KEY_HEADER,
-    WIDGET_KEY_PREFIX,
-    TenantContext,
 )
 from src.multi_tenant.cosmos_schema import (
-    AuditEventType,
     CustomerProfileDocument,
     PreferencesDocument,
     TenantDocument,
     TenantStatus,
     TenantTier,
-    TIER_DEFAULTS,
 )
 from src.multi_tenant.security_hardening import (
     sanitize_ai_response,
@@ -54,11 +48,9 @@ from tests.conftest import (
     ENTERPRISE_TENANT_ID,
     PROFESSIONAL_TENANT_ID,
     STARTER_TENANT_ID,
-    TEST_API_KEY_ENTERPRISE,
     TEST_API_KEY_PROFESSIONAL,
     TEST_API_KEY_STARTER,
     auth_headers_api_key,
-    make_tenant_context,
 )
 
 
@@ -363,7 +355,6 @@ class TestAuthBypass:
         # The app_client fixture only has ACTIVE tenants, so any
         # deactivated tenant lookup would fail. We verify by checking
         # that the middleware validates tenant status.
-        from src.multi_tenant.middleware import TenantAuthMiddleware
 
         # The middleware checks tenant status and rejects non-ACTIVE/PAST_DUE
         assert TenantStatus.DEACTIVATED not in {TenantStatus.ACTIVE, TenantStatus.PAST_DUE}
@@ -530,7 +521,6 @@ class TestPromptInjection:
         """SEC-36: Critic bypass attempt results in fail-closed behavior."""
         from src.multi_tenant.critic_policy import (
             CriticPolicy,
-            CriticVerdict,
             SAFE_FALLBACK_MESSAGE,
         )
 

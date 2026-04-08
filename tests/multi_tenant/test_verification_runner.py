@@ -14,7 +14,6 @@ Verifies:
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -177,7 +176,7 @@ class TestVerificationRunnerExecution:
             # Mock internal checks too
             with patch('src.multi_tenant.verification_runner.os.path.exists', return_value=True):
                 with patch.dict('os.environ', {'AZURE_KEYVAULT_URL': 'https://kv.example.com'}):
-                    results = await runner.run()
+                    await runner.run()
 
         # Should have called set_config multiple times (batches + final)
         assert mock_repo.set_config.call_count >= 2, \

@@ -19,8 +19,6 @@ from src.agents.plugins.registry import (
     SkillMode,
 )
 from src.agents.plugins.overlay import (
-    EffectiveAgentConfig,
-    EffectiveSkillConfig,
     resolve_effective_config,
     resolve_for_tenant,
 )

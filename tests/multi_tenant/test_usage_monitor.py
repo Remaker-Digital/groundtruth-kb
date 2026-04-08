@@ -29,7 +29,6 @@ from src.multi_tenant.tenant_usage_monitor import (
     THROTTLE_ERROR_RATE,
     THROTTLE_MULTIPLIER,
     THROTTLE_RATE_FACTOR,
-    WARN_ERROR_RATE,
     WARN_MULTIPLIER,
     WINDOW_MINUTES,
     WINDOW_SECONDS,
@@ -211,8 +210,8 @@ class TestThrottleState:
         monitor = _make_monitor()
 
         # 8 requests, 2 errors = 25% = THROTTLE_ERROR_RATE
-        good = int(8 * (1 - THROTTLE_ERROR_RATE) / (1 - THROTTLE_ERROR_RATE))
-        error = int(THROTTLE_ERROR_RATE * 8)
+        int(8 * (1 - THROTTLE_ERROR_RATE) / (1 - THROTTLE_ERROR_RATE))
+        int(THROTTLE_ERROR_RATE * 8)
         _fill_events(monitor, _TENANT_A, count=6, is_error=False)
         _fill_events(monitor, _TENANT_A, count=2, is_error=True)
 

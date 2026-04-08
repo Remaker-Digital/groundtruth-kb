@@ -11,7 +11,6 @@ Tests for:
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,11 +20,6 @@ from src.chat.models import (
     StreamEvent,
     StreamEventType,
     error_event,
-    token_event,
-    stage_event,
-    done_event,
-    validated_event,
-    retracted_event,
 )
 from src.chat.pipeline import _classify_openai_error
 

@@ -26,11 +26,9 @@ from fastapi.testclient import TestClient
 
 from tests.conftest import (
     TEST_API_KEY_STARTER,
-    TEST_API_KEY_PROFESSIONAL,
     TEST_API_KEY_HASH_STARTER,
     TEST_API_KEY_HASH_PROFESSIONAL,
     TEST_SPA_KEY,
-    TEST_SPA_KEY_HASH,
     TEST_SPA_ADMIN_DOC,
     TEST_WIDGET_KEY,
     TEST_WIDGET_KEY_HASH,

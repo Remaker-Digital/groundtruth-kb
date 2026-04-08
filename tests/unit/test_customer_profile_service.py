@@ -33,7 +33,6 @@ from src.multi_tenant.customer_profile_service import (
     CustomerProfileService,
     MAX_CART_ITEMS,
     MAX_MARKETING_SEGMENTS,
-    MAX_PRODUCT_QUESTIONS,
     MAX_PURCHASE_HISTORY,
     STALE_PROFILE_DAYS,
     extract_identity_from_text,
@@ -481,7 +480,7 @@ class TestSyncFromShopify:
         profile_dict = _make_profile().model_dump()
         svc, repo = _make_service(profile_doc=profile_dict)
         # Empty shopify_data — no sections to sync
-        result = await svc.sync_from_shopify(TENANT_ID, CUSTOMER_ID, {})
+        await svc.sync_from_shopify(TENANT_ID, CUSTOMER_ID, {})
         # upsert should NOT be called when nothing changed
         repo.upsert_profile.assert_not_awaited()
 
@@ -490,7 +489,7 @@ class TestSyncFromShopify:
         profile_dict = _make_profile().model_dump()
         svc, repo = _make_service(profile_doc=profile_dict)
         shopify_data = {"orders": []}
-        result = await svc.sync_from_shopify(TENANT_ID, CUSTOMER_ID, shopify_data)
+        await svc.sync_from_shopify(TENANT_ID, CUSTOMER_ID, shopify_data)
         # Empty orders list should not trigger upsert
         repo.upsert_profile.assert_not_awaited()
 

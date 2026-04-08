@@ -461,7 +461,6 @@ class TestBindingHydration:
 
     def test_orchestrator_hydration_call_exists(self):
         """Orchestrator must call load_tenant_bindings before sync routing."""
-        import ast
         with open("src/chat/pipeline/orchestrator.py") as f:
             source = f.read()
         assert "load_tenant_bindings" in source, (
@@ -470,7 +469,6 @@ class TestBindingHydration:
 
     def test_dispatch_hydration_call_exists(self):
         """dispatch_with_binding must hydrate before sync check_binding."""
-        import ast
         with open("src/agents/plugins/dispatch.py") as f:
             source = f.read()
         assert "load_tenant_bindings" in source, (

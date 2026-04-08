@@ -47,9 +47,7 @@ _PHONE_EXTRACT_PATTERN = re.compile(r"(\+[1-9]\d{1,14})")
 _EMAIL_STRICT_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 # Flexible email regex: extract an email embedded in a sentence
-_EMAIL_EXTRACT_PATTERN = re.compile(
-    r"\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b"
-)
+_EMAIL_EXTRACT_PATTERN = re.compile(r"\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b")
 
 # Don't try to extract email from long messages (likely not an email submission)
 _MAX_EMAIL_MSG_LENGTH = 200
@@ -403,7 +401,8 @@ async def preprocess_identity(
     except Exception as exc:
         logger.warning(
             "Identity preprocessor: failed to read conversation %s: %s",
-            conversation_id, exc,
+            conversation_id,
+            exc,
         )
         return IdentityAction(action="none")
 
@@ -483,8 +482,7 @@ async def preprocess_identity(
                     action="otp_received",
                     email=identity_email,
                     system_message=(
-                        "Email verified! I can now access your account information. "
-                        "How can I help you today?"
+                        "Email verified! I can now access your account information. How can I help you today?"
                     ),
                 )
             else:
@@ -567,15 +565,16 @@ async def preprocess_identity(
                     logger.error("Failed to mark phone verified: %s", exc)
 
                 # Mask phone for display (show country code + last 3 digits)
-                masked_phone = identity_phone[:3] + "***" + identity_phone[-3:] if identity_phone and len(identity_phone) > 6 else identity_phone or ""
+                masked_phone = (
+                    identity_phone[:3] + "***" + identity_phone[-3:]
+                    if identity_phone and len(identity_phone) > 6
+                    else identity_phone or ""
+                )
 
                 return IdentityAction(
                     action="sms_otp_received",
                     phone=identity_phone,
-                    system_message=(
-                        f"Phone {masked_phone} verified! "
-                        f"Thanks for confirming your phone number."
-                    ),
+                    system_message=(f"Phone {masked_phone} verified! Thanks for confirming your phone number."),
                 )
             else:
                 return IdentityAction(
@@ -593,7 +592,6 @@ async def preprocess_identity(
 
     email = _extract_email(content_stripped)
     if email:
-
         # Send OTP
         sent = await _send_otp_for_conversation(email=email, tenant_id=tenant_id)
         if not sent:

@@ -26,14 +26,11 @@ from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import TenantStatus, TenantTier
 from src.multi_tenant.admin_conversation_api import (
     SearchConversationsRequest,
-    SearchConversationsResponse,
-    SearchResultEntry,
     _extract_search_snippet,
     configure_admin_conversation_services,
     router,
 )
 from src.multi_tenant.middleware import get_tenant_context
-from src.multi_tenant.repository import ConversationRepository
 
 # ---------------------------------------------------------------------------
 # Constants

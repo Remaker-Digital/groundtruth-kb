@@ -127,7 +127,10 @@ router = APIRouter(prefix="/api/audit", tags=["admin-audit"])
     "",
     response_model=AuditListResponse,
     summary="Query audit log events",
-    description="Returns a paginated list of audit log events. Supports filtering by event type, customer ID, and date range, ordered by most recent first.",
+    description=(
+        "Returns a paginated list of audit log events. Supports filtering by event type, customer ID, and date range, "
+        "ordered by most recent first."
+    ),
     responses={
         400: {"description": "Invalid event_type filter value"},
         500: {"description": "Audit log query failed"},
@@ -166,8 +169,7 @@ async def list_audit_events(
     if event_type is not None and event_type not in VALID_EVENT_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid event_type '{event_type}'. "
-            f"Valid values: {sorted(VALID_EVENT_TYPES)}",
+            detail=f"Invalid event_type '{event_type}'. Valid values: {sorted(VALID_EVENT_TYPES)}",
         )
 
     # Default date range: last 30 days
@@ -237,7 +239,10 @@ async def list_audit_events(
 @router.get(
     "/export",
     summary="Export audit log as CSV",
-    description="Exports audit log events as a downloadable CSV file. Same filtering as the query endpoint but returns all matching events.",
+    description=(
+        "Exports audit log events as a downloadable CSV file. Same filtering as the query endpoint but returns all "
+        "matching events."
+    ),
     responses={
         400: {"description": "Invalid event_type filter value"},
         500: {"description": "Audit log export failed"},
@@ -296,22 +301,32 @@ async def export_audit_events(
     # Build CSV
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "id", "event_type", "timestamp", "actor",
-        "customer_id", "trace_id", "details",
-    ])
+    writer.writerow(
+        [
+            "id",
+            "event_type",
+            "timestamp",
+            "actor",
+            "customer_id",
+            "trace_id",
+            "details",
+        ]
+    )
 
     import json
+
     for e in events_raw:
-        writer.writerow([
-            e.get("id", ""),
-            e.get("event_type", ""),
-            e.get("timestamp", ""),
-            e.get("actor", ""),
-            e.get("customer_id", ""),
-            e.get("trace_id", ""),
-            json.dumps(sanitize_audit_payload(e.get("payload") or e.get("details") or {})),
-        ])
+        writer.writerow(
+            [
+                e.get("id", ""),
+                e.get("event_type", ""),
+                e.get("timestamp", ""),
+                e.get("actor", ""),
+                e.get("customer_id", ""),
+                e.get("trace_id", ""),
+                json.dumps(sanitize_audit_payload(e.get("payload") or e.get("details") or {})),
+            ]
+        )
 
     output.seek(0)
 

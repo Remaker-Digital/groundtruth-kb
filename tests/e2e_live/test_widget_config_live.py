@@ -844,7 +844,7 @@ class TestMutations:
         _click_switch_label(page, "Pre-chat form")
         page.wait_for_timeout(500)
         # After enabling, pre-chat field chips should appear
-        chips = page.locator("text=Name, text=Email, text=Phone, text=Company")
+        page.locator("text=Name, text=Email, text=Phone, text=Company")
         # At least the pre-chat fields section should be visible
         # (or it was already enabled and we just disabled it — both valid)
         title = page.locator("h2:has-text('Widget configuration')")
