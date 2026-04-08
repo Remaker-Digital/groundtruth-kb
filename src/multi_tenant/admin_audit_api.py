@@ -40,6 +40,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.multi_tenant.audit_sanitizer import sanitize_audit_payload
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType
 from src.multi_tenant.middleware import get_tenant_context
@@ -213,7 +214,7 @@ async def list_audit_events(
             timestamp=e.get("timestamp", ""),
             actor=e.get("actor"),
             customer_id=e.get("customer_id"),
-            details=e.get("details", {}),
+            details=sanitize_audit_payload(e.get("payload") or e.get("details") or {}),
             trace_id=e.get("trace_id"),
         )
         for e in events_raw
@@ -309,7 +310,7 @@ async def export_audit_events(
             e.get("actor", ""),
             e.get("customer_id", ""),
             e.get("trace_id", ""),
-            json.dumps(e.get("details", {})),
+            json.dumps(sanitize_audit_payload(e.get("payload") or e.get("details") or {})),
         ])
 
     output.seek(0)

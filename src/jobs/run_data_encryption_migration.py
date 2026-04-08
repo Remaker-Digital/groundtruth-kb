@@ -87,14 +87,21 @@ async def _get_or_create_tenant_dek(
         logger.error("Encryption or secret service not initialized")
         return None
 
-    # Check if DEK already exists
+    # Check if DEK already exists and is valid (unwrappable with current KEK)
     existing = await secret_svc.get_secret(tenant_id, TenantSecretType.DEK)
     if existing is not None:
-        wrapped_dek = base64.b64decode(existing)
-        # Pre-warm the cache by unwrapping
-        await svc.unwrap_key_async(wrapped_dek, tenant_id)
-        logger.info("Existing DEK found for tenant %s", tenant_id)
-        return wrapped_dek
+        try:
+            wrapped_dek = base64.b64decode(existing)
+            # Pre-warm the cache by unwrapping
+            await svc.unwrap_key_async(wrapped_dek, tenant_id)
+            logger.info("Existing DEK found for tenant %s", tenant_id)
+            return wrapped_dek
+        except Exception as exc:
+            # DEK is stale (e.g., wrapped with old CMK) — recreate
+            logger.warning(
+                "Existing DEK for %s is invalid (will recreate): %s",
+                tenant_id, str(exc)[:80],
+            )
 
     if dry_run:
         logger.info("[DRY RUN] Would create DEK for tenant %s", tenant_id)
@@ -287,8 +294,19 @@ async def _bootstrap() -> None:
     await secret_svc.initialize()
 
 
-async def _main_async(dry_run: bool, tenant_id: str | None) -> None:
+async def _main_async(dry_run: bool, tenant_id: str | None, *, force: bool = False) -> None:
     """Async main: bootstrap services then run migration."""
+    # Safety gate: prevent accidental production encryption from local machine
+    db_name = os.environ.get("COSMOS_DB_DATABASE", "")
+    logger.info("Target database: %s", db_name or "(not set)")
+    if not dry_run and not force:
+        if "staging" not in db_name and "dev" not in db_name:
+            logger.error(
+                "SAFETY GATE: COSMOS_DB_DATABASE=%s looks like production. "
+                "Pass --force to confirm, or set COSMOS_DB_DATABASE to the staging DB.",
+                db_name,
+            )
+            return
     await _bootstrap()
     await run_migration(dry_run=dry_run, tenant_id=tenant_id)
 
@@ -298,10 +316,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Encrypt tenant data at rest")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing")
     parser.add_argument("--tenant", type=str, help="Migrate a single tenant")
+    parser.add_argument("--force", action="store_true", help="Bypass production database safety gate")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant))
+    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant, force=args.force))
 
 
 if __name__ == "__main__":

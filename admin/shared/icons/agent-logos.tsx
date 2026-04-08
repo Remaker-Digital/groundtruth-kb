@@ -1,6 +1,7 @@
 /**
- * Agent provider logos — inline SVGs from Simple Icons (CC0 license)
- * and the Agent Red brand logo.
+ * Agent provider logos — real SVG files from integration-logos/ where available,
+ * inline SVGs from Simple Icons (CC0 license) as fallback, and the Agent Red
+ * brand logo as the default.
  *
  * Usage:
  *   import { getAgentLogo } from '../../shared/icons/agent-logos';
@@ -10,21 +11,60 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface LogoProps {
   size?: number;
   className?: string;
 }
 
+const AGENT_LOGO_FILES: Record<string, string> = {
+  stripe_mcp: 'stripe-logo',
+  shopify_mcp: 'shopify-logo',
+  zendesk: 'zendesk-logo',
+};
+
+function makeImageLogo(stem: string): React.FC<LogoProps> {
+  const ImageLogo: React.FC<LogoProps> = ({ size = 32, className }) => {
+    const [error, setError] = useState(false);
+    if (error) {
+      const Fallback = INLINE_LOGO_MAP[stem] || AgentRedLogo;
+      return <Fallback size={size} className={className} />;
+    }
+    return (
+      <img
+        src={`/integration-logos/${stem}-light.svg`}
+        alt=""
+        width={size}
+        height={size}
+        className={className}
+        style={{ objectFit: 'contain', display: 'block' }}
+        onError={() => setError(true)}
+      />
+    );
+  };
+  return ImageLogo;
+}
+
 // ---------------------------------------------------------------------------
 // Agent Red (first-party agents)
 // ---------------------------------------------------------------------------
 
+/**
+ * Agent Red brand logo — The Beacon ({r} monogram).
+ * Simplified inline version of branding/logo/SVG/icon-master.svg.
+ * White {r} on Agent Red orange-red (#ff3621) rounded rectangle.
+ * S259 D9: replaced placeholder "R" with real brand monogram.
+ */
 const AgentRedLogo: React.FC<LogoProps> = ({ size = 32 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <rect width="24" height="24" rx="4" fill="#dc2626" />
-    <text x="12" y="16.5" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold" fontFamily="system-ui">R</text>
+  <svg width={size} height={size} viewBox="0 0 128 128" fill="none">
+    <rect width="128" height="128" rx="21" fill="#ff3621" />
+    {/* Left curly brace */}
+    <path d="M25 90V74c0-4-4-5-7-5v-8c3 0 7-1 7-5V39c0-7 6-11 12-11h7v10h-4c-3 0-4 2-4 5v14c0 6-5 8-8 8v1c3 0 8 2 8 9v13c0 3 1 5 4 5h4v10h-7c-6 0-12-5-12-11z" fill="white"/>
+    {/* Lowercase r */}
+    <path d="M51 44h12v7h0c2-5 8-8 14-8 2 0 2 0 3 0v12c-1 0-3-1-4-1-7 0-12 5-12 11v21H51V44z" fill="white"/>
+    {/* Right curly brace */}
+    <path d="M86 91h4c3 0 4-2 4-5V73c0-7 5-8 8-9V64c-4 0-8-2-8-6V44c0-3-1-5-4-5h-4V29h7c6 0 12 5 12 11v17c0 3 4 5 7 5v8c-3 0-7 1-7 5V90c0 7-6 11-12 11h-7z" fill="white"/>
   </svg>
 );
 
@@ -85,25 +125,39 @@ const GoogleDocsLogo: React.FC<LogoProps> = ({ size = 32 }) => (
 );
 
 // ---------------------------------------------------------------------------
-// Logo registry — maps agent_id to logo component
+// Inline SVG fallbacks — used when no file-based logo exists or image fails
 // ---------------------------------------------------------------------------
 
-const LOGO_MAP: Record<string, React.FC<LogoProps>> = {
-  // External MCP
-  stripe_mcp: StripeLogo,
-  shopify_mcp: ShopifyLogo,
+const INLINE_LOGO_MAP: Record<string, React.FC<LogoProps>> = {
+  'stripe-logo': StripeLogo,
+  'shopify-logo': ShopifyLogo,
+  'zendesk-logo': ZendeskLogo,
   coinbase_mcp: CoinbaseLogo,
   paypal_mcp: PayPalLogo,
   square_mcp: SquareLogo,
-  // Integration agents
-  zendesk: ZendeskLogo,
+  slack: SlackLogo,
+  google_docs: GoogleDocsLogo,
+};
+
+// ---------------------------------------------------------------------------
+// Logo registry — prefers real logo files, falls back to inline SVGs
+// ---------------------------------------------------------------------------
+
+const LOGO_MAP: Record<string, React.FC<LogoProps>> = {
+  ...Object.fromEntries(
+    Object.entries(AGENT_LOGO_FILES).map(([agentId, stem]) => [agentId, makeImageLogo(stem)]),
+  ),
+  coinbase_mcp: CoinbaseLogo,
+  paypal_mcp: PayPalLogo,
+  square_mcp: SquareLogo,
   slack: SlackLogo,
   google_docs: GoogleDocsLogo,
 };
 
 /**
  * Get the logo component for an agent.
- * Returns the third-party logo if available, otherwise the Agent Red logo.
+ * Returns a file-based logo if available in integration-logos/, an inline SVG
+ * fallback for known agents, or the Agent Red logo as the default.
  */
 export function getAgentLogo(agentId: string): React.FC<LogoProps> {
   return LOGO_MAP[agentId] || AgentRedLogo;

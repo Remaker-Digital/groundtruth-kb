@@ -144,8 +144,8 @@ class TestFindBestAgent:
     """Auto-assignment routing logic."""
 
     @pytest.mark.asyncio
-    async def test_se_03_returns_lowest_workload(self):
-        """Selects the agent with the fewest unresolved escalations."""
+    async def test_se_03_returns_first_matching_agent(self):
+        """Returns the first matching agent for the category (WI-3030: no workload balancing)."""
         session = _make_session(
             team_members=[
                 _make_agent_member("agent-a", ["support"]),
@@ -155,11 +155,11 @@ class TestFindBestAgent:
         )
 
         result = await session.find_best_agent_for_category(TENANT_ID, "support")
-        assert result == "agent-b"
+        assert result == "agent-a"  # first match, no workload balancing
 
     @pytest.mark.asyncio
-    async def test_se_04_respects_concurrency_cap(self):
-        """Agent at max_concurrent_conversations is skipped."""
+    async def test_se_04_returns_first_match_regardless_of_load(self):
+        """Concurrency caps removed for async email-bridge model (WI-3030)."""
         session = _make_session(
             team_members=[
                 _make_agent_member("agent-a", ["support"], max_concurrent=2),
@@ -169,7 +169,7 @@ class TestFindBestAgent:
         )
 
         result = await session.find_best_agent_for_category(TENANT_ID, "support")
-        assert result == "agent-b"  # agent-a is at cap
+        assert result == "agent-a"  # no cap enforcement in async model
 
     @pytest.mark.asyncio
     async def test_se_05_returns_none_when_no_match(self):

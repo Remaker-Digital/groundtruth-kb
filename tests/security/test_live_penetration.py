@@ -120,7 +120,7 @@ class TestAuthenticationBypass:
 
     def test_sec_l04_invalid_key_correct_prefix(self, client):
         """SEC-L04: Invalid API key (correct prefix, wrong hash) → 401."""
-        r = client.get("/api/config", headers={"X-API-Key": "ar_user_fake_AAAAAAAAAAAAA_BBBBB"})
+        r = client.get("/api/config", headers={"X-API-Key": "ar_user_fake_AAAAAAAAAAAAA_BBBBB"})  # noqa: S105 — deliberately fake key for negative auth test
         assert r.status_code == 401
 
     def test_sec_l05_empty_api_key(self, client):
@@ -442,7 +442,7 @@ class TestProviderProtection:
         r = client.put(
             "/api/superadmin/tenants/test-tenant/tier",
             json={"tier": "enterprise"},
-            headers={"X-API-Key": "ar_user_fake_notadmin"},
+            headers={"X-API-Key": "ar_user_fake_notadmin"},  # noqa: S105 — deliberately fake key for negative auth test
         )
         assert r.status_code in (401, 403, 404), f"Non-superadmin: got {r.status_code}"
 
@@ -455,15 +455,20 @@ class TestCorsAndHeaders:
     """Verify CORS configuration and security response headers."""
 
     def test_sec_l40_cors_preflight(self, client):
-        """SEC-L40: OPTIONS preflight returns CORS headers."""
+        """SEC-L40: OPTIONS preflight returns CORS headers for allowed origins.
+
+        CORS is configured to accept *.myshopify.com, *.azurecontainerapps.io,
+        and localhost.  Unrecognized origins are correctly rejected (400).
+        We test with an allowed origin pattern to verify preflight succeeds.
+        """
         r = client.options(
             "/api/config",
             headers={
-                "Origin": "https://example.com",
+                "Origin": "https://test-store.myshopify.com",
                 "Access-Control-Request-Method": "GET",
             },
         )
-        assert r.status_code in (200, 204, 405), f"CORS preflight: got {r.status_code}"
+        assert r.status_code in (200, 204), f"CORS preflight: got {r.status_code}"
 
     def test_sec_l41_security_headers_present(self, client):
         """SEC-L41: Response includes security headers."""

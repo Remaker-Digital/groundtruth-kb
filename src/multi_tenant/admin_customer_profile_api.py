@@ -47,11 +47,24 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+class ContactAttributeResponse(BaseModel):
+    """A linked contact attribute (ADR-004)."""
+
+    attribute_type: str
+    value: str
+    verified: bool = False
+    source: str = ""
+    added_at: str = ""
+
+
 class CustomerProfileResponse(BaseModel):
     """A single customer profile for the admin dashboard."""
 
     customer_id: str
     tenant_id: str
+    # ADR-004: Canonical identity
+    canonical_id: str = ""
+    contact_attributes: list[ContactAttributeResponse] = Field(default_factory=list)
     consent_status: str
     purchase_history: list[dict[str, Any]] = Field(default_factory=list)
     product_questions: list[dict[str, Any]] = Field(default_factory=list)
@@ -244,6 +257,17 @@ async def list_profiles(
         CustomerProfileResponse(
             customer_id=p.get("customer_id", ""),
             tenant_id=ctx.tenant_id,
+            canonical_id=p.get("canonical_id", ""),
+            contact_attributes=[
+                ContactAttributeResponse(
+                    attribute_type=a.get("attribute_type", ""),
+                    value=a.get("value", ""),
+                    verified=a.get("verified", False),
+                    source=a.get("source", ""),
+                    added_at=a.get("added_at", ""),
+                )
+                for a in p.get("contact_attributes", [])
+            ],
             consent_status=p.get("consent_status", "not_asked"),
             purchase_history=p.get("purchase_history", []),
             product_questions=p.get("product_questions", []),
@@ -300,9 +324,23 @@ async def get_profile(
             detail=f"Customer profile '{customer_id}' not found",
         )
 
+    # ADR-004: Include canonical identity fields
+    contact_attrs = [
+        ContactAttributeResponse(
+            attribute_type=a.attribute_type.value if hasattr(a.attribute_type, "value") else str(a.attribute_type),
+            value=a.value,
+            verified=a.verified,
+            source=a.source,
+            added_at=a.added_at,
+        )
+        for a in getattr(profile, "contact_attributes", [])
+    ]
+
     return CustomerProfileResponse(
         customer_id=profile.customer_id,
         tenant_id=ctx.tenant_id,
+        canonical_id=getattr(profile, "canonical_id", "") or "",
+        contact_attributes=contact_attrs,
         consent_status=profile.consent_status.value
         if hasattr(profile.consent_status, "value")
         else str(profile.consent_status),

@@ -144,6 +144,16 @@ Key files: CLAUDE.md, memory/MEMORY.md
 Next: [describe task].
 ```
 
+### Session Start: Bridge Liveness Check (Mandatory)
+
+Before any session work proceeds, Prime Builder must verify the bridge is alive:
+
+1. **Send** a bridge message to Codex: `"Report your current operating state"` (expected_response: `status_update`, artifact_refs: `["AGENTS.md"]`, action_items: `["Send operating state summary back to prime"]`).
+2. **Wait** for Codex to reply. Poll Prime's inbox every 15 seconds for up to 2 minutes.
+3. **Proceed** only after the reply is received. If no reply arrives within 2 minutes, report the bridge failure to the owner before continuing.
+
+This check confirms the Prime↔Codex bridge is operational and both agents can communicate. Do not skip this step.
+
 ### Protected Behaviors & Removal Rule
 
 **Never remove code, tests, features, or procedure entries without explicit owner approval.** If something looks wrong — ASK rather than act. Protected behaviors are specifications with `type = 'protected_behavior'` (PB-* IDs) carrying machine-verifiable assertions. The Build & Deploy Phase 0 regression gate checks these before every build.

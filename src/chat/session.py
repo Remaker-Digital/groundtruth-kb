@@ -50,6 +50,8 @@ from src.multi_tenant.conversation_meter import (
 )
 from src.multi_tenant.cosmos_schema import (
     TIER_DEFAULTS,
+    ContactAttribute,
+    ContactAttributeType,
     ConversationDocument,
     ConversationStatus,
     TenantTier,
@@ -161,10 +163,12 @@ class ConversationSession:
         conversation_repo: ConversationRepository,
         conversation_meter: ConversationMeter | None = None,
         team_repo: TeamMemberRepository | None = None,
+        customer_profile_repo: Any | None = None,
     ) -> None:
         self._repo = conversation_repo
         self._meter = conversation_meter
         self._team_repo = team_repo
+        self._customer_repo = customer_profile_repo
         self._pii_scrubber: PiiScrubber | None = None
 
     def set_pii_scrubber(self, enabled: bool) -> None:
@@ -231,8 +235,15 @@ class ConversationSession:
         conversation_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
 
-        # Resolve customer_id from visitor identity if provided
-        customer_id = _resolve_customer_id(request.visitor)
+        # ADR-004: Resolve canonical customer identity (find-or-create).
+        # Falls back to legacy resolver when no customer_profile_repo is configured.
+        canonical_customer_id: str | None = None
+        if self._customer_repo:
+            canonical_customer_id, customer_id = await _resolve_canonical_customer_id(
+                request.visitor, tenant_id, self._customer_repo,
+            )
+        else:
+            customer_id = _resolve_customer_id(request.visitor)
 
         # AUTH-5: Extract verification flag from metadata (set by endpoint)
         customer_verified = bool(
@@ -268,6 +279,7 @@ class ConversationSession:
             conversation_id=conversation_id,
             status=ConversationStatus.ACTIVE,
             customer_id=customer_id,
+            canonical_customer_id=canonical_customer_id,
             customer_verified=customer_verified,
             is_billable=is_billable,
             message_count=message_count,
@@ -323,7 +335,9 @@ class ConversationSession:
             ConversationNotActiveError: Conversation is not in ACTIVE status.
             TurnLimitReachedError: Conversation has reached MAX_TURNS.
         """
-        doc = await self._get_active_conversation(tenant_id, request.conversation_id)
+        # WI-3030 v2.1: Use _get_writable_conversation so customers can
+        # continue chatting after async email-bridge escalation.
+        doc = await self._get_writable_conversation(tenant_id, request.conversation_id)
 
         turn_count = doc.get("turn_count", 0)
         if turn_count >= MAX_TURNS:
@@ -391,7 +405,9 @@ class ConversationSession:
             return await self.add_customer_message(tenant_id, request)
 
         for _attempt in range(max_retries):
-            doc = await self._get_active_conversation(
+            # WI-3030 v2.1: Use _get_writable_conversation so customers
+            # can continue chatting after async email-bridge escalation.
+            doc = await self._get_writable_conversation(
                 tenant_id, request.conversation_id,
             )
             etag = doc.get("_etag", "")
@@ -843,12 +859,13 @@ class ConversationSession:
     ) -> str | None:
         """Find an active escalation_agent who handles the given category.
 
-        Selects the agent with the fewest unresolved escalations who is
-        still below their ``max_concurrent_conversations`` cap.  Falls
-        back to agents handling ``general_inquiry`` if no exact match.
+        Returns the first matching agent's document ID, or falls back to
+        agents handling ``general_inquiry``.  Returns ``None`` if no
+        suitable agent is available.
 
-        Returns the member's document ID, or ``None`` if no suitable
-        agent is available.
+        WI-3030 S259: Simplified for async email-bridge model — no
+        concurrency caps or workload balancing needed since the agent
+        responds via email, not live chat.
         """
         if not self._team_repo:
             logger.debug("No team_repo configured — cannot auto-assign")
@@ -876,28 +893,7 @@ class ConversationSession:
         if not candidates:
             return None
 
-        # Score each candidate by current workload
-        best_id: str | None = None
-        best_count = float("inf")
-
-        for member in candidates:
-            member_id = member["id"]
-            cap = member.get("max_concurrent_conversations", 5)
-
-            count = await self._repo.count_filtered(
-                tenant_id,
-                status=ConversationStatus.ESCALATED,
-                assigned_to=member_id,
-            )
-
-            if count >= cap:
-                continue  # at capacity
-
-            if count < best_count:
-                best_count = count
-                best_id = member_id
-
-        return best_id
+        return candidates[0]["id"]
 
     async def find_superadmin_email(self, tenant_id: str) -> str | None:
         """Return the email address of the tenant's superadmin.
@@ -1089,6 +1085,27 @@ class ConversationSession:
             raise ConversationNotActiveError(conversation_id, status)
         return doc
 
+    async def _get_writable_conversation(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+    ) -> dict[str, Any]:
+        """Read a conversation that accepts customer messages.
+
+        ACTIVE and ESCALATED conversations are writable.  ESCALATED
+        conversations continue the AI chat while the async email-bridge
+        handles human follow-up separately (WI-3030 v2.1).
+        """
+        doc = await self._get_conversation(tenant_id, conversation_id)
+        status = doc.get("status", "")
+        writable_statuses = {
+            ConversationStatus.ACTIVE.value,
+            ConversationStatus.ESCALATED.value,
+        }
+        if status not in writable_statuses:
+            raise ConversationNotActiveError(conversation_id, status)
+        return doc
+
 
 # ---------------------------------------------------------------------------
 # Module-level singleton
@@ -1115,6 +1132,7 @@ def configure_conversation_session(
     conversation_repo: ConversationRepository,
     conversation_meter: ConversationMeter | None = None,
     team_repo: TeamMemberRepository | None = None,
+    customer_profile_repo: Any | None = None,
 ) -> ConversationSession:
     """Configure the module-level singleton with explicit dependencies.
 
@@ -1126,6 +1144,7 @@ def configure_conversation_session(
         conversation_repo=conversation_repo,
         conversation_meter=conversation_meter,
         team_repo=team_repo,
+        customer_profile_repo=customer_profile_repo,
     )
     return _session
 
@@ -1136,10 +1155,115 @@ def configure_conversation_session(
 
 
 def _resolve_customer_id(visitor: VisitorIdentity | None) -> str | None:
-    """Extract customer_id from visitor identity, if available."""
+    """Extract customer_id from visitor identity, if available.
+
+    Legacy synchronous resolver — returns the raw visitor identifier
+    (Shopify GID, email, or None).  Used when no CustomerProfileRepository
+    is available (backward compat).
+    """
     if visitor is None:
         return None
     return visitor.customer_id or visitor.email or None
+
+
+async def _resolve_canonical_customer_id(
+    visitor: VisitorIdentity | None,
+    tenant_id: str,
+    customer_repo: Any,
+) -> tuple[str | None, str | None]:
+    """Resolve visitor identity to a canonical customer ID (ADR-004).
+
+    Implements find-or-create:
+      1. If visitor has a cid_ prefixed customer_id, use it directly.
+      2. If visitor has a Shopify customer GID, resolve via contact_attributes.
+      3. If visitor has an email, resolve via contact_attributes.
+      4. If no match found, create a new canonical profile.
+      5. Anonymous visitors → (None, None).
+
+    Returns:
+        (canonical_customer_id, legacy_customer_id) tuple.
+        legacy_customer_id preserves the original visitor identifier for
+        backward compatibility on the ConversationDocument.
+    """
+    from src.multi_tenant.repositories.customer import generate_canonical_id
+
+    if visitor is None:
+        return None, None
+
+    legacy_id = visitor.customer_id or visitor.email or None
+    now = datetime.now(timezone.utc).isoformat()
+
+    # 1. Direct canonical_id (future: widget sends it)
+    if visitor.customer_id and visitor.customer_id.startswith("cid_"):
+        return visitor.customer_id, visitor.customer_id
+
+    # 2. Shopify customer GID lookup
+    if visitor.customer_id:
+        canonical = await customer_repo.resolve_by_attribute(
+            tenant_id, ContactAttributeType.SHOPIFY_CUSTOMER_GID, visitor.customer_id,
+        )
+        if canonical:
+            return canonical, legacy_id
+
+        # Auto-create profile for new Shopify customer.
+        canonical = generate_canonical_id()
+        attrs = [ContactAttribute(
+            attribute_type=ContactAttributeType.SHOPIFY_CUSTOMER_GID,
+            value=visitor.customer_id,
+            verified=False,
+            source="shopify_session",
+            added_at=now,
+        )]
+        if visitor.email:
+            attrs.append(ContactAttribute(
+                attribute_type=ContactAttributeType.EMAIL,
+                value=visitor.email,
+                verified=False,
+                source="shopify_session",
+                added_at=now,
+            ))
+        await customer_repo.create_profile_with_canonical_id(
+            tenant_id, canonical, contact_attributes=attrs,
+        )
+        # Post-create race guard: re-resolve to detect concurrent writes.
+        # If another writer created a profile for the same attribute,
+        # the query returns the earlier writer's canonical_id.  We keep
+        # the first-writer-wins profile and orphan ours (it will have no
+        # conversations linked and can be cleaned up asynchronously).
+        winner = await customer_repo.resolve_by_attribute(
+            tenant_id, ContactAttributeType.SHOPIFY_CUSTOMER_GID, visitor.customer_id,
+        )
+        return (winner or canonical), legacy_id
+
+    # 3. Email lookup
+    if visitor.email:
+        canonical = await customer_repo.resolve_by_attribute(
+            tenant_id, ContactAttributeType.EMAIL, visitor.email,
+        )
+        if canonical:
+            return canonical, legacy_id
+
+        # Auto-create profile for new email customer.
+        canonical = generate_canonical_id()
+        await customer_repo.create_profile_with_canonical_id(
+            tenant_id, canonical, contact_attributes=[
+                ContactAttribute(
+                    attribute_type=ContactAttributeType.EMAIL,
+                    value=visitor.email,
+                    verified=False,
+                    source="self_asserted",
+                    added_at=now,
+                ),
+            ],
+        )
+        # Post-create race guard (same pattern as Shopify path)
+        winner = await customer_repo.resolve_by_attribute(
+            tenant_id, ContactAttributeType.EMAIL, visitor.email,
+        )
+        return (winner or canonical), legacy_id
+
+    # 4. Anonymous — no canonical_id
+    return None, None
 
 
 def _end_reason_to_status(reason: ConversationEndReason) -> ConversationStatus:

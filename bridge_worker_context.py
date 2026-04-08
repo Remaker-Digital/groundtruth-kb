@@ -62,14 +62,34 @@ def clean_path_candidate(raw: str) -> str:
 
 
 def resolve_artifact_name(name: str, *, project_dir: Path = PROJECT_DIR) -> Path | None:
-    candidate = Path(name)
-    if candidate.is_absolute() and candidate.exists():
-        return candidate.resolve()
-    if not candidate.is_absolute():
-        direct = (project_dir / candidate).resolve()
-        if direct.exists():
-            return direct
+    """Resolve an artifact name to a file path.
 
+    Three resolution strategies:
+      (a) Absolute path → direct existence check only (never rglob).
+      (b) Relative path → try project_dir join, then rglob search.
+      (c) Malformed / unparseable → return None.
+
+    Bridge autonomy Phase A (S259): absolute paths must never be passed
+    to Path.rglob() — it raises ValueError on non-relative patterns.
+    """
+    if not name or not name.strip():
+        return None
+
+    candidate = Path(name)
+
+    # (a) Absolute path — direct check only, no rglob search.
+    if candidate.is_absolute():
+        if candidate.exists():
+            return candidate.resolve()
+        return None
+
+    # (b) Relative path — try direct join first.
+    direct = (project_dir / candidate).resolve()
+    if direct.exists():
+        return direct
+
+    # (b cont.) Fall back to rglob search in known directories.
+    # Only filename-like patterns are safe for rglob.
     search_roots = [
         project_dir / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX",
         project_dir / "independent-progress-assessments",
@@ -79,7 +99,11 @@ def resolve_artifact_name(name: str, *, project_dir: Path = PROJECT_DIR) -> Path
     for root in search_roots:
         if not root.exists():
             continue
-        root_matches = list(root.rglob(name))
+        try:
+            root_matches = list(root.rglob(name))
+        except (ValueError, OSError):
+            # Non-relative pattern, invalid chars, or OS-level path error.
+            continue
         for match in root_matches:
             if match.is_file() and match not in matches:
                 matches.append(match)
@@ -154,6 +178,64 @@ def discover_artifacts(context: dict[str, Any], *, project_dir: Path = PROJECT_D
     return sorted(found.values(), key=lambda item: item["path"])
 
 
+def _repo_relative_artifact_path(raw: Any, *, project_dir: Path = PROJECT_DIR) -> str | None:
+    candidate: str | None = None
+    if isinstance(raw, dict):
+        for key in ("path", "name"):
+            value = raw.get(key)
+            if isinstance(value, str) and value.strip():
+                candidate = value
+                break
+    elif isinstance(raw, str) and raw.strip():
+        candidate = raw
+
+    if not candidate:
+        return None
+
+    cleaned = clean_path_candidate(candidate)
+    if not cleaned:
+        return None
+
+    path = Path(cleaned)
+    if path.is_absolute():
+        try:
+            relative = path.resolve().relative_to(project_dir.resolve())
+        except (OSError, RuntimeError, ValueError):
+            return None
+    else:
+        relative = path
+
+    relative_text = relative.as_posix().strip()
+    if not relative_text or relative_text.startswith("../"):
+        return None
+    return relative_text
+
+
+def _repair_payload_artifact_refs(
+    context: dict[str, Any],
+    *,
+    project_dir: Path = PROJECT_DIR,
+) -> list[dict[str, str]]:
+    refs: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def _append_ref(raw: Any) -> None:
+        relative_path = _repo_relative_artifact_path(raw, project_dir=project_dir)
+        if not relative_path or relative_path in seen:
+            return
+        seen.add(relative_path)
+        refs.append({"type": "file", "path": relative_path, "note": "Bridge artifact"})
+
+    for item in context.get("referenced_artifacts", []):
+        _append_ref(item.get("path") if isinstance(item, dict) else item)
+
+    canonical = context.get("canonical_message") or {}
+    for raw in canonical.get("artifact_refs", []):
+        _append_ref(raw)
+
+    return refs
+
+
 def summarize_context(agent: str, context: dict[str, Any]) -> str:
     canonical = context["canonical_message"]
     latest_worker = context.get(
@@ -181,7 +263,6 @@ def build_prompt(
     agent: str,
     snapshot_path: Path,
     new_items: list[dict[str, Any]],
-    claimed_items: list[dict[str, Any]],
     contexts: list[dict[str, Any]],
     *,
     project_dir: Path = PROJECT_DIR,
@@ -201,7 +282,6 @@ Canonical bridge snapshot:
 {snapshot_path}
 
 Pending new inbox count: {len(new_items)}
-Pending claimed/immediate count: {len(claimed_items)}
 
 Target thread summaries:
 {context_lines}
@@ -209,33 +289,15 @@ Target thread summaries:
 Required actions:
 1. Read the canonical bridge snapshot before narrating any pickup.
 2. Process only the target thread summaries plus the pending inbox IDs listed in the canonical bridge snapshot for this wake.
-3. If a target is malformed or has bridge status `invalid`, do not claim it; use `send_correction_message(...)` with the invalid message id and do not send freeform correction traffic via `send_message(...)`.
+3. If a target is malformed or has bridge status `failed`, use `send_correction_message(...)` with the failed message id and do not send freeform correction traffic via `send_message(...)`.
 4. If a target already has a prior {worker_name} review or final outbound verdict in the snapshot, do not narrate a fresh review; treat it as resend/closure work and cite the canonical report path if present.
-5. Do not auto-accept substantive work on sight; accept only after context inspection confirms the work you are actually taking.
-6. Treat claimed items as active work and send status immediately if any claimed thread has exceeded the 10-minute update cadence or a thread is flagged with `claimed_thread_silence_breach`.
-7. If a thread is flagged with `ack_breach` or `response_window_breach`, address that breach before lower-priority work and reflect the timing miss in independent-progress-assessments/BRIDGE-RESPONSIVENESS-LEDGER.md.
-8. Process requests end-to-end without waiting for owner approval unless blocked by a true external decision.
-9. If the bridge is clear after processing, state that explicitly and exit.
+5. Do not send protocol acknowledgements, acceptance notes, or negotiation-only replies. The only acceptable bridge response is a full substantive reply to the request.
+6. Every peer `send_message(...)` reply must include a valid `payload_json` with `expected_response`, `artifact_refs`, and `action_items`. Do not send bare substantive replies.
+7. For ordinary follow-up replies, prefer `expected_response=\"status_update\"` and carry forward the in-scope artifact refs from the thread.
+8. After sending the substantive reply, resolve the original inbound request as `completed` or `failed`.
+9. Process requests end-to-end without waiting for owner approval unless blocked by a true external decision.
+10. If the bridge is clear after processing, state that explicitly and exit.
 """
-
-
-def claimed_item_due(agent: str, item: dict[str, Any], state: dict[str, Any], cadence_minutes: int) -> bool:
-    if item.get("claimed_by") != agent:
-        return False
-
-    claimed_at = _parse_iso(item.get("claimed_at"))
-    if claimed_at is None:
-        return True
-
-    age_seconds = (_now() - claimed_at).total_seconds()
-    if age_seconds < cadence_minutes * 60:
-        return False
-
-    last_wake = _parse_iso(state.get("last_wake_by_message", {}).get(item["id"]))
-    if last_wake is None:
-        return True
-
-    return (_now() - last_wake).total_seconds() >= cadence_minutes * 60
 
 
 def build_context_snapshot(
@@ -243,13 +305,11 @@ def build_context_snapshot(
     trigger: str,
     contexts: list[dict[str, Any]],
     new_items: list[dict[str, Any]],
-    due_claimed: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
         "generated_at": _now().isoformat(),
         "trigger": trigger,
         "new_inbox_ids": [item["id"] for item in new_items],
-        "claimed_or_immediate_ids": [item["id"] for item in due_claimed],
         "contexts": contexts,
     }
 
@@ -257,34 +317,35 @@ def build_context_snapshot(
 def select_dispatch_batch(
     contexts: list[dict[str, Any]],
     new_items: list[dict[str, Any]],
-    due_claimed: list[dict[str, Any]],
     *,
     max_targets: int = DEFAULT_MAX_DISPATCH_TARGETS,
 ) -> dict[str, Any]:
     if max_targets < 1:
         raise ValueError("max_targets must be at least 1")
 
-    ordered_ids: list[str] = []
+    context_by_id: dict[str, dict[str, Any]] = {}
+    context_order: list[str] = []
     for context in contexts:
         canonical_id = str((context.get("canonical_message") or {}).get("id") or "").strip()
-        if canonical_id and canonical_id not in ordered_ids:
-            ordered_ids.append(canonical_id)
-    for item in list(new_items) + list(due_claimed):
+        if canonical_id and canonical_id not in context_by_id:
+            context_by_id[canonical_id] = context
+            context_order.append(canonical_id)
+
+    ordered_ids: list[str] = []
+    for item in new_items:
         message_id = str(item.get("id") or "").strip()
         if message_id and message_id not in ordered_ids:
             ordered_ids.append(message_id)
+    for canonical_id in context_order:
+        if canonical_id not in ordered_ids:
+            ordered_ids.append(canonical_id)
 
     selected_ids = ordered_ids[:max_targets]
     selected_set = set(selected_ids)
 
     return {
-        "contexts": [
-            context
-            for context in contexts
-            if str((context.get("canonical_message") or {}).get("id") or "").strip() in selected_set
-        ],
+        "contexts": [context_by_id[message_id] for message_id in selected_ids if message_id in context_by_id],
         "new_items": [item for item in new_items if str(item.get("id") or "").strip() in selected_set],
-        "due_claimed": [item for item in due_claimed if str(item.get("id") or "").strip() in selected_set],
         "target_ids": selected_ids,
         "deferred_ids": ordered_ids[max_targets:],
     }
@@ -312,16 +373,17 @@ def build_contexts(
     agent: str,
     explicit_refs: list[str],
     new_items: list[dict[str, Any]],
-    due_claimed: list[dict[str, Any]],
     project_dir: Path = PROJECT_DIR,
     log_fn: Callable[[str], None] | None = None,
+    max_contexts: int | None = None,
 ) -> list[dict[str, Any]]:
+    if max_contexts is not None and max_contexts < 1:
+        raise ValueError("max_contexts must be at least 1")
+
     reasons_by_id: dict[str, set[str]] = {}
 
     for item in new_items:
         reasons_by_id.setdefault(item["id"], set()).add("new")
-    for item in due_claimed:
-        reasons_by_id.setdefault(item["id"], set()).add("claimed-cadence")
     for message_ref in explicit_refs:
         context = _worker_context(bridge, message_ref, agent=agent)
         if context is None:
@@ -332,27 +394,35 @@ def build_contexts(
         reasons_by_id.setdefault(canonical_id, set()).add(f"explicit:{message_ref}")
 
     contexts: list[dict[str, Any]] = []
-    for message_id, reasons in sorted(reasons_by_id.items()):
-        context = _worker_context(bridge, message_id, agent=agent)
-        if context is None:
-            continue
-        thread_sla = context.get("thread_sla") or {}
-        for risk_type in thread_sla.get("risk_types", []):
-            reasons.add(risk_type)
-        canonical = context.get("canonical_message") or {}
-        if canonical.get("status") == "invalid":
-            reasons.add("invalid")
-        context["wake_reasons"] = sorted(reasons)
-        context["referenced_artifacts"] = discover_artifacts(context, project_dir=project_dir)
-        latest_worker = context.get(
-            "latest_non_protocol_codex_message"
-            if agent == "codex"
-            else "latest_non_protocol_prime_message"
-        )
-        context["already_reviewed_hint"] = bool(
-            latest_worker and latest_worker.get("id") != context["canonical_message"]["id"]
-        )
-        contexts.append(context)
+    for message_id, reasons in reasons_by_id.items():
+        if max_contexts is not None and len(contexts) >= max_contexts:
+            break
+        # Phase A: isolate context-build failures per thread.
+        # One bad message/artifact must not stop all autonomous bridge work.
+        try:
+            context = _worker_context(bridge, message_id, agent=agent)
+            if context is None:
+                continue
+            canonical = context.get("canonical_message") or {}
+            if canonical.get("status") == "failed":
+                reasons.add("failed")
+            context["wake_reasons"] = sorted(reasons)
+            context["referenced_artifacts"] = discover_artifacts(context, project_dir=project_dir)
+            latest_worker = context.get(
+                "latest_non_protocol_codex_message"
+                if agent == "codex"
+                else "latest_non_protocol_prime_message"
+            )
+            context["already_reviewed_hint"] = bool(
+                latest_worker and latest_worker.get("id") != context["canonical_message"]["id"]
+            )
+            contexts.append(context)
+        except Exception as exc:
+            if log_fn is not None:
+                log_fn(
+                    f"context-build failed for message {message_id}: {exc!r} — "
+                    "skipping this thread, continuing with remaining targets"
+                )
     return contexts
 
 
@@ -368,18 +438,85 @@ def _peer_sender_for_context(agent: str, context: dict[str, Any]) -> str | None:
 def _default_action_items(outcome: str) -> list[str]:
     if outcome == "blocked":
         return [
-            "Acknowledge receipt of this review",
-            "Send a revised implementation or plan if further review is needed",
+            "Send a substantive unblock plan or revised implementation if further review is needed",
+            "Poll for the peer's next substantive reply before reopening this thread",
         ]
     if outcome == "superseded":
         return [
-            "Acknowledge receipt of this update",
             "Use the newest thread guidance if further action is still needed",
+            "Send a substantive follow-up only if the replacement thread still needs bridge work",
         ]
     return [
-        "Acknowledge receipt of this review",
         "Proceed with the next planned step only if no further review gates remain",
+        "Send a substantive follow-up only if further bridge coordination is still needed",
     ]
+
+
+def context_requires_action(agent: str, context: dict[str, Any]) -> bool:
+    canonical = context.get("canonical_message") or {}
+    canonical_status = str(canonical.get("status") or "").strip().lower()
+    request_created_at = _parse_iso(canonical.get("created_at"))
+    peer = _peer_sender_for_context(agent, context)
+    if not peer:
+        return False
+
+    thread_messages = context.get("thread_messages") or []
+    # Count substantive AND system (correction) outbound messages as satisfying the request.
+    # Corrections are sent via send_correction_message() with tags=["system"] so they get
+    # message_kind="system". They are valid responses that should prevent re-dispatch.
+    substantive_outbound = [
+        item
+        for item in thread_messages
+        if item.get("sender") == agent
+        and item.get("recipient") == peer
+        and item.get("message_kind") in ("substantive", "system")
+        and (
+            request_created_at is None
+            or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
+        )
+    ]
+    valid_outbound = [item for item in substantive_outbound if item.get("status") != "failed"]
+    invalid_outbound = [item for item in substantive_outbound if item.get("status") == "failed"]
+    protocol_outbound = [
+        item
+        for item in thread_messages
+        if item.get("sender") == agent
+        and item.get("recipient") == peer
+        and item.get("message_kind") == "protocol_ack"
+        and (
+            request_created_at is None
+            or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
+        )
+    ]
+    if invalid_outbound:
+        return True
+    if valid_outbound:
+        return False
+
+    if canonical_status in {"completed", "failed"}:
+        if protocol_outbound:
+            return False
+        return True
+
+    return True
+
+
+def _supersede_failed_outbound_messages(
+    bridge: Any,
+    *,
+    failed_outbound: list[dict[str, Any]],
+    resolution: str,
+) -> int:
+    resolved = 0
+    for item in failed_outbound:
+        bridge.resolve_message(
+            message_id=item["id"],
+            agent="owner",
+            outcome="failed",
+            resolution=resolution,
+        )
+        resolved += 1
+    return resolved
 
 
 def repair_terminal_thread_outputs(
@@ -396,7 +533,6 @@ def repair_terminal_thread_outputs(
         agent=agent,
         explicit_refs=target_refs,
         new_items=[],
-        due_claimed=[],
         project_dir=project_dir,
         log_fn=log_fn,
     )
@@ -405,6 +541,9 @@ def repair_terminal_thread_outputs(
         peer = _peer_sender_for_context(agent, context)
         if not peer:
             continue
+        expected_response = str(canonical.get("expected_response") or "").strip().lower()
+        canonical_status = str(canonical.get("status") or "").strip().lower()
+        request_created_at = _parse_iso(canonical.get("created_at"))
 
         thread_messages = context.get("thread_messages") or []
         substantive_outbound = [
@@ -413,27 +552,101 @@ def repair_terminal_thread_outputs(
             if item.get("sender") == agent
             and item.get("recipient") == peer
             and item.get("message_kind") == "substantive"
+            and (
+                request_created_at is None
+                or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
+            )
         ]
-        valid_outbound = [item for item in substantive_outbound if item.get("status") != "invalid"]
-        invalid_outbound = [item for item in substantive_outbound if item.get("status") == "invalid"]
-
+        valid_outbound = [item for item in substantive_outbound if item.get("status") != "failed"]
+        invalid_outbound = [item for item in substantive_outbound if item.get("status") == "failed"]
+        protocol_outbound = [
+            item
+            for item in thread_messages
+            if item.get("sender") == agent
+            and item.get("recipient") == peer
+            and item.get("message_kind") == "protocol_ack"
+            and (
+                request_created_at is None
+                or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
+            )
+        ]
         if valid_outbound:
-            for item in invalid_outbound:
-                bridge.resolve_message(
-                    message_id=item["id"],
-                    agent="owner",
-                    outcome="superseded",
+            if canonical_status not in {"completed", "failed"}:
+                latest_valid = valid_outbound[-1]
+                resolved = bridge.resolve_message(
+                    message_id=canonical["id"],
+                    agent=agent,
+                    outcome="completed",
                     resolution=(
-                        f"Superseded by valid substantive outbound bridge message on thread "
+                        f"Closed after substantive reply {latest_valid.get('id')} "
+                        f"on thread {context.get('thread_correlation_id')}."
+                    ),
+                )
+                if resolved.get("ok"):
+                    repaired += 1
+                    if log_fn is not None:
+                        log_fn(
+                            f"terminal repair closed request after substantive reply on "
+                            f"thread {context.get('thread_correlation_id')}: {latest_valid.get('id')}"
+                        )
+            repaired += int(
+                _supersede_failed_outbound_messages(
+                bridge,
+                failed_outbound=invalid_outbound,
+                resolution=(
+                    f"Superseded by valid substantive outbound bridge message on thread "
+                    f"{context.get('thread_correlation_id')}."
+                ),
+                )
+                > 0
+            )
+            continue
+
+        if canonical_status == "completed" and protocol_outbound:
+            repaired += int(
+                _supersede_failed_outbound_messages(
+                    bridge,
+                    failed_outbound=invalid_outbound,
+                    resolution=(
+                        f"Superseded by legacy protocol acknowledgement on thread "
                         f"{context.get('thread_correlation_id')}."
                     ),
                 )
+                > 0
+            )
             continue
 
-        artifact_refs = [
-            {"type": "file", "path": item["path"], "note": "Bridge artifact"}
-            for item in context.get("referenced_artifacts", [])
-        ]
+        if canonical_status not in {"completed", "failed"} and expected_response == "acknowledgement":
+            resolved = bridge.resolve_message(
+                message_id=canonical["id"],
+                agent=agent,
+                outcome="failed",
+                resolution=(
+                    "Acknowledgement-only bridge requests are no longer supported. "
+                    "Sender must wait for a substantive reply."
+                ),
+            )
+            if resolved.get("ok"):
+                repaired += 1
+                if log_fn is not None:
+                    log_fn(
+                        f"terminal repair closed acknowledgement-only thread after protocol change: "
+                        f"{context.get('thread_correlation_id')}"
+                    )
+            repaired += int(
+                _supersede_failed_outbound_messages(
+                    bridge,
+                    failed_outbound=invalid_outbound,
+                    resolution=(
+                        f"Superseded after acknowledgement-only thread closure on "
+                        f"{context.get('thread_correlation_id')}."
+                    ),
+                )
+                > 0
+            )
+            continue
+
+        artifact_refs = _repair_payload_artifact_refs(context, project_dir=project_dir)
 
         subject = ""
         body = ""
@@ -441,7 +654,7 @@ def repair_terminal_thread_outputs(
             latest_invalid = invalid_outbound[-1]
             subject = str(latest_invalid.get("subject") or "").strip()
             body = str(latest_invalid.get("body") or "").strip()
-        elif canonical.get("status") in {"done", "blocked", "superseded"} and canonical.get("resolution"):
+        elif canonical.get("status") in {"completed", "failed"} and canonical.get("resolution"):
             outcome = str(canonical.get("status") or "done").upper()
             subject = f"Re: {canonical.get('subject', 'Bridge thread')} — {outcome}"
             body = f"Thread completed with outcome {outcome}.\n\n{canonical.get('resolution')}"
@@ -451,10 +664,9 @@ def repair_terminal_thread_outputs(
         if not subject or not body:
             continue
 
-        outcome_value = str(canonical.get("status") or "done").lower()
+        outcome_value = str(canonical.get("status") or "completed").lower()
         payload = {
-            "expected_response": "acknowledgement",
-            "response_window": "session",
+            "expected_response": "status_update",
             "artifact_refs": artifact_refs,
             "action_items": _default_action_items(outcome_value),
         }
@@ -464,11 +676,11 @@ def repair_terminal_thread_outputs(
             subject=subject,
             body=body,
             payload_json=json.dumps(payload),
-            tags_json=json.dumps(["bridge-sync", "review", outcome_value or "done"]),
+            tags_json=json.dumps(["bridge-sync", "review", outcome_value or "completed"]),
             priority=int(canonical.get("priority") or 2),
             correlation_id=context.get("thread_correlation_id"),
         )
-        if result.get("status") == "invalid":
+        if result.get("status") == "failed":
             if log_fn is not None:
                 log_fn(
                     f"terminal repair failed validation for thread {context.get('thread_correlation_id')}: "
@@ -482,14 +694,12 @@ def repair_terminal_thread_outputs(
                 f"terminal repair sent valid outbound for thread {context.get('thread_correlation_id')}: "
                 f"{result.get('id')}"
             )
-        for item in invalid_outbound:
-            bridge.resolve_message(
-                message_id=item["id"],
-                agent="owner",
-                outcome="superseded",
-                resolution=(
-                    f"Superseded by repaired canonical outbound bridge message {result.get('id')} "
-                    f"on thread {context.get('thread_correlation_id')}."
-                ),
-            )
+        _supersede_failed_outbound_messages(
+            bridge,
+            failed_outbound=invalid_outbound,
+            resolution=(
+                f"Superseded by repaired canonical outbound bridge message {result.get('id')} "
+                f"on thread {context.get('thread_correlation_id')}."
+            ),
+        )
     return repaired

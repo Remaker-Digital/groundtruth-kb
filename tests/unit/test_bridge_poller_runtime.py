@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import bridge_poller
@@ -12,18 +12,16 @@ def _valid_payload() -> str:
     return json.dumps(
         {
             "expected_response": "advisory_review",
-            "response_window": "short",
             "artifact_refs": ["artifact.md"],
             "action_items": ["review the note"],
         }
     )
 
 
-def _ack_payload() -> str:
+def _unsupported_ack_payload() -> str:
     return json.dumps(
         {
             "expected_response": "acknowledgement",
-            "response_window": "session",
             "artifact_refs": ["proposal.md"],
             "action_items": ["acknowledge receipt"],
         }
@@ -35,21 +33,18 @@ class _FakeBridge:
         self._items = items
 
     def list_inbox(self, *, agent: str, status: str, limit: int) -> dict:
-        assert status == "new"
+        assert status == "pending"
         return {"count": len(self._items), "items": list(self._items)}
-
-    def claim_message(self, *, message_id: str, agent: str) -> dict:
-        return {"claimed": True}
 
     def resolve_message(self, **_: object) -> dict:
         return {"ok": True}
 
 
-def test_list_inbox_new_excludes_invalid(tmp_path: Path, monkeypatch) -> None:
+def test_list_inbox_pending_excludes_failed(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "bridge.db"
     monkeypatch.setattr(runtime, "DB_PATH", db_path)
 
-    invalid_result = runtime.send_message(
+    failed_result = runtime.send_message(
         sender="codex",
         recipient="prime",
         subject="Malformed review request",
@@ -64,14 +59,14 @@ def test_list_inbox_new_excludes_invalid(tmp_path: Path, monkeypatch) -> None:
         payload_json=_valid_payload(),
     )
 
-    new_inbox = runtime.list_inbox(agent="prime", status="new", limit=10)
-    invalid_inbox = runtime.list_inbox(agent="prime", status="invalid", limit=10)
+    pending_inbox = runtime.list_inbox(agent="prime", status="pending", limit=10)
+    failed_inbox = runtime.list_inbox(agent="prime", status="failed", limit=10)
 
-    assert [item["id"] for item in new_inbox["items"]] == [valid_result["id"]]
-    assert [item["id"] for item in invalid_inbox["items"]] == [invalid_result["id"]]
+    assert [item["id"] for item in pending_inbox["items"]] == [valid_result["id"]]
+    assert [item["id"] for item in failed_inbox["items"]] == [failed_result["id"]]
 
 
-def test_root_ack_request_is_valid_without_correlation(tmp_path: Path, monkeypatch) -> None:
+def test_root_ack_request_is_failed_after_protocol_change(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "bridge.db"
     monkeypatch.setattr(runtime, "DB_PATH", db_path)
 
@@ -80,14 +75,73 @@ def test_root_ack_request_is_valid_without_correlation(tmp_path: Path, monkeypat
         recipient="prime",
         subject="Please acknowledge this proposal review request",
         body="proposal attached",
-        payload_json=_ack_payload(),
+        payload_json=_unsupported_ack_payload(),
     )
 
-    assert result["status"] == "new"
+    assert result["status"] == "failed"
+    assert (
+        "invalid expected_response: acknowledgement"
+        in result["validation_errors"]
+    )
+
+
+def test_root_status_update_request_is_valid_without_correlation(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    result = runtime.send_message(
+        sender="codex",
+        recipient="prime",
+        subject="Bridge status check",
+        body="Reply with a short substantive status update.",
+        payload_json=json.dumps(
+            {
+                "expected_response": "status_update",
+                "artifact_refs": ["artifact.md"],
+                "action_items": ["Send a short substantive status update"],
+            }
+        ),
+    )
+
+    assert result["status"] == "pending"
     assert result["validation_errors"] == []
 
 
-def test_reply_like_message_without_correlation_stays_invalid(tmp_path: Path, monkeypatch) -> None:
+def test_peer_reply_without_expected_response_fails(tmp_path: Path, monkeypatch) -> None:
+    """In v3, replies no longer inherit structured contract from root. Replies must carry their own payload."""
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    root = runtime.send_message(
+        sender="prime",
+        recipient="codex",
+        subject="Bridge round-trip test",
+        body="Reply with a short substantive status update.",
+        payload_json=json.dumps(
+            {
+                "expected_response": "status_update",
+                "artifact_refs": [{"type": "file", "path": "CLAUDE.md", "note": "valid ref"}],
+                "action_items": ["Send a short substantive reply confirming the bridge processed this thread"],
+            }
+        ),
+    )
+    assert root["status"] == "pending"
+
+    reply = runtime.send_message(
+        sender="codex",
+        recipient="prime",
+        subject="RE: Bridge round-trip test",
+        body="Bridge processed the thread successfully.",
+        payload_json=json.dumps({"message_kind": "substantive", "status": "processed"}),
+        correlation_id=root["id"],
+    )
+
+    # Without expected_response in payload, the reply should fail validation
+    assert reply["status"] == "failed"
+    assert any("missing expected_response" in e for e in reply["validation_errors"])
+
+
+def test_reply_like_message_without_correlation_stays_failed(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "bridge.db"
     monkeypatch.setattr(runtime, "DB_PATH", db_path)
 
@@ -99,7 +153,7 @@ def test_reply_like_message_without_correlation_stays_invalid(tmp_path: Path, mo
         payload_json=json.dumps({"response_type": "status_update"}),
     )
 
-    assert result["status"] == "invalid"
+    assert result["status"] == "failed"
     assert "missing correlation_id for reply-like peer message" in result["validation_errors"]
 
 
@@ -120,41 +174,9 @@ def test_resolve_message_reference_allows_sender_lookup(tmp_path: Path, monkeypa
     assert resolved["id"] == sent["id"]
 
 
-def test_legacy_null_thread_row_is_repaired_for_ack_correlation(tmp_path: Path, monkeypatch) -> None:
-    db_path = tmp_path / "bridge.db"
-    monkeypatch.setattr(runtime, "DB_PATH", db_path)
-
-    root = runtime.send_message(
-        sender="codex",
-        recipient="prime",
-        subject="Legacy root",
-        body="body",
-        payload_json=_valid_payload(),
-    )
-
-    with runtime._conn() as conn:
-        conn.execute("UPDATE messages SET thread_id = NULL WHERE id = ?", (root["id"],))
-        conn.execute("DELETE FROM threads WHERE thread_id = ?", (root["id"],))
-        conn.execute(f"PRAGMA user_version = {runtime.SCHEMA_VERSION_CURRENT}")
-        conn.commit()
-
-    ack = runtime.send_message(
-        sender="prime",
-        recipient="codex",
-        subject="Accepted: Legacy root",
-        body="ack",
-        payload_json=json.dumps({"response_type": "accepted"}),
-        tags_json=json.dumps(["protocol", "accepted", "bridge-sync"]),
-        correlation_id=root["id"],
-    )
-
-    assert ack["status"] == "new"
-    assert ack["validation_errors"] == []
-
-
-def test_invalid_message_wakes_sender_only() -> None:
+def test_failed_message_wakes_sender_only() -> None:
     event = {
-        "event_type": "message.invalid",
+        "event_type": "message.failed",
         "details": {"sender": "codex", "recipient": "prime"},
     }
 
@@ -168,8 +190,8 @@ def test_handle_inbox_suppresses_repeat_wake_for_same_message(tmp_path: Path) ->
         "sender": "prime",
         "recipient": "codex",
         "subject": "Review this",
-        "status": "new",
-        "payload": {"expected_response": "acknowledgement"},
+        "status": "pending",
+        "payload": {"expected_response": "advisory_review"},
         "tags": [],
         "message_kind": "substantive",
     }
@@ -204,13 +226,13 @@ def test_handle_inbox_suppresses_repeat_wake_for_same_message(tmp_path: Path) ->
     assert second["surfaced"] == 0
 
 
-def test_handle_inbox_ignores_invalid_items_for_wake(tmp_path: Path) -> None:
+def test_handle_inbox_ignores_failed_items_for_wake(tmp_path: Path) -> None:
     item = {
-        "id": "m-invalid",
+        "id": "m-failed",
         "sender": "prime",
         "recipient": "codex",
         "subject": "Malformed closure",
-        "status": "invalid",
+        "status": "failed",
         "payload": {},
         "tags": [],
         "message_kind": "substantive",
@@ -228,12 +250,12 @@ def test_handle_inbox_ignores_invalid_items_for_wake(tmp_path: Path) -> None:
         write_enabled=True,
     )
 
-    assert handled["invalid_inbox"] == 1
+    assert handled["failed_inbox"] == 1
     assert handled["wake_candidates"] == []
     assert handled["surfaced"] == 0
 
 
-def test_build_worker_event_payload_includes_thread_snapshot(tmp_path: Path, monkeypatch) -> None:
+def test_build_worker_event_payload_includes_thread_state(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "bridge.db"
     monkeypatch.setattr(runtime, "DB_PATH", db_path)
 
@@ -283,7 +305,7 @@ def test_send_correction_message_is_valid_and_dedupes(tmp_path: Path, monkeypatc
     db_path = tmp_path / "bridge.db"
     monkeypatch.setattr(runtime, "DB_PATH", db_path)
 
-    invalid = runtime.send_message(
+    failed = runtime.send_message(
         sender="prime",
         recipient="codex",
         subject="Malformed revised plan",
@@ -291,17 +313,17 @@ def test_send_correction_message_is_valid_and_dedupes(tmp_path: Path, monkeypatc
         payload_json=_valid_payload(),
         correlation_id="missing-thread",
     )
-    assert invalid["status"] == "invalid"
+    assert failed["status"] == "failed"
 
     first = runtime.send_correction_message(
         sender="codex",
-        invalid_message_id=invalid["id"],
+        failed_message_id=failed["id"],
         guidance="Use the canonical report already on disk unless a resend is still needed.",
         artifact_refs_json=json.dumps(["report.md"]),
     )
     second = runtime.send_correction_message(
         sender="codex",
-        invalid_message_id=invalid["id"],
+        failed_message_id=failed["id"],
         guidance="duplicate call should dedupe",
         artifact_refs_json=json.dumps(["report.md"]),
     )
@@ -309,16 +331,73 @@ def test_send_correction_message_is_valid_and_dedupes(tmp_path: Path, monkeypatc
     correction = runtime.resolve_message_reference(first["id"], recipient="prime")
 
     assert first["ok"] is True
-    assert first["status"] == "new"
+    assert first["status"] == "pending"
     assert first["validation_errors"] == []
     assert first["deduped"] is False
     assert second["ok"] is True
     assert second["id"] == first["id"]
     assert second["deduped"] is True
     assert correction is not None
-    assert correction["correlation_id"] == invalid["id"]
+    assert correction["correlation_id"] == failed["id"]
     assert correction["payload"]["response_type"] == "correction"
-    assert "system" in correction["tags"]
+
+
+def test_clear_failed_messages_clears_historical_rows(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    failed = runtime.send_message(
+        sender="codex",
+        recipient="prime",
+        subject="Malformed historical request",
+        body="missing structured fields",
+        payload_json="{}",
+    )
+    assert failed["status"] == "failed"
+
+    with runtime._conn() as conn:
+        conn.execute(
+            "UPDATE messages SET created_at = ? WHERE id = ?",
+            ((datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(), failed["id"]),
+        )
+        conn.commit()
+
+    before = runtime.get_latest_notification_event_id()["last_event_id"]
+    cleared = runtime.clear_failed_messages(agent="prime", older_than_minutes=15, limit=20)
+    after = runtime.get_latest_notification_event_id()["last_event_id"]
+
+    assert cleared["ok"] is True
+    assert cleared["cleared_count"] == 1
+    assert cleared["cleared_ids"] == [failed["id"]]
+    assert after == before
+
+
+def test_clear_failed_messages_leaves_recent_failed_rows_untouched(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    failed = runtime.send_message(
+        sender="codex",
+        recipient="prime",
+        subject="Malformed recent request",
+        body="missing structured fields",
+        payload_json="{}",
+    )
+    assert failed["status"] == "failed"
+
+    cleared = runtime.clear_failed_messages(agent="prime", older_than_minutes=15, limit=20)
+    failed_inbox = runtime.list_inbox(agent="prime", status="failed", limit=10)
+
+    assert cleared["ok"] is True
+    assert cleared["cleared_count"] == 0
+    assert failed_inbox["count"] == 1
+    assert failed_inbox["items"][0]["id"] == failed["id"]
 
 
 def test_handle_inbox_defers_to_resident_worker_when_healthy(tmp_path: Path) -> None:
@@ -327,8 +406,8 @@ def test_handle_inbox_defers_to_resident_worker_when_healthy(tmp_path: Path) -> 
         "sender": "prime",
         "recipient": "codex",
         "subject": "Review this quickly",
-        "status": "new",
-        "payload": {"expected_response": "acknowledgement"},
+        "status": "pending",
+        "payload": {"expected_response": "advisory_review"},
         "tags": [],
         "message_kind": "substantive",
     }
@@ -405,3 +484,142 @@ def test_launch_agent_wake_caps_message_ids(monkeypatch, tmp_path: Path) -> None
     cmd = launched[0]
     passed_ids = [cmd[index + 1] for index, value in enumerate(cmd[:-1]) if value == "--message-id"]
     assert passed_ids == launched_ids
+
+
+def test_retry_pending_message(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    sent = runtime.send_message(
+        sender="codex",
+        recipient="prime",
+        subject="Review request",
+        body="Please inspect artifact",
+        payload_json=_valid_payload(),
+    )
+    assert sent["status"] == "pending"
+
+    result = runtime.retry_pending_message(message_id=sent["id"], agent="prime")
+    assert result["ok"] is True
+    assert result["retry_count"] == 1
+
+    result2 = runtime.retry_pending_message(message_id=sent["id"], agent="prime")
+    assert result2["ok"] is True
+    assert result2["retry_count"] == 2
+
+
+def test_retry_pending_message_caps_at_max(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    sent = runtime.send_message(
+        sender="codex",
+        recipient="prime",
+        subject="Review request",
+        body="Please inspect artifact",
+        payload_json=_valid_payload(),
+    )
+
+    for _ in range(runtime.MAX_RETRIES):
+        result = runtime.retry_pending_message(message_id=sent["id"], agent="prime")
+        assert result["ok"] is True
+
+    result = runtime.retry_pending_message(message_id=sent["id"], agent="prime")
+    assert result["ok"] is False
+    assert "max retries exceeded" in result["reason"]
+
+
+def test_resolve_message_with_new_outcomes(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    sent = runtime.send_message(
+        sender="codex",
+        recipient="prime",
+        subject="Review request",
+        body="body",
+        payload_json=_valid_payload(),
+    )
+
+    result = runtime.resolve_message(
+        message_id=sent["id"],
+        agent="prime",
+        outcome="completed",
+        resolution="Work done",
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "completed"
+
+
+# ---------------------------------------------------------------------------
+# v3 contract enforcement tests (Codex residual from S261)
+# ---------------------------------------------------------------------------
+
+
+def test_self_addressed_peer_message_rejected(tmp_path: Path, monkeypatch) -> None:
+    """Peer messages where sender == recipient must be rejected."""
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    result = runtime.send_message(
+        sender="codex",
+        recipient="codex",
+        subject="Self-addressed message",
+        body="This should fail validation.",
+        payload_json=_valid_payload(),
+    )
+
+    assert result["status"] == "failed"
+    assert any("self-addressed" in e for e in result["validation_errors"])
+
+
+def test_status_update_reply_without_correlation_id_rejected(tmp_path: Path, monkeypatch) -> None:
+    """A peer status_update with response_type but no correlation_id must fail."""
+    db_path = tmp_path / "bridge.db"
+    monkeypatch.setattr(runtime, "DB_PATH", db_path)
+
+    result = runtime.send_message(
+        sender="prime",
+        recipient="codex",
+        subject="Uncorrelated status update",
+        body="status update without thread context",
+        payload_json=json.dumps({
+            "expected_response": "status_update",
+            "response_type": "status_update",
+            "artifact_refs": ["CLAUDE.md"],
+            "action_items": ["acknowledge status"],
+        }),
+    )
+
+    assert result["status"] == "failed"
+    assert any("missing correlation_id" in e for e in result["validation_errors"])
+
+
+def test_correction_reply_satisfies_context_requires_action() -> None:
+    """A correction (message_kind=system) from the agent must satisfy context_requires_action."""
+    from bridge_worker_context import context_requires_action
+
+    context = {
+        "canonical_message": {
+            "id": "m-request",
+            "status": "pending",
+            "sender": "prime",
+            "recipient": "codex",
+            "subject": "Review request",
+            "expected_response": "advisory_review",
+            "created_at": "2026-04-05T10:00:00+00:00",
+        },
+        "thread_messages": [
+            {
+                "id": "m-correction",
+                "sender": "codex",
+                "recipient": "prime",
+                "message_kind": "system",
+                "status": "pending",
+                "created_at": "2026-04-05T10:01:00+00:00",
+            },
+        ],
+    }
+
+    assert context_requires_action("codex", context) is False

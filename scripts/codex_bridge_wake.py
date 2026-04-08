@@ -12,16 +12,21 @@ from pathlib import Path
 
 import msvcrt
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from bridge_worker_context import (
     DEFAULT_MAX_DISPATCH_TARGETS,
     PROJECT_DIR,
     build_context_snapshot,
     build_contexts,
     build_prompt,
-    claimed_item_due,
+    context_requires_action,
     repair_terminal_thread_outputs,
     select_dispatch_batch,
 )
+from bridge_resident_worker import _maybe_clear_failed_residue
 
 HOOKS_DIR = PROJECT_DIR / ".claude" / "hooks"
 
@@ -83,39 +88,6 @@ def _append_agent_log(agent: str, message: str) -> None:
     line = f"[{_now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
     with _log_file(agent).open("a", encoding="utf-8") as fh:
         fh.write(line)
-
-
-def _auto_accept_new_items(bridge, agent: str, new_items: list[dict]) -> list[dict]:
-    accepted: list[dict] = []
-    for item in new_items:
-        if item.get("message_kind") == "protocol_ack":
-            continue
-        if item.get("sender") not in {"codex", "prime"}:
-            continue
-        result = bridge.accept_message(
-            message_id=item["id"],
-            agent=agent,
-            note=(
-                f"{agent} bridge wake loaded thread context immediately and "
-                "queued substantive processing."
-            ),
-            payload_json=json.dumps({
-                "wake_path": "fallback-wake",
-                "wake_ack": True,
-            }),
-        )
-        if result.get("ok"):
-            accepted.append(item)
-            _append_agent_log(
-                agent,
-                f"auto-accepted on wake: {item['id']} -> {result.get('response_message_id')}",
-            )
-        else:
-            _append_agent_log(
-                agent,
-                f"auto-accept skipped: {item['id']} status={result.get('status')}",
-            )
-    return accepted
 
 
 def _load_state(agent: str) -> dict:
@@ -192,19 +164,15 @@ def _invoke_codex(codex_exe: Path, prompt: str, timeout_seconds: int) -> subproc
     _append_agent_log("codex", f"launching codex exec: {codex_exe}")
     popen_kwargs: dict[str, object] = {
         "cwd": str(PROJECT_DIR),
-        "capture_output": True,
         "text": True,
         "timeout": timeout_seconds,
     }
     if os.name == "nt":
-        # pythonw.exe runs without a console, but codex.exe is a console app.
-        # Without CREATE_NO_WINDOW, Windows allocates a visible terminal host.
-        popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
     completed = subprocess.run(
         cmd,
         **popen_kwargs,
     )
-    _last_stdout_file("codex").write_text(completed.stdout or "", encoding="utf-8")
     if completed.stderr:
         _append_agent_log("codex", f"codex exec stderr: {completed.stderr.strip()}")
     return completed
@@ -258,36 +226,45 @@ def main() -> int:
     try:
         with _FileLock(_lock_file(args.agent)):
             state = _load_state(args.agent)
-            new_items = bridge.list_inbox(agent=args.agent, status="new", limit=100).get("items", [])
-            accepted_now = _auto_accept_new_items(bridge, args.agent, new_items)
-            claimed = bridge.list_inbox(agent=args.agent, status="claimed", limit=100).get("items", [])
-            due_claimed = [
-                item for item in claimed if claimed_item_due(args.agent, item, state, args.cadence_minutes)
-            ]
-            immediate_claimed = accepted_now + due_claimed
+            _maybe_clear_failed_residue(
+                args.agent,
+                bridge,
+                state,
+                log_fn=lambda message: _append_agent_log(args.agent, message),
+            )
+            new_items = bridge.list_inbox(agent=args.agent, status="pending", limit=100).get("items", [])
             contexts = build_contexts(
                 bridge,
                 agent=args.agent,
                 explicit_refs=args.message_id,
-                new_items=[],
-                due_claimed=immediate_claimed,
+                new_items=new_items,
                 project_dir=PROJECT_DIR,
                 log_fn=lambda message: _append_agent_log(args.agent, message),
+                max_contexts=args.max_dispatch_targets,
             )
+            pending_ids = {
+                str(item.get("id") or "").strip()
+                for item in new_items
+                if str(item.get("id") or "").strip()
+            }
+            contexts = [
+                context
+                for context in contexts
+                if str((context.get("canonical_message") or {}).get("id") or "").strip() in pending_ids
+                or context_requires_action(args.agent, context)
+            ]
 
             batch = select_dispatch_batch(
                 contexts,
                 new_items,
-                immediate_claimed,
                 max_targets=args.max_dispatch_targets,
             )
             batch_contexts = batch["contexts"]
             batch_new_items = batch["new_items"]
-            batch_immediate_claimed = batch["due_claimed"]
             wake_targets = set(batch["target_ids"])
             deferred_targets = batch["deferred_ids"]
 
-            if not batch_new_items and not batch_immediate_claimed and not batch_contexts:
+            if not batch_new_items and not batch_contexts:
                 _append_agent_log(args.agent, "no pending bridge work; exiting")
                 return 0
 
@@ -297,11 +274,24 @@ def main() -> int:
                     f"wake batch capped at {args.max_dispatch_targets}; deferred_targets={','.join(deferred_targets)}",
                 )
 
+            pre_repair_count = repair_terminal_thread_outputs(
+                bridge,
+                agent=args.agent,
+                target_refs=sorted(wake_targets),
+                project_dir=PROJECT_DIR,
+                log_fn=lambda message: _append_agent_log(args.agent, message),
+            )
+            if pre_repair_count > 0:
+                _append_agent_log(
+                    args.agent,
+                    f"pre-dispatch terminal repair handled {pre_repair_count} target(s); re-evaluate bridge queue before heavy worker execution",
+                )
+                return 0
+
             payload = build_context_snapshot(
                 trigger=args.trigger,
                 contexts=batch_contexts,
                 new_items=batch_new_items,
-                due_claimed=batch_immediate_claimed,
             )
             HOOKS_DIR.mkdir(parents=True, exist_ok=True)
             _last_context_file(args.agent).write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -309,7 +299,6 @@ def main() -> int:
                 args.agent,
                 _last_context_file(args.agent),
                 batch_new_items,
-                batch_immediate_claimed,
                 batch_contexts,
                 project_dir=PROJECT_DIR,
             )
@@ -333,7 +322,7 @@ def main() -> int:
             )
             _append_agent_log(
                 args.agent,
-                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} claimed_or_immediate={len(batch_immediate_claimed)} contexts={len(batch_contexts)}",
+                f"{args.agent} wake exit={completed.returncode} trigger={args.trigger} new={len(batch_new_items)} contexts={len(batch_contexts)}",
             )
             if completed.returncode != 0:
                 return completed.returncode

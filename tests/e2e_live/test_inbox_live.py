@@ -239,7 +239,7 @@ class TestSearchAndFilters:
 
         # Click Active tab — Mantine SegmentedControl renders as label elements
         active_tab = shared_inbox_page.locator(
-            "label:has-text('Active'), [data-value='active'], text=/Active/i"
+            "label:has-text('Active')"
         ).first
         active_tab.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
@@ -253,7 +253,7 @@ class TestSearchAndFilters:
             "Active tab click did not filter conversations"
         )
         # Restore to All tab
-        all_tab = shared_inbox_page.locator("text=/All/i").first
+        all_tab = shared_inbox_page.locator(":text('All')").first
         all_tab.click()
         shared_inbox_page.wait_for_timeout(1000)
 
@@ -263,7 +263,7 @@ class TestSearchAndFilters:
         if _is_rate_limited(shared_inbox_page):
             pytest.skip("Rate-limited by API")
         esc_tab = shared_inbox_page.locator(
-            "label:has-text('Esc'), [data-value='escalated'], text=/Esc/i"
+            "label:has-text('Esc')"
         ).first
         esc_tab.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
@@ -277,7 +277,7 @@ class TestSearchAndFilters:
         )
         # Restore to All tab
         shared_inbox_page.locator(
-            "label:has-text('All'), [data-value='all'], text=/All/i"
+            "label:has-text('All')"
         ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1000)
 
@@ -287,7 +287,7 @@ class TestSearchAndFilters:
         if _is_rate_limited(shared_inbox_page):
             pytest.skip("Rate-limited by API")
         resolved_tab = shared_inbox_page.locator(
-            "label:has-text('Resolved'), [data-value='resolved'], text=/Resolved/i"
+            "label:has-text('Resolved')"
         ).first
         resolved_tab.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
@@ -301,7 +301,7 @@ class TestSearchAndFilters:
         )
         # Restore to All tab
         shared_inbox_page.locator(
-            "label:has-text('All'), [data-value='all'], text=/All/i"
+            "label:has-text('All')"
         ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1000)
 
@@ -311,7 +311,7 @@ class TestSearchAndFilters:
         if _is_rate_limited(shared_inbox_page):
             pytest.skip("Rate-limited by API")
         archived_tab = shared_inbox_page.locator(
-            "label:has-text('Archived'), [data-value='archived'], text=/Archived/i"
+            "label:has-text('Archived')"
         ).first
         archived_tab.click(timeout=10_000)
         # Archived tab makes a separate API call — wait longer
@@ -325,7 +325,7 @@ class TestSearchAndFilters:
         )
         # Restore to All tab
         shared_inbox_page.locator(
-            "label:has-text('All'), [data-value='all'], text=/All/i"
+            "label:has-text('All')"
         ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1000)
 
@@ -340,11 +340,11 @@ class TestSearchAndFilters:
 
         # Switch to Active then back to All — Mantine SegmentedControl
         shared_inbox_page.locator(
-            "label:has-text('Active'), [data-value='active'], text=/Active/i"
+            "label:has-text('Active')"
         ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
         shared_inbox_page.locator(
-            "label:has-text('All'), [data-value='all'], text=/All/i"
+            "label:has-text('All')"
         ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
 
@@ -899,7 +899,7 @@ class TestEscalationModal:
         if escalate_btn.count() == 0:
             # Try tooltip-based ActionIcon — look for orange icon buttons
             escalate_btn = shared_inbox_page.locator(
-                "button >> text=/escalate/i"
+                'button:has-text("Escalate")'
             )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"
@@ -934,7 +934,7 @@ class TestEscalationModal:
             "button:has-text('Escalate'), "
             "[aria-label*='Escalate' i], "
             "[title*='Escalate' i], "
-            "button >> text=/escalate/i"
+            'button:has-text("Escalate")'
         )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"
@@ -973,7 +973,7 @@ class TestEscalationModal:
             "button:has-text('Escalate'), "
             "[aria-label*='Escalate' i], "
             "[title*='Escalate' i], "
-            "button >> text=/escalate/i"
+            'button:has-text("Escalate")'
         )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"
@@ -1033,9 +1033,7 @@ class TestConversationActions:
         }
         tab_label = tab_map.get(status, status.title())
         tab = page.locator(
-            f"label:has-text('{tab_label}'), "
-            f"[data-value='{status}'], "
-            f"text=/{tab_label}/i"
+            f"label:has-text('{tab_label}')"
         ).first
         tab.click(timeout=10_000)
         page.wait_for_timeout(2000)
@@ -1046,7 +1044,7 @@ class TestConversationActions:
     def _restore_all_tab(self, page: Page):
         """Switch back to the All tab."""
         page.locator(
-            "label:has-text('All'), [data-value='all'], text=/All/i"
+            "label:has-text('All')"
         ).first.click(timeout=10_000)
         page.wait_for_timeout(1000)
 
@@ -1165,7 +1163,7 @@ class TestConversationActions:
             "button:has-text('Escalate'), "
             "[aria-label*='Escalate' i], "
             "[title*='Escalate' i], "
-            "button >> text=/escalate/i"
+            'button:has-text("Escalate")'
         )
         assert escalate_btn.count() > 0, (
             "Escalate text visible but button element not clickable"

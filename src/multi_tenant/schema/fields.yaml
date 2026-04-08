@@ -592,6 +592,23 @@ fields:
     doc_link: "https://agentredcx.com/docs/configuration/escalation#notifications"
     affects_agents:
       - escalation-handler
+
+  - field_name: whatsapp_business_phone
+    display_name: WhatsApp business phone
+    field_type: string
+    validation:
+      max_length: 20
+      pattern: "^\\+[1-9]\\d{6,14}$"
+    platform_default: null
+    tier_gate: professional
+    onboarding_step: 6
+    step_order: 3
+    tooltip: "WhatsApp number for live escalation. Customers get a link to message you directly."
+    description: "When set, escalation messages include a WhatsApp link so customers can continue the conversation on WhatsApp. Uses your existing WhatsApp Business app — no API integration needed. Format: +1234567890."
+    placeholder: "e.g. +15551234567"
+    doc_link: "https://agentredcx.com/docs/configuration/escalation#whatsapp"
+    affects_agents:
+      - escalation-handler
     pii_classification: direct
     injected_in_prompt: false
 

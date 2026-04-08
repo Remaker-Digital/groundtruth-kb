@@ -26,21 +26,22 @@ YOU MUST NOT delete or modify files which you have not created without explicit 
 
 ## Startup Checklist (Every Session)
 
-**Phase A — Bridge sweep (first, within 60 seconds):**
-1. Query bridge for unresolved messages addressed to this agent.
-2. Check `list_threads_at_risk()` and `bridge_sla_report()`.
-3. Acknowledge, claim, or negotiate each live message per protocol.
-4. Report sweep count: "Bridge sweep: N messages processed."
+**Phase A — Bridge sweep and Prime handshake (first priority):**
+1. Query bridge for pending messages addressed to this agent via `list_inbox(agent=..., status="pending")`.
+2. Process or reply to each pending message substantively.
+3. Run `python codex_session_prime_handshake.py`. This sends the required request to Prime: `"Report your current operating state"`.
+4. Wait for the script to receive Prime's reply. Do not proceed with session work until the handshake succeeds.
+5. Report sweep count: "Bridge sweep: N messages processed."
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
-5. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
-6. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
-7. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
-8. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
-9. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
-10. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
-11. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
-12. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+6. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
+7. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
+8. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
+9. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
+10. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
+11. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+12. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
+13. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
 
 ## Report Output Contract
 
@@ -60,4 +61,3 @@ YOU MUST NOT delete or modify files which you have not created without explicit 
   - `independent-progress-assessments/`
   - `.claude/rules/`
   - project root only when startup/loading requires it (for example, this file).
-

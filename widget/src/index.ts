@@ -204,6 +204,16 @@ async function init(
     store.setState({ shopifyCustomer });
   }
 
+  // S259 D14: Admin users have implicit consent — suppress consent banner.
+  // Detect admin context from auth configuration set during transport init.
+  const scriptEl = document.currentScript
+    || document.querySelector('script[data-widget-key]');
+  const _authType = scriptEl?.getAttribute('data-auth-type') || '';
+  const _authToken = scriptEl?.getAttribute('data-auth-token') || '';
+  if ((_authType === 'session_token' || _authType === 'api_key') && _authToken) {
+    store.setState({ isAdminContext: true });
+  }
+
   // P0-AUTH-FIX: Always start in conversation view. Identity collection
   // happens in-conversation via the identity preprocessor, not via a
   // blocking pre-chat form. Shopify HMAC customers get auto-verified;
@@ -560,6 +570,23 @@ async function init(
     // WI-0868: Live config preview from admin WidgetConfigurator
     if (ev.data.type === 'ar:config-preview' && ev.data.payload) {
       store.setState({ config: { ...store.getState().config, ...ev.data.payload } });
+
+      // S259 D4: Resize panel iframe when dimension presets change.
+      // Tokens are computed once at init; the iframe has fixed style.
+      // When width/height presets change via preview, resize the iframe directly.
+      if (panelIframe && !mobileFullscreen) {
+        const p = ev.data.payload;
+        if (p.widget_panel_width) {
+          const w = p.widget_panel_width === 'compact' ? '320px'
+            : p.widget_panel_width === 'wide' ? '440px' : '380px';
+          panelIframe.style.width = w;
+        }
+        if (p.widget_panel_height) {
+          const h = p.widget_panel_height === 'short' ? '420px'
+            : p.widget_panel_height === 'tall' ? '620px' : '520px';
+          panelIframe.style.height = h;
+        }
+      }
     }
   });
 

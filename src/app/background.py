@@ -1146,9 +1146,10 @@ async def _vectorization_scanner_loop() -> None:
                     for conv in unvectorized:
                         conv_id = conv.get("conversation_id") or conv.get("id")
                         customer_id = conv.get("customer_id")
+                        canonical_cid = conv.get("canonical_customer_id")
                         messages = conv.get("messages", [])
 
-                        if not conv_id or not customer_id:
+                        if not conv_id or not (customer_id or canonical_cid):
                             continue
 
                         try:
@@ -1161,8 +1162,10 @@ async def _vectorization_scanner_loop() -> None:
                                 # Explicit consent required — check customer profile
                                 consent = ConsentStatus.NOT_ASKED
                                 try:
+                                    # ADR-004: prefer canonical_customer_id for profile lookup
+                                    profile_key = canonical_cid or customer_id
                                     profile = await profile_repo.read(
-                                        tid, f"profile:{customer_id}",
+                                        tid, f"{tid}:{profile_key}",
                                     )
                                     if profile:
                                         consent = ConsentStatus(
@@ -1177,6 +1180,7 @@ async def _vectorization_scanner_loop() -> None:
                                 customer_id=customer_id,
                                 conversation_id=conv_id,
                                 messages=messages,
+                                canonical_customer_id=canonical_cid,
                                 consent_status=consent,
                             )
 

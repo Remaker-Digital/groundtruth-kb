@@ -511,7 +511,7 @@ async def _ensure_widget_key_hash(tenant_id: str, widget_key: str) -> None:
             "missing" if not current_hash else "stale",
         )
     except Exception:
-        logger.debug("Widget key hash self-heal failed", exc_info=True)
+        logger.warning("Widget key hash self-heal failed for tenant=%s", tenant_id[:8], exc_info=True)
 
 
 # ---------------------------------------------------------------------------

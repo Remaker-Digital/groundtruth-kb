@@ -574,10 +574,33 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       }
     }
 
-    injectWidget();
+    // Widget key hash self-heal race condition fix:
+    // The activation-status poll triggers a server-side hash repair, but
+    // this useEffect fires in the same render cycle.  If the widget_key_hash
+    // was missing, the widget's own /api/config fetch (via X-Widget-Key) hits
+    // a 401 in middleware before the self-heal completes.  The widget bails
+    // permanently because 401 is not retried.
+    //
+    // Fix: inject the widget, then check after a delay whether AgentRed SDK
+    // initialized.  If not, re-inject — by that time the self-heal will have
+    // repaired the hash on the server side.
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    injectWidget().then(() => {
+      retryTimer = setTimeout(() => {
+        const sdk = (window as unknown as Record<string, unknown>).AgentRed;
+        if (!sdk) {
+          console.warn('[AgentRed Admin] Widget did not initialize — retrying (hash self-heal may have been in progress).');
+          const stale = document.getElementById('agent-red-admin-widget');
+          if (stale) stale.remove();
+          injectWidget();
+        }
+      }, 4000);
+    });
 
     // Cleanup on unmount
     return () => {
+      if (retryTimer) clearTimeout(retryTimer);
       const existing = document.getElementById('agent-red-admin-widget');
       if (existing) existing.remove();
       const sdk = (window as unknown as Record<string, unknown>).AgentRed as

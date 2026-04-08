@@ -66,6 +66,7 @@ class AdminConversationSummary(CamelCaseModel):
     conversation_id: str
     status: str | None = None
     customer_id: str | None = None
+    canonical_customer_id: str | None = None  # ADR-004
     customer_name: str | None = None
     is_billable: bool = False
     message_count: int = 0
@@ -103,6 +104,7 @@ class AdminConversationDetailResponse(CamelCaseModel):
     tenant_id: str
     status: str | None = None
     customer_id: str | None = None
+    canonical_customer_id: str | None = None  # ADR-004
     customer_name: str | None = None
     is_billable: bool = False
     message_count: int = 0

@@ -191,8 +191,13 @@ def build_frontends() -> bool:
 
 
 def trigger_workflow(workflow_file: str, tag: str) -> bool:
-    """Trigger a GitHub Actions workflow."""
-    cmd = f"gh workflow run {workflow_file} --field tag={tag}"
+    """Trigger a GitHub Actions workflow on the current branch."""
+    # --ref ensures the workflow checks out the current branch (which
+    # has the PRODUCT_VERSION bump and latest dist/ artifacts), not the
+    # default branch.  Without this, actions/checkout@v4 uses main.
+    branch_code, branch = _run("git branch --show-current")
+    ref_flag = f" --ref {branch.strip()}" if branch_code == 0 and branch.strip() else ""
+    cmd = f"gh workflow run {workflow_file} --field tag={tag}{ref_flag}"
     code, output = _run(cmd)
     if code != 0:
         log(f"  ERROR: Failed to trigger {workflow_file}: {output}")

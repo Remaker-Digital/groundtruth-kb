@@ -562,7 +562,7 @@ class ActivationService:
                                 current_hash[:8] if current_hash else "missing",
                             )
                 except Exception:
-                    logger.debug("Widget key hash repair check failed", exc_info=True)
+                    logger.warning("Widget key hash repair FAILED for tenant=%s", tenant_id[:8], exc_info=True)
             return
 
         logger.info(
@@ -596,8 +596,14 @@ class ActivationService:
                     ],
                 )
             except Exception:
-                # Tenant doc may already have a hash — non-critical
-                logger.debug("Widget key hash update on tenant doc failed", exc_info=True)
+                # Widget key hash write failure is NOT non-critical — without
+                # the hash, widget key auth returns 401 and the widget is
+                # invisible.  Log at warning so failures are visible.
+                logger.warning(
+                    "Widget key hash write to tenant doc FAILED for tenant=%s — "
+                    "widget auth will not work until repaired",
+                    tenant_id[:8], exc_info=True,
+                )
 
         logger.info(
             "Widget key auto-provisioned for tenant=%s",

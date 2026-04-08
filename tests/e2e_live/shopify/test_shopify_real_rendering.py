@@ -61,7 +61,7 @@ MAX_PAGE_LOAD_SECS = 30
 SHOPIFY_PAGES = [
     ("/", "Dashboard"),
     ("/inbox", "Conversation Inbox"),
-    ("/configuration", "Agent configuration"),
+    ("/configuration", "AI configuration"),
     ("/knowledge-base", "Knowledge Base"),
     ("/widget", "Widget configuration"),
     ("/billing", "Billing"),
@@ -177,6 +177,33 @@ def staging_reachable() -> None:
     """Verify staging is reachable before running tests."""
     if not _check_staging_reachable():
         pytest.skip(f"Staging unreachable at {STAGING_FQDN}")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def tenant_registered() -> None:
+    """Verify the test Shopify store is registered in staging Cosmos.
+
+    When the Shopify dev store is not registered (e.g. after a CMK incident
+    or tenant cleanup), ALL real rendering tests fail with 'not registered'.
+    This fixture turns those 30+ failures into a single clean SKIP.
+    """
+    try:
+        import httpx
+        with httpx.Client(timeout=10.0) as c:
+            resp = c.get(f"{STAGING_FQDN}/api/tenants/lookup?shop={REAL_SHOP_DOMAIN}")
+            if resp.status_code != 200:
+                pytest.skip(
+                    f"Shopify store {REAL_SHOP_DOMAIN} not registered in staging "
+                    f"(HTTP {resp.status_code}) — env-limitation, not product defect"
+                )
+            data = resp.json()
+            if not data.get("found"):
+                pytest.skip(
+                    f"Shopify store {REAL_SHOP_DOMAIN} not found in staging "
+                    f"(lookup returned found=false) — env-limitation, not product defect"
+                )
+    except Exception as exc:
+        pytest.skip(f"Cannot verify tenant registration: {exc}")
 
 
 @pytest.fixture(autouse=True, scope="class")

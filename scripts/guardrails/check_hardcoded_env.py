@@ -96,6 +96,10 @@ EXCLUDED = [
     re.compile(r"\.lock$"),
     re.compile(r"package-lock\.json$"),
     re.compile(r"\.min\.(js|css)$"),
+    # Security penetration tests intentionally contain fake credentials
+    re.compile(r"tests/security/test_live_penetration"),
+    # Visual evidence artifacts (must record actual URLs tested)
+    re.compile(r"logs/visual-evidence/"),
 ]
 
 

@@ -1,20 +1,96 @@
 {
-  "A1_version": "1.92.0",
+  "A1_version": "1.98.83",
   "A2_status": "active",
   "A3_activation": {
     "is_active": true,
     "is_configured": true,
     "has_pending_changes": false,
-    "active_version": 2
+    "active_version": 47
   },
-  "A4_conversation_count": 0,
+  "A4_conversation_count": 833,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 240,
-  "A7_team_count": 4,
+  "A6_kb_count": 264,
+  "A7_team_count": 41,
   "A8_team_members": [
+    {
+      "displayName": "DoubleClick e2e-te",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "<script>alert(\"xss\")</script>",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
     {
       "displayName": "Alex Johnson",
       "role": "viewer"
@@ -30,6 +106,78 @@
     {
       "displayName": "Sarah Chen",
       "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "DoubleClick e2e-te",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "<script>alert(\"xss\")</script>",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
     }
   ],
   "A9_draft_status": 200,

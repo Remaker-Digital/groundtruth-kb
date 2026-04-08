@@ -62,5 +62,19 @@ export default defineConfig({
   server: {
     port: 3100,
     open: '/dev.html',
+    // Proxy /api to backend to avoid CORS during local widget development.
+    // The widget sends X-Widget-Key which triggers a CORS preflight that
+    // remote backends reject for localhost origins. The proxy makes requests
+    // server-to-server, bypassing the browser's same-origin policy.
+    // Set WIDGET_DEV_BACKEND_URL to point at staging or local backend.
+    proxy: process.env.WIDGET_DEV_BACKEND_URL
+      ? {
+          '/api': {
+            target: process.env.WIDGET_DEV_BACKEND_URL,
+            changeOrigin: true,
+            secure: true,
+          },
+        }
+      : undefined,
   },
 });

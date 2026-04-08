@@ -14,4 +14,4 @@
 # The [web] extra provides FastAPI/Jinja2/Uvicorn for the KB web UI.
 # Default: install from GitHub (same version as requirements-test.txt).
 # Override: for local GT development, replace with: -e ../groundtruth-kb[web]
-groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1
+groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2

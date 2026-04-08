@@ -200,9 +200,15 @@ export const Header: FunctionComponent<HeaderProps> = ({
         />
       )}
 
+      <style>{gradientEnd
+        ? `.ar-header-close:focus-visible { box-shadow: 0 0 0 2px #000000, 0 0 0 4px #FFFFFF !important; }`
+        : `.ar-header-close:focus-visible { box-shadow: 0 0 0 2px ${focusRingColor(tokens.colorPrimary)} !important; }`
+      }</style>
+
       {/* Close button */}
       <button
         type="button"
+        className="ar-header-close"
         aria-label={locale.closeWidget}
         onClick={onClose}
         style={{
@@ -219,23 +225,6 @@ export const Header: FunctionComponent<HeaderProps> = ({
           transition: `background-color ${tokens.transitionFast}, box-shadow ${tokens.transitionFast}`,
           outline: 'none',
           opacity: 0.9,
-        }}
-        onFocus={(e) => {
-          // On gradient headers, no single-color ring can guarantee >= 3:1
-          // against all possible interior blend points (non-linear luminance).
-          // Solution: double ring — black inner + white outer (or vice versa).
-          // One band always contrasts >= 4.58:1 against ANY background.
-          // On flat headers, use focusRingColor for a clean single ring.
-          if (gradientEnd) {
-            (e.currentTarget as HTMLElement).style.boxShadow =
-              '0 0 0 2px #000000, 0 0 0 4px #FFFFFF';
-          } else {
-            (e.currentTarget as HTMLElement).style.boxShadow =
-              `0 0 0 2px ${focusRingColor(tokens.colorPrimary)}`;
-          }
-        }}
-        onBlur={(e) => {
-          (e.currentTarget as HTMLElement).style.boxShadow = 'none';
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.15)';

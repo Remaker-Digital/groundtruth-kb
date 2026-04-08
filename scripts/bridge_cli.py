@@ -10,10 +10,9 @@ Usage:
   python scripts/bridge_cli.py send --from prime --to codex --subject "Review request" --body "..."
   python scripts/bridge_cli.py inbox --agent prime
   python scripts/bridge_cli.py thread <thread-ref>
-  python scripts/bridge_cli.py claim <message-id> --agent prime
   python scripts/bridge_cli.py resolve <message-id> --agent prime --resolution "Done"
   python scripts/bridge_cli.py health
-  python scripts/bridge_cli.py send-review --subject "G3b plan" --body "..." --artifacts "file1.md,file2.py"
+  python scripts/bridge_cli.py retry <message-id> --agent prime
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -30,12 +29,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
 from prime_bridge_runtime import (
-    bridge_sla_report,
-    claim_message,
+    clear_failed_messages,
     get_thread,
+    health,
     list_inbox,
-    list_threads_at_risk,
     resolve_message,
+    retry_pending_message,
     send_message,
     wait_for_notifications,
 )
@@ -87,12 +86,6 @@ def cmd_thread(args: argparse.Namespace) -> None:
     _pp(result)
 
 
-def cmd_claim(args: argparse.Namespace) -> None:
-    """Claim a message."""
-    result = claim_message(message_id=args.message_id, agent=args.agent)
-    _pp(result)
-
-
 def cmd_resolve(args: argparse.Namespace) -> None:
     """Resolve a message."""
     result = resolve_message(
@@ -100,6 +93,15 @@ def cmd_resolve(args: argparse.Namespace) -> None:
         agent=args.agent,
         outcome=args.outcome,
         resolution=args.resolution,
+    )
+    _pp(result)
+
+
+def cmd_retry(args: argparse.Namespace) -> None:
+    """Retry a pending message (non-blocking persistent retry)."""
+    result = retry_pending_message(
+        message_id=args.message_id,
+        agent=args.agent,
     )
     _pp(result)
 
@@ -121,27 +123,22 @@ def cmd_notifications(args: argparse.Namespace) -> None:
 
 
 def cmd_health(args: argparse.Namespace) -> None:
-    """Bridge health check — inbox counts + SLA + at-risk threads."""
+    """Bridge health check."""
     print("=== Bridge Health ===\n")
-
-    for agent in ("prime", "codex"):
-        inbox = list_inbox(agent=agent, status="new")
-        print(f"  {agent} inbox: {inbox['count']} new message(s)")
-
-    for agent in ("prime", "codex"):
-        print()
-        at_risk = list_threads_at_risk(agent=agent)
-        risk_count = at_risk.get("count", 0)
-        print(f"  {agent} threads at risk: {risk_count}")
-        if risk_count > 0:
-            for t in at_risk.get("items", []):
-                print(f"    [{t.get('thread_id', '?')[:8]}] {t.get('risk_reason', '?')}")
-
-        sla = bridge_sla_report(agent=agent)
-        breaches = sla.get("breaches", 0)
-        print(f"  {agent} SLA breaches: {breaches}")
-
+    result = health()
+    print(result)
     print()
+
+
+def cmd_clear_failed(args: argparse.Namespace) -> None:
+    """Quietly clear historical failed-message residue."""
+    result = clear_failed_messages(
+        agent=args.agent,
+        older_than_minutes=args.older_than_minutes,
+        limit=args.limit,
+        resolution=args.resolution,
+    )
+    _pp(result)
 
 
 def cmd_send_review(args: argparse.Namespace) -> None:
@@ -152,7 +149,6 @@ def cmd_send_review(args: argparse.Namespace) -> None:
     payload = {
         "artifact_refs": artifact_refs,
         "expected_response": "advisory_review",
-        "response_window": args.response_window,
         "action_items": action_items,
     }
 
@@ -193,7 +189,7 @@ def main() -> None:
     # inbox
     p_inbox = sub.add_parser("inbox", help="List inbox messages")
     p_inbox.add_argument("--agent", required=True, choices=["prime", "codex"])
-    p_inbox.add_argument("--status", default="new")
+    p_inbox.add_argument("--status", default="pending")
     p_inbox.add_argument("--limit", type=int, default=20)
     p_inbox.set_defaults(func=cmd_inbox)
 
@@ -203,19 +199,19 @@ def main() -> None:
     p_thread.add_argument("--agent", choices=["prime", "codex"])
     p_thread.set_defaults(func=cmd_thread)
 
-    # claim
-    p_claim = sub.add_parser("claim", help="Claim a message")
-    p_claim.add_argument("message_id")
-    p_claim.add_argument("--agent", required=True, choices=["prime", "codex"])
-    p_claim.set_defaults(func=cmd_claim)
-
     # resolve
     p_resolve = sub.add_parser("resolve", help="Resolve a message")
     p_resolve.add_argument("message_id")
     p_resolve.add_argument("--agent", required=True, choices=["prime", "codex", "owner"])
-    p_resolve.add_argument("--outcome", default="done", choices=["done", "blocked", "superseded"])
+    p_resolve.add_argument("--outcome", default="completed", choices=["completed", "failed"])
     p_resolve.add_argument("--resolution", default="")
     p_resolve.set_defaults(func=cmd_resolve)
+
+    # retry
+    p_retry = sub.add_parser("retry", help="Retry a pending message")
+    p_retry.add_argument("message_id")
+    p_retry.add_argument("--agent", required=True, choices=["prime", "codex"])
+    p_retry.set_defaults(func=cmd_retry)
 
     # notifications
     p_notif = sub.add_parser("notifications", help="Poll for notifications")
@@ -228,13 +224,30 @@ def main() -> None:
     p_health = sub.add_parser("health", help="Bridge health check")
     p_health.set_defaults(func=cmd_health)
 
+    # clear-failed
+    p_clear_failed = sub.add_parser(
+        "clear-failed",
+        help="Quietly clear historical failed bridge messages",
+    )
+    p_clear_failed.add_argument(
+        "--agent",
+        default="prime",
+        choices=["prime", "codex"],
+    )
+    p_clear_failed.add_argument("--older-than-minutes", type=int, default=15)
+    p_clear_failed.add_argument("--limit", type=int, default=200)
+    p_clear_failed.add_argument(
+        "--resolution",
+        default="Historical failed bridge residue cleared by owner.",
+    )
+    p_clear_failed.set_defaults(func=cmd_clear_failed)
+
     # send-review (typed wrapper)
     p_review = sub.add_parser("send-review", help="Send structured advisory review request")
     p_review.add_argument("--subject", "-s", required=True)
     p_review.add_argument("--body", "-b", required=True)
     p_review.add_argument("--artifacts", help="Comma-separated artifact file paths")
     p_review.add_argument("--action-items", help="Pipe-separated action items")
-    p_review.add_argument("--response-window", default="async", choices=["immediate", "short", "session", "async"])
     p_review.add_argument("--priority", type=int, default=2)
     p_review.add_argument("--correlation-id")
     p_review.set_defaults(func=cmd_send_review)

@@ -21,6 +21,7 @@ from src.multi_tenant.cosmos_schema import AuditEventType, TenantTier
 from src.multi_tenant.middleware import get_tenant_context
 
 from src.multi_tenant.superadmin_api import _monolith as _state
+from src.multi_tenant.superadmin_api._pii_mask import mask_domain, mask_email
 
 router = _state.router
 
@@ -235,7 +236,7 @@ async def list_all_tenants(
 
     # Data query with pagination via OFFSET/LIMIT
     # SPEC-1843 v6 / WI-1641: customer_email and shopify_shop_domain restored
-    # (tenancy management data per SPEC-1637)
+    # (tenancy management data per SPEC-1637). ZK masking applied (S262).
     data_query = (
         f"SELECT c.tenant_id, c.status, c.tier, c.billing_channel, "
         f"c.customer_email, c.shopify_shop_domain, "
@@ -252,6 +253,8 @@ async def list_all_tenants(
         parameters=params if params else None,
         max_item_count=limit,
     ):
+        item["customer_email"] = mask_email(item.get("customer_email"))
+        item["shopify_shop_domain"] = mask_domain(item.get("shopify_shop_domain"))
         tenants.append(TenantSummaryItem(**item))
 
     return TenantDirectoryResponse(

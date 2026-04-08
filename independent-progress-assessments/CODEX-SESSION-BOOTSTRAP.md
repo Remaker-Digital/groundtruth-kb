@@ -25,11 +25,10 @@ Optional local environment overrides remain available:
 
 ## Recommended Review-Session Startup
 
-**Phase A — Bridge sweep (first, within 60 seconds):**
-1. Query bridge for unresolved messages addressed to this agent.
-2. Check `list_threads_at_risk()` and `bridge_sla_report()`.
-3. Acknowledge, claim, or negotiate each live message per protocol.
-4. Report sweep count: "Bridge sweep: N messages processed."
+**Phase A — Bridge sweep (first priority):**
+1. Query bridge for pending messages via `list_inbox(agent=..., status="pending")`.
+2. Process each pending message with a substantive reply or resolve it.
+3. Report sweep count: "Bridge sweep: N messages processed."
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 5. Start Codex in this workspace:

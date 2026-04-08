@@ -26,6 +26,20 @@ class _FakeWrappedBridge:
         return {"ok": True, "context": copy.deepcopy(self._context)}
 
 
+class _MapBridge:
+    def __init__(self, contexts: dict[str, dict]) -> None:
+        self._contexts = contexts
+        self.calls: list[str] = []
+
+    def get_worker_event_payload(self, message_ref: str, agent: str | None = None) -> dict:
+        assert agent == "codex"
+        self.calls.append(message_ref)
+        return copy.deepcopy(self._contexts[message_ref])
+
+    def list_threads(self, *, agent: str, status: str, limit: int) -> dict:
+        raise AssertionError("list_threads should not be called in this test")
+
+
 class _RepairBridge:
     def __init__(self, context: dict) -> None:
         self._context = context
@@ -33,7 +47,7 @@ class _RepairBridge:
         self.resolved_messages: list[dict] = []
 
     def get_worker_event_payload(self, message_ref: str, agent: str | None = None) -> dict:
-        assert message_ref == "m-1"
+        assert message_ref == self._context["canonical_message"]["id"]
         assert agent == "codex"
         return copy.deepcopy(self._context)
 
@@ -61,7 +75,7 @@ class _RepairBridge:
                 "correlation_id": correlation_id,
             }
         )
-        return {"ok": True, "status": "new", "id": "repair-1"}
+        return {"ok": True, "status": "pending", "id": "repair-1"}
 
     def resolve_message(self, *, message_id: str, agent: str, outcome: str, resolution: str) -> dict:
         self.resolved_messages.append(
@@ -87,12 +101,11 @@ def test_build_contexts_prefers_structured_artifact_refs(tmp_path) -> None:
         {
             "canonical_message": {
                 "id": "m-1",
-                "status": "new",
+                "status": "pending",
                 "subject": "Review note",
             },
             "thread_correlation_id": "m-1",
             "artifact_refs": ["structured-artifact.md"],
-            "thread_sla": {"risk_types": ["ack_breach"]},
             "thread_messages": [
                 {"id": "m-1", "body": "See INSIGHTS-2026-03-29-TEST-NOTE.md for details."}
             ],
@@ -110,14 +123,14 @@ def test_build_contexts_prefers_structured_artifact_refs(tmp_path) -> None:
         agent="codex",
         explicit_refs=["m-1"],
         new_items=[{"id": "m-1"}],
-        due_claimed=[],
+
         project_dir=tmp_path,
     )
 
     assert len(contexts) == 1
     context = contexts[0]
     assert context["already_reviewed_hint"] is True
-    assert set(context["wake_reasons"]) == {"ack_breach", "explicit:m-1", "new"}
+    assert set(context["wake_reasons"]) == {"explicit:m-1", "new"}
     assert context["referenced_artifacts"] == [
         {"path": str(discovered.resolve()), "source": "artifact-name"},
         {"path": str(structured.resolve()), "source": "structured-artifact-ref"},
@@ -131,12 +144,11 @@ def test_build_contexts_accepts_wrapped_runtime_payload(tmp_path) -> None:
         {
             "canonical_message": {
                 "id": "m-1",
-                "status": "new",
+                "status": "pending",
                 "subject": "Wrapped payload",
             },
             "thread_correlation_id": "m-1",
             "artifact_refs": ["artifact.md"],
-            "thread_sla": {"risk_types": []},
             "thread_messages": [],
             "latest_non_protocol_codex_message": None,
             "latest_non_protocol_prime_message": None,
@@ -148,12 +160,93 @@ def test_build_contexts_accepts_wrapped_runtime_payload(tmp_path) -> None:
         agent="codex",
         explicit_refs=["m-1"],
         new_items=[],
-        due_claimed=[],
+
         project_dir=tmp_path,
     )
 
     assert len(contexts) == 1
     assert contexts[0]["canonical_message"]["id"] == "m-1"
+
+
+def test_build_contexts_preserves_new_then_explicit_order(tmp_path) -> None:
+    bridge = _MapBridge(
+        {
+            "m-new": {
+                "canonical_message": {"id": "m-new", "status": "pending", "subject": "New"},
+                "thread_correlation_id": "m-new",
+                "artifact_refs": [],
+                "thread_messages": [],
+                "latest_non_protocol_codex_message": None,
+                "latest_non_protocol_prime_message": None,
+            },
+            "m-explicit": {
+                "canonical_message": {"id": "m-explicit", "status": "pending", "subject": "Explicit"},
+                "thread_correlation_id": "m-explicit",
+                "artifact_refs": [],
+                "thread_messages": [],
+                "latest_non_protocol_codex_message": None,
+                "latest_non_protocol_prime_message": None,
+            },
+        }
+    )
+
+    contexts = context_builder.build_contexts(
+        bridge,
+        agent="codex",
+        explicit_refs=["m-explicit"],
+        new_items=[{"id": "m-new"}],
+
+        project_dir=tmp_path,
+    )
+
+    assert [context["canonical_message"]["id"] for context in contexts] == [
+        "m-new",
+        "m-explicit",
+    ]
+
+
+def test_build_contexts_caps_context_building_to_dispatch_window(tmp_path) -> None:
+    bridge = _MapBridge(
+        {
+            "m-1": {
+                "canonical_message": {"id": "m-1", "status": "pending", "subject": "One"},
+                "thread_correlation_id": "m-1",
+                "artifact_refs": [],
+                "thread_messages": [],
+                "latest_non_protocol_codex_message": None,
+                "latest_non_protocol_prime_message": None,
+            },
+            "m-2": {
+                "canonical_message": {"id": "m-2", "status": "pending", "subject": "Two"},
+                "thread_correlation_id": "m-2",
+                "artifact_refs": [],
+                "thread_messages": [],
+                "latest_non_protocol_codex_message": None,
+                "latest_non_protocol_prime_message": None,
+            },
+            "m-3": {
+                "canonical_message": {"id": "m-3", "status": "pending", "subject": "Three"},
+                "thread_correlation_id": "m-3",
+                "artifact_refs": [],
+                "thread_messages": [],
+                "latest_non_protocol_codex_message": None,
+                "latest_non_protocol_prime_message": None,
+            },
+        }
+    )
+
+    contexts = context_builder.build_contexts(
+        bridge,
+        agent="codex",
+        explicit_refs=[],
+        new_items=[{"id": "m-1"}, {"id": "m-2"}, {"id": "m-3"}],
+
+        project_dir=tmp_path,
+        max_contexts=2,
+    )
+
+    assert [context["canonical_message"]["id"] for context in contexts] == ["m-1", "m-2"]
+    assert bridge.calls == ["m-1", "m-2"]
 
 
 def test_build_prompt_scopes_work_and_requires_structured_corrections(tmp_path) -> None:
@@ -164,12 +257,11 @@ def test_build_prompt_scopes_work_and_requires_structured_corrections(tmp_path) 
         "codex",
         snapshot,
         [{"id": "m-1"}],
-        [],
         [
             {
-                "canonical_message": {"id": "m-1", "status": "invalid", "subject": "Malformed request"},
+                "canonical_message": {"id": "m-1", "status": "failed", "subject": "Malformed request"},
                 "thread_correlation_id": "m-1",
-                "wake_reasons": ["invalid"],
+                "wake_reasons": ["failed"],
                 "latest_non_protocol_codex_message": None,
                 "latest_non_protocol_prime_message": None,
                 "already_reviewed_hint": False,
@@ -182,16 +274,17 @@ def test_build_prompt_scopes_work_and_requires_structured_corrections(tmp_path) 
     assert "Process only the target thread summaries plus the pending inbox IDs listed in the canonical bridge snapshot" in prompt
     assert "use `send_correction_message(...)`" in prompt
     assert "do not send freeform correction traffic via `send_message(...)`" in prompt
+    assert "Do not send protocol acknowledgements" in prompt
 
 
-def test_repair_terminal_thread_outputs_sends_valid_peer_message_and_supersedes_invalids(tmp_path) -> None:
+def test_repair_terminal_thread_outputs_sends_valid_peer_message_and_supersedes_failed(tmp_path) -> None:
     report = tmp_path / "INSIGHTS-2026-03-29-TEST-NOTE.md"
     report.write_text("note", encoding="utf-8")
     bridge = _RepairBridge(
         {
             "canonical_message": {
                 "id": "m-1",
-                "status": "done",
+                "status": "completed",
                 "priority": 2,
                 "sender": "prime",
                 "recipient": "codex",
@@ -199,14 +292,13 @@ def test_repair_terminal_thread_outputs_sends_valid_peer_message_and_supersedes_
             },
             "thread_correlation_id": "m-1",
             "artifact_refs": [str(report.name)],
-            "thread_sla": {"risk_types": []},
             "thread_messages": [
                 {
                     "id": "bad-1",
                     "sender": "codex",
                     "recipient": "prime",
                     "message_kind": "substantive",
-                    "status": "invalid",
+                    "status": "failed",
                     "subject": "Review complete: NO-GO",
                     "body": "Canonical report: INSIGHTS-2026-03-29-TEST-NOTE.md",
                 }
@@ -229,19 +321,143 @@ def test_repair_terminal_thread_outputs_sends_valid_peer_message_and_supersedes_
     assert sent["sender"] == "codex"
     assert sent["recipient"] == "prime"
     assert sent["correlation_id"] == "m-1"
-    assert sent["payload"]["expected_response"] == "acknowledgement"
+    assert sent["payload"]["expected_response"] == "status_update"
     assert sent["payload"]["action_items"]
     assert sent["payload"]["artifact_refs"] == [
-        {"type": "file", "path": str(report.resolve()), "note": "Bridge artifact"}
+        {"type": "file", "path": report.name, "note": "Bridge artifact"}
     ]
     assert bridge.resolved_messages == [
         {
             "message_id": "bad-1",
             "agent": "owner",
-            "outcome": "superseded",
+            "outcome": "failed",
             "resolution": "Superseded by repaired canonical outbound bridge message repair-1 on thread m-1.",
         }
     ]
+
+
+def test_repair_terminal_thread_outputs_closes_ack_only_threads_after_protocol_change(tmp_path) -> None:
+    artifact = tmp_path / "CLAUDE.md"
+    artifact.write_text("bridge proof", encoding="utf-8")
+    bridge = _RepairBridge(
+        {
+            "canonical_message": {
+                "id": "m-ack",
+                "status": "pending",
+                "priority": 2,
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "AUTONOMY-PROOF: Bridge round-trip test",
+                "expected_response": "acknowledgement",
+                "message_kind": "substantive",
+            },
+            "thread_correlation_id": "m-ack",
+            "artifact_refs": ["CLAUDE.md"],
+            "thread_messages": [],
+            "latest_non_protocol_codex_message": None,
+            "latest_non_protocol_prime_message": None,
+        }
+    )
+
+    repaired = context_builder.repair_terminal_thread_outputs(
+        bridge,
+        agent="codex",
+        target_refs=["m-ack"],
+        project_dir=tmp_path,
+    )
+
+    assert repaired == 1
+    assert bridge.sent_messages == []
+    assert bridge.resolved_messages == [
+        {
+            "message_id": "m-ack",
+            "agent": "codex",
+            "outcome": "failed",
+            "resolution": "Acknowledgement-only bridge requests are no longer supported. Sender must wait for a substantive reply.",
+        }
+    ]
+
+
+def test_repair_terminal_thread_outputs_closes_system_ack_threads_and_supersedes_failed(tmp_path) -> None:
+    bridge = _RepairBridge(
+        {
+            "canonical_message": {
+                "id": "m-system",
+                "status": "pending",
+                "priority": 2,
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Correction: failed bridge message bad-req",
+                "expected_response": "acknowledgement",
+                "message_kind": "system",
+            },
+            "thread_correlation_id": "m-system",
+            "artifact_refs": [],
+            "thread_messages": [
+                {
+                    "id": "bad-reply",
+                    "sender": "codex",
+                    "recipient": "prime",
+                    "message_kind": "substantive",
+                    "status": "failed",
+                    "subject": "Malformed correction response",
+                    "body": "body",
+                }
+            ],
+            "latest_non_protocol_codex_message": None,
+            "latest_non_protocol_prime_message": None,
+        }
+    )
+
+    repaired = context_builder.repair_terminal_thread_outputs(
+        bridge,
+        agent="codex",
+        target_refs=["m-system"],
+        project_dir=tmp_path,
+    )
+
+    assert repaired == 2
+    assert bridge.sent_messages == []
+    assert bridge.resolved_messages == [
+        {
+            "message_id": "m-system",
+            "agent": "codex",
+            "outcome": "failed",
+            "resolution": "Acknowledgement-only bridge requests are no longer supported. Sender must wait for a substantive reply.",
+        },
+        {
+            "message_id": "bad-reply",
+            "agent": "owner",
+            "outcome": "failed",
+            "resolution": "Superseded after acknowledgement-only thread closure on m-system.",
+        },
+    ]
+
+
+def test_context_requires_action_false_for_completed_ack_only_thread_with_protocol_ack() -> None:
+    context = {
+        "canonical_message": {
+            "id": "m-ack-done",
+            "status": "completed",
+            "sender": "prime",
+            "recipient": "codex",
+            "subject": "AUTONOMY-PROOF: Bridge round-trip test",
+            "expected_response": "acknowledgement",
+            "created_at": "2026-04-05T23:41:12+00:00",
+        },
+        "thread_messages": [
+            {
+                "id": "accepted-1",
+                "sender": "codex",
+                "recipient": "prime",
+                "message_kind": "protocol_ack",
+                "status": "completed",
+                "created_at": "2026-04-05T23:41:13+00:00",
+            }
+        ],
+    }
+
+    assert context_builder.context_requires_action("codex", context) is False
 
 
 def test_select_dispatch_batch_caps_targets_and_preserves_order() -> None:
@@ -250,18 +466,16 @@ def test_select_dispatch_batch_caps_targets_and_preserves_order() -> None:
         {"canonical_message": {"id": "m-2"}},
         {"canonical_message": {"id": "m-3"}},
     ]
-    new_items = [{"id": "m-2"}, {"id": "m-4"}]
-    due_claimed = [{"id": "m-3"}, {"id": "m-5"}]
+    new_items = [{"id": "m-2"}, {"id": "m-4"}, {"id": "m-3"}, {"id": "m-5"}]
 
     batch = context_builder.select_dispatch_batch(
         contexts,
         new_items,
-        due_claimed,
         max_targets=2,
     )
 
-    assert batch["target_ids"] == ["m-1", "m-2"]
-    assert batch["deferred_ids"] == ["m-3", "m-4", "m-5"]
-    assert [item["canonical_message"]["id"] for item in batch["contexts"]] == ["m-1", "m-2"]
-    assert batch["new_items"] == [{"id": "m-2"}]
-    assert batch["due_claimed"] == []
+    assert batch["target_ids"] == ["m-2", "m-4"]
+    assert batch["deferred_ids"] == ["m-3", "m-5", "m-1"]
+    assert [item["canonical_message"]["id"] for item in batch["contexts"]] == ["m-2"]
+    assert batch["new_items"] == [{"id": "m-2"}, {"id": "m-4"}]
+    assert "due_claimed" not in batch  # v3: no claimed state

@@ -177,19 +177,6 @@ const tierBadgeStyle: React.CSSProperties = {
   border: `1px solid ${tokens.warning}44`,
 };
 
-const comingSoonBadgeStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 4,
-  padding: '2px 8px',
-  borderRadius: 10,
-  fontSize: 11,
-  fontWeight: 600,
-  background: '#6366f122',
-  color: '#818cf8',
-  border: '1px solid #6366f144',
-};
-
 // Button component — uses CSS hover utility classes from tokens.css
 const btnBase: React.CSSProperties = {
   padding: '6px 14px',
@@ -288,12 +275,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
               {statusLabel}
             </span>
           )}
-          {integration.comingSoon && (
-            <span style={comingSoonBadgeStyle}>
-              Coming Soon
-            </span>
-          )}
-          {!integration.comingSoon && !integration.tierMet && integration.tierGate && (
+          {!integration.tierMet && integration.tierGate && (
             <span style={tierBadgeStyle}>
               {String.fromCodePoint(0x2B06)} {integration.tierGate} tier
             </span>
@@ -305,11 +287,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
 
         {/* Actions — inline with text */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {integration.comingSoon ? (
-            <span style={{ fontSize: 12, color: '#818cf8' }}>
-              This integration is under development and will be available soon.
-            </span>
-          ) : !integration.tierMet ? (
+          {!integration.tierMet ? (
             <span style={{ fontSize: 12, color: tokens.warning }}>
               Upgrade to {integration.tierGate} to use this integration
             </span>
@@ -402,7 +380,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
         )}
 
         {/* SPEC-1772: OAuth setup button for disconnected OAuth integrations */}
-        {!integration.comingSoon && integration.tierMet && !integration.enabled && integration.authType === 'oauth2' && (
+        {integration.tierMet && !integration.enabled && integration.authType === 'oauth2' && (
           <div style={{ marginTop: 6 }}>
             <span style={{ fontSize: 11, color: tokens.textTertiary }}>
               OAuth setup required — click Activate to begin authorization

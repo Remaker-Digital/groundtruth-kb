@@ -145,30 +145,32 @@ class TestWidgetCORSHeaders:
     def test_we_live_07_widget_js_cors(
         self, live_client: httpx.Client, platform_reachable: None
     ):
-        """WE-LIVE-07: Widget.js responds with CORS headers for cross-origin loading."""
+        """WE-LIVE-07: Widget.js responds with CORS headers for cross-origin loading.
+
+        Uses a *.myshopify.com origin which matches the CORS allow_origin_regex.
+        """
         resp = live_client.get(
             "/widget.js",
-            headers={"Origin": "https://example.com"},
+            headers={"Origin": "https://test-store.myshopify.com"},
         )
         assert resp.status_code == 200
-        # Check for CORS headers (may or may not be present depending on config)
-        # At minimum, the resource should be loadable (200 status is sufficient)
-        # CORS headers are set by the middleware — their presence indicates
-        # the widget can be embedded on third-party sites
 
     def test_we_live_08_chat_api_cors(
         self, live_client: httpx.Client, platform_reachable: None
     ):
-        """WE-LIVE-08: Chat API responds to preflight OPTIONS requests."""
+        """WE-LIVE-08: Chat API responds to preflight OPTIONS requests.
+
+        CORS is configured to accept *.myshopify.com, *.azurecontainerapps.io,
+        and localhost.  Uses an allowed origin to verify the preflight succeeds.
+        """
         resp = live_client.options(
             "/api/chat/conversations",
             headers={
-                "Origin": "https://example.com",
+                "Origin": "https://test-store.myshopify.com",
                 "Access-Control-Request-Method": "POST",
                 "Access-Control-Request-Headers": "X-Widget-Key, Content-Type",
             },
         )
-        # Should respond (200 or 204 for OPTIONS, or 405 if OPTIONS not handled)
-        assert resp.status_code in (200, 204, 405), (
-            f"Unexpected OPTIONS response: {resp.status_code}"
+        assert resp.status_code in (200, 204), (
+            f"CORS preflight: got {resp.status_code}"
         )

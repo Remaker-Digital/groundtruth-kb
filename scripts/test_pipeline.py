@@ -1011,7 +1011,7 @@ def phase_15_external_verification(args: argparse.Namespace) -> PhaseResult:
 
 
 def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
-    """Run live widget embed verification tests (SPEC-1649)."""
+    """Run live widget embed verification + Active→Visible gate (SPEC-1649, S257)."""
     t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_widget_embed_live.py consumes PREVIEW_WIDGET_KEY + PROD_URL
@@ -1019,9 +1019,26 @@ def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
     skip = _check_required_env_vars(env_vars, ["PREVIEW_WIDGET_KEY", "PROD_URL"], 16, "Widget Embed")
     if skip:
         return skip
-    passed, failed, errors, xfailed, dt, _ = _run_pytest(
+
+    # S257: Four tiers of widget verification — ALL must pass for the gate:
+    #   Tier 1: API-level embed checks (bundle served, config returns, CORS)
+    #   Tier 2: API-level precondition checks (is_active, widget_key, hash)
+    #   Tier 3: Browser-visible admin check (Playwright: launcher in admin UI)
+    #   Tier 4: Browser-visible storefront check (Playwright: launcher on Shopify)
+    #
+    # Tiers 3+4 are the CANONICAL visual gates per Codex advisory.
+    # Without BOTH, a defect that renders on one surface but not the other
+    # would pass the gate.  Storefront tests skip cleanly if
+    # SHOPIFY_STORE_DOMAIN is not configured (no false failures).
+    test_paths = [
         "tests/live_api/test_widget_embed_live.py",
-        timeout=120, prefix="  [widget-embed] ",
+        "tests/e2e_live/test_widget_readiness_live.py::TestActiveConfigImpliesWidgetVisible",
+        "tests/e2e_live/test_widget_readiness_live.py::TestAdminWidgetReadiness",
+        "tests/e2e_live/test_widget_readiness_live.py::TestStorefrontWidgetReadiness",
+    ]
+    passed, failed, errors, xfailed, dt, _ = _run_pytest(
+        test_paths,
+        timeout=180, prefix="  [widget-embed] ",
         extra_env=env_vars,
     )
 
@@ -1423,7 +1440,8 @@ def main():
         11: ["tests/live_api/test_conversation_quality_live.py"],
         13: ["tests/security/test_config_pipeline_live.py"],
         15: ["tests/live_api/test_external_urls_live.py"],
-        16: ["tests/live_api/test_widget_embed_live.py"],
+        16: ["tests/live_api/test_widget_embed_live.py",
+             "tests/e2e_live/test_widget_readiness_live.py"],
         17: ["tests/fuzzing/"],
         18: ["tests/property/"],
         19: ["tests/live_api/test_widget_transport_live.py"],
