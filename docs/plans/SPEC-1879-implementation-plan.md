@@ -1,0 +1,150 @@
+# SPEC-1879: Phone Identity Channel — Implementation Plan
+
+**Canonical spec:** `docs/specs/SPEC-1879-phone-identity-channel.md`
+**This plan:** `docs/plans/SPEC-1879-implementation-plan.md`
+
+## Scope
+
+Phone as **verified contact method** (v1), NOT full phone-primary identity. Narrower scope per Codex recommendation.
+
+**Phase 1 does not implement canonical phone-linking or new merge semantics under ADR-004.** ADR-004 remains under Loyal Opposition NO-GO for first-writer-wins duplicate-claim resolution. Phase 1 is additive groundwork only: schema fields, E.164 validation, and SMS OTP endpoints. ContactAttribute(PHONE) linkage to canonical profiles is deferred to a later phase pending ADR-004 resolution.
+
+## Phase 1: Additive Groundwork (Schema + SMS OTP Endpoints)
+
+### Phase 1 File Manifest
+
+| # | File | Change Type | Description |
+|---|------|-------------|-------------|
+| 1 | `src/multi_tenant/cosmos_schema.py` | Extend | Add `identity_phone`, `identity_sms_sent_at`, `identity_sms_attempts` to ConversationDocument |
+| 2 | `src/chat/models.py` | Extend | Add `phone: str \| None` to VisitorIdentity |
+| 3 | `src/multi_tenant/widget_otp_verification.py` | Extend | Add `POST /api/chat/otp/send-sms` + `POST /api/chat/otp/verify-sms` endpoints |
+| 4 | `src/multi_tenant/admin_conversation_api.py` | Extend | Add `identity_phone` to conversation response models |
+| 5 | `admin/shared/types/index.ts` | Extend | Add `identityPhone` to TypeScript types |
+
+### Phase 1 Explicit Exclusions
+
+- NO customer_token issuance from verify-sms (current runtime sets customer_verified=True for any valid token, skipping identity collection — Codex P1-2)
+- NO ContactAttribute(PHONE) linkage to canonical profiles
+- NO CustomerRepository.link_attribute() calls
+- NO find_or_create_by_attribute() for phone
+- NO session/endpoint profile resolution changes
+- NO identity_preprocessor phone flow (Phase 2)
+- NO widget PhoneOtpVerification component (Phase 3)
+
+### Phase 1 Deliverables
+
+1. **ConversationDocument fields** (cosmos_schema.py):
+   - `identity_phone: str | None` — phone collected in-conversation or pre-chat
+   - `identity_sms_sent_at: str | None` — ISO 8601 timestamp of last SMS OTP send
+   - `identity_sms_attempts: int` — rate limit counter (max 3 per conversation)
+
+2. **VisitorIdentity phone field** (models.py):
+   - `phone: str | None` — optional phone from pre-chat form
+
+3. **SMS OTP endpoints** (widget_otp_verification.py):
+   - `POST /api/chat/otp/send-sms`:
+     - E.164 validation (`^\+[1-9]\d{1,14}$`)
+     - Professional+ tier gate
+     - Rate limit: 3 per 5 min per IP
+     - Hash code (SHA-256 via sms_verification.hash_code()) before storage
+     - Token ID: `otp:{tenant_id}:{phone}`, token_type: `widget_otp_sms`
+     - 10-minute TTL
+     - Send via SmsVerificationService.send_code()
+   - `POST /api/chat/otp/verify-sms`:
+     - Constant-time hash comparison
+     - Single-use token consumption
+     - Returns `verified: true` + normalized phone (E.164) on success
+     - **Does NOT mint customer_token** — current chat runtime would treat any valid token as customer_verified=True, skipping identity collection (Codex P1-2). Token issuance deferred to later phase with reviewed phone-aware session path.
+     - **Does NOT link ContactAttribute** — deferred pending ADR-004
+
+4. **Admin API** (admin_conversation_api.py) — prep-only:
+   - Add `identity_phone` to conversation list/detail response models
+   - No population path in Phase 1 — field will be null until identity_preprocessor phone flow (Phase 2)
+
+5. **TypeScript types** (admin/shared/types/index.ts) — prep-only:
+   - Add `identityPhone?: string` to conversation types
+   - No UI display changes in Phase 1
+
+### Phase 1 Reuse (no new modules)
+
+- `SmsVerificationService.send_code()` from `src/multi_tenant/sms_verification.py`
+- `hash_code()` from `src/multi_tenant/sms_verification.py`
+- `VerificationTokenRepository` from existing token collection
+- `get_rate_limit_backend()` for request throttling
+
+### Phase 1 Security Requirements
+
+- [x] E.164 normalization before OTP send
+- [x] Hashed token storage (SHA-256, not plaintext)
+- [x] 10-minute TTL on verification tokens
+- [x] Request throttling (3 per 5 min per IP) — Phase 1 guard is IP-rate-limit only
+- [ ] Per-conversation SMS attempt throttling (deferred to Phase 2; Codex non-blocking note)
+- [x] Single-use token consumption
+- [x] Professional+ tier gate
+- [x] No plaintext code storage
+
+## Phase 2A: Conversation-Scoped Phone Capture (Track A — owner approved, pending Codex GO)
+
+**Track:** A (narrow conversation-scoped). No session/token/canonical changes.
+
+### Phase 2A File Manifest (2 files)
+
+| File | Change |
+|------|--------|
+| `src/chat/identity_preprocessor.py` | Dual-state email/SMS preprocessor: phone detection (E.164), SMS OTP send/verify, per-conversation throttling, phone_verified field |
+| `src/multi_tenant/customer_profile_service.py` | Phone in asserted_identity (conversation-sourced, no canonical linking) |
+
+### Phase 2A Explicit Exclusions
+
+- NO customer_verified=True from phone-only verification (uses separate phone_verified field)
+- NO session.py changes (no phone in _resolve_customer_id or _resolve_canonical_customer_id)
+- NO endpoints.py changes (no phone token decoding, no X-Customer-Phone-Token)
+- NO phone-based customer_token issuance
+- NO ContactAttribute(PHONE) linkage or canonical phone lookup
+- NO phone-based cache warm-up
+
+### Phase 2A Assurance Model
+
+Phone SMS OTP verification sets `phone_verified=True` (NEW conversation-scoped field). Does NOT set `customer_verified=True`. Identity priority preserved: Shopify HMAC > email OTP > phone OTP. Phone success persists identity_phone and asserted_identity phone only.
+
+### Phase 2A Dual-State Preprocessor
+
+- Email OTP pending (`identity_otp_sent_at`) and SMS OTP pending (`identity_sms_sent_at`) are independent state machines
+- If both pending: email takes precedence for 6-digit code verification
+- Phone detection only runs if no email collected AND no OTP of either kind is pending
+- Per-conversation SMS throttling: `identity_sms_attempts` max 3, enforced
+- Phone extraction: strict E.164 only (`^\+[1-9]\d{1,14}$`), no fuzzy parsing
+
+## Phase 2B: Phone Token + Session Redesign (future — requires ADR-004 + assurance model redesign)
+
+| File | Change |
+|------|--------|
+| `src/chat/session.py` | Profile resolution: customer_id > email > phone |
+| `src/chat/endpoints.py` | X-Customer-Phone-Token header, phone token decoding, cache warmup |
+| `src/multi_tenant/widget_otp_verification.py` | Re-introduce phone customer_token issuance with reviewed assurance model |
+
+## Phase 3: Widget Phone OTP Component (future)
+
+| File | Change |
+|------|--------|
+| `widget/src/components/PhoneOtpVerification.tsx` | **NEW** — phone OTP UI |
+| `widget/src/state/store.ts` | customerPhone, customerPhoneToken |
+| `widget/src/transport/http.ts` | sendPhoneOtp(), verifyPhoneOtp() |
+| `widget/src/components/PreChatForm.tsx` | Add 'phone' to allowed field types |
+| `widget/src/components/Panel.tsx` | Phone OTP routing |
+| `widget/src/locale/en.ts` | Phone OTP locale strings |
+
+## Phase 4: Admin Display + Escalation Gate (future)
+
+| File | Change |
+|------|--------|
+| `admin/standalone/pages/Inbox.tsx` | Phone display in inbox |
+| `src/chat/pipeline/critic_escalation.py` | Phone-aware escalation gate |
+
+## Codex Review Protocol
+
+Each phase requires Codex GO before implementation begins. Post-implementation report sent after each phase.
+
+---
+
+*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

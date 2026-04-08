@@ -176,7 +176,7 @@ class TestVerificationRunnerExecution:
             mock_get.return_value = (200, {"x-product-version": "1.92.0"}, '{"status": "healthy"}')
             # Mock internal checks too
             with patch('src.multi_tenant.verification_runner.os.path.exists', return_value=True):
-                with patch.dict('os.environ', {'KEY_VAULT_URL': 'https://kv.example.com'}):
+                with patch.dict('os.environ', {'AZURE_KEYVAULT_URL': 'https://kv.example.com'}):
                     results = await runner.run()
 
         # Should have called set_config multiple times (batches + final)
@@ -190,7 +190,7 @@ class TestVerificationRunnerExecution:
             mock_get.return_value = (200, {}, '{"status": "healthy"}')
             with patch.object(runner, '_update_cosmos', new_callable=AsyncMock):
                 with patch('src.multi_tenant.verification_runner.os.path.exists', return_value=True):
-                    with patch.dict('os.environ', {'KEY_VAULT_URL': 'https://kv.example.com'}):
+                    with patch.dict('os.environ', {'AZURE_KEYVAULT_URL': 'https://kv.example.com'}):
                         results = await runner.run()
 
         assert isinstance(results, list)
@@ -212,7 +212,7 @@ class TestVerificationRunnerExecution:
         with patch.object(runner, '_http_get', side_effect=_flaky_get):
             with patch.object(runner, '_update_cosmos', new_callable=AsyncMock):
                 with patch('src.multi_tenant.verification_runner.os.path.exists', return_value=True):
-                    with patch.dict('os.environ', {'KEY_VAULT_URL': 'https://kv.example.com'}):
+                    with patch.dict('os.environ', {'AZURE_KEYVAULT_URL': 'https://kv.example.com'}):
                         results = await runner.run()
 
         # All 8 checks should complete even if some fail

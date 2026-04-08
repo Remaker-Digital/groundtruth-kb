@@ -1250,6 +1250,19 @@ async def main() -> None:
     args = parser.parse_args()
 
     dry_run = not args.execute
+
+    # Safety gate: warn when targeting production database
+    if not dry_run:
+        db_name = os.environ.get("COSMOS_DB_DATABASE", "")
+        if db_name and "staging" not in db_name and "dev" not in db_name:
+            print(
+                f"WARNING: COSMOS_DB_DATABASE={db_name} looks like production. "
+                "Seeding will write to the production database."
+            )
+            if not os.environ.get("SEED_ALLOW_PRODUCTION"):
+                print("Set SEED_ALLOW_PRODUCTION=1 to confirm, or change COSMOS_DB_DATABASE.")
+                return
+
     await seed(dry_run=dry_run, demo=args.demo, embed=args.embed, preset=args.preset)
 
 

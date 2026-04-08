@@ -503,6 +503,26 @@ class ConversationDocument(BaseModel):
         description="Number of OTP verification attempts in this conversation (rate limit: 3)",
     )
 
+    # In-conversation phone identity collection (SPEC-1879)
+    identity_phone: str | None = Field(
+        default=None,
+        description="E.164 phone number collected in-conversation or pre-chat (before SMS OTP verification)",
+    )
+    identity_sms_sent_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when SMS OTP was last sent for this conversation",
+    )
+    identity_sms_attempts: int = Field(
+        default=0,
+        description="Number of SMS OTP verification attempts in this conversation (rate limit: 3)",
+    )
+    phone_verified: bool = Field(
+        default=False,
+        description="Whether phone identity was verified via SMS OTP (SPEC-1879 Phase 2A). "
+        "Separate from customer_verified — phone is weaker assurance. "
+        "Does NOT suppress identity collection or treat customer as non-anonymous.",
+    )
+
     # Async email-bridge escalation (WI-3030 S259)
     escalation_sent: bool = Field(
         default=False,
@@ -719,7 +739,7 @@ class CustomerProfileDocument(BaseModel):
     # Data source 7: Asserted identity (Issue #5b — PCM Layer 1)
     asserted_identity: dict[str, Any] = Field(
         default_factory=dict,
-        description="{name, email, extracted_at, source}",
+        description="{name, email, phone, extracted_at, source}",
     )
 
     # GDPR consent (inherited from tenant, can be overridden per-customer)

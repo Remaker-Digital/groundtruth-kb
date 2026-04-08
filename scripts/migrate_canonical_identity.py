@@ -186,7 +186,7 @@ async def main(args: argparse.Namespace) -> None:
                 "Pass --force to confirm, or set COSMOS_DB_DATABASE to the staging DB name.",
                 db_name,
             )
-            return
+            sys.exit(1)
 
     # Initialize Cosmos DB connection (lightweight — only connect, don't create containers)
     from src.multi_tenant.cosmos_client import get_cosmos_manager

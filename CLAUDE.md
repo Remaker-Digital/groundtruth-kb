@@ -53,6 +53,14 @@ All new work in this repository must include:
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
+**operating procedure.** 
+- Have your Loyal Opposition review every implementation proposal before you implement anything. 
+- Have your Loyal Opposition review the post-implementation report you produce after every implementation work session. 
+- Do not proceed to the next task or step without a GO agreement from your Loyal Opposition. 
+- If your Loyal Opposition stops responding, investigate and resolve the blockage. 
+- Do not delete post-implementation reports. 
+- Before you deploy any build, ask this question: Is Agent Red ready for a full production deployment?
+
 ---
 
 ## Artifacts and Change Control
@@ -199,6 +207,24 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 
 ---
 
+## Branching Strategy
+
+| Branch | Purpose | Updated when |
+|--------|---------|-------------|
+| `main` | Production mirror. Always matches the most recent production deployment. | Merge from `develop` at deployment time. |
+| `develop` | Continuous development. All new features, fixes, and experiments land here. | Every session. |
+
+**Workflow:** `develop` → build/test → deploy to staging → staging verified → merge to `main` → deploy to production.
+
+**Rules:**
+1. Never commit directly to `main`. All work happens on `develop`.
+2. Merge to `main` only as part of a production deployment operation.
+3. `main` must always be deployable — it represents what is running in production.
+4. Version tags (v1.98.x) are created on `develop` at build time and propagated to `main` via merge.
+5. Hotfixes: branch from `main`, fix, merge to both `main` and `develop`.
+
+---
+
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-03-17*
-*Version: 65.0.0*
+*Last Updated: 2026-04-07*
+*Version: 66.0.0*

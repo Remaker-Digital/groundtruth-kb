@@ -453,10 +453,10 @@ class VerificationRunner:
 
     async def _check_key_vault(self) -> CheckResult:
         """Internal: Key Vault URL configured (config check, not connectivity)."""
-        kv_url = os.environ.get("KEY_VAULT_URL", "")
+        kv_url = os.environ.get("AZURE_KEYVAULT_URL", "") or os.environ.get("KEY_VAULT_URL", "")
         if kv_url:
-            return CheckResult(status="pass", detail="KEY_VAULT_URL configured (config-only check)")
-        return CheckResult(status="skip", detail="KEY_VAULT_URL not set")
+            return CheckResult(status="pass", detail="AZURE_KEYVAULT_URL configured (config-only check)")
+        return CheckResult(status="skip", detail="AZURE_KEYVAULT_URL not set")
 
     async def _check_spa_assets(self) -> CheckResult:
         """Internal: SPA dist bundles exist on filesystem."""

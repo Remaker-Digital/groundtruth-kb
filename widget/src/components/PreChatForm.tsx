@@ -30,7 +30,7 @@ import type { Locale } from '@/locale/en';
 interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'email' | 'textarea';
+  type: 'text' | 'email' | 'phone' | 'textarea';
   required: boolean;
   placeholder?: string;
 }
@@ -53,11 +53,15 @@ interface PreChatFormProps {
 // ---------------------------------------------------------------------------
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_E164_REGEX = /^\+[1-9]\d{1,14}$/;
 
 function validateField(field: FormField, value: string, locale: Locale): string | null {
   if (field.required && !value.trim()) return locale.fieldRequired;
   if (field.type === 'email' && value.trim() && !EMAIL_REGEX.test(value.trim())) {
     return locale.fieldInvalidEmail;
+  }
+  if (field.type === 'phone' && value.trim() && !PHONE_E164_REGEX.test(value.trim())) {
+    return 'Please enter a valid phone number (e.g. +15551234567)';
   }
   return null;
 }
@@ -195,11 +199,12 @@ export const PreChatForm: FunctionComponent<PreChatFormProps> = ({
                 />
               ) : (
                 <input
-                  type={field.type}
+                  type={field.type === 'phone' ? 'tel' : field.type}
+                  inputMode={field.type === 'phone' ? 'tel' : undefined}
                   value={value}
                   onInput={(e) => handleChange(field.name, (e.target as HTMLInputElement).value)}
                   onBlur={() => handleBlur(field)}
-                  placeholder={field.placeholder || ''}
+                  placeholder={field.placeholder || (field.type === 'phone' ? '+15551234567' : '')}
                   style={inputBaseStyle(tokens, !!error)}
                 />
               )}

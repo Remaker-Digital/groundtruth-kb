@@ -61,7 +61,7 @@ def _has_cosmos() -> bool:
 
 
 def _has_keyvault() -> bool:
-    return bool(os.environ.get("KEY_VAULT_URL"))
+    return bool(os.environ.get("AZURE_KEYVAULT_URL") or os.environ.get("KEY_VAULT_URL"))
 
 
 def _has_nats() -> bool:
@@ -80,7 +80,7 @@ requires_cosmos = pytest.mark.skipif(
 )
 requires_keyvault = pytest.mark.skipif(
     not _has_keyvault(),
-    reason="Key Vault URL not configured (KEY_VAULT_URL)",
+    reason="Key Vault URL not configured (AZURE_KEYVAULT_URL or KEY_VAULT_URL)",
 )
 requires_nats = pytest.mark.skipif(
     not _has_nats(),
@@ -479,7 +479,7 @@ class TestKeyVaultIntegration:
         from azure.identity.aio import DefaultAzureCredential
         from azure.keyvault.secrets.aio import SecretClient
 
-        vault_url = os.environ["KEY_VAULT_URL"]
+        vault_url = os.environ.get("AZURE_KEYVAULT_URL") or os.environ["KEY_VAULT_URL"]
         credential = DefaultAzureCredential()
         client = SecretClient(vault_url=vault_url, credential=credential)
 
@@ -501,7 +501,7 @@ class TestKeyVaultIntegration:
         from azure.identity.aio import DefaultAzureCredential
         from azure.keyvault.secrets.aio import SecretClient
 
-        vault_url = os.environ["KEY_VAULT_URL"]
+        vault_url = os.environ.get("AZURE_KEYVAULT_URL") or os.environ["KEY_VAULT_URL"]
         credential = DefaultAzureCredential()
         client = SecretClient(vault_url=vault_url, credential=credential)
 

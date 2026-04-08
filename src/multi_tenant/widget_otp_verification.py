@@ -1,12 +1,14 @@
-"""Widget OTP email verification — customer-facing 6-digit code flow.
+"""Widget OTP verification — customer-facing 6-digit code flow (email + SMS).
 
 Provides endpoints for the chat widget to send and verify OTP codes
 before starting a conversation. Uses the existing verification_tokens
 Cosmos DB collection with TTL-based auto-expiry.
 
 Endpoints:
-    POST /api/chat/otp/send    — Send a 6-digit OTP to customer email
-    POST /api/chat/otp/verify  — Verify the OTP code
+    POST /api/chat/otp/send        — Send a 6-digit OTP to customer email
+    POST /api/chat/otp/verify      — Verify the email OTP code
+    POST /api/chat/otp/send-sms    — Send a 6-digit OTP via SMS (SPEC-1879)
+    POST /api/chat/otp/verify-sms  — Verify the SMS OTP code (SPEC-1879)
 
 Authentication:
     Widget key (X-Widget-Key: pk_live_...) — same as all /api/chat/* endpoints.
@@ -39,6 +41,12 @@ router = APIRouter(prefix="/api/chat/otp", tags=["Widget OTP"])
 _OTP_TTL = 10 * 60  # 10 minutes
 _OTP_LENGTH = 6  # 6-digit numeric code
 _OTP_TOKEN_TYPE = "widget_otp"
+_SMS_OTP_TOKEN_TYPE = "widget_otp_sms"  # SPEC-1879
+
+# E.164 phone validation
+import re
+
+_E164_PATTERN = re.compile(r"^\+[1-9]\d{1,14}$")
 
 # ---------------------------------------------------------------------------
 # Rate limiting (in-memory, per-instance)
@@ -478,3 +486,258 @@ async def _send_otp_email(
 
     logger.warning("No email provider configured for widget OTP")
     return False
+
+
+# ---------------------------------------------------------------------------
+# SMS OTP — SPEC-1879: Phone Identity Channel
+# ---------------------------------------------------------------------------
+
+
+def normalize_e164(raw_phone: str) -> str | None:
+    """Normalize a phone number to E.164 format.
+
+    Strips spaces, dashes, parentheses, and dots. Returns the normalized
+    string if valid, or None if the result doesn't match E.164.
+    """
+    cleaned = raw_phone.strip()
+    for ch in " -().":
+        cleaned = cleaned.replace(ch, "")
+    if _E164_PATTERN.match(cleaned):
+        return cleaned
+    return None
+
+
+class SmsSendRequest(BaseModel):
+    """Request body for sending an SMS OTP (SPEC-1879)."""
+
+    phone: str = Field(description="Customer phone number (E.164 format)")
+    name: str = Field(default="", description="Customer name (optional)")
+
+
+class SmsSendResponse(BaseModel):
+    """Response after SMS OTP send — uniform to prevent enumeration."""
+
+    sent: bool = Field(
+        default=True,
+        description="Always true — never reveals whether the phone was valid",
+    )
+    message: str = Field(default="Enter the code we sent to your phone.")
+
+
+class SmsVerifyRequest(BaseModel):
+    """Request body for verifying an SMS OTP code (SPEC-1879)."""
+
+    phone: str = Field(description="Customer phone number (E.164 format)")
+    code: str = Field(description="6-digit OTP code")
+
+
+class SmsVerifyResponse(BaseModel):
+    """Response after SMS OTP verification.
+
+    Phase 1 constraint: does NOT return a customer_token. The verified phone
+    is confirmed but no chat-usable token is minted until a phone-aware
+    session/endpoint path is reviewed in a later phase (Codex P1-2 blocker).
+    """
+
+    verified: bool = Field(description="Whether the code was valid")
+    phone: str | None = Field(
+        default=None,
+        description="Verified phone number (E.164) — returned only on success",
+    )
+
+
+async def _check_tier_gate(tenant_id: str) -> bool:
+    """Return True if tenant is professional+ (SPEC-1879 tier gate)."""
+    try:
+        from src.multi_tenant.repository import TenantRepository
+
+        tenant_repo = TenantRepository()
+        tenant = await tenant_repo.get(tenant_id)
+        if tenant:
+            tier = tenant.get("tier", "starter")
+            return tier in ("professional", "enterprise")
+    except Exception:
+        logger.debug("Failed to check tier for %s — defaulting to blocked", tenant_id)
+    return False
+
+
+@router.post(
+    "/send-sms",
+    response_model=SmsSendResponse,
+    summary="Send OTP code via SMS (SPEC-1879)",
+    description="Sends a 6-digit verification code to the customer's phone via SMS. "
+    "Requires professional+ tier. Rate-limited to 3 requests per 5 minutes per IP. "
+    "Requires widget key authentication.",
+)
+async def send_sms_otp(
+    body: SmsSendRequest,
+    request: Request,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> SmsSendResponse:
+    """Send a 6-digit OTP to the customer's phone number via ACS SMS.
+
+    This endpoint is widget-authenticated (X-Widget-Key).
+    Always returns the same response to prevent phone enumeration.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+
+    if _is_rate_limited(client_ip):
+        logger.warning(
+            "SMS OTP rate limit exceeded: ip=%s tenant=%s",
+            client_ip, ctx.tenant_id,
+        )
+        return SmsSendResponse()
+
+    try:
+        # Tier gate: professional+ only
+        if not await _check_tier_gate(ctx.tenant_id):
+            logger.info(
+                "SMS OTP blocked by tier gate: tenant=%s", ctx.tenant_id,
+            )
+            return SmsSendResponse(
+                sent=True,
+                message="SMS verification is not available for your plan.",
+            )
+
+        # Validate and normalize E.164
+        phone = normalize_e164(body.phone)
+        if not phone:
+            return SmsSendResponse()
+
+        from src.multi_tenant.repositories import VerificationTokenRepository
+        from src.multi_tenant.sms_verification import hash_code
+
+        token_repo = VerificationTokenRepository()
+
+        otp_code = _generate_otp()
+        hashed_code = hash_code(otp_code)
+
+        # Store hashed OTP in verification_tokens with TTL
+        token_id = f"otp:{ctx.tenant_id}:{phone}"
+
+        try:
+            await token_repo.delete_token(token_id, _SMS_OTP_TOKEN_TYPE)
+        except Exception:
+            pass
+
+        await token_repo.create_token(
+            token_id=token_id,
+            token_type=_SMS_OTP_TOKEN_TYPE,
+            tenant_id=ctx.tenant_id,
+            email=phone,  # Reuse email field for phone (token schema)
+            ttl=_OTP_TTL,
+        )
+
+        # Patch to store hashed code (NOT plaintext — Codex requirement)
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+        from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
+
+        container = get_cosmos_manager().get_container(
+            COLLECTION_VERIFICATION_TOKENS,
+        )
+        await container.patch_item(
+            item=token_id,
+            partition_key=_SMS_OTP_TOKEN_TYPE,
+            patch_operations=[
+                {"op": "add", "path": "/otp_code_hash", "value": hashed_code},
+                {"op": "add", "path": "/customer_name", "value": body.name},
+            ],
+        )
+
+        # Send SMS via ACS
+        from src.multi_tenant.sms_verification import _send_sms
+
+        await _send_sms(phone, otp_code)
+
+        logger.info(
+            "SMS OTP sent: tenant=%s phone=%s***",
+            ctx.tenant_id, phone[:6],
+        )
+
+    except Exception:
+        logger.exception("Error sending SMS OTP")
+
+    return SmsSendResponse()
+
+
+@router.post(
+    "/verify-sms",
+    response_model=SmsVerifyResponse,
+    summary="Verify SMS OTP code (SPEC-1879)",
+    description="Verifies the 6-digit SMS code entered by the customer. "
+    "Returns verified status and phone on success. "
+    "Phase 1: no customer_token, no ContactAttribute linkage.",
+)
+async def verify_sms_otp(
+    body: SmsVerifyRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> SmsVerifyResponse:
+    """Verify a 6-digit SMS OTP code submitted by the customer.
+
+    On success, returns verified=True and the normalized phone number.
+    Phase 1 constraint: does NOT mint a customer_token or link
+    ContactAttribute(PHONE). Token issuance deferred to a later phase
+    with a reviewed phone-aware session/endpoint path.
+    """
+    try:
+        phone = normalize_e164(body.phone)
+        if not phone:
+            return SmsVerifyResponse(verified=False)
+
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+        from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
+        from src.multi_tenant.repositories import VerificationTokenRepository
+        from src.multi_tenant.sms_verification import hash_code
+
+        token_repo = VerificationTokenRepository()
+        token_id = f"otp:{ctx.tenant_id}:{phone}"
+
+        container = get_cosmos_manager().get_container(
+            COLLECTION_VERIFICATION_TOKENS,
+        )
+
+        try:
+            doc = await container.read_item(
+                item=token_id,
+                partition_key=_SMS_OTP_TOKEN_TYPE,
+            )
+        except Exception:
+            return SmsVerifyResponse(verified=False)
+
+        if doc.get("used"):
+            return SmsVerifyResponse(verified=False)
+
+        # Constant-time hash comparison (Codex security requirement)
+        stored_hash = doc.get("otp_code_hash", "")
+        submitted_hash = hash_code(body.code.strip())
+        if not secrets.compare_digest(submitted_hash, stored_hash):
+            logger.info(
+                "SMS OTP mismatch: tenant=%s phone=%s***",
+                ctx.tenant_id, phone[:6],
+            )
+            return SmsVerifyResponse(verified=False)
+
+        # Mark token as consumed (single-use)
+        await token_repo.consume_token(token_id, _SMS_OTP_TOKEN_TYPE)
+
+        # Phase 1: return verified status + phone only.
+        # No customer_token minted — current chat runtime treats any valid
+        # customer_token as customer_verified=True which would skip identity
+        # collection (Codex P1-2 blocker). Token issuance deferred to a
+        # later phase with a reviewed phone-aware session path.
+
+        logger.info(
+            "SMS OTP verified: tenant=%s phone=%s***",
+            ctx.tenant_id, phone[:6],
+        )
+
+        return SmsVerifyResponse(
+            verified=True,
+            phone=phone,
+        )
+
+    except Exception:
+        logger.exception("Error verifying SMS OTP")
+        return SmsVerifyResponse(verified=False)
+
+

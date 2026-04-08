@@ -38,6 +38,18 @@ DB_PATH = Path(
 )
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+
+def get_bridge_db() -> sqlite3.Connection:
+    """Return a connection to the canonical bridge database.
+
+    Always uses the home-directory bridge.db (or PRIME_BRIDGE_DB override).
+    Never resolves relative to the workspace CWD. Use this instead of
+    sqlite3.connect('bridge.db') to avoid workspace-local DB splits.
+    """
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
 mcp = FastMCP(
     name="prime-bridge",
     instructions=(

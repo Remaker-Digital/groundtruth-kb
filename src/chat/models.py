@@ -114,6 +114,11 @@ class VisitorIdentity(BaseModel):
 
     name: str | None = Field(default=None, max_length=200, description="Visitor display name")
     email: str | None = Field(default=None, max_length=320, description="Visitor email address")
+    phone: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Visitor phone number in E.164 format (SPEC-1879)",
+    )
     customer_id: str | None = Field(
         default=None,
         max_length=200,

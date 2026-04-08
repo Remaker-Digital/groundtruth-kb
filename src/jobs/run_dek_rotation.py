@@ -270,8 +270,19 @@ async def _bootstrap() -> None:
     await secret_svc.initialize()
 
 
-async def _main_async(dry_run: bool, tenant_id: str | None, max_age_days: int) -> None:
+async def _main_async(dry_run: bool, tenant_id: str | None, max_age_days: int, *, force: bool = False) -> None:
     """Async main: bootstrap then rotate."""
+    import os
+    db_name = os.environ.get("COSMOS_DB_DATABASE", "")
+    logger.info("Target database: %s", db_name or "(not set)")
+    if not dry_run and not force:
+        if "staging" not in db_name and "dev" not in db_name:
+            logger.error(
+                "SAFETY GATE: COSMOS_DB_DATABASE=%s looks like production. "
+                "Pass --force to confirm, or set COSMOS_DB_DATABASE to the staging DB.",
+                db_name,
+            )
+            return
     await _bootstrap()
     await run_rotation(dry_run=dry_run, tenant_id=tenant_id, max_age_days=max_age_days)
 
@@ -282,10 +293,11 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing")
     parser.add_argument("--tenant", type=str, help="Rotate a single tenant")
     parser.add_argument("--max-age-days", type=int, default=DEK_ROTATION_INTERVAL_DAYS)
+    parser.add_argument("--force", action="store_true", help="Bypass production database safety gate")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant, max_age_days=args.max_age_days))
+    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant, max_age_days=args.max_age_days, force=args.force))
 
 
 if __name__ == "__main__":

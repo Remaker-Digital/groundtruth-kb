@@ -83,6 +83,7 @@ class AdminConversationSummary(CamelCaseModel):
     # Customer identity (AUTH-5 / P0-AUTH-FIX)
     customer_verified: bool = False
     identity_email: str | None = None
+    identity_phone: str | None = None  # SPEC-1879
 
 
 class AdminConversationListResponse(CamelCaseModel):
@@ -122,6 +123,7 @@ class AdminConversationDetailResponse(CamelCaseModel):
     # Customer identity (AUTH-5 / P0-AUTH-FIX)
     customer_verified: bool = False
     identity_email: str | None = None
+    identity_phone: str | None = None  # SPEC-1879
     # Pipeline trace (SPEC-1530 — end-to-end conversation tracing)
     pipeline_trace: dict[str, Any] | None = None
 
@@ -506,6 +508,7 @@ async def list_conversations(
             archived_at=c.get("archived_at"),
             customer_verified=c.get("customer_verified", False),
             identity_email=c.get("identity_email"),
+            identity_phone=c.get("identity_phone"),
         )
         for c in conversations_raw
     ]
@@ -745,6 +748,7 @@ async def get_conversation_detail(
         internal_notes=doc.get("internal_notes", []),
         customer_verified=doc.get("customer_verified", False),
         identity_email=doc.get("identity_email"),
+        identity_phone=doc.get("identity_phone"),
         pipeline_trace=doc.get("pipeline_trace"),
     )
 
