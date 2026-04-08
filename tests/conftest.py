@@ -591,7 +591,25 @@ def app_client(
     import src.main as _main_mod
     import src.app.lifecycle as _lifecycle_mod
     import src.app.health as _health_mod
+    import src.multi_tenant.agntcy_sdk_integration as _agntcy_mod
     from src.multi_tenant.middleware import configure_tenant_resolution
+
+    # Mock AGNTCY SDK status so /ready returns 200 (transport_active=True).
+    # Without this, /ready returns 503 because SPEC-1802 enforces transport
+    # in ALL environments. CI has no AGNTCY transport configured.
+    _mock_sdk_status = {
+        "sdk_initialized": True,
+        "transport_type": "mock",
+        "transport_active": True,
+        "active_tier": "mock",
+        "slim_endpoint": None,
+        "nats_endpoint": None,
+        "nats_protocol": None,
+        "available_protocols": [],
+        "available_transports": [],
+        "agent_topics": [],
+        "directory": {"directory_available": False},
+    }
 
     # Patch module-level imports in the submodules where startup/ready
     # handlers actually reference them (R1 refactoring, session 31).
@@ -601,9 +619,9 @@ def app_client(
         patch.object(_health_mod, "get_circuit_breaker_registry", return_value=mock_circuit_breakers),
         patch.object(_lifecycle_mod, "init_nats_manager", new_callable=AsyncMock),
         patch.object(_lifecycle_mod, "close_nats_manager", new_callable=AsyncMock),
-        patch.object(_lifecycle_mod, "configure_tracing", return_value=None),
-        patch.object(_lifecycle_mod, "configure_tenant_logging", return_value=None),
+        patch.object(_main_mod, "_startup_tracing", new=AsyncMock()),
         patch.object(_lifecycle_mod, "TenantRepository", side_effect=Exception("mocked")),
+        patch.object(_agntcy_mod, "get_sdk_status", return_value=_mock_sdk_status),
     ):
         with TestClient(_main_mod.app, raise_server_exceptions=False) as client:
             # Wire tenant resolvers *after* TestClient startup so they are

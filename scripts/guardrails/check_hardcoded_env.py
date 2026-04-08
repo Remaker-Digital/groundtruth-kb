@@ -98,6 +98,8 @@ EXCLUDED = [
     re.compile(r"\.min\.(js|css)$"),
     # Security penetration tests intentionally contain fake credentials
     re.compile(r"tests/security/test_live_penetration"),
+    # Test conftest contains mock API keys for test fixtures (not real creds)
+    re.compile(r"tests/conftest\.py$"),
     # Visual evidence artifacts (must record actual URLs tested)
     re.compile(r"logs/visual-evidence/"),
 ]

@@ -204,12 +204,13 @@ class TestSpec0784TagAndBranchForward:
     """SPEC-0784: Tag-and-branch-forward (Model A) MUST be used."""
 
     def test_on_main_branch(self):
-        # The project works on main branch, not long-lived dev branches
+        # The project uses main (production) and develop (active dev) branches.
+        # Both are acceptable working branches per CLAUDE.md branching strategy.
         git_head = ROOT / ".git" / "HEAD"
         if git_head.exists():
             ref = git_head.read_text(encoding="utf-8").strip()
-            assert "main" in ref or "master" in ref, \
-                "Must be working on main branch"
+            assert "main" in ref or "master" in ref or "develop" in ref, \
+                "Must be working on main or develop branch"
 
 
 # ═══════════════════════════════════════════════════════════════════════

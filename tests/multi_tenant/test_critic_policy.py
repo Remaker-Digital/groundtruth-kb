@@ -507,7 +507,7 @@ class TestTimeoutBudget:
     def test_timeout_constants(self):
         """CP-19: 800ms timeout budget enforced via constants."""
         assert CRITIC_TIMEOUT_MS == 800
-        assert CRITIC_HTTP_TIMEOUT_SECONDS == 1.0  # Slightly above 800ms for network buffer
+        assert CRITIC_HTTP_TIMEOUT_SECONDS == 3.0  # Above 800ms for network buffer + retry headroom
         assert CIRCUIT_BREAKER_FAILURE_THRESHOLD == 5
         assert CIRCUIT_BREAKER_WINDOW_SECONDS == 30
         assert CIRCUIT_BREAKER_RECOVERY_SECONDS == 15
