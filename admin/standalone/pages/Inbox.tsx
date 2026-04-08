@@ -1298,6 +1298,12 @@ export function InboxPage() {
                         <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{selectedConversation.identityEmail}</Text>
                       </Group>
                     )}
+                    {selectedConversation.identityPhone && (
+                      <Group gap={8} wrap="nowrap">
+                        <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Phone</Text>
+                        <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{selectedConversation.identityPhone}</Text>
+                      </Group>
+                    )}
                     {selectedConversation.customerId && (
                       <Group gap={8} wrap="nowrap">
                         <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Customer ID</Text>
@@ -1314,7 +1320,7 @@ export function InboxPage() {
                         {selectedConversation.customerVerified ? 'Verified' : 'Anonymous'}
                       </Badge>
                     </Group>
-                    {!selectedConversation.customerName && !selectedConversation.customerId && !selectedConversation.identityEmail && (
+                    {!selectedConversation.customerName && !selectedConversation.customerId && !selectedConversation.identityEmail && !selectedConversation.identityPhone && (
                       <Text size="xs" c="dimmed" fs="italic">
                         No customer identity collected in this conversation.
                       </Text>

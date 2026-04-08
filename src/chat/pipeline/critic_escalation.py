@@ -155,22 +155,25 @@ class CriticEscalationMixin:
             )
             trace.set_escalation(escalated=True, reason=reason)
 
-        # Check for customer email BEFORE escalating.
+        # Check for customer identity (email or phone) BEFORE escalating.
+        # SPEC-1879 Phase 4: accept phone OR email as sufficient identity.
         customer_email: str | None = None
+        customer_phone: str | None = None
         conv_doc: dict[str, Any] | None = None
         try:
             conv_doc = await self._session._get_conversation(tenant_id, conversation_id)
             customer_email = conv_doc.get("identity_email")
+            customer_phone = conv_doc.get("identity_phone")
         except Exception:
-            logger.debug("Could not read conversation for identity_email")
+            logger.debug("Could not read conversation for identity fields")
 
-        if not customer_email:
+        if not customer_email and not customer_phone:
             return {
                 "email_required": True,
                 "email_prompt": (
                     "I'd like to connect you with a human representative who can "
-                    "help with this. Could you share your email address so they "
-                    "can follow up with you directly?"
+                    "help with this. Could you share your email address or phone "
+                    "number so they can follow up with you directly?"
                 ),
                 "escalation_msg": "",
                 "continuation_msg": "",
