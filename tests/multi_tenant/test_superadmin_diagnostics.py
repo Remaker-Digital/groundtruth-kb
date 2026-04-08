@@ -18,21 +18,17 @@ Endpoints tested:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 
 from src.multi_tenant.superadmin_api._diagnostics import (
-    ConfigDriftEntry,
     ConfigDriftResponse,
-    DiagnosticLogEntry,
     DiagnosticLogsResponse,
     DiagnosticMetricsResponse,
-    DiagnosticTraceEntry,
     DiagnosticTracesResponse,
     SystemHealthResponse,
-    PipelineRunListResponse,
     PipelineRunRequest,
     PipelineRunStatusResponse,
     PipelineRunTriggerResponse,
@@ -44,7 +40,6 @@ from src.multi_tenant.superadmin_api._diagnostics import (
     diagnostic_metrics,
     diagnostic_traces,
     get_test_run_status,
-    list_test_runs,
     trigger_test_run,
 )
 
@@ -517,7 +512,7 @@ class TestDiagnosticHealth:
 async def aiter_empty():
     """Async iterator that yields nothing."""
     return
-    yield  # noqa: unreachable — makes this an async generator
+    yield  # makes this an async generator (unreachable by design)
 
 
 # ---------------------------------------------------------------------------

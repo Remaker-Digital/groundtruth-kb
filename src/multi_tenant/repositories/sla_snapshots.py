@@ -12,7 +12,7 @@ Collection: sla_snapshots (partition key: /snapshot_type)
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_client import get_cosmos_manager

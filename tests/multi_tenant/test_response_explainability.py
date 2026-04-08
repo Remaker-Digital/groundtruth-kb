@@ -19,7 +19,6 @@ References:
 
 from unittest.mock import patch
 
-import pytest
 
 from src.multi_tenant.response_explainability import (
     CriticAssessment,

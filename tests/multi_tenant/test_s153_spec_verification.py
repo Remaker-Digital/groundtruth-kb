@@ -31,8 +31,6 @@ import inspect
 import os
 import re
 from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -423,7 +421,6 @@ class TestSpec1640InitializedTenantWizard:
         assert hasattr(activation_service, "ActivationService"), (
             "SPEC-1640: ActivationService must exist"
         )
-        svc = activation_service.ActivationService.__init__
         # Verify it tracks activation state
         source = inspect.getsource(activation_service.ActivationService)
         assert "is_active" in source or "is_configured" in source, (

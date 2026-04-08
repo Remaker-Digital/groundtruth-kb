@@ -74,7 +74,7 @@ class TestSLIMTransportPath:
             importlib.reload(mod)
 
             # Should not raise — graceful fallback
-            transport = mod.get_default_transport()
+            mod.get_default_transport()
             # May be None if SLIM creation fails
 
 

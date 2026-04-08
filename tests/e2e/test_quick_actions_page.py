@@ -16,9 +16,8 @@ Run with:
 """
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
-from .conftest import AdminApiMocker
 
 pytestmark = pytest.mark.e2e
 
@@ -140,7 +139,7 @@ class TestQuickActionsFeatures:
         The Sort order field was identified as redundant and should be removed
         or replaced by drag-and-drop ordering.
         """
-        page_text = admin_quick_actions_page.text_content("body") or ""
+        admin_quick_actions_page.text_content("body") or ""
         # Sort order field should NOT be prominently displayed
         # It's OK if "order" appears in other contexts (e.g., "Track Order")
         sort_order_label = admin_quick_actions_page.locator("label:has-text('Sort order')")

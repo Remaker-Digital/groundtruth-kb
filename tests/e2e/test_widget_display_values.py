@@ -83,11 +83,11 @@ class TestWidgetAppearanceValues:
 
     def test_gradient_switch_off(self, admin_widget_page: Page) -> None:
         """Gradient switch is unchecked (widget_header_gradient_enabled=False)."""
-        switch = admin_widget_page.locator(
+        admin_widget_page.locator(
             'input[type="checkbox"]'
         ).filter(has=admin_widget_page.locator("..").filter(has_text="Enable header gradient"))
         # Alternative: find the switch role near the gradient label
-        gradient_switch = admin_widget_page.locator(
+        admin_widget_page.locator(
             'input[role="switch"]'
         ).first
         # Walk through all switches to find the gradient one

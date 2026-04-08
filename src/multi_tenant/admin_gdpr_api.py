@@ -210,7 +210,10 @@ router = APIRouter(prefix="/api/gdpr", tags=["admin-gdpr"])
     "/export",
     response_model=ExportResponse,
     summary="Export tenant or customer data",
-    description="Exports data for GDPR right of access (Article 15) and portability (Article 20). Scope determines whether the entire tenant's data or a specific customer's data is exported.",
+    description=(
+        "Exports data for GDPR right of access (Article 15) and portability (Article 20). Scope determines whether the "
+        "entire tenant's data or a specific customer's data is exported."
+    ),
     responses={
         400: {"description": "Invalid scope or missing customer_id"},
         503: {"description": "GDPR export services not initialized"},
@@ -273,7 +276,10 @@ async def export_data(
     "/delete",
     response_model=DeleteResponse,
     summary="Delete tenant or customer data",
-    description="Performs cascading data deletion for GDPR right to erasure (Article 17). Tenant-level deletion checks the grace period unless force=true. Customer-level deletion proceeds immediately.",
+    description=(
+        "Performs cascading data deletion for GDPR right to erasure (Article 17). Tenant-level deletion checks the "
+        "grace period unless force=true. Customer-level deletion proceeds immediately."
+    ),
     responses={
         400: {"description": "Invalid scope or missing customer_id"},
         409: {"description": "Grace period still active for tenant"},
@@ -310,11 +316,13 @@ async def delete_data(
     try:
         if request.scope == "tenant":
             result = await service.delete_tenant(
-                ctx.tenant_id, force=request.force,
+                ctx.tenant_id,
+                force=request.force,
             )
         else:
             result = await service.delete_customer(
-                ctx.tenant_id, request.customer_id,
+                ctx.tenant_id,
+                request.customer_id,
             )
     except GracePeriodActiveError as exc:
         raise HTTPException(
@@ -355,7 +363,10 @@ async def delete_data(
     "/consent",
     response_model=ConsentStatusResponse,
     summary="Get tenant consent status",
-    description="Returns the tenant's current consent status for Persistent Customer Memory. Consent gates Layers 2-4; Layer 1 is always active regardless.",
+    description=(
+        "Returns the tenant's current consent status for Persistent Customer Memory. Consent gates Layers 2-4; Layer 1 "
+        "is always active regardless."
+    ),
     responses={
         503: {"description": "GDPR consent services not initialized"},
     },
@@ -379,7 +390,8 @@ async def get_consent_status(
         consent = tenant_doc.get("consent_status", "not_asked")
     except Exception:
         logger.exception(
-            "Error reading tenant consent: tenant=%s", ctx.tenant_id[:8],
+            "Error reading tenant consent: tenant=%s",
+            ctx.tenant_id[:8],
         )
         consent = "not_asked"
 
@@ -398,7 +410,10 @@ async def get_consent_status(
     "/consent",
     response_model=UpdateConsentResponse,
     summary="Update tenant consent status",
-    description="Updates the tenant's consent status for Persistent Customer Memory. Setting to 'denied' prevents new Layer 2-4 data from being stored.",
+    description=(
+        "Updates the tenant's consent status for Persistent Customer Memory. Setting to 'denied' prevents new Layer "
+        "2-4 data from being stored."
+    ),
     responses={
         400: {"description": "Invalid consent_status value"},
         503: {"description": "GDPR consent services not initialized"},
@@ -418,8 +433,7 @@ async def update_consent(
     if request.consent_status not in VALID_CONSENT_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid consent_status '{request.consent_status}'. "
-            f"Valid values: {sorted(VALID_CONSENT_STATUSES)}",
+            detail=f"Invalid consent_status '{request.consent_status}'. Valid values: {sorted(VALID_CONSENT_STATUSES)}",
         )
 
     manager = _get_consent_manager()
@@ -456,7 +470,10 @@ async def update_consent(
     "/consent/customer",
     response_model=UpdateConsentResponse,
     summary="Update customer consent status",
-    description="Updates a specific customer's consent status. Setting to 'denied' triggers automatic deletion of the customer's Layer 2-4 data per GDPR Article 17.",
+    description=(
+        "Updates a specific customer's consent status. Setting to 'denied' triggers automatic deletion of the "
+        "customer's Layer 2-4 data per GDPR Article 17."
+    ),
     responses={
         400: {"description": "Invalid consent_status value"},
         503: {"description": "GDPR consent services not initialized"},
@@ -476,8 +493,7 @@ async def update_customer_consent(
     if request.consent_status not in VALID_CONSENT_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid consent_status '{request.consent_status}'. "
-            f"Valid values: {sorted(VALID_CONSENT_STATUSES)}",
+            detail=f"Invalid consent_status '{request.consent_status}'. Valid values: {sorted(VALID_CONSENT_STATUSES)}",
         )
 
     manager = _get_consent_manager()

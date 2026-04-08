@@ -12,16 +12,8 @@ Master Test Plan: §4 Gap Register — Shopify Compliance (1.0-required)
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
-from tests.conftest import (
-    ENTERPRISE_TENANT_ID,
-    PROFESSIONAL_TENANT_ID,
-    STARTER_TENANT_ID,
-)
 
 
 # ---------------------------------------------------------------------------

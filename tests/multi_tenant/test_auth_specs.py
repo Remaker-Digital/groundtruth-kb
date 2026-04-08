@@ -16,7 +16,6 @@ Run:
 from __future__ import annotations
 
 import re
-import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,17 +31,14 @@ from src.multi_tenant.auth import (
     TenantContext,
     TenantInactiveError,
     generate_user_api_key,
-    hash_api_key,
     is_user_api_key,
     validate_tenant_status,
     verify_shopify_session_token,
     verify_user_api_key,
-    verify_widget_key,
 )
 from src.multi_tenant.cosmos_schema import TeamMemberRole, TenantStatus, TenantTier
 from src.multi_tenant.middleware import (
     TenantAuthMiddleware,
-    get_tenant_context,
     require_role,
     require_tier,
 )

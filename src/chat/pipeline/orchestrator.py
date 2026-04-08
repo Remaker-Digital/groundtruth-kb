@@ -33,10 +33,7 @@ from src.chat.models import (
 from src.chat.pipeline.agent_dispatch import AgentDispatchMixin
 from src.chat.pipeline.analytics import AnalyticsMixin
 from src.chat.pipeline.constants import (
-    ADMIN_ASSISTANCE_INTENT,
     AGENT_URLS,
-    ESCALATION_INTENT,
-    USE_AGENT_CONTAINERS,
 )
 from src.chat.pipeline.constants import _classify_openai_error
 from src.chat.pipeline.critic_escalation import CriticEscalationMixin
@@ -45,7 +42,6 @@ from src.multi_tenant.conversation_meter import ConversationMeter
 from src.multi_tenant.conversation_vectorizer import ConversationVectorizer
 from src.multi_tenant.cosmos_schema import (
     ConsentStatus,
-    ConversationStatus,
     CustomerProfileDocument,
     PreferencesDocument,
     TenantDocument,
@@ -1324,7 +1320,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             response = copilot_result.get("response", "")
-            sources = copilot_result.get("sources", [])
+            copilot_result.get("sources", [])
 
             trace.add_stage(
                 "co-pilot",
@@ -1464,7 +1460,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         consent_status=consent,
                     )
                     if history_results:
-                        compressed = ConversationVectorizer.compress_for_prompt(
+                        ConversationVectorizer.compress_for_prompt(
                             history_results,
                         )
                         for result in history_results:

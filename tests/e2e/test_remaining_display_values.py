@@ -24,11 +24,8 @@ from playwright.sync_api import Page, expect
 
 from .conftest import (
     MOCK_BILLING,
-    MOCK_INTEGRATIONS,
     MOCK_KNOWLEDGE_BASE,
-    MOCK_MEMORY_PRIVACY,
     MOCK_QUICK_ACTIONS,
-    _navigate_admin_to,
 )
 
 pytestmark = pytest.mark.e2e

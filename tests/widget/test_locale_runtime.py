@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import pytest
 from pathlib import Path
 
 WIDGET_SRC = Path(__file__).resolve().parent.parent.parent / "widget" / "src"

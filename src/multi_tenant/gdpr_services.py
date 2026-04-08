@@ -53,9 +53,8 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import Enum
 from typing import Any, Protocol
 
 from src.multi_tenant.cosmos_schema import (
@@ -63,7 +62,6 @@ from src.multi_tenant.cosmos_schema import (
     BillingChannel,
     ConsentStatus,
     PiiClassification,
-    TenantStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -1386,7 +1384,6 @@ class ConsentManager:
 
         if self._profiles is not None:
             try:
-                doc_id = f"{tenant_id}:{customer_id}"
                 profile = await self._profiles.get_by_customer_id(
                     tenant_id, customer_id,
                 )

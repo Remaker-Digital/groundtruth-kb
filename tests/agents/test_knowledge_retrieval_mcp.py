@@ -8,7 +8,6 @@ backward compatibility, end-to-end process() flow with MCP.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -51,7 +50,7 @@ def _make_mcp_result(
         "sources": [
             {
                 "id": f"mcp-{i}",
-                "title": f"Storefront: search_products",
+                "title": "Storefront: search_products",
                 "source_type": "mcp",
                 "server_name": "shopify-storefront",
                 "tool_name": "search_products",

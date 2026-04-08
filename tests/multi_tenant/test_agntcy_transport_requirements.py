@@ -10,10 +10,8 @@ Also covers transport tier detection from get_sdk_status().
 
 from __future__ import annotations
 
-import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 class TestTransportAvailability:
@@ -81,7 +79,7 @@ class TestReadyEndpointTransportEnforcement:
         from pathlib import Path
 
         health_src = Path("src/app/health.py").read_text(encoding="utf-8")
-        tree = ast.parse(health_src)
+        ast.parse(health_src)
 
         # Find the string "not_ready" in the source — confirms the 503 path
         assert "not_ready" in health_src
@@ -90,7 +88,6 @@ class TestReadyEndpointTransportEnforcement:
 
     def test_ready_does_not_503_in_development(self):
         """In development, /ready should not enforce transport requirement."""
-        import ast
         from pathlib import Path
 
         health_src = Path("src/app/health.py").read_text(encoding="utf-8")
@@ -116,7 +113,6 @@ class TestFailLoudDispatchBehavior:
 
     def test_tier_4_blocked_in_deployed_environments(self):
         """SPEC-1802: Tier 4 (in-process) is blocked in staging/production."""
-        import ast
         from pathlib import Path
 
         dispatch_src = Path("src/chat/pipeline/agent_dispatch.py").read_text(encoding="utf-8")

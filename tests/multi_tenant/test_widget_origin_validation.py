@@ -7,9 +7,7 @@ Validates:
 3. Backward compatibility: empty origins list allows all
 """
 import inspect
-from pathlib import Path
 
-import pytest
 
 
 # ---------------------------------------------------------------------------

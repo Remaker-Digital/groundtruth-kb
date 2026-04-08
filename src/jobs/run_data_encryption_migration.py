@@ -20,8 +20,8 @@ import asyncio
 import base64
 import os
 import logging
-import sys
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

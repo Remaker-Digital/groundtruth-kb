@@ -26,14 +26,11 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e_mock.conftest import (
-    navigate_to,
     navigate_and_settle,
     dismiss_onboarding_if_present,
     main_text,
-    assert_mock_active,
     get_api_json,
     post_api_json,
-    MOCK_TENANT,
 )
 
 

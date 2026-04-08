@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 
 from src.quality_metrics.backfill_untested_specs import (
     RISK_TIERS,

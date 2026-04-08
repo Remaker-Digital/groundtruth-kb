@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.agents.plugins.bindings import BindingCheckResult, SkillBindingService
-from src.agents.plugins.dispatch import PluginDispatcher, PluginDispatchResult
+from src.agents.plugins.bindings import SkillBindingService
+from src.agents.plugins.dispatch import PluginDispatcher
 from src.agents.plugins.events import InvocationEventBus
 from src.agents.plugins.registry import PluginAgentRegistry
 

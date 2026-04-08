@@ -177,7 +177,7 @@ class TestPanelHeaderCustomConfig:
             body=json.dumps({"conversation_id": "test-conv-custom"}),
         ))
 
-        page.goto(f"http://localhost:3100/dev.html", wait_until="domcontentloaded")
+        page.goto("http://localhost:3100/dev.html", wait_until="domcontentloaded")
         page.wait_for_function("!!window.AgentRed", timeout=10_000)
         page.evaluate("window.AgentRed.open()")
         page.wait_for_selector('iframe[title="Agent Red Chat"]', timeout=5_000)

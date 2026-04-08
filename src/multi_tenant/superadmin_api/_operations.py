@@ -8,7 +8,6 @@ Endpoints are registered on the shared router from _monolith.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Body, Depends, HTTPException, Query

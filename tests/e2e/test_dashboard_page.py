@@ -33,7 +33,6 @@ from playwright.sync_api import Page, expect
 from .conftest import (
     MOCK_ANALYTICS_SUMMARY,
     MOCK_CONFIG,
-    MOCK_DAILY_VOLUME,
     MOCK_INBOX_CONVERSATIONS,
     MOCK_INTENT_BREAKDOWN,
     MOCK_KNOWLEDGE_GAPS_DATA,

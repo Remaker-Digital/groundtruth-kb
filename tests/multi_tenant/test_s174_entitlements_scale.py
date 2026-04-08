@@ -15,8 +15,6 @@ Covers:
 """
 
 import asyncio
-import time
-from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -59,8 +57,7 @@ class TestTrialTierMapping:
     @pytest.mark.asyncio
     async def test_require_tier_trial_allows_professional_features(self):
         """Trial tier passes Professional-level tier gate (both map to level 1)."""
-        from fastapi import FastAPI, Depends, Request
-        from starlette.testclient import TestClient
+        from fastapi import FastAPI, Request
         from src.multi_tenant.middleware import require_tier
         from src.multi_tenant.cosmos_schema import TenantTier
 
@@ -70,8 +67,7 @@ class TestTrialTierMapping:
         async def pro_feature(request: Request):
             return {"ok": True}
 
-        # Directly test the tier ordering logic
-        from src.multi_tenant.middleware import require_tier
+        # Directly test the tier ordering logic (already imported above)
         dep = require_tier(TenantTier.PROFESSIONAL)
         # The dependency is a closure — we can inspect the tier_order dict
         # by calling the inner function with a mocked request

@@ -84,7 +84,7 @@ class TestAlertHistoryRepository:
     def test_repository_exists(self):
         """AlertHistoryRepository exists."""
         try:
-            from src.multi_tenant.repositories.alerts import AlertHistoryRepository
+            from src.multi_tenant.repositories.alerts import AlertHistoryRepository  # noqa: F401
         except ImportError:
             pytest.skip("AlertHistoryRepository not yet created (Phase 3 pending)")
 

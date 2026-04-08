@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -261,7 +260,7 @@ class TestSpec1258TotpVerifyEndpoint:
         resp = await verify_totp_2fa(TotpVerifyRequest(
             pending_token=pending_token, code="123456",
         ))
-        body = json.loads(resp.body)
+        json.loads(resp.body)
         assert resp.status_code == 503
 
 
@@ -631,7 +630,7 @@ class TestSpec1276TotpKeyVaultStorage:
         service = MfaTotpService(secret_service=mock_secret_svc)
 
         member = {"id": "mem-abc-123", "email": "admin@test.com", "tenant_id": "t-1"}
-        result = await service.start_enrollment(member)
+        await service.start_enrollment(member)
 
         mock_secret_svc.set_secret_raw.assert_called_once()
         call_args = mock_secret_svc.set_secret_raw.call_args

@@ -101,17 +101,16 @@ def _send_acs_email_sync(
             retry_after = getattr(exc, "retry_after", None) or "unknown"
             logger.warning(
                 "ACS rate-limited (429): retry_after=%s to=%s",
-                retry_after, to_email,
+                retry_after,
+                to_email,
             )
-            raise RuntimeError(
-                f"Email rate limit exceeded — retry in {retry_after} seconds"
-            ) from exc
+            raise RuntimeError(f"Email rate limit exceeded — retry in {retry_after} seconds") from exc
         logger.error(
-            "ACS begin_send HTTP error %s: %s", exc.status_code, exc.message,
+            "ACS begin_send HTTP error %s: %s",
+            exc.status_code,
+            exc.message,
         )
-        raise RuntimeError(
-            f"ACS email error ({exc.status_code}): {exc.message}"
-        ) from exc
+        raise RuntimeError(f"ACS email error ({exc.status_code}): {exc.message}") from exc
     result = poller.result(timeout=60)  # 60s max — prevent indefinite hang
     return getattr(result, "status", "unknown")
 
@@ -131,7 +130,12 @@ async def send_acs_email(
     import asyncio
 
     return await asyncio.to_thread(
-        _send_acs_email_sync, conn_str, sender, to_email, subject, html_body,
+        _send_acs_email_sync,
+        conn_str,
+        sender,
+        to_email,
+        subject,
+        html_body,
     )
 
 
@@ -372,7 +376,8 @@ class DashboardAlertChannel(AlertChannel):
         except Exception as exc:
             logger.exception(
                 "DashboardAlertChannel delivery failed: alert_id=%s tenant=%s",
-                alert.alert_id, alert.tenant_id,
+                alert.alert_id,
+                alert.tenant_id,
             )
             return ChannelResult(
                 channel_name=self.name,
@@ -412,12 +417,14 @@ class WebhookAlertChannel(AlertChannel):
         webhook_url: str | None = None
         try:
             prefs = await self._preferences.read(
-                alert.tenant_id, alert.tenant_id,
+                alert.tenant_id,
+                alert.tenant_id,
             )
             webhook_url = prefs.get("webhook_url") if prefs else None
         except Exception:
             logger.debug(
-                "Could not read preferences for tenant=%s", alert.tenant_id,
+                "Could not read preferences for tenant=%s",
+                alert.tenant_id,
             )
 
         if not webhook_url:
@@ -447,28 +454,33 @@ class WebhookAlertChannel(AlertChannel):
                     )
                     if response.status_code < 300:
                         return ChannelResult(
-                            channel_name=self.name, success=True,
+                            channel_name=self.name,
+                            success=True,
                         )
-                    last_error = (
-                        f"HTTP {response.status_code} from webhook"
-                    )
+                    last_error = f"HTTP {response.status_code} from webhook"
 
             except httpx.TimeoutException:
                 last_error = f"timeout after {self.TIMEOUT_SECONDS}s (attempt {attempt + 1})"
                 logger.debug(
                     "Webhook timeout: tenant=%s url=%s attempt=%d",
-                    alert.tenant_id, webhook_url, attempt + 1,
+                    alert.tenant_id,
+                    webhook_url,
+                    attempt + 1,
                 )
             except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
                 logger.debug(
                     "Webhook delivery error: tenant=%s attempt=%d error=%s",
-                    alert.tenant_id, attempt + 1, last_error,
+                    alert.tenant_id,
+                    attempt + 1,
+                    last_error,
                 )
 
         logger.warning(
             "WebhookAlertChannel exhausted retries: alert_id=%s tenant=%s error=%s",
-            alert.alert_id, alert.tenant_id, last_error,
+            alert.alert_id,
+            alert.tenant_id,
+            last_error,
         )
         return ChannelResult(
             channel_name=self.name,
@@ -485,7 +497,8 @@ class WebhookAlertChannel(AlertChannel):
 _EMAIL_WRAPPER = """<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#141414;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<body style="margin:0;padding:0;background:#141414;
+font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;padding:32px 0">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0">
@@ -501,7 +514,9 @@ _EMAIL_WRAPPER = """<!DOCTYPE html>
 </td></tr>
 <tr><td style="padding:16px 32px">
   <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center">
-    Agent Red Customer Experience &mdash; a product of <a href="https://remakerdigital.com" style="color:#ff3621;text-decoration:none">Remaker Digital</a>
+    Agent Red Customer Experience &mdash; a product of
+    <a href="https://remakerdigital.com" style="color:#ff3621;
+    text-decoration:none">Remaker Digital</a>
   </p>
   <p style="margin:8px 0 0;color:#6b7280;font-size:11px;text-align:center">
     This is a system message. To unsubscribe, please
@@ -583,95 +598,99 @@ def _render_email(alert: Alert) -> tuple[str, str]:
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Approaching Usage Limit</h2>'
             '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
-            '{severity}</div>'
+            "{severity}</div>"
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
             '<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">'
             '<strong style="color:#92400e">Recommendation:</strong>'
             '<p style="color:#92400e;margin:8px 0 0">Purchase a conversation pack to avoid overage charges '
-            'and ensure uninterrupted service.</p></div>'
+            "and ensure uninterrupted service.</p></div>"
         ),
         AlertType.USAGE_100_PCT: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Conversation Allowance Exhausted</h2>'
             '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
-            '{severity}</div>'
+            "{severity}</div>"
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
             '<div style="background:#fee2e2;border:1px solid #fca5a5;padding:16px;margin:16px 0">'
             '<strong style="color:#991b1b">Action Required:</strong>'
             '<p style="color:#991b1b;margin:8px 0 0">Your included conversations are exhausted. '
-            'Additional conversations will draw from pack balance or incur per-conversation overage charges.</p></div>'
+            "Additional conversations will draw from pack balance or incur per-conversation overage charges.</p></div>"
         ),
         # Trial expiry
         AlertType.TRIAL_EXPIRING: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Trial Expiring Soon</h2>'
             '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
-            '{severity}</div>'
+            "{severity}</div>"
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
             '<div style="background:#eff6ff;border:1px solid #93c5fd;padding:16px;margin:16px 0">'
             '<strong style="color:#1e40af">Upgrade to keep your setup:</strong>'
             '<p style="color:#1e40af;margin:8px 0 0">Your AI configuration, knowledge base, and conversation '
-            'history will be preserved when you subscribe to any paid plan.</p></div>'
+            "history will be preserved when you subscribe to any paid plan.</p></div>"
         ),
         # API key delivery
         AlertType.API_KEY_GENERATED: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">API Key Generated</h2>'
             '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
-            '{severity}</div>'
+            "{severity}</div>"
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
             '<div style="background:#f3f4f6;border:1px solid #d1d5db;'
-            'padding:16px;margin:16px 0;font-family:\'JetBrains Mono\',monospace">'
+            "padding:16px;margin:16px 0;font-family:'JetBrains Mono',monospace\">"
             '<code style="word-break:break-all;color:#111827;font-size:14px">{api_key}</code></div>'
             '<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">'
             '<strong style="color:#92400e">Security Notice:</strong>'
             '<p style="color:#92400e;margin:8px 0 0">Store this key securely. It will not be shown again. '
-            'If lost, generate a new key from the admin dashboard.</p></div>'
+            "If lost, generate a new key from the admin dashboard.</p></div>"
         ),
         # Team invite
         AlertType.TEAM_INVITE: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Team Invitation</h2>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '{admin_link_block}'
+            "{admin_link_block}"
             '<div style="background:#eff6ff;border:1px solid #93c5fd;padding:16px;margin:16px 0">'
             '<strong style="color:#1e40af">Getting Started:</strong>'
             '<p style="color:#1e40af;margin:8px 0 0">Log in with your '
-            'email address to access your team workspace.</p></div>'
+            "email address to access your team workspace.</p></div>"
         ),
         # Escalation
         AlertType.ESCALATION: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Customer Escalation</h2>'
             '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
-            '{severity}</div>'
+            "{severity}</div>"
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
             '<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">'
             '<strong style="color:#92400e">Action Required:</strong>'
-            '<p style="color:#92400e;margin:8px 0 0">A customer conversation has been escalated and needs your attention. '
-            'Log in to the Agent Red admin dashboard to view the conversation.</p></div>'
+            '<p style="color:#92400e;margin:8px 0 0">'
+            "A customer conversation has been escalated and needs your attention. "
+            "Log in to the Agent Red admin dashboard to view the conversation.</p></div>"
         ),
         # Outage / SLA
         AlertType.OUTAGE_NOTIFICATION: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Service Notification</h2>'
             '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
-            '{severity}</div>'
+            "{severity}</div>"
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
             '<div style="background:#fee2e2;border:1px solid #fca5a5;padding:16px;margin:16px 0">'
             '<strong style="color:#991b1b">Status:</strong>'
             '<p style="color:#991b1b;margin:8px 0 0">Our team is actively investigating. '
-            'You will receive a follow-up notification when the issue is resolved.</p></div>'
+            "You will receive a follow-up notification when the issue is resolved.</p></div>"
         ),
     }
 
     # Select body template or use generic fallback
-    body_tmpl = body_templates.get(alert.alert_type, (
-        '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">{title}</h2>'
-        '<div style="display:inline-block;padding:4px 12px;'
-        f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
-        '{severity}</div>'
-        '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-    ))
+    body_tmpl = body_templates.get(
+        alert.alert_type,
+        (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">{title}</h2>'
+            '<div style="display:inline-block;padding:4px 12px;'
+            f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+            "{severity}</div>"
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+        ),
+    )
 
     # Build optional admin link block for team invites
     admin_url = alert.metadata.get("admin_url", "")
@@ -679,7 +698,7 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         admin_link_block = (
             '<div style="text-align:center;margin:24px 0">'
             f'<a href="{admin_url}" style="display:inline-block;padding:12px 32px;'
-            'background:#3B82F6;color:#fff;text-decoration:none;font-weight:600;'
+            "background:#3B82F6;color:#fff;text-decoration:none;font-weight:600;"
             'font-size:16px;border-radius:6px">Open Admin Dashboard</a></div>'
         )
     else:
@@ -746,7 +765,8 @@ class EmailAlertChannel(AlertChannel):
                 return prefs["notification_email"]
         except Exception:
             logger.debug(
-                "Could not read preferences for tenant=%s", tenant_id,
+                "Could not read preferences for tenant=%s",
+                tenant_id,
             )
 
         # 2. Fallback to tenant.customer_email
@@ -756,7 +776,8 @@ class EmailAlertChannel(AlertChannel):
                 return tenant["customer_email"]
         except Exception:
             logger.debug(
-                "Could not read tenant for tenant=%s", tenant_id,
+                "Could not read tenant for tenant=%s",
+                tenant_id,
             )
 
         return None
@@ -785,7 +806,8 @@ class EmailAlertChannel(AlertChannel):
             if status == "Succeeded":
                 logger.info(
                     "Email sent via Azure Comm: alert_id=%s to=%s",
-                    alert.alert_id, to_email,
+                    alert.alert_id,
+                    to_email,
                 )
                 return ChannelResult(channel_name=self.name, success=True)
             else:
@@ -868,7 +890,9 @@ class EmailAlertChannel(AlertChannel):
 
             logger.info(
                 "Email sent via SMTP: alert_id=%s to=%s host=%s",
-                alert.alert_id, to_email, smtp_host,
+                alert.alert_id,
+                to_email,
+                smtp_host,
             )
             return ChannelResult(channel_name=self.name, success=True)
 
@@ -897,15 +921,9 @@ class EmailAlertChannel(AlertChannel):
         #   TEAM_INVITE  → invitee's email
         #   ESCALATION   → assigned agent / superadmin (via recipient_emails)
         #   Everything else → tenant notification_email / customer_email
-        if (
-            alert.alert_type == AlertType.TEAM_INVITE
-            and alert.metadata.get("invitee_email")
-        ):
+        if alert.alert_type == AlertType.TEAM_INVITE and alert.metadata.get("invitee_email"):
             to_email = alert.metadata["invitee_email"]
-        elif (
-            alert.alert_type == AlertType.ESCALATION
-            and alert.metadata.get("recipient_emails")
-        ):
+        elif alert.alert_type == AlertType.ESCALATION and alert.metadata.get("recipient_emails"):
             to_email = alert.metadata["recipient_emails"][0]
         else:
             to_email = await self._resolve_recipient(alert.tenant_id)
@@ -923,19 +941,26 @@ class EmailAlertChannel(AlertChannel):
         # Try SMTP first (Titan or other SMTP provider)
         if os.environ.get("SMTP_HOST"):
             result = await self._send_via_smtp(
-                to_email, subject, html_body, alert,
+                to_email,
+                subject,
+                html_body,
+                alert,
             )
             if result.success:
                 return result
             logger.warning(
                 "SMTP delivery failed, trying ACS fallback: alert_id=%s error=%s",
-                alert.alert_id, result.error,
+                alert.alert_id,
+                result.error,
             )
 
         # Fall back to Azure Communication Services
         if os.environ.get("AZURE_COMM_CONNECTION_STRING"):
             return await self._send_via_azure_comm(
-                to_email, subject, html_body, alert,
+                to_email,
+                subject,
+                html_body,
+                alert,
             )
 
         # No provider configured — log and skip
@@ -943,7 +968,8 @@ class EmailAlertChannel(AlertChannel):
             "EmailAlertChannel: no email provider configured "
             "(set SMTP_HOST or AZURE_COMM_CONNECTION_STRING). "
             "alert_id=%s to=%s skipped.",
-            alert.alert_id, to_email,
+            alert.alert_id,
+            to_email,
         )
         return ChannelResult(
             channel_name=self.name,
@@ -1305,7 +1331,6 @@ async def send_team_invite_alert(
     Returns:
         DeliveryResult, or None if no service is configured.
     """
-    import os
 
     service = get_alert_service()
     if service is None:
@@ -1319,10 +1344,8 @@ async def send_team_invite_alert(
     admin_url = _build_admin_login_url(tenant_slug=slug)
 
     message_parts = [
-        f"{inviter_name} has invited you to join their Agent Red team "
-        f"as a {role}.",
-        f"Log in to the admin dashboard at {admin_url} with your "
-        f"email address ({invitee_email}) to get started.",
+        f"{inviter_name} has invited you to join their Agent Red team as a {role}.",
+        f"Log in to the admin dashboard at {admin_url} with your email address ({invitee_email}) to get started.",
     ]
 
     alert = create_alert(
@@ -1424,11 +1447,7 @@ async def send_escalation_alert(
         tenant_id=tenant_id,
         alert_type=AlertType.ESCALATION,
         title=f"Customer escalation: {reason[:80]}",
-        message=(
-            f"{context_summary or reason}\n\n"
-            f"Conversation: {conversation_id}\n"
-            f"Urgency: {urgency}"
-        ),
+        message=(f"{context_summary or reason}\n\nConversation: {conversation_id}\nUrgency: {urgency}"),
         severity=severity,
         metadata={
             "conversation_id": conversation_id,

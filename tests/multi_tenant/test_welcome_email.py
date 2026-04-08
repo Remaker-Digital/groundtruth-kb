@@ -362,7 +362,7 @@ class TestWelcomeEmailIntegration:
         ):
             from src.integrations.provisioning import provision_trial_tenant
 
-            record = await provision_trial_tenant(
+            await provision_trial_tenant(
                 customer_email="trial@example.com",
                 trial_duration_days=14,
             )
@@ -394,6 +394,6 @@ class TestWelcomeEmailIntegration:
         ):
             from src.integrations.provisioning import provision_trial_tenant
 
-            record = await provision_trial_tenant(customer_email=None)
+            await provision_trial_tenant(customer_email=None)
 
         mock_send.assert_not_called()

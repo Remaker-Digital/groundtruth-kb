@@ -25,17 +25,13 @@ import pytest
 
 from src.multi_tenant.superadmin_api._alerts import (
     AlertThresholdListResponse,
-    AlertThresholdResponse,
     AlertThresholdWriteRequest,
     AlertThresholdWriteResponse,
     EmailChannelConfig,
     ErrorRateThreshold,
     NotificationChannelListResponse,
-    NotificationChannelResponse,
     NotificationChannelWriteRequest,
-    NotificationChannelWriteResponse,
     NotificationTestRequest,
-    NotificationTestResponse,
     QueueDepthThreshold,
     ResourceUtilizationThreshold,
     ResponseTimeThreshold,

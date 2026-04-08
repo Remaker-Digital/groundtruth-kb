@@ -157,7 +157,7 @@ class TestFCR03SomeFollowups:
 
         # cust-A's resolution ended 48h ago; follow-up started 24h ago
         # (24 hours after resolution = within 72h window)
-        cust_a_ended = (NOW - timedelta(hours=48)).isoformat()
+        (NOW - timedelta(hours=48)).isoformat()
         followup_started = (NOW - timedelta(hours=24)).isoformat()
 
         followup_window_convs = resolved + [

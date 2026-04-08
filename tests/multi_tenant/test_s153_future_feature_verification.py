@@ -8,10 +8,8 @@ are in fact present in the production codebase.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-import sqlite3
 from pathlib import Path
 
-import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src" / "multi_tenant"

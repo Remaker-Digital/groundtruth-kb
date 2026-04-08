@@ -52,7 +52,7 @@ class TestWidgetShadowDOM:
         """SPEC-1129: Support at least 10 data-attribute overrides for Shopify."""
         source = (WIDGET_SRC / "index.ts").read_text()
         # Count 'data-' entries in the attrMap object
-        data_attrs = re.findall(r"'data-[a-z-]+'", source)
+        re.findall(r"'data-[a-z-]+'", source)
         # The attrMap has data-color, data-position, data-auto-open, data-auto-open-delay,
         # data-mobile-enabled, data-sound-enabled, data-greeting, data-header-text,
         # data-agent-name, data-context, data-customer-name = 11 in attrMap.

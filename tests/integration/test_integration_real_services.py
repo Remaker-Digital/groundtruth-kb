@@ -35,17 +35,11 @@ from stripe._webhook import WebhookSignature as _StripeWebhookSignature
 from fastapi.testclient import TestClient
 
 # Load .env.local (shared loader — R7 refactoring)
-from scripts._env import load_env_local
+from scripts._env import load_env_local  # noqa: E402
 load_env_local(override=True)
 
-from src.integrations.stripe_catalog import load_catalog
-from src.integrations.provisioning import BillingChannel, TenantStatus
-from tests.conftest import (
-    TEST_API_KEY_STARTER,
-    auth_headers_api_key,
-    make_tenant_document,
-)
-from tests.helpers.fake_tenant_repo import FakeTenantRepo
+from src.integrations.stripe_catalog import load_catalog  # noqa: E402
+from tests.helpers.fake_tenant_repo import FakeTenantRepo  # noqa: E402
 
 # Skip all tests in this module if real APIs are not configured
 pytestmark = pytest.mark.skipif(

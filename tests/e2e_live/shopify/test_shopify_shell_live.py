@@ -19,9 +19,7 @@ import pytest
 from playwright.sync_api import Page
 
 from .conftest import (
-    SHOPIFY_BASE_URL,
     SHOPIFY_NAV_ITEMS,
-    TEST_SHOP_DOMAIN,
     _body_text,
     _create_shopify_page,
 )
@@ -321,7 +319,7 @@ class TestNavigationItems:
         ]
         actual_destinations = [dest for _, dest in SHOPIFY_NAV_ITEMS]
         assert actual_destinations == expected_destinations, (
-            f"Nav destinations mismatch"
+            "Nav destinations mismatch"
         )
 
 

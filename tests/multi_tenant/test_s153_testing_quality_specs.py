@@ -11,7 +11,6 @@ defined by the aspirational specifications.
 import sqlite3
 from pathlib import Path
 
-import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = ROOT / "tests"
@@ -189,7 +188,7 @@ class TestSpec0513UIElementEvaluation:
             WHERE applicable_dimensions IS NOT NULL AND applicable_dimensions != ''
         """).fetchall()
         conn.close()
-        assert rows[0][0] >= 100, f"Must have 100+ elements with dimension taxonomy"
+        assert rows[0][0] >= 100, "Must have 100+ elements with dimension taxonomy"
 
 
 # ─────────────────────────────────────────────────────────────

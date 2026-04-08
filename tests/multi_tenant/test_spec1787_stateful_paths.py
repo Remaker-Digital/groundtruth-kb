@@ -14,14 +14,10 @@ Focus areas:
 
 from __future__ import annotations
 
-import asyncio
 import threading
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ===========================================================================
@@ -42,7 +38,6 @@ class TestRedisPubSubStatefulPath:
         """
         import src.multi_tenant.cache_invalidation as mod
 
-        received_messages = []
 
         # Create a mock Redis client with working pub/sub
         mock_redis = MagicMock()

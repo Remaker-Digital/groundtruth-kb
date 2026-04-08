@@ -44,7 +44,7 @@ import contextvars
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.context import Context

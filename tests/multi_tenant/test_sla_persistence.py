@@ -20,8 +20,6 @@ Run:
 
 from __future__ import annotations
 
-import asyncio
-import time
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,8 +30,6 @@ from src.multi_tenant.sla_monitoring import (
     ErrorBudget,
     SLAMonitoringService,
     SLATrendPoint,
-    SLA_TARGETS,
-    LATENCY_WINDOW_SECONDS,
 )
 
 
@@ -550,7 +546,7 @@ class TestSLATrendsEndpoint:
             "src.multi_tenant.repositories.sla_snapshots.SLASnapshotRepository",
             return_value=mock_repo,
         ):
-            ctx = MagicMock()
+            MagicMock()
             result = await sla_trends(range_days=1, period_days=30)
             assert isinstance(result, SLATrendsResponse)
             assert result.range_days == 1
@@ -567,7 +563,7 @@ class TestSLATrendsEndpoint:
             "src.multi_tenant.repositories.sla_snapshots.get_cosmos_manager",
             side_effect=RuntimeError("Cosmos unavailable"),
         ):
-            ctx = MagicMock()
+            MagicMock()
             with pytest.raises(HTTPException) as exc_info:
                 await sla_trends(range_days=7, period_days=30)
             assert exc_info.value.status_code == 503

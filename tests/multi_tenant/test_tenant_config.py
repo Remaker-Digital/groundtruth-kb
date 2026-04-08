@@ -18,24 +18,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-from fastapi.testclient import TestClient
 
 from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.tenant_config_processor import (
     ConfigReadResult,
-    ConfigUpdateResult,
     ConfigValidationResult,
     TenantConfigProcessor,
     _CacheEntry,
-    get_config_processor,
 )
 from src.multi_tenant.tenant_config_schema import (
-    ConfigFieldType,
-    ConfigValidationError,
     OnboardingStep,
-    TierGate,
-    export_schema_for_api,
     get_field_registry,
     get_fields_by_step,
     get_fields_for_tier,
@@ -44,12 +36,7 @@ from src.multi_tenant.tenant_config_schema import (
     validate_field,
 )
 from tests.conftest import (
-    ENTERPRISE_TENANT_ID,
-    PROFESSIONAL_TENANT_ID,
     STARTER_TENANT_ID,
-    TEST_API_KEY_ENTERPRISE,
-    TEST_API_KEY_PROFESSIONAL,
-    TEST_API_KEY_STARTER,
 )
 
 
@@ -63,7 +50,7 @@ class TestSchemaValidation:
 
     def test_tc01_brand_name_required(self):
         """TC-01: brand_name is a required field."""
-        result = validate_config({"brand_voice": "friendly"}, TenantTier.STARTER)
+        validate_config({"brand_voice": "friendly"}, TenantTier.STARTER)
 
         # brand_name has a platform default, so no error
         # But if we validate just brand_name = None with required=True

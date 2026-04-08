@@ -98,7 +98,7 @@ class TestIssueReportEscalation:
         )
 
         captured_calls = []
-        original_escalation = AsyncMock()
+        AsyncMock()
 
         async def capture_escalation(**kwargs):
             captured_calls.append(kwargs)

@@ -25,12 +25,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import stripe
 
-from tests.conftest import (
-    TEST_API_KEY_STARTER,
-    TEST_API_KEY_PROFESSIONAL,
-    TEST_API_KEY_ENTERPRISE,
-    auth_headers_api_key,
-)
 from tests.helpers.fake_tenant_repo import FakeTenantRepo, run_sync
 
 

@@ -11,9 +11,6 @@ Test plan ref: COMPREHENSIVE-TEST-PLAN-S245-S255.md Slice 0c
 
 from __future__ import annotations
 
-import os
-import pytest
-from unittest.mock import patch
 
 
 def _resolve_host(env: dict[str, str]) -> str:

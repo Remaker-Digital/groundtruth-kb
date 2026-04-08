@@ -23,8 +23,6 @@ from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.knowledge_score import (
-    RELEVANCE_THRESHOLD,
-    KnowledgeScoreBreakdown,
     classify_unanswered,
     cluster_gaps,
     compute_knowledge_score,

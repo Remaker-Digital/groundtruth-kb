@@ -14,10 +14,7 @@ Composite: weighted sum → 0-100 scale.
 """
 from __future__ import annotations
 
-import json
 import logging
-import sys
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -200,7 +197,7 @@ def compute_composite_score(
     return round(raw * 100, 1)
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass  # noqa: E402
 
 
 @dataclass

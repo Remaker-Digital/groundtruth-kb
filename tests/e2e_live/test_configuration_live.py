@@ -799,7 +799,6 @@ class TestEscalationMutations:
         live_config_page.wait_for_timeout(1500)
 
         text = _text(live_config_page)
-        keyword_added = test_keyword in text
 
         # Save to persist, then page is intact
         page_intact = "config" in text.lower() or "escalat" in text.lower()
@@ -1245,8 +1244,7 @@ class TestNegativeConfigInputs:
         # Either validation error shown or submit was blocked (disabled)
         text = _text(shared_config_page).lower()
         page_intact = "config" in text
-        modal_still_open = shared_config_page.locator("[role='dialog']").count() > 0
-        has_error = "required" in text or "name" in text or "empty" in text
+        shared_config_page.locator("[role='dialog']").count() > 0
 
         # Close modal
         cancel = shared_config_page.locator("button:has-text('Cancel')")

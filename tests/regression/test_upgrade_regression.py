@@ -14,7 +14,6 @@ Run specific tiers:
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
-import json
 import time
 import pytest
 import httpx
@@ -67,7 +66,7 @@ class TestTier0Health:
         """API version header should be present on responses."""
         r = client.get("/health")
         # ApiVersionMiddleware adds X-API-Version header
-        version = r.headers.get("X-API-Version", r.headers.get("x-api-version"))
+        r.headers.get("X-API-Version", r.headers.get("x-api-version"))
         # Version header may or may not be present depending on middleware ordering
         # but health should always work
         assert r.status_code == 200

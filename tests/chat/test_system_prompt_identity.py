@@ -18,15 +18,12 @@ Run:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
 
 import pytest
 
 from src.multi_tenant.system_prompt_builder import (
     AgentRole,
     SystemPromptBuilder,
-    _ANONYMOUS_SESSION_RULES,
-    _IDENTITY_COLLECTION_RULES,
 )
 from src.multi_tenant.cosmos_schema import TenantDocument, PreferencesDocument
 

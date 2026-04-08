@@ -27,7 +27,6 @@ from src.multi_tenant.superadmin_api._entitlements import (
     EntitlementWriteRequest,
     EntitlementWriteResponse,
     FeatureFlagEntry,
-    FeatureFlagEvalResult,
     FeatureFlagsDocument,
     FeatureFlagsResponse,
     _ENTITLEMENT_CONFIG_TYPES,

@@ -19,7 +19,6 @@ Test plan reference: §5.10 (Magic Link Auth)
 
 from __future__ import annotations
 
-import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -30,11 +29,9 @@ from src.multi_tenant.security_hardening import get_rate_limit_backend, set_rate
 from src.multi_tenant.magic_link_auth import (
     MagicLinkRequest,
     MagicLinkRequestResponse,
-    MagicLinkVerifyResponse,
     _JWT_SECRET,
     _RATE_MAX,
     _RATE_WINDOW,
-    _TOKEN_TTL_SECONDS,
     _TOKEN_TYPE,
     _is_rate_limited,
     create_magic_link_session_token,
@@ -212,7 +209,7 @@ class TestRateLimiting:
 
     def test_ml13_old_entries_expire(self):
         """Entries older than the rate window should be cleaned up."""
-        get_rate_limit_backend().reset(f"magic_link:10.0.0.6")
+        get_rate_limit_backend().reset("magic_link:10.0.0.6")
         assert _is_rate_limited("10.0.0.6") is False
 
 

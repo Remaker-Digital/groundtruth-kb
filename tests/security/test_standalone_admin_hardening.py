@@ -4,7 +4,6 @@ SPEC-1688 (Argon2id), SPEC-1689 (opaque session), SPEC-1690 (CSRF), SPEC-1691 (1
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-import pytest
 
 
 class TestArgon2idPasswordStorage:

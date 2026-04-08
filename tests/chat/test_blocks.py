@@ -13,7 +13,6 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
 
 from src.chat.blocks import (
     extract_actions,

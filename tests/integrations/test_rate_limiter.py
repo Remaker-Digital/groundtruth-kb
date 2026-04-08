@@ -311,7 +311,7 @@ class TestRetryExecutor:
     def test_compute_backoff_increases(self):
         executor = RetryExecutor(base_backoff=1.0, max_backoff=30.0)
         b0 = executor._compute_backoff(0)
-        b1 = executor._compute_backoff(1)
+        executor._compute_backoff(1)
         b2 = executor._compute_backoff(2)
         # Backoff should generally increase (with jitter variance)
         # Just check that attempt 2 base (4s) > attempt 0 base (1s) on average

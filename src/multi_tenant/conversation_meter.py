@@ -44,7 +44,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -53,12 +52,10 @@ from typing import Any
 import stripe
 
 from src.multi_tenant.cosmos_schema import (
-    TIER_DEFAULTS,
     AuditEventType,
     ConversationDocument,
     ConversationStatus,
     TenantTier,
-    UsageCounterDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -542,7 +539,7 @@ class ConversationMeter:
         billing_period = self._current_billing_period()
 
         # Get or create the usage counter for this period
-        counter = await self._usage.get_or_create_counter(
+        await self._usage.get_or_create_counter(
             tenant_id, billing_period, tier,
         )
 

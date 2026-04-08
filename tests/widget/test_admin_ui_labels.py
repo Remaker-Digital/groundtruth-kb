@@ -147,7 +147,7 @@ class TestColorFieldRenames:
         for line in lines:
             if 'label=' in line and 'Primary color' in line:
                 raise AssertionError(
-                    f"Found 'Primary color' in a label attribute — should be 'Header left color'"
+                    "Found 'Primary color' in a label attribute — should be 'Header left color'"
                 )
 
     def test_side_by_side_layout(self) -> None:

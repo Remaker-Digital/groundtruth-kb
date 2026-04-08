@@ -846,7 +846,7 @@ class TestThemeTokensLightMode:
     def _load(self) -> None:
         self.source = _read(TOKENS_CSS)
         # Extract light mode block
-        idx = self.source.index('html[data-mantine-color-scheme="light"]')
+        self.source.index('html[data-mantine-color-scheme="light"]')
         # Find the last occurrence (the override block, not the header block)
         last_idx = self.source.rindex('html[data-mantine-color-scheme="light"] {')
         self.light_block = self.source[last_idx:last_idx + 600]

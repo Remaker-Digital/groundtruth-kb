@@ -75,7 +75,6 @@ PROTECTED_ROLES = {"superadmin"}
 class TeamMemberResponse(CamelCaseModel):
     """A single team member."""
 
-
     id: str
     tenant_id: str
     email: str
@@ -108,7 +107,6 @@ class TeamMemberResponse(CamelCaseModel):
 class TeamListResponse(CamelCaseModel):
     """Paginated list of team members."""
 
-
     tenant_id: str
     total_count: int = Field(description="Total matching members")
     offset: int
@@ -118,7 +116,6 @@ class TeamListResponse(CamelCaseModel):
 
 class CreateTeamMemberRequest(CamelCaseModel):
     """Request body for POST /api/team."""
-
 
     email: str = Field(
         min_length=3,
@@ -152,7 +149,6 @@ class CreateTeamMemberRequest(CamelCaseModel):
 
 class UpdateTeamMemberRequest(CamelCaseModel):
     """Request body for PUT /api/team/{member_id}."""
-
 
     display_name: str | None = Field(
         default=None,
@@ -289,7 +285,10 @@ router = APIRouter(prefix="/api/admin/team", tags=["admin-team"])
     "",
     response_model=TeamListResponse,
     summary="List team members",
-    description="Returns a paginated list of team members. Supports filtering by role and active status, ordered by most recently updated first.",
+    description=(
+        "Returns a paginated list of team members. Supports filtering by role and active status, ordered by most "
+        "recently updated first."
+    ),
     responses={
         400: {"description": "Invalid role filter value"},
         503: {"description": "Team management services not initialized"},
@@ -385,7 +384,6 @@ async def list_team_members(
 class WhoamiResponse(CamelCaseModel):
     """Response for GET /api/admin/team/whoami."""
 
-
     tenant_id: str
     role: str | None = None
     team_member_id: str | None = None
@@ -401,7 +399,10 @@ class WhoamiResponse(CamelCaseModel):
     response_model=WhoamiResponse,
     status_code=200,
     summary="Get caller identity",
-    description="Returns the authenticated caller's role and identity. Used by the admin frontend to determine nav visibility and permissions.",
+    description=(
+        "Returns the authenticated caller's role and identity. Used by the admin frontend to determine nav visibility "
+        "and permissions."
+    ),
 )
 async def whoami(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -476,7 +477,10 @@ async def get_team_member(
     response_model=TeamMemberResponse,
     status_code=201,
     summary="Create team member",
-    description="Creates a new team member with a per-user API key. The member is immediately active. The raw API key is returned ONCE in the response.",
+    description=(
+        "Creates a new team member with a per-user API key. The member is immediately active. The raw API key is "
+        "returned ONCE in the response."
+    ),
     responses={
         400: {"description": "Invalid role, protected role, or invalid escalation categories"},
         409: {"description": "Team member with this email already exists"},
@@ -507,8 +511,7 @@ async def create_team_member(
     if request.role in PROTECTED_ROLES:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot create a team member with the '{request.role}' role. "
-            "This role is auto-provisioned only.",
+            detail=f"Cannot create a team member with the '{request.role}' role. This role is auto-provisioned only.",
         )
 
     # Validate escalation_categories
@@ -517,8 +520,7 @@ async def create_team_member(
         if invalid_cats:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid escalation categories: {invalid_cats}. "
-                f"Valid values: {ESCALATION_CATEGORIES}",
+                detail=f"Invalid escalation categories: {invalid_cats}. Valid values: {ESCALATION_CATEGORIES}",
             )
         # Only escalation_agent role may have categories
         if request.role != "escalation_agent":
@@ -662,7 +664,8 @@ async def resend_team_invite(
         )
         logger.info(
             "Re-sent team invite: email=%s tenant=%s",
-            member_email, ctx.tenant_id[:8],
+            member_email,
+            ctx.tenant_id[:8],
         )
     except Exception as exc:
         logger.warning("Failed to re-send team invite: %s", exc)
@@ -686,7 +689,10 @@ async def resend_team_invite(
     "/{member_id}",
     response_model=TeamMemberResponse,
     summary="Update team member",
-    description="Updates an existing team member. Only provided fields are updated; omitted fields retain their current values. Superadmin members can only be modified by other superadmins.",
+    description=(
+        "Updates an existing team member. Only provided fields are updated; omitted fields retain their current "
+        "values. Superadmin members can only be modified by other superadmins."
+    ),
     responses={
         400: {"description": "Invalid role, protected role assignment, or invalid escalation categories"},
         404: {"description": "Team member not found"},
@@ -717,8 +723,7 @@ async def update_team_member(
     if request.role is not None and request.role in PROTECTED_ROLES:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot assign the '{request.role}' role via update. "
-            "This role is auto-provisioned only.",
+            detail=f"Cannot assign the '{request.role}' role via update. This role is auto-provisioned only.",
         )
 
     # Read existing document to verify it exists
@@ -742,8 +747,7 @@ async def update_team_member(
         if invalid_cats:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid escalation categories: {invalid_cats}. "
-                f"Valid values: {ESCALATION_CATEGORIES}",
+                detail=f"Invalid escalation categories: {invalid_cats}. Valid values: {ESCALATION_CATEGORIES}",
             )
         # Determine the effective role after update
         effective_role = request.role if request.role is not None else existing_role
@@ -772,7 +776,9 @@ async def update_team_member(
     if request.escalation_categories is not None:
         patch_operations.append({"op": "set", "path": "/escalation_categories", "value": request.escalation_categories})
     if request.max_concurrent_conversations is not None:
-        patch_operations.append({"op": "set", "path": "/max_concurrent_conversations", "value": request.max_concurrent_conversations})
+        patch_operations.append(
+            {"op": "set", "path": "/max_concurrent_conversations", "value": request.max_concurrent_conversations}
+        )
     if request.is_active is not None:
         patch_operations.append({"op": "set", "path": "/is_active", "value": request.is_active})
     if request.staff_domain_tags is not None:
@@ -845,7 +851,6 @@ async def update_team_member(
 class DeleteTeamMemberResponse(CamelCaseModel):
     """Response for successful team member deletion."""
 
-
     id: str
     deleted_at: str
 
@@ -854,7 +859,9 @@ class DeleteTeamMemberResponse(CamelCaseModel):
     "/{member_id}",
     response_model=DeleteTeamMemberResponse,
     summary="Remove team member",
-    description="Permanently removes the team member. An audit log entry is created. Superadmin members cannot be removed.",
+    description=(
+        "Permanently removes the team member. An audit log entry is created. Superadmin members cannot be removed."
+    ),
     responses={
         400: {"description": "Cannot remove a superadmin member"},
         404: {"description": "Team member not found"},
@@ -932,7 +939,6 @@ async def delete_team_member(
 
 class RotateKeyResponse(CamelCaseModel):
     """Response for successful key rotation."""
-
 
     id: str
     user_api_key: str = Field(description="New API key — returned ONCE")
@@ -1168,8 +1174,7 @@ async def confirm_mfa_enrollment(
     if not confirmed:
         raise HTTPException(status_code=401, detail="Invalid TOTP code. Please try again.")
 
-    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
-                 actor=member_id, payload={"action": "mfa_enrolled"})
+    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id, actor=member_id, payload={"action": "mfa_enrolled"})
 
     return {"status": "enrolled", "message": "MFA enrollment confirmed successfully."}
 
@@ -1211,8 +1216,7 @@ async def disable_mfa(
     if not disabled:
         raise HTTPException(status_code=401, detail="Invalid TOTP code.")
 
-    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
-                 actor=member_id, payload={"action": "mfa_disabled"})
+    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id, actor=member_id, payload={"action": "mfa_disabled"})
 
     return {"status": "disabled", "message": "MFA has been disabled."}
 
@@ -1237,7 +1241,7 @@ async def grant_mfa_opt_out(
         raise HTTPException(status_code=403, detail="Only superadmin can grant MFA opt-out")
 
     try:
-        doc = await repo.read(ctx.tenant_id, member_id)
+        await repo.read(ctx.tenant_id, member_id)
     except DocumentNotFoundError:
         raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
 
@@ -1251,9 +1255,12 @@ async def grant_mfa_opt_out(
         ],
     )
 
-    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
-                 actor=getattr(ctx, "team_member_id", "admin"),
-                 payload={"action": "mfa_opt_out_granted", "member_id": member_id})
+    await _audit(
+        AuditEventType.TEAM_MEMBER_UPDATED,
+        ctx.tenant_id,
+        actor=getattr(ctx, "team_member_id", "admin"),
+        payload={"action": "mfa_opt_out_granted", "member_id": member_id},
+    )
 
     return {"status": "opt_out_granted", "message": f"MFA opt-out granted for member {member_id}."}
 
@@ -1277,7 +1284,7 @@ async def revoke_mfa_opt_out(
         raise HTTPException(status_code=403, detail="Only superadmin can revoke MFA opt-out")
 
     try:
-        doc = await repo.read(ctx.tenant_id, member_id)
+        await repo.read(ctx.tenant_id, member_id)
     except DocumentNotFoundError:
         raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
 
@@ -1291,9 +1298,12 @@ async def revoke_mfa_opt_out(
         ],
     )
 
-    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
-                 actor=getattr(ctx, "team_member_id", "admin"),
-                 payload={"action": "mfa_opt_out_revoked", "member_id": member_id})
+    await _audit(
+        AuditEventType.TEAM_MEMBER_UPDATED,
+        ctx.tenant_id,
+        actor=getattr(ctx, "team_member_id", "admin"),
+        payload={"action": "mfa_opt_out_revoked", "member_id": member_id},
+    )
 
     return {"status": "opt_out_revoked", "message": f"MFA opt-out revoked for member {member_id}."}
 
@@ -1301,6 +1311,7 @@ async def revoke_mfa_opt_out(
 # ---------------------------------------------------------------------------
 # SPEC-0761: Customer admin account provisioning
 # ---------------------------------------------------------------------------
+
 
 async def provision_customer_admin(
     tenant_id: str,
@@ -1359,7 +1370,9 @@ async def provision_customer_admin(
 
     logger.info(
         "Customer admin provisioned: tenant=%s email=%s member_id=%s",
-        tenant_id, customer_email, member_id,
+        tenant_id,
+        customer_email,
+        member_id,
     )
 
     return {

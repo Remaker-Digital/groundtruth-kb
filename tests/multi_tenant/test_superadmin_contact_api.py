@@ -13,15 +13,13 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
-import pytest
 
 from src.multi_tenant.superadmin_contact_api import (
     ContactMessageItem,
     ContactMessageListResponse,
     ContactMessageUpdateRequest,
-    ContactMessageUpdateResponse,
     configure_superadmin_contact_services,
     router,
 )

@@ -12,7 +12,6 @@ Master Test Plan: §4 Gap Register — Document Parser Real Files (1.0-required)
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest

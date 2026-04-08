@@ -19,7 +19,6 @@ from src.multi_tenant.mcp_client import (
     DEFAULT_MCP_TIMEOUT_MS,
     READ_PREFIXES,
     MUTATE_PREFIXES,
-    SERVER_TYPE_DEFAULTS,
     AgentRedMcpClient,
     McpServerConfig,
     McpToolBlockedError,

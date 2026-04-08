@@ -12,21 +12,18 @@ Master Test Plan: §4 Gap Register — Multi-Tenant Isolation (1.0-required)
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from src.multi_tenant.cosmos_schema import (
     ConversationStatus,
-    TenantTier,
 )
 from src.multi_tenant.repository import (
     ConversationRepository,
     CustomerProfileRepository,
     KnowledgeBaseRepository,
-    TenantScopedRepository,
 )
 
 

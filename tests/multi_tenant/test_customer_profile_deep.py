@@ -14,10 +14,9 @@ Uses mocked CustomerProfileRepository to avoid Cosmos DB dependency.
 
 from __future__ import annotations
 
-import importlib
 from datetime import datetime, timezone, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 

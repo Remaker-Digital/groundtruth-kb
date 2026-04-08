@@ -15,25 +15,18 @@ Run:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 from src.multi_tenant.cosmos_schema import (
-    AuditEventType,
     TenantTier,
     TIER_DEFAULTS,
 )
 from src.multi_tenant.archival_pipeline import (
-    ARCHIVABLE_TIERS,
-    ARCHIVAL_BATCH_SIZE,
-    AUDIT_EVENT_DATA_ARCHIVED,
-    ENTERPRISE_TIER,
     WARM_ARCHIVE_CONTAINER,
     ArchivalPipelineService,
     ArchivalScanResult,
-    TenantArchivalResult,
     configure_archival_service,
     get_archival_service,
 )

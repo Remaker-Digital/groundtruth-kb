@@ -9,14 +9,12 @@ Tests verify algebraic properties of the tier ordering system:
 """
 from __future__ import annotations
 
-import pytest
-from hypothesis import given, assume
+from hypothesis import given
 
 from src.multi_tenant.entitlement_service import (
     FROZEN_ENTITLEMENTS,
     TIER_ORDER,
     EntitlementService,
-    _GATE_ALIASES,
     _resolve_gate,
 )
 from tests.property.conftest import (

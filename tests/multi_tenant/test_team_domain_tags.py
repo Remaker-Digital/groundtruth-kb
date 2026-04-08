@@ -10,9 +10,8 @@ Test plan ref: COMPREHENSIVE-TEST-PLAN-S245-S255.md Slice 0b
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-from src.multi_tenant.admin_team_api import router
 
 
 class TestDomainTagsCRUD:

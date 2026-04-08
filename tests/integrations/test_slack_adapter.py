@@ -32,7 +32,6 @@ from src.integrations.models import (
     RateLimitError,
 )
 from src.integrations.slack.adapter import (
-    INTEGRATION_ID,
     SlackAdapter,
     build_citation_block,
     build_escalation_block,

@@ -47,7 +47,7 @@ import os
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.integrations.stripe_catalog import StripeCatalog, load_catalog
@@ -143,24 +143,30 @@ def _build_line_items(
     items: list[dict] = []
 
     # 1. Base subscription price
-    items.append({
-        "price": tier.price_id_for_interval(interval),
-        "quantity": 1,
-    })
+    items.append(
+        {
+            "price": tier.price_id_for_interval(interval),
+            "quantity": 1,
+        }
+    )
 
     # 2. Metered overage — no quantity (usage reported via Billing Meter)
-    items.append({
-        "price": tier.overage_price_id,
-    })
+    items.append(
+        {
+            "price": tier.overage_price_id,
+        }
+    )
 
     # 3. Add-ons
     for addon_id in addon_ids:
         catalog.validate_addon_for_tier(addon_id, tier_name)
         addon = catalog.get_addon(addon_id)
-        items.append({
-            "price": addon.price_id,
-            "quantity": 1,
-        })
+        items.append(
+            {
+                "price": addon.price_id,
+                "quantity": 1,
+            }
+        )
 
     return items
 
@@ -175,7 +181,10 @@ def _build_line_items(
     response_model=CheckoutResponse,
     status_code=200,
     summary="Create a Stripe Checkout session",
-    description="Creates a Stripe Checkout Session for subscription signup including base tier price, metered overage price, and any selected add-on prices as recurring line items.",
+    description=(
+        "Creates a Stripe Checkout Session for subscription signup including base tier price, metered overage price, "
+        "and any selected add-on prices as recurring line items."
+    ),
     responses={
         400: {"description": "Invalid tier, billing interval, or add-on configuration"},
         502: {"description": "Stripe API error during session creation"},
@@ -284,7 +293,9 @@ async def create_checkout_session(body: CheckoutRequest) -> CheckoutResponse:
     "/success",
     status_code=200,
     summary="Handle successful checkout redirect",
-    description="Handles the post-payment success redirect from Stripe. Returns session details or a thank-you message.",
+    description=(
+        "Handles the post-payment success redirect from Stripe. Returns session details or a thank-you message."
+    ),
 )
 async def checkout_success(request: Request) -> JSONResponse:
     """Handle successful checkout redirect.

@@ -11,7 +11,6 @@ from __future__ import annotations
 from src.chat.models import QualityScore
 from src.chat.quality_escalation import (
     QualityEscalationConfig,
-    QualityEscalationRecommendation,
     should_quality_escalate,
 )
 

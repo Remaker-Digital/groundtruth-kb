@@ -20,7 +20,6 @@ Run with:
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
-import json
 
 import pytest
 from playwright.sync_api import Page, expect
@@ -402,7 +401,7 @@ class TestTeamPageRenames:
         page_text = admin_team_page.text_content("body") or ""
         role_header = admin_team_page.locator("text=Role")
         # Check for tooltip trigger near Role header
-        info_icons = admin_team_page.locator('[aria-label*="help"], [aria-label*="info"], [title*="role"], [title*="permission"]')
+        admin_team_page.locator('[aria-label*="help"], [aria-label*="info"], [title*="role"], [title*="permission"]')
         has_roles = role_header.count() > 0 or "Role" in page_text
         # Roles tooltip may show on hover — verify Role header exists
         assert has_roles, \

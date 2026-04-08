@@ -11,7 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from unittest.mock import AsyncMock, patch
 
-import pytest
 
 from tests.multi_tenant.conftest import MutationTestBase
 

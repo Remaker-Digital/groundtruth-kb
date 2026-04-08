@@ -15,7 +15,6 @@ Test plan reference: HV-1 (Support Diagnostics)
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -171,7 +170,7 @@ def mock_audit_repo_empty():
 
     async def _mock_query_items(**kwargs):
         return
-        yield  # noqa: unreachable — makes this an async generator
+        yield  # makes this an async generator (unreachable by design)
 
     container.query_items = _mock_query_items
     repo._container = container

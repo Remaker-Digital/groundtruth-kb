@@ -132,15 +132,15 @@ VECTOR_DIMENSIONS = 3072  # text-embedding-3-large
 VECTOR_SIMILARITY = "cosine"
 
 # TTL values (seconds)
-TTL_USAGE_PERIOD = 35 * 24 * 60 * 60       # 35 days (billing period + buffer)
-TTL_IDEMPOTENCY = 7 * 24 * 60 * 60         # 7 days for idempotency keys
-TTL_AUDIT_LOG = 365 * 24 * 60 * 60         # 1 year (audit log retention)
-TTL_PACK_BALANCE = 90 * 24 * 60 * 60       # 90 days (pack validity)
-TTL_SLA_SNAPSHOTS = 90 * 24 * 60 * 60     # 90 days (SLA trend retention)
-TTL_VERIFICATION_TOKEN = 10 * 60           # 10 minutes (email verification link)
-TTL_INCIDENTS = 365 * 24 * 60 * 60        # 1 year (incident history retention)
-TTL_ALERT_HISTORY = 90 * 24 * 60 * 60     # 90 days (alert history retention)
-TTL_INGESTION_JOBS = 30 * 24 * 60 * 60   # 30 days (ingestion job retention)
+TTL_USAGE_PERIOD = 35 * 24 * 60 * 60  # 35 days (billing period + buffer)
+TTL_IDEMPOTENCY = 7 * 24 * 60 * 60  # 7 days for idempotency keys
+TTL_AUDIT_LOG = 365 * 24 * 60 * 60  # 1 year (audit log retention)
+TTL_PACK_BALANCE = 90 * 24 * 60 * 60  # 90 days (pack validity)
+TTL_SLA_SNAPSHOTS = 90 * 24 * 60 * 60  # 90 days (SLA trend retention)
+TTL_VERIFICATION_TOKEN = 10 * 60  # 10 minutes (email verification link)
+TTL_INCIDENTS = 365 * 24 * 60 * 60  # 1 year (incident history retention)
+TTL_ALERT_HISTORY = 90 * 24 * 60 * 60  # 90 days (alert history retention)
+TTL_INGESTION_JOBS = 30 * 24 * 60 * 60  # 30 days (ingestion job retention)
 TTL_INTEGRATION_EVENTS = 30 * 24 * 60 * 60  # 30 days (integration event retention, SPEC-1773)
 TTL_PII_TOKEN_MAPPINGS = 7 * 24 * 60 * 60  # 7 days (PII token mapping retention)
 TTL_INVOCATION_EVENTS = 30 * 24 * 60 * 60  # 30 days (invocation event retention, SPEC-1855)
@@ -229,10 +229,10 @@ class AuditEventType(str, Enum):
 class PiiClassification(str, Enum):
     """PII classification for fields (Decision #7 — PII scrubbing)."""
 
-    NONE = "none"             # No PII (safe to log)
-    DIRECT = "direct"         # Directly identifies a person (email, name)
-    INDIRECT = "indirect"     # Could identify with other data (IP, device)
-    SENSITIVE = "sensitive"   # Special category (health, financial)
+    NONE = "none"  # No PII (safe to log)
+    DIRECT = "direct"  # Directly identifies a person (email, name)
+    INDIRECT = "indirect"  # Could identify with other data (IP, device)
+    SENSITIVE = "sensitive"  # Special category (health, financial)
 
 
 class ContactAttributeType(str, Enum):
@@ -396,7 +396,10 @@ class ConversationDocument(BaseModel):
     # ADR-004: Canonical customer identity
     canonical_customer_id: str | None = Field(
         default=None,
-        description="Stable canonical customer ID (cid_<uuid4>) per ADR-004. Populated on new conversations; old conversations may have only customer_id.",
+        description=(
+            "Stable canonical customer ID (cid_<uuid4>) per ADR-004. Populated on new conversations; old conversations "
+            "may have only customer_id."
+        ),
     )
 
     # Conversation type (SPEC-1561 — Co-pilot admin conversations)
@@ -426,7 +429,10 @@ class ConversationDocument(BaseModel):
     # SPEC-1866: Conversation-level agent override
     conversation_agent_override: str | None = Field(
         default=None,
-        description="Agent ID override for this conversation. Set by admin to route to a specific peer agent without modifying tenant config.",
+        description=(
+            "Agent ID override for this conversation. Set by admin to route to a specific peer agent without modifying "
+            "tenant config."
+        ),
     )
     conversation_agent_override_at: str | None = Field(
         default=None,
@@ -895,7 +901,9 @@ class WebsiteSourceDocument(BaseModel):
     # Schedule
     auto_refresh: bool = Field(default=True, description="Enable periodic re-crawling")
     refresh_interval_hours: int = Field(
-        default=24, ge=6, le=168,
+        default=24,
+        ge=6,
+        le=168,
         description="Hours between automatic re-crawls (6-168)",
     )
 
@@ -1002,8 +1010,15 @@ class QuickActionPrompt(BaseModel):
 
 # Valid page types for quick action assignments
 VALID_PAGE_TYPES = {
-    "home", "product", "collection", "cart", "search",
-    "blog", "page", "all", "other",
+    "home",
+    "product",
+    "collection",
+    "cart",
+    "search",
+    "blog",
+    "page",
+    "all",
+    "other",
 }
 
 
@@ -1022,8 +1037,7 @@ class QuickActionPageAssignment(BaseModel):
     )
     page_handle: str | None = Field(
         default=None,
-        description="Specific page handle (e.g. product slug). "
-        "null = applies to all pages of this type.",
+        description="Specific page handle (e.g. product slug). null = applies to all pages of this type.",
     )
     slot_1_action_id: str | None = Field(
         default=None,
@@ -1067,13 +1081,12 @@ class PreferencesDocument(BaseModel):
     config_state: str = Field(
         default="active",
         description="Activation lifecycle state: draft | active | previous. "
-                    "Documents without this field are treated as 'active' for "
-                    "backward compatibility.",
+        "Documents without this field are treated as 'active' for "
+        "backward compatibility.",
     )
     activated_at: str | None = Field(
         default=None,
-        description="ISO 8601 timestamp of when this config was activated (set "
-                    "on state transition to 'active')",
+        description="ISO 8601 timestamp of when this config was activated (set on state transition to 'active')",
     )
     activated_by: str | None = Field(
         default=None,
@@ -1082,12 +1095,12 @@ class PreferencesDocument(BaseModel):
     config_name: str | None = Field(
         default=None,
         description="Named configuration label (e.g. 'Default', 'Holiday Mode'). "
-                    "'Default' is the undeletable initial production config.",
+        "'Default' is the undeletable initial production config.",
     )
     appearance_name: str | None = Field(
         default=None,
         description="Named widget appearance label (e.g. 'Default', 'Dark Theme'). "
-                    "'Default' is the undeletable initial widget appearance.",
+        "'Default' is the undeletable initial widget appearance.",
     )
 
     # Brand & tone (onboarding step 1)
@@ -1165,30 +1178,49 @@ class PreferencesDocument(BaseModel):
     widget_offset_y: int | None = Field(default=None, description="Vertical offset from bottom edge (px)")
     widget_agent_avatar_url: str | None = Field(default=None, description="URL of agent avatar image")
     widget_agent_display_name: str | None = Field(default=None, description="Name shown in widget header/bubbles")
-    widget_agent_title: str | None = Field(default=None, description="Subtitle under agent name (e.g. Customer Support)")
+    widget_agent_title: str | None = Field(
+        default=None, description="Subtitle under agent name (e.g. Customer Support)"
+    )
     widget_logo_url: str | None = Field(default=None, description="URL of company logo in widget header")
     widget_show_branding: bool | None = Field(default=None, description="Show 'Powered by Agent Red' badge")
     widget_mobile_enabled: bool | None = Field(default=None, description="Show widget on mobile devices")
     widget_mobile_fullscreen: bool | None = Field(default=None, description="Chat panel fills full viewport on mobile")
-    widget_mobile_position: str | None = Field(default=None, description="Mobile position override (bottom-right|bottom-left)")
+    widget_mobile_position: str | None = Field(
+        default=None, description="Mobile position override (bottom-right|bottom-left)"
+    )
     widget_mobile_offset_x: int | None = Field(default=None, description="Mobile horizontal offset in pixels")
     widget_mobile_offset_y: int | None = Field(default=None, description="Mobile vertical offset in pixels")
     widget_dark_mode: bool | None = Field(default=None, description="Use dark color scheme")
     widget_color_mode: str | None = Field(default=None, description="light | dark | auto")
-    widget_header_gradient_end: str | None = Field(default=None, description="Hex color for header gradient end (#RRGGBB)")
-    widget_header_gradient_enabled: bool | None = Field(default=None, description="Enable header gradient (left→right color blend)")
+    widget_header_gradient_end: str | None = Field(
+        default=None, description="Hex color for header gradient end (#RRGGBB)"
+    )
+    widget_header_gradient_enabled: bool | None = Field(
+        default=None, description="Enable header gradient (left→right color blend)"
+    )
     widget_font_family: str | None = Field(default=None, description="CSS font-family value")
     widget_border_radius: int | None = Field(default=None, description="Border radius for widget panels (px)")
     widget_launcher_size: int | None = Field(default=None, description="Launcher button diameter (px)")
     widget_launcher_icon: str | None = Field(default=None, description="chat | headset | help | custom")
     widget_header_title: str | None = Field(default=None, description="Widget header title text")
     widget_header_subtitle: str | None = Field(default=None, description="Widget header subtitle text")
-    widget_agent_bubble_color: str | None = Field(default=None, description="Hex color for agent message bubble background (#RRGGBB)")
-    widget_agent_bubble_text_color: str | None = Field(default=None, description="Hex color for agent message bubble text (#RRGGBB)")
-    widget_customer_bubble_color: str | None = Field(default=None, description="Hex color for customer message bubble background (#RRGGBB)")
-    widget_customer_bubble_text_color: str | None = Field(default=None, description="Hex color for customer message bubble text (#RRGGBB)")
+    widget_agent_bubble_color: str | None = Field(
+        default=None, description="Hex color for agent message bubble background (#RRGGBB)"
+    )
+    widget_agent_bubble_text_color: str | None = Field(
+        default=None, description="Hex color for agent message bubble text (#RRGGBB)"
+    )
+    widget_customer_bubble_color: str | None = Field(
+        default=None, description="Hex color for customer message bubble background (#RRGGBB)"
+    )
+    widget_customer_bubble_text_color: str | None = Field(
+        default=None, description="Hex color for customer message bubble text (#RRGGBB)"
+    )
     widget_launcher_shape: str | None = Field(default=None, description="circle | rounded-square | pill")
-    widget_launcher_color: str | None = Field(default=None, description="Hex color for launcher button background (#RRGGBB). Falls back to widget_primary_color.")
+    widget_launcher_color: str | None = Field(
+        default=None,
+        description="Hex color for launcher button background (#RRGGBB). Falls back to widget_primary_color.",
+    )
     widget_shadow_intensity: str | None = Field(default=None, description="none | subtle | standard | heavy")
     widget_panel_width: str | None = Field(default=None, description="compact | standard | wide")
     widget_panel_height: str | None = Field(default=None, description="short | standard | tall")
@@ -1207,12 +1239,18 @@ class PreferencesDocument(BaseModel):
     widget_greeting_enabled: bool | None = Field(default=None, description="Show greeting message on open")
     widget_greeting_mode: str | None = Field(default=None, description="Greeting mode: 'static' or 'ai_generated'")
     widget_greeting_message: str | None = Field(default=None, description="Greeting message text")
-    widget_pre_chat_form_enabled: bool | None = Field(default=None, description="Show pre-chat form before conversation")
-    widget_pre_chat_fields: list[str] | None = Field(default=None, description="Pre-chat form field names (name, email, phone, etc.)")
+    widget_pre_chat_form_enabled: bool | None = Field(
+        default=None, description="Show pre-chat form before conversation"
+    )
+    widget_pre_chat_fields: list[str] | None = Field(
+        default=None, description="Pre-chat form field names (name, email, phone, etc.)"
+    )
     widget_offline_form_enabled: bool | None = Field(default=None, description="Show offline contact form")
 
     # Content and targeting
-    widget_key: str | None = Field(default=None, description="Publishable widget key (pk_live_...) for widget authentication")
+    widget_key: str | None = Field(
+        default=None, description="Publishable widget key (pk_live_...) for widget authentication"
+    )
     approved_widget_origins: list[str] = Field(
         default_factory=list,
         description=(
@@ -1224,15 +1262,26 @@ class PreferencesDocument(BaseModel):
     widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
     widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
     widget_page_rules: list[str] | None = Field(default=None, description="URL patterns for page visibility rules")
-    widget_exit_intent_enabled: bool = Field(default=False, description="Auto-open widget on exit intent (desktop mouseleave)")
-    widget_scroll_depth_trigger: int | None = Field(default=None, description="Auto-open widget at scroll depth percentage (1-100)")
+    widget_exit_intent_enabled: bool = Field(
+        default=False, description="Auto-open widget on exit intent (desktop mouseleave)"
+    )
+    widget_scroll_depth_trigger: int | None = Field(
+        default=None, description="Auto-open widget at scroll depth percentage (1-100)"
+    )
 
     # Transcript continuity (SPEC-1868)
-    widget_transcript_continuity: str = Field(default="none", description="Transcript continuity level: none, session (sessionStorage), persistent (localStorage+TTL)")
-    widget_transcript_ttl_hours: int = Field(default=24, description="TTL in hours for persistent transcript continuity (max 168 = 7 days)")
+    widget_transcript_continuity: str = Field(
+        default="none",
+        description="Transcript continuity level: none, session (sessionStorage), persistent (localStorage+TTL)",
+    )
+    widget_transcript_ttl_hours: int = Field(
+        default=24, description="TTL in hours for persistent transcript continuity (max 168 = 7 days)"
+    )
 
     # Structured answer blocks (SPEC-1867)
-    structured_blocks_enabled: bool = Field(default=False, description="Enable structured answer blocks in widget (professional+ tier)")
+    structured_blocks_enabled: bool = Field(
+        default=False, description="Enable structured answer blocks in widget (professional+ tier)"
+    )
 
     # Notifications (WI-G: email alerts)
     notification_email: str | None = Field(
@@ -1464,10 +1513,10 @@ class TeamMemberRole(str, Enum):
         viewer     — Read-only access to all dashboard pages.
     """
 
-    SUPERADMIN = "superadmin"              # Hidden, undeletable, auto-provisioned
-    ADMIN = "admin"                        # Full access, can manage team
+    SUPERADMIN = "superadmin"  # Hidden, undeletable, auto-provisioned
+    ADMIN = "admin"  # Full access, can manage team
     ESCALATION_AGENT = "escalation_agent"  # Read-only Inbox, escalation email target
-    VIEWER = "viewer"                      # Read-only dashboard access
+    VIEWER = "viewer"  # Read-only dashboard access
 
 
 # Escalation categories that can be assigned to escalation agents
@@ -1965,16 +2014,20 @@ class ContactMessageDocument(BaseModel):
     subject: str = Field(description="Subject line (max 200 chars)")
     message: str = Field(description="Full message body (max 5000 chars)")
     member_email: str | None = Field(
-        default=None, description="Team member email who sent the message",
+        default=None,
+        description="Team member email who sent the message",
     )
     member_role: str | None = Field(
-        default=None, description="Team member role (admin, viewer, etc.)",
+        default=None,
+        description="Team member role (admin, viewer, etc.)",
     )
     member_id: str | None = Field(
-        default=None, description="Team member ID",
+        default=None,
+        description="Team member ID",
     )
     tier: str | None = Field(
-        default=None, description="Tenant tier at time of submission",
+        default=None,
+        description="Tenant tier at time of submission",
     )
     status: str = Field(
         default="new",
@@ -2637,8 +2690,8 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
     TenantTier.TRIAL.value: {
         "included_conversations": 5_000,
         "memory_layers": [1, 2, 3],
-        "overage_rate": 0.0,            # No overage during trial — hard cap
-        "trial_duration_days": 14,      # 14-day trial period
+        "overage_rate": 0.0,  # No overage during trial — hard cap
+        "trial_duration_days": 14,  # 14-day trial period
         "rate_limit_rpm": RATE_LIMIT_RPM_DEFAULT,
     },
     TenantTier.STARTER.value: {
@@ -2725,7 +2778,9 @@ class TenantAgentOverlayDocument(BaseModel):
     enabled: bool = True
     prompt_overrides: dict[str, str] = Field(
         default_factory=dict,
-        description="Reserved for Phase 2. Not consumed by SystemPromptBuilder until prompt-resolution contract is specified.",
+        description=(
+            "Reserved for Phase 2. Not consumed by SystemPromptBuilder until prompt-resolution contract is specified."
+        ),
     )
     skill_overrides: dict[str, SkillOverride] = Field(default_factory=dict)
     custom_metadata: dict[str, Any] = Field(default_factory=dict)

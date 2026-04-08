@@ -24,7 +24,6 @@ from __future__ import annotations
 import hashlib
 from unittest.mock import patch
 
-import pytest
 
 
 # ---------------------------------------------------------------------------

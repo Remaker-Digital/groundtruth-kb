@@ -125,7 +125,7 @@ class TestLoadingState:
             f"{mock_base_url}{INTEGRATIONS_PATH}{separator}tenant=mock-tenant-001",
             wait_until="commit",
         )
-        skeletons = page.locator(
+        page.locator(
             ".mantine-Skeleton-root, [data-testid*='loading'], "
             "[role='progressbar'], .mantine-Loader-root"
         )

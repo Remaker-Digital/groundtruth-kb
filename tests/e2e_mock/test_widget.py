@@ -6,7 +6,7 @@ widget test functionality, config integration, and API contracts
 against the mock Vite dev server.
 """
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
 from tests.e2e_mock.conftest import (
     api_origin,

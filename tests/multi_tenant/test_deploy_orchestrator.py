@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import json
 import subprocess
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from scripts.deploy_orchestrator import (
     DeployResult,

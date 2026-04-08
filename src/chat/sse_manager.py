@@ -41,7 +41,7 @@ from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.chat.models import StreamEvent, done_event, error_event
+from src.chat.models import StreamEvent, done_event
 
 logger = logging.getLogger(__name__)
 

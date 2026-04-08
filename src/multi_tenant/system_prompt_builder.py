@@ -72,7 +72,6 @@ from src.multi_tenant.cosmos_schema import (
     PreferencesDocument,
     TenantDocument,
     TenantTier,
-    TIER_DEFAULTS,
 )
 
 logger = logging.getLogger(__name__)

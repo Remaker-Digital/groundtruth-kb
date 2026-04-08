@@ -14,9 +14,8 @@ Run with:
 """
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
-from .conftest import AdminApiMocker
 
 pytestmark = pytest.mark.e2e
 

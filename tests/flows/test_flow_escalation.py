@@ -20,7 +20,6 @@ SPEC-1843: Zero-knowledge.
 
 from __future__ import annotations
 
-from unittest.mock import patch
 
 import pytest
 
@@ -95,7 +94,7 @@ class TestFlowEscalationEncryption:
 
         repo = ConversationRepository()
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakeConv(

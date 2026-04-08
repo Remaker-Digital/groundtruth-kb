@@ -12,7 +12,6 @@ from tests.e2e_mock.conftest import (
     navigate_and_settle,
     dismiss_onboarding_if_present,
     get_api_json,
-    post_api_json,
     assert_mock_active,
     main_text,
 )

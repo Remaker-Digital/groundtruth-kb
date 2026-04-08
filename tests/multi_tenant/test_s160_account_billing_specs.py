@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os
-import pytest
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

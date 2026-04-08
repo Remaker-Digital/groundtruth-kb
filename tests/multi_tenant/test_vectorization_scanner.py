@@ -13,7 +13,6 @@ Verifies:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -352,7 +351,6 @@ class TestVectorizationScannerRegistration:
 
     def test_main_imports_register_vectorization_scanner(self):
         """main.py imports register_vectorization_scanner."""
-        import importlib
         import src.main as main_mod
 
         # Verify the function is in the module's namespace

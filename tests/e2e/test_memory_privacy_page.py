@@ -21,7 +21,7 @@ Run with:
 import pytest
 from playwright.sync_api import Page, expect
 
-from .conftest import AdminApiMocker, MOCK_MEMORY_PRIVACY, setup_admin_page
+from .conftest import AdminApiMocker, setup_admin_page
 
 pytestmark = pytest.mark.e2e
 
@@ -135,7 +135,7 @@ class TestTierGating:
             save_btn.click()
             page.wait_for_timeout(500)
             # Should not show "Failed to save settings" error
-            error_text = page.locator("text=Failed to save settings")
+            page.locator("text=Failed to save settings")
             # This is a soft check — the error may not appear at all
             # The key assertion is that the page didn't crash
             expect(heading.first).to_be_visible()

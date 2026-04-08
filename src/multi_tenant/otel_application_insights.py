@@ -272,7 +272,6 @@ def configure_tracing_with_app_insights() -> dict[str, Any]:
         Configuration result dict from configure_exporter().
     """
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
     from src.multi_tenant.otel_tracing import configure_tracing
 
@@ -292,7 +291,6 @@ def configure_tracing_with_app_insights() -> dict[str, Any]:
 
                 # Re-create provider with sampler
                 from opentelemetry import trace
-                from opentelemetry.sdk.resources import Resource
 
                 resource = provider.resource
                 sampled_provider = TracerProvider(

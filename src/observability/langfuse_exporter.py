@@ -419,7 +419,7 @@ def export_trace(
             f"critic:{payload['critic_verdict']}",
         ]
         if use_lane2:
-            tags.append(f"lane:2")
+            tags.append("lane:2")
             tags.append(f"memory:{payload.get('memory_signal_count', 0)}")
             tags.append(f"escalated:{payload.get('was_escalated', False)}")
         else:
@@ -433,7 +433,7 @@ def export_trace(
             trace_id=trace_id or None,
             metadata=payload,
             tags=tags,
-        ) as root:
+        ):
             # Create child spans for each pipeline stage
             for sa in payload["stage_attributions"]:
                 with client.start_as_current_observation(

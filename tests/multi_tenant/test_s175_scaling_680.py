@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import os
 import threading
-import time
 from collections import OrderedDict
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -68,7 +67,6 @@ class TestGlobalSSELimit:
 
         mgr = SSEConnectionManager()
         # Simulate connections at global limit
-        original = mgr.global_connection_count
         with patch.object(
             type(mgr), "global_connection_count",
             new_callable=lambda: property(lambda self: 5000),

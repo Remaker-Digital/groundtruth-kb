@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -35,7 +34,6 @@ from src.multi_tenant.pipeline_resilience import (
     ServiceCircuitBreaker,
     ServiceCircuitBreakerRegistry,
     ServiceUnavailableError,
-    StageResult,
     _TenantGate,
     call_with_breaker,
     get_circuit_breaker_registry,

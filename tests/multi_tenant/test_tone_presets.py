@@ -8,7 +8,6 @@ and response_length.
 
 from __future__ import annotations
 
-import pytest
 
 from src.multi_tenant.system_prompt_builder import (
     _TONE_PRESETS,

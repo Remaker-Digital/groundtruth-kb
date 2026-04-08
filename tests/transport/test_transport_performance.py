@@ -22,7 +22,6 @@ Governing decisions: ADR-001, DCL-002 v4.
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 
@@ -30,14 +29,11 @@ import pytest
 
 from tests.transport.conftest import (
     BenchmarkResult,
-    consume_sse_events,
     get_stage_latency,
     get_total_latency,
     has_error_event,
-    has_stage,
     requires_test_host,
     run_conversation,
-    STAGING_WIDGET_KEY,
     TEST_HOST_URL,
 )
 

@@ -26,7 +26,6 @@ from src.multi_tenant.alert_delivery import (
     AlertDeliveryService,
     AlertSeverity,
     AlertType,
-    ChannelResult,
     EmailAlertChannel,
     _render_email,
     _severity_color,
@@ -458,7 +457,6 @@ class TestEmailChannelRegistration:
     def test_all_four_channels(self, email_channel):
         from src.multi_tenant.alert_delivery import (
             DashboardAlertChannel,
-            LogAlertChannel,
             WebhookAlertChannel,
         )
 

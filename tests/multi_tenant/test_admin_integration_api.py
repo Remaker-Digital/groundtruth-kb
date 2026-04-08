@@ -25,12 +25,10 @@ import pytest
 from src.multi_tenant.admin_integration_api import (
     INTEGRATION_TYPES,
     IntegrationDetail,
-    IntegrationSummary,
     IntegrationUpdateRequest,
     _build_summary,
     _INTEGRATION_META,
     _tier_meets_gate,
-    router,
 )
 
 

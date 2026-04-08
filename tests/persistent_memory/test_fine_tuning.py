@@ -20,11 +20,9 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
-import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 

@@ -697,7 +697,7 @@ class TestFooterExistence:
         """Copyright notice includes 'All rights reserved.'"""
         text = _sidebar_text(shared_admin_page)
         assert "All rights reserved" in text, (
-            f"'All rights reserved' not found in sidebar footer"
+            "'All rights reserved' not found in sidebar footer"
         )
 
 

@@ -13,8 +13,6 @@ Covers: configure_chat_services, _get_session, _get_pipeline,
 
 from __future__ import annotations
 
-import asyncio
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -35,7 +33,6 @@ from src.chat.models import (
     ConversationStartResponse,
     ConversationStateResponse,
     EndConversationResponse,
-    IssueReportResponse,
     MessageRole,
     SendMessageResponse,
     WebSocketMessage,

@@ -25,12 +25,10 @@ import pytest
 from src.multi_tenant.superadmin_api._rate_limits import (
     RateLimitConfig,
     RateLimitListResponse,
-    RateLimitResponse,
     RateLimitWriteRequest,
     RateLimitWriteResponse,
     RetryConfig,
     RetryConfigListResponse,
-    RetryConfigResponse,
     RetryConfigWriteRequest,
     RetryConfigWriteResponse,
     VALID_RATE_LIMIT_TIERS,
@@ -505,4 +503,4 @@ class TestRetryConfigHistory:
 async def _aiter_empty():
     """Async iterator that yields nothing."""
     return
-    yield  # noqa: unreachable — makes this an async generator
+    yield  # makes this an async generator (unreachable by design)

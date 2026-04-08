@@ -30,7 +30,6 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
@@ -52,14 +51,12 @@ logger = logging.getLogger(__name__)
 class StatusBreakdown(CamelCaseModel):
     """Conversation count for a single status."""
 
-
     status: str
     count: int
 
 
 class AnalyticsSummaryResponse(CamelCaseModel):
     """Aggregated conversation metrics for a date range (WI #176)."""
-
 
     tenant_id: str
     since: str = Field(description="Start of date range (ISO 8601)")
@@ -74,15 +71,9 @@ class AnalyticsSummaryResponse(CamelCaseModel):
     avg_messages: float = Field(description="Average message count per conversation")
 
     # Frontend-expected fields (AnalyticsSummary type)
-    avg_response_time: float | None = Field(
-        default=None, description="Average response time in seconds"
-    )
-    resolution_rate: float | None = Field(
-        default=None, description="Resolution rate (0.0-1.0)"
-    )
-    customer_satisfaction: float | None = Field(
-        default=None, description="Customer satisfaction score (1.0-5.0)"
-    )
+    avg_response_time: float | None = Field(default=None, description="Average response time in seconds")
+    resolution_rate: float | None = Field(default=None, description="Resolution rate (0.0-1.0)")
+    customer_satisfaction: float | None = Field(default=None, description="Customer satisfaction score (1.0-5.0)")
 
     # Status breakdown
     status_breakdown: list[StatusBreakdown] = Field(
@@ -112,7 +103,6 @@ class AnalyticsSummaryResponse(CamelCaseModel):
 class IntentEntry(CamelCaseModel):
     """A single agent/intent with its invocation count."""
 
-
     agent: str = Field(description="Agent name (e.g. intent-classifier)")
     invocation_count: int = Field(description="Number of conversations invoking this agent")
     percentage: float = Field(description="Percentage of total conversations")
@@ -120,7 +110,6 @@ class IntentEntry(CamelCaseModel):
 
 class IntentsResponse(CamelCaseModel):
     """Top agents/intents by invocation volume (WI #177)."""
-
 
     tenant_id: str
     since: str
@@ -131,7 +120,6 @@ class IntentsResponse(CamelCaseModel):
 
 class GapEntry(CamelCaseModel):
     """A conversation representing a potential knowledge gap."""
-
 
     conversation_id: str
     status: str
@@ -146,7 +134,6 @@ class GapEntry(CamelCaseModel):
 
 class GapsResponse(CamelCaseModel):
     """Knowledge gap report — conversations the AI couldn't resolve (WI #178)."""
-
 
     tenant_id: str
     since: str
@@ -217,7 +204,10 @@ router = APIRouter(prefix="/api/analytics", tags=["admin-analytics"])
     "/summary",
     response_model=AnalyticsSummaryResponse,
     summary="Get analytics summary metrics",
-    description="Returns aggregated conversation metrics for a date range including total/billable counts, average turns/messages, status breakdown, escalation rate, and Critic pass rate.",
+    description=(
+        "Returns aggregated conversation metrics for a date range including total/billable counts, average "
+        "turns/messages, status breakdown, escalation rate, and Critic pass rate."
+    ),
     responses={
         503: {"description": "Admin analytics services not initialized"},
     },
@@ -289,11 +279,7 @@ async def get_analytics_summary(
     critic_pass_rate = (critic_passed / critic_total) if critic_total > 0 else 0.0
 
     # Resolution rate: proportion of non-escalated, non-error conversations
-    resolved_count = sum(
-        sc.get("count", 0)
-        for sc in status_counts
-        if sc.get("status") not in ("escalated", "error")
-    )
+    resolved_count = sum(sc.get("count", 0) for sc in status_counts if sc.get("status") not in ("escalated", "error"))
     resolution_rate = (resolved_count / total) if total > 0 else 0.0
 
     status_breakdown = [
@@ -335,7 +321,10 @@ async def get_analytics_summary(
     "/intents",
     response_model=IntentsResponse,
     summary="Get intent distribution",
-    description="Returns agent/intent invocation distribution for a date range, showing which pipeline stages are most active and identifying routing patterns.",
+    description=(
+        "Returns agent/intent invocation distribution for a date range, showing which pipeline stages are most active "
+        "and identifying routing patterns."
+    ),
     responses={
         503: {"description": "Admin analytics services not initialized"},
     },
@@ -415,7 +404,10 @@ async def get_intent_distribution(
     "/gaps",
     response_model=GapsResponse,
     summary="Get knowledge gap report",
-    description="Returns conversations with escalated or error status, representing cases where the AI could not resolve the customer's request. Useful for identifying missing knowledge base content.",
+    description=(
+        "Returns conversations with escalated or error status, representing cases where the AI could not resolve the "
+        "customer's request. Useful for identifying missing knowledge base content."
+    ),
     responses={
         503: {"description": "Admin analytics services not initialized"},
     },
@@ -461,12 +453,8 @@ async def get_knowledge_gaps(
         billable_only=True,
     )
 
-    escalated_count = sum(
-        1 for c in gap_conversations if c.get("status") == "escalated"
-    )
-    error_count = sum(
-        1 for c in gap_conversations if c.get("status") == "error"
-    )
+    escalated_count = sum(1 for c in gap_conversations if c.get("status") == "escalated")
+    error_count = sum(1 for c in gap_conversations if c.get("status") == "error")
 
     gaps = [
         GapEntry(

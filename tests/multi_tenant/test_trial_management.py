@@ -16,7 +16,7 @@ Run:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, call
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -25,13 +25,11 @@ from src.multi_tenant.cosmos_schema import (
     BillingChannel,
     TenantStatus,
     TenantTier,
-    TIER_DEFAULTS,
 )
 
 
 from src.multi_tenant.trial_management import (
     DEFAULT_TRIAL_CONVERSATION_LIMIT,
-    DEFAULT_TRIAL_DURATION_DAYS,
     DEMO_CONVERSATION_COUNT,
     TRIAL_EXPIRED_GRACE_DAYS,
     TRIAL_MODEL,
@@ -289,7 +287,7 @@ class TestTrialProvisioning:
         service, repos = _make_service()
         conversation_repo = repos[2]
 
-        result = await service.provision_trial(
+        await service.provision_trial(
             customer_email="demo@example.com",
             seed_demo_data=True,
         )
@@ -303,7 +301,7 @@ class TestTrialProvisioning:
         service, repos = _make_service()
         audit_repo = repos[5]
 
-        result = await service.provision_trial(
+        await service.provision_trial(
             customer_email="audit@example.com",
         )
 

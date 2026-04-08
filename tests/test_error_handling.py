@@ -12,16 +12,11 @@ rate limit budgets. Auth middleware intercepts all non-exempt paths.
 
 from __future__ import annotations
 
-import pytest
 
 from tests.conftest import (
-    auth_headers_api_key,
-    TEST_API_KEY_STARTER,
     TEST_API_KEY_PROFESSIONAL,
     TEST_API_KEY_ENTERPRISE,
-    STARTER_TENANT_ID,
     PROFESSIONAL_TENANT_ID,
-    ENTERPRISE_TENANT_ID,
 )
 
 

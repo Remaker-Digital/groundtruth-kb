@@ -62,7 +62,6 @@ logger = logging.getLogger(__name__)
 class AdminConversationSummary(CamelCaseModel):
     """Compact conversation record for the admin inbox list view."""
 
-
     conversation_id: str
     status: str | None = None
     customer_id: str | None = None
@@ -89,7 +88,6 @@ class AdminConversationSummary(CamelCaseModel):
 class AdminConversationListResponse(CamelCaseModel):
     """Paginated list of conversations for the admin inbox."""
 
-
     tenant_id: str
     total_count: int = Field(description="Total matching conversations")
     offset: int
@@ -99,7 +97,6 @@ class AdminConversationListResponse(CamelCaseModel):
 
 class AdminConversationDetailResponse(CamelCaseModel):
     """Full conversation detail for the admin inbox."""
-
 
     conversation_id: str
     tenant_id: str
@@ -148,7 +145,6 @@ class PipelineTraceResponse(CamelCaseModel):
 class MessageEntry(CamelCaseModel):
     """A single message in the conversation transcript."""
 
-
     role: str
     content: str
     timestamp: str | None = None
@@ -159,7 +155,6 @@ class MessageEntry(CamelCaseModel):
 class ConversationMessagesResponse(CamelCaseModel):
     """Full message history for a conversation."""
 
-
     conversation_id: str
     tenant_id: str
     message_count: int
@@ -168,7 +163,6 @@ class ConversationMessagesResponse(CamelCaseModel):
 
 class AssignAgentRequest(CamelCaseModel):
     """Request body for POST /api/admin/conversations/{id}/assign."""
-
 
     agent_id: str = Field(
         min_length=1,
@@ -180,7 +174,6 @@ class AssignAgentRequest(CamelCaseModel):
 class AssignAgentResponse(CamelCaseModel):
     """Response for successful agent assignment."""
 
-
     conversation_id: str
     assigned_to: str
     assigned_at: str
@@ -188,7 +181,6 @@ class AssignAgentResponse(CamelCaseModel):
 
 class EscalateConversationRequest(CamelCaseModel):
     """Optional request body for POST /api/admin/conversations/{id}/escalate."""
-
 
     category: str | None = Field(
         default=None,
@@ -203,7 +195,6 @@ class EscalateConversationRequest(CamelCaseModel):
 class EscalateConversationResponse(CamelCaseModel):
     """Response for successful conversation escalation."""
 
-
     conversation_id: str
     status: str
     escalated_at: str
@@ -214,7 +205,6 @@ class EscalateConversationResponse(CamelCaseModel):
 class ResolveConversationResponse(CamelCaseModel):
     """Response for successful conversation resolution."""
 
-
     conversation_id: str
     status: str
     resolved_at: str
@@ -223,14 +213,12 @@ class ResolveConversationResponse(CamelCaseModel):
 class ArchiveConversationResponse(CamelCaseModel):
     """Response for successful conversation archive/unarchive."""
 
-
     conversation_id: str
     archived_at: str | None = None
 
 
 class AddNoteRequest(CamelCaseModel):
     """Request body for POST /api/admin/conversations/{id}/notes."""
-
 
     content: str = Field(
         min_length=1,
@@ -247,7 +235,6 @@ class AddNoteRequest(CamelCaseModel):
 class AddNoteResponse(CamelCaseModel):
     """Response for successfully added note."""
 
-
     conversation_id: str
     note_id: str
     created_at: str
@@ -255,7 +242,6 @@ class AddNoteResponse(CamelCaseModel):
 
 class SearchConversationsRequest(CamelCaseModel):
     """Request body for POST /api/admin/conversations/search."""
-
 
     query: str = Field(
         min_length=1,
@@ -285,7 +271,6 @@ class SearchConversationsRequest(CamelCaseModel):
 class SearchResultEntry(CamelCaseModel):
     """A single conversation match from a search."""
 
-
     conversation_id: str
     customer_id: str | None = None
     customer_name: str | None = None
@@ -299,7 +284,6 @@ class SearchResultEntry(CamelCaseModel):
 
 class SearchConversationsResponse(CamelCaseModel):
     """Response for conversation search."""
-
 
     tenant_id: str
     query: str
@@ -364,9 +348,7 @@ async def _read_conversation(
     try:
         results = await repo.query(
             tenant_id=tenant_id,
-            query_text=(
-                "SELECT * FROM c WHERE c.conversation_id = @conv_id"
-            ),
+            query_text=("SELECT * FROM c WHERE c.conversation_id = @conv_id"),
             parameters=[
                 {"name": "@conv_id", "value": conversation_id},
             ],
@@ -402,7 +384,10 @@ router = APIRouter(prefix="/api/admin/conversations", tags=["admin-inbox"])
     "",
     response_model=AdminConversationListResponse,
     summary="List admin inbox conversations",
-    description="Returns a paginated list of conversations for the merchant admin inbox. Supports filtering by status, customer, date range, and assigned agent.",
+    description=(
+        "Returns a paginated list of conversations for the merchant admin inbox. Supports filtering by status, "
+        "customer, date range, and assigned agent."
+    ),
     responses={
         400: {"description": "Invalid status filter value"},
         503: {"description": "Admin conversation services not initialized"},
@@ -707,7 +692,10 @@ def _extract_search_snippet(
     "/{conversation_id}",
     response_model=AdminConversationDetailResponse,
     summary="Get conversation detail",
-    description="Returns full conversation detail including internal notes and pipeline trace. Message transcript is available via the separate /messages endpoint.",
+    description=(
+        "Returns full conversation detail including internal notes and pipeline trace. Message transcript is available "
+        "via the separate /messages endpoint."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         503: {"description": "Admin conversation services not initialized"},
@@ -762,7 +750,10 @@ async def get_conversation_detail(
     "/{conversation_id}/messages",
     response_model=ConversationMessagesResponse,
     summary="Get conversation message history",
-    description="Returns all messages in chronological order, including customer messages, AI responses, system events, and human agent messages.",
+    description=(
+        "Returns all messages in chronological order, including customer messages, AI responses, system events, and "
+        "human agent messages."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         503: {"description": "Admin conversation services not initialized"},
@@ -840,12 +831,14 @@ async def export_conversation_csv(
     writer.writerow(["timestamp", "role", "content", "message_id"])
 
     for m in raw_messages:
-        writer.writerow([
-            m.get("timestamp", ""),
-            m.get("role", ""),
-            m.get("content", ""),
-            m.get("message_id", ""),
-        ])
+        writer.writerow(
+            [
+                m.get("timestamp", ""),
+                m.get("role", ""),
+                m.get("content", ""),
+                m.get("message_id", ""),
+            ]
+        )
 
     csv_content = output.getvalue()
     output.close()
@@ -916,7 +909,10 @@ async def get_conversation_trace(
     "/{conversation_id}/assign",
     response_model=AssignAgentResponse,
     summary="Assign human agent to conversation",
-    description="Assigns a human agent to a conversation, typically after an escalation event. The assigned agent receives the conversation in their inbox.",
+    description=(
+        "Assigns a human agent to a conversation, typically after an escalation event. The assigned agent receives the "
+        "conversation in their inbox."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         503: {"description": "Admin conversation services not initialized"},
@@ -972,7 +968,10 @@ async def assign_agent(
     "/{conversation_id}/escalate",
     response_model=EscalateConversationResponse,
     summary="Escalate conversation to human support",
-    description="Marks a conversation as escalated, flagging it for human agent attention. The AI agent stops responding and the conversation appears in the escalated queue.",
+    description=(
+        "Marks a conversation as escalated, flagging it for human agent attention. The AI agent stops responding and "
+        "the conversation appears in the escalated queue."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         409: {"description": "Conversation already escalated, or resolved >24h ago"},
@@ -1011,17 +1010,14 @@ async def escalate_conversation(
         if resolved_at_str:
             try:
                 resolved_at = datetime.fromisoformat(resolved_at_str)
-                hours_since = (
-                    datetime.now(timezone.utc) - resolved_at
-                ).total_seconds() / 3600
+                hours_since = (datetime.now(timezone.utc) - resolved_at).total_seconds() / 3600
                 re_escalation_allowed = hours_since <= 24
             except (ValueError, TypeError):
                 pass  # Malformed timestamp — treat as outside window
         if not re_escalation_allowed:
             raise HTTPException(
                 status_code=409,
-                detail="Conversation was resolved more than 24 hours ago "
-                "and can no longer be escalated",
+                detail="Conversation was resolved more than 24 hours ago and can no longer be escalated",
             )
 
     now = datetime.now(timezone.utc).isoformat()
@@ -1035,9 +1031,11 @@ async def escalate_conversation(
     if category and not assigned_to and _team_repo:
         try:
             from src.chat.session import get_conversation_session
+
             session = get_conversation_session()
             assigned_to = await session.find_best_agent_for_category(
-                ctx.tenant_id, category,
+                ctx.tenant_id,
+                category,
             )
         except Exception:
             logger.debug("Auto-assign during manual escalation failed (non-blocking)")
@@ -1100,7 +1098,10 @@ async def escalate_conversation(
             conversation_id=conversation_id,
             reason=f"Manual escalation by admin for customer: {customer_name}",
             urgency="medium",
-            context_summary=f"Conversation with {customer_name} ({doc.get('message_count', 0)} messages) was escalated by an admin.",
+            context_summary=(
+                f"Conversation with {customer_name} "
+                f"({doc.get('message_count', 0)} messages) was escalated by an admin."
+            ),
             recipient_emails=recipient_emails or None,
             escalation_category=category,
             assigned_to=assigned_to,
@@ -1116,10 +1117,12 @@ async def escalate_conversation(
     # P3-1: Quality aggregate + regression alert at admin escalation closeout
     try:
         from src.chat.quality_closeout import evaluate_quality_and_alert
+
         await evaluate_quality_and_alert(ctx.tenant_id, conversation_id, repo)
     except Exception:
         logger.warning(
-            "Quality closeout failed (non-fatal): conv=%s", conversation_id,
+            "Quality closeout failed (non-fatal): conv=%s",
+            conversation_id,
             exc_info=True,
         )
 
@@ -1141,7 +1144,10 @@ async def escalate_conversation(
     "/{conversation_id}/resolve",
     response_model=ResolveConversationResponse,
     summary="Mark conversation as resolved",
-    description="Marks a conversation as resolved, indicating the customer's issue has been addressed. Removes it from the active/escalated queues.",
+    description=(
+        "Marks a conversation as resolved, indicating the customer's issue has been addressed. Removes it from the "
+        "active/escalated queues."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         409: {"description": "Conversation already resolved"},
@@ -1190,10 +1196,12 @@ async def resolve_conversation(
     # P3-1: Quality aggregate + regression alert at resolve closeout
     try:
         from src.chat.quality_closeout import evaluate_quality_and_alert
+
         await evaluate_quality_and_alert(ctx.tenant_id, conversation_id, repo)
     except Exception:
         logger.warning(
-            "Quality closeout failed (non-fatal): conv=%s", conversation_id,
+            "Quality closeout failed (non-fatal): conv=%s",
+            conversation_id,
             exc_info=True,
         )
 
@@ -1220,7 +1228,10 @@ async def resolve_conversation(
     response_model=AddNoteResponse,
     status_code=201,
     summary="Add internal note to conversation",
-    description="Adds an internal merchant note to a conversation. Notes are visible only to the merchant team, never shown to the customer.",
+    description=(
+        "Adds an internal merchant note to a conversation. Notes are visible only to the merchant team, never shown to "
+        "the customer."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         503: {"description": "Admin conversation services not initialized"},
@@ -1284,7 +1295,10 @@ async def add_note(
     "/{conversation_id}/archive",
     response_model=ArchiveConversationResponse,
     summary="Archive a conversation",
-    description="Archives a resolved or timed-out conversation. Archived conversations are hidden from the default inbox view but can be retrieved with the archived filter.",
+    description=(
+        "Archives a resolved or timed-out conversation. Archived conversations are hidden from the default inbox view "
+        "but can be retrieved with the archived filter."
+    ),
     responses={
         404: {"description": "Conversation not found"},
         409: {"description": "Conversation must be resolved or timed out to archive"},
@@ -1486,7 +1500,9 @@ async def set_agent_override(
         tier_gate = getattr(agent_defn, "tier_gate", None)
         if tier_gate and tier_gate != "free" and ctx.tier:
             tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
-            if tier_order.get(str(ctx.tier.value if hasattr(ctx.tier, "value") else ctx.tier), 0) < tier_order.get(tier_gate, 0):
+            if tier_order.get(str(ctx.tier.value if hasattr(ctx.tier, "value") else ctx.tier), 0) < tier_order.get(
+                tier_gate, 0
+            ):
                 raise HTTPException(
                     status_code=422,
                     detail=f"Tenant tier '{ctx.tier}' does not meet agent tier gate '{tier_gate}'",
@@ -1530,7 +1546,11 @@ async def set_agent_override(
         operations = [
             {"op": "set", "path": "/conversation_agent_override", "value": request.agent_id},
             {"op": "set", "path": "/conversation_agent_override_at", "value": now},
-            {"op": "set", "path": "/conversation_agent_override_by", "value": ctx.team_member_id or ctx.user_id or "admin"},
+            {
+                "op": "set",
+                "path": "/conversation_agent_override_by",
+                "value": ctx.team_member_id or ctx.user_id or "admin",
+            },
             {"op": "set", "path": "/last_activity_at", "value": now},
         ]
     else:
@@ -1557,6 +1577,7 @@ async def set_agent_override(
     # Audit event
     try:
         from src.agents.plugins.events import emit_invocation
+
         emit_invocation(
             trace_id="",
             invoker="admin-override",

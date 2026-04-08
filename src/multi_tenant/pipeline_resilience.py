@@ -54,18 +54,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from src.multi_tenant.auth import TenantContext
-from src.multi_tenant.cosmos_schema import TenantTier
 
 logger = logging.getLogger(__name__)
 

@@ -28,7 +28,6 @@ from tests.e2e_mock.conftest import (
     dismiss_onboarding_if_present,
     main_text,
     navigate_and_settle,
-    navigate_to,
 )
 
 

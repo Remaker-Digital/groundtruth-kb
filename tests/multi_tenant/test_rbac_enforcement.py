@@ -18,8 +18,7 @@ Test plan reference: §5.12 (RBAC Enforcement — WI #295 Phase 3)
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -28,7 +27,6 @@ from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import TeamMemberRole
 from src.multi_tenant.middleware import (
     _ADMIN_ONLY_PREFIXES,
-    _ALL_ROLES_PREFIXES,
     _RBAC_OPEN_PATHS,
     enforce_rbac,
     get_tenant_context,

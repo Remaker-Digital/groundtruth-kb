@@ -673,10 +673,8 @@ class TestFullScan:
 
         # Track cosine_similarity calls — should NOT be called since each group has only 1 entry
         call_count = [0]
-        original_cos = None
         try:
-            from src.multi_tenant.semantic_cache import cosine_similarity as _orig
-            original_cos = _orig
+            from src.multi_tenant.semantic_cache import cosine_similarity as _orig  # noqa: F401
         except ImportError:
             pass
 
@@ -685,7 +683,7 @@ class TestFullScan:
             return 0.30  # Low similarity
 
         with patch("src.multi_tenant.semantic_cache.cosine_similarity", side_effect=tracking_cos):
-            result = await self.scanner.scan("tenant-1", force=True)
+            await self.scanner.scan("tenant-1", force=True)
             # cosine_similarity should not be called — each entry_type group has only 1 entry
             assert call_count[0] == 0
 

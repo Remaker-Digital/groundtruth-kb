@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import secrets
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch

@@ -24,11 +24,9 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-import time
-from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from src.multi_tenant.alert_delivery import format_branded_email
@@ -53,8 +51,11 @@ _RATE_MAX = 3  # max 3 requests per window per IP
 def _is_rate_limited(client_ip: str) -> bool:
     """Check if IP has exceeded email change request rate limit (SPEC-1694)."""
     from src.multi_tenant.security_hardening import get_rate_limit_backend
+
     return get_rate_limit_backend().is_limited(
-        f"email_change:{client_ip}", max_requests=_RATE_MAX, window_seconds=_RATE_WINDOW,
+        f"email_change:{client_ip}",
+        max_requests=_RATE_MAX,
+        window_seconds=_RATE_WINDOW,
     )
 
 
@@ -73,11 +74,13 @@ _TOKEN_TTL = 900  # 15 minutes
 
 class EmailChangeRequest(BaseModel):
     """Request body for email change."""
+
     new_email: str = Field(description="New email address to change to")
 
 
 class EmailChangeResponse(BaseModel):
     """Response for email change request."""
+
     ok: bool
     message: str
 
@@ -168,7 +171,8 @@ _CONFIRM_SUCCESS_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <div class="card">
-  <div class="check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>
+  <div class="check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42
+  1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>
   <h1>Email Address Updated</h1>
   <p>Your <span class="brand">Agent Red</span> platform admin email has been
      changed to <strong>{email}</strong>. You can close this tab.</p>
@@ -194,7 +198,9 @@ _CONFIRM_ERROR_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <div class="card">
-  <div class="icon"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg></div>
+  <div class="icon"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59
+  5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41
+  17.59 19 19 17.59 13.41 12 19 6.41z"/></svg></div>
   <h1>Email Change Failed</h1>
   <p>{reason}</p>
 </div>
@@ -311,12 +317,12 @@ async def request_email_change(
 
     if new_email == old_email:
         return EmailChangeResponse(
-            ok=False, message="New email is the same as your current email.",
+            ok=False,
+            message="New email is the same as your current email.",
         )
 
     try:
         from src.multi_tenant.repositories import (
-            PlatformAdminRepository,
             VerificationTokenRepository,
         )
 
@@ -406,7 +412,9 @@ async def request_email_change(
 
         logger.info(
             "Email change requested: old=%s new=%s admin=%s",
-            old_email, new_email, ctx.platform_admin_id,
+            old_email,
+            new_email,
+            ctx.platform_admin_id,
         )
 
         return EmailChangeResponse(
@@ -427,8 +435,7 @@ async def request_email_change(
     "/confirm",
     response_class=HTMLResponse,
     summary="Confirm email change (public)",
-    description="Validates the token and updates the platform admin email. "
-    "Renders a branded confirmation page.",
+    description="Validates the token and updates the platform admin email. Renders a branded confirmation page.",
 )
 async def confirm_email_change(
     token: str = Query(description="Email change token from confirmation email"),
@@ -492,7 +499,8 @@ async def confirm_email_change(
         except Exception:
             logger.exception(
                 "Failed to update admin email: admin_id=%s new=%s",
-                admin_id, new_email,
+                admin_id,
+                new_email,
             )
             return HTMLResponse(
                 content=_CONFIRM_ERROR_HTML.format(
@@ -536,7 +544,9 @@ async def confirm_email_change(
 
         logger.info(
             "Email change confirmed: admin=%s old=%s new=%s",
-            admin_id, old_email, new_email,
+            admin_id,
+            old_email,
+            new_email,
         )
 
         return HTMLResponse(

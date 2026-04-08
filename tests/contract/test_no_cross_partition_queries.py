@@ -20,7 +20,6 @@ import ast
 import os
 import re
 
-import pytest
 
 # Root of the source tree
 SRC_ROOT = os.path.join(

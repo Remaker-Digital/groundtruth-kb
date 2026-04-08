@@ -18,7 +18,7 @@ Test plan reference: §5.13 (MFA Management — WI #295 Phase 4)
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 

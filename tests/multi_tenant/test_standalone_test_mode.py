@@ -254,7 +254,7 @@ class TestTestModeConversationTagging:
         # Mock the query method
         repo.query = AsyncMock(return_value=[{"status": "resolved", "count": 3}])
 
-        result = await repo.count_by_status(
+        await repo.count_by_status(
             tenant_id=TENANT_ID,
             since="2026-01-01T00:00:00Z",
             is_test_mode=True,
@@ -273,7 +273,7 @@ class TestTestModeConversationTagging:
         repo = ConversationRepository.__new__(ConversationRepository)
         repo.query = AsyncMock(return_value=[{"status": "resolved", "count": 10}])
 
-        result = await repo.count_by_status(
+        await repo.count_by_status(
             tenant_id=TENANT_ID,
             since="2026-01-01T00:00:00Z",
             is_test_mode=False,
@@ -291,7 +291,7 @@ class TestTestModeConversationTagging:
         repo = ConversationRepository.__new__(ConversationRepository)
         repo.query = AsyncMock(return_value=[{"status": "resolved", "count": 15}])
 
-        result = await repo.count_by_status(
+        await repo.count_by_status(
             tenant_id=TENANT_ID,
             since="2026-01-01T00:00:00Z",
             is_test_mode=None,
@@ -312,7 +312,7 @@ class TestTestModeConversationTagging:
             "avg_turns": 3.0, "avg_messages": 6.0,
         }])
 
-        result = await repo.aggregate_metrics(
+        await repo.aggregate_metrics(
             tenant_id=TENANT_ID,
             since="2026-01-01T00:00:00Z",
             is_test_mode=True,

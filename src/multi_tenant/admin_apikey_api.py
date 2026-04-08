@@ -625,7 +625,7 @@ async def reset_api_key_via_email(
 
     # Build self-service re-reset URL for the security notification in the email.
     # SPEC-1617: include ?tenant= slug so the link is globally unique.
-    from src.multi_tenant.welcome_email import _build_admin_login_url, tenant_url_slug
+    from src.multi_tenant.welcome_email import tenant_url_slug
 
     shop_domain = tenant.get("shopify_shop_domain")
     slug = tenant_url_slug(shop_domain, tenant_name, tenant_id)

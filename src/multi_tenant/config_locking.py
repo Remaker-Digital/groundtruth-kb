@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class ConfigLockStatus(CamelCaseModel):
     """Current lock/version status of a config document."""
+
     tenant_id: str
     config_state: str
     etag: str = Field(description="Cosmos DB ETag — pass this on save to prevent overwrites")
@@ -35,12 +36,14 @@ class ConfigLockStatus(CamelCaseModel):
 
 class ConfigSaveWithLockRequest(CamelCaseModel):
     """Request body that includes an etag for optimistic locking."""
+
     etag: str = Field(description="ETag from the last config read. Required to prevent concurrent overwrites.")
     changes: dict[str, Any] = Field(description="Config fields to update")
 
 
 class ConfigConflictResponse(CamelCaseModel):
     """409 Conflict response with details about who modified the config."""
+
     detail: str
     current_etag: str
     last_modified_by: str | None = None
@@ -71,7 +74,10 @@ def _get_repo():
     "/status",
     response_model=ConfigLockStatus,
     summary="Get current config lock status",
-    description="Returns the current ETag and version of the draft config. Use this ETag when saving to prevent concurrent overwrites.",
+    description=(
+        "Returns the current ETag and version of the draft config. Use this ETag when saving to prevent concurrent "
+        "overwrites."
+    ),
 )
 async def get_lock_status(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -91,7 +97,10 @@ async def get_lock_status(
         # No draft — return the active config's etag
         docs = await repo.query(
             tenant_id=ctx.tenant_id,
-            query_text="SELECT * FROM c WHERE (c.config_state = 'active' OR NOT IS_DEFINED(c.config_state)) ORDER BY c.version DESC",
+            query_text=(
+                "SELECT * FROM c WHERE (c.config_state = 'active' "
+                "OR NOT IS_DEFINED(c.config_state)) ORDER BY c.version DESC"
+            ),
             parameters=[],
             max_items=1,
         )
@@ -134,7 +143,10 @@ async def validate_etag(
     if not docs:
         docs = await repo.query(
             tenant_id=ctx.tenant_id,
-            query_text="SELECT * FROM c WHERE (c.config_state = 'active' OR NOT IS_DEFINED(c.config_state)) ORDER BY c.version DESC",
+            query_text=(
+                "SELECT * FROM c WHERE (c.config_state = 'active' "
+                "OR NOT IS_DEFINED(c.config_state)) ORDER BY c.version DESC"
+            ),
             parameters=[],
             max_items=1,
         )

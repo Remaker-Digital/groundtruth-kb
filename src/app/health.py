@@ -174,7 +174,7 @@ def register_health_endpoints(app: FastAPI) -> None:
                 content={"error": "Platform admin authentication required"},
             )
         try:
-            from src.multi_tenant.auth import hash_api_key, SPA_API_KEY_PREFIX
+            from src.multi_tenant.auth import hash_api_key
             from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
 
             key_hash = hash_api_key(api_key)
@@ -207,7 +207,6 @@ def register_health_endpoints(app: FastAPI) -> None:
             from src.multi_tenant.middleware import _tenant_meta_cache
 
             # Access shards through the middleware module
-            rate_limit_shard_sizes: list[int] = []
             # Import is deferred — middleware may not have a running instance
             metrics["tenant_meta_cache_size"] = len(_tenant_meta_cache)
         except Exception:

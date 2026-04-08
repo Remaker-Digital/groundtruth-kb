@@ -8,9 +8,9 @@ and API contracts.
 import pytest
 
 pytestmark = pytest.mark.timeout(30)
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page  # noqa: E402
 
-from tests.e2e_mock.conftest import (
+from tests.e2e_mock.conftest import (  # noqa: E402
     api_origin,
     navigate_and_settle,
     dismiss_onboarding_if_present,

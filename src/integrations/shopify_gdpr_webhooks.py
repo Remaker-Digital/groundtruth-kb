@@ -136,6 +136,7 @@ async def _verify_webhook_request(request: Request) -> dict[str, Any]:
 
     try:
         import json
+
         payload = json.loads(body)
     except (ValueError, TypeError):
         logger.warning("Shopify GDPR webhook payload is not valid JSON")
@@ -179,11 +180,13 @@ async def _resolve_tenant_id(shop_domain: str) -> str | None:
                 return tenant_doc.get("id") or tenant_doc.get("tenant_id")
         except Exception:
             logger.exception(
-                "Error resolving shop domain to tenant: shop=%s", shop_domain,
+                "Error resolving shop domain to tenant: shop=%s",
+                shop_domain,
             )
 
     logger.warning(
-        "Cannot resolve shop %s to tenant — no repo configured", shop_domain,
+        "Cannot resolve shop %s to tenant — no repo configured",
+        shop_domain,
     )
     return None
 
@@ -204,7 +207,10 @@ router = APIRouter(prefix="/api/shopify/gdpr", tags=["shopify-gdpr"])
     "/customers-data-request",
     status_code=200,
     summary="Handle customer data request webhook",
-    description="Handles the Shopify customers/data_request GDPR webhook. Verifies HMAC signature and exports customer data when services are available.",
+    description=(
+        "Handles the Shopify customers/data_request GDPR webhook. Verifies HMAC signature and exports customer data "
+        "when services are available."
+    ),
     responses={
         400: {"description": "Invalid JSON payload"},
         401: {"description": "Missing or invalid HMAC signature"},
@@ -237,12 +243,11 @@ async def customers_data_request(request: Request) -> JSONResponse:
     shop_domain = payload.get("shop_domain", "")
     customer = payload.get("customer", {})
     customer_id = str(customer.get("id", ""))
-    customer_email = customer.get("email", "")
+    customer.get("email", "")
     data_request_id = payload.get("data_request", {}).get("id")
 
     logger.info(
-        "Shopify GDPR customers/data_request: shop=%s customer_id=%s "
-        "data_request_id=%s",
+        "Shopify GDPR customers/data_request: shop=%s customer_id=%s data_request_id=%s",
         shop_domain,
         customer_id,
         data_request_id,
@@ -256,8 +261,7 @@ async def customers_data_request(request: Request) -> JSONResponse:
             # Export customer data using the same service as the admin API
             result = await _export_service.export_customer(tenant_id, customer_id)
             logger.info(
-                "Shopify GDPR data export completed: shop=%s customer=%s "
-                "export_id=%s stores=%d",
+                "Shopify GDPR data export completed: shop=%s customer=%s export_id=%s stores=%d",
                 shop_domain,
                 customer_id,
                 result.export_id,
@@ -271,8 +275,7 @@ async def customers_data_request(request: Request) -> JSONResponse:
             )
     elif tenant_id is None:
         logger.info(
-            "Shopify GDPR customers/data_request: shop=%s not found in tenants "
-            "(may have already been deleted)",
+            "Shopify GDPR customers/data_request: shop=%s not found in tenants (may have already been deleted)",
             shop_domain,
         )
     else:
@@ -299,7 +302,10 @@ async def customers_data_request(request: Request) -> JSONResponse:
     "/customers-redact",
     status_code=200,
     summary="Handle customer data redaction webhook",
-    description="Handles the Shopify customers/redact GDPR webhook. Verifies HMAC signature and deletes all personal data for the specified customer.",
+    description=(
+        "Handles the Shopify customers/redact GDPR webhook. Verifies HMAC signature and deletes all personal data for "
+        "the specified customer."
+    ),
     responses={
         400: {"description": "Invalid JSON payload"},
         401: {"description": "Missing or invalid HMAC signature"},
@@ -331,7 +337,7 @@ async def customers_redact(request: Request) -> JSONResponse:
     shop_domain = payload.get("shop_domain", "")
     customer = payload.get("customer", {})
     customer_id = str(customer.get("id", ""))
-    customer_email = customer.get("email", "")
+    customer.get("email", "")
 
     logger.info(
         "Shopify GDPR customers/redact: shop=%s customer_id=%s",
@@ -346,8 +352,7 @@ async def customers_redact(request: Request) -> JSONResponse:
         try:
             result = await _deletion_service.delete_customer(tenant_id, customer_id)
             logger.info(
-                "Shopify GDPR customer redaction completed: shop=%s customer=%s "
-                "deletion_id=%s stores=%d",
+                "Shopify GDPR customer redaction completed: shop=%s customer=%s deletion_id=%s stores=%d",
                 shop_domain,
                 customer_id,
                 result.deletion_id,
@@ -386,7 +391,10 @@ async def customers_redact(request: Request) -> JSONResponse:
     "/shop-redact",
     status_code=200,
     summary="Handle shop data redaction webhook",
-    description="Handles the Shopify shop/redact GDPR webhook. Verifies HMAC signature and deletes all data associated with the shop after the 48-hour grace period.",
+    description=(
+        "Handles the Shopify shop/redact GDPR webhook. Verifies HMAC signature and deletes all data associated with "
+        "the shop after the 48-hour grace period."
+    ),
     responses={
         400: {"description": "Invalid JSON payload"},
         401: {"description": "Missing or invalid HMAC signature"},
@@ -432,8 +440,7 @@ async def shop_redact(request: Request) -> JSONResponse:
             # has already elapsed before this webhook fires.
             result = await _deletion_service.delete_tenant(tenant_id, force=True)
             logger.info(
-                "Shopify GDPR shop redaction completed: shop=%s tenant=%s "
-                "deletion_id=%s stores=%d",
+                "Shopify GDPR shop redaction completed: shop=%s tenant=%s deletion_id=%s stores=%d",
                 shop_domain,
                 tenant_id,
                 result.deletion_id,

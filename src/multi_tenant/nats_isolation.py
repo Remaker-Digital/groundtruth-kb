@@ -44,11 +44,10 @@ Architecture references:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -57,9 +56,7 @@ import nats
 from nats.aio.client import Client as NATSClient
 from nats.aio.msg import Msg
 from nats.errors import (
-    BadSubscriptionError,
     ConnectionClosedError,
-    NoRespondersError,
     TimeoutError as NATSTimeoutError,
 )
 from nats.js.api import (
@@ -535,7 +532,7 @@ class TenantNATSManager:
         )
 
         try:
-            info = await self._js.add_stream(config)
+            await self._js.add_stream(config)
             self._provisioned_streams.add(sname)
             self._circuit_breaker.record_success()
 
@@ -593,7 +590,7 @@ class TenantNATSManager:
 
         try:
             # Fetch current config and update
-            info = await self._js.find_stream_name_by_subject(
+            await self._js.find_stream_name_by_subject(
                 tenant_wildcard(tenant_id),
             )
             stream_info = await self._js.stream_info(sname)
@@ -601,7 +598,7 @@ class TenantNATSManager:
             config = stream_info.config
             config.max_msgs_per_subject = max_msgs
 
-            updated = await self._js.update_stream(config)
+            await self._js.update_stream(config)
             self._circuit_breaker.record_success()
 
             logger.info(

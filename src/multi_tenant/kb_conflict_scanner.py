@@ -565,7 +565,7 @@ class KBConflictScanner:
         for field_name, config_value in fields_to_check.items():
             field_info = _CONFIG_POLICY_FIELDS[field_name]
             keywords = field_info["keywords"]
-            label = field_info["label"]
+            field_info["label"]
 
             # Filter articles by keyword relevance (title or content)
             relevant_articles = _filter_articles_by_keywords(entries, keywords)

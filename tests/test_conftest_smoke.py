@@ -13,8 +13,6 @@ import pytest
 
 from tests.conftest import (
     TEST_API_KEY_STARTER,
-    TEST_API_KEY_PROFESSIONAL,
-    TEST_API_KEY_ENTERPRISE,
     STARTER_TENANT_ID,
     auth_headers_api_key,
     make_tenant_context,

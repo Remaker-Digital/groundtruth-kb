@@ -12,13 +12,12 @@ Tests cover all 5 domain agents:
 
 from __future__ import annotations
 
-import time
 
 import pytest
 
 from src.agents.plugins.campaigns_agent import Campaign, CampaignsAgentTools
 from src.agents.plugins.bot_agent import BotAgentTools
-from src.agents.plugins.sales_agent import CartItem, ProductResult, SalesAgentTools
+from src.agents.plugins.sales_agent import ProductResult, SalesAgentTools
 from src.agents.plugins.gateway_agent import GatewayAgentTools, HumanAgent
 from src.agents.plugins.schedule_agent import ScheduleAgentTools
 
@@ -308,7 +307,7 @@ class TestGatewayAgent:
 
     @pytest.mark.asyncio
     async def test_transfer_context(self, tools: GatewayAgentTools):
-        q = await tools.queue_customer("t-1", "conv-1")
+        await tools.queue_customer("t-1", "conv-1")
         result = await tools.transfer_context(
             "t-1", "conv-1",
             summary="Customer needs help with billing",

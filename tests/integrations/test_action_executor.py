@@ -9,7 +9,7 @@ rate limit handling, and tenant-level HITL overrides.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -18,7 +18,6 @@ import pytest
 from src.integrations.action_executor import (
     AIAction,
     ActionExecutor,
-    ActionResult,
     ActionStatus,
     ActionType,
     HITLPolicy,
@@ -29,7 +28,6 @@ from src.integrations.manifest import (
     IntegrationManifest,
 )
 from src.integrations.models import (
-    IntegrationError,
     MessageDirection,
     NormalizedContact,
     NormalizedMessage,

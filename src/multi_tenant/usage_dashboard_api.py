@@ -59,7 +59,6 @@ logger = logging.getLogger(__name__)
 class UsageDashboardResponse(CamelCaseModel):
     """Layer 1: Real-time usage dashboard for the current billing period."""
 
-
     tenant_id: str
     billing_period: str
 
@@ -85,7 +84,6 @@ class UsageDashboardResponse(CamelCaseModel):
 class DailyVolumeEntry(CamelCaseModel):
     """A single day's conversation volume."""
 
-
     date: str = Field(description="Date (YYYY-MM-DD)")
     total: int = Field(description="Total conversations")
     billable: int = Field(description="Billable conversations")
@@ -94,7 +92,6 @@ class DailyVolumeEntry(CamelCaseModel):
 class DailyVolumeResponse(CamelCaseModel):
     """Daily volume breakdown for chart rendering."""
 
-
     tenant_id: str
     billing_period: str
     days: list[DailyVolumeEntry]
@@ -102,7 +99,6 @@ class DailyVolumeResponse(CamelCaseModel):
 
 class ConversationSummary(CamelCaseModel):
     """Compact conversation record for list endpoints."""
-
 
     conversation_id: str
     status: str | None = None
@@ -120,7 +116,6 @@ class ConversationSummary(CamelCaseModel):
 class ConversationListResponse(CamelCaseModel):
     """Paginated list of conversations with metadata."""
 
-
     tenant_id: str
     billing_period: str
     total_count: int = Field(description="Total matching conversations")
@@ -131,7 +126,6 @@ class ConversationListResponse(CamelCaseModel):
 
 class ConversationDetailResponse(CamelCaseModel):
     """Full billing detail for a single conversation (Layer 2)."""
-
 
     conversation_id: str
     tenant_id: str
@@ -202,11 +196,15 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 # Layer 1: Real-time usage dashboard
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/usage",
     response_model=UsageDashboardResponse,
     summary="Get real-time usage dashboard",
-    description="Returns current conversation counts, allowance remaining, overage estimate, pack balance, and active billing alerts for the authenticated tenant.",
+    description=(
+        "Returns current conversation counts, allowance remaining, overage estimate, pack balance, and active billing "
+        "alerts for the authenticated tenant."
+    ),
 )
 async def get_usage_dashboard(
     billing_period: str | None = Query(
@@ -269,6 +267,7 @@ async def get_usage_dashboard(
 # Layer 1 supplement: daily volume chart data
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/usage/daily",
     response_model=DailyVolumeResponse,
@@ -325,7 +324,7 @@ async def get_daily_volume(
     period_end = f"{next_year:04d}-{next_month:02d}-01T00:00:00Z"
 
     # Fetch all conversations in the period
-    conversations = await repo.list_billable(
+    await repo.list_billable(
         tenant_id=ctx.tenant_id,
         since=period_start,
         until=period_end,
@@ -382,11 +381,14 @@ async def get_daily_volume(
 # Layer 2: Per-conversation audit trail
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/conversations",
     response_model=ConversationListResponse,
     summary="List billable conversations",
-    description="Returns a paginated list of billable conversations for the authenticated tenant with compact summaries.",
+    description=(
+        "Returns a paginated list of billable conversations for the authenticated tenant with compact summaries."
+    ),
     responses={
         400: {"description": "Invalid billing_period format"},
     },
@@ -638,11 +640,15 @@ async def export_conversations_csv(
 # Layer 2: Single conversation billing detail
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/conversations/{conversation_id}",
     response_model=ConversationDetailResponse,
     summary="Get conversation billing detail",
-    description="Returns the complete billing attribution record for a single conversation including agents invoked, model used, and Critic pass/fail.",
+    description=(
+        "Returns the complete billing attribution record for a single conversation including agents invoked, model "
+        "used, and Critic pass/fail."
+    ),
     responses={
         404: {"description": "Conversation not found"},
     },

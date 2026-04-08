@@ -9,7 +9,6 @@ Run:
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
-import pytest
 
 from src.multi_tenant.api_models import CamelCaseModel
 

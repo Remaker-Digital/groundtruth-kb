@@ -31,7 +31,7 @@ Total: 32 tests
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -45,7 +45,6 @@ from src.multi_tenant.superadmin_api import (
     configure_superadmin_services,
 )
 from src.multi_tenant.status_api import (
-    ActiveIncidentPublic,
     PublicStatusResponse,
     configure_status_api,
 )

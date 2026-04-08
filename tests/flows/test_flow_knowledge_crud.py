@@ -19,11 +19,10 @@ SPEC-1843: Zero-knowledge architecture.
 
 from __future__ import annotations
 
-from unittest.mock import patch, AsyncMock
 
 import pytest
 
-from tests.conftest import STARTER_TENANT_ID, MockCosmosManager
+from tests.conftest import STARTER_TENANT_ID
 from src.multi_tenant.repositories.base import EncryptedFieldPatchError
 from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
 
@@ -94,7 +93,7 @@ class TestFlowKnowledgeArticleEncryption:
 
         repo = KnowledgeBaseRepository()
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakeArticle(
@@ -150,7 +149,7 @@ class TestFlowKnowledgeArticleIsolation:
 
         repo = KnowledgeBaseRepository()
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             # Create for starter tenant
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
@@ -166,7 +165,7 @@ class TestFlowKnowledgeArticleIsolation:
             # MockContainerProxy doesn't enforce partition keys, but the
             # repository's read() should use tenant_id as partition_key
             try:
-                doc = await repo.read("t-attacker-999", "kb-isolated-001")
+                await repo.read("t-attacker-999", "kb-isolated-001")
                 # If it returns, verify it's not the starter's data
                 # (In real Cosmos, this would 404 due to partition key mismatch)
             except Exception:

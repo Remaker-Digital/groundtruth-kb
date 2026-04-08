@@ -15,7 +15,7 @@ Covers: ConversationSession (start_conversation, add_customer_message,
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -36,7 +36,6 @@ from src.chat.session import (
     _end_reason_to_status,
     _resolve_customer_id,
     configure_conversation_session,
-    get_conversation_session,
 )
 from src.multi_tenant.conversation_meter import ConversationEndReason, MAX_TURNS
 from src.multi_tenant.cosmos_schema import ConversationStatus, TenantTier
@@ -134,7 +133,7 @@ class TestStartConversation:
     @pytest.mark.asyncio
     async def test_start_with_initial_message(self, session, mock_repo):
         request = ConversationStartRequest(initial_message="Hello!")
-        result = await session.start_conversation("tenant-001", request)
+        await session.start_conversation("tenant-001", request)
 
         # Verify the document created has an initial message
         call_args = mock_repo.create.call_args
@@ -147,7 +146,7 @@ class TestStartConversation:
     async def test_start_with_visitor_identity(self, session, mock_repo):
         visitor = VisitorIdentity(customer_id="cust-abc", email="a@b.com")
         request = ConversationStartRequest(visitor=visitor)
-        result = await session.start_conversation("tenant-001", request)
+        await session.start_conversation("tenant-001", request)
 
         call_args = mock_repo.create.call_args
         doc = call_args.args[1]
@@ -272,7 +271,7 @@ class TestAddCustomerMessage:
 
         # Verify append_message was called (content should be scrubbed)
         call_args = mock_repo.append_message.call_args
-        msg = call_args.kwargs["message"]
+        call_args.kwargs["message"]
         # The scrubbed content should not contain the raw email
         assert result.accepted is True
 
@@ -288,7 +287,7 @@ class TestAddCustomerMessage:
             content="Hello",
             metadata={"page_url": "https://example.com/product/123"},
         )
-        result = await session.add_customer_message("tenant-001", request)
+        await session.add_customer_message("tenant-001", request)
 
         call_args = mock_repo.append_message.call_args
         msg = call_args.kwargs["message"]
@@ -337,7 +336,7 @@ class TestAddAiMessage:
     @pytest.mark.asyncio
     async def test_add_ai_message_with_trace(self, session, mock_repo):
         self._setup_read_modify_write_mocks(mock_repo)
-        msg_id = await session.add_ai_message(
+        await session.add_ai_message(
             "tenant-001",
             "conv-001",
             "Here is the answer.",
@@ -407,7 +406,7 @@ class TestEndConversation:
             feedback_text="Great help!",
             reason="resolved",
         )
-        result = await session.end_conversation(
+        await session.end_conversation(
             "tenant-001", "conv-001", request,
         )
 

@@ -50,9 +50,7 @@ Dependencies:
 from __future__ import annotations
 
 import logging
-import json
-import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -60,7 +58,6 @@ from pydantic import BaseModel, Field
 from src.multi_tenant.cosmos_schema import (
     ConsentStatus,
     TenantTier,
-    TIER_DEFAULTS,
 )
 
 logger = logging.getLogger(__name__)

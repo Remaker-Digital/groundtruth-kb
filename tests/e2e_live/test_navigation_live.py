@@ -10,10 +10,9 @@ present, and the header reflects real tenant configuration.
 
 import re
 
-import pytest
 from playwright.sync_api import Page
 
-from tests.e2e_live.conftest import NAV_ITEMS, _navigate_admin_to
+from tests.e2e_live.conftest import NAV_ITEMS
 
 
 # ---------------------------------------------------------------------------

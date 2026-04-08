@@ -369,7 +369,7 @@ class TestKnowledgeVectorizerEmbedding:
     async def test_embed_entry_active(self, vectorizer: KnowledgeVectorizer) -> None:
         """Active entry gets embedded (dev-mode zero vectors)."""
         entry = _make_kb_entry()
-        result = await vectorizer.embed_entry(TENANT_ID, entry)
+        await vectorizer.embed_entry(TENANT_ID, entry)
         # patch was called with embedding data
         vectorizer._kb_repo.patch.assert_called_once()
         call_args = vectorizer._kb_repo.patch.call_args
@@ -984,7 +984,6 @@ class TestAdminAPIEmbedding:
     async def test_create_triggers_embedding(self) -> None:
         """POST /api/admin/knowledge triggers embedding."""
         from src.multi_tenant.admin_knowledge_api import (
-            _knowledge_vectorizer,
             configure_admin_knowledge_services,
         )
 

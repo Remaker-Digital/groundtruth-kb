@@ -8,7 +8,6 @@ unarchive, add_note, search, and the _extract_search_snippet helper.
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,7 +18,6 @@ from src.multi_tenant.admin_conversation_api import (
     _get_repo,
     _read_conversation,
     configure_admin_conversation_services,
-    router,
 )
 from src.multi_tenant.cosmos_schema import ConversationStatus
 from src.multi_tenant.repository import DocumentNotFoundError
@@ -264,7 +262,7 @@ class TestListConversations:
 
         from src.multi_tenant.admin_conversation_api import list_conversations
 
-        result = await list_conversations(
+        await list_conversations(
             status="escalated", customer_id=None, since=None, until=None,
             assigned_to=None, archived=None, offset=0, limit=50, ctx=mock_ctx,
         )

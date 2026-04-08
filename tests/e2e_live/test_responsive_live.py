@@ -8,7 +8,6 @@ collapse, content reflow, stat card stacking, and form width.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
-import re
 
 import pytest
 from playwright.sync_api import Page
@@ -73,7 +72,6 @@ class TestDesktopLayout:
         shared_admin_page.wait_for_timeout(500)
 
         # Check if preview element is positioned to the right
-        viewport_width = 1440
         main_box = _get_bounding_box(shared_admin_page, "main")
         if main_box:
             assert main_box["width"] > 800, (
@@ -145,7 +143,7 @@ class TestTabletLayout:
 
         # Either the burger is shown OR the sidebar collapses
         # (exact behavior depends on the Mantine responsive breakpoint)
-        has_responsive = burger.count() > 0 or not sidebar_visible
+        burger.count() > 0 or not sidebar_visible
         # At 768px, the sidebar may still be visible but narrower
         # Accept either collapsed or narrow sidebar
         if sidebar_visible:

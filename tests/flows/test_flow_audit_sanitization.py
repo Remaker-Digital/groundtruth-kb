@@ -20,7 +20,6 @@ GOV-19: Outside-in testing.
 
 from __future__ import annotations
 
-import pytest
 
 from src.multi_tenant.audit_sanitizer import (
     ALLOWED_PAYLOAD_FIELDS,

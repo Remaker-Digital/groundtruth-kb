@@ -29,7 +29,6 @@ from src.agents.base import AgentRedBaseAgent
 from src.multi_tenant.critic_policy import (
     SAFE_FALLBACK_MESSAGE,
     CriticBlockReason,
-    CriticResult,
     CriticVerdict,
 )
 
@@ -161,7 +160,7 @@ class CriticSupervisorAgent(AgentRedBaseAgent):
                 parsed = {}
 
             verdict_str = parsed.get("verdict", "rejected")
-            reasoning = parsed.get("reasoning", "")
+            parsed.get("reasoning", "")
             try:
                 verdict = CriticVerdict(verdict_str)
             except ValueError:

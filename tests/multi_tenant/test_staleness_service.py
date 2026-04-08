@@ -20,7 +20,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -517,7 +517,7 @@ class TestRefreshOperations:
         vec.embed_batch.return_value = 3
 
         svc = self._make_service(repo=repo, vectorizer=vec)
-        count = await svc.refresh_stale(TENANT_ID, max_entries=3)
+        await svc.refresh_stale(TENANT_ID, max_entries=3)
 
         # embed_batch should have been called with at most 3 entries
         call_args = vec.embed_batch.call_args

@@ -16,12 +16,10 @@ Tests cover:
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
 from src.agents.plugins.registry import (
-    AgentStatus,
     PluginAgentDefinition,
     PluginAgentRegistry,
 )

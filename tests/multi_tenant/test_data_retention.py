@@ -16,10 +16,8 @@ Run:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
-import pytest
 
 from src.multi_tenant.cosmos_schema import (
     AuditEventType,
@@ -27,11 +25,9 @@ from src.multi_tenant.cosmos_schema import (
     TIER_DEFAULTS,
 )
 from src.multi_tenant.data_retention import (
-    DELETION_BATCH_SIZE,
     UNLIMITED_RETENTION_TIERS,
     DataRetentionService,
     RetentionScanResult,
-    TenantRetentionResult,
     configure_retention_service,
     get_retention_service,
 )

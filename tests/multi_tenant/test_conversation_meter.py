@@ -14,7 +14,7 @@ Work Item: P0 launch-blocker tests.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -27,13 +27,10 @@ from src.multi_tenant.conversation_meter import (
     RECONCILIATION_DISCREPANCY_THRESHOLD,
     ConversationEndReason,
     ConversationMeter,
-    MeterResult,
-    ReconciliationResult,
     UsageAlertType,
     UsageDashboard,
 )
 from src.multi_tenant.cosmos_schema import (
-    AuditEventType,
     ConversationStatus,
     TenantTier,
     TIER_DEFAULTS,

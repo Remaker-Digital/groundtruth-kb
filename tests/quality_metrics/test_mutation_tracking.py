@@ -4,7 +4,6 @@
 """
 from __future__ import annotations
 
-import pytest
 
 from src.quality_metrics.mutation_tracking import (
     parse_mutmut_results,

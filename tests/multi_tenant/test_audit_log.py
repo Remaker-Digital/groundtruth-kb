@@ -16,18 +16,14 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
-import pytest
 
 from src.multi_tenant.cosmos_schema import AuditEventType
 from src.multi_tenant.admin_audit_api import (
     VALID_EVENT_TYPES,
-    AuditEventResponse,
-    AuditListResponse,
     configure_admin_audit_services,
     router,
 )
@@ -175,7 +171,7 @@ class TestAuditQueryEndpoint:
             )
 
         assert resp.status_code == 200
-        body = resp.json()
+        resp.json()
         # Verify the filter was passed to the repo
         call_kwargs = mock_repo.query_by_tenant.call_args.kwargs
         assert call_kwargs.get("event_type") == AuditEventType.DATA_EXPORTED.value
@@ -392,7 +388,7 @@ class TestErrorHandling:
         """Invalid event_type query param returns 400."""
         with patch(
             "src.multi_tenant.admin_audit_api._audit_repo"
-        ) as mock_repo:
+        ):
             resp = app_client.get(
                 _url("/api/audit?event_type=INVALID_TYPE", tenant_id=PROFESSIONAL_TENANT_ID),
                 headers=auth_headers_api_key(TEST_API_KEY_PROFESSIONAL),
@@ -405,7 +401,7 @@ class TestErrorHandling:
         """Invalid event_type on CSV export returns 400."""
         with patch(
             "src.multi_tenant.admin_audit_api._audit_repo"
-        ) as mock_repo:
+        ):
             resp = app_client.get(
                 _url("/api/audit/export?event_type=BOGUS", tenant_id=PROFESSIONAL_TENANT_ID),
                 headers=auth_headers_api_key(TEST_API_KEY_PROFESSIONAL),

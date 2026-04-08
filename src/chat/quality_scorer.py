@@ -15,7 +15,6 @@ document's message metadata under ``quality_score``.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from src.chat.models import QualityScore
 

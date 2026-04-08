@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from html import escape
 from typing import Any
 
@@ -52,23 +52,24 @@ def _format_transcript_html(messages: list[dict[str, Any]]) -> str:
                 time_str = ""
 
         rows.append(
-            f'<tr>'
+            f"<tr>"
             f'<td style="padding:8px 12px;vertical-align:top;color:{color};'
             f'font-weight:600;white-space:nowrap;font-size:13px;">'
-            f'{escape(label)}'
-            f'{"&nbsp;<span style=&quot;color:#999;font-weight:400;&quot;>" + escape(time_str) + "</span>" if time_str else ""}'
-            f'</td>'
+            f"{escape(label)}"
+            f"{'&nbsp;<span style=&quot;color:#999;font-weight:400;&quot;>'
+              + escape(time_str) + '</span>' if time_str else ''}"
+            f"</td>"
             f'<td style="padding:8px 12px;font-size:13px;color:#333;">'
-            f'{escape(content)}'
-            f'</td>'
-            f'</tr>'
+            f"{escape(content)}"
+            f"</td>"
+            f"</tr>"
         )
 
     return (
         '<table style="width:100%;border-collapse:collapse;'
         'border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">'
-        f'{"".join(rows)}'
-        '</table>'
+        f"{''.join(rows)}"
+        "</table>"
     )
 
 
@@ -84,17 +85,20 @@ def _build_customer_email_html(
 ) -> str:
     """Build HTML body for the customer escalation notification."""
     return f"""\
-<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;color:#333;">
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,
+sans-serif;max-width:600px;margin:0 auto;color:#333;">
   <h2 style="color:#222;margin-bottom:4px;">{escape(store_name)}</h2>
   <p style="color:#666;margin-top:0;">Your support request has been escalated</p>
   <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">
   <p>A member of our team will review your request and respond directly via email
   within <strong>{response_hours} hours</strong>.</p>
-  <p style="color:#888;font-size:13px;">If you don't see a reply, please check your spam folder.</p>
+  <p style="color:#888;font-size:13px;">If you don't see a reply,
+  please check your spam folder.</p>
   <h3 style="color:#444;font-size:14px;margin-bottom:8px;">Conversation transcript</h3>
   {transcript_html}
   <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">
-  <p style="color:#999;font-size:11px;">This email was sent by {escape(store_name)} via Agent Red Customer Experience.</p>
+  <p style="color:#999;font-size:11px;">This email was sent by
+  {escape(store_name)} via Agent Red Customer Experience.</p>
 </div>"""
 
 
@@ -113,11 +117,10 @@ def _build_agent_email_html(
     conversation_id: str,
 ) -> str:
     """Build HTML body for the agent escalation notification."""
-    urgency_color = {"high": "#d32f2f", "medium": "#f57c00", "low": "#388e3c"}.get(
-        urgency, "#666"
-    )
+    urgency_color = {"high": "#d32f2f", "medium": "#f57c00", "low": "#388e3c"}.get(urgency, "#666")
     return f"""\
-<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;color:#333;">
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,
+sans-serif;max-width:600px;margin:0 auto;color:#333;">
   <h2 style="color:#222;margin-bottom:4px;">Escalation — {escape(store_name)}</h2>
   <p style="color:#666;margin-top:0;">A customer conversation has been escalated to you.</p>
   <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">
@@ -195,13 +198,18 @@ async def send_escalation_emails(
         results["customer"] = status
         logger.info(
             "Escalation email to customer: tenant=%s conv=%s to=%s status=%s",
-            tenant_id, conversation_id[:8], customer_email, status,
+            tenant_id,
+            conversation_id[:8],
+            customer_email,
+            status,
         )
     except Exception:
         results["customer"] = "failed"
         logger.warning(
             "Failed to send customer escalation email: tenant=%s conv=%s",
-            tenant_id, conversation_id[:8], exc_info=True,
+            tenant_id,
+            conversation_id[:8],
+            exc_info=True,
         )
 
     # --- Agent email (with Reply-To: customer) ---
@@ -216,12 +224,14 @@ async def send_escalation_emails(
             conversation_id=conversation_id,
         )
         # Use _send_acs_email_sync directly to add replyTo field
-        from src.multi_tenant.alert_delivery import _send_acs_email_sync, SENDER_ADDRESS
+        from src.multi_tenant.alert_delivery import SENDER_ADDRESS
         from azure.core.pipeline.policies import RetryPolicy
         from azure.communication.email import EmailClient
 
         retry_policy = RetryPolicy(
-            retry_total=2, retry_backoff_factor=1, retry_backoff_max=5,
+            retry_total=2,
+            retry_backoff_factor=1,
+            retry_backoff_max=5,
         )
         client = EmailClient.from_connection_string(conn_str, retry_policy=retry_policy)
         message = {
@@ -243,13 +253,19 @@ async def send_escalation_emails(
         results["agent"] = status
         logger.info(
             "Escalation email to agent: tenant=%s conv=%s to=%s reply_to=%s status=%s",
-            tenant_id, conversation_id[:8], agent_email, customer_email, status,
+            tenant_id,
+            conversation_id[:8],
+            agent_email,
+            customer_email,
+            status,
         )
     except Exception:
         results["agent"] = "failed"
         logger.warning(
             "Failed to send agent escalation email: tenant=%s conv=%s",
-            tenant_id, conversation_id[:8], exc_info=True,
+            tenant_id,
+            conversation_id[:8],
+            exc_info=True,
         )
 
     return results

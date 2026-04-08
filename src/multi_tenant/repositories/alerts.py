@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from azure.cosmos.exceptions import (
-    CosmosResourceExistsError,
     CosmosResourceNotFoundError,
 )
 
@@ -24,7 +23,6 @@ from src.multi_tenant.cosmos_client import get_cosmos_manager
 from src.multi_tenant.cosmos_schema import (
     COLLECTION_ALERT_HISTORY,
     COLLECTION_ALERT_RULES,
-    AlertRuleType,
     AlertSeverity,
 )
 

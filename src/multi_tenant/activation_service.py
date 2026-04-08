@@ -118,11 +118,22 @@ class ValidationResult:
 # Fields excluded from draft diff (metadata, not merchant config)
 # ---------------------------------------------------------------------------
 
-_METADATA_FIELDS = frozenset({
-    "id", "tenant_id", "version", "is_current", "config_state",
-    "config_name", "appearance_name", "created_at", "created_by",
-    "activated_at", "activated_by", "widget_key",
-})
+_METADATA_FIELDS = frozenset(
+    {
+        "id",
+        "tenant_id",
+        "version",
+        "is_current",
+        "config_state",
+        "config_name",
+        "appearance_name",
+        "created_at",
+        "created_by",
+        "activated_at",
+        "activated_by",
+        "widget_key",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +180,9 @@ class ActivationService:
     # ------------------------------------------------------------------
 
     async def _ensure_config_state(
-        self, doc: dict[str, Any], tenant_id: str,
+        self,
+        doc: dict[str, Any],
+        tenant_id: str,
     ) -> dict[str, Any]:
         """Backfill config_state on old documents that lack the field.
 
@@ -254,10 +267,7 @@ class ActivationService:
                     # Patch the existing draft document.
                     # Cosmos DB limits patch to 10 operations per request,
                     # so batch into groups of 10.
-                    all_ops = [
-                        {"op": "set", "path": f"/{key}", "value": value}
-                        for key, value in changes.items()
-                    ]
+                    all_ops = [{"op": "set", "path": f"/{key}", "value": value} for key, value in changes.items()]
                     _COSMOS_PATCH_LIMIT = 10
                     for i in range(0, len(all_ops), _COSMOS_PATCH_LIMIT):
                         batch = all_ops[i : i + _COSMOS_PATCH_LIMIT]
@@ -269,7 +279,8 @@ class ActivationService:
 
                     logger.info(
                         "Updated draft for tenant=%s: %d fields changed",
-                        tenant_id[:8], len(changes),
+                        tenant_id[:8],
+                        len(changes),
                     )
 
                     return DraftSaveResult(
@@ -303,25 +314,31 @@ class ActivationService:
                     draft_uid = uuid.uuid4().hex[:8]
                     now = datetime.now(timezone.utc).isoformat()
 
-                    base_config.update({
-                        "id": f"{tenant_id}:{draft_version}:{draft_uid}",
-                        "tenant_id": tenant_id,
-                        "version": draft_version,
-                        "is_current": False,
-                        "config_state": ConfigState.DRAFT.value,
-                        "created_at": now,
-                        "created_by": actor,
-                        "activated_at": None,
-                        "activated_by": None,
-                    })
+                    base_config.update(
+                        {
+                            "id": f"{tenant_id}:{draft_version}:{draft_uid}",
+                            "tenant_id": tenant_id,
+                            "version": draft_version,
+                            "is_current": False,
+                            "config_state": ConfigState.DRAFT.value,
+                            "created_at": now,
+                            "created_by": actor,
+                            "activated_at": None,
+                            "activated_by": None,
+                        }
+                    )
 
                     await self._prefs_repo.upsert(
-                        tenant_id, PreferencesDocument(**base_config),
+                        tenant_id,
+                        PreferencesDocument(**base_config),
                     )
 
                     logger.info(
                         "Created draft v%d for tenant=%s from active v%d with %d changes",
-                        draft_version, tenant_id[:8], active_version, len(changes),
+                        draft_version,
+                        tenant_id[:8],
+                        active_version,
+                        len(changes),
                     )
 
                     return DraftSaveResult(
@@ -334,7 +351,9 @@ class ActivationService:
         except Exception as exc:
             logger.error(
                 "Failed to save draft for tenant=%s: %s",
-                tenant_id[:8], exc, exc_info=True,
+                tenant_id[:8],
+                exc,
+                exc_info=True,
             )
             return DraftSaveResult(
                 success=False,
@@ -400,7 +419,9 @@ class ActivationService:
                     )
                     logger.info(
                         "Updated %s signal on draft v%d for tenant=%s",
-                        signal_field, draft.get("version", 0), tenant_id[:8],
+                        signal_field,
+                        draft.get("version", 0),
+                        tenant_id[:8],
                     )
                     return DraftSaveResult(
                         success=True,
@@ -422,25 +443,30 @@ class ActivationService:
                     base_config[signal_field] = now
 
                     draft_version = active_version + 1
-                    base_config.update({
-                        "id": f"{tenant_id}:{draft_version}",
-                        "tenant_id": tenant_id,
-                        "version": draft_version,
-                        "is_current": False,
-                        "config_state": ConfigState.DRAFT.value,
-                        "created_at": now,
-                        "created_by": actor,
-                        "activated_at": None,
-                        "activated_by": None,
-                    })
+                    base_config.update(
+                        {
+                            "id": f"{tenant_id}:{draft_version}",
+                            "tenant_id": tenant_id,
+                            "version": draft_version,
+                            "is_current": False,
+                            "config_state": ConfigState.DRAFT.value,
+                            "created_at": now,
+                            "created_by": actor,
+                            "activated_at": None,
+                            "activated_by": None,
+                        }
+                    )
 
                     await self._prefs_repo.upsert(
-                        tenant_id, PreferencesDocument(**base_config),
+                        tenant_id,
+                        PreferencesDocument(**base_config),
                     )
 
                     logger.info(
                         "Created draft v%d for tenant=%s via %s signal",
-                        draft_version, tenant_id[:8], signal_field,
+                        draft_version,
+                        tenant_id[:8],
+                        signal_field,
                     )
 
                     return DraftSaveResult(
@@ -452,7 +478,9 @@ class ActivationService:
         except Exception as exc:
             logger.error(
                 "Failed to create signal draft for tenant=%s: %s",
-                tenant_id[:8], exc, exc_info=True,
+                tenant_id[:8],
+                exc,
+                exc_info=True,
             )
             return DraftSaveResult(
                 success=False,
@@ -464,7 +492,9 @@ class ActivationService:
     # ------------------------------------------------------------------
 
     async def get_draft_state(
-        self, tenant_id: str, tier: TenantTier,
+        self,
+        tenant_id: str,
+        tier: TenantTier,
     ) -> DraftState:
         """Return the current draft state for the activation banner.
 
@@ -567,7 +597,8 @@ class ActivationService:
 
         logger.info(
             "Auto-provisioning widget key for tenant=%s (missing from %s config)",
-            tenant_id[:8], target.get("config_state", "unknown"),
+            tenant_id[:8],
+            target.get("config_state", "unknown"),
         )
 
         raw_key = generate_widget_key(tenant_id)
@@ -602,7 +633,8 @@ class ActivationService:
                 logger.warning(
                     "Widget key hash write to tenant doc FAILED for tenant=%s — "
                     "widget auth will not work until repaired",
-                    tenant_id[:8], exc_info=True,
+                    tenant_id[:8],
+                    exc_info=True,
                 )
 
         logger.info(
@@ -615,7 +647,9 @@ class ActivationService:
     # ------------------------------------------------------------------
 
     def _validate_tier_entitlements(
-        self, draft: dict, tier: TenantTier,
+        self,
+        draft: dict,
+        tier: TenantTier,
     ) -> list[dict[str, str]]:
         """Check that draft config doesn't use features above the tenant's tier.
 
@@ -634,13 +668,14 @@ class ActivationService:
         if configured_layers and isinstance(configured_layers, list):
             for layer in configured_layers:
                 if layer not in allowed_layers:
-                    errors.append({
-                        "field": "memory_layers",
-                        "message": (
-                            f"Memory layer {layer} is not available on the "
-                            f"{tier.value} tier. Upgrade to access it."
-                        ),
-                    })
+                    errors.append(
+                        {
+                            "field": "memory_layers",
+                            "message": (
+                                f"Memory layer {layer} is not available on the {tier.value} tier. Upgrade to access it."
+                            ),
+                        }
+                    )
                     break  # One error is enough
 
         return errors
@@ -650,7 +685,9 @@ class ActivationService:
     # ------------------------------------------------------------------
 
     async def validate_for_activation(
-        self, tenant_id: str, tier: TenantTier,
+        self,
+        tenant_id: str,
+        tier: TenantTier,
     ) -> ValidationResult:
         """Run activation validation rules.
 
@@ -673,7 +710,15 @@ class ActivationService:
             else:
                 return ValidationResult(
                     can_activate=False,
-                    hard_errors=[{"field": "_system", "message": "Save your configuration first. Go to Agent Configuration, review your settings, and click 'Save draft inputs' before activating."}],
+                    hard_errors=[
+                        {
+                            "field": "_system",
+                            "message": (
+                                "Save your configuration first. Go to Agent Configuration, "
+                                "review your settings, and click 'Save draft inputs' before activating."
+                            ),
+                        }
+                    ],
                 )
 
         hard_errors: list[dict[str, str]] = []
@@ -682,49 +727,53 @@ class ActivationService:
         # Hard block: brand_name
         brand_name = draft.get("brand_name")
         if not brand_name or not str(brand_name).strip():
-            hard_errors.append({
-                "field": "brand_name",
-                "message": "Brand name is required before activation",
-                "page": "agent-configuration",
-            })
+            hard_errors.append(
+                {
+                    "field": "brand_name",
+                    "message": "Brand name is required before activation",
+                    "page": "agent-configuration",
+                }
+            )
 
         # Widget key: auto-provisioned during activation if missing
         widget_key = draft.get("widget_key")
         if not widget_key:
-            warnings.append({
-                "field": "widget_key",
-                "message": "Widget key will be generated automatically during activation",
-                "page": "system",
-            })
+            warnings.append(
+                {
+                    "field": "widget_key",
+                    "message": "Widget key will be generated automatically during activation",
+                    "page": "system",
+                }
+            )
 
         # Hard block: brand_voice (mandatory — session 21)
         brand_voice = draft.get("brand_voice")
         if not brand_voice or not str(brand_voice).strip():
-            hard_errors.append({
-                "field": "brand_voice",
-                "message": "Brand voice is required before activation",
-                "page": "agent-configuration",
-            })
+            hard_errors.append(
+                {
+                    "field": "brand_voice",
+                    "message": "Brand voice is required before activation",
+                    "page": "agent-configuration",
+                }
+            )
 
         # Warning: KB articles
         if self._kb_repo is not None:
             try:
                 articles = await self._kb_repo.query(
                     tenant_id=tenant_id,
-                    query_text=(
-                        "SELECT VALUE COUNT(1) FROM c "
-                        "WHERE c.is_active = true"
-                    ),
+                    query_text=("SELECT VALUE COUNT(1) FROM c WHERE c.is_active = true"),
                     max_items=1,
                 )
                 kb_count = articles[0] if articles else 0
                 if kb_count < 1:
-                    warnings.append({
-                        "field": "knowledge_base",
-                        "message": "No published knowledge base articles — AI will use "
-                                   "general knowledge only",
-                        "page": "knowledge-base",
-                    })
+                    warnings.append(
+                        {
+                            "field": "knowledge_base",
+                            "message": "No published knowledge base articles — AI will use general knowledge only",
+                            "page": "knowledge-base",
+                        }
+                    )
             except Exception:
                 logger.debug("KB count check failed during validation", exc_info=True)
 
@@ -819,7 +868,15 @@ class ActivationService:
                         )
                     return ActivationResult(
                         success=False,
-                        errors=[{"field": "_system", "message": "Save your configuration first. Go to Agent Configuration, review your settings, and click 'Save draft inputs' before activating."}],
+                        errors=[
+                            {
+                                "field": "_system",
+                                "message": (
+                                "Save your configuration first. Go to Agent Configuration, "
+                                "review your settings, and click 'Save draft inputs' before activating."
+                            ),
+                            }
+                        ],
                     )
 
                 active = await self._prefs_repo.get_active(tenant_id)
@@ -900,14 +957,12 @@ class ActivationService:
                 first_activation_warnings: list[str] = []
                 if active is None:
                     try:
-                        first_activation_warnings = await self._maybe_start_ingestion(
-                            tenant_id
-                        )
+                        first_activation_warnings = await self._maybe_start_ingestion(tenant_id)
                     except Exception:
                         logger.warning(
-                            "Post-activation ingestion failed for tenant=%s "
-                            "(activation itself succeeded)",
-                            tenant_id[:8], exc_info=True,
+                            "Post-activation ingestion failed for tenant=%s (activation itself succeeded)",
+                            tenant_id[:8],
+                            exc_info=True,
                         )
                         first_activation_warnings = [
                             "Storefront ingestion could not start. "
@@ -915,10 +970,7 @@ class ActivationService:
                         ]
 
                 result_warnings = list(validation.warnings or [])
-                result_warnings.extend(
-                    {"field": "_system", "message": w}
-                    for w in first_activation_warnings
-                )
+                result_warnings.extend({"field": "_system", "message": w} for w in first_activation_warnings)
 
                 return ActivationResult(
                     success=True,
@@ -929,7 +981,9 @@ class ActivationService:
         except Exception as exc:
             logger.error(
                 "Failed to activate config for tenant=%s: %s",
-                tenant_id[:8], exc, exc_info=True,
+                tenant_id[:8],
+                exc,
+                exc_info=True,
             )
             return ActivationResult(
                 success=False,
@@ -970,7 +1024,8 @@ class ActivationService:
 
                     secret_service = get_secret_service()
                     access_token = await secret_service.get_secret(
-                        tenant_id, TenantSecretType.SHOPIFY_TOKEN,
+                        tenant_id,
+                        TenantSecretType.SHOPIFY_TOKEN,
                     )
                 except Exception:
                     pass
@@ -979,13 +1034,9 @@ class ActivationService:
 
                     access_token = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
                 if not access_token:
-                    warnings.append(
-                        "Shopify access token not available — "
-                        "storefront ingestion skipped."
-                    )
+                    warnings.append("Shopify access token not available — storefront ingestion skipped.")
                     logger.warning(
-                        "First-activation ingestion skipped for tenant %s: "
-                        "no Shopify access token",
+                        "First-activation ingestion skipped for tenant %s: no Shopify access token",
                         tenant_id[:8],
                     )
                 else:
@@ -1004,14 +1055,13 @@ class ActivationService:
                         "may take a few minutes."
                     )
                     logger.info(
-                        "First-activation ingestion dispatched for tenant "
-                        "%s (Shopify: %s)",
-                        tenant_id[:8], shop_domain,
+                        "First-activation ingestion dispatched for tenant %s (Shopify: %s)",
+                        tenant_id[:8],
+                        shop_domain,
                     )
             else:
                 logger.info(
-                    "First activation for tenant %s — no Shopify domain, "
-                    "skipping automatic ingestion",
+                    "First activation for tenant %s — no Shopify domain, skipping automatic ingestion",
                     tenant_id[:8],
                 )
 
@@ -1126,7 +1176,9 @@ class ActivationService:
         except Exception as exc:
             logger.error(
                 "Failed to restore config for tenant=%s: %s",
-                tenant_id[:8], exc, exc_info=True,
+                tenant_id[:8],
+                exc,
+                exc_info=True,
             )
             return RestoreResult(
                 success=False,
@@ -1233,7 +1285,9 @@ class ActivationService:
         except Exception as exc:
             logger.error(
                 "Failed to discard draft for tenant=%s: %s",
-                tenant_id[:8], exc, exc_info=True,
+                tenant_id[:8],
+                exc,
+                exc_info=True,
             )
             return False
 

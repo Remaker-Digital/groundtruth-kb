@@ -12,7 +12,6 @@ Validates that the sanitizer:
 8. SPA query projection returns only safe fields
 """
 import inspect
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -395,8 +394,8 @@ class TestAuditWriteGuard:
                 if "_audit_repo.create(" in line and not line.strip().startswith("#"):
                     violations.append(f"{py_file.name}:{i}: {line.strip()}")
         assert not violations, (
-            f"Direct _audit_repo.create() calls found — must use log_event() "
-            f"for SPEC-1843 sanitization:\n" + "\n".join(violations)
+            "Direct _audit_repo.create() calls found — must use log_event() "
+            "for SPEC-1843 sanitization:\n" + "\n".join(violations)
         )
 
 

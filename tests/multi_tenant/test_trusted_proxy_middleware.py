@@ -387,4 +387,4 @@ class TestMiddlewareRegistration:
 
 
 # Needed for env var test
-import os
+import os  # noqa: E402

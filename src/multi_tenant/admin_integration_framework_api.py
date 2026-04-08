@@ -210,7 +210,7 @@ async def get_setup_instructions(
                 auth_url = mgr.get_authorization_url(
                     integration_id=integration_id,
                     tenant_id=ctx.tenant_id,
-                    redirect_uri=f"/api/integrations/oauth/callback",
+                    redirect_uri="/api/integrations/oauth/callback",
                     scopes=manifest.auth_config.scopes,
                 )
             except Exception:

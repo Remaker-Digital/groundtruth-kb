@@ -32,7 +32,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
-    TIER_DEFAULTS,
     AuditEventType,
     TenantTier,
 )

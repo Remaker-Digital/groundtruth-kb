@@ -15,12 +15,10 @@ Covers all 7 findings from the independent code quality review:
 from __future__ import annotations
 
 import asyncio
-import importlib
 import inspect
 import re
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -438,7 +436,7 @@ class TestRepositoryBarrelSync:
         import src.multi_tenant.repositories as package
 
         for name in package.__all__:
-            obj = getattr(package, name)
+            getattr(package, name)
             # Verify the same object is available from the barrel
             from src.multi_tenant import repository as barrel
             barrel_obj = getattr(barrel, name, None)

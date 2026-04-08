@@ -66,7 +66,6 @@ VALID_ENTRY_TYPES = {"product", "faq", "policy", "custom", "article"}
 class KnowledgeEntryResponse(CamelCaseModel):
     """A single knowledge base entry."""
 
-
     id: str
     tenant_id: str
     entry_type: str
@@ -93,7 +92,6 @@ class KnowledgeEntryResponse(CamelCaseModel):
 class KnowledgeListResponse(CamelCaseModel):
     """Paginated list of knowledge base entries."""
 
-
     tenant_id: str
     total_count: int = Field(description="Total matching entries")
     offset: int
@@ -103,7 +101,6 @@ class KnowledgeListResponse(CamelCaseModel):
 
 class CreateKnowledgeEntryRequest(CamelCaseModel):
     """Request body for POST /api/admin/knowledge."""
-
 
     entry_type: str = Field(
         default="article",
@@ -145,7 +142,6 @@ class CreateKnowledgeEntryRequest(CamelCaseModel):
 
 class UpdateKnowledgeEntryRequest(CamelCaseModel):
     """Request body for PUT /api/admin/knowledge/{id}."""
-
 
     entry_type: str | None = Field(
         default=None,
@@ -194,14 +190,12 @@ class UpdateKnowledgeEntryRequest(CamelCaseModel):
 class DeleteKnowledgeEntryResponse(CamelCaseModel):
     """Response for successful soft-delete."""
 
-
     id: str
     deleted_at: str
 
 
 class UploadResultResponse(CamelCaseModel):
     """Response for document upload (WI #214)."""
-
 
     source_type: str = Field(description="pdf | docx | csv | txt | url")
     source_filename: str | None = Field(default=None, description="Original filename")
@@ -214,7 +208,6 @@ class UploadResultResponse(CamelCaseModel):
 
 class URLImportRequest(CamelCaseModel):
     """Request body for POST /api/admin/knowledge/import-url."""
-
 
     url: str = Field(description="URL to scrape and import")
     entry_type: str = Field(
@@ -236,7 +229,6 @@ class URLImportRequest(CamelCaseModel):
 class StalenessScoreResponse(CamelCaseModel):
     """Staleness score for a single entry."""
 
-
     id: str
     staleness_score: float
     staleness_category: str
@@ -246,7 +238,6 @@ class StalenessScoreResponse(CamelCaseModel):
 
 class StalenessSummaryResponse(CamelCaseModel):
     """Summary of staleness across the tenant's KB."""
-
 
     total_entries: int
     avg_staleness_score: float
@@ -260,14 +251,12 @@ class StalenessSummaryResponse(CamelCaseModel):
 class StaleEntriesResponse(CamelCaseModel):
     """List of stale entries."""
 
-
     entries: list[StalenessScoreResponse]
     threshold: float
 
 
 class ConflictPairResponse(CamelCaseModel):
     """A pair of KB entries with a detected conflict."""
-
 
     entry_a_id: str
     entry_a_title: str
@@ -284,7 +273,6 @@ class ConflictPairResponse(CamelCaseModel):
 
 class ScanResultResponse(CamelCaseModel):
     """Result of a full KB conflict scan."""
-
 
     tenant_id: str
     scanned_at: str
@@ -331,7 +319,6 @@ class ConfigConflictResponse(CamelCaseModel):
 class ChunkPreviewItem(CamelCaseModel):
     """A single chunk in the chunk preview response (C5)."""
 
-
     chunk_index: int
     title: str
     text: str
@@ -345,7 +332,6 @@ class ChunkPreviewResponse(CamelCaseModel):
     Returns a preview of how a KB article would be chunked by the
     document parser, including per-chunk metadata for visualization.
     """
-
 
     entry_id: str
     title: str
@@ -393,7 +379,9 @@ def configure_admin_knowledge_services(
     scanner_status = "enabled" if conflict_scanner else "disabled"
     logger.info(
         "Admin knowledge base API services configured (vectorization=%s, staleness=%s, scanner=%s)",
-        vectorizer_status, staleness_status, scanner_status,
+        vectorizer_status,
+        staleness_status,
+        scanner_status,
     )
 
 
@@ -488,7 +476,10 @@ async def _signal_kb_draft(ctx: "TenantContext") -> None:
     "",
     response_model=KnowledgeListResponse,
     summary="List knowledge base entries",
-    description="Returns a paginated list of knowledge base entries. Supports filtering by type, language, active status, and title search.",
+    description=(
+        "Returns a paginated list of knowledge base entries. Supports filtering by type, language, active status, and "
+        "title search."
+    ),
     responses={
         400: {"description": "Invalid entry_type filter value"},
         503: {"description": "Knowledge base services not initialized"},
@@ -568,7 +559,10 @@ async def list_knowledge_entries(
 @router.get(
     "/export",
     summary="Export knowledge base as CSV",
-    description="Exports all knowledge base entries as a downloadable CSV file with columns for id, type, title, content, tags, language, active status, source info, and timestamps.",
+    description=(
+        "Exports all knowledge base entries as a downloadable CSV file with columns for id, type, title, content, "
+        "tags, language, active status, source info, and timestamps."
+    ),
     responses={
         200: {"content": {"text/csv": {}}, "description": "CSV knowledge base export"},
         503: {"description": "Knowledge base services not initialized"},
@@ -594,37 +588,41 @@ async def export_knowledge_entries(
     writer = csv.writer(output)
 
     # Header
-    writer.writerow([
-        "id",
-        "entry_type",
-        "title",
-        "content",
-        "tags",
-        "language",
-        "is_active",
-        "source_type",
-        "source_filename",
-        "source_url",
-        "created_at",
-        "updated_at",
-    ])
+    writer.writerow(
+        [
+            "id",
+            "entry_type",
+            "title",
+            "content",
+            "tags",
+            "language",
+            "is_active",
+            "source_type",
+            "source_filename",
+            "source_url",
+            "created_at",
+            "updated_at",
+        ]
+    )
 
     for entry in entries:
         tags_str = ";".join(entry.get("tags", []))
-        writer.writerow([
-            entry.get("id", ""),
-            entry.get("entry_type", ""),
-            entry.get("title", ""),
-            entry.get("content", ""),
-            tags_str,
-            entry.get("language", "en"),
-            entry.get("is_active", True),
-            entry.get("source_type", "manual"),
-            entry.get("source_filename", ""),
-            entry.get("source_url", ""),
-            entry.get("created_at", ""),
-            entry.get("updated_at", ""),
-        ])
+        writer.writerow(
+            [
+                entry.get("id", ""),
+                entry.get("entry_type", ""),
+                entry.get("title", ""),
+                entry.get("content", ""),
+                tags_str,
+                entry.get("language", "en"),
+                entry.get("is_active", True),
+                entry.get("source_type", "manual"),
+                entry.get("source_filename", ""),
+                entry.get("source_url", ""),
+                entry.get("created_at", ""),
+                entry.get("updated_at", ""),
+            ]
+        )
 
     logger.info(
         "KB export: entries=%d tenant=%s",
@@ -649,7 +647,10 @@ async def export_knowledge_entries(
     "/staleness",
     response_model=StalenessSummaryResponse,
     summary="Get content staleness summary",
-    description="Returns a summary of content staleness across the knowledge base, including counts of fresh, aging, stale, and very stale entries with the average staleness score.",
+    description=(
+        "Returns a summary of content staleness across the knowledge base, including counts of fresh, aging, stale, "
+        "and very stale entries with the average staleness score."
+    ),
     responses={
         503: {"description": "Staleness service not initialized"},
     },
@@ -679,7 +680,10 @@ async def get_staleness_summary(
     "/stale",
     response_model=StaleEntriesResponse,
     summary="List stale knowledge entries",
-    description="Lists knowledge base entries above the staleness threshold. Default threshold is 0.6, returning stale and very stale entries.",
+    description=(
+        "Lists knowledge base entries above the staleness threshold. Default threshold is 0.6, returning stale and "
+        "very stale entries."
+    ),
     responses={
         503: {"description": "Staleness service not initialized"},
     },
@@ -856,7 +860,10 @@ async def preview_entry_chunks(
     response_model=KnowledgeEntryResponse,
     status_code=201,
     summary="Create knowledge base entry",
-    description="Creates a new knowledge base entry. The entry is immediately active and searchable by the Knowledge Retrieval agent.",
+    description=(
+        "Creates a new knowledge base entry. The entry is immediately active and searchable by the Knowledge Retrieval "
+        "agent."
+    ),
     responses={
         400: {"description": "Invalid entry_type value"},
         503: {"description": "Knowledge base services not initialized"},
@@ -872,7 +879,6 @@ async def create_knowledge_entry(
     Retrieval agent during conversations.
     """
     repo = _get_repo()
-
 
     # Validate entry_type
     if request.entry_type not in VALID_ENTRY_TYPES:
@@ -904,7 +910,7 @@ async def create_knowledge_entry(
         updated_at=now,
     )
 
-    created = await repo.create(ctx.tenant_id, doc)
+    await repo.create(ctx.tenant_id, doc)
 
     logger.info(
         "Knowledge entry created: id=%s type=%s tenant=%s",
@@ -924,7 +930,8 @@ async def create_knowledge_entry(
         except Exception as embed_exc:
             logger.warning(
                 "KB entry embedding failed (non-blocking): id=%s error=%s",
-                entry_id, embed_exc,
+                entry_id,
+                embed_exc,
             )
 
     created_dict = {
@@ -951,7 +958,10 @@ async def create_knowledge_entry(
     "/{entry_id}",
     response_model=KnowledgeEntryResponse,
     summary="Update knowledge base entry",
-    description="Updates an existing knowledge base entry. Only provided fields are updated; omitted fields retain their current values.",
+    description=(
+        "Updates an existing knowledge base entry. Only provided fields are updated; omitted fields retain their "
+        "current values."
+    ),
     responses={
         400: {"description": "Invalid entry_type value"},
         404: {"description": "Knowledge entry not found"},
@@ -1018,10 +1028,7 @@ async def update_knowledge_entry(
     old_status = existing.get("status")
     new_status = request.status
     archiving = new_status == "archived" and old_status != "archived"
-    unarchiving = (
-        new_status in ("published", "draft")
-        and old_status == "archived"
-    )
+    unarchiving = new_status in ("published", "draft") and old_status == "archived"
 
     if archiving:
         # Deactivate on archive so RAG pipeline no longer retrieves this entry
@@ -1063,12 +1070,14 @@ async def update_knowledge_entry(
             )
             logger.info(
                 "Cleared vector embedding for archived entry: id=%s tenant=%s",
-                entry_id, ctx.tenant_id[:8],
+                entry_id,
+                ctx.tenant_id[:8],
             )
         except Exception as clear_exc:
             logger.warning(
                 "Failed to clear embedding for archived entry (non-blocking): id=%s error=%s",
-                entry_id, clear_exc,
+                entry_id,
+                clear_exc,
             )
 
     # Build response from existing + updates
@@ -1115,7 +1124,8 @@ async def update_knowledge_entry(
         except Exception as embed_exc:
             logger.warning(
                 "KB entry re-embedding failed (non-blocking): id=%s error=%s",
-                entry_id, embed_exc,
+                entry_id,
+                embed_exc,
             )
 
     updated["id"] = entry_id
@@ -1132,7 +1142,10 @@ async def update_knowledge_entry(
     "/{entry_id}",
     response_model=DeleteKnowledgeEntryResponse,
     summary="Soft-delete knowledge base entry",
-    description="Sets is_active to false so the entry is no longer returned by the Knowledge Retrieval agent. The data is preserved for audit purposes and can be reactivated via PUT.",
+    description=(
+        "Sets is_active to false so the entry is no longer returned by the Knowledge Retrieval agent. The data is "
+        "preserved for audit purposes and can be reactivated via PUT."
+    ),
     responses={
         404: {"description": "Knowledge entry not found"},
         503: {"description": "Knowledge base services not initialized"},
@@ -1185,7 +1198,10 @@ async def delete_knowledge_entry(
     response_model=UploadResultResponse,
     status_code=201,
     summary="Upload document to knowledge base",
-    description="Uploads a document (PDF, DOCX, CSV, or TXT) and parses it into knowledge base entries. Multi-page documents are chunked with paragraph-aware splitting.",
+    description=(
+        "Uploads a document (PDF, DOCX, CSV, or TXT) and parses it into knowledge base entries. Multi-page documents "
+        "are chunked with paragraph-aware splitting."
+    ),
     responses={
         400: {"description": "Invalid entry_type, missing filename, or empty file"},
         422: {"description": "Document parsing failed or no content extracted"},
@@ -1291,9 +1307,7 @@ async def upload_knowledge_document(
         try:
             await _knowledge_vectorizer.embed_batch(ctx.tenant_id, entries)
         except Exception as embed_exc:
-            logger.warning(
-                "Batch embedding after upload failed (non-blocking): %s", embed_exc
-            )
+            logger.warning("Batch embedding after upload failed (non-blocking): %s", embed_exc)
 
     return UploadResultResponse(
         source_type=parse_result.source_type,
@@ -1315,7 +1329,10 @@ async def upload_knowledge_document(
     response_model=UploadResultResponse,
     status_code=201,
     summary="Import knowledge from URL",
-    description="Scrapes a web page, extracts main text content, and creates knowledge base entries. Navigation, scripts, and non-content elements are stripped.",
+    description=(
+        "Scrapes a web page, extracts main text content, and creates knowledge base entries. Navigation, scripts, and "
+        "non-content elements are stripped."
+    ),
     responses={
         400: {"description": "Invalid entry_type or malformed URL"},
         422: {"description": "URL import failed or no content extracted"},
@@ -1439,9 +1456,7 @@ async def import_knowledge_from_url(
         try:
             await _knowledge_vectorizer.embed_batch(ctx.tenant_id, all_entries)
         except Exception as embed_exc:
-            logger.warning(
-                "Batch embedding after URL import failed (non-blocking): %s", embed_exc
-            )
+            logger.warning("Batch embedding after URL import failed (non-blocking): %s", embed_exc)
 
     return UploadResultResponse(
         source_type=source_type,
@@ -1462,7 +1477,10 @@ async def import_knowledge_from_url(
     "/{entry_id}/verify",
     response_model=StalenessScoreResponse,
     summary="Mark entry as verified",
-    description="Marks a knowledge base entry as verified by a human, updating last_verified_at and recalculating the staleness score.",
+    description=(
+        "Marks a knowledge base entry as verified by a human, updating last_verified_at and recalculating the "
+        "staleness score."
+    ),
     responses={
         404: {"description": "Knowledge entry not found"},
         503: {"description": "Staleness service not initialized"},
@@ -1568,7 +1586,10 @@ async def scan_for_conflicts(
     "/scan/result",
     response_model=ScanResultResponse,
     summary="Get last scan result",
-    description="Returns the most recent conflict scan result if still cached (5-minute TTL). Returns 404 if no recent scan exists.",
+    description=(
+        "Returns the most recent conflict scan result if still cached (5-minute TTL). Returns 404 if no recent scan "
+        "exists."
+    ),
     responses={
         404: {"description": "No recent scan result available"},
         503: {"description": "Conflict scanner not initialized"},
@@ -1836,7 +1857,7 @@ async def create_website_source(
         raise HTTPException(
             status_code=409,
             detail=f"Website source limit reached ({limits['max_sources']} for {tier} tier). "
-                   f"Upgrade your plan or remove an existing source.",
+            f"Upgrade your plan or remove an existing source.",
         )
 
     # --- Enforce tier page limit ---
@@ -1871,12 +1892,15 @@ async def create_website_source(
     await repo.create(ctx.tenant_id, doc)
     logger.info(
         "Website source created: tenant=%s domain=%s max_pages=%d",
-        ctx.tenant_id[:8], domain, effective_max_pages,
+        ctx.tenant_id[:8],
+        domain,
+        effective_max_pages,
     )
 
     # --- Trigger first crawl via ingestion job ---
     try:
         from src.multi_tenant.cosmos_schema import IngestionJobDocument, IngestionJobType
+
         job = IngestionJobDocument(
             id=str(uuid.uuid4()),
             tenant_id=ctx.tenant_id,
@@ -1986,7 +2010,10 @@ async def delete_website_source(
 
     logger.info(
         "Website source deleted: tenant=%s source=%s domain=%s kb_entries_deleted=%d",
-        ctx.tenant_id[:8], source_id[:8], domain, deleted_count,
+        ctx.tenant_id[:8],
+        source_id[:8],
+        domain,
+        deleted_count,
     )
 
     return WebsiteSourceActionResponse(
@@ -2032,7 +2059,9 @@ async def trigger_crawl(
 
     logger.info(
         "Manual crawl triggered: tenant=%s source=%s domain=%s",
-        ctx.tenant_id[:8], source_id[:8], doc.get("domain", ""),
+        ctx.tenant_id[:8],
+        source_id[:8],
+        doc.get("domain", ""),
     )
 
     return WebsiteSourceActionResponse(

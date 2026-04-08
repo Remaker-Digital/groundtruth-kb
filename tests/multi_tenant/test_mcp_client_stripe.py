@@ -7,9 +7,8 @@ Test IDs: MCPS-01 → MCPS-12
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from src.multi_tenant.mcp_client import (
     McpServerConfig,

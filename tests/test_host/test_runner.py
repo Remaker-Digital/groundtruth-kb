@@ -10,12 +10,11 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from test_host.cosmos_writer import CosmosWriter, RunState, TestResult
+from test_host.cosmos_writer import CosmosWriter, RunState
 from test_host.runner import TestRunner
 from test_host.suites import SUITE_CONFIGS
 

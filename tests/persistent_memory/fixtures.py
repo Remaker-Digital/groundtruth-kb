@@ -24,7 +24,6 @@ from src.multi_tenant.cosmos_schema import (
     ConversationDocument,
     ConversationStatus,
     CustomerProfileDocument,
-    MemoryVectorDocument,
     PreferencesDocument,
     TenantDocument,
     TenantStatus,

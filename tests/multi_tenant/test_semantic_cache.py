@@ -13,16 +13,15 @@ Covers:
 
 from __future__ import annotations
 
-import math
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from src.multi_tenant.semantic_cache import (
     EMBEDDING_CACHE_MAX_ENTRIES,
     EMBEDDING_CACHE_TTL_SECONDS,
-    EMBEDDING_COST_PER_1K_TOKENS,
     RESPONSE_CACHE_TTL_SECONDS,
     SEARCH_CACHE_TTL_SECONDS,
     SEMANTIC_SIMILARITY_THRESHOLD,

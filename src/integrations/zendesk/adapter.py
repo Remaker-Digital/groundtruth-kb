@@ -21,7 +21,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
 
@@ -332,7 +332,7 @@ class ZendeskAdapter:
         self, tenant_id: str, ticket_id: str, tags: list[str]
     ) -> NormalizedTicket:
         """Add tags to a ticket (non-destructive merge)."""
-        data = await self._request(
+        await self._request(
             "PUT",
             f"/tickets/{ticket_id}/tags.json",
             json_body={"tags": tags},

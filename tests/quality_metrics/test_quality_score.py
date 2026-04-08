@@ -7,20 +7,13 @@ and KB storage via quality_scores table.
 """
 from __future__ import annotations
 
-import sys
 from unittest.mock import MagicMock
 
-import pytest
 
 from src.quality_metrics.quality_score import (
     WEIGHTS,
     compute_all_metrics,
     compute_composite_score,
-    compute_spec_coverage,
-    compute_defect_escape_rate,
-    compute_assertion_strength,
-    compute_change_failure_rate,
-    compute_test_freshness,
     compute_coverage_delta,
     normalize_coverage_delta,
     trend_arrow,

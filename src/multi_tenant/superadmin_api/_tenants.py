@@ -73,114 +73,6 @@ class TenantDistributionSummary(CamelCaseModel):
     by_billing_channel: dict[str, int] = Field(default_factory=dict)
 
 
-class TierOverrideResponse(CamelCaseModel):
-    """Response after setting a tenant's subscription tier."""
-
-    tenant_id: str
-    previous_tier: str | None = None
-    new_tier: str
-    updated_at: str
-
-
-VALID_TIERS = {t.value for t in TenantTier}
-
-class CreateTenantRequest(CamelCaseModel):
-    """Request body for SPA tenant creation."""
-
-    merchant_name: str = Field(
-        ..., min_length=1, max_length=200,
-        description="Merchant display name (becomes brand_name in preferences)",
-    )
-    merchant_url: str | None = Field(
-        default=None, max_length=500,
-        description="Merchant website or Shopify domain (optional)",
-    )
-    superadmin_email: str = Field(
-        ..., min_length=5, max_length=320,
-        description="Tenant owner email — receives welcome email + SUPERADMIN key",
-    )
-
-    @field_validator("superadmin_email")
-    @classmethod
-    def validate_email_format(cls, v: str) -> str:
-        import re
-        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", v):
-            raise ValueError("Invalid email address format")
-        return v
-    tier: str = Field(
-        ...,
-        description="Subscription tier: trial, starter, professional, or enterprise",
-    )
-    expires_at: str | None = Field(
-        default=None,
-        description="Optional ISO 8601 expiry timestamp. When set, tenant access "
-        "is blocked after this time. Omit or null for no expiry.",
-    )
-
-    @field_validator("expires_at")
-    @classmethod
-    def validate_expires_at_iso(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        try:
-            datetime.fromisoformat(v)
-        except (ValueError, TypeError):
-            raise ValueError("expires_at must be a valid ISO 8601 timestamp")
-        return v
-
-
-class CreateTenantResponse(CamelCaseModel):
-    """Response from SPA tenant creation.
-
-    SPEC-1673: Raw tenant API keys are NEVER returned in API responses.
-    Keys are delivered directly to the tenant superadmin via email only.
-    The provider operator sees delivery status, not raw credentials.
-    """
-
-    tenant_id: str
-    status: str
-    tier: str
-    superadmin_email: str
-    keys_delivered_via_email: bool = False
-    warnings: list[str] = Field(default_factory=list)
-
-
-class ResendWelcomeEmailResponse(CamelCaseModel):
-    """Response from resending a welcome email."""
-
-    tenant_id: str
-    sent_to: str
-    sent: bool
-    message: str
-
-
-class SetExpiryRequest(CamelCaseModel):
-    """Request body for setting/clearing tenant access expiry."""
-
-    expires_at: str | None = Field(
-        description="ISO 8601 timestamp for access expiry, or null to remove expiry.",
-    )
-
-    @field_validator("expires_at")
-    @classmethod
-    def validate_expires_at_iso(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        try:
-            datetime.fromisoformat(v)
-        except (ValueError, TypeError):
-            raise ValueError("expires_at must be a valid ISO 8601 timestamp")
-        return v
-
-
-class SetExpiryResponse(CamelCaseModel):
-    """Response from setting/clearing tenant access expiry."""
-
-    tenant_id: str
-    previous_expires_at: str | None
-    new_expires_at: str | None
-    updated_at: str
-
 # ---------------------------------------------------------------------------
 # RB-2: Tenant Directory
 # ---------------------------------------------------------------------------
@@ -1070,7 +962,6 @@ async def update_tenant_rate_limit(
     from src.multi_tenant.cosmos_schema import (
         RATE_LIMIT_RPM_DEFAULT,
         RATE_LIMIT_RPM_FLOOR,
-        TIER_DEFAULTS,
     )
 
     if not _state._tenant_repo:
@@ -1143,7 +1034,6 @@ async def get_tenant_rate_limit(
     from src.multi_tenant.cosmos_schema import (
         RATE_LIMIT_RPM_DEFAULT,
         RATE_LIMIT_RPM_FLOOR,
-        TIER_DEFAULTS,
     )
 
     if not _state._tenant_repo:

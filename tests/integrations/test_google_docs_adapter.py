@@ -25,7 +25,6 @@ import pytest
 
 from src.integrations.models import (
     AuthenticationError,
-    IntegrationError,
     RateLimitError,
 )
 from src.integrations.google_docs.adapter import (

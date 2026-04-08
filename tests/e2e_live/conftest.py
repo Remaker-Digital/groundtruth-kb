@@ -48,7 +48,7 @@ def pytest_collection_modifyitems(items):
 # ---------------------------------------------------------------------------
 # Auto-load .env.local (transient credentials — R7 refactoring)
 # ---------------------------------------------------------------------------
-from scripts._env import load_env_local
+from scripts._env import load_env_local  # noqa: E402
 
 load_env_local()
 

@@ -8,14 +8,12 @@ staleness endpoints, chunk preview, and conflict scan.
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.multi_tenant.admin_knowledge_api import (
-    VALID_ENTRY_TYPES,
     ChunkPreviewResponse,
     DeleteKnowledgeEntryResponse,
     KnowledgeEntryResponse,
@@ -28,7 +26,6 @@ from src.multi_tenant.admin_knowledge_api import (
     _get_repo,
     _signal_kb_draft,
     configure_admin_knowledge_services,
-    router,
 )
 from src.multi_tenant.repository import DocumentNotFoundError
 
@@ -259,7 +256,7 @@ class TestListKnowledgeEntries:
         from src.multi_tenant.admin_knowledge_api import list_knowledge_entries
 
         with patch("src.multi_tenant.staleness_service.classify_staleness", return_value=None):
-            result = await list_knowledge_entries(
+            await list_knowledge_entries(
                 entry_type="faq", language=None, is_active=None,
                 search=None, offset=0, limit=50, ctx=mock_ctx,
             )

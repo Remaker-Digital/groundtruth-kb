@@ -67,7 +67,7 @@ class CriticEscalationMixin:
 
         Phase 2A: Removed in-process _validate_with_critic_direct() path.
         """
-        from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult, CriticVerdict
+        from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult
 
         # Option 1: Use CriticPolicy if configured (transport/HTTP to AGNTCY containers)
         if self._critic:

@@ -10,10 +10,7 @@ Session S152 — spec review and real test creation (batch 2).
 from __future__ import annotations
 
 import inspect
-import os
-import re
 
-import pytest
 
 
 # ---------------------------------------------------------------------------

@@ -229,7 +229,7 @@ class TestTenantResolution:
         If VITE_API_URL points to the wrong server, or the shop is not mapped
         in Cosmos, this test fails.
         """
-        console_errors = _setup_minimal_mocks(page)
+        _setup_minimal_mocks(page)
         elapsed = _navigate_and_wait(page, "/", "Dashboard")
 
         text = _page_text(page)
@@ -252,7 +252,7 @@ class TestTenantResolution:
         self, page: Page, staging_reachable
     ):
         """Tenant resolution should NOT show an error banner."""
-        console_errors = _setup_minimal_mocks(page)
+        _setup_minimal_mocks(page)
         _navigate_and_wait(page, "/", "Dashboard")
 
         text = _page_text(page)
@@ -287,7 +287,7 @@ class TestPageRendering:
         Pages may show loading states for data, but the page title
         and Polaris Page wrapper must render.
         """
-        console_errors = _setup_minimal_mocks(page)
+        _setup_minimal_mocks(page)
         elapsed = _navigate_and_wait(page, path, expected_title)
 
         text = _page_text(page)

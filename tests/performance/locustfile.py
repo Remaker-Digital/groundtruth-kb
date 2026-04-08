@@ -40,14 +40,11 @@ Prerequisites:
 
 from __future__ import annotations
 
-import json
 import os
-import time
 import uuid
 from typing import Any
 
 from locust import HttpUser, TaskSet, between, tag, task
-from locust.exception import StopUser
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +401,7 @@ class HealthProbeUser(HttpUser):
             catch_response=True,
         ) as response:
             if response.status_code == 200:
-                data = response.json()
+                response.json()
                 response.success()
             else:
                 response.failure(f"Health check failed: {response.status_code}")
@@ -447,7 +444,7 @@ class HealthProbeUser(HttpUser):
 # ===========================================================================
 
 
-from locust import events
+from locust import events  # noqa: E402
 
 
 @events.request.add_listener

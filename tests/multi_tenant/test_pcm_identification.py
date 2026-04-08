@@ -14,7 +14,6 @@ Verifies:
 
 from __future__ import annotations
 
-import pytest
 
 from src.multi_tenant.cosmos_schema import (
     PreferencesDocument,

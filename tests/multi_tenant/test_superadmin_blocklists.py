@@ -15,10 +15,8 @@ import pytest
 from src.multi_tenant.superadmin_api._blocklists import (
     VALID_LIST_TYPES,
     BlocklistCheckRequest,
-    BlocklistCheckResponse,
     BlocklistDocument,
     BlocklistEntry,
-    BlocklistResponse,
     BlocklistWriteResponse,
     MaintenanceResponse,
     MaintenanceState,
@@ -230,7 +228,7 @@ class TestBlocklistCRUD:
             result = await list_blocklists()
 
         assert len(result.lists) == len(VALID_LIST_TYPES)
-        ip_list = [l for l in result.lists if l.list_type == "ip"]
+        ip_list = [entry for entry in result.lists if entry.list_type == "ip"]
         assert len(ip_list) == 1
         assert len(ip_list[0].entries) == 3
 

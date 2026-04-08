@@ -60,15 +60,20 @@ def _enforce_tier_gate(ctx: TenantContext) -> None:
 
 class PreviewChatRequest(CamelCaseModel):
     """Request body for preview chat."""
+
     message: str = Field(..., min_length=1, max_length=4000)
     config_overrides: dict[str, Any] | None = Field(
         default=None,
-        description="Temporary config overrides for this preview (e.g. response_tone_preset, intent_confidence_threshold). Not persisted.",
+        description=(
+            "Temporary config overrides for this preview (e.g. response_tone_preset, intent_confidence_threshold). Not "
+            "persisted."
+        ),
     )
 
 
 class PreviewTraceResponse(CamelCaseModel):
     """Full decision trace for a preview conversation."""
+
     conversation_id: str
     trace: dict[str, Any]
 

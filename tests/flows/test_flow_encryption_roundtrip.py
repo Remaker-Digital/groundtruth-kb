@@ -19,18 +19,12 @@ GOV-19: Outside-in testing.
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from tests.conftest import (
-    TEST_API_KEY_STARTER,
-    TEST_API_KEY_HASH_STARTER,
     STARTER_TENANT_ID,
-    auth_headers_api_key,
-    make_tenant_document,
-    MockCosmosManager,
 )
 from src.multi_tenant.repositories.base import EncryptedFieldPatchError
 
@@ -49,7 +43,7 @@ class TestFlowConversationEncryption:
 
         repo = ConversationRepository()
 
-        with _mock_encryption_service() as enc_svc, _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
             from pydantic import BaseModel
 
             class FakeConvDoc(BaseModel):
@@ -59,7 +53,7 @@ class TestFlowConversationEncryption:
                 customer_intent: str
                 partition_key: str
 
-            doc = await repo.create(
+            await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakeConvDoc(
                     id="conv-001",
@@ -91,7 +85,7 @@ class TestFlowConversationEncryption:
         repo = ConversationRepository()
         original_messages = [{"role": "user", "content": "Hello"}]
 
-        with _mock_encryption_service() as enc_svc, _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             from pydantic import BaseModel
 
             class FakeConvDoc(BaseModel):
@@ -218,7 +212,7 @@ class TestFlowTenantEncryption:
             customer_email: str
             partition_key: str
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakeTenantDoc(
@@ -253,7 +247,7 @@ class TestFlowTeamMemberEncryption:
             display_name: str
             partition_key: str
 
-        with _mock_encryption_service(), _mock_cosmos_for_repo(repo) as container:
+        with _mock_encryption_service(), _mock_cosmos_for_repo(repo):
             await repo.create(
                 tenant_id=STARTER_TENANT_ID,
                 document=FakeTeamDoc(
@@ -311,7 +305,6 @@ def _mock_encryption_service():
       2. encryption service is not None (mocked here)
       3. tenant DEK exists (injected into _dek_cache here)
     """
-    import base64
     from contextlib import contextmanager
     from unittest.mock import MagicMock
     import src.multi_tenant.repositories.base as _base_mod

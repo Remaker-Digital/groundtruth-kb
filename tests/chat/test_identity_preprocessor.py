@@ -35,7 +35,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.chat.identity_preprocessor import (
-    IdentityAction,
     _MAX_OTP_ATTEMPTS,
     _MAX_SMS_OTP_ATTEMPTS,
     _extract_email,

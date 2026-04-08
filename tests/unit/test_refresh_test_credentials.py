@@ -10,8 +10,6 @@ Test plan ref: COMPREHENSIVE-TEST-PLAN-S245-S255.md Slice 1
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,7 +20,6 @@ from scripts.refresh_test_credentials import (
     _write_env_local,
     _fetch_widget_key,
     _verify_credentials,
-    ENV_LOCAL,
 )
 
 

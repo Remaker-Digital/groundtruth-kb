@@ -11,7 +11,7 @@ Test plan ref: COMPREHENSIVE-TEST-PLAN-S245-S255.md Slice 3
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -20,7 +20,6 @@ from src.chat.session import (
     ConversationSession,
     InFlightResponseError,
     ConcurrencyExhaustedError,
-    TurnLimitReachedError,
 )
 
 

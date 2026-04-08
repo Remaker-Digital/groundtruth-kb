@@ -13,9 +13,7 @@ from __future__ import annotations
 import logging
 import statistics
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)

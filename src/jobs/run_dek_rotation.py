@@ -11,6 +11,7 @@ Designed to run as a scheduled job (Azure Container App Job or cron).
 Usage:
     python -m src.jobs.run_dek_rotation [--dry-run] [--tenant TENANT_ID] [--max-age-days 90]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,7 +19,7 @@ import asyncio
 import base64
 import logging
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,7 @@ ENCRYPTED_COLLECTIONS: dict[str, list[str]] = {
     "memory_vectors": ["chunk_text", "source_conversation_id"],
     "tenants": ["customer_email", "shopify_shop_domain", "brand_name"],
     "team_members": ["email", "display_name"],
-    "preferences": ["custom_instructions", "return_policy", "shipping_info",
-                     "webhook_urls", "notification_settings"],
+    "preferences": ["custom_instructions", "return_policy", "shipping_info", "webhook_urls", "notification_settings"],
 }
 
 
@@ -134,7 +134,10 @@ async def rotate_tenant_dek(tenant_id: str, *, dry_run: bool = False) -> dict:
                     # Plaintext field — should have been migrated first
                     logger.warning(
                         "Plaintext field found during rotation: %s.%s in %s (tenant %s)",
-                        collection_name, field, doc_id, tenant_id,
+                        collection_name,
+                        field,
+                        doc_id,
+                        tenant_id,
                     )
                     continue
 
@@ -146,19 +149,26 @@ async def rotate_tenant_dek(tenant_id: str, *, dry_run: bool = False) -> dict:
                 # Decrypt with old DEK, re-encrypt with new DEK
                 try:
                     plaintext = svc.decrypt_field(
-                        old_wrapped_dek, value,
-                        tenant_id=tenant_id, doc_id=doc_id,
+                        old_wrapped_dek,
+                        value,
+                        tenant_id=tenant_id,
+                        doc_id=doc_id,
                     )
                     doc[field] = svc.encrypt_field(
-                        new_wrapped_dek, plaintext,
-                        tenant_id=tenant_id, doc_id=doc_id,
+                        new_wrapped_dek,
+                        plaintext,
+                        tenant_id=tenant_id,
+                        doc_id=doc_id,
                     )
                     stats["fields_reencrypted"] += 1
                     fields_rotated += 1
                 except Exception:
                     logger.error(
                         "Failed to re-encrypt %s.%s in %s for tenant %s",
-                        collection_name, field, doc_id, tenant_id,
+                        collection_name,
+                        field,
+                        doc_id,
+                        tenant_id,
                         exc_info=True,
                     )
                     stats["errors"] += 1
@@ -170,7 +180,9 @@ async def rotate_tenant_dek(tenant_id: str, *, dry_run: bool = False) -> dict:
                     except Exception:
                         logger.error(
                             "Failed to write back %s/%s for tenant %s",
-                            collection_name, doc_id, tenant_id,
+                            collection_name,
+                            doc_id,
+                            tenant_id,
                             exc_info=True,
                         )
                         stats["errors"] += 1
@@ -184,7 +196,8 @@ async def rotate_tenant_dek(tenant_id: str, *, dry_run: bool = False) -> dict:
     elif stats["errors"] > 0 and not dry_run:
         logger.error(
             "DEK rotation had %d errors for tenant %s — old DEK retained",
-            stats["errors"], tenant_id,
+            stats["errors"],
+            tenant_id,
         )
 
     action = "DRY RUN" if dry_run else "Rotation"
@@ -193,7 +206,9 @@ async def rotate_tenant_dek(tenant_id: str, *, dry_run: bool = False) -> dict:
 
 
 async def run_rotation(
-    *, dry_run: bool = False, tenant_id: str | None = None,
+    *,
+    dry_run: bool = False,
+    tenant_id: str | None = None,
     max_age_days: int = DEK_ROTATION_INTERVAL_DAYS,
 ) -> None:
     """Run DEK rotation for tenants with DEKs older than max_age_days."""
@@ -201,7 +216,9 @@ async def run_rotation(
 
     logger.info(
         "Starting DEK rotation (dry_run=%s, max_age=%d days, tenant=%s)",
-        dry_run, max_age_days, tenant_id or "ALL_ELIGIBLE",
+        dry_run,
+        max_age_days,
+        tenant_id or "ALL_ELIGIBLE",
     )
     start = time.monotonic()
 
@@ -210,7 +227,9 @@ async def run_rotation(
         if age is not None and age < max_age_days:
             logger.info(
                 "Tenant %s DEK age is %.1f days (< %d) — skipping",
-                tenant_id, age, max_age_days,
+                tenant_id,
+                age,
+                max_age_days,
             )
         else:
             await rotate_tenant_dek(tenant_id, dry_run=dry_run)
@@ -273,6 +292,7 @@ async def _bootstrap() -> None:
 async def _main_async(dry_run: bool, tenant_id: str | None, max_age_days: int, *, force: bool = False) -> None:
     """Async main: bootstrap then rotate."""
     import os
+
     db_name = os.environ.get("COSMOS_DB_DATABASE", "")
     logger.info("Target database: %s", db_name or "(not set)")
     if not dry_run and not force:
@@ -297,7 +317,9 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant, max_age_days=args.max_age_days, force=args.force))
+    asyncio.run(
+        _main_async(dry_run=args.dry_run, tenant_id=args.tenant, max_age_days=args.max_age_days, force=args.force)
+    )
 
 
 if __name__ == "__main__":

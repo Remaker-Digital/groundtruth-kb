@@ -15,14 +15,10 @@ Run:
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 
-import pytest
 
 from evaluation.pilots.quality_pilot import (
     DATASET_PATH,
-    PilotReport,
     ScenarioResult,
     evaluate_response,
     load_dataset,

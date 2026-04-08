@@ -68,10 +68,7 @@ class PortalRequest(BaseModel):
 
     tenant_id: str | None = Field(
         default=None,
-        description=(
-            "Tenant ID (UUID). The module looks up the Stripe customer ID "
-            "from the provisioning service."
-        ),
+        description=("Tenant ID (UUID). The module looks up the Stripe customer ID from the provisioning service."),
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
     stripe_customer_id: str | None = Field(
@@ -82,8 +79,7 @@ class PortalRequest(BaseModel):
     return_url: str | None = Field(
         default=None,
         description=(
-            "URL to redirect the customer back to after they exit the portal. "
-            "Defaults to the application base URL."
+            "URL to redirect the customer back to after they exit the portal. Defaults to the application base URL."
         ),
     )
 
@@ -180,7 +176,10 @@ async def _resolve_stripe_customer_id(
     response_model=PortalResponse,
     status_code=200,
     summary="Create a Customer Portal session",
-    description="Creates a Stripe Customer Portal session where the customer can manage their subscription, update payment methods, view invoices, and cancel or resume.",
+    description=(
+        "Creates a Stripe Customer Portal session where the customer can manage their subscription, update payment "
+        "methods, view invoices, and cancel or resume."
+    ),
     responses={
         400: {"description": "Missing tenant_id and stripe_customer_id, or tenant has no Stripe billing"},
         404: {"description": "Tenant not found"},
@@ -324,11 +323,7 @@ async def billing_status_endpoint(
 
     renewal_date: str | None = None
     if sub.current_period_end:
-        renewal_date = (
-            datetime.fromtimestamp(sub.current_period_end, tz=timezone.utc)
-            .date()
-            .isoformat()
-        )
+        renewal_date = datetime.fromtimestamp(sub.current_period_end, tz=timezone.utc).date().isoformat()
 
     logger.info(
         "Billing status retrieved: customer=%s status=%s renewal=%s",

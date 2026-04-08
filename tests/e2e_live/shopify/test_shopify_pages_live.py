@@ -328,7 +328,7 @@ class TestSettingsGdprSection:
         text = _body_text(shared_shopify_settings)
         # The Settings page renders TeamManager first, then GDPR
         # Both should be present
-        has_team = "team" in text.lower() or "member" in text.lower()
+        "team" in text.lower() or "member" in text.lower()
         has_gdpr = "data & privacy" in text.lower() or "data &" in text.lower()
         # At least the GDPR section must be present (team might need API)
         assert has_gdpr, "GDPR section must render on Settings page"

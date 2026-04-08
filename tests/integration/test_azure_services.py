@@ -25,7 +25,6 @@ import logging
 import os
 import time
 import uuid
-from typing import Any
 
 import pytest
 
@@ -35,7 +34,7 @@ logger = logging.getLogger(__name__)
 # Load .env.local if available
 # ---------------------------------------------------------------------------
 # Load .env.local (shared loader — R7 refactoring)
-from scripts._env import load_env_local
+from scripts._env import load_env_local  # noqa: E402
 load_env_local()
 
 
@@ -538,10 +537,10 @@ class TestKeyVaultIntegration:
         """KV-03: TenantSecretService uses correct naming convention."""
         from src.multi_tenant.tenant_secret_service import TenantSecretService
 
-        svc = TenantSecretService.__new__(TenantSecretService)
+        TenantSecretService.__new__(TenantSecretService)
         # Verify naming format without actually accessing Key Vault
         expected_name = "tenant-abc123-shopify_api_key"
-        actual_name = f"tenant-abc123-shopify_api_key"
+        actual_name = "tenant-abc123-shopify_api_key"
         assert expected_name == actual_name
 
 
@@ -660,7 +659,7 @@ class TestPipelineSmokeTest:
 
         for i in range(5):
             start = time.monotonic()
-            response = await client.chat.completions.create(
+            await client.chat.completions.create(
                 model=deployment,
                 messages=[{"role": "user", "content": f"Reply: OK {i}"}],
                 max_tokens=10,
@@ -673,7 +672,7 @@ class TestPipelineSmokeTest:
         p50 = latencies[len(latencies) // 2]
 
         # Log the results for manual review
-        print(f"\n  Latency measurements: {[f'{l:.0f}ms' for l in latencies]}")
+        print(f"\n  Latency measurements: {[f'{lat:.0f}ms' for lat in latencies]}")
         print(f"  P50: {p50:.0f}ms, P95 (approx): {latencies[-1]:.0f}ms")
 
         # SLA: P50 < 1500ms for a simple request (generous for network variability)

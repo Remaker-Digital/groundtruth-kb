@@ -101,7 +101,9 @@ class TenantRecord(BaseModel):
     grace_period_ends_at: str | None = Field(default=None, description="When data will be deleted")
 
     # Widget key (populated during provisioning, shown once)
-    widget_key: str | None = Field(default=None, description="Raw widget key (pk_live_...) — present only in provisioning response")
+    widget_key: str | None = Field(
+        default=None, description="Raw widget key (pk_live_...) — present only in provisioning response"
+    )
 
 
 # Grace period duration (30 days, per SLA)
@@ -195,8 +197,11 @@ def configure_provisioning_repo(
     _tenant_repo = tenant_repo
     _team_repo = team_repo
     _domain_index_repo = domain_index_repo
-    logger.info("Provisioning repos configured (team_repo=%s, domain_index=%s)",
-                "yes" if team_repo else "no", "yes" if domain_index_repo else "no")
+    logger.info(
+        "Provisioning repos configured (team_repo=%s, domain_index=%s)",
+        "yes" if team_repo else "no",
+        "yes" if domain_index_repo else "no",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +311,7 @@ async def _provision_tenant_dek(tenant_id: str) -> None:
 
         # Store wrapped DEK as base64 string in Key Vault
         import base64
+
         wrapped_b64 = base64.b64encode(wrapped_dek).decode("ascii")
 
         secret_svc = get_secret_service()
@@ -421,7 +427,9 @@ async def provision_tenant(
             if operations:
                 await _tenant_repo.patch(existing_id, existing_id, operations)
             updated_doc = await _tenant_repo.update_encrypted_fields(
-                existing_id, existing_id, encrypted_updates,
+                existing_id,
+                existing_id,
+                encrypted_updates,
             )
         else:
             updated_doc = await _tenant_repo.patch(existing_id, existing_id, operations)
@@ -1086,7 +1094,8 @@ async def get_tenant(
 
 
 async def _validate_api_key_for_tenant(
-    tenant_id: str, api_key: str,
+    tenant_id: str,
+    api_key: str,
 ) -> dict[str, Any] | None:
     """Validate an API key against a known tenant (partition-scoped).
 
@@ -1129,6 +1138,7 @@ async def _read_brand_name(tenant_id: str) -> str | None:
     """
     try:
         from src.multi_tenant.config.config_processor import get_config_processor
+
         processor = get_config_processor()
         result = await processor.get_config(tenant_id)
         return result.config.get("brand_name") if result and result.config else None
@@ -1147,7 +1157,10 @@ async def _read_brand_name(tenant_id: str) -> str | None:
     response_model=TenantLookupResponse,
     status_code=200,
     summary="Lookup tenant by channel identifier",
-    description="Looks up a tenant by Stripe customer ID or Shopify shop domain. Returns the tenant's status, tier, and billing channel.",
+    description=(
+        "Looks up a tenant by Stripe customer ID or Shopify shop domain. Returns the tenant's status, tier, and "
+        "billing channel."
+    ),
     responses={
         400: {"description": "No lookup parameter provided"},
     },
@@ -1174,7 +1187,11 @@ async def lookup_tenant_endpoint(
     if not stripe_customer_id and not shop:
         raise HTTPException(
             status_code=400,
-            detail="Provide 'stripe_customer_id' or 'shop' query parameter. API key tenant discovery is not supported (SPEC-1644). Use POST /api/auth/validate-key instead.",
+            detail=(
+                "Provide 'stripe_customer_id' or 'shop' query parameter. "
+                "API key tenant discovery is not supported (SPEC-1644). "
+                "Use POST /api/auth/validate-key instead."
+            ),
         )
 
     # Direct channel lookup — repo is the primary path
@@ -1272,7 +1289,10 @@ async def validate_key_endpoint(
     response_model=TenantResponse,
     status_code=200,
     summary="Get tenant status by ID",
-    description="Returns the full tenant status record including lifecycle status, billing channel, tier, interval, and add-ons.",
+    description=(
+        "Returns the full tenant status record including lifecycle status, billing channel, tier, interval, and "
+        "add-ons."
+    ),
     responses={
         404: {"description": "Tenant not found"},
     },

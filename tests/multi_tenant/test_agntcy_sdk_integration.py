@@ -20,16 +20,12 @@ Module under test: src/multi_tenant/agntcy_sdk_integration.py
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.multi_tenant.agntcy_sdk_integration import (
     AgentTopic,
-    NATS_ENDPOINT,
-    SLIM_ENDPOINT,
-    SLIM_ORG_NAMESPACE,
-    TRANSPORT_TYPE,
     close_agntcy_sdk,
     create_a2a_client,
     create_mcp_client,
@@ -374,7 +370,7 @@ class TestClientCreation:
         orig = mod.NATS_ENDPOINT
         try:
             mod.NATS_ENDPOINT = "nats://localhost:4222"
-            client = create_a2a_client("custom-agent")
+            create_a2a_client("custom-agent")
             mock_factory.create_client.assert_called_once_with(
                 "A2A",
                 agent_topic="custom-agent",

@@ -42,14 +42,12 @@ from src.chat.models import (
     VisitorIdentity,
 )
 from src.multi_tenant.conversation_meter import (
-    IDLE_TIMEOUT_SECONDS,
     MAX_TURNS,
     NON_BILLABLE_PREFIXES,
     ConversationEndReason,
     ConversationMeter,
 )
 from src.multi_tenant.cosmos_schema import (
-    TIER_DEFAULTS,
     ContactAttribute,
     ContactAttributeType,
     ConversationDocument,
@@ -940,7 +938,7 @@ class ConversationSession:
             escalation_category: Optional category (from ESCALATION_CATEGORIES).
             assigned_to: Optional human agent ID for auto-assignment.
         """
-        doc = await self._get_active_conversation(tenant_id, conversation_id)
+        await self._get_active_conversation(tenant_id, conversation_id)
 
         now = datetime.now(timezone.utc).isoformat()
         system_msg: dict[str, Any] = {

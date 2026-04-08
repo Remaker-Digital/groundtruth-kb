@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import logging
 import re
-import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
@@ -43,7 +42,6 @@ from src.multi_tenant.cosmos_schema import (
     ConsentStatus,
     CustomerProfileDocument,
     TenantTier,
-    TIER_DEFAULTS,
 )
 
 logger = logging.getLogger(__name__)

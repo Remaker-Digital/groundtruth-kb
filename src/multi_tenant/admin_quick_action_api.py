@@ -63,7 +63,6 @@ from src.multi_tenant.cosmos_schema import (
 )
 from src.multi_tenant.activation_service import get_activation_service
 from src.multi_tenant.middleware import get_tenant_context
-from src.multi_tenant.repository import DocumentNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +84,6 @@ MAX_ICON_LENGTH = 50
 class QuickActionResponse(CamelCaseModel):
     """A single quick action prompt button."""
 
-
     id: str
     label: str
     prompt_template: str
@@ -99,7 +97,6 @@ class QuickActionResponse(CamelCaseModel):
 class QuickActionListResponse(CamelCaseModel):
     """List of quick action prompts for a tenant."""
 
-
     tenant_id: str
     total_count: int
     actions: list[QuickActionResponse]
@@ -107,7 +104,6 @@ class QuickActionListResponse(CamelCaseModel):
 
 class CreateQuickActionRequest(CamelCaseModel):
     """Request body for POST /api/admin/quick-actions."""
-
 
     label: str = Field(
         min_length=1,
@@ -131,7 +127,6 @@ class CreateQuickActionRequest(CamelCaseModel):
 class UpdateQuickActionRequest(CamelCaseModel):
     """Request body for PUT /api/admin/quick-actions/{id}."""
 
-
     label: str | None = Field(
         default=None,
         min_length=1,
@@ -150,7 +145,6 @@ class UpdateQuickActionRequest(CamelCaseModel):
 class PageAssignmentResponse(CamelCaseModel):
     """A page-to-quick-action slot assignment."""
 
-
     page_type: str
     page_handle: str | None = None
     slot_1_action_id: str | None = None
@@ -164,7 +158,6 @@ class PageAssignmentResponse(CamelCaseModel):
 class PageAssignmentListResponse(CamelCaseModel):
     """List of page assignments for a tenant."""
 
-
     tenant_id: str
     total_count: int
     assignments: list[PageAssignmentResponse]
@@ -172,7 +165,6 @@ class PageAssignmentListResponse(CamelCaseModel):
 
 class UpsertPageAssignmentRequest(CamelCaseModel):
     """Request body for PUT /api/admin/quick-actions/assignments."""
-
 
     page_type: str = Field(
         description="Page type: home, product, collection, cart, search, blog, page, all, other",
@@ -259,7 +251,8 @@ def _get_tenant_lock(tenant_id: str) -> asyncio.Lock:
         evicted_id, _ = _tenant_qa_locks.popitem(last=False)
         logger.debug(
             "Tenant lock cap reached (%d), evicted oldest: %s",
-            MAX_TENANT_LOCKS, evicted_id[:8],
+            MAX_TENANT_LOCKS,
+            evicted_id[:8],
         )
 
     lock = asyncio.Lock()
@@ -301,7 +294,8 @@ def _action_dict_to_response(action: dict[str, Any]) -> QuickActionResponse:
 
 
 def _find_action_by_id(
-    actions: list[dict[str, Any]], action_id: str,
+    actions: list[dict[str, Any]],
+    action_id: str,
 ) -> dict[str, Any] | None:
     """Find a quick action by ID in the actions list."""
     for action in actions:
@@ -427,7 +421,9 @@ async def create_quick_action(
 
     logger.info(
         "Quick action created: tenant=%s id=%s label=%s",
-        ctx.tenant_id[:8], action.id[:8], action.label[:30],
+        ctx.tenant_id[:8],
+        action.id[:8],
+        action.label[:30],
     )
     return _action_dict_to_response(action_dict)
 
@@ -492,8 +488,7 @@ async def upsert_page_assignment(
     if body.page_type not in VALID_PAGE_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid page_type '{body.page_type}'. "
-            f"Valid values: {sorted(VALID_PAGE_TYPES)}",
+            detail=f"Invalid page_type '{body.page_type}'. Valid values: {sorted(VALID_PAGE_TYPES)}",
         )
 
     # Validate that referenced action IDs exist
@@ -516,9 +511,8 @@ async def upsert_page_assignment(
     async with lock:
         # Check tier limit for new assignments
         existing_assignments = await repo.get_page_assignments(ctx.tenant_id)
-        is_new = not any(
-            a.get("page_type") == body.page_type
-            and a.get("page_handle") == body.page_handle
+        not any(
+            a.get("page_type") == body.page_type and a.get("page_handle") == body.page_handle
             for a in existing_assignments
         )
         # Ensure draft exists before QA write (D68 fix)
@@ -538,7 +532,9 @@ async def upsert_page_assignment(
 
     logger.info(
         "Page assignment upserted: tenant=%s page_type=%s page_handle=%s",
-        ctx.tenant_id[:8], body.page_type, body.page_handle or "(all)",
+        ctx.tenant_id[:8],
+        body.page_type,
+        body.page_handle or "(all)",
     )
     return _enrich_assignment(assignment_dict, actions)
 
@@ -561,7 +557,8 @@ async def upsert_page_assignment(
 async def delete_page_assignment(
     page_type: str,
     page_handle: str | None = Query(
-        None, description="Page handle for specific page match",
+        None,
+        description="Page handle for specific page match",
     ),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> None:
@@ -572,14 +569,18 @@ async def delete_page_assignment(
     await _ensure_qa_draft(ctx)
 
     removed = await repo.delete_page_assignment(
-        ctx.tenant_id, page_type, page_handle,
+        ctx.tenant_id,
+        page_type,
+        page_handle,
     )
     if not removed:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     logger.info(
         "Page assignment deleted: tenant=%s page_type=%s page_handle=%s",
-        ctx.tenant_id[:8], page_type, page_handle or "(all)",
+        ctx.tenant_id[:8],
+        page_type,
+        page_handle or "(all)",
     )
 
 
@@ -660,7 +661,8 @@ async def update_quick_action(
 
     logger.info(
         "Quick action updated: tenant=%s id=%s",
-        ctx.tenant_id[:8], action_id[:8],
+        ctx.tenant_id[:8],
+        action_id[:8],
     )
     return _action_dict_to_response(action)
 
@@ -697,7 +699,8 @@ async def delete_quick_action(
 
     logger.info(
         "Quick action deleted: tenant=%s id=%s",
-        ctx.tenant_id[:8], action_id[:8],
+        ctx.tenant_id[:8],
+        action_id[:8],
     )
 
 
@@ -709,12 +712,12 @@ _STARTER_ACTIONS = [
     {
         "label": "Track my order",
         "prompt_template": "I'd like to check on the status of my recent order.",
-        "icon": "\U0001F4E6",
+        "icon": "\U0001f4e6",
     },
     {
         "label": "Return or exchange",
         "prompt_template": "I need help with a return or exchange for a product I purchased.",
-        "icon": "\U0001F504",
+        "icon": "\U0001f504",
     },
     {
         "label": "Product question",
@@ -724,7 +727,7 @@ _STARTER_ACTIONS = [
     {
         "label": "Shipping info",
         "prompt_template": "What are your shipping options and delivery timeframes?",
-        "icon": "\U0001F69A",
+        "icon": "\U0001f69a",
     },
 ]
 
@@ -732,7 +735,9 @@ _STARTER_ACTIONS = [
 @router.post(
     "/seed",
     summary="Seed starter quick actions",
-    description="Creates 4 example quick actions if none exist. Idempotent — does nothing if quick actions already exist.",
+    description=(
+        "Creates 4 example quick actions if none exist. Idempotent — does nothing if quick actions already exist."
+    ),
     responses={
         200: {"description": "Seed result"},
         503: {"description": "Quick action services not initialized"},
@@ -766,6 +771,7 @@ async def seed_quick_actions(
 
     logger.info(
         "Seeded %d starter quick actions: tenant=%s",
-        len(created), ctx.tenant_id[:8],
+        len(created),
+        ctx.tenant_id[:8],
     )
     return {"seeded": len(created), "ids": created}

@@ -10,6 +10,7 @@ inside the SPA for tenant-scoped access to all admin features.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -23,7 +24,7 @@ import time as _time
 import argon2
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from starlette.responses import Response as StarletteResponse
 from starlette.staticfiles import StaticFiles
 
@@ -33,9 +34,7 @@ logger = logging.getLogger(__name__)
 # Module-level state (importable by tests)
 # ---------------------------------------------------------------------------
 
-_admin_standalone_dist = (
-    pathlib.Path(__file__).resolve().parent.parent.parent / "admin" / "standalone" / "dist"
-)
+_admin_standalone_dist = pathlib.Path(__file__).resolve().parent.parent.parent / "admin" / "standalone" / "dist"
 _ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_PREVIEW_PASSWORD", "")
 _ADMIN_RESET_EMAIL = os.environ.get("ADMIN_RESET_EMAIL", "").strip().lower()
 _ADMIN_COOKIE_NAME = "agentred_admin"
@@ -61,16 +60,12 @@ def _verify_password(password: str) -> bool:
         return False
 
 
-_admin_password_hash: str = (
-    _hash_password(_ADMIN_INITIAL_PASSWORD) if _ADMIN_INITIAL_PASSWORD else ""
-)
+_admin_password_hash: str = _hash_password(_ADMIN_INITIAL_PASSWORD) if _ADMIN_INITIAL_PASSWORD else ""
 # Immutable HMAC key for reset tokens -- derived deterministically from the env var
 # password so all replicas agree.  Uses SHA-256 (not Argon2) because this needs
 # to be deterministic and fast (signing key, not password storage).
 _ADMIN_HMAC_KEY: str = (
-    hashlib.sha256(f"agentred-admin:{_ADMIN_INITIAL_PASSWORD}".encode()).hexdigest()
-    if _ADMIN_INITIAL_PASSWORD
-    else ""
+    hashlib.sha256(f"agentred-admin:{_ADMIN_INITIAL_PASSWORD}".encode()).hexdigest() if _ADMIN_INITIAL_PASSWORD else ""
 )
 
 # Session secret for signing session tokens (SPEC-1689).
@@ -157,10 +152,109 @@ _STANDALONE_SHARED_STYLES = """
   .logo { margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto; }
 """
 
-_LOGO_DATA_URI = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxzdmcKICAgaWQ9IkxheWVyXzIiCiAgIHZpZXdCb3g9IjAgMCA1MjAuMDAwMDIgMTI4IgogICB2ZXJzaW9uPSIxLjEiCiAgIHdpZHRoPSI1MjAiCiAgIGhlaWdodD0iMTI4IgogICB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogIDxkZWZzCiAgICAgaWQ9ImRlZnMxIj4KICAgIDxzdHlsZQogICAgICAgaWQ9InN0eWxlMSI+LmNscy0xe2ZpbGw6I2ZmZjt9LmNscy0ye2ZpbGw6bm9uZTt9LmNscy0ze2ZpbGw6I2ZmMzYyMTt9PC9zdHlsZT4KICA8L2RlZnM+CiAgPHJlY3QKICAgICBjbGFzcz0iY2xzLTIiCiAgICAgd2lkdGg9IjEyOC40NDQ2NCIKICAgICBoZWlnaHQ9IjEyOCIKICAgICBpZD0icmVjdDEiCiAgICAgeD0iMCIKICAgICB5PSIwIgogICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4KICA8cmVjdAogICAgIGNsYXNzPSJjbHMtMyIKICAgICB4PSIxLjEzOTM4MzMiCiAgICAgeT0iMS4zMjY5NjkxIgogICAgIHdpZHRoPSIxMjYuMjc3MDIiCiAgICAgaGVpZ2h0PSIxMjUuMzQ2MDYiCiAgICAgaWQ9InJlY3QyIgogICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4KICA8cGF0aAogICAgIGNsYXNzPSJjbHMtMSIKICAgICBkPSJtIDUwLjA5ODEzLDQzLjM2NjA0NSBoIDExLjg4MDE1NiB2IDcuMjM5MjUzIGggMC4xODA2MzQgYyAyLjI1MDk3NywtNS4zMDc4NTkgNy41NTg4MzYsLTguMzc4NjM2IDEzLjUwNTg2MSwtOC4zNzg2MzYgMS42MjU3MDYsMCAyLjQzMTYxMSwwLjIzNjIxMyAyLjc5Mjg3OSwwLjMxOTU4MyB2IDEyLjE1ODA1NCBjIC0xLjE2NzE3MywtMC40MDI5NTMgLTIuNjEyMjQ1LC0wLjU2OTY5MiAtNC4wNTczMTYsLTAuNTY5NjkyIC03LjM3ODIwMiwwIC0xMS42OTk1MjIsNC43NTIwNjIgLTExLjY5OTUyMiwxMS4yNjg3NzkgViA4NS43NzMzMzggSCA1MC4wOTgxMyB2IC00Mi40MjExODggMCB6IgogICAgIGlkPSJwYXRoMyIKICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgPGcKICAgICBpZD0iZzE0IgogICAgIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAuMDYyNTI0OTcpIj4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTEiCiAgICAgICBkPSJNIDI0LjYwNzkwMiw4OS41NTk3MDIgViA3My40NTU0OTEgYyAwLC0zLjg2Mjc4OCAtMy45NDYxNTcsLTQuOTg4Mjc2IC03LjQwNTk5MiwtNS4yMzgzODUgdiAtOC40NDgxMSBjIDMuNDU5ODM1LC0wLjA4MzM3IDcuNDA1OTkyLC0xLjIwODg1OCA3LjQwNTk5MiwtNC42Njg2OTMgViAzOC41MjM2NjQgYyAwLC02LjYwMDA4NiA1Ljg3NzU1LC0xMS40MzU1MTggMTEuOTA3OTQ1LC0xMS40MzU1MTggaCA2LjkxOTY3IHYgOS45NzY1NTEgaCAtMy42OTYwNDkgYyAtMy4yOTMwOTUsMCAtNC4wOTkwMDEsMS44NDgwMjUgLTQuMDk5MDAxLDQuNjY4NjkzIHYgMTQuMDA2MDc4IGMgMCw1Ljc5NDE4MiAtNC41ODUzMjMsNy43MjU1NzUgLTguMjExODk3LDguMjExODk4IHYgMC4xNjY3MzggYyAyLjgyMDY2OSwwLjQ4NjMyMyA4LjEyODUyOCwxLjkzMTM5NCA4LjIxMTg5Nyw4LjYxNDg1MSB2IDEzLjYwMzEyNiBjIDAsMi44MjA2NjggMC44MDU5MDYsNC42Njg2OTMgNC4wOTkwMDEsNC42Njg2OTMgaCAzLjY5NjA0OSB2IDkuOTA3MDc2IGggLTYuOTE5NjcgYyAtNi4wMzAzOTUsMCAtMTEuOTA3OTQ1LC00Ljc1MjA2MiAtMTEuOTA3OTQ1LC0xMS4zNTIxNDggeiIKICAgICAgIGlkPSJwYXRoMiIKICAgICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTEiCiAgICAgICBkPSJtIDg0Ljk5NTIyLDkxLjAwNDc3MSBoIDMuNjI2NTczIGMgMy4zNzY0NjYsMCA0LjE4MjM3MSwtMS44NDgwMjQgNC4xODIzNzEsLTQuNjY4NjkyIFYgNzIuNzMyOTUzIGMgMCwtNi42ODM0NTYgNS4zMDc4NTksLTguMTI4NTI4IDguMTI4NTI2LC04LjYxNDg1IFYgNjMuOTUxMzY0IEMgOTcuMzg5NDg3LDYzLjQ2NTA0MiA5Mi44MDQxNjQsNjEuNTMzNjQ4IDkyLjgwNDE2NCw1NS43Mzk0NjcgViA0MS43MzMzODkgYyAwLC0yLjgyMDY2OSAtMC44MDU5MDUsLTQuNjY4NjkzIC00LjE4MjM3MSwtNC42Njg2OTMgSCA4NC45OTUyMiB2IC05Ljk3NjU1MiBoIDYuOTE5NjY5IGMgNi4wMzAzOTUsMCAxMS45MDc5NDEsNC44MzU0MzIgMTEuOTA3OTQxLDExLjQzNTUxOCB2IDE2LjU3NjYzOSBjIDAsMy40NTk4MzUgMy45NDYxNiw0LjU4NTMyMyA3LjQwNiw0LjY2ODY5MyB2IDguNDQ4MTEgYyAtMy41NDMyMSwwLjIzNjIxNCAtNy40MDYsMS4zNjE3MDIgLTcuNDA2LDUuMjM4Mzg1IFYgODkuNTU5NyBjIDAsNi42MDAwODYgLTUuODc3NTQ2LDExLjM1MjE1IC0xMS45MDc5NDEsMTEuMzUyMTUgSCA4NC45OTUyMiBaIgogICAgICAgaWQ9InBhdGg0IgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogIDwvZz4KICA8ZwogICAgIGlkPSJnMTMiCiAgICAgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCwtMC40MzA3MzkpIj4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTEiCiAgICAgICBkPSJtIDE2Ny41MzEwNCw2NS4xNjcxNyBjIDAsLTkuNjcwODY0IDYuNzI1MTQsLTE2LjkzNzkwNiAxNS43MTUxNSwtMTYuOTM3OTA2IDQuNzY1OTYsMCA4LjQ0ODExLDIuMTM5ODE3IDEwLjI4MjI0LDQuODM1NDMyIGggMC4wNTU2IHYgLTMuOTczOTQ3IGggOC41NTkyNyB2IDMyLjIzNjIxMiBoIC04LjA3Mjk1IHYgLTQuNDA0Njg5IGggLTAuMTI1MDUgYyAtMS43MDkwOCwyLjg3NjI0OCAtNS44Nzc1NSw1LjI2NjE3NCAtMTAuODI0MTQsNS4yNjYxNzQgLTguNjg0MzMsMCAtMTUuNjA0LC03LjE1NTg4MyAtMTUuNjA0LC0xNy4wMDczODEgeiBtIDE3LjU0OTI4LDkuNDIwNzU1IGMgNS4xNDExMiwwIDguNjg0MzMsLTQuMTU0NTgxIDguNjg0MzMsLTkuMzY1MTc1IDAsLTUuMjEwNTk1IC0zLjU0MzIxLC05LjM2NTE3NiAtOC42ODQzMywtOS4zNjUxNzYgLTUuMTQxMTIsMCAtOC42ODQzMiw0LjA0MzQyMiAtOC42ODQzMiw5LjM2NTE3NiAwLDUuMzIxNzU0IDMuNTQzMiw5LjM2NTE3NSA4LjY4NDMyLDkuMzY1MTc1IHoiCiAgICAgICBpZD0icGF0aDUiCiAgICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0xIgogICAgICAgZD0ibSAyMTIuMzAwNDcsODkuMDI0NzQ2IDMuNjY4MjYsLTUuMjY2MTc0IGMgMS45NTkxOCwyLjA4NDIzOCA1LjE5NjcsMy40MTgxNSA5LjI0MDEyLDMuNDE4MTUgNC43NjU5NSwwIDkuMzY1MTcsLTIuMTM5ODE4IDkuMzY1MTcsLTcuODkyMzE0IHYgLTIuMzg5OTI2IGggLTAuMTI1MDUgYyAtMS43MDkwOCwyLjg3NjI0OCAtNS44Nzc1NSw1LjI2NjE3NCAtMTAuODI0MTQsNS4yNjYxNzQgLTguNjg0MzMsMCAtMTUuNjA0LC03LjE1NTg4MyAtMTUuNjA0LC0xNy4wMDczODEgMCwtOS44NTE0OTcgNi43MjUxNCwtMTYuOTM3OTA2IDE1LjcxNTE2LC0xNi45Mzc5MDYgNC43NjU5NSwwIDguNDQ4MTEsMi4xMzk4MTcgMTAuMjgyMjQsNC44MzU0MzIgaCAwLjA1NTYgdiAtMy45NzM5NDcgaCA4LjU1OTI3IHYgMjkuMTA5ODU1IGMgMCw5LjU0NTgxIC01LjYyNzQ1LDE1LjIyODgzMSAtMTYuNzU3MjgsMTUuMjI4ODMxIC02LjExMzc2LDAgLTExLjA3NDI1LC0xLjcwOTA3NSAtMTMuNTc1MzMsLTQuNDA0Njg5IHogbSAxMy4yNjk2NSwtMTQuNDM2ODIxIGMgNS4xNDExMiwwIDguNjg0MzIsLTQuMTU0NTgxIDguNjg0MzIsLTkuMzY1MTc1IDAsLTUuMjEwNTk1IC0zLjU0MzIsLTkuMzY1MTc2IC04LjY4NDMyLC05LjM2NTE3NiAtNS4xNDExMiwwIC04LjY4NDMzLDQuMDQzNDIyIC04LjY4NDMzLDkuMzY1MTc2IDAsNS4zMjE3NTQgMy41NDMyMSw5LjM2NTE3NSA4LjY4NDMzLDkuMzY1MTc1IHoiCiAgICAgICBpZD0icGF0aDYiCiAgICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0xIgogICAgICAgZD0ibSAyNDguNTEwNjMsNjUuMjIyNzUgYyAwLC05Ljc4MjAyMyA3LjEwMDMsLTE3LjAwNzM4MSAxNi43NTcyNywtMTcuMDA3MzgxIDguNjg0MzIsMCAxNi43MDE2OSw1Ljc1MjQ5NiAxNi43MDE2OSwxOS4xNDcxOTggdiAwLjQzMDc0MyBoIC0yNC41OTQwMSBjIDAuOTE3MDcsNC45NjA0ODYgNC4wOTkwMSw3LjAzMDgyOSA4LjA3Mjk1LDcuMDMwODI5IDIuOTMxODMsMCA1Ljc1MjUsLTEuMTY3MTczIDcuNTMxMDUsLTMuNTQzMjA1IGwgNi40MTk0NSw0LjM0OTExIGMgLTIuNzUxMTksMy4zNjI1NzEgLTYuODUwMTksNi41NDQ1MDcgLTEzLjk1MDUsNi41NDQ1MDcgLTkuNzI2NDQsMCAtMTYuOTM3OSwtNy4xNTU4ODMgLTE2LjkzNzksLTE2LjkzNzkwNiB6IG0gMjQuMjE4ODQsLTMuMjM3NTE2IGMgLTAuNjExMzgsLTQuMDQzNDIyIC0zLjM2MjU3LC02LjYwMDA4NyAtNy41MzEwNSwtNi42MDAwODcgLTMuNjEyNjcsMCAtNi45NzUyNSwyLjAxNDc2MyAtNy44MjI4NCw2LjYwMDA4NyB6IgogICAgICAgaWQ9InBhdGg3IgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMSIKICAgICAgIGQ9Im0gMjg3LjgzMzI1LDQ5LjA3Njg1NCBoIDguMDcyOTUgdiA0LjI3OTYzNSBoIDAuMTI1MDUgYyAxLjk1OTE4LC0yLjc1MTE5NCA0Ljk2MDQ5LC01LjAxNjA2NiAxMC4wODc3MSwtNS4wMTYwNjYgOC4xOTgsMCAxMi4xNzE5NSw1LjI2NjE3NSAxMi4xNzE5NSwxMy41MTk3NTYgdiAxOS40NTI4ODcgaCAtOC41NTkyNyBWIDY0LjE4MDYzMSBjIDAsLTQuNjU0Nzk4IC0xLjQ3Mjg2LC03Ljk0Nzg5NCAtNi4yMzg4MiwtNy45NDc4OTQgLTQuNzY1OTYsMCAtNy4xMDAzLDMuMzA2OTkxIC03LjEwMDMsOC4wMTczNjggdiAxNy4wNjI5NjEgaCAtOC41NTkyNyB6IgogICAgICAgaWQ9InBhdGg4IgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMSIKICAgICAgIGQ9Ik0gMzI3Ljk0Nzg4LDczLjcyNjQ0IFYgNTYuMjg4MzE3IGggLTUuMTQxMTIgdiAtNy4yMTE0NjMgaCA1LjE0MTEyIHYgLTkuMzY1MTc1IGggOC41NTkyNyB2IDkuMzY1MTc1IGggNy4xMDAzIHYgNy4yMTE0NjMgaCAtNy4xMDAzIHYgMTYuMDIwODQxIGMgMCwyLjAxNDc2NCAxLjQwMzM5LDIuNTAxMDg2IDMuMzA2OTksMi41MDEwODYgMS40NzI4NiwwIDIuOTMxODMsLTAuMzA1Njg4IDQuMDQzNDIsLTAuNTU1Nzk3IHYgNy4wMzA4MjkgYyAtMS40MDMzOSwwLjMwNTY4OCAtNC4xNTQ1OCwwLjYxMTM3NyAtNi4yMzg4MiwwLjYxMTM3NyAtNS4xNDExMiwwIC05LjY3MDg2LC0xLjgzNDEzIC05LjY3MDg2LC04LjE5ODAwMyB6IgogICAgICAgaWQ9InBhdGg5IgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMyIKICAgICAgIGQ9Im0gMzQ3LjUyNTgyLDg1LjM0MjU5MiBoIDI3LjcwNjQ3IHYgNS4wMTYwNjYgaCAtMjcuNzA2NDcgeiIKICAgICAgIGlkPSJwYXRoMTAiCiAgICAgICBzdHlsZT0iZmlsbDojZmZmZmZmO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMyIKICAgICAgIGQ9Im0gMzgwLjk4NDc4LDQ5LjA3Njg1NCBoIDguMDcyOTUgdiA1LjUwMjM4OCBoIDAuMTI1MDYgYyAxLjUyODQ0LC00LjA0MzQyMiA1LjE0MTEyLC02LjM2Mzg3MyA5LjE3MDY0LC02LjM2Mzg3MyAxLjA5NzcsMCAxLjY1MzUsMC4xODA2MzQgMS45MDM2MSwwLjI1MDEwOCB2IDkuMjQwMTIyIGMgLTAuNzkyMDEsLTAuMzA1Njg5IC0xLjc3ODU1LC0wLjQzMDc0MyAtMi43NTEyLC0wLjQzMDc0MyAtNS4wMTYwNiwwIC03Ljk0Nzg5LDMuNjEyNjc5IC03Ljk0Nzg5LDguNTU5MjcgdiAxNS40Nzg5NCBoIC04LjU1OTI3IFYgNDkuMDc2ODU0IFoiCiAgICAgICBpZD0icGF0aDExIgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMyIKICAgICAgIGQ9Im0gNDAyLjgxMzcsNjUuMjIyNzUgYyAwLC05Ljc4MjAyMyA3LjEwMDMxLC0xNy4wMDczODEgMTYuNzU3MjcsLTE3LjAwNzM4MSA4LjY4NDMzLDAgMTYuNzAxNyw1Ljc1MjQ5NiAxNi43MDE3LDE5LjE0NzE5OCB2IDAuNDMwNzQzIGggLTI0LjU5NDAxIGMgMC45MTcwNiw0Ljk2MDQ4NiA0LjA5OSw3LjAzMDgyOSA4LjA3Mjk1LDcuMDMwODI5IDIuOTMxODMsMCA1Ljc1MjQ5LC0xLjE2NzE3MyA3LjUzMTA0LC0zLjU0MzIwNSBsIDYuNDE5NDYsNC4zNDkxMSBjIC0yLjc1MTIsMy4zNjI1NzEgLTYuODUwMiw2LjU0NDUwNyAtMTMuOTUwNSw2LjU0NDUwNyAtOS43MjY0NSwwIC0xNi45Mzc5MSwtNy4xNTU4ODMgLTE2LjkzNzkxLC0xNi45Mzc5MDYgeiBtIDI0LjIzMjc0LC0zLjIzNzUxNiBjIC0wLjYxMTM4LC00LjA0MzQyMiAtMy4zNjI1NywtNi42MDAwODcgLTcuNTMxMDUsLTYuNjAwMDg3IC0zLjYxMjY3LDAgLTYuOTc1MjQsMi4wMTQ3NjMgLTcuODIyODMsNi42MDAwODcgeiIKICAgICAgIGlkPSJwYXRoMTIiCiAgICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0zIgogICAgICAgZD0ibSA0NDAuMzE2MDksNjUuMTY3MTcgYyAwLC05LjY3MDg2NCA2LjcyNTE0LC0xNi45Mzc5MDYgMTUuNzE1MTUsLTE2LjkzNzkwNiA0Ljc2NTk2LDAgOC40MzQyMiwyLjEzOTgxNyAxMC4yODIyNCw0LjgzNTQzMiBoIDAuMDU1NiBWIDM1LjQ0NTkzOCBoIDguNTU5MjcgdiA0NS44ODEwMjMgaCAtOC4wNzI5NSB2IC00LjQwNDY4OSBoIC0wLjEyNTA1IGMgLTEuNzA5MDgsMi44NzYyNDggLTUuODc3NTUsNS4yNjYxNzQgLTEwLjgyNDE0LDUuMjY2MTc0IC04LjY4NDMzLDAgLTE1LjYwNCwtNy4xNTU4ODMgLTE1LjYwNCwtMTcuMDA3MzgxIHogbSAxNy41NDkyOCw5LjQyMDc1NSBjIDUuMTQxMTIsMCA4LjY4NDMzLC00LjE1NDU4MSA4LjY4NDMzLC05LjM2NTE3NSAwLC01LjIxMDU5NSAtMy41NDMyMSwtOS4zNjUxNzYgLTguNjg0MzMsLTkuMzY1MTc2IC01LjE0MTEyLDAgLTguNjg0MzIsNC4wNDM0MjIgLTguNjg0MzIsOS4zNjUxNzYgMCw1LjMyMTc1NCAzLjU0MzIsOS4zNjUxNzUgOC42ODQzMiw5LjM2NTE3NSB6IgogICAgICAgaWQ9InBhdGgxMyIKICAgICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4KICA8L2c+Cjwvc3ZnPgo="
+_LOGO_DATA_URI = (
+    "data:image/svg+xml;base64,"
+    "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxzdmcKICAgaWQ9IkxheWVyXzIi"
+    "CiAgIHZpZXdCb3g9IjAgMCA1MjAuMDAwMDIgMTI4IgogICB2ZXJzaW9uPSIxLjEiCiAgIHdpZHRoPSI1MjAiCiAgIGhlaWdodD0i"
+    "MTI4IgogICB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcv"
+    "MjAwMC9zdmciPgogIDxkZWZzCiAgICAgaWQ9ImRlZnMxIj4KICAgIDxzdHlsZQogICAgICAgaWQ9InN0eWxlMSI+LmNscy0xe2Zp"
+    "bGw6I2ZmZjt9LmNscy0ye2ZpbGw6bm9uZTt9LmNscy0ze2ZpbGw6I2ZmMzYyMTt9PC9zdHlsZT4KICA8L2RlZnM+CiAgPHJlY3QK"
+    "ICAgICBjbGFzcz0iY2xzLTIiCiAgICAgd2lkdGg9IjEyOC40NDQ2NCIKICAgICBoZWlnaHQ9IjEyOCIKICAgICBpZD0icmVjdDEi"
+    "CiAgICAgeD0iMCIKICAgICB5PSIwIgogICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4KICA8cmVjdAogICAgIGNs"
+    "YXNzPSJjbHMtMyIKICAgICB4PSIxLjEzOTM4MzMiCiAgICAgeT0iMS4zMjY5NjkxIgogICAgIHdpZHRoPSIxMjYuMjc3MDIiCiAg"
+    "ICAgaGVpZ2h0PSIxMjUuMzQ2MDYiCiAgICAgaWQ9InJlY3QyIgogICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4K"
+    "ICA8cGF0aAogICAgIGNsYXNzPSJjbHMtMSIKICAgICBkPSJtIDUwLjA5ODEzLDQzLjM2NjA0NSBoIDExLjg4MDE1NiB2IDcuMjM5"
+    "MjUzIGggMC4xODA2MzQgYyAyLjI1MDk3NywtNS4zMDc4NTkgNy41NTg4MzYsLTguMzc4NjM2IDEzLjUwNTg2MSwtOC4zNzg2MzYg"
+    "MS42MjU3MDYsMCAyLjQzMTYxMSwwLjIzNjIxMyAyLjc5Mjg3OSwwLjMxOTU4MyB2IDEyLjE1ODA1NCBjIC0xLjE2NzE3MywtMC40"
+    "MDI5NTMgLTIuNjEyMjQ1LC0wLjU2OTY5MiAtNC4wNTczMTYsLTAuNTY5NjkyIC03LjM3ODIwMiwwIC0xMS42OTk1MjIsNC43NTIw"
+    "NjIgLTExLjY5OTUyMiwxMS4yNjg3NzkgViA4NS43NzMzMzggSCA1MC4wOTgxMyB2IC00Mi40MjExODggMCB6IgogICAgIGlkPSJw"
+    "YXRoMyIKICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgPGcKICAgICBpZD0iZzE0IgogICAgIHRyYW5zZm9y"
+    "bT0idHJhbnNsYXRlKDAuMDYyNTI0OTcpIj4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTEiCiAgICAgICBkPSJNIDI0LjYw"
+    "NzkwMiw4OS41NTk3MDIgViA3My40NTU0OTEgYyAwLC0zLjg2Mjc4OCAtMy45NDYxNTcsLTQuOTg4Mjc2IC03LjQwNTk5MiwtNS4y"
+    "MzgzODUgdiAtOC40NDgxMSBjIDMuNDU5ODM1LC0wLjA4MzM3IDcuNDA1OTkyLC0xLjIwODg1OCA3LjQwNTk5MiwtNC42Njg2OTMg"
+    "ViAzOC41MjM2NjQgYyAwLC02LjYwMDA4NiA1Ljg3NzU1LC0xMS40MzU1MTggMTEuOTA3OTQ1LC0xMS40MzU1MTggaCA2LjkxOTY3"
+    "IHYgOS45NzY1NTEgaCAtMy42OTYwNDkgYyAtMy4yOTMwOTUsMCAtNC4wOTkwMDEsMS44NDgwMjUgLTQuMDk5MDAxLDQuNjY4Njkz"
+    "IHYgMTQuMDA2MDc4IGMgMCw1Ljc5NDE4MiAtNC41ODUzMjMsNy43MjU1NzUgLTguMjExODk3LDguMjExODk4IHYgMC4xNjY3Mzgg"
+    "YyAyLjgyMDY2OSwwLjQ4NjMyMyA4LjEyODUyOCwxLjkzMTM5NCA4LjIxMTg5Nyw4LjYxNDg1MSB2IDEzLjYwMzEyNiBjIDAsMi44"
+    "MjA2NjggMC44MDU5MDYsNC42Njg2OTMgNC4wOTkwMDEsNC42Njg2OTMgaCAzLjY5NjA0OSB2IDkuOTA3MDc2IGggLTYuOTE5Njcg"
+    "YyAtNi4wMzAzOTUsMCAtMTEuOTA3OTQ1LC00Ljc1MjA2MiAtMTEuOTA3OTQ1LC0xMS4zNTIxNDggeiIKICAgICAgIGlkPSJwYXRo"
+    "MiIKICAgICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTEiCiAg"
+    "ICAgICBkPSJtIDg0Ljk5NTIyLDkxLjAwNDc3MSBoIDMuNjI2NTczIGMgMy4zNzY0NjYsMCA0LjE4MjM3MSwtMS44NDgwMjQgNC4x"
+    "ODIzNzEsLTQuNjY4NjkyIFYgNzIuNzMyOTUzIGMgMCwtNi42ODM0NTYgNS4zMDc4NTksLTguMTI4NTI4IDguMTI4NTI2LC04LjYx"
+    "NDg1IFYgNjMuOTUxMzY0IEMgOTcuMzg5NDg3LDYzLjQ2NTA0MiA5Mi44MDQxNjQsNjEuNTMzNjQ4IDkyLjgwNDE2NCw1NS43Mzk0"
+    "NjcgViA0MS43MzMzODkgYyAwLC0yLjgyMDY2OSAtMC44MDU5MDUsLTQuNjY4NjkzIC00LjE4MjM3MSwtNC42Njg2OTMgSCA4NC45"
+    "OTUyMiB2IC05Ljk3NjU1MiBoIDYuOTE5NjY5IGMgNi4wMzAzOTUsMCAxMS45MDc5NDEsNC44MzU0MzIgMTEuOTA3OTQxLDExLjQz"
+    "NTUxOCB2IDE2LjU3NjYzOSBjIDAsMy40NTk4MzUgMy45NDYxNiw0LjU4NTMyMyA3LjQwNiw0LjY2ODY5MyB2IDguNDQ4MTEgYyAt"
+    "My41NDMyMSwwLjIzNjIxNCAtNy40MDYsMS4zNjE3MDIgLTcuNDA2LDUuMjM4Mzg1IFYgODkuNTU5NyBjIDAsNi42MDAwODYgLTUu"
+    "ODc3NTQ2LDExLjM1MjE1IC0xMS45MDc5NDEsMTEuMzUyMTUgSCA4NC45OTUyMiBaIgogICAgICAgaWQ9InBhdGg0IgogICAgICAg"
+    "c3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogIDwvZz4KICA8ZwogICAgIGlkPSJnMTMiCiAgICAgdHJhbnNmb3JtPSJ0"
+    "cmFuc2xhdGUoMCwtMC40MzA3MzkpIj4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTEiCiAgICAgICBkPSJtIDE2Ny41MzEw"
+    "NCw2NS4xNjcxNyBjIDAsLTkuNjcwODY0IDYuNzI1MTQsLTE2LjkzNzkwNiAxNS43MTUxNSwtMTYuOTM3OTA2IDQuNzY1OTYsMCA4"
+    "LjQ0ODExLDIuMTM5ODE3IDEwLjI4MjI0LDQuODM1NDMyIGggMC4wNTU2IHYgLTMuOTczOTQ3IGggOC41NTkyNyB2IDMyLjIzNjIx"
+    "MiBoIC04LjA3Mjk1IHYgLTQuNDA0Njg5IGggLTAuMTI1MDUgYyAtMS43MDkwOCwyLjg3NjI0OCAtNS44Nzc1NSw1LjI2NjE3NCAt"
+    "MTAuODI0MTQsNS4yNjYxNzQgLTguNjg0MzMsMCAtMTUuNjA0LC03LjE1NTg4MyAtMTUuNjA0LC0xNy4wMDczODEgeiBtIDE3LjU0"
+    "OTI4LDkuNDIwNzU1IGMgNS4xNDExMiwwIDguNjg0MzMsLTQuMTU0NTgxIDguNjg0MzMsLTkuMzY1MTc1IDAsLTUuMjEwNTk1IC0z"
+    "LjU0MzIxLC05LjM2NTE3NiAtOC42ODQzMywtOS4zNjUxNzYgLTUuMTQxMTIsMCAtOC42ODQzMiw0LjA0MzQyMiAtOC42ODQzMiw5"
+    "LjM2NTE3NiAwLDUuMzIxNzU0IDMuNTQzMiw5LjM2NTE3NSA4LjY4NDMyLDkuMzY1MTc1IHoiCiAgICAgICBpZD0icGF0aDUiCiAg"
+    "ICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0xIgogICAgICAg"
+    "ZD0ibSAyMTIuMzAwNDcsODkuMDI0NzQ2IDMuNjY4MjYsLTUuMjY2MTc0IGMgMS45NTkxOCwyLjA4NDIzOCA1LjE5NjcsMy40MTgx"
+    "NSA5LjI0MDEyLDMuNDE4MTUgNC43NjU5NSwwIDkuMzY1MTcsLTIuMTM5ODE4IDkuMzY1MTcsLTcuODkyMzE0IHYgLTIuMzg5OTI2"
+    "IGggLTAuMTI1MDUgYyAtMS43MDkwOCwyLjg3NjI0OCAtNS44Nzc1NSw1LjI2NjE3NCAtMTAuODI0MTQsNS4yNjYxNzQgLTguNjg0"
+    "MzMsMCAtMTUuNjA0LC03LjE1NTg4MyAtMTUuNjA0LC0xNy4wMDczODEgMCwtOS44NTE0OTcgNi43MjUxNCwtMTYuOTM3OTA2IDE1"
+    "LjcxNTE2LC0xNi45Mzc5MDYgNC43NjU5NSwwIDguNDQ4MTEsMi4xMzk4MTcgMTAuMjgyMjQsNC44MzU0MzIgaCAwLjA1NTYgdiAt"
+    "My45NzM5NDcgaCA4LjU1OTI3IHYgMjkuMTA5ODU1IGMgMCw5LjU0NTgxIC01LjYyNzQ1LDE1LjIyODgzMSAtMTYuNzU3MjgsMTUu"
+    "MjI4ODMxIC02LjExMzc2LDAgLTExLjA3NDI1LC0xLjcwOTA3NSAtMTMuNTc1MzMsLTQuNDA0Njg5IHogbSAxMy4yNjk2NSwtMTQu"
+    "NDM2ODIxIGMgNS4xNDExMiwwIDguNjg0MzIsLTQuMTU0NTgxIDguNjg0MzIsLTkuMzY1MTc1IDAsLTUuMjEwNTk1IC0zLjU0MzIs"
+    "LTkuMzY1MTc2IC04LjY4NDMyLC05LjM2NTE3NiAtNS4xNDExMiwwIC04LjY4NDMzLDQuMDQzNDIyIC04LjY4NDMzLDkuMzY1MTc2"
+    "IDAsNS4zMjE3NTQgMy41NDMyMSw5LjM2NTE3NSA4LjY4NDMzLDkuMzY1MTc1IHoiCiAgICAgICBpZD0icGF0aDYiCiAgICAgICBz"
+    "dHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0xIgogICAgICAgZD0ibSAy"
+    "NDguNTEwNjMsNjUuMjIyNzUgYyAwLC05Ljc4MjAyMyA3LjEwMDMsLTE3LjAwNzM4MSAxNi43NTcyNywtMTcuMDA3MzgxIDguNjg0"
+    "MzIsMCAxNi43MDE2OSw1Ljc1MjQ5NiAxNi43MDE2OSwxOS4xNDcxOTggdiAwLjQzMDc0MyBoIC0yNC41OTQwMSBjIDAuOTE3MDcs"
+    "NC45NjA0ODYgNC4wOTkwMSw3LjAzMDgyOSA4LjA3Mjk1LDcuMDMwODI5IDIuOTMxODMsMCA1Ljc1MjUsLTEuMTY3MTczIDcuNTMx"
+    "MDUsLTMuNTQzMjA1IGwgNi40MTk0NSw0LjM0OTExIGMgLTIuNzUxMTksMy4zNjI1NzEgLTYuODUwMTksNi41NDQ1MDcgLTEzLjk1"
+    "MDUsNi41NDQ1MDcgLTkuNzI2NDQsMCAtMTYuOTM3OSwtNy4xNTU4ODMgLTE2LjkzNzksLTE2LjkzNzkwNiB6IG0gMjQuMjE4ODQs"
+    "LTMuMjM3NTE2IGMgLTAuNjExMzgsLTQuMDQzNDIyIC0zLjM2MjU3LC02LjYwMDA4NyAtNy41MzEwNSwtNi42MDAwODcgLTMuNjEy"
+    "NjcsMCAtNi45NzUyNSwyLjAxNDc2MyAtNy44MjI4NCw2LjYwMDA4NyB6IgogICAgICAgaWQ9InBhdGg3IgogICAgICAgc3R5bGU9"
+    "InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMSIKICAgICAgIGQ9Im0gMjg3Ljgz"
+    "MzI1LDQ5LjA3Njg1NCBoIDguMDcyOTUgdiA0LjI3OTYzNSBoIDAuMTI1MDUgYyAxLjk1OTE4LC0yLjc1MTE5NCA0Ljk2MDQ5LC01"
+    "LjAxNjA2NiAxMC4wODc3MSwtNS4wMTYwNjYgOC4xOTgsMCAxMi4xNzE5NSw1LjI2NjE3NSAxMi4xNzE5NSwxMy41MTk3NTYgdiAx"
+    "OS40NTI4ODcgaCAtOC41NTkyNyBWIDY0LjE4MDYzMSBjIDAsLTQuNjU0Nzk4IC0xLjQ3Mjg2LC03Ljk0Nzg5NCAtNi4yMzg4Miwt"
+    "Ny45NDc4OTQgLTQuNzY1OTYsMCAtNy4xMDAzLDMuMzA2OTkxIC03LjEwMDMsOC4wMTczNjggdiAxNy4wNjI5NjEgaCAtOC41NTky"
+    "NyB6IgogICAgICAgaWQ9InBhdGg4IgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAg"
+    "ICAgIGNsYXNzPSJjbHMtMSIKICAgICAgIGQ9Ik0gMzI3Ljk0Nzg4LDczLjcyNjQ0IFYgNTYuMjg4MzE3IGggLTUuMTQxMTIgdiAt"
+    "Ny4yMTE0NjMgaCA1LjE0MTEyIHYgLTkuMzY1MTc1IGggOC41NTkyNyB2IDkuMzY1MTc1IGggNy4xMDAzIHYgNy4yMTE0NjMgaCAt"
+    "Ny4xMDAzIHYgMTYuMDIwODQxIGMgMCwyLjAxNDc2NCAxLjQwMzM5LDIuNTAxMDg2IDMuMzA2OTksMi41MDEwODYgMS40NzI4Niww"
+    "IDIuOTMxODMsLTAuMzA1Njg4IDQuMDQzNDIsLTAuNTU1Nzk3IHYgNy4wMzA4MjkgYyAtMS40MDMzOSwwLjMwNTY4OCAtNC4xNTQ1"
+    "OCwwLjYxMTM3NyAtNi4yMzg4MiwwLjYxMTM3NyAtNS4xNDExMiwwIC05LjY3MDg2LC0xLjgzNDEzIC05LjY3MDg2LC04LjE5ODAw"
+    "MyB6IgogICAgICAgaWQ9InBhdGg5IgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAg"
+    "ICAgIGNsYXNzPSJjbHMtMyIKICAgICAgIGQ9Im0gMzQ3LjUyNTgyLDg1LjM0MjU5MiBoIDI3LjcwNjQ3IHYgNS4wMTYwNjYgaCAt"
+    "MjcuNzA2NDcgeiIKICAgICAgIGlkPSJwYXRoMTAiCiAgICAgICBzdHlsZT0iZmlsbDojZmZmZmZmO2ZpbGwtb3BhY2l0eToxO3N0"
+    "cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMyIKICAgICAgIGQ9Im0gMzgwLjk4NDc4"
+    "LDQ5LjA3Njg1NCBoIDguMDcyOTUgdiA1LjUwMjM4OCBoIDAuMTI1MDYgYyAxLjUyODQ0LC00LjA0MzQyMiA1LjE0MTEyLC02LjM2"
+    "Mzg3MyA5LjE3MDY0LC02LjM2Mzg3MyAxLjA5NzcsMCAxLjY1MzUsMC4xODA2MzQgMS45MDM2MSwwLjI1MDEwOCB2IDkuMjQwMTIy"
+    "IGMgLTAuNzkyMDEsLTAuMzA1Njg5IC0xLjc3ODU1LC0wLjQzMDc0MyAtMi43NTEyLC0wLjQzMDc0MyAtNS4wMTYwNiwwIC03Ljk0"
+    "Nzg5LDMuNjEyNjc5IC03Ljk0Nzg5LDguNTU5MjcgdiAxNS40Nzg5NCBoIC04LjU1OTI3IFYgNDkuMDc2ODU0IFoiCiAgICAgICBp"
+    "ZD0icGF0aDExIgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDoxLjM4OTQ5IiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJj"
+    "bHMtMyIKICAgICAgIGQ9Im0gNDAyLjgxMzcsNjUuMjIyNzUgYyAwLC05Ljc4MjAyMyA3LjEwMDMxLC0xNy4wMDczODEgMTYuNzU3"
+    "MjcsLTE3LjAwNzM4MSA4LjY4NDMzLDAgMTYuNzAxNyw1Ljc1MjQ5NiAxNi43MDE3LDE5LjE0NzE5OCB2IDAuNDMwNzQzIGggLTI0"
+    "LjU5NDAxIGMgMC45MTcwNiw0Ljk2MDQ4NiA0LjA5OSw3LjAzMDgyOSA4LjA3Mjk1LDcuMDMwODI5IDIuOTMxODMsMCA1Ljc1MjQ5"
+    "LC0xLjE2NzE3MyA3LjUzMTA0LC0zLjU0MzIwNSBsIDYuNDE5NDYsNC4zNDkxMSBjIC0yLjc1MTIsMy4zNjI1NzEgLTYuODUwMiw2"
+    "LjU0NDUwNyAtMTMuOTUwNSw2LjU0NDUwNyAtOS43MjY0NSwwIC0xNi45Mzc5MSwtNy4xNTU4ODMgLTE2LjkzNzkxLC0xNi45Mzc5"
+    "MDYgeiBtIDI0LjIzMjc0LC0zLjIzNzUxNiBjIC0wLjYxMTM4LC00LjA0MzQyMiAtMy4zNjI1NywtNi42MDAwODcgLTcuNTMxMDUs"
+    "LTYuNjAwMDg3IC0zLjYxMjY3LDAgLTYuOTc1MjQsMi4wMTQ3NjMgLTcuODIyODMsNi42MDAwODcgeiIKICAgICAgIGlkPSJwYXRo"
+    "MTIiCiAgICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjEuMzg5NDkiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0zIgog"
+    "ICAgICAgZD0ibSA0NDAuMzE2MDksNjUuMTY3MTcgYyAwLC05LjY3MDg2NCA2LjcyNTE0LC0xNi45Mzc5MDYgMTUuNzE1MTUsLTE2"
+    "LjkzNzkwNiA0Ljc2NTk2LDAgOC40MzQyMiwyLjEzOTgxNyAxMC4yODIyNCw0LjgzNTQzMiBoIDAuMDU1NiBWIDM1LjQ0NTkzOCBo"
+    "IDguNTU5MjcgdiA0NS44ODEwMjMgaCAtOC4wNzI5NSB2IC00LjQwNDY4OSBoIC0wLjEyNTA1IGMgLTEuNzA5MDgsMi44NzYyNDgg"
+    "LTUuODc3NTUsNS4yNjYxNzQgLTEwLjgyNDE0LDUuMjY2MTc0IC04LjY4NDMzLDAgLTE1LjYwNCwtNy4xNTU4ODMgLTE1LjYwNCwt"
+    "MTcuMDA3MzgxIHogbSAxNy41NDkyOCw5LjQyMDc1NSBjIDUuMTQxMTIsMCA4LjY4NDMzLC00LjE1NDU4MSA4LjY4NDMzLC05LjM2"
+    "NTE3NSAwLC01LjIxMDU5NSAtMy41NDMyMSwtOS4zNjUxNzYgLTguNjg0MzMsLTkuMzY1MTc2IC01LjE0MTEyLDAgLTguNjg0MzIs"
+    "NC4wNDM0MjIgLTguNjg0MzIsOS4zNjUxNzYgMCw1LjMyMTc1NCAzLjU0MzIsOS4zNjUxNzUgOC42ODQzMiw5LjM2NTE3NSB6Igog"
+    "ICAgICAgaWQ9InBhdGgxMyIKICAgICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MS4zODk0OSIgLz4KICA8L2c+Cjwvc3ZnPgo="
+)
 
 _STANDALONE_FORGOT_LINK = (
-    f'  <a href="/admin/standalone/_forgot-password" class="link">Forgot your password?</a>'
+    '  <a href="/admin/standalone/_forgot-password" class="link">Forgot your password?</a>'
     if _ADMIN_RESET_EMAIL
     else ""
 )
@@ -226,7 +320,8 @@ _STANDALONE_FORGOT_PW_SENT_HTML = f"""<!DOCTYPE html>
   <img src="{_LOGO_DATA_URI}" alt="Agent Red" width="200" height="49" class="logo" />
   <div style="font-size:32px;margin-bottom:12px;">&#9993;</div>
   <h1>Check your email</h1>
-  <p class="subtitle">If that email matches our records, we've sent a password reset link. The link expires in 15 minutes.</p>
+  <p class="subtitle">If that email matches our records,
+  we've sent a password reset link. The link expires in 15 minutes.</p>
   <p style="font-size:13px;color:#a0a0a0;line-height:1.5;margin-top:12px;">
     Don't see it? Check your spam folder.
   </p>
@@ -256,7 +351,8 @@ _STANDALONE_RESET_PW_HTML = f"""<!DOCTYPE html>
     <label for="new">New password</label>
     <input id="new" type="password" name="new_password" placeholder="New password" autofocus required minlength="12"/>
     <label for="confirm">Confirm new password</label>
-    <input id="confirm" type="password" name="confirm_password" placeholder="Confirm new password" required minlength="12"/>
+    <input id="confirm" type="password" name="confirm_password"
+      placeholder="Confirm new password" required minlength="12"/>
     <button type="submit">Set password</button>
   </form>
   <a href="/admin/standalone/" class="link">Back to sign in</a>
@@ -283,7 +379,6 @@ _STANDALONE_RESET_INVALID_HTML = f"""<!DOCTYPE html>
 </html>"""
 
 
-
 def _render_login_html(csrf_token: str | None = None, error: str | None = None) -> str:
     """Render the login page HTML with a fresh CSRF token (SPEC-1690)."""
     if csrf_token is None:
@@ -291,9 +386,11 @@ def _render_login_html(csrf_token: str | None = None, error: str | None = None) 
     html = _STANDALONE_LOGIN_HTML.replace("{{csrf_token}}", csrf_token)
     if error:
         html = html.replace(
-            'Incorrect password. Please try again.', error,
+            "Incorrect password. Please try again.",
+            error,
         ).replace(
-            'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            'class="error" id="err"',
+            'class="error" id="err" style="display:block"',
         )
     return html
 
@@ -305,27 +402,34 @@ def _render_forgot_pw_html(csrf_token: str | None = None, error: str | None = No
     html = _STANDALONE_FORGOT_PW_HTML.replace("{{csrf_token}}", csrf_token)
     if error:
         html = html.replace(
-            'Please enter a valid email address.', error,
+            "Please enter a valid email address.",
+            error,
         ).replace(
-            'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            'class="error" id="err"',
+            'class="error" id="err" style="display:block"',
         )
     return html
 
 
 def _render_reset_pw_html(
-    token: str, csrf_token: str | None = None, error: str | None = None,
+    token: str,
+    csrf_token: str | None = None,
+    error: str | None = None,
 ) -> str:
     """Render the reset-password page HTML with CSRF token and reset token."""
     if csrf_token is None:
         csrf_token = _generate_csrf_token()
     html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token).replace(
-        "{{csrf_token}}", csrf_token,
+        "{{csrf_token}}",
+        csrf_token,
     )
     if error:
         html = html.replace(
-            'Passwords do not match.', error,
+            "Passwords do not match.",
+            error,
         ).replace(
-            'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            'class="error" id="err"',
+            'class="error" id="err" style="display:block"',
         )
     return html
 
@@ -341,7 +445,9 @@ def _generate_reset_token(ttl: int = 900) -> str:
     expiry = str(int(_time.time() + ttl))
     payload = f"{nonce}.{expiry}"
     sig = _hmac.new(
-        _ADMIN_HMAC_KEY.encode(), payload.encode(), "sha256",
+        _ADMIN_HMAC_KEY.encode(),
+        payload.encode(),
+        "sha256",
     ).hexdigest()
     return f"{payload}.{sig}"
 
@@ -361,7 +467,9 @@ def _validate_reset_token(token: str) -> bool:
     # Recompute HMAC
     payload = f"{nonce}.{expiry_str}"
     expected = _hmac.new(
-        _ADMIN_HMAC_KEY.encode(), payload.encode(), "sha256",
+        _ADMIN_HMAC_KEY.encode(),
+        payload.encode(),
+        "sha256",
     ).hexdigest()
     if not _hmac.compare_digest(sig, expected):
         return False
@@ -404,7 +512,8 @@ def _send_admin_password_changed_email(to_email: str, forgot_password_url: str) 
 <html>
 <head><meta charset="utf-8"/></head>
 <body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,system-ui,sans-serif;">
-<div style="max-width:560px;margin:40px auto;padding:40px;background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
+<div style="max-width:560px;margin:40px auto;padding:40px;
+background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
   <div style="text-align:center;margin-bottom:24px;">
     <h1 style="margin:0;font-size:20px;color:#F5F5F5;">Agent Red</h1>
     <p style="margin:4px 0 0;font-size:14px;color:#A0A0A0;">Customer Experience</p>
@@ -422,7 +531,10 @@ def _send_admin_password_changed_email(to_email: str, forgot_password_url: str) 
       If you did not reset your password, someone may have access to your account.
       Reset your password immediately to secure your account.
     </p>
-    <a href="{forgot_password_url}" style="display:inline-block;padding:10px 24px;background:#ff3621;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px;">
+    <a href="{forgot_password_url}"
+      style="display:inline-block;padding:10px 24px;
+      background:#ff3621;color:#ffffff;font-size:13px;
+      font-weight:600;text-decoration:none;border-radius:6px;">
       Reset Password
     </a>
   </div>
@@ -497,7 +609,8 @@ def _send_admin_reset_email(to_email: str, reset_url: str) -> bool:
 <html>
 <head><meta charset="utf-8"/></head>
 <body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,system-ui,sans-serif;">
-<div style="max-width:560px;margin:40px auto;padding:40px;background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
+<div style="max-width:560px;margin:40px auto;padding:40px;
+background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
   <div style="text-align:center;margin-bottom:24px;">
     <h1 style="margin:0;font-size:20px;color:#F5F5F5;">Agent Red</h1>
     <p style="margin:4px 0 0;font-size:14px;color:#A0A0A0;">Customer Experience</p>
@@ -507,7 +620,10 @@ def _send_admin_reset_email(to_email: str, reset_url: str) -> bool:
     We received a request to reset the admin password. Click the button below to choose a new password.
   </p>
   <div style="text-align:center;margin:24px 0;">
-    <a href="{reset_url}" style="display:inline-block;padding:12px 32px;background:#ff3621;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">
+    <a href="{reset_url}"
+      style="display:inline-block;padding:12px 32px;
+      background:#ff3621;color:#ffffff;font-size:14px;
+      font-weight:600;text-decoration:none;border-radius:8px;">
       Reset Password
     </a>
   </div>
@@ -571,6 +687,7 @@ def _send_admin_reset_email(to_email: str, reset_url: str) -> bool:
 # mount_standalone_admin() — called by main.py to register routes on the app
 # ---------------------------------------------------------------------------
 
+
 def mount_standalone_admin(app: FastAPI) -> None:
     """Mount the standalone admin SPA routes on the given FastAPI application.
 
@@ -601,7 +718,8 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 csrf = _generate_csrf_token()
                 response = HTMLResponse(
                     content=_render_login_html(csrf_token=csrf, error="Invalid request. Please try again."),
-                    status_code=403, headers=_NO_CACHE_HEADERS,
+                    status_code=403,
+                    headers=_NO_CACHE_HEADERS,
                 )
                 response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
                 return response
@@ -628,7 +746,8 @@ def mount_standalone_admin(app: FastAPI) -> None:
             csrf = _generate_csrf_token()
             response = HTMLResponse(
                 content=_render_login_html(csrf_token=csrf),
-                status_code=403, headers=_NO_CACHE_HEADERS,
+                status_code=403,
+                headers=_NO_CACHE_HEADERS,
             )
             response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
             return response
@@ -702,6 +821,7 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 reset_url = f"{scheme}://{host}/admin/standalone/_reset-password?token={reset_token}"
 
                 import asyncio
+
                 await asyncio.to_thread(_send_admin_reset_email, email, reset_url)  # SPEC-1622: non-blocking SMTP
 
             # Always return success page (prevents email enumeration)
@@ -752,7 +872,8 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 csrf = _generate_csrf_token()
                 response = HTMLResponse(
                     content=_render_reset_pw_html(
-                        token=token, csrf_token=csrf,
+                        token=token,
+                        csrf_token=csrf,
                         error=f"Password must be at least {_MIN_PASSWORD_LENGTH} characters.",
                     ),
                     status_code=400,
@@ -787,7 +908,10 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 host = request.headers.get("host", request.url.hostname or "localhost")
                 forgot_url = f"{scheme}://{host}/admin/standalone/_forgot-password"
                 import asyncio
-                await asyncio.to_thread(_send_admin_password_changed_email, _ADMIN_RESET_EMAIL, forgot_url)  # SPEC-1622: non-blocking SMTP
+
+                await asyncio.to_thread(
+                    _send_admin_password_changed_email, _ADMIN_RESET_EMAIL, forgot_url
+                )  # SPEC-1622: non-blocking SMTP
 
             # Auto-login: set opaque session token and redirect to admin dashboard.
             session_token = _generate_session_token()
@@ -869,6 +993,6 @@ def mount_standalone_admin(app: FastAPI) -> None:
         )
     else:
         logger.warning(
-            "Standalone admin SPA dist directory not found at %s — "
-            "standalone admin will not be available", _admin_standalone_dist,
+            "Standalone admin SPA dist directory not found at %s — standalone admin will not be available",
+            _admin_standalone_dist,
         )

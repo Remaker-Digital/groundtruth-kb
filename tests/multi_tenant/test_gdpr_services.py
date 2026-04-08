@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -833,7 +833,6 @@ class TestCascadingDeletionOrder:
         deletion_order: list[str] = []
 
         for name, repo in adapter._repos.items():
-            original_query = repo.query
 
             async def _tracking_query(
                 *args: Any, _name: str = name, **kwargs: Any,

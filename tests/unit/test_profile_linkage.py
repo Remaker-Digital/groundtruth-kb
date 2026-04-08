@@ -12,7 +12,6 @@ Tests that:
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -20,7 +19,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from src.chat.endpoints import router
-from src.chat.models import ConversationStartRequest, VisitorIdentity
+from src.chat.models import VisitorIdentity
 from src.chat.session import _resolve_customer_id
 
 

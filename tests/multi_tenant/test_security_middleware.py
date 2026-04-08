@@ -14,16 +14,13 @@ Run:
 
 from __future__ import annotations
 
-import json
 
 import pytest
 from starlette.testclient import TestClient
 
 from src.multi_tenant.security_middleware import (
-    BODY_LIMIT_EXEMPT_PREFIXES,
     MAX_BODY_SIZE_BYTES,
     MAX_JSON_DEPTH,
-    SECURITY_HEADERS,
     JsonDepthValidationMiddleware,
     RequestBodyLimitMiddleware,
     SecurityHeadersMiddleware,

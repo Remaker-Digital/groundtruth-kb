@@ -26,7 +26,7 @@ testing — there is no constraint on mutating staging data.
 import re
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ class TestSearchAndFilters:
         # Capture initial All tab count
         text_before = _text(shared_inbox_page)
         all_match = re.search(r'All\s*\((\d+)\)', text_before)
-        all_count = int(all_match.group(1)) if all_match else -1
+        int(all_match.group(1)) if all_match else -1
 
         # Click Active tab — Mantine SegmentedControl renders as label elements
         active_tab = shared_inbox_page.locator(
@@ -336,7 +336,7 @@ class TestSearchAndFilters:
             pytest.skip("Rate-limited by API")
         # Capture initial state
         text_before = _text(shared_inbox_page)
-        count_before = len(re.findall(r'\d+\s*messages?', text_before))
+        len(re.findall(r'\d+\s*messages?', text_before))
 
         # Switch to Active then back to All — Mantine SegmentedControl
         shared_inbox_page.locator(
@@ -1056,7 +1056,7 @@ class TestConversationActions:
             self._restore_all_tab(live_inbox_page)
             return  # No active conversations — state-dependent, not an element failure
 
-        text_before = _text(live_inbox_page)
+        _text(live_inbox_page)
         # Look for Resolve button
         resolve_btn = live_inbox_page.locator(
             "button:has-text('Resolve'), "
