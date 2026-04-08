@@ -141,6 +141,27 @@ class TestExtractIdentityFromText:
         result = extract_identity_from_text("I'm Back!")
         assert "name" not in result
 
+    # -- D3 strict E.164 phone extraction (SPEC-1879 Phase 2A remediation) ----
+
+    def test_phone_valid_e164(self):
+        result = extract_identity_from_text("my phone is +15551234567")
+        assert result.get("phone") == "+15551234567"
+
+    def test_phone_overlong_rejected(self):
+        """Overlong digit string must not be truncated."""
+        result = extract_identity_from_text("my phone is +155512345678901234")
+        assert "phone" not in result
+
+    def test_phone_trailing_alpha_rejected(self):
+        """Trailing alpha must not be silently stripped."""
+        result = extract_identity_from_text("my phone is +15551234567abc")
+        assert "phone" not in result
+
+    def test_phone_embedded_word_rejected(self):
+        """Phone embedded in a word must be rejected."""
+        result = extract_identity_from_text("call+15551234567now")
+        assert "phone" not in result
+
 
 # ---------------------------------------------------------------------------
 # Core CRUD

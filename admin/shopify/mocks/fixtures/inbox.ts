@@ -12,7 +12,7 @@ export function createInboxFixture() {
       startedAt: "2026-03-10T08:30:00Z", endedAt: null, lastActivityAt: "2026-03-10T09:15:00Z",
       isBillable: true, agentsInvoked: ["CustomerServiceAgent"], modelUsed: "gpt-4o",
       criticPassed: true, escalationCategory: null, archivedAt: null,
-      customerVerified: true, identityEmail: "emily@example.com", pipelineTrace: null,
+      customerVerified: true, identityEmail: "emily@example.com", identityPhone: null, pipelineTrace: null,
     },
     {
       conversationId: "conv-002", customerId: "cust-102", customerName: "Marcus Johnson",
@@ -20,7 +20,7 @@ export function createInboxFixture() {
       startedAt: "2026-03-09T14:20:00Z", endedAt: null, lastActivityAt: "2026-03-09T16:45:00Z",
       isBillable: true, agentsInvoked: ["CustomerServiceAgent", "EscalationAgent"], modelUsed: "gpt-4o",
       criticPassed: false, escalationCategory: "technical", archivedAt: null,
-      customerVerified: true, identityEmail: "marcus@example.com", pipelineTrace: null,
+      customerVerified: true, identityEmail: "marcus@example.com", identityPhone: "+15551234567", pipelineTrace: null,
     },
     {
       conversationId: "conv-003", customerId: "cust-103", customerName: "Sophie Chen",
@@ -29,7 +29,7 @@ export function createInboxFixture() {
       lastActivityAt: "2026-03-08T10:15:00Z",
       isBillable: true, agentsInvoked: ["OrderStatusAgent"], modelUsed: "gpt-4o",
       criticPassed: true, escalationCategory: null, archivedAt: null,
-      customerVerified: false, identityEmail: null, pipelineTrace: null,
+      customerVerified: false, identityEmail: null, identityPhone: null, pipelineTrace: null,
     },
   ];
 

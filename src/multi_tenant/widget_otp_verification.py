@@ -546,18 +546,13 @@ class SmsVerifyResponse(BaseModel):
 
 
 async def _check_tier_gate(tenant_id: str) -> bool:
-    """Return True if tenant is professional+ (SPEC-1879 tier gate)."""
-    try:
-        from src.multi_tenant.repository import TenantRepository
+    """Return True if tenant is professional+ (SPEC-1879 tier gate).
 
-        tenant_repo = TenantRepository()
-        tenant = await tenant_repo.get(tenant_id)
-        if tenant:
-            tier = tenant.get("tier", "starter")
-            return tier in ("professional", "enterprise")
-    except Exception:
-        logger.debug("Failed to check tier for %s — defaulting to blocked", tenant_id)
-    return False
+    Delegates to shared utility; kept as local wrapper for backward compat.
+    """
+    from src.multi_tenant.tier_utils import check_tier_gate
+
+    return await check_tier_gate(tenant_id)
 
 
 @router.post(

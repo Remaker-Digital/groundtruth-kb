@@ -73,7 +73,9 @@ _EMAIL_PATTERN = re.compile(
 )
 
 # E.164 phone extraction (SPEC-1879 Phase 2A)
-_PHONE_PATTERN = re.compile(r"(\+[1-9]\d{1,14})")
+# Word-char lookarounds reject trailing alpha, embedded words, overlong digits.
+_PHONE_PATTERN = re.compile(r"(?<![+\w])(\+[1-9]\d{1,14})(?!\w)")
+_PHONE_STRICT = re.compile(r"^\+[1-9]\d{1,14}$")
 
 
 def extract_identity_from_text(text: str) -> dict[str, str]:
@@ -103,9 +105,9 @@ def extract_identity_from_text(text: str) -> dict[str, str]:
     if email_match:
         result["email"] = email_match.group(1)
 
-    # Extract phone (SPEC-1879 Phase 2A — E.164 only)
+    # Extract phone (SPEC-1879 Phase 2A — strict E.164 only)
     phone_match = _PHONE_PATTERN.search(text)
-    if phone_match:
+    if phone_match and _PHONE_STRICT.match(phone_match.group(1)):
         result["phone"] = phone_match.group(1)
 
     return result

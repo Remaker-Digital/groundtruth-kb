@@ -41,7 +41,8 @@ logger = logging.getLogger(__name__)
 # E.164 phone: strict match (starts with +, 2-15 digits)
 _PHONE_STRICT_PATTERN = re.compile(r"^\+[1-9]\d{1,14}$")
 # Flexible: phone embedded in a short message like "my phone is +15551234567"
-_PHONE_EXTRACT_PATTERN = re.compile(r"(\+[1-9]\d{1,14})")
+# Uses word-char lookarounds to reject trailing alpha, embedded words, overlong digits.
+_PHONE_EXTRACT_PATTERN = re.compile(r"(?<![+\w])(\+[1-9]\d{1,14})(?!\w)")
 
 # Strict email regex: entire message is a single email address
 _EMAIL_STRICT_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -253,9 +254,12 @@ def _extract_phone(content: str) -> str | None:
 
     matches = _PHONE_EXTRACT_PATTERN.findall(stripped)
     if len(matches) == 1:
-        return matches[0]
+        # Defense-in-depth: verify candidate passes strict E.164 fullmatch
+        candidate = matches[0]
+        if _PHONE_STRICT_PATTERN.match(candidate):
+            return candidate
 
-    return None  # Zero or multiple phones — ambiguous
+    return None  # Zero, multiple, or invalid phones
 
 
 # ---------------------------------------------------------------------------
@@ -494,7 +498,41 @@ async def preprocess_identity(
                     ),
                 )
 
-        # Not a code or skip phrase -- pass through to AI (it knows OTP is pending)
+        # Not a code or skip phrase — check for phone before passing through.
+        # Dual-state: email OTP pending, but customer may also provide phone.
+        if not conv_doc.get("identity_sms_sent_at"):
+            phone = _extract_phone(content_stripped)
+            if phone:
+                from src.multi_tenant.tier_utils import check_tier_gate
+
+                if await check_tier_gate(tenant_id):
+                    sent = await _send_sms_otp_for_conversation(phone=phone, tenant_id=tenant_id)
+                    if sent:
+                        try:
+                            now_iso = datetime.now(timezone.utc).isoformat()
+                            await conv_repo.patch(
+                                tenant_id,
+                                conversation_id,
+                                operations=[
+                                    {"op": "set", "path": "/identity_phone", "value": phone},
+                                    {"op": "set", "path": "/identity_sms_sent_at", "value": now_iso},
+                                    {"op": "set", "path": "/identity_sms_attempts", "value": 0},
+                                    {"op": "set", "path": "/updated_at", "value": now_iso},
+                                ],
+                            )
+                        except Exception as exc:
+                            logger.warning("Failed to update conversation with phone: %s", exc)
+
+                        masked_phone = phone[:3] + "***" + phone[-3:] if len(phone) > 6 else phone
+                        return IdentityAction(
+                            action="phone_received",
+                            phone=phone,
+                            system_message=(
+                                f"I've also sent an SMS code to {masked_phone}. "
+                                f"You can verify with either the email or SMS code."
+                            ),
+                        )
+
         return IdentityAction(action="none")
 
     # -- State: SMS OTP pending (SPEC-1879 Phase 2A) -------------------------
@@ -585,7 +623,40 @@ async def preprocess_identity(
                     ),
                 )
 
-        # Not a code or skip phrase — pass through
+        # Not a code or skip phrase — check for email before passing through.
+        # Dual-state: SMS OTP pending, but customer may also provide email.
+        # Email takes precedence per spec — if email found, start email OTP too.
+        if not conv_doc.get("identity_otp_sent_at"):
+            email = _extract_email(content_stripped)
+            if email:
+                sent = await _send_otp_for_conversation(email=email, tenant_id=tenant_id)
+                if sent:
+                    try:
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        await conv_repo.patch(
+                            tenant_id,
+                            conversation_id,
+                            operations=[
+                                {"op": "set", "path": "/identity_email", "value": email},
+                                {"op": "set", "path": "/identity_otp_sent_at", "value": now_iso},
+                                {"op": "set", "path": "/identity_otp_attempts", "value": 0},
+                                {"op": "set", "path": "/updated_at", "value": now_iso},
+                            ],
+                        )
+                    except Exception as exc:
+                        logger.warning("Failed to update conversation with email: %s", exc)
+
+                    parts = email.split("@")
+                    masked = parts[0][:2] + "***@" + parts[1] if len(parts) == 2 else email
+                    return IdentityAction(
+                        action="email_received",
+                        email=email,
+                        system_message=(
+                            f"I've also sent a verification code to {masked}. "
+                            f"You can verify with either the email or SMS code."
+                        ),
+                    )
+
         return IdentityAction(action="none")
 
     # -- State: No OTP sent yet -- check for email address ------------------
@@ -639,6 +710,15 @@ async def preprocess_identity(
     if not identity_email and not otp_sent_at and not sms_sent_at:
         phone = _extract_phone(content_stripped)
         if phone:
+            # Professional+ tier gate — starter tenants cannot use SMS OTP
+            from src.multi_tenant.tier_utils import check_tier_gate
+
+            if not await check_tier_gate(tenant_id):
+                logger.info(
+                    "SMS OTP blocked by tier gate: tenant=%s", tenant_id,
+                )
+                return IdentityAction(action="none")
+
             # Send SMS OTP
             sent = await _send_sms_otp_for_conversation(phone=phone, tenant_id=tenant_id)
             if not sent:
