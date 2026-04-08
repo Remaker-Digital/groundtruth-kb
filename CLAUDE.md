@@ -207,6 +207,24 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 
 ---
 
+## Branching Strategy
+
+| Branch | Purpose | Updated when |
+|--------|---------|-------------|
+| `main` | Production mirror. Always matches the most recent production deployment. | Merge from `develop` at deployment time. |
+| `develop` | Continuous development. All new features, fixes, and experiments land here. | Every session. |
+
+**Workflow:** `develop` → build/test → deploy to staging → staging verified → merge to `main` → deploy to production.
+
+**Rules:**
+1. Never commit directly to `main`. All work happens on `develop`.
+2. Merge to `main` only as part of a production deployment operation.
+3. `main` must always be deployable — it represents what is running in production.
+4. Version tags (v1.98.x) are created on `develop` at build time and propagated to `main` via merge.
+5. Hotfixes: branch from `main`, fix, merge to both `main` and `develop`.
+
+---
+
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-03-17*
-*Version: 65.0.0*
+*Last Updated: 2026-04-07*
+*Version: 66.0.0*
