@@ -63,6 +63,7 @@ def mock_ctx():
     ctx.tenant_id = "tenant-001"
     ctx.tier = TenantTier.STARTER
     ctx.status = "active"
+    ctx.team_member_role = None
     return ctx
 
 
@@ -708,7 +709,7 @@ class TestReportIssue:
         import src.chat.endpoints as ep
         ep._session = mock_session
 
-        mock_session.get_state = AsyncMock(
+        mock_session.get_conversation = AsyncMock(
             side_effect=ConversationNotFoundError("conv-x", "tenant-001")
         )
 

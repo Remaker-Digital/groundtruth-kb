@@ -23,6 +23,7 @@ R2 refactoring — session 34.
 # SYNC NOTICE (SPEC-1627): This list MUST mirror repositories/__init__.py __all__.
 # When adding a new repository class, add it to BOTH files.
 from src.multi_tenant.repositories import (  # noqa: F401
+    AgentSkillBindingRepository,
     AlertHistoryRepository,
     AlertRuleRepository,
     AuditLogRepository,
@@ -30,6 +31,7 @@ from src.multi_tenant.repositories import (  # noqa: F401
     CustomerProfileRepository,
     DocumentConflictError,
     DocumentNotFoundError,
+    DomainIndexRepository,
     IncidentRepository,
     KnowledgeBaseRepository,
     MemoryVectorRepository,
@@ -39,6 +41,7 @@ from src.multi_tenant.repositories import (  # noqa: F401
     PreferencesRepository,
     SLASnapshotRepository,
     TeamMemberRepository,
+    TenantAgentOverlayRepository,
     TenantIsolationError,
     TenantRepository,
     TenantScopedRepository,
@@ -72,4 +75,7 @@ __all__ = [
     "AlertRuleRepository",
     "AlertHistoryRepository",
     "PlatformAdminRepository",
+    "DomainIndexRepository",
+    "TenantAgentOverlayRepository",
+    "AgentSkillBindingRepository",
 ]

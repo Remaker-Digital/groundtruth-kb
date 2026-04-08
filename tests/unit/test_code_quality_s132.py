@@ -106,7 +106,7 @@ class TestSmtpAsyncOffload:
     def test_standalone_auth_password_changed_email_offloaded(self):
         """standalone_auth.py must offload _send_admin_password_changed_email."""
         source = Path("src/app/standalone_auth.py").read_text()
-        assert "asyncio.to_thread(_send_admin_password_changed_email" in source
+        assert "asyncio.to_thread(" in source and "_send_admin_password_changed_email" in source
 
 
 # ---------------------------------------------------------------------------

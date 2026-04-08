@@ -64,7 +64,7 @@ class TestIdempotentAppendHappy:
         doc = _make_doc()
         repo.replace_with_etag = AsyncMock()
         session = _make_session(repo=repo)
-        session._get_active_conversation = AsyncMock(return_value=doc)
+        session._get_writable_conversation = AsyncMock(return_value=doc)
 
         key = str(uuid.uuid4())
         request = _make_request(idempotency_key=key)
@@ -92,7 +92,7 @@ class TestIdempotentAppendHappy:
         }
         doc = _make_doc(messages=[existing_msg], turn_count=1)
         session = _make_session(repo=repo)
-        session._get_active_conversation = AsyncMock(return_value=doc)
+        session._get_writable_conversation = AsyncMock(return_value=doc)
 
         request = _make_request(idempotency_key="key-dup")
 
@@ -120,7 +120,7 @@ class TestIdempotentAppendRetry:
 
         session = _make_session(repo=repo)
         # First call returns doc1, second returns doc2 (fresh)
-        session._get_active_conversation = AsyncMock(side_effect=[doc1, doc2])
+        session._get_writable_conversation = AsyncMock(side_effect=[doc1, doc2])
         # First replace fails with ETag conflict, second succeeds
         repo.replace_with_etag = AsyncMock(
             side_effect=[CosmosAccessConditionFailedError(message="conflict"), None]
@@ -132,7 +132,7 @@ class TestIdempotentAppendRetry:
 
         assert response.accepted is True
         assert repo.replace_with_etag.await_count == 2
-        assert session._get_active_conversation.await_count == 2
+        assert session._get_writable_conversation.await_count == 2
 
     @pytest.mark.asyncio
     async def test_all_retries_exhausted_raises(self):
@@ -147,7 +147,7 @@ class TestIdempotentAppendRetry:
         session = _make_session(repo=repo)
         # Each retry re-reads the document; return fresh copies so in-memory
         # mutations from prior attempts don't leak the idempotency key.
-        session._get_active_conversation = AsyncMock(
+        session._get_writable_conversation = AsyncMock(
             side_effect=[_make_doc(etag=f"etag-{i}") for i in range(5)]
         )
 
@@ -178,7 +178,7 @@ class TestIdempotentAppendInFlight:
         doc = _make_doc(messages=[customer_msg])
 
         session = _make_session()
-        session._get_active_conversation = AsyncMock(return_value=doc)
+        session._get_writable_conversation = AsyncMock(return_value=doc)
 
         request = _make_request(idempotency_key="key-new")
 

@@ -581,6 +581,9 @@ class TestEscalation:
 
     @pytest.mark.asyncio
     async def test_find_best_agent_at_capacity(self, session, mock_team_repo, mock_repo):
+        """WI-3030 S259: Capacity checks removed for async email-bridge model.
+        An active agent matching the category is always returned regardless of
+        concurrent conversation count."""
         mock_team_repo.list_members = AsyncMock(return_value=[
             {
                 "id": "agent-1",
@@ -593,7 +596,7 @@ class TestEscalation:
         mock_repo.count_filtered = AsyncMock(return_value=2)
 
         result = await session.find_best_agent_for_category("tenant-001", "billing")
-        assert result is None
+        assert result == "agent-1"
 
     @pytest.mark.asyncio
     async def test_find_best_agent_no_team_repo(self):

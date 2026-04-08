@@ -86,7 +86,7 @@ class TestIssueReportEscalation:
         from src.chat.endpoints import report_issue, IssueReportRequest
 
         mock_session = MagicMock()
-        mock_session.get_state = AsyncMock(return_value=MagicMock())
+        mock_session.get_conversation = AsyncMock(return_value=MagicMock())
         mock_session._conversation_repo = None
 
         mock_ctx = MagicMock()
@@ -123,7 +123,7 @@ class TestIssueReportEscalation:
         from src.chat.endpoints import report_issue, IssueReportRequest
 
         mock_session = MagicMock()
-        mock_session.get_state = AsyncMock(return_value=MagicMock())
+        mock_session.get_conversation = AsyncMock(return_value=MagicMock())
         mock_session._conversation_repo = None
 
         mock_ctx = MagicMock()
@@ -155,7 +155,7 @@ class TestIssueReportEscalation:
         from src.chat.endpoints import report_issue, IssueReportRequest
 
         mock_session = MagicMock()
-        mock_session.get_state = AsyncMock(return_value=MagicMock())
+        mock_session.get_conversation = AsyncMock(return_value=MagicMock())
         mock_session._conversation_repo = None
 
         mock_ctx = MagicMock()
@@ -188,7 +188,7 @@ class TestIssueReportEscalation:
         from src.chat.endpoints import report_issue, IssueReportRequest
 
         mock_session = MagicMock()
-        mock_session.get_state = AsyncMock(return_value=MagicMock())
+        mock_session.get_conversation = AsyncMock(return_value=MagicMock())
         mock_session._conversation_repo = None
 
         mock_ctx = MagicMock()
