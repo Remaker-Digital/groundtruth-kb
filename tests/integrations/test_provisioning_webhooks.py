@@ -36,7 +36,7 @@ from src.integrations.provisioning import (
     provision_trial_tenant,
     update_tenant,
 )
-from tests.helpers.fake_tenant_repo import FakeTenantRepo
+from tests.helpers.fake_tenant_repo import FakeDomainIndexRepo, FakeTenantRepo
 
 
 # ---------------------------------------------------------------------------
@@ -46,12 +46,13 @@ from tests.helpers.fake_tenant_repo import FakeTenantRepo
 
 @pytest.fixture(autouse=True)
 def fake_tenant_repo():
-    """Wire a FakeTenantRepo into the provisioning module for each test."""
+    """Wire FakeTenantRepo + FakeDomainIndexRepo into provisioning for each test."""
     repo = FakeTenantRepo()
-    configure_provisioning_repo(repo, team_repo=None)
+    domain_repo = FakeDomainIndexRepo()
+    configure_provisioning_repo(repo, team_repo=None, domain_index_repo=domain_repo)
     yield repo
-    # Clean up module-level reference
-    configure_provisioning_repo(None, team_repo=None)
+    # Clean up module-level references
+    configure_provisioning_repo(None, team_repo=None, domain_index_repo=None)
 
 
 # ===================================================================

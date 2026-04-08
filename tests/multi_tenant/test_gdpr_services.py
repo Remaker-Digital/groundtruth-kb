@@ -728,15 +728,16 @@ class TestCosmosDataStoreAdapter:
         mock_cosmos_repos["conversation_repo"].list_by_customer.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_gdpr_27_delete_7_collections(self, mock_cosmos_repos: dict[str, AsyncMock]) -> None:
-        """GDPR-27: Deletion cascades through all 7 collections."""
+    async def test_gdpr_27_delete_8_collections(self, mock_cosmos_repos: dict[str, AsyncMock]) -> None:
+        """GDPR-27: Deletion cascades through all 7 collections + domain_index cleanup."""
         adapter = CosmosDataStoreAdapter(**mock_cosmos_repos)
         result = await adapter.delete_tenant_data(TENANT_ID)
 
-        # All 7 internal collection names processed
+        # 7 internal collections + domain_index cleanup attempt
         expected_collections = {
             "tenants", "conversations", "usage", "customer_profiles",
             "knowledge_bases", "memory_vectors", "preferences",
+            "domain_index",
         }
         assert set(result.keys()) == expected_collections
         for repo in mock_cosmos_repos.values():

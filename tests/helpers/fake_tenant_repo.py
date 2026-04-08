@@ -106,6 +106,26 @@ class FakeTenantRepo:
         return None
 
 
+class FakeDomainIndexRepo:
+    """In-memory implementation of DomainIndexRepository for testing.
+
+    Maps domain identifiers (stripe_customer_id, shopify_shop_domain)
+    to tenant IDs, supporting lookup, upsert, and delete.
+    """
+
+    def __init__(self) -> None:
+        self.index: dict[str, str] = {}
+
+    async def lookup(self, domain: str) -> str | None:
+        return self.index.get(domain)
+
+    async def upsert(self, domain: str, tenant_id: str, channel: str = "") -> None:
+        self.index[domain] = tenant_id
+
+    async def delete(self, domain: str) -> None:
+        self.index.pop(domain, None)
+
+
 def run_sync(coro: Any) -> Any:
     """Run an async coroutine synchronously.
 
