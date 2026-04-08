@@ -13,10 +13,8 @@ Verifies:
 
 from __future__ import annotations
 
-import importlib
 import os
-import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -189,7 +187,6 @@ class TestProvisionTestTenant:
     def test_raises_on_403(self) -> None:
         """Must raise RuntimeError with SPEC-1673 message on 403."""
         from scripts._self_provision import provision_test_tenant
-        import httpx
 
         mock_resp = MagicMock()
         mock_resp.status_code = 403
@@ -307,7 +304,7 @@ class TestProvisionTestTenant:
             mock_client.post = capture_post
             mock_client_cls.return_value = mock_client
 
-            result = provision_test_tenant("https://example.com", "ar_spa_plat_test")
+            provision_test_tenant("https://example.com", "ar_spa_plat_test")
             # Should have auto-generated merchantName and superadminEmail
             assert "merchantName" in captured_body
             assert "superadminEmail" in captured_body
@@ -368,7 +365,6 @@ class TestPipelineSelfProvisionFlag:
 
     def test_argparser_accepts_self_provision(self) -> None:
         """Pipeline main() source must contain --self-provision flag."""
-        import inspect
         # Import the module carefully — avoid triggering argparse
         import importlib
         spec = importlib.util.find_spec("scripts.test_pipeline")

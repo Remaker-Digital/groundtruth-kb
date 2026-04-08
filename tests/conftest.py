@@ -27,10 +27,8 @@ from fastapi.testclient import TestClient
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import (
     BillingChannel,
-    TenantDocument,
     TenantStatus,
     TenantTier,
-    TIER_DEFAULTS,
 )
 
 # Import modules that will be patched — ensures they're in sys.modules

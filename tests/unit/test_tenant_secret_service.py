@@ -627,7 +627,7 @@ class TestKeyVaultClientMode:
 
         async def mock_gen():
             raise ConnectionError("Cannot connect")
-            yield  # noqa: unreachable — makes this an async generator
+            yield  # makes this an async generator (unreachable by design)
 
         svc._client = MagicMock()
         svc._client.list_properties_of_secrets = mock_gen
