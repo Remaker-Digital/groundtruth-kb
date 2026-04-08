@@ -377,26 +377,63 @@ export const Panel: FunctionComponent<PanelProps> = ({
     const store = getStore();
     const verificationMode = (activeConfig as Record<string, unknown>).customer_email_verification as string ?? 'required';
     const email = data.email || '';
+    const phone = data.phone || '';
 
-    // If verification is disabled or no email provided, go straight to conversation
-    if (verificationMode === 'disabled' || !email) {
+    // If verification is disabled, go straight to conversation
+    if (verificationMode === 'disabled') {
       beginConversation(data);
       return;
     }
 
-    // Store pre-chat data and email for OTP flow
-    store.setState({
-      preChatData: data,
-      customerEmail: email,
-      isLoading: true,
-      otpError: null,
-    });
+    // Email OTP path (takes precedence over phone when both present)
+    if (email) {
+      store.setState({
+        preChatData: data,
+        customerEmail: email,
+        isLoading: true,
+        otpError: null,
+      });
+      await apiSendOtp(email, data.name || '');
+      store.setState({ view: 'otp', isLoading: false });
+      return;
+    }
 
-    // Send OTP
-    await apiSendOtp(email, data.name || '');
+    // Phone SMS OTP path (SPEC-1879 Phase 3)
+    // Backend SmsSendResponse always returns sent=true (anti-enumeration).
+    // The message field distinguishes real sends from blocked responses:
+    // - Default success: "Enter the code we sent to your phone."
+    // - Tier-gated: "SMS verification is not available for your plan."
+    if (phone) {
+      store.setState({
+        preChatData: data,
+        customerPhone: phone,
+        isLoading: true,
+        phoneOtpError: null,
+      });
+      const sendResult = await apiSendPhoneOtp(phone, data.name || '');
+      const isTierBlocked = sendResult.sent
+        && sendResult.message?.toLowerCase().includes('not available');
 
-    // Transition to OTP screen
-    store.setState({ view: 'otp', isLoading: false });
+      if (sendResult.sent && !isTierBlocked) {
+        // SMS actually sent — transition to OTP entry screen
+        store.setState({ view: 'phone_otp', isLoading: false });
+      } else if (isTierBlocked) {
+        // Tier-gated — business decision: proceed without verification
+        store.setState({ isLoading: false, phoneOtpError: null });
+        beginConversation(data);
+      } else {
+        // Transport/network failure — do NOT bypass verification.
+        // Show error and stay on pre-chat form so customer can retry.
+        store.setState({
+          isLoading: false,
+          phoneOtpError: activeLocale.phoneOtpInvalid ?? 'Unable to send verification code. Please try again.',
+        });
+      }
+      return;
+    }
+
+    // No email or phone — go straight to conversation
+    beginConversation(data);
   }, [beginConversation, activeConfig]);
 
   /** Skip pre-chat form — continue as anonymous guest. */
@@ -477,8 +514,10 @@ export const Panel: FunctionComponent<PanelProps> = ({
     const { customerPhone, preChatData } = store.getState();
     if (!customerPhone) return;
 
-    await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
-    store.setState({ phoneOtpError: null });
+    const result = await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
+    // Check for tier-gate block message (backend sent=true is anti-enumeration)
+    const isBlocked = result.message && result.message.toLowerCase().includes('not available');
+    store.setState({ phoneOtpError: isBlocked ? result.message : null });
   }, []);
 
   /** Skip phone OTP verification (SPEC-1879, optional mode only). */
@@ -912,7 +951,11 @@ export const Panel: FunctionComponent<PanelProps> = ({
             locale={activeLocale}
             phone={state.customerPhone}
             onVerify={handlePhoneOtpVerify}
-            onSkip={handlePhoneOtpSkip}
+            onSkip={
+              ((activeConfig as Record<string, unknown>).customer_email_verification as string) === 'optional'
+                ? handlePhoneOtpSkip
+                : undefined
+            }
             onResend={handlePhoneOtpResend}
             isLoading={state.isLoading}
             error={state.phoneOtpError ?? undefined}

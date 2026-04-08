@@ -61,7 +61,7 @@ function validateField(field: FormField, value: string, locale: Locale): string 
     return locale.fieldInvalidEmail;
   }
   if (field.type === 'phone' && value.trim() && !PHONE_E164_REGEX.test(value.trim())) {
-    return 'Please enter a valid phone number (e.g. +15551234567)';
+    return locale.fieldInvalidPhone;
   }
   return null;
 }

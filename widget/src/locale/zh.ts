@@ -35,6 +35,7 @@ export const zh: Locale = {
   yesterday: '昨天',
   fieldRequired: '此字段为必填项',
   fieldInvalidEmail: '请输入有效的电子邮件地址',
+  fieldInvalidPhone: '请输入有效的电话号码（例如 +8613912345678）',
   fileTooLarge: '文件大小不能超过10MB',
   fileUploading: '上传中...',
   reportIssue: '报告问题',

@@ -35,6 +35,7 @@ export const fr: Locale = {
   yesterday: 'Hier',
   fieldRequired: 'Ce champ est obligatoire',
   fieldInvalidEmail: 'Veuillez entrer une adresse e-mail valide',
+  fieldInvalidPhone: 'Veuillez entrer un numéro de téléphone valide (ex. +33612345678)',
   fileTooLarge: 'Le fichier doit faire moins de 10 Mo',
   fileUploading: 'Envoi en cours...',
   reportIssue: 'Signaler un problème',

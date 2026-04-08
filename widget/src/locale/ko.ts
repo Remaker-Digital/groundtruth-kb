@@ -35,6 +35,7 @@ export const ko: Locale = {
   yesterday: '어제',
   fieldRequired: '필수 입력 항목입니다',
   fieldInvalidEmail: '유효한 이메일을 입력해 주세요',
+  fieldInvalidPhone: '유효한 전화번호를 입력해 주세요 (예: +821012345678)',
   fileTooLarge: '파일 크기는 10MB 이하여야 합니다',
   fileUploading: '업로드 중...',
   reportIssue: '문제 신고',

@@ -35,6 +35,7 @@ export const pt: Locale = {
   yesterday: 'Ontem',
   fieldRequired: 'Este campo é obrigatório',
   fieldInvalidEmail: 'Digite um e-mail válido',
+  fieldInvalidPhone: 'Digite um número de telefone válido (ex. +5511912345678)',
   fileTooLarge: 'O arquivo deve ter menos de 10 MB',
   fileUploading: 'Enviando...',
   reportIssue: 'Reportar problema',

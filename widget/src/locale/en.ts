@@ -39,6 +39,7 @@ export interface Locale {
   yesterday: string;
   fieldRequired: string;
   fieldInvalidEmail: string;
+  fieldInvalidPhone: string;
   fileTooLarge: string;
   fileUploading: string;
   reportIssue: string;
@@ -129,6 +130,7 @@ export const en: Locale = {
   yesterday: 'Yesterday',
   fieldRequired: 'This field is required',
   fieldInvalidEmail: 'Please enter a valid email',
+  fieldInvalidPhone: 'Please enter a valid phone number (e.g. +15551234567)',
   fileTooLarge: 'File must be under 10MB',
   fileUploading: 'Uploading...',
   reportIssue: 'Report an issue',

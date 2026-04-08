@@ -35,6 +35,7 @@ export const ja: Locale = {
   yesterday: '昨日',
   fieldRequired: 'この項目は必須です',
   fieldInvalidEmail: '有効なメールアドレスを入力してください',
+  fieldInvalidPhone: '有効な電話番号を入力してください（例: +81901234567）',
   fileTooLarge: 'ファイルは10MB以下にしてください',
   fileUploading: 'アップロード中...',
   reportIssue: '問題を報告',
