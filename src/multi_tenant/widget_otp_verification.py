@@ -292,7 +292,10 @@ async def verify_otp(
                     ],
                 )
             except Exception:
-                pass  # Non-fatal — worst case counter doesn't increment
+                logger.warning(
+                    "Widget OTP: failed to increment verify_attempts for %s — throttle may not reflect this attempt",
+                    token_id,
+                )
             logger.info(
                 "Widget OTP mismatch: tenant=%s email=%s attempt=%d",
                 ctx.tenant_id, body.email, attempts + 1,
@@ -676,6 +679,7 @@ async def send_sms_otp(
 
     except Exception:
         logger.exception("Error sending SMS OTP")
+        return SmsSendResponse(sent=False, message="Unable to send verification code. Please try again.")
 
     return SmsSendResponse()
 
@@ -750,7 +754,10 @@ async def verify_sms_otp(
                     ],
                 )
             except Exception:
-                pass  # Non-fatal — worst case counter doesn't increment
+                logger.warning(
+                    "SMS OTP: failed to increment verify_attempts for %s — throttle may not reflect this attempt",
+                    token_id,
+                )
             logger.info(
                 "SMS OTP mismatch: tenant=%s phone=%s*** attempt=%d",
                 ctx.tenant_id, phone[:6], attempts + 1,

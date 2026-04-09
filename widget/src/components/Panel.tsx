@@ -375,6 +375,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
   /** Handle pre-chat form submission — route through OTP if verification enabled. */
   const handlePreChatSubmit = useCallback(async (data: Record<string, string>) => {
     const store = getStore();
+    if (store.getState().isLoading) return; // Double-submit guard (all paths)
     const verificationMode = (activeConfig as Record<string, unknown>).customer_email_verification as string ?? 'required';
     const email = data.email || '';
     const phone = data.phone || '';
@@ -402,7 +403,6 @@ export const Panel: FunctionComponent<PanelProps> = ({
     // Backend SmsSendResponse always returns sent=true (anti-enumeration).
     // Uses structured `reason` field for programmatic branching.
     if (phone) {
-      if (store.getState().isLoading) return; // Double-submit guard
       store.setState({
         preChatData: data,
         customerPhone: phone,
@@ -512,25 +512,28 @@ export const Panel: FunctionComponent<PanelProps> = ({
    * false if a transport error occurred (error is surfaced; cooldown suppressed). */
   const handlePhoneOtpResend = useCallback(async (): Promise<boolean> => {
     const store = getStore();
-    const { customerPhone, preChatData } = store.getState();
-    if (!customerPhone) return false;
+    const { customerPhone, preChatData, isLoading } = store.getState();
+    if (!customerPhone || isLoading) return false;
+
+    store.setState({ isLoading: true, phoneOtpError: null });
 
     const result = await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
     // Tier-gate: prefer structured reason field, fall back to message string
     const isBlocked = result.reason === 'tier_blocked'
       || (result.message && result.message.toLowerCase().includes('not available'));
     if (isBlocked) {
-      store.setState({ phoneOtpError: result.message });
+      store.setState({ isLoading: false, phoneOtpError: result.message });
       return true; // intentional outcome — start cooldown to prevent hammering
     }
     if (!result.sent) {
       // Transport/network failure — surface error, do not start cooldown
       store.setState({
+        isLoading: false,
         phoneOtpError: activeLocale.phoneSendFailed ?? 'Unable to send verification code. Please try again.',
       });
       return false;
     }
-    store.setState({ phoneOtpError: null });
+    store.setState({ isLoading: false, phoneOtpError: null });
     return true;
   }, [activeLocale]);
 
