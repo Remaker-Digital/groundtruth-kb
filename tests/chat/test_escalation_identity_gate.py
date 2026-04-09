@@ -16,6 +16,7 @@ Also verifies:
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,8 +26,16 @@ TENANT_ID = "test-tenant-001"
 CONV_ID = "conv-gate-001"
 
 
-def _build_mixin(conv_doc: dict | None = None):
-    """Build a CriticEscalationMixin instance with mocked session."""
+def _build_mixin(conv_doc: dict | None = None, *, use_real_budget: bool = False):
+    """Build a CriticEscalationMixin instance with mocked session.
+
+    Args:
+        conv_doc: Conversation document to return from _get_conversation.
+        use_real_budget: When True, _call_escalation_handler is left as a real
+            async method (AsyncMock) so that the budget actually awaits it.
+            When False (default), it's a sync MagicMock for tests that only
+            need to verify the identity gate logic.
+    """
     from src.chat.pipeline.critic_escalation import CriticEscalationMixin
 
     obj = CriticEscalationMixin.__new__(CriticEscalationMixin)
@@ -37,10 +46,20 @@ def _build_mixin(conv_doc: dict | None = None):
     obj._session.find_superadmin_email = AsyncMock(return_value=None)
     obj._session._repo = AsyncMock()
     obj._session._repo.patch_conversation = AsyncMock()
-    # Prevent unawaited-coroutine warning: the real _call_escalation_handler
-    # creates a coroutine passed to budget.execute_with_budget. With a MagicMock
-    # budget, that coroutine is never awaited. Replace with a sync MagicMock.
-    obj._call_escalation_handler = MagicMock(return_value={"reason": "test"})
+    if use_real_budget:
+        # Keep _call_escalation_handler as an async callable so the budget
+        # can properly await it through asyncio.wait_for().
+        obj._call_escalation_handler = AsyncMock(return_value={
+            "reason": "test",
+            "urgency": "medium",
+            "context_summary": "Budget path test",
+            "category": "general_inquiry",
+            "model": "test-model",
+        })
+    else:
+        # Prevent unawaited-coroutine warning: with a MagicMock budget the
+        # coroutine is never awaited, so use a sync MagicMock.
+        obj._call_escalation_handler = MagicMock(return_value={"reason": "test"})
     return obj
 
 
@@ -66,6 +85,15 @@ def _make_conv_doc(
 
 def _make_budget():
     return MagicMock()
+
+
+def _make_real_budget(total_ms: int = 5000, stage_ms: int = 3000):
+    """Create a real PipelineTimeoutBudget that awaits coroutines."""
+    from src.multi_tenant.pipeline_resilience import PipelineTimeoutBudget
+    return PipelineTimeoutBudget(
+        total_deadline_ms=total_ms,
+        stage_budgets_ms={"escalation-handler": stage_ms},
+    )
 
 
 def _make_trace():
@@ -290,3 +318,83 @@ class TestEscalationMessaging:
         )
         assert result["email_required"] is False
         assert "as soon as possible" in result["escalation_msg"].lower()
+
+
+class TestEscalationBudgetPath:
+    """Exercises execute_with_budget success path with a real PipelineTimeoutBudget.
+
+    Codex Phase 4 GO noted that existing tests use MagicMock for the budget,
+    which silently discards the coroutine. These tests use a real budget so
+    asyncio.wait_for actually awaits _call_escalation_handler.
+    """
+
+    @pytest.mark.asyncio
+    async def test_real_budget_awaits_handler(self):
+        """Real budget awaits _call_escalation_handler without coroutine warnings."""
+        mixin = _build_mixin(
+            _make_conv_doc(identity_email="customer@example.com"),
+            use_real_budget=True,
+        )
+        budget = _make_real_budget()
+        result = await mixin._run_escalation_side_effects(
+            tenant_id=TENANT_ID,
+            conversation_id=CONV_ID,
+            customer_message="I need help",
+            system_prompt="You are helpful.",
+            budget=budget,
+            trace=_make_trace(),
+        )
+        # The handler was actually awaited through the budget
+        mixin._call_escalation_handler.assert_awaited_once()
+        assert result["email_required"] is False
+        # Budget recorded the stage
+        assert len(budget.stages) >= 1
+        assert budget.stages[-1].stage == "escalation-handler"
+        assert budget.stages[-1].succeeded is True
+
+    @pytest.mark.asyncio
+    async def test_real_budget_with_verified_phone(self):
+        """Real budget path works with phone-only identity."""
+        mixin = _build_mixin(
+            _make_conv_doc(identity_phone="+14155551234", phone_verified=True),
+            use_real_budget=True,
+        )
+        budget = _make_real_budget()
+        result = await mixin._run_escalation_side_effects(
+            tenant_id=TENANT_ID,
+            conversation_id=CONV_ID,
+            customer_message="I need help",
+            system_prompt="You are helpful.",
+            budget=budget,
+            trace=_make_trace(),
+        )
+        mixin._call_escalation_handler.assert_awaited_once()
+        assert result["email_required"] is False
+        assert "phone" in result["escalation_msg"].lower()
+
+    @pytest.mark.asyncio
+    async def test_real_budget_timeout_degrades_gracefully(self):
+        """When budget expires, escalation still proceeds with defaults."""
+        mixin = _build_mixin(
+            _make_conv_doc(identity_email="customer@example.com"),
+            use_real_budget=True,
+        )
+
+        # Make the handler take longer than the budget allows
+        async def slow_handler(*args, **kwargs):
+            await asyncio.sleep(10)
+            return {"reason": "should not reach"}
+
+        mixin._call_escalation_handler = slow_handler
+
+        budget = _make_real_budget(total_ms=50, stage_ms=50)  # 50ms budget
+        result = await mixin._run_escalation_side_effects(
+            tenant_id=TENANT_ID,
+            conversation_id=CONV_ID,
+            customer_message="I need help",
+            system_prompt="You are helpful.",
+            budget=budget,
+            trace=_make_trace(),
+        )
+        # Should degrade gracefully — escalation still proceeds with defaults
+        assert result["email_required"] is False
