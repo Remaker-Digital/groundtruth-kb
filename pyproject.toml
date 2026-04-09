@@ -83,8 +83,8 @@ ignore = [
     "B905",    # zip-without-explicit-strict — too noisy for existing code
     "SIM108",  # use-ternary-operator — sometimes if/else is clearer
     "UP007",   # non-pep604-annotation — X | Y vs Optional[X] preference
-    # Deferred style improvements (tracked for future tightening):
-    "B904",    # raise-without-from-inside-except — adopt incrementally
+    # Deferred improvements (tracked for future tightening):
+    "B904",    # raise-without-from-inside-except — reliability/debuggability debt (106 findings in src/); adopt incrementally, not style-only
     "UP042",   # replace-str-enum — StrEnum migration deferred to Python 3.12 cleanup pass
     "SIM105",  # suppressible-exception — contextlib.suppress preference, low impact
     "SIM102",  # collapsible-if — readability preference, case-by-case

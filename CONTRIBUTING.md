@@ -31,7 +31,7 @@ Agent Red follows a specification-first development methodology:
 ## Code Standards
 
 - **Python**: Formatted and linted with [ruff](https://docs.astral.sh/ruff/)
-  (see `pyproject.toml` for rules).
+  (see `pyproject.toml` for rules). CI enforces zero E/F violations in `src/`; test and admin directories retain pre-existing lint debt.
 - **TypeScript/React**: Standard ESLint + Prettier configuration.
 - **Copyright**: All new files must include the copyright header:
   ```

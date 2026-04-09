@@ -37,11 +37,11 @@ Internal stable customer identity replacing contact-means-as-key.
 - **Envelope encryption** — P0 incident closed; DEK recovery, field restoration, safety gates
 - **Deploy procedure** — 5 work packages: approval gate, rollback, unified config, structured logging, canonical paths
 - **Tenant provisioning** — display_name (auto-generated), hard contact gate on provision_tenant()
-- **CI stability** — lint zero errors (E/F), 9/11 test shards green, ~50 test fixes
+- **CI stability** — lint zero errors (E/F) in `src/`, 9/11 test shards green, ~50 test fixes
 
 ### Code quality improvements
 
-- **Lint remediation** — 1,446 ruff errors resolved to zero (E/F rules)
+- **Lint remediation** — 1,446 ruff errors resolved to zero (E/F rules) in `src/`; non-`src/` directories (tests, admin, scripts) retain pre-existing violations
 - **Import cycle detection** — automated detector, 0 real cycles across 281 modules
 - **GitHub hygiene** — README refresh, wiki sync, branch protection, issue templates
 - **Evaluation reports** — Agent Red and OrbaTech technical assessment documents
