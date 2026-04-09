@@ -440,15 +440,15 @@ export async function verifyOtp(
 export async function sendPhoneOtp(
   phone: string,
   name?: string,
-): Promise<{ sent: boolean; message: string | null }> {
-  const resp = await request<{ sent: boolean; message?: string }>('POST', '/api/chat/otp/send-sms', {
+): Promise<{ sent: boolean; message: string | null; reason: string | null }> {
+  const resp = await request<{ sent: boolean; message?: string; reason?: string }>('POST', '/api/chat/otp/send-sms', {
     phone,
     name: name ?? '',
   });
   if (resp.ok && resp.data) {
-    return { sent: resp.data.sent, message: resp.data.message ?? null };
+    return { sent: resp.data.sent, message: resp.data.message ?? null, reason: resp.data.reason ?? null };
   }
-  return { sent: false, message: null };
+  return { sent: false, message: null, reason: null };
 }
 
 /** Verify a 6-digit SMS OTP code. Returns verified phone on success. */

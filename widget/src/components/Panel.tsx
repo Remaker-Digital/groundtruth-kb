@@ -400,10 +400,9 @@ export const Panel: FunctionComponent<PanelProps> = ({
 
     // Phone SMS OTP path (SPEC-1879 Phase 3)
     // Backend SmsSendResponse always returns sent=true (anti-enumeration).
-    // The message field distinguishes real sends from blocked responses:
-    // - Default success: "Enter the code we sent to your phone."
-    // - Tier-gated: "SMS verification is not available for your plan."
+    // Uses structured `reason` field for programmatic branching.
     if (phone) {
+      if (store.getState().isLoading) return; // Double-submit guard
       store.setState({
         preChatData: data,
         customerPhone: phone,
@@ -411,8 +410,8 @@ export const Panel: FunctionComponent<PanelProps> = ({
         phoneOtpError: null,
       });
       const sendResult = await apiSendPhoneOtp(phone, data.name || '');
-      const isTierBlocked = sendResult.sent
-        && sendResult.message?.toLowerCase().includes('not available');
+      const isTierBlocked = sendResult.reason === 'tier_blocked'
+        || (sendResult.sent && sendResult.message?.toLowerCase().includes('not available'));
 
       if (sendResult.sent && !isTierBlocked) {
         // SMS actually sent — transition to OTP entry screen
@@ -489,8 +488,8 @@ export const Panel: FunctionComponent<PanelProps> = ({
   /** Verify phone SMS OTP code (SPEC-1879 Phase 3). */
   const handlePhoneOtpVerify = useCallback(async (code: string) => {
     const store = getStore();
-    const { customerPhone, preChatData } = store.getState();
-    if (!customerPhone) return;
+    const { customerPhone, preChatData, isLoading } = store.getState();
+    if (!customerPhone || isLoading) return; // Double-submit guard
 
     store.setState({ isLoading: true, phoneOtpError: null });
 
@@ -517,8 +516,9 @@ export const Panel: FunctionComponent<PanelProps> = ({
     if (!customerPhone) return false;
 
     const result = await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
-    // Tier-gate: backend returns sent=true (anti-enumeration) with a block message
-    const isBlocked = result.message && result.message.toLowerCase().includes('not available');
+    // Tier-gate: prefer structured reason field, fall back to message string
+    const isBlocked = result.reason === 'tier_blocked'
+      || (result.message && result.message.toLowerCase().includes('not available'));
     if (isBlocked) {
       store.setState({ phoneOtpError: result.message });
       return true; // intentional outcome — start cooldown to prevent hammering

@@ -22,7 +22,7 @@ interface PhoneOtpVerificationProps {
   phone: string;
   onVerify: (code: string) => void;
   onSkip?: () => void;
-  onResend: () => void;
+  onResend: () => Promise<boolean>;
   isLoading: boolean;
   error?: string;
 }
@@ -49,6 +49,14 @@ export const PhoneOtpVerification: FunctionComponent<PhoneOtpVerificationProps> 
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
+
+  // Clear digit inputs on verification failure so the customer starts fresh
+  useEffect(() => {
+    if (error) {
+      setDigits(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    }
+  }, [error]);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -110,10 +118,13 @@ export const PhoneOtpVerification: FunctionComponent<PhoneOtpVerificationProps> 
     [digits, onVerify],
   );
 
-  const handleResend = useCallback(() => {
+  const handleResend = useCallback(async () => {
     if (resendCooldown > 0) return;
-    onResend();
-    setResendCooldown(60);
+    const success = await onResend();
+    // Only start cooldown if the send succeeded or was an intentional tier-gate outcome.
+    // On transport failure onResend() returns false — suppress cooldown so the
+    // customer can retry immediately without being locked out for 60 seconds.
+    if (success) setResendCooldown(60);
   }, [resendCooldown, onResend]);
 
   // Mask phone for display: show country code + last 3 digits

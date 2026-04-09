@@ -41,6 +41,7 @@ _OTP_TTL = 10 * 60  # 10 minutes
 _OTP_LENGTH = 6  # 6-digit numeric code
 _OTP_TOKEN_TYPE = "widget_otp"
 _SMS_OTP_TOKEN_TYPE = "widget_otp_sms"  # SPEC-1879
+_MAX_VERIFY_ATTEMPTS = 5  # Lock token after 5 failed attempts
 
 # E.164 phone validation
 import re  # noqa: E402
@@ -77,8 +78,8 @@ def _generate_otp() -> str:
 class OtpSendRequest(BaseModel):
     """Request body for sending an OTP to a customer email."""
 
-    email: str = Field(description="Customer email address")
-    name: str = Field(default="", description="Customer name (optional)")
+    email: str = Field(description="Customer email address", max_length=254)
+    name: str = Field(default="", description="Customer name (optional)", max_length=200)
 
 
 class OtpSendResponse(BaseModel):
@@ -94,8 +95,8 @@ class OtpSendResponse(BaseModel):
 class OtpVerifyRequest(BaseModel):
     """Request body for verifying an OTP code."""
 
-    email: str = Field(description="Customer email address")
-    code: str = Field(description="6-digit OTP code")
+    email: str = Field(description="Customer email address", max_length=254)
+    code: str = Field(description="6-digit OTP code", max_length=6)
 
 
 class OtpVerifyResponse(BaseModel):
@@ -269,12 +270,32 @@ async def verify_otp(
         if doc.get("used"):
             return OtpVerifyResponse(verified=False)
 
+        # Attempt throttle: lock token after _MAX_VERIFY_ATTEMPTS failures
+        attempts = doc.get("verify_attempts", 0)
+        if attempts >= _MAX_VERIFY_ATTEMPTS:
+            logger.warning(
+                "Widget OTP locked (max attempts): tenant=%s email=%s attempts=%d",
+                ctx.tenant_id, body.email, attempts,
+            )
+            return OtpVerifyResponse(verified=False)
+
         # Compare OTP codes (constant-time comparison)
         stored_code = doc.get("otp_code", "")
         if not secrets.compare_digest(body.code.strip(), stored_code):
+            # Increment attempt counter
+            try:
+                await container.patch_item(
+                    item=token_id,
+                    partition_key=_OTP_TOKEN_TYPE,
+                    patch_operations=[
+                        {"op": "incr", "path": "/verify_attempts", "value": 1},
+                    ],
+                )
+            except Exception:
+                pass  # Non-fatal — worst case counter doesn't increment
             logger.info(
-                "Widget OTP mismatch: tenant=%s email=%s",
-                ctx.tenant_id, body.email,
+                "Widget OTP mismatch: tenant=%s email=%s attempt=%d",
+                ctx.tenant_id, body.email, attempts + 1,
             )
             return OtpVerifyResponse(verified=False)
 
@@ -509,8 +530,8 @@ def normalize_e164(raw_phone: str) -> str | None:
 class SmsSendRequest(BaseModel):
     """Request body for sending an SMS OTP (SPEC-1879)."""
 
-    phone: str = Field(description="Customer phone number (E.164 format)")
-    name: str = Field(default="", description="Customer name (optional)")
+    phone: str = Field(description="Customer phone number (E.164 format)", max_length=16)
+    name: str = Field(default="", description="Customer name (optional)", max_length=200)
 
 
 class SmsSendResponse(BaseModel):
@@ -521,13 +542,17 @@ class SmsSendResponse(BaseModel):
         description="Always true — never reveals whether the phone was valid",
     )
     message: str = Field(default="Enter the code we sent to your phone.")
+    reason: str | None = Field(
+        default=None,
+        description="Structured reason code for programmatic branching (e.g., 'tier_blocked')",
+    )
 
 
 class SmsVerifyRequest(BaseModel):
     """Request body for verifying an SMS OTP code (SPEC-1879)."""
 
-    phone: str = Field(description="Customer phone number (E.164 format)")
-    code: str = Field(description="6-digit OTP code")
+    phone: str = Field(description="Customer phone number (E.164 format)", max_length=16)
+    code: str = Field(description="6-digit OTP code", max_length=6)
 
 
 class SmsVerifyResponse(BaseModel):
@@ -591,6 +616,7 @@ async def send_sms_otp(
             return SmsSendResponse(
                 sent=True,
                 message="SMS verification is not available for your plan.",
+                reason="tier_blocked",
             )
 
         # Validate and normalize E.164
@@ -701,13 +727,33 @@ async def verify_sms_otp(
         if doc.get("used"):
             return SmsVerifyResponse(verified=False)
 
+        # Attempt throttle: lock token after _MAX_VERIFY_ATTEMPTS failures
+        attempts = doc.get("verify_attempts", 0)
+        if attempts >= _MAX_VERIFY_ATTEMPTS:
+            logger.warning(
+                "SMS OTP locked (max attempts): tenant=%s phone=%s*** attempts=%d",
+                ctx.tenant_id, phone[:6], attempts,
+            )
+            return SmsVerifyResponse(verified=False)
+
         # Constant-time hash comparison (Codex security requirement)
         stored_hash = doc.get("otp_code_hash", "")
         submitted_hash = hash_code(body.code.strip())
         if not secrets.compare_digest(submitted_hash, stored_hash):
+            # Increment attempt counter
+            try:
+                await container.patch_item(
+                    item=token_id,
+                    partition_key=_SMS_OTP_TOKEN_TYPE,
+                    patch_operations=[
+                        {"op": "incr", "path": "/verify_attempts", "value": 1},
+                    ],
+                )
+            except Exception:
+                pass  # Non-fatal — worst case counter doesn't increment
             logger.info(
-                "SMS OTP mismatch: tenant=%s phone=%s***",
-                ctx.tenant_id, phone[:6],
+                "SMS OTP mismatch: tenant=%s phone=%s*** attempt=%d",
+                ctx.tenant_id, phone[:6], attempts + 1,
             )
             return SmsVerifyResponse(verified=False)
 
