@@ -195,10 +195,15 @@ class TestTriggerTestRun:
     async def test_trigger_invalid_environment_returns_400(self, mock_tenant_ctx):
         """Invalid environment returns HTTP 400."""
         from fastapi import HTTPException
+        import os
+        from unittest.mock import patch
 
-        body = PipelineRunRequest(environment="local")
-        with pytest.raises(HTTPException) as exc_info:
-            await trigger_test_run(body, mock_tenant_ctx)
+        # The implementation ignores the client-supplied environment and uses
+        # the server's ENVIRONMENT env var. Patch it to an invalid value.
+        body = PipelineRunRequest(environment="staging")
+        with patch.dict(os.environ, {"ENVIRONMENT": "local"}):
+            with pytest.raises(HTTPException) as exc_info:
+                await trigger_test_run(body, mock_tenant_ctx)
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio

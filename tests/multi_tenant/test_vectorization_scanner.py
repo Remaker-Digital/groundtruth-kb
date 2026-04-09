@@ -110,6 +110,7 @@ class TestVectorizationScanner:
             customer_id="cust-001",
             conversation_id="conv-001",
             messages=conv["messages"],
+            canonical_customer_id=None,  # ADR-004: canonical ID passed through (None when no CID resolved)
             consent_status=ConsentStatus.GRANTED,
         )
 

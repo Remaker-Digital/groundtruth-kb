@@ -578,6 +578,7 @@ class TestHealthCacheInvalidation:
 
     def test_ready_endpoint_includes_cache_invalidation(self):
         """GET /ready response includes cache_invalidation.redis_pubsub boolean."""
+        from unittest.mock import patch
         from fastapi import FastAPI
         from starlette.testclient import TestClient
         from src.app.health import register_health_endpoints
@@ -585,7 +586,14 @@ class TestHealthCacheInvalidation:
         app = FastAPI()
         register_health_endpoints(app)
         client = TestClient(app, raise_server_exceptions=False)
-        response = client.get("/ready")
+        # SPEC-1802/DCL-002: /ready returns 503 when transport is not active.
+        # Mock get_sdk_status to report transport active so readiness check reaches
+        # the cache_invalidation section.
+        with patch(
+            "src.multi_tenant.agntcy_sdk_integration.get_sdk_status",
+            return_value={"transport_active": True, "active_tier": "nats"},
+        ):
+            response = client.get("/ready")
         assert response.status_code == 200
         data = response.json()
         assert "cache_invalidation" in data
