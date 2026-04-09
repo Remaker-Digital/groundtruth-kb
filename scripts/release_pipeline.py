@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Release Pipeline — CANONICAL PRODUCTION APPROVAL PATH (S251 OM-1).
+"""Release Pipeline — HIGHER-LEVEL RELEASE ORCHESTRATION (S251 OM-1).
 
-This is the ONLY script whose exit code may be used to authorize
-production promotion. All other deploy scripts (deploy_orchestrator.py,
-deploy_ui.py, deploy.py) are smoke helpers whose verdicts are advisory.
+This script orchestrates the full release cycle (tests → staging → production).
+It delegates production deployment to the CANONICAL production deploy command:
+
+    python scripts/deploy_pipeline.py --env production --version vX.Y.Z --approved
+
+deploy_pipeline.py is the sole canonical production deployment procedure.
+This script is the orchestrator that sequences pre-release gates around it.
 
 Single-invocation pipeline that executes the complete release cycle:
 
     Step 1: Offline unit/integration tests (fail-fast)
-    Step 2: Deploy to staging
+    Step 2: Deploy to staging (via deploy_pipeline.py --env staging)
     Step 3: E2E tests against staging (destructive + load, excluding Shopify)
-    Step 4: Deploy to production (non-disruptive upgrade)
+    Step 4: Deploy to production (via deploy_pipeline.py --env production)
     Step 5: Production health verification
 
 GOV-16: Production deployment requires owner approval via DEPLOY_APPROVED

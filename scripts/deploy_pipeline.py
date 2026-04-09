@@ -1277,6 +1277,27 @@ def main() -> int:
     if args.dry_run:
         log("INFO", "*** DRY RUN MODE -- no destructive actions ***")
 
+    # WP4: Structured deploy metadata (Codex spec section 7, WP4)
+    import subprocess as _sp
+
+    repo_sha = "unknown"
+    try:
+        _r = _sp.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5,
+                     cwd=str(PROJECT_ROOT))
+        if _r.returncode == 0:
+            repo_sha = _r.stdout.strip()[:12]
+    except Exception:
+        pass
+
+    log("INFO", f"  Pipeline metadata:")
+    log("INFO", f"    repo_commit:     {repo_sha}")
+    log("INFO", f"    repo_root:       {PROJECT_ROOT}")
+    log("INFO", f"    version_tag:     {args.version}")
+    log("INFO", f"    environment:     {args.env}")
+    log("INFO", f"    dry_run:         {args.dry_run}")
+    log("INFO", f"    approved:        {getattr(args, 'approved', False)}")
+    log("INFO", f"    started_at:      {datetime.now().isoformat()}")
+
     # -----------------------------------------------------------------------
     # Shared build phases (0-7) — identical for both tracks, stop on failure
     # -----------------------------------------------------------------------
@@ -1408,14 +1429,30 @@ def main() -> int:
     # Print summary
     _print_summary(results, args, start_time, log_path, defect_wi)
 
-    # Structured JSON result (Codex WP4 interim — deploy_config contract)
+    # WP4: Structured JSON result with full deploy metadata
+    end_time = time.time()
     deploy_result = {
         "version": args.version,
         "environment": args.env,
         "status": "FAILED" if any_failed else "SUCCESS",
+        "repo_commit": repo_sha,
+        "repo_root": str(PROJECT_ROOT),
+        "started_at": datetime.fromtimestamp(start_time).isoformat(),
+        "ended_at": datetime.now().isoformat(),
+        "duration_seconds": round(end_time - start_time, 1),
+        "dry_run": args.dry_run,
         "phases_completed": sum(1 for r in results if r.passed),
         "phases_total": len(results),
-        "duration_seconds": round(time.time() - start_time, 1),
+        "phases": [
+            {
+                "phase": r.phase,
+                "name": r.name,
+                "status": r.status,
+                "duration_seconds": round(r.duration, 1),
+                "detail": r.detail,
+            }
+            for r in results
+        ],
         "rollback_attempted": getattr(args, "_rollback_attempted", False),
         "rollback_succeeded": getattr(args, "_rollback_succeeded", None),
         "rollback_image": getattr(args, "_rollback_image", None),
