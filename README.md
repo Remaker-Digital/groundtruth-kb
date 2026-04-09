@@ -29,16 +29,16 @@ planned ecosystem.
 
 ```bash
 # Install from GitHub (not published to PyPI)
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
 
-# Initialize a new project
-gt init my-project
+# Bootstrap a desktop-ready prototype project
+gt bootstrap-desktop my-project --owner "Your Organization" --init-git
 
-# Seed with governance specs and examples
-gt --config my-project/groundtruth.toml seed --example
+# Inspect the seeded project
+gt --config my-project/groundtruth.toml summary
 
 # Open the web UI (requires [web] extra)
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
 gt --config my-project/groundtruth.toml serve
 # Visit http://localhost:8090
 ```
@@ -75,19 +75,26 @@ The [method documentation](docs/method/README.md) describes the engineering disc
 - [Adoption & Promotion](docs/method/09-adoption.md) — upstream/downstream model, update procedures
 - [KB Tooling](docs/method/10-tooling.md) — CLI commands, web UI, Python API, configuration
 
+- [Operational Configuration Capture](docs/method/11-operational-configuration.md) - bridges, automations, directives, and role inventory
+- [Desktop Setup Guide](docs/desktop-setup.md) - same-day client workstation bootstrap and prerequisites
+
 ## Getting Started
 
 New to GroundTruth? The [getting started guide](docs/bootstrap.md) walks you
 through setting up the core toolkit in your project: install, init, first spec,
 first test, assertions, web UI, templates, and CI/CD — in 10 steps.
 
+If you need a same-day client workstation setup, start with the
+[desktop setup guide](docs/desktop-setup.md).
+
 ## Process Templates
 
 The [templates/](templates/README.md) directory contains reference templates for
 setting up a GroundTruth project: rules files, state files, hooks, and agent
 configuration. Copy them into your project and customize the placeholders.
-Project-specific customization (bridge runtimes, cloud deploy, dual-agent
-configuration) is planned for [groundtruth-project-kit](docs/architecture/product-split.md).
+GroundTruth includes reference templates for capturing bridge and automation
+configuration, but project-specific runtime setup and scaffold automation are
+still planned for [groundtruth-project-kit](docs/architecture/product-split.md).
 
 ## Contributing
 

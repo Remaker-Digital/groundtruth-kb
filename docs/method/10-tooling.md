@@ -6,19 +6,19 @@ This guide covers the practical use of the GroundTruth CLI, web UI, and configur
 
 ```bash
 # Install from GitHub (not published to PyPI)
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
 ```
 
 For the web UI (optional):
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
 ```
 
 For development (tests, linting):
 
 ```bash
-pip install "groundtruth-kb[dev] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+pip install "groundtruth-kb[dev] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
 ```
 
 ## Initializing a project
@@ -37,6 +37,28 @@ To seed with starter governance specs and example data:
 ```bash
 gt --config my-project/groundtruth.toml seed --example
 ```
+
+## Bootstrapping a desktop-ready prototype
+
+If you want the shortest path from installation to a usable project scaffold,
+use:
+
+```bash
+gt bootstrap-desktop my-project --owner "Your Organization" --init-git
+```
+
+This command creates:
+
+- `groundtruth.toml`
+- `groundtruth.db`
+- `CLAUDE.md`
+- `MEMORY.md`
+- `BRIDGE-INVENTORY.md`
+- `.claude/hooks/`
+- `.claude/rules/`
+- `.github/workflows/` using the bundled CI templates
+
+It also seeds governance records and the example domain records by default.
 
 ## Configuration
 

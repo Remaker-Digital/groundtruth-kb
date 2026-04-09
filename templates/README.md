@@ -9,6 +9,9 @@ setup.  Project-specific customization (bridge runtimes, cloud deployment,
 dual-agent configuration) is planned for
 [groundtruth-project-kit](../docs/architecture/product-split.md).
 
+Reference capture templates for bridges and automations are included here;
+automated setup of those runtimes is still out of scope.
+
 See the [Adoption guide](../docs/method/09-adoption.md) for the managed vs
 project-owned boundary.
 
@@ -18,6 +21,7 @@ project-owned boundary.
 |----------|---------|---------|
 | `CLAUDE.md` | Project rules and procedures for AI assistants | Project root |
 | `MEMORY.md` | Session state and operational memory | Project root |
+| `BRIDGE-INVENTORY.md` | Optional inventory of bridge runtime, directives, roles, and automations | Project root |
 | `hooks/assertion-check.py` | SessionStart hook — run assertions on session start | `.claude/hooks/` |
 | `hooks/spec-classifier.py` | UserPromptSubmit hook — detect spec language, enforce spec-first | `.claude/hooks/` |
 | `rules/loyal-opposition.md` | Review agent behavior rules | `.claude/rules/` |
@@ -45,6 +49,7 @@ TEMPLATES=$(python -c "from groundtruth_kb import get_templates_dir; print(get_t
 # Copy templates to your project
 cp "$TEMPLATES/CLAUDE.md" my-project/CLAUDE.md
 cp "$TEMPLATES/MEMORY.md" my-project/MEMORY.md
+cp "$TEMPLATES/BRIDGE-INVENTORY.md" my-project/BRIDGE-INVENTORY.md
 mkdir -p my-project/.claude/hooks my-project/.claude/rules
 cp "$TEMPLATES/hooks/"*.py my-project/.claude/hooks/
 cp "$TEMPLATES/rules/"*.md my-project/.claude/rules/
@@ -64,6 +69,10 @@ project's values:
 - `{{VERSION}}` — current version
 - `{{ENVIRONMENT_DESCRIPTION}}` — deployment environment summary
 - `{{TEST_STATUS}}` — current test pass/fail counts
+
+If your project uses a bridge, multiple agents, or recurring automation, also
+customize `BRIDGE-INVENTORY.md` so the runtime entrypoints, directives, role
+descriptions, and schedules are discoverable from the project.
 
 The manual placeholder approach is intentional for groundtruth-kb.
 Automated profile-based customization (e.g., `gt project init --profile

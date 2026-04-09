@@ -28,6 +28,7 @@ This rule file defines mandatory behavior for the implementing/building agent.
 - State session objective at the start
 - Reference the session ID in all artifacts and commits
 - Update the state file (MEMORY.md) during wrap-up
+- If the project uses a bridge or recurring automation, keep the bridge or operations inventory aligned with runtime changes in the same session
 - Every fifth session: run audit hygiene steps
 
 ## Protected Behaviors

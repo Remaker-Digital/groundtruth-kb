@@ -3,3 +3,9 @@ __pycache__/
 groundtruth.db
 .hypothesis/
 tmp-review-config/
+.claude/
+.codex-wheel-check/
+.codex-wheel-check-r2/
+dist/
+*.egg-info/
+.venv/

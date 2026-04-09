@@ -16,6 +16,7 @@ Engineering discipline for AI-powered systems — from specification to producti
 | 08 | [Architecture Decisions](08-architecture.md) | ADR/DCL/IPR/CVR workflow, compliance checking |
 | 09 | [Adoption & Promotion](09-adoption.md) | Upstream/downstream model, managed files, update procedures |
 | 10 | [KB Tooling](10-tooling.md) | Installation, CLI commands, web UI, configuration |
+| 11 | [Operational Configuration Capture](11-operational-configuration.md) | How to capture bridges, automations, directives, and role configuration |
 
 ## Architecture documents
 

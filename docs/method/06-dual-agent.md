@@ -97,3 +97,18 @@ Single-agent is sufficient for:
 - Documentation-only changes
 - Routine maintenance (dependency updates, log rotation)
 - Exploratory research that doesn't modify production artifacts
+
+## Configuration capture for dual-agent systems
+
+If dual-agent work depends on a bridge, resident workers, scheduled jobs, or
+other automation, that configuration must be captured explicitly in the
+project. At minimum, keep an inventory of:
+
+- runtime entrypoints and bridge scripts
+- rule files and markdown directives
+- scheduled tasks and automation definitions
+- role ownership, review boundaries, and standing exceptions
+- protocol, retry, handshake, and recovery rules
+
+See [Operational Configuration Capture](11-operational-configuration.md) for
+the full capture contract.

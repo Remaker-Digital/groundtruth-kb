@@ -256,7 +256,61 @@ class TestVersion:
     def test_version(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.1" in result.output
+        assert "0.1.2" in result.output
+
+
+# ---------------------------------------------------------------------------
+# gt bootstrap-desktop
+# ---------------------------------------------------------------------------
+
+
+class TestBootstrapDesktop:
+    def test_bootstrap_desktop_creates_scaffold(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "client-prototype"
+        result = runner.invoke(
+            main,
+            [
+                "bootstrap-desktop",
+                "client-prototype",
+                "--dir",
+                str(target),
+                "--owner",
+                "Acme Labs",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (target / "groundtruth.toml").exists()
+        assert (target / "groundtruth.db").exists()
+        assert (target / "CLAUDE.md").exists()
+        assert (target / "MEMORY.md").exists()
+        assert (target / "BRIDGE-INVENTORY.md").exists()
+        assert (target / ".claude" / "hooks" / "assertion-check.py").exists()
+        assert (target / ".claude" / "rules" / "prime-builder.md").exists()
+        assert (target / ".github" / "workflows" / "test.yml").exists()
+
+        claude_text = (target / "CLAUDE.md").read_text(encoding="utf-8")
+        bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
+        assert "{{PROJECT_NAME}}" not in claude_text
+        assert "client-prototype" in claude_text
+        assert "Acme Labs" in claude_text
+        assert "{{AGENT_OR_PROCESS_1}}" not in bridge_text
+
+        db = KnowledgeDB(db_path=target / "groundtruth.db")
+        try:
+            summary = db.get_summary()
+            assert summary["spec_total"] == 8
+            assert summary["test_artifact_count"] >= 3
+        finally:
+            db.close()
+
+    def test_bootstrap_desktop_rejects_non_empty_target(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "occupied"
+        target.mkdir()
+        (target / "notes.txt").write_text("already here", encoding="utf-8")
+
+        result = runner.invoke(main, ["bootstrap-desktop", "occupied", "--dir", str(target)])
+        assert result.exit_code != 0
+        assert "not empty" in result.output
 
 
 # ---------------------------------------------------------------------------

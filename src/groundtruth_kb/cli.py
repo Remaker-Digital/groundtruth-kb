@@ -16,6 +16,11 @@ from pathlib import Path
 import click
 
 from groundtruth_kb import __version__
+from groundtruth_kb.bootstrap import (
+    DesktopBootstrapOptions,
+    bootstrap_desktop_project,
+    bootstrap_summary,
+)
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.gates import GateRegistry
@@ -96,6 +101,75 @@ def init(ctx: click.Context, project_name: str, target_dir: str | None) -> None:
     click.echo(f"  Config: {toml_path}")
     click.echo(f"  Database: {db_path}")
     click.echo(f"\nNext: cd {target} && gt seed --example")
+
+
+# ---------------------------------------------------------------------------
+# gt bootstrap-desktop
+# ---------------------------------------------------------------------------
+
+
+@main.command("bootstrap-desktop")
+@click.argument("project_name")
+@click.option("--dir", "target_dir", type=click.Path(), default=None, help="Target directory (default: ./<name>)")
+@click.option("--owner", default="Your Organization", show_default=True, help="Project owner or client name")
+@click.option(
+    "--project-type",
+    default="AI Service Prototype",
+    show_default=True,
+    help="Project type label written into the scaffold",
+)
+@click.option("--brand-mark", default="GT", show_default=True, help="Short brand mark for the KB UI")
+@click.option("--brand-color", default="#2563eb", show_default=True, help="Primary brand color for the KB UI")
+@click.option(
+    "--copyright",
+    "copyright_notice",
+    default=None,
+    help="Copyright notice to write into scaffolded files",
+)
+@click.option("--include-ci/--no-include-ci", default=True, show_default=True, help="Copy CI workflow templates")
+@click.option("--init-git", is_flag=True, help="Initialize a git repository in the target directory")
+@click.option(
+    "--seed-example/--no-seed-example",
+    default=True,
+    show_default=True,
+    help="Seed governance specs plus the example domain specs/tests",
+)
+def bootstrap_desktop_cmd(
+    project_name: str,
+    target_dir: str | None,
+    owner: str,
+    project_type: str,
+    brand_mark: str,
+    brand_color: str,
+    copyright_notice: str | None,
+    include_ci: bool,
+    init_git: bool,
+    seed_example: bool,
+) -> None:
+    """Create a same-day desktop prototype scaffold for a new GroundTruth project."""
+    target = Path(target_dir) if target_dir else Path.cwd() / project_name
+    options = DesktopBootstrapOptions(
+        project_name=project_name,
+        owner=owner,
+        project_type=project_type,
+        target_dir=target,
+        brand_mark=brand_mark,
+        brand_color=brand_color,
+        copyright_notice=copyright_notice or "",
+        include_ci=include_ci,
+        init_git=init_git,
+        seed_example=seed_example,
+    )
+    try:
+        created = bootstrap_desktop_project(options)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"Required tool not found: {exc.filename}") from exc
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except OSError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(bootstrap_summary(created, include_ci=include_ci, init_git=init_git, seed_example=seed_example))
 
 
 # ---------------------------------------------------------------------------

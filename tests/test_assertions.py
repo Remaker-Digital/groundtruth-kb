@@ -13,7 +13,6 @@ from groundtruth_kb.assertions import (
     _normalize_assertion,
     _safe_glob,
     _safe_resolve,
-    _walk_path,
     format_summary,
     run_all_assertions,
     run_single_assertion,

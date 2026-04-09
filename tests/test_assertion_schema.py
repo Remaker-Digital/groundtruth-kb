@@ -9,7 +9,6 @@ import pytest
 from groundtruth_kb.assertion_schema import validate_assertion, validate_assertion_list
 from groundtruth_kb.db import KnowledgeDB
 
-
 # ---------------------------------------------------------------------------
 # validate_assertion — valid cases
 # ---------------------------------------------------------------------------
