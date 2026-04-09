@@ -24,8 +24,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.local_env
-
 from src.multi_tenant.agntcy_sdk_integration import (
     AgentTopic,
     close_agntcy_sdk,
@@ -36,6 +34,8 @@ from src.multi_tenant.agntcy_sdk_integration import (
     get_sdk_status,
     init_agntcy_sdk,
 )
+
+pytestmark = pytest.mark.local_env
 
 
 # ---------------------------------------------------------------------------
