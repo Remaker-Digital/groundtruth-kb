@@ -8,9 +8,10 @@ A step-by-step walkthrough for adding the GroundTruth knowledge database and gov
 install, init, seed, specifications, tests, assertions, web UI,
 process templates, and CI/CD.
 
-**This guide does NOT cover** full project scaffolding, infrastructure
-provisioning, dual-agent runtime configuration, bridge setup, or cloud
-deployment.  Those capabilities are planned for a separate
+**This guide does NOT cover** cloud infrastructure provisioning or a full
+Agent Red deployment topology. For the fastest client workstation path, use the
+[desktop setup guide](desktop-setup.md). Richer scaffold automation and cloud
+bootstrap remain part of the planned
 [groundtruth-project-kit](architecture/product-split.md) package.
 
 ## Prerequisites
@@ -22,7 +23,7 @@ deployment.  Those capabilities are planned for a separate
 ## Step 1: Install GroundTruth
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
 ```
 
 Verify the installation:
@@ -30,6 +31,18 @@ Verify the installation:
 ```bash
 gt --version
 ```
+
+## Fastest path: desktop bootstrap
+
+If you want a same-day prototype scaffold with templates, hooks, rules, seed
+data, and optional git initialization, use:
+
+```bash
+gt bootstrap-desktop my-project --owner "Your Organization" --init-git
+```
+
+Then continue with the remaining steps if you want to understand the underlying
+manual setup.
 
 ## Step 2: Initialize your project
 
@@ -147,7 +160,7 @@ If the assertion passes (the file and pattern exist), you'll see a passing resul
 The web UI requires the `[web]` extra:
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
 gt serve
 ```
 
@@ -163,6 +176,7 @@ TEMPLATES=$(python -c "from groundtruth_kb import get_templates_dir; print(get_t
 # Project rules and state files
 cp "$TEMPLATES/CLAUDE.md" ./CLAUDE.md
 cp "$TEMPLATES/MEMORY.md" ./MEMORY.md
+cp "$TEMPLATES/BRIDGE-INVENTORY.md" ./BRIDGE-INVENTORY.md
 
 # Hooks for Claude Code
 mkdir -p .claude/hooks .claude/rules
@@ -171,6 +185,18 @@ cp "$TEMPLATES/rules/"*.md .claude/rules/
 ```
 
 Edit `CLAUDE.md` and `MEMORY.md` to replace the `{{PLACEHOLDER}}` values with your project's details.
+
+If your project uses a bridge, multiple agents, resident workers, or recurring
+automations, keep `BRIDGE-INVENTORY.md` and the related rule/state files
+updated with:
+
+- runtime entrypoints and helper scripts
+- scheduled tasks or automation definitions
+- role and ownership boundaries
+- protocol, retry, and health-check rules
+
+See [Operational Configuration Capture](method/11-operational-configuration.md)
+for the full capture contract.
 
 ## Step 10: Set up CI/CD (optional)
 

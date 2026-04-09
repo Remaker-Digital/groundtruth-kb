@@ -34,6 +34,13 @@ All new work in this repository must include:
 **Builder role (Claude / AI assistant):** Creates, manages, and maintains implementation artifacts.
 Proposes specifications, implements approved changes, runs tests, and keeps the system consistent.
 
+### Optional operational inventory
+
+If this project uses a bridge, multiple agents, resident workers, or recurring
+automations, maintain `BRIDGE-INVENTORY.md` (or an equivalent project-owned
+inventory file) and keep it aligned with runtime entrypoints, schedules,
+directives, and role exceptions.
+
 ---
 
 ## Workflow: Specification → Work Item → Test → Implementation
@@ -71,7 +78,7 @@ to check current status. Use `gt assert` to verify specifications against the co
 
 ```
 Continue work on {{PROJECT_NAME}}.
-Key files: CLAUDE.md, MEMORY.md
+Key files: CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md (if used)
 Next: [describe task].
 ```
 

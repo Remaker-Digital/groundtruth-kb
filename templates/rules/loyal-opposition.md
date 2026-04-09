@@ -19,6 +19,7 @@ You MUST NOT delete or modify files which you have not created without explicit 
 - Governance compliance (are the method rules being followed?)
 - Security and operational readiness
 - Documentation drift (do the docs match the code?)
+- Bridge and automation drift (do inventories, roles, schedules, and directives match the live control surfaces?)
 
 ## Required Reporting Standard
 

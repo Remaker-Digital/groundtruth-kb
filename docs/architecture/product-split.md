@@ -26,17 +26,19 @@ The stable upstream core.
 | Capability | Examples |
 |------------|----------|
 | Knowledge database | Append-only SQLite, 9 artifact types, full version history |
-| CLI | `gt init`, `gt assert`, `gt seed`, `gt summary`, `gt serve` |
+| CLI | `gt init`, `gt bootstrap-desktop`, `gt assert`, `gt seed`, `gt summary`, `gt serve` |
 | Governance framework | Built-in gates, pluggable gate architecture, assertion engine |
-| Method documentation | 10 numbered docs describing the specification-first workflow |
+| Method documentation | 11 numbered docs describing the specification-first workflow |
 | Web dashboard | Optional FastAPI UI (`[web]` extra) |
-| Reference templates | CLAUDE.md, MEMORY.md, hooks, rules, CI/CD workflows |
+| Reference templates | CLAUDE.md, MEMORY.md, bridge inventory, hooks, rules, CI/CD workflows |
 
 **Scope boundary:** groundtruth-kb initializes a knowledge database
 (`groundtruth.toml` + `groundtruth.db`) and provides the tools to
-manage specifications, tests, work items, and assertions.  It does not
-scaffold full projects, provision infrastructure, configure dual-agent
-runtimes, or set up cloud environments.
+manage specifications, tests, work items, assertions, and the method
+docs/templates that tell teams how to capture operational configuration.
+It includes a lightweight local bootstrap path for same-day prototype work, but
+it does not scaffold full production projects, provision infrastructure,
+configure dual-agent runtimes automatically, or set up cloud environments.
 
 ### Layer 2 — `groundtruth-project-kit` (planned, separate package)
 
@@ -109,7 +111,7 @@ distributable artifact.
 
 | Package | Version | Status |
 |---------|---------|--------|
-| groundtruth-kb | 0.1.1 | Alpha — extracted from production system (2,000+ specs, 11,000+ tests) |
+| groundtruth-kb | 0.1.2 | Alpha — extracted from production system (2,000+ specs, 11,000+ tests) |
 | groundtruth-project-kit | — | Design phase (Phase 1: scope clarification, Phase 2: implementation) |
 | Cloud profiles | — | Not started (gated on Phase 2 validation) |
 

@@ -33,7 +33,7 @@ groundtruth-kb (upstream)
     └── src/                      ← your application code
 ```
 
-**GroundTruth** provides the method documentation, the knowledge database engine, the governance gate framework, and reference [process templates](../../templates/README.md) for project setup. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation. The boundary between them is explicit.
+**GroundTruth** provides the method documentation, the knowledge database engine, the governance gate framework, and reference [process templates](../../templates/README.md) for project setup, including templates for capturing bridge and automation configuration. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation. The boundary between them is explicit.
 
 ## Managed vs project-owned files
 
@@ -74,6 +74,7 @@ Not every improvement discovered in a downstream project belongs upstream. Use t
 - Adds a governance gate that would benefit any GroundTruth project (not just yours)
 - Improves a method document with a correction or clarification
 - Adds a reusable pattern (e.g., a governance gate, a seed data set) that would benefit any GroundTruth project
+- Improves the generic capture contract or reference templates for bridges, automations, or control-surface configuration
 
 **Keep project-local** when the change:
 
@@ -86,7 +87,7 @@ Not every improvement discovered in a downstream project belongs upstream. Use t
 
 - Is reusable scaffolding (bootstrap profiles, project manifest templates)
 - Adds environment detection or doctor checks (tool presence, auth validation)
-- Provides bridge runtime configuration or dual-agent setup patterns
+- Provides automated bridge runtime scaffolding or dual-agent setup patterns
 - Generates project-owned files from parameterized profiles
 
 **Gray area — ask yourself:** "Would a stranger starting a new GroundTruth project benefit from this?" If yes, promote upstream to groundtruth-kb. If it's reusable scaffolding, it likely belongs in groundtruth-project-kit. If only your team would use it, keep it local.
