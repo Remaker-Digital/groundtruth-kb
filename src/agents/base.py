@@ -243,8 +243,8 @@ class AgentRedBaseAgent(BaseAgentProtocol):
         Subclasses should NOT override this method — override process() instead.
         """
         start_time = time.monotonic()
-        reply_to = message.reply_to
-        headers = message.headers or {}
+        reply_to = getattr(message, "reply_to", None)
+        headers = getattr(message, "headers", None) or {}
 
         try:
             payload = parse_payload(message)
