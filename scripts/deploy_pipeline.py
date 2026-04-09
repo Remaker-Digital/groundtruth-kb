@@ -51,7 +51,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
 
-from upgrade_verification import ENVIRONMENTS, TENANTS, api_call  # noqa: E402
+from scripts.deploy_config import ENVIRONMENTS, TENANTS  # noqa: E402
+from upgrade_verification import api_call  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -241,6 +242,21 @@ def phase_0_validate_environment(args: argparse.Namespace) -> PhaseResult:
     # 8. Target environment valid
     if args.env not in ENVIRONMENTS:
         failures.append(f"Unknown environment '{args.env}' (valid: {list(ENVIRONMENTS.keys())})")
+
+    # 9. Production approval gate (GOV-16, SPEC-1882, Codex WP1)
+    # Must fail BEFORE any build or ACR work — this is pre-flight.
+    if args.env == "production":
+        approved = (
+            os.environ.get("DEPLOY_APPROVED") == "1"
+            or getattr(args, "approved", False)
+        )
+        if not approved:
+            failures.append(
+                "Production deploy requires explicit owner approval. "
+                "Set DEPLOY_APPROVED=1 or pass --approved to proceed (GOV-16)."
+            )
+        else:
+            log("INFO", "  Owner approval: CONFIRMED (GOV-16)")
 
     dt = time.time() - t0
     if failures:
@@ -1107,14 +1123,40 @@ def phase_11_production_verification(args: argparse.Namespace) -> PhaseResult:
     if failures:
         detail = "; ".join(failures)
         log("FAIL", f"  Production verification failed: {detail}")
-        # Include rollback instructions
-        log("WARN", "")
-        log("WARN", "  PRODUCTION DEPLOYMENT VERIFICATION FAILED -- Manual action may be required:")
-        log("WARN", f"  1. Check if failure is transient (rate limiting, cold start)")
-        log("WARN", f"  2. If persistent, rollback:")
-        log("WARN", f"     az containerapp update --name {env_config.get('container_app', '?')} "
-                     f"--resource-group {RESOURCE_GROUP} --image <previous-image-tag>")
-        log("WARN", "")
+
+        # Codex WP3: Automatic rollback on production smoke failure
+        rollback_image = getattr(args, "_rollback_image", None)
+        if rollback_image:
+            log("WARN", "")
+            log("WARN", "  AUTOMATIC ROLLBACK INITIATED")
+            log("WARN", f"  Rolling back to: {rollback_image}")
+            try:
+                from scripts.deploy_config import rollback_to_image
+
+                rollback_ok = rollback_to_image("production", rollback_image)
+                if rollback_ok:
+                    log("PASS", "  Rollback command succeeded")
+                    # Wait for health after rollback
+                    log("INFO", "  Waiting for health after rollback (60s)...")
+                    time.sleep(15)
+                    rb_status, rb_body, _ = api_call(fqdn, "/health", timeout=10)
+                    if rb_status == 200:
+                        log("PASS", "  Rollback health check: OK")
+                        args._rollback_succeeded = True
+                    else:
+                        log("FAIL", f"  Rollback health check: HTTP {rb_status}")
+                        args._rollback_succeeded = False
+                else:
+                    log("FAIL", "  Rollback command FAILED — manual intervention required")
+                    args._rollback_succeeded = False
+            except Exception as exc:
+                log("FAIL", f"  Rollback exception: {exc}")
+                args._rollback_succeeded = False
+            args._rollback_attempted = True
+        else:
+            log("WARN", "  No rollback image captured — manual intervention required")
+            args._rollback_attempted = False
+
         return PhaseResult(11, "Production Verification", "FAIL", dt, detail, f"[{total_pass}/35]")
 
     log("PASS", f"  Production verification: {total_pass}/35 upgrade + 3/3 smoke")
@@ -1217,6 +1259,8 @@ def main() -> int:
                         help="Image version tag (e.g., v1.66.0)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Validate without executing destructive actions")
+    parser.add_argument("--approved", action="store_true",
+                        help="Explicit owner approval for production deploy (GOV-16)")
     args = parser.parse_args()
 
     # Validate version format
@@ -1274,6 +1318,20 @@ def main() -> int:
         result = phase_10a_pre_deploy_snapshot(args)
         results.append(result)
         all_ok = result.passed or result.status == "SKIP"
+
+    # Capture rollback image before deploy (Codex WP3)
+    if all_ok and args.env == "production":
+        try:
+            from scripts.deploy_config import get_current_image
+
+            rollback_img = get_current_image("production")
+            if rollback_img:
+                args._rollback_image = rollback_img
+                log("INFO", f"  Rollback image captured: {rollback_img}")
+            else:
+                log("WARN", "  Could not capture rollback image — rollback will be unavailable")
+        except Exception as exc:
+            log("WARN", f"  Rollback image capture failed: {exc}")
 
     if all_ok:
         # Phase 9: Deploy
@@ -1349,6 +1407,28 @@ def main() -> int:
 
     # Print summary
     _print_summary(results, args, start_time, log_path, defect_wi)
+
+    # Structured JSON result (Codex WP4 interim — deploy_config contract)
+    deploy_result = {
+        "version": args.version,
+        "environment": args.env,
+        "status": "FAILED" if any_failed else "SUCCESS",
+        "phases_completed": sum(1 for r in results if r.passed),
+        "phases_total": len(results),
+        "duration_seconds": round(time.time() - start_time, 1),
+        "rollback_attempted": getattr(args, "_rollback_attempted", False),
+        "rollback_succeeded": getattr(args, "_rollback_succeeded", None),
+        "rollback_image": getattr(args, "_rollback_image", None),
+        "defect_wi": defect_wi,
+        "log_file": str(log_path) if log_path else None,
+    }
+    result_path = PROJECT_ROOT / "logs" / f"deploy-result-{args.env}-{int(start_time)}.json"
+    try:
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text(json.dumps(deploy_result, indent=2))
+        log("INFO", f"  Deploy result: {result_path}")
+    except Exception:
+        pass
 
     return 0 if not any_failed else 1
 

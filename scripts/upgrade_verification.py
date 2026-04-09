@@ -42,43 +42,13 @@ if str(_PROJECT_ROOT) not in _sys.path:
 from scripts._env import load_env_local as _load_env  # noqa: E402
 _load_env()
 
-ENVIRONMENTS = {
-    "staging": {
-        "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-        "container_app": "agent-red-staging",
-        "tenant_id": "remaker-digital-001",
-        "api_key": _os.environ.get("STAGING_REMAKER_TENANT_KEY", "") or _os.environ.get("STAGING_TENANT_API_KEY", ""),
-        "widget_key": _os.environ.get("STAGING_REMAKER_WIDGET_KEY", "") or _os.environ.get("STAGING_TENANT_WIDGET_KEY", ""),
-        "spa_api_key": _os.environ.get("STAGING_SPA_KEY", "") or _os.environ.get("STAGING_SPA_API_KEY", ""),
-        "resource_group": "Agent-Red",
-        "cosmos_db_database": "agentred-staging",
-    },
-    "production": {
-        "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-        "container_app": "agent-red-api-gateway",
-        "tenant_id": "test-customer-001",
-        "api_key": _os.environ.get("PRODUCTION_REMAKER_TENANT_KEY", "") or _os.environ.get("PRODUCTION_TENANT_API_KEY", ""),
-        "widget_key": _os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or _os.environ.get("PRODUCTION_TENANT_WIDGET_KEY", ""),
-        "spa_api_key": _os.environ.get("PRODUCTION_SPA_KEY", "") or _os.environ.get("PRODUCTION_SPA_API_KEY", ""),
-        "resource_group": "Agent-Red",
-        "cosmos_db_database": "agentred",
-    },
-}
+# SPEC-1882 / Codex WP2: Shared config — single source of truth.
+# Import from deploy_config.py to prevent snapshot-tenant / verify-tenant drift.
+from scripts.deploy_config import ENVIRONMENTS  # noqa: E402
 
 # Additional tenants for multi-tenant upgrade verification.
-# Keyed by "{env}:{tenant_id}".
-TENANTS = {
-    "staging:staging-001": {
-        "tenant_id": "staging-001",
-        "api_key": _os.environ.get("STAGING_001_TENANT_KEY", "") or _os.environ.get("STAGING_001_API_KEY", ""),
-        "widget_key": _os.environ.get("STAGING_001_WIDGET_KEY", ""),
-    },
-    "staging:staging-002": {
-        "tenant_id": "staging-002",
-        "api_key": _os.environ.get("STAGING_002_TENANT_KEY", "") or _os.environ.get("STAGING_002_API_KEY", ""),
-        "widget_key": _os.environ.get("STAGING_002_WIDGET_KEY", ""),
-    },
-}
+# SPEC-1882 / Codex WP2: Shared multi-tenant config.
+from scripts.deploy_config import TENANTS  # noqa: E402
 
 
 def api_call(fqdn: str, path: str, api_key: str | None = None,
