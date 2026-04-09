@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 // @ts-nocheck
 /**
  * Agent handlers — overlay CRUD, binding CRUD, effective config, available skills.

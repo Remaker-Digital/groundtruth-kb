@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * SecretHealth — Aggregate secret health (SPEC-1843 zero-knowledge).
  *

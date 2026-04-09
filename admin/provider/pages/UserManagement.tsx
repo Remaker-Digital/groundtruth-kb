@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * UserManagement — SPA platform admin user management page (SPEC-1675).
  *

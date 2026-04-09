@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * TenantDirectory — Cross-tenant directory with filtering and pagination.
  *

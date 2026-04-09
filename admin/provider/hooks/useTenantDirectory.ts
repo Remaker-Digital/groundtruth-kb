@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * useTenantDirectory — Shared hook that caches the tenant directory for
  * human-readable tenant identification across all Provider Console pages.

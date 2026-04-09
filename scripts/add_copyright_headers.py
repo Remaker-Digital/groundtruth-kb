@@ -20,9 +20,9 @@ TS_HEADER = "// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All 
 # Directories to process
 PY_DIRS = [REPO_ROOT / "src"]
 TS_DIRS = [
-    REPO_ROOT / "admin" / "standalone" / "src",
-    REPO_ROOT / "admin" / "provider" / "src",
-    REPO_ROOT / "admin" / "shopify" / "src",
+    REPO_ROOT / "admin" / "standalone",
+    REPO_ROOT / "admin" / "provider",
+    REPO_ROOT / "admin" / "shopify",
     REPO_ROOT / "admin" / "shared",
     REPO_ROOT / "widget" / "src",
 ]
