@@ -440,8 +440,11 @@ class TestCPD008DryRunPath:
         assert "docker build" not in result.stdout
 
 
+MOCK_RUNNER = PROJECT_ROOT / "tests" / "unit" / "helpers" / "run_mocked_pipeline.py"
+
+
 # ---------------------------------------------------------------------------
-# CPD-009: Success path — dry-run CLI + mocked phase_11 behavioral
+# CPD-009: Success path — dry-run CLI + mocked phase_11 behavioral + CLI subprocess
 # ---------------------------------------------------------------------------
 
 class TestCPD009SuccessPath:
@@ -492,6 +495,29 @@ class TestCPD009SuccessPath:
         assert result.status == "PASS"
         # Rollback must not have been set when verification succeeds
         assert not getattr(args, "_rollback_attempted", False)
+
+    def test_mocked_success_path_cli_exits_zero(self):
+        """Subprocess CLI: all phases mocked to PASS → pipeline exits 0.
+
+        This is the Phase C case 4 proof from the Codex test protocol v0.1:
+        top-level command wired correctly so a success-path run exits 0.
+        Uses run_mocked_pipeline.py which patches every phase function before
+        calling deploy_pipeline.main() — proving CLI exit-code wiring without
+        touching Azure, ACR, or live HTTP.
+        """
+        result = subprocess.run(
+            [sys.executable, str(MOCK_RUNNER), "success",
+             "--env", "staging", "--version", _current_version(), "--approved"],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(PROJECT_ROOT),
+        )
+        assert result.returncode == 0, (
+            f"Mocked success path exited {result.returncode} (expected 0). "
+            f"stdout: {result.stdout[-800:]}"
+        )
+        assert "RESULT: SUCCESS" in result.stdout, (
+            f"Expected SUCCESS banner in output. stdout: {result.stdout[-800:]}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -547,6 +573,33 @@ class TestCPD010MockedSmokeFailurePath:
         )
         assert result.returncode != 0
         assert "Phase" not in result.stdout or "FAIL" in result.stdout
+
+    def test_mocked_smoke_failure_cli_exits_one_with_rollback(self):
+        """Subprocess CLI: production smoke failure → pipeline exits 1, rollback logged.
+
+        This is the Phase C case 5 proof from the Codex test protocol v0.1:
+        top-level command wired correctly so a smoke-failure path exits 1 and
+        records rollback attempt. Uses run_mocked_pipeline.py which patches
+        all shared/deploy phases to PASS while leaving phase_11_production_verification
+        to run with api_call stubbed to return 503 — the minimal proof that CLI
+        exit code and rollback path are correctly wired end-to-end.
+        """
+        result = subprocess.run(
+            [sys.executable, str(MOCK_RUNNER), "smoke_failure",
+             "--env", "production", "--version", _current_version(), "--approved"],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(PROJECT_ROOT),
+        )
+        assert result.returncode == 1, (
+            f"Mocked smoke-failure path exited {result.returncode} (expected 1). "
+            f"stdout: {result.stdout[-800:]}"
+        )
+        assert "AUTOMATIC ROLLBACK INITIATED" in result.stdout, (
+            f"Rollback message not found in output. stdout: {result.stdout[-800:]}"
+        )
+        assert "RESULT: FAILURE" in result.stdout, (
+            f"Expected FAILURE banner in output. stdout: {result.stdout[-800:]}"
+        )
 
     def test_deploy_result_json_includes_required_fields_on_staging_dry_run(self):
         """Staging dry-run writes JSON with version, environment, status, duration_seconds."""
