@@ -13,13 +13,17 @@ SPEC-1882 / S270: Production environment protection.
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
 
 import pytest
 
 # Import the hook module directly
 _HOOK_PATH = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "destructive-gate.py"
+
+pytestmark = pytest.mark.skipif(
+    not _HOOK_PATH.exists(),
+    reason=f"Hook file not in checkout: {_HOOK_PATH}",
+)
 
 
 @pytest.fixture()

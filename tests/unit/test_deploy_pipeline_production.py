@@ -32,13 +32,29 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_PIPELINE = PROJECT_ROOT / "scripts" / "deploy_pipeline.py"
 DEPLOY_CONFIG = PROJECT_ROOT / "scripts" / "deploy_config.py"
+
+# Detect Azure CLI availability for subprocess deploy tests.
+# These tests run deploy_pipeline.py which calls `az` — skip when not authenticated.
+_az_available = False
+try:
+    _az_check = subprocess.run(
+        ["az", "account", "show"], capture_output=True, timeout=10
+    )
+    _az_available = _az_check.returncode == 0
+except (FileNotFoundError, subprocess.TimeoutExpired):
+    pass
+
+_skip_no_az = pytest.mark.skipif(
+    not _az_available,
+    reason="Azure CLI not authenticated (az account show failed)",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +194,7 @@ class TestCPD003NoInteractivePrompts:
         # Filter out false positives (e.g., tool_input, input_placeholder)
         real_input_calls = [c for c in input_calls if c.strip() == "input("]
         assert len(real_input_calls) == 0, (
-            f"deploy_pipeline.py contains input() calls — must be non-interactive"
+            "deploy_pipeline.py contains input() calls — must be non-interactive"
         )
 
     def test_no_input_calls_in_deploy_config(self):
@@ -384,11 +400,9 @@ class TestCPD007RollbackFailureReported:
         assert args._rollback_succeeded is False
         assert args._rollback_attempted is True
 
+    @_skip_no_az
     def test_deploy_result_json_includes_rollback_fields_on_dry_run(self):
         """Dry-run run writes JSON result file containing rollback_attempted, rollback_succeeded, rollback_image."""
-        import glob
-        import tempfile
-
         result = subprocess.run(
             [sys.executable, str(DEPLOY_PIPELINE),
              "--env", "staging", "--version", _current_version(), "--dry-run"],
@@ -414,6 +428,7 @@ class TestCPD007RollbackFailureReported:
 class TestCPD008DryRunPath:
     """--dry-run must exit 0 AND print DRY RUN in stdout with no deploy side effects."""
 
+    @_skip_no_az
     def test_dry_run_exits_zero_and_prints_banner_on_staging(self):
         """Staging dry-run: exit code 0 AND stdout contains 'DRY RUN'."""
         result = subprocess.run(
@@ -450,6 +465,7 @@ MOCK_RUNNER = PROJECT_ROOT / "tests" / "unit" / "helpers" / "run_mocked_pipeline
 class TestCPD009SuccessPath:
     """Production verification must return PASS and not set rollback when all checks pass."""
 
+    @_skip_no_az
     def test_production_approved_dry_run_passes_approval_gate(self):
         """--env production --approved --dry-run exits 0 and confirms approval."""
         result = subprocess.run(
@@ -465,6 +481,7 @@ class TestCPD009SuccessPath:
             f"stdout: {result.stdout[-500:]}"
         )
 
+    @_skip_no_az
     def test_staging_dry_run_exits_zero(self):
         """Staging dry-run exits 0 — all phases return PASS in dry-run."""
         result = subprocess.run(
@@ -601,6 +618,7 @@ class TestCPD010MockedSmokeFailurePath:
             f"Expected FAILURE banner in output. stdout: {result.stdout[-800:]}"
         )
 
+    @_skip_no_az
     def test_deploy_result_json_includes_required_fields_on_staging_dry_run(self):
         """Staging dry-run writes JSON with version, environment, status, duration_seconds."""
         result = subprocess.run(

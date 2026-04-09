@@ -59,6 +59,7 @@ export const zh: Locale = {
   phoneOtpPrompt: '请输入我们发送到您手机的验证码。',
   phoneOtpResend: '重新发送短信验证码',
   phoneOtpInvalid: '验证码无效，请检查您的短信后重试。',
+  phoneSendFailed: '无法发送验证码，请重试。',
   consentPrompt: '我们使用您的对话记录来提供个性化支持。您可以随时更改此设置。',
   consentAccept: '允许',
   consentDecline: '不允许',

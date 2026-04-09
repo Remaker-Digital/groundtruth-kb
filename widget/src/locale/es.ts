@@ -59,6 +59,7 @@ export const es: Locale = {
   phoneOtpPrompt: 'Ingresa el código que enviamos a tu teléfono.',
   phoneOtpResend: 'Reenviar código SMS',
   phoneOtpInvalid: 'Código inválido. Revisa tu SMS e inténtalo de nuevo.',
+  phoneSendFailed: 'No se pudo enviar el código de verificación. Inténtalo de nuevo.',
   consentPrompt: 'Usamos tu historial de conversación para brindarte soporte personalizado. Puedes cambiarlo en cualquier momento.',
   consentAccept: 'Permitir',
   consentDecline: 'No, gracias',

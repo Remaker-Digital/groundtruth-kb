@@ -9,6 +9,11 @@ from pathlib import Path
 # Bridge modules live at repo root — ensure it's on sys.path for CI
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+import pytest  # noqa: E402
+
+if sys.platform != "win32":
+    pytest.skip("bridge_resident_worker requires msvcrt (Windows-only)", allow_module_level=True)
+
 import bridge_resident_worker as resident_worker  # noqa: E402
 
 

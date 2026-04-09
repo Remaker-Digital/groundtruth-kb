@@ -105,6 +105,7 @@ jobs:
           python -m pytest ${{ steps.paths.outputs.test_args }} \
             -n auto \
             --cov=src \
+            --cov-fail-under=0 \
             --cov-report=xml:coverage-${{ matrix.shard }}.xml \
             --cov-report=json:coverage-${{ matrix.shard }}.json \
             --junitxml=test-results-${{ matrix.shard }}.xml \

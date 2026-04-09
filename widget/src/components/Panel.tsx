@@ -426,7 +426,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         // Show error and stay on pre-chat form so customer can retry.
         store.setState({
           isLoading: false,
-          phoneOtpError: activeLocale.phoneOtpInvalid ?? 'Unable to send verification code. Please try again.',
+          phoneOtpError: activeLocale.phoneSendFailed ?? 'Unable to send verification code. Please try again.',
         });
       }
       return;
@@ -434,7 +434,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
 
     // No email or phone — go straight to conversation
     beginConversation(data);
-  }, [beginConversation, activeConfig]);
+  }, [beginConversation, activeConfig, activeLocale]);
 
   /** Skip pre-chat form — continue as anonymous guest. */
   const handlePreChatSkip = useCallback(() => {
@@ -508,17 +508,31 @@ export const Panel: FunctionComponent<PanelProps> = ({
     }
   }, [beginConversation, activeLocale]);
 
-  /** Resend phone SMS OTP code (SPEC-1879 Phase 3). */
-  const handlePhoneOtpResend = useCallback(async () => {
+  /** Resend phone SMS OTP code (SPEC-1879 Phase 3).
+   * Returns true if cooldown should start (success or intentional tier-gate),
+   * false if a transport error occurred (error is surfaced; cooldown suppressed). */
+  const handlePhoneOtpResend = useCallback(async (): Promise<boolean> => {
     const store = getStore();
     const { customerPhone, preChatData } = store.getState();
-    if (!customerPhone) return;
+    if (!customerPhone) return false;
 
     const result = await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
-    // Check for tier-gate block message (backend sent=true is anti-enumeration)
+    // Tier-gate: backend returns sent=true (anti-enumeration) with a block message
     const isBlocked = result.message && result.message.toLowerCase().includes('not available');
-    store.setState({ phoneOtpError: isBlocked ? result.message : null });
-  }, []);
+    if (isBlocked) {
+      store.setState({ phoneOtpError: result.message });
+      return true; // intentional outcome — start cooldown to prevent hammering
+    }
+    if (!result.sent) {
+      // Transport/network failure — surface error, do not start cooldown
+      store.setState({
+        phoneOtpError: activeLocale.phoneSendFailed ?? 'Unable to send verification code. Please try again.',
+      });
+      return false;
+    }
+    store.setState({ phoneOtpError: null });
+    return true;
+  }, [activeLocale]);
 
   /** Skip phone OTP verification (SPEC-1879, optional mode only). */
   const handlePhoneOtpSkip = useCallback(() => {
@@ -919,6 +933,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
             onSubmit={handlePreChatSubmit}
             onSkip={handlePreChatSkip}
             isLoading={state.isLoading}
+            phoneError={state.phoneOtpError ?? undefined}
           />
         </div>
       )}

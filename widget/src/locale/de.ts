@@ -59,6 +59,7 @@ export const de: Locale = {
   phoneOtpPrompt: 'Geben Sie den Code ein, den wir an Ihr Telefon gesendet haben.',
   phoneOtpResend: 'SMS-Code erneut senden',
   phoneOtpInvalid: 'Ungültiger Code. Bitte überprüfen Sie Ihre SMS und versuchen Sie es erneut.',
+  phoneSendFailed: 'Der Bestätigungscode konnte nicht gesendet werden. Bitte versuchen Sie es erneut.',
   consentPrompt: 'Wir verwenden Ihren Gesprächsverlauf für personalisierten Support. Sie können dies jederzeit ändern.',
   consentAccept: 'Erlauben',
   consentDecline: 'Nein danke',

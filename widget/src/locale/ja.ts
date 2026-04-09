@@ -59,6 +59,7 @@ export const ja: Locale = {
   phoneOtpPrompt: '電話に送信されたコードを入力してください。',
   phoneOtpResend: 'SMSコードを再送信',
   phoneOtpInvalid: '無効なコードです。SMSを確認してもう一度お試しください。',
+  phoneSendFailed: '確認コードを送信できませんでした。もう一度お試しください。',
   consentPrompt: 'パーソナライズされたサポートのために会話履歴を使用します。いつでも変更できます。',
   consentAccept: '許可する',
   consentDecline: '許可しない',
