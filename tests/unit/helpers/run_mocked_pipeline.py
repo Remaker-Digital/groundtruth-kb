@@ -153,10 +153,11 @@ elif MODE == "smoke_failure":
             dp, "_stream",
             return_value=MagicMock(returncode=0, stdout="(41 pass, 0 fail)"),
         ))
-        # get_current_image is imported inside main() — patch at source module level
+        # get_current_image is imported inside main() — patch at source module level.
+        # Use a synthetic previous-version tag (the "current" image being replaced).
         stack.enter_context(patch(
             "scripts.deploy_config.get_current_image",
-            return_value="acragentredeastus.azurecr.io/api-gateway:v1.98.90",
+            return_value="acragentredeastus.azurecr.io/api-gateway:v1.98.0-mock-prev",
         ))
         stack.enter_context(patch(
             "scripts.deploy_config.rollback_to_image",

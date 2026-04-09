@@ -42,13 +42,16 @@ DEPLOY_CONFIG = PROJECT_ROOT / "scripts" / "deploy_config.py"
 
 # Detect Azure CLI availability for subprocess deploy tests.
 # These tests run deploy_pipeline.py which calls `az` — skip when not authenticated.
+# On Windows, `az` is `az.cmd`; a bare list-form subprocess call cannot resolve
+# .cmd extensions without shell=True. Use a string command with shell=True so the
+# probe behaves identically to the actual pipeline runtime path on all platforms.
 _az_available = False
 try:
     _az_check = subprocess.run(
-        ["az", "account", "show"], capture_output=True, timeout=10
+        "az account show", capture_output=True, timeout=10, shell=True
     )
     _az_available = _az_check.returncode == 0
-except (FileNotFoundError, subprocess.TimeoutExpired):
+except (subprocess.TimeoutExpired, OSError):
     pass
 
 _skip_no_az = pytest.mark.skipif(
@@ -92,18 +95,6 @@ def _load_deploy_pipeline():
     return mod
 
 
-def _smoke_fail_api_call(fqdn, path, api_key=None, timeout=10):
-    """api_call stub that always returns 503 (smoke failure)."""
-    return (503, {}, {})
-
-
-def _smoke_pass_api_call(fqdn, path, api_key=None, timeout=10):
-    """api_call stub that always returns 200 with correct version (smoke pass)."""
-    if path == "/health":
-        return (200, {"product_version": "1.98.90"}, {"x-product-version": "1.98.90"})
-    return (200, {"found": True}, {})
-
-
 def _current_version() -> str:
     """Return the current PRODUCT_VERSION as a v-prefixed string for CLI tests."""
     try:
@@ -115,7 +106,20 @@ def _current_version() -> str:
         spec.loader.exec_module(mod)
         return f"v{mod.PRODUCT_VERSION}"
     except Exception:
-        return "v1.98.90"
+        return "v1.98.91"
+
+
+def _smoke_fail_api_call(fqdn, path, api_key=None, timeout=10):
+    """api_call stub that always returns 503 (smoke failure)."""
+    return (503, {}, {})
+
+
+def _smoke_pass_api_call(fqdn, path, api_key=None, timeout=10):
+    """api_call stub that returns 200 with the current PRODUCT_VERSION (smoke pass)."""
+    if path == "/health":
+        v = _current_version().lstrip("v")
+        return (200, {"product_version": v}, {"x-product-version": v})
+    return (200, {"found": True}, {})
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +280,7 @@ class TestCPD006RollbackOnSmokeFailure:
     """Production smoke failure must trigger automatic rollback."""
 
     def _make_args(self, rollback_image=None, snapshot_files=None):
-        args = argparse.Namespace(dry_run=False, version="v1.98.90", env="production")
+        args = argparse.Namespace(dry_run=False, version=_current_version(), env="production")
         args._rollback_image = rollback_image
         args._snapshot_files = snapshot_files or []
         return args
@@ -337,7 +341,7 @@ class TestCPD007RollbackFailureReported:
     """Rollback failure must be captured in args and reflected in structured output."""
 
     def _make_smoke_fail_args(self):
-        args = argparse.Namespace(dry_run=False, version="v1.98.90", env="production")
+        args = argparse.Namespace(dry_run=False, version=_current_version(), env="production")
         args._rollback_image = "acragentredeastus.azurecr.io/api-gateway:v1.98.89"
         args._snapshot_files = ["fake_snapshot.json"]
         return args
@@ -497,7 +501,7 @@ class TestCPD009SuccessPath:
     def test_phase_11_returns_pass_when_all_checks_succeed(self):
         """phase_11 returns PASS PhaseResult when phase-c and all smoke checks pass."""
         dp = _load_deploy_pipeline()
-        args = argparse.Namespace(dry_run=False, version="v1.98.90", env="production")
+        args = argparse.Namespace(dry_run=False, version=_current_version(), env="production")
         args._rollback_image = None
         args._snapshot_files = ["fake_snapshot.json"]
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
@@ -547,7 +551,7 @@ class TestCPD010MockedSmokeFailurePath:
     def test_phase_11_fails_when_snapshot_missing(self):
         """phase_11 returns FAIL immediately when no snapshot is available."""
         dp = _load_deploy_pipeline()
-        args = argparse.Namespace(dry_run=False, version="v1.98.90", env="production")
+        args = argparse.Namespace(dry_run=False, version=_current_version(), env="production")
         args._rollback_image = None
         args._snapshot_files = []    # no snapshot
 
@@ -563,7 +567,7 @@ class TestCPD010MockedSmokeFailurePath:
     def test_phase_11_fails_and_sets_rollback_attempted_on_smoke_failure(self):
         """phase_11 returns FAIL and sets _rollback_attempted when smoke fails + image present."""
         dp = _load_deploy_pipeline()
-        args = argparse.Namespace(dry_run=False, version="v1.98.90", env="production")
+        args = argparse.Namespace(dry_run=False, version=_current_version(), env="production")
         args._rollback_image = "acragentredeastus.azurecr.io/api-gateway:v1.98.89"
         args._snapshot_files = ["fake_snapshot.json"]
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
