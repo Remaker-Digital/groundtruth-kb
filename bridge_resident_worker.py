@@ -20,6 +20,7 @@ from bridge_worker_context import (
     build_contexts,
     build_prompt,
     context_requires_action,
+    fast_path_session_start_requests,
     repair_terminal_thread_outputs,
     select_dispatch_batch,
 )
@@ -630,6 +631,22 @@ def run(args: argparse.Namespace) -> int:
                         )
                         _write_health(args.agent, status="running", last_event_id=last_event_id)
                         startup_scan_pending = True  # force immediate inbox re-scan
+                        continue
+
+                    fast_path_count = fast_path_session_start_requests(
+                        bridge,
+                        agent=args.agent,
+                        target_refs=targets,
+                        project_dir=PROJECT_DIR,
+                        log_fn=lambda message: _append_log(args.agent, message),
+                    )
+                    if fast_path_count > 0:
+                        _append_log(
+                            args.agent,
+                            f"session-start fast path handled {fast_path_count} target(s); re-evaluating queue",
+                        )
+                        _write_health(args.agent, status="running", last_event_id=last_event_id)
+                        startup_scan_pending = True
                         continue
 
                     payload = build_context_snapshot(
