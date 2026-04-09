@@ -662,7 +662,8 @@ def phase_10a_pre_deploy_snapshot(args: argparse.Namespace) -> PhaseResult:
         expected_files = [results_dir / "phase_a_staging-001.json",
                           results_dir / "phase_a_staging-002.json"]
     else:
-        expected_files = [results_dir / "phase_a_remaker-digital-001.json"]
+        prod_tenant = ENVIRONMENTS["production"]["tenant_id"] or "remaker-digital-001"
+        expected_files = [results_dir / f"phase_a_{prod_tenant}.json"]
 
     missing = [str(f.name) for f in expected_files if not f.exists()]
     if missing:
@@ -671,6 +672,8 @@ def phase_10a_pre_deploy_snapshot(args: argparse.Namespace) -> PhaseResult:
         return PhaseResult(8, "Pre-Deploy Snapshot", "FAIL", time.time() - t0, detail)
 
     log("PASS", f"  {phase_name} snapshots saved ({len(expected_files)} tenants)")
+    # Store snapshot paths in args so production verification can pass --snapshot
+    args._snapshot_files = expected_files
     dt = time.time() - t0
     return PhaseResult(8, "Pre-Deploy Snapshot", "PASS", dt)
 
@@ -1065,18 +1068,25 @@ def phase_11_production_verification(args: argparse.Namespace) -> PhaseResult:
     expected_version = args.version.lstrip("v")
     failures = []
 
-    # Part 1: Upgrade verification (phase-c, 35 assertions)
+    # Part 1: Upgrade verification (phase-c, 41 assertions)
     script = PROJECT_ROOT / "scripts" / "upgrade_verification.py"
     log("INFO", "  Running phase-c upgrade verification...")
-    try:
-        r = _stream(
-            [sys.executable, str(script), "phase-c",
-             "--env", "production", "--new-version", expected_version],
-            cwd=PROJECT_ROOT, timeout=600, prefix="  [phase-c] ",
-        )
-    except Exception as e:
-        failures.append(f"phase-c exception: {e}")
+    snapshot_files = getattr(args, "_snapshot_files", [])
+    snapshot_path = str(snapshot_files[0]) if snapshot_files else None
+    if not snapshot_path:
+        failures.append("phase-c: no pre-deploy snapshot available (phase_10a skipped or failed)")
         r = None
+    else:
+        try:
+            r = _stream(
+                [sys.executable, str(script), "phase-c",
+                 "--env", "production", "--new-version", expected_version,
+                 "--snapshot", snapshot_path],
+                cwd=PROJECT_ROOT, timeout=600, prefix="  [phase-c] ",
+            )
+        except Exception as e:
+            failures.append(f"phase-c exception: {e}")
+            r = None
 
     total_pass, total_fail = (0, 0)
     if r is not None:
@@ -1157,10 +1167,10 @@ def phase_11_production_verification(args: argparse.Namespace) -> PhaseResult:
             log("WARN", "  No rollback image captured — manual intervention required")
             args._rollback_attempted = False
 
-        return PhaseResult(11, "Production Verification", "FAIL", dt, detail, f"[{total_pass}/35]")
+        return PhaseResult(11, "Production Verification", "FAIL", dt, detail, f"[{total_pass}/41]")
 
-    log("PASS", f"  Production verification: {total_pass}/35 upgrade + 3/3 smoke")
-    return PhaseResult(11, "Production Verification", "PASS", dt, extra=f"[{total_pass}/35]")
+    log("PASS", f"  Production verification: {total_pass}/41 upgrade + 3/3 smoke")
+    return PhaseResult(11, "Production Verification", "PASS", dt, extra=f"[{total_pass}/41]")
 
 
 # ---------------------------------------------------------------------------
@@ -1340,8 +1350,9 @@ def main() -> int:
         results.append(result)
         all_ok = result.passed or result.status == "SKIP"
 
-    # Capture rollback image before deploy (Codex WP3)
-    if all_ok and args.env == "production":
+    # Capture rollback image before deploy (Codex WP3).
+    # FAIL CLOSED: production deploy is blocked if rollback image cannot be captured.
+    if all_ok and args.env == "production" and not args.dry_run:
         try:
             from scripts.deploy_config import get_current_image
 
@@ -1350,9 +1361,19 @@ def main() -> int:
                 args._rollback_image = rollback_img
                 log("INFO", f"  Rollback image captured: {rollback_img}")
             else:
-                log("WARN", "  Could not capture rollback image — rollback will be unavailable")
+                log("FAIL", "  Cannot capture rollback image — aborting deploy (fail-closed)")
+                results.append(PhaseResult(
+                    8, "Rollback Pre-flight", "FAIL", 0.0,
+                    "get_current_image returned None; deploy blocked until rollback baseline is established"
+                ))
+                all_ok = False
         except Exception as exc:
-            log("WARN", f"  Rollback image capture failed: {exc}")
+            log("FAIL", f"  Rollback image capture raised exception: {exc}")
+            results.append(PhaseResult(
+                8, "Rollback Pre-flight", "FAIL", 0.0,
+                f"get_current_image exception: {exc}"
+            ))
+            all_ok = False
 
     if all_ok:
         # Phase 9: Deploy
