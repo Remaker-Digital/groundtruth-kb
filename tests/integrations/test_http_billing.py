@@ -648,6 +648,7 @@ class TestStripeWebhooks:
             interval="month",
             stripe_customer_id="cus_cancel_001",
             stripe_subscription_id="sub_cancel_001",
+            customer_email="cancel@example.com",
         ))
 
         event = _make_stripe_event(
@@ -725,6 +726,7 @@ class TestStripeWebhooks:
             tier="starter",
             interval="month",
             stripe_customer_id="cus_fail_001",
+            customer_email="fail@example.com",
         ))
 
         event = _make_stripe_event(
@@ -909,6 +911,7 @@ class TestShopifyBilling:
         This path is auth-exempt.
         """
         mock_shopify_client.execute.return_value = {
+            "shop": {"email": "merchant@test-shop.com"},
             "currentAppInstallation": {
                 "activeSubscriptions": [
                     {
@@ -958,6 +961,7 @@ class TestShopifyBilling:
     ):
         """HTTP-BILL-31: GET /api/shopify/billing/status — returns subscription status."""
         mock_shopify_client.execute.return_value = {
+            "shop": {"email": "merchant@test-shop.com"},
             "currentAppInstallation": {
                 "activeSubscriptions": [
                     {
@@ -1070,6 +1074,7 @@ class TestTenantEndpoints:
             billing_channel=BillingChannel.SHOPIFY,
             tier="starter",
             shopify_shop_domain="lookup-shop.myshopify.com",
+            customer_email="lookup@example.com",
         ))
 
         resp = starter_client.get(
@@ -1091,6 +1096,7 @@ class TestTenantEndpoints:
             tier="professional",
             interval="month",
             stripe_customer_id="cus_detail_001",
+            customer_email="detail@example.com",
         ))
 
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
@@ -1120,6 +1126,7 @@ class TestPackPurchaseWithTenantId:
             tier="starter",
             interval="month",
             stripe_customer_id="cus_tenant_pack_001",
+            customer_email="tenant-pack@example.com",
         ))
 
         resp = starter_client.post(

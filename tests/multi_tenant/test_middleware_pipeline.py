@@ -153,6 +153,7 @@ class TestAuthentication:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_mwp02",
+            customer_email="mwp02@example.com",
         ))
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
         assert resp.status_code == 200
@@ -317,6 +318,7 @@ class TestCorrelation:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_corr_001",
+            customer_email="corr@example.com",
         ))
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
         assert resp.status_code == 200
@@ -362,6 +364,7 @@ class TestFullStack:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_stack_001",
+            customer_email="stack@example.com",
         ))
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
         assert resp.status_code == 200

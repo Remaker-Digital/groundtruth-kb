@@ -88,6 +88,7 @@ class TestProvisionTenant:
             interval="month",
             shopify_shop_domain="alice.myshopify.com",
             shopify_subscription_id="gid://shopify/AppSubscription/123",
+            customer_email="alice@example.com",
         )
         assert t.billing_channel == BillingChannel.SHOPIFY
         assert t.shopify_shop_domain == "alice.myshopify.com"
@@ -101,6 +102,7 @@ class TestProvisionTenant:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_re",
+            customer_email="reprovision@example.com",
         )
         original_id = t1.tenant_id
 
@@ -108,6 +110,7 @@ class TestProvisionTenant:
             billing_channel=BillingChannel.STRIPE,
             tier="professional",
             stripe_customer_id="cus_re",
+            customer_email="reprovision@example.com",
         )
         # Same tenant, updated tier
         assert t2.tenant_id == original_id
@@ -120,6 +123,7 @@ class TestProvisionTenant:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_grace",
+            customer_email="grace@example.com",
         )
         # Simulate deactivation via direct repo patch
         await fake_tenant_repo.patch(t.tenant_id, t.tenant_id, [
@@ -132,6 +136,7 @@ class TestProvisionTenant:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_grace",
+            customer_email="grace@example.com",
         )
         assert t2.deactivated_at is None
         assert t2.grace_period_ends_at is None
@@ -143,6 +148,7 @@ class TestProvisionTenant:
             tier="enterprise",
             addons=["multi-language", "white-label"],
             stripe_customer_id="cus_addons",
+            customer_email="addons@example.com",
         )
         assert t.addons == ["multi-language", "white-label"]
 
@@ -151,6 +157,7 @@ class TestProvisionTenant:
         t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_uuid",
+            customer_email="uuid@example.com",
         )
         assert len(t.tenant_id) == 36  # UUID format
         assert "-" in t.tenant_id
@@ -160,6 +167,7 @@ class TestProvisionTenant:
         t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_ts",
+            customer_email="timestamps@example.com",
         )
         # Verify timestamps are ISO 8601 strings
         assert isinstance(t.created_at, str)
@@ -181,6 +189,7 @@ class TestActivateTenant:
         t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_act",
+            customer_email="activate@example.com",
         )
         assert t.status == TenantStatus.PROVISIONING
 
@@ -193,6 +202,7 @@ class TestActivateTenant:
         await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_act_stripe",
+            customer_email="act-stripe@example.com",
         )
         result = await activate_tenant(stripe_customer_id="cus_act_stripe")
         assert result is not None
@@ -203,6 +213,7 @@ class TestActivateTenant:
         await provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             shopify_shop_domain="shop.myshopify.com",
+            customer_email="shop@example.com",
         )
         result = await activate_tenant(shopify_shop_domain="shop.myshopify.com")
         assert result is not None
@@ -218,6 +229,7 @@ class TestActivateTenant:
         t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_clear",
+            customer_email="clear@example.com",
         )
         # Simulate prior deactivation
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -244,6 +256,7 @@ class TestUpdateTenant:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_upd",
+            customer_email="upd@example.com",
         )
         result = await update_tenant(tier="professional", stripe_customer_id="cus_upd")
         assert result.tier == "professional"
@@ -255,6 +268,7 @@ class TestUpdateTenant:
             tier="starter",
             interval="month",
             stripe_customer_id="cus_int",
+            customer_email="interval@example.com",
         )
         result = await update_tenant(interval="year", stripe_customer_id="cus_int")
         assert result.interval == "year"
@@ -265,6 +279,7 @@ class TestUpdateTenant:
             billing_channel=BillingChannel.STRIPE,
             addons=["a"],
             stripe_customer_id="cus_addon",
+            customer_email="addon@example.com",
         )
         result = await update_tenant(addons=["a", "b", "c"], stripe_customer_id="cus_addon")
         assert result.addons == ["a", "b", "c"]
@@ -275,6 +290,7 @@ class TestUpdateTenant:
             billing_channel=BillingChannel.STRIPE,
             addons=["multi-language"],
             stripe_customer_id="cus_clr",
+            customer_email="clr@example.com",
         )
         result = await update_tenant(addons=[], stripe_customer_id="cus_clr")
         assert result.addons == []
@@ -286,6 +302,7 @@ class TestUpdateTenant:
             tier="starter",
             interval="month",
             stripe_customer_id="cus_keep",
+            customer_email="keep@example.com",
         )
         result = await update_tenant(tier=None, stripe_customer_id="cus_keep")
         assert result.tier == "starter"  # Unchanged
@@ -308,6 +325,7 @@ class TestDeactivateTenant:
         await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_deact",
+            customer_email="deact@example.com",
         )
         await activate_tenant(stripe_customer_id="cus_deact")
 
@@ -321,6 +339,7 @@ class TestDeactivateTenant:
         await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_30d",
+            customer_email="grace30d@example.com",
         )
         result = await deactivate_tenant(stripe_customer_id="cus_30d")
         # Parse ISO timestamps and verify 30-day delta
@@ -347,6 +366,7 @@ class TestFlagPaymentIssue:
         await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_flag",
+            customer_email="flag@example.com",
         )
         await activate_tenant(stripe_customer_id="cus_flag")
 
@@ -363,6 +383,7 @@ class TestFlagPaymentIssue:
         t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_ts",
+            customer_email="flag-ts@example.com",
         )
         old_updated = t.updated_at
         result = await flag_payment_issue(stripe_customer_id="cus_ts")
@@ -382,6 +403,7 @@ class TestGetTenant:
         t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_get",
+            customer_email="get@example.com",
         )
         result = await get_tenant(tenant_id=t.tenant_id)
         assert result is not None
@@ -392,6 +414,7 @@ class TestGetTenant:
         await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_get_stripe",
+            customer_email="get-stripe@example.com",
         )
         result = await get_tenant(stripe_customer_id="cus_get_stripe")
         assert result is not None
@@ -401,6 +424,7 @@ class TestGetTenant:
         await provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             shopify_shop_domain="getshop.myshopify.com",
+            customer_email="getshop@example.com",
         )
         result = await get_tenant(shopify_shop_domain="getshop.myshopify.com")
         assert result is not None
@@ -490,6 +514,7 @@ class TestTenantLifecycle:
             billing_channel=BillingChannel.STRIPE,
             tier="enterprise",
             stripe_customer_id="cus_lifecycle",
+            customer_email="lifecycle@test.com",
         )
         assert t.status == TenantStatus.PROVISIONING
         assert t.tier == "enterprise"
@@ -502,11 +527,13 @@ class TestTenantLifecycle:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_iso_1",
+            customer_email="iso1@example.com",
         )
         s2 = await provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             tier="professional",
             shopify_shop_domain="iso.myshopify.com",
+            customer_email="iso2@example.com",
         )
         assert s1.tenant_id != s2.tenant_id
         assert len(fake_tenant_repo.store) == 2
@@ -560,7 +587,7 @@ class TestHandleCheckoutCompleted:
                     "mode": "subscription",
                     "customer": "cus_wh_sub",
                     "subscription": "sub_wh_001",
-                    "customer_email": "webhook@test.com",
+                    "customer_details": {"email": "webhook@test.com"},
                     "metadata": {
                         "agent_red_tier": "professional",
                         "agent_red_interval": "month",
@@ -663,6 +690,7 @@ class TestHandleSubscriptionDeleted:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_wh_del",
+            customer_email="wh-del@example.com",
         )
         await activate_tenant(stripe_customer_id="cus_wh_del")
 
@@ -700,6 +728,7 @@ class TestHandlePaymentFailed:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_wh_fail",
+            customer_email="wh-fail@example.com",
         )
         await activate_tenant(stripe_customer_id="cus_wh_fail")
 
@@ -739,6 +768,7 @@ class TestHandlePaymentSucceeded:
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_wh_pay",
+            customer_email="wh-pay@example.com",
         )
         await activate_tenant(stripe_customer_id="cus_wh_pay")
 

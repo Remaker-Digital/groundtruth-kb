@@ -78,6 +78,20 @@ class FakeTenantRepo:
                 doc[field] = op["value"]
         return copy.deepcopy(doc)
 
+    async def update_encrypted_fields(
+        self,
+        tenant_id: str,
+        document_id: str,
+        fields: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update encrypted fields (in fake, just a direct set)."""
+        doc = self.store.get(tenant_id)
+        if doc is None:
+            raise RuntimeError(f"Document not found: {tenant_id}")
+        for key, value in fields.items():
+            doc[key] = value
+        return copy.deepcopy(doc)
+
     async def find_by_stripe_customer_id(
         self, stripe_customer_id: str,
     ) -> dict[str, Any] | None:

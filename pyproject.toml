@@ -25,6 +25,7 @@ markers = [
     "visual: visual regression tests requiring Playwright + Vite dev server (Layer 1-2)",
     "nats: tests requiring a live NATS JetStream server (nats://localhost:4222)",
     "property: property-based tests using Hypothesis (SPEC-1843)",
+    "local_env: tests requiring local environment files (.env.local, SCHEDULE.md, etc.)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",

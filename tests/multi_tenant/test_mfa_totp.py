@@ -179,6 +179,7 @@ class TestGenerateQrCodeDataUrl:
 
     def test_mfa_03_data_url_prefix(self):
         """MFA-03: QR code output starts with data:image/png;base64, prefix."""
+        pytest.importorskip("PIL", reason="Pillow required for QR code generation")
         uri = "otpauth://totp/AgentRed:test@example.com?secret=JBSWY3DPEHPK3PXP"
         data_url = generate_qr_code_data_url(uri)
 

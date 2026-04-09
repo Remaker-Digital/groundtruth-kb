@@ -236,6 +236,9 @@ mutation appUsageRecordCreate(
 # Query the current active subscription
 _ACTIVE_SUBSCRIPTION_QUERY = """
 query {
+    shop {
+        email
+    }
     currentAppInstallation {
         activeSubscriptions {
             id
@@ -531,6 +534,9 @@ async def confirm_subscription(
     client = get_shopify_client()
     data = await client.execute(_ACTIVE_SUBSCRIPTION_QUERY)
 
+    # SPEC-1882: extract shop owner email for superadmin contact gate
+    shop_email = data.get("shop", {}).get("email")
+
     installation = data.get("currentAppInstallation", {})
     subscriptions = installation.get("activeSubscriptions", [])
 
@@ -591,6 +597,7 @@ async def confirm_subscription(
         interval=sub_info.get("interval"),
         shopify_shop_domain=shop_domain,
         shopify_subscription_id=active_sub["id"],
+        customer_email=shop_email,
     )
 
     # Immediately activate — Shopify collects payment during approval
