@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Module-level singleton for ChatPipeline.
 
 Provides get_chat_pipeline(), configure_chat_pipeline(), and
@@ -66,10 +67,9 @@ def get_chat_pipeline() -> ChatPipeline:
     """
     global _pipeline
     if _pipeline is None:
+        from src.chat.session import get_conversation_session
         from src.multi_tenant.customer_profile_service import get_profile_service
         from src.multi_tenant.system_prompt_builder import get_prompt_builder
-
-        from src.chat.session import get_conversation_session
 
         _pipeline = ChatPipeline(
             session=get_conversation_session(),

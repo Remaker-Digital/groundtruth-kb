@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Default alert rules — ship operational monitoring out of the box (SPEC-1831).
 
 Seeds 8 default alert rules into Cosmos ``platform_config`` on application
@@ -12,7 +13,7 @@ seeding when rules already exist.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -167,7 +168,7 @@ async def seed_default_alert_rules() -> int:
         return 0
 
     # Seed the default rules
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     rules_by_id = {rule["rule_id"]: rule for rule in DEFAULT_ALERT_RULES}
 
     doc = PlatformConfigDocument(

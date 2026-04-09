@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Normalized data models — integration boundary types (SPEC-1762).
 
 All adapters produce and consume these normalized models.  Vendor-specific
@@ -14,7 +15,6 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Enums

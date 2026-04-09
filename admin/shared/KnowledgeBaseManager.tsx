@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * KnowledgeBaseManager - CRUD manager for knowledge base articles.
  *

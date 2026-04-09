@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin Contact Messages API — cross-tenant contact message management.
 
 Provides REST endpoints for the service provider (SUPERADMIN role) to
@@ -20,6 +21,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+from datetime import UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -337,10 +339,10 @@ async def update_contact_message(
         raise HTTPException(status_code=404, detail=f"Contact message {message_id} not found")
 
     # Build patch operations
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     patch_ops: list[dict[str, Any]] = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     if body.status is not None:
         patch_ops.append({"op": "set", "path": "/status", "value": body.status})

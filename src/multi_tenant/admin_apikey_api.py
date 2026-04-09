@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin API Key Management API — generate, rotate, revoke, reset API keys.
 
 Provides REST endpoints for merchant API key lifecycle management:
@@ -40,14 +41,13 @@ import os
 import re
 import secrets
 import string
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.auth import TenantContext, hash_api_key
 from src.multi_tenant.middleware import get_tenant_context
 
@@ -390,7 +390,7 @@ async def generate_new_api_key(
 
     raw_key = generate_api_key(ctx.tenant_id)
     key_hash = hash_api_key(raw_key)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     key_prefix = raw_key[:12]
 
     # Update tenant document with new key hash + metadata
@@ -448,7 +448,7 @@ async def rotate_api_key(
 
     raw_key = generate_api_key(ctx.tenant_id)
     key_hash = hash_api_key(raw_key)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     key_prefix = raw_key[:12]
 
     # Atomically update with new key hash
@@ -513,7 +513,7 @@ async def revoke_api_key(
         raise HTTPException(status_code=404, detail="No API key to revoke")
 
     old_prefix = tenant.get("api_key_prefix", "unknown")
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Clear key hash and metadata
     await _tenant_repo.patch(
@@ -609,7 +609,7 @@ async def reset_api_key_via_email(
     # Generate new key and update tenant
     raw_key = generate_api_key(tenant_id)
     key_hash = hash_api_key(raw_key)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     key_prefix = raw_key[:12]
 
     await _tenant_repo.patch(

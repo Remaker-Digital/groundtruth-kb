@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """RAG Configuration — knowledge source management (SPEC-0617, SPEC-0823).
 
 Manages RAG knowledge sources for each tenant, covering:

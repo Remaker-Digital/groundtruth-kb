@@ -9,6 +9,45 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.98.91 — Phone Identity, Canonical Identity & Production Hardening (Staging, 2026-04-09)
+
+### Phone identity channel (SPEC-1879)
+
+Full SMS OTP verification flow for customer identity.
+
+- **Phone OTP endpoints** — send-sms / verify-sms with E.164 validation, SHA-256 hashed tokens
+- **Conversation-scoped verification** — phone_verified separate from customer_verified
+- **Widget integration** — PhoneOtpVerification component, pre-chat phone field, 8 locale files
+- **Admin inbox** — phone display in identity panel, escalation gate for unverified phones
+- **Tier gate** — professional+ tier required for phone identity features
+- **Azure Communication Services** — toll-free SMS via ACS (verification submitted)
+
+### Canonical identity (ADR-004)
+
+Internal stable customer identity replacing contact-means-as-key.
+
+- **Canonical ID** — `cid_<uuid>` as primary key, contact means as mutable attributes
+- **Contact attributes** — array-based contact_attributes replacing flat email fields
+- **Session find-or-create** — automatic identity resolution on conversation start
+- **Admin APIs** — identity lookup, merge, and contact attribute management
+- **Migration script** — production-safe migration with rollback capability
+
+### Production hardening
+
+- **Envelope encryption** — P0 incident closed; DEK recovery, field restoration, safety gates
+- **Deploy procedure** — 5 work packages: approval gate, rollback, unified config, structured logging, canonical paths
+- **Tenant provisioning** — display_name (auto-generated), hard contact gate on provision_tenant()
+- **CI stability** — lint zero errors (E/F), 9/11 test shards green, ~50 test fixes
+
+### Code quality improvements
+
+- **Lint remediation** — 1,446 ruff errors resolved to zero (E/F rules)
+- **Import cycle detection** — automated detector, 0 real cycles across 281 modules
+- **GitHub hygiene** — README refresh, wiki sync, branch protection, issue templates
+- **Evaluation reports** — Agent Red and OrbaTech technical assessment documents
+
+---
+
 ## v1.98.16 — Self-Service Deployment Pipeline & Dashboard Overhaul (Production, 2026-03-23)
 
 ### Self-service deployment pipeline (SPEC-1825)

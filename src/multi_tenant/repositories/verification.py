@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Verification token repository — short-lived tokens for email verification
 and magic links.
@@ -12,6 +13,7 @@ uses ``token_type`` as partition key (e.g. "email_verification",
 from __future__ import annotations
 
 import logging
+from datetime import UTC
 from typing import Any
 
 from azure.cosmos.exceptions import (
@@ -71,7 +73,7 @@ class VerificationTokenRepository:
         Raises:
             DocumentConflictError: If token_id already exists.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         doc = {
             "id": token_id,
@@ -79,7 +81,7 @@ class VerificationTokenRepository:
             "tenant_id": tenant_id,
             "email": email,
             "used": False,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "ttl": ttl,
         }
         if member_id is not None:

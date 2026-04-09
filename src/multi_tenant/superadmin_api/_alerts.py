@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Alert thresholds and notification channel configuration.
 
 Domain sub-module for SPEC-1822 (Alert Threshold Configuration) and
@@ -24,7 +25,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, Query
@@ -37,7 +38,6 @@ from src.multi_tenant.cosmos_schema import (
     PlatformConfigDocument,
 )
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -326,7 +326,7 @@ async def put_alert_threshold(
         )
 
     repo = _get_platform_repo()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
     # Read existing to get current version
@@ -670,7 +670,7 @@ async def put_notification_channel(
         )
 
     repo = _get_platform_repo()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
     # Read existing to get current version
@@ -830,7 +830,7 @@ async def send_test_notification(
                 "event": "test_notification",
                 "severity": body.severity,
                 "message": body.message,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "source": "agent-red-spa-console",
             }
 

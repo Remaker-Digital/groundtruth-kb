@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Presets API — G6 Vertical Template Starter Kits (SPEC-1878).
 
 Provides REST endpoints for the OnboardingWizard's preset selection:

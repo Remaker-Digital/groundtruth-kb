@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Shopify GDPR mandatory webhook handlers (WI #35).
 
 Shopify requires all apps to implement three GDPR webhook endpoints before
@@ -27,9 +28,9 @@ Shopify GDPR webhook reference:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
-import base64
 import logging
 import os
 from typing import Any

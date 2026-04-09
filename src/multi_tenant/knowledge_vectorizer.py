@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Knowledge Base vectorization and hybrid retrieval pipeline.
 
 Work Items #209-213 (Decision RAG-1): Enterprise-grade RAG for the
@@ -36,7 +37,7 @@ import math
 import re
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -471,7 +472,7 @@ class KnowledgeVectorizer:
         embedding = embeddings[0]
 
         # Update entry with embedding
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         operations = [
             {"op": "set", "path": "/embedding", "value": embedding},
             {"op": "set", "path": "/embedding_model", "value": EMBEDDING_MODEL},
@@ -550,7 +551,7 @@ class KnowledgeVectorizer:
                 continue
 
             # Update each entry
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             for entry, embedding in zip(batch, embeddings):
                 entry_id = entry.get("id", "")
                 title = entry.get("title", "")
@@ -1047,7 +1048,7 @@ class RetrievalMetrics:
             "latency_ms": round(latency_ms, 1),
             "mode": mode,
             "top_score": round(top_score, 4),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._recent_queries) > self._max_recent:
             self._recent_queries = self._recent_queries[-self._max_recent:]

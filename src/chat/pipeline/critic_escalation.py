@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Critic validation and escalation handling mixin.
 
 Provides critic safety validation (fail-closed) and escalation handler
@@ -13,6 +14,7 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator
+from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
 from src.chat.models import (
@@ -286,13 +288,13 @@ class CriticEscalationMixin:
         # conversation was escalated, regardless of email bridge outcome.
         # This prevents repeat escalation on subsequent turns.
         try:
-            from datetime import datetime, timezone as tz
+            from datetime import datetime
             await self._session._repo.patch_conversation(
                 tenant_id, conversation_id,
                 {
                     "escalation_sent": True,
                     "escalated_via_email_at": (
-                        datetime.now(tz.utc).isoformat() if email_bridge_sent else None
+                        datetime.now(UTC).isoformat() if email_bridge_sent else None
                     ),
                 },
             )

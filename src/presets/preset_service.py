@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Preset Service — G6 Vertical Template Starter Kits (SPEC-1878).
 
 Loads vertical presets from YAML files and applies them to tenants
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -268,7 +269,7 @@ class PresetService:
         from src.multi_tenant.admin_quick_action_api import _get_repo
 
         repo = _get_repo()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         created_ids: list[str] = []
 
         for qa in quick_actions:
@@ -322,11 +323,11 @@ class PresetService:
         if not articles:
             return 0
 
-        from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
         from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
+        from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
 
         repo = KnowledgeBaseRepository()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         created = 0
 
         for article in articles:

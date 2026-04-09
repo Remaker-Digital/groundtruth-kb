@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Co-Pilot knowledge management, document CRUD, ingestion, config.
 
 Domain sub-module extracted from the superadmin_api monolith.
@@ -9,14 +10,13 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -185,7 +185,7 @@ async def create_copilot_document(
 
     import hashlib
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     slug = body.title.lower().replace(" ", "-")[:50]
     doc_id = f"{body.document_category}:{slug}"
     content_hash = hashlib.sha256(
@@ -253,7 +253,7 @@ async def update_copilot_document(
 
     import hashlib
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Merge updates
     title = body.title if body.title is not None else existing.get("title", "")
@@ -328,7 +328,7 @@ async def delete_copilot_document(
 
     from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     doc = AdminDocumentationDocument(
         **{**existing, "is_active": False, "updated_at": now}
     )
@@ -367,7 +367,7 @@ async def ingest_docs_site(
     if not docs_dir.exists():
         raise HTTPException(status_code=404, detail="Admin guide directory not found")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     created = 0
     updated = 0
     skipped = 0
@@ -484,9 +484,10 @@ async def import_url(
         raise HTTPException(status_code=400, detail="Only HTTPS URLs are accepted")
 
     import hashlib
+
     import httpx
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -553,7 +554,7 @@ async def re_embed_documents(
     if _state._admin_doc_repo is None:
         raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     updated = 0
     errors: list[dict[str, str]] = []
 
@@ -789,7 +790,7 @@ async def _save_copilot_config(config: dict[str, Any]) -> None:
         return
     from src.multi_tenant.cosmos_schema import CopilotConfigDocument
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     merged = {
         "id": "copilot_config",
         "document_category": "platform",
@@ -861,7 +862,7 @@ async def update_copilot_schedule(
     config["scan_scope"] = body.scan_scope
 
     # Compute next_scan_at based on frequency
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if body.scan_frequency == "daily":
         next_scan = now + timedelta(days=1)
         config["next_scan_at"] = next_scan.isoformat()
@@ -944,7 +945,7 @@ async def update_copilot_retrieval_config(
 
     await _save_copilot_config(config)
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return CopilotRetrievalConfigResponse(
         vector_weight=body.vector_weight,
         bm25_weight=body.bm25_weight,

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Security hardening utilities — input/output sanitization, auth rate limiting,
 and API key rotation.
@@ -793,7 +794,7 @@ async def rotate_api_key(request: Request) -> KeyRotationResponse:
     # Store old key hash for grace period (24 hours)
     import datetime as dt
 
-    grace_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=24)
+    grace_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=24)
 
     # Read current key hash for grace period
     tenant = await _tenant_repo.read(tenant_id, tenant_id)
@@ -802,7 +803,7 @@ async def rotate_api_key(request: Request) -> KeyRotationResponse:
     # Update tenant with new key hash
     operations = [
         {"op": "set", "path": "/api_key_hash", "value": new_hash},
-        {"op": "set", "path": "/updated_at", "value": dt.datetime.now(dt.timezone.utc).isoformat()},
+        {"op": "set", "path": "/updated_at", "value": dt.datetime.now(dt.UTC).isoformat()},
     ]
 
     # Store old hash for grace period (append to a list field or separate doc)
@@ -857,7 +858,7 @@ async def rotate_widget_key(request: Request) -> WidgetKeyRotationResponse:
 
     import datetime as dt
 
-    now_iso = dt.datetime.now(dt.timezone.utc).isoformat()
+    now_iso = dt.datetime.now(dt.UTC).isoformat()
 
     await _tenant_repo.patch(
         tenant_id,

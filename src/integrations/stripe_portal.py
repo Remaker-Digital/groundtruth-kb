@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Stripe Customer Portal session management.
 
@@ -27,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import UTC
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException
@@ -319,11 +321,11 @@ async def billing_status_endpoint(
                 plan_name = product  # Product ID as fallback
 
     # Convert period_end to ISO date
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     renewal_date: str | None = None
     if sub.current_period_end:
-        renewal_date = datetime.fromtimestamp(sub.current_period_end, tz=timezone.utc).date().isoformat()
+        renewal_date = datetime.fromtimestamp(sub.current_period_end, tz=UTC).date().isoformat()
 
     logger.info(
         "Billing status retrieved: customer=%s status=%s renewal=%s",

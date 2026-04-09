@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Tenant secret management — per-tenant secrets in Azure Key Vault.
 
 Work Item #29 (Decision #6): Enum-based access to per-tenant secrets

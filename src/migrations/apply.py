@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Migration runner for Agent Red schema migrations.
 
 Discovers migration modules in src/migrations/, tracks applied migrations
@@ -30,7 +31,7 @@ import importlib
 import logging
 import pkgutil
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
@@ -264,7 +265,7 @@ class MigrationRunner:
                     "id": f"migration-{version}",
                     "version": version,
                     "description": description,
-                    "applied_at": datetime.now(timezone.utc).isoformat(),
+                    "applied_at": datetime.now(UTC).isoformat(),
                     "applied_by": "migration-runner",
                     "success": True,
                     "duration_ms": round(duration_ms, 1),
@@ -294,7 +295,7 @@ class MigrationRunner:
                     "id": f"migration-{version}",
                     "version": version,
                     "description": description,
-                    "applied_at": datetime.now(timezone.utc).isoformat(),
+                    "applied_at": datetime.now(UTC).isoformat(),
                     "applied_by": "migration-runner",
                     "success": False,
                     "error": error_msg,

@@ -6,7 +6,7 @@ Team member repository — team_members collection (admin dashboard access).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import COLLECTION_TEAM_MEMBERS
@@ -110,7 +110,7 @@ class TeamMemberRepository(TenantScopedRepository):
         self, tenant_id: str, document_id: str,
     ) -> dict[str, Any]:
         """Deactivate a team member (set is_active = false)."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=document_id,
@@ -208,7 +208,7 @@ class TeamMemberRepository(TenantScopedRepository):
             updates: Dict of field names → new values. Values of ``None``
                 are stored as JSON null (for clearing fields).
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         operations: list[dict[str, Any]] = [
             {"op": "set", "path": f"/{key}", "value": value}
             for key, value in updates.items()

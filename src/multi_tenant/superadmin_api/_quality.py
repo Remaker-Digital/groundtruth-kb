@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Quality endpoints (SPEC-1838, SPEC-0188).
 
 Provides read-only API endpoints for quality data:
@@ -11,7 +12,7 @@ Provides read-only API endpoints for quality data:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Query
 from pydantic import Field
@@ -19,7 +20,6 @@ from pydantic import Field
 from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 logger = logging.getLogger(__name__)
@@ -104,8 +104,8 @@ async def get_quality_score(
 
     try:
         from src.quality_metrics.quality_score import (
-            compute_all_metrics,
             WEIGHTS,
+            compute_all_metrics,
         )
         # Knowledge DB is a dev-only tool (tools/knowledge-db/db.py).
         # In container deployments the module may not be available.
@@ -253,7 +253,7 @@ async def list_quality_conversations(
                 overall_score=agg.get("overall", 0.0),
                 turn_count=item.get("message_count", 0),
                 scored_at=datetime.fromtimestamp(
-                    item.get("_ts", 0), tz=timezone.utc
+                    item.get("_ts", 0), tz=UTC
                 ).isoformat() if item.get("_ts") else "",
             ))
         return entries
@@ -285,8 +285,9 @@ async def get_quality_summary(
         raise HTTPException(status_code=403, detail="Platform admin required")
 
     try:
-        from src.multi_tenant.cosmos_client import get_conversations_container
         import time
+
+        from src.multi_tenant.cosmos_client import get_conversations_container
 
         container = get_conversations_container()
         cutoff_ts = int(time.time()) - (period_days * 86400)

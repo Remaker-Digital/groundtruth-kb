@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Incidents, alerts, MFA, cost analytics, abuse detection.
 
 Domain sub-module extracted from the superadmin_api monolith.
@@ -8,6 +9,7 @@ Endpoints are registered on the shared router from _monolith.
 from __future__ import annotations
 
 import logging
+from datetime import UTC
 from typing import Any
 
 from fastapi import Body, Depends, HTTPException, Query
@@ -17,7 +19,6 @@ from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -954,12 +955,12 @@ async def get_cost_analytics(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> CostOverviewResponse:
     """Compute estimated per-tenant costs based on conversation volume and token usage."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     if not _state._tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     period_start = (now - timedelta(days=days)).isoformat()
     period_end = now.isoformat()
 
@@ -1154,12 +1155,12 @@ async def get_abuse_signals(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AbuseOverviewResponse:
     """Scan all active tenants for abuse signals and anomalous usage patterns."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     if not _state._tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     day_ago = (now - timedelta(days=1)).isoformat()
 
     tenant_ids: list[str] = []
@@ -1283,12 +1284,12 @@ async def toggle_abuse_flag(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AbuseFlagResponse:
     """Flag or unflag a tenant for manual abuse review."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     if not _state._tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.user_id if hasattr(ctx, "user_id") else "superadmin"
 
     try:

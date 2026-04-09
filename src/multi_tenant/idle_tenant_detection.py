@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Idle tenant detection and auto-downgrade (SPEC-1835).
 
 Detects tenants with no activity and triggers notification/downgrade workflows.
@@ -14,7 +15,7 @@ Background job scans all tenants and classifies idle state:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -54,12 +55,12 @@ def should_update_activity(
         return True
 
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     try:
         last = datetime.fromisoformat(last_activity_at)
         if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
+            last = last.replace(tzinfo=UTC)
         elapsed = (now - last).total_seconds()
         return elapsed >= ACTIVITY_COALESCE_SECONDS
     except (ValueError, TypeError):
@@ -79,12 +80,12 @@ def classify_idle_state(
         return "archival_review"  # No activity ever recorded
 
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     try:
         last = datetime.fromisoformat(last_activity_at)
         if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
+            last = last.replace(tzinfo=UTC)
         idle_days = (now - last).days
     except (ValueError, TypeError):
         return "archival_review"
@@ -116,7 +117,7 @@ async def scan_idle_tenants(
     Does NOT take action — just reports. Actions are taken by separate handlers.
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     if tenant_repo is None:
         try:
@@ -176,7 +177,7 @@ def _compute_idle_days(last_activity_at: str | None, now: datetime) -> int:
     try:
         last = datetime.fromisoformat(last_activity_at)
         if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
+            last = last.replace(tzinfo=UTC)
         return (now - last).days
     except (ValueError, TypeError):
         return 999

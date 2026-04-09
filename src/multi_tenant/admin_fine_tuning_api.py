@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Fine-Tuning API — Layer 4 management endpoints (SPEC-1522).
 
 Provides REST endpoints for managing per-tenant model fine-tuning:

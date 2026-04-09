@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Email Change Request & Confirmation (SPEC-1682, SPEC-1683).
 
 Two-phase email change flow for platform admins:
@@ -24,6 +25,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from datetime import UTC
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
@@ -357,9 +359,9 @@ async def request_email_change(
         host = request.headers.get("host", request.url.hostname or "localhost")
         confirm_url = f"{scheme}://{host}/api/admin/email/confirm?token={token_id}"
 
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
         # 1. Send confirmation email to NEW address
         confirm_html = _CONFIRM_EMAIL_BODY.format(confirm_url=confirm_url)

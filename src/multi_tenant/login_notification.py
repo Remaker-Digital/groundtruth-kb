@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SPA Login Notification Emails (SPEC-1676).
 
 Sends a non-blocking email notification every time a platform admin
@@ -19,7 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ async def send_login_notification(
 
         from src.multi_tenant.welcome_email import _build_admin_login_url
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         admin_url = _build_admin_login_url()
         body_html = _LOGIN_NOTIFICATION_BODY.format(
             timestamp=timestamp,

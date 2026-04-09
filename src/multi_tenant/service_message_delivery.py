@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Service message delivery — bulk BCC email to tenant superadmins.
 
 Sends service messages (system announcements, update notices) from the

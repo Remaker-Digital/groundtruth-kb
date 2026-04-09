@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Integration Registry — singleton registry for plugin management (SPEC-1761).
 
 The registry is the central coordination point for all integrations.

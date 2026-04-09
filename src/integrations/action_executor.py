@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Action Executor with HITL Gating — routes AI requests to adapters (SPEC-1769).
 
 The ActionExecutor is the single dispatch point for AI-initiated actions against
@@ -14,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -114,7 +115,7 @@ class AIAction(BaseModel):
     requested_by: str = "ai_agent"
     hitl_required: bool | None = None  # None = use policy default
     priority: str = "normal"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ActionResult(BaseModel):
@@ -140,7 +141,7 @@ class ActionAuditEntry(BaseModel):
     event: str  # requested, approved, rejected, executed, failed
     actor: str = ""
     details: dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +281,7 @@ class ActionExecutor:
 
     async def _execute(self, action: AIAction) -> ActionResult:
         """Execute an action against its integration adapter."""
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
 
         try:
             adapter = self._registry.get_adapter(
@@ -296,7 +297,7 @@ class ActionExecutor:
 
         try:
             result_data = await self._dispatch(adapter, action)
-            elapsed = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+            elapsed = (datetime.now(UTC) - start).total_seconds() * 1000
 
             self._log_audit(action, "executed", details={"duration_ms": elapsed})
 
@@ -304,7 +305,7 @@ class ActionExecutor:
                 action_id=action.action_id,
                 status=ActionStatus.COMPLETED,
                 result=result_data,
-                executed_at=datetime.now(timezone.utc),
+                executed_at=datetime.now(UTC),
                 duration_ms=elapsed,
             )
 

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Avatar upload endpoint — D22 capability.
 
@@ -16,10 +17,10 @@ from __future__ import annotations
 import base64
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.middleware import get_tenant_context, TenantContext
+from src.multi_tenant.middleware import TenantContext, get_tenant_context
 
 logger = logging.getLogger(__name__)
 

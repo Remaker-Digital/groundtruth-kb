@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Customer profile repository — customer_profiles collection (Layer 1).
 
@@ -11,7 +12,7 @@ and can be linked/unlinked without changing the canonical identity.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -78,7 +79,7 @@ class CustomerProfileRepository(TenantScopedRepository):
     ) -> dict[str, Any]:
         """Update the last_interaction_at timestamp."""
         doc_id = f"{tenant_id}:{customer_id}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=doc_id,
@@ -165,7 +166,7 @@ class CustomerProfileRepository(TenantScopedRepository):
         Uses create (not upsert) so a 409 Conflict is raised if a
         concurrent writer already created a profile with this ID.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         profile = CustomerProfileDocument(
             id=f"{tenant_id}:{canonical_id}",
             tenant_id=tenant_id,
@@ -205,7 +206,7 @@ class CustomerProfileRepository(TenantScopedRepository):
                 tenant_id,
             )
         doc_id = profile.get("id", f"{tenant_id}:{canonical_id}")
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=doc_id,
@@ -248,7 +249,7 @@ class CustomerProfileRepository(TenantScopedRepository):
 
         # Use actual document ID from profile (may be legacy format for migrated docs)
         doc_id = profile.get("id", f"{tenant_id}:{canonical_id}")
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=doc_id,

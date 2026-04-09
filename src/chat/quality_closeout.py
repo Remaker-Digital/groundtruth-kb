@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Quality closeout helper — shared across all conversation-end paths.
 
 Called by:
@@ -17,6 +18,7 @@ so the dashboard read path (_quality.py:242) always has data.
 from __future__ import annotations
 
 import logging
+from datetime import UTC
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -90,8 +92,8 @@ async def _evaluate_regression(
     detect_regression(), and delivers alert through the rule system.
     """
     try:
-        from src.multi_tenant.repositories.alerts import AlertRuleRepository, AlertHistoryRepository
         from src.multi_tenant.alert_delivery import get_alert_service
+        from src.multi_tenant.repositories.alerts import AlertHistoryRepository, AlertRuleRepository
 
         rule_repo = AlertRuleRepository()
         history_repo = AlertHistoryRepository()
@@ -115,12 +117,12 @@ async def _evaluate_regression(
             rule_id, tenant_id=tenant_id,
         )
         if last_trigger:
-            from datetime import datetime, timezone, timedelta
+            from datetime import datetime, timedelta
             triggered_at = last_trigger.get("triggered_at", "")
             if triggered_at:
                 try:
                     last_time = datetime.fromisoformat(triggered_at.replace("Z", "+00:00"))
-                    if datetime.now(timezone.utc) - last_time < timedelta(minutes=cooldown_minutes):
+                    if datetime.now(UTC) - last_time < timedelta(minutes=cooldown_minutes):
                         return  # Still in cooldown
                 except (ValueError, TypeError):
                     pass
@@ -153,7 +155,7 @@ async def _evaluate_regression(
         # Deliver via configured channels
         alert_service = get_alert_service()
         if alert_service:
-            from src.multi_tenant.alert_delivery import Alert, AlertType, AlertSeverity
+            from src.multi_tenant.alert_delivery import Alert, AlertSeverity, AlertType
             channels = quality_rule.get("notification_channels")
             await alert_service.deliver_alert(
                 Alert(

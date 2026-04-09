@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Website crawl service — automated website source crawling with change detection.
 
 Orchestrates the crawl lifecycle for WebsiteSourceDocument records:
@@ -18,7 +19,7 @@ product listings, policies, and other merchant site content.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
 
@@ -229,7 +230,7 @@ async def crawl_website_source(
         embedded_count = await _vectorize_new_entries(tenant_id, entry_ids)
 
         # --- Update source with results ---
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         refresh_hours = source.get("refresh_interval_hours", 24)
         next_crawl = (now + timedelta(hours=refresh_hours)).isoformat()
 

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Tenant Agent Overlay repository — agent_overlays collection (SPEC-1854, WI-4011).
 
@@ -10,7 +11,7 @@ Partition key: /tenant_id. Document ID: agent_id (unique per tenant).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -105,7 +106,7 @@ class TenantAgentOverlayRepository(TenantScopedRepository):
         staff_domain_tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create or replace an overlay for tenant + agent."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Validate custom_metadata keys AND shapes (Codex Findings 4 + review P2)
         clean_metadata = {}

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """PatternExtractionService — Layer 3 cross-session behavioral pattern learning.
 
 Work Items #90-92 (Decision #30): Post-conversation analysis to extract,
@@ -50,7 +51,7 @@ Dependencies:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -158,7 +159,7 @@ class ExtractedPattern(BaseModel):
         description="Confidence score (0.0-1.0).  Decays at 0.05/month.",
     )
     last_reinforced: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO 8601 timestamp of the last reinforcement event.",
     )
     reinforcement_count: int = Field(
@@ -474,7 +475,7 @@ class PatternExtractionService:
         if not raw_patterns:
             return []
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         validated: list[ExtractedPattern] = []
 
         for raw in raw_patterns:
@@ -690,7 +691,7 @@ class PatternExtractionService:
         if not new_patterns:
             return await self.get_patterns(tenant_id, customer_id)
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Load existing patterns
         existing_raw = await self._load_patterns(tenant_id, customer_id)
@@ -793,7 +794,7 @@ class PatternExtractionService:
         if not existing_raw:
             return []
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         surviving: list[ExtractedPattern] = []
         pruned_count = 0
 
@@ -811,7 +812,7 @@ class PatternExtractionService:
                 # Ensure timezone-aware comparison
                 if last_reinforced.tzinfo is None:
                     last_reinforced = last_reinforced.replace(
-                        tzinfo=timezone.utc
+                        tzinfo=UTC
                     )
                 elapsed = now - last_reinforced
                 months_elapsed = elapsed.total_seconds() / (

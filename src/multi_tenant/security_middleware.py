@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Security middleware — trusted proxy, request body limits, JSON depth, security headers.
 
 Provides four middleware components for defense-in-depth:

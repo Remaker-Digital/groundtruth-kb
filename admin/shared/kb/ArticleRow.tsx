@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * ArticleRow — a single table row in the KB article list, showing title,
  * category, status badge, staleness badge, last-updated date, and a

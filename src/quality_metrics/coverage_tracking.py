@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SPEC-1844: Line Coverage Enforcement and Per-Module Tracking.
 
 Parses coverage.py JSON reports, computes per-module line/branch

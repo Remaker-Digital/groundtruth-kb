@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Centralized entitlement accessor — single source of truth for all tier config (SPEC-1815).
 
 Replaces all hardcoded TIER_DEFAULTS, TIER_PRICING, _TIER_PRICING, TIER_FEATURES,

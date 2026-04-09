@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Knowledge Base conflict and duplication scanner.
 
 On-demand tool that scans all active knowledge base entries for a tenant
@@ -32,7 +33,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -494,7 +495,7 @@ class KBConflictScanner:
 
         result = ScanResult(
             tenant_id=tenant_id,
-            scanned_at=datetime.now(timezone.utc).isoformat(),
+            scanned_at=datetime.now(UTC).isoformat(),
             total_entries_scanned=total,
             entries_with_embeddings=len(with_embeddings),
             entries_without_embeddings=len(without_embeddings),
@@ -552,7 +553,7 @@ class KBConflictScanner:
         if not fields_to_check:
             return ConfigScanResult(
                 tenant_id=tenant_id,
-                scanned_at=datetime.now(timezone.utc).isoformat(),
+                scanned_at=datetime.now(UTC).isoformat(),
                 config_fields_checked=0,
                 articles_checked=0,
                 scan_duration_ms=0,
@@ -593,7 +594,7 @@ class KBConflictScanner:
 
         result = ConfigScanResult(
             tenant_id=tenant_id,
-            scanned_at=datetime.now(timezone.utc).isoformat(),
+            scanned_at=datetime.now(UTC).isoformat(),
             config_fields_checked=len(fields_to_check),
             articles_checked=len(entries),
             conflicts=conflicts,

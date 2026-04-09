@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Add-on subscription checkout — WI#138 capability.
 
@@ -19,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.middleware import get_tenant_context, TenantContext
+from src.multi_tenant.middleware import TenantContext, get_tenant_context
 
 logger = logging.getLogger(__name__)
 

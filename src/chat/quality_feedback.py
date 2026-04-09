@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """CQ-8: Quality feedback loop (SPEC-0187 / WI-1518).
 
 Analyses patterns in quality issues across recent turns and generates

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin GDPR API — data export, deletion, and consent management (WI #180).
 
 Provides REST endpoints for the merchant admin dashboard's Settings page

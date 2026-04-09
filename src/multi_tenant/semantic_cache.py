@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Semantic caching for Knowledge Base retrieval and AI responses.
 
 Work Items #223-225: Multi-layer caching system that reduces Azure OpenAI

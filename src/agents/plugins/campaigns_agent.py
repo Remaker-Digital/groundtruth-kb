@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Campaigns Agent — Marketing Campaign Information MCP Server (SPEC-1707).
 
 Provides campaign-aware tools for the AI pipeline: active campaigns,
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,7 @@ class CampaignsAgentTools:
             conversation_id=conversation_id,
             tenant_id=tenant_id,
             event=event,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         self._metrics.append(metric)
         logger.info(

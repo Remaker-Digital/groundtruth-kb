@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Cloud-native verification runner for SPA-triggered E2E testing (SPEC-1846).
 
 Executes HTTP-based verification checks against a live deployment entirely
@@ -24,8 +25,8 @@ import asyncio
 import logging
 import os
 import time
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -129,7 +130,7 @@ class VerificationRunner:
         import httpx
 
         self._start_time = time.monotonic()
-        self._start_wall = datetime.now(timezone.utc).isoformat()
+        self._start_wall = datetime.now(UTC).isoformat()
         categories = SUITE_CATEGORIES.get(self.suite, ["health"])
         all_checks = self._get_checks_for_categories(categories)
 
@@ -343,7 +344,7 @@ class VerificationRunner:
         """Upsert the run document in Cosmos with current progress."""
         try:
             from src.multi_tenant.repositories.platform import PlatformConfigDocument
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             passed = sum(1 for r in self._results if r.status == "pass")
             failed = sum(1 for r in self._results if r.status == "fail")
             skipped = sum(1 for r in self._results if r.status == "skip")

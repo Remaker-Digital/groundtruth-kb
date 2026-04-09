@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP Agent Plug-in Registry (SPEC-1706).
 
 Configuration-driven agent discovery and dispatch.  Loads agent

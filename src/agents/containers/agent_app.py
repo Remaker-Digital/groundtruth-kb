@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — Generic Agent Container App
 #
 # Reusable FastAPI application factory for agent containers. Each agent
@@ -20,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import Any, Type
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -41,7 +42,7 @@ SLIM_ORG_NAMESPACE = os.environ.get(
 
 
 def create_agent_app(
-    agent_class: Type[AgentRedBaseAgent],
+    agent_class: type[AgentRedBaseAgent],
     *,
     configure_fn: Any = None,
     extra_routes_fn: Any = None,
@@ -204,8 +205,8 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
     """
     try:
         from src.multi_tenant.agntcy_sdk_integration import (
-            get_transport_with_setup,
             _try_nats_transport_with_setup,
+            get_transport_with_setup,
         )
 
         # ADR-001: per-interface transport evaluation with cascade.

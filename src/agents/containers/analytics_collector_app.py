@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from src.agents.containers.agent_app import create_agent_app
 from src.agents.analytics_collector import AnalyticsCollectorAgent
+from src.agents.containers.agent_app import create_agent_app
 
 app = create_agent_app(AnalyticsCollectorAgent)

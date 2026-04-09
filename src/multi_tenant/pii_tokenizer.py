@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Reversible PII tokenization for transport-layer privacy (AGNTCY Phase 6).
 
 Replaces one-way PII scrubbing (``[REDACTED:type]``) with reversible UUID

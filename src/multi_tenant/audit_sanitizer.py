@@ -17,7 +17,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 # ── PII denylist — always stripped ─────────────────────────────────────
 # Fields that carry PII / tenant business data.  Unconditionally removed
 # before any allowlist check.

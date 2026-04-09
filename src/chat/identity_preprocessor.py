@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """In-conversation identity preprocessor (P0-AUTH-FIX).
 
 Intercepts customer messages before they reach the AI pipeline to detect
@@ -33,7 +34,7 @@ import logging
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -103,9 +104,9 @@ async def _send_otp_for_conversation(email: str, tenant_id: str) -> bool:
     Returns True if OTP was sent successfully, False otherwise.
     """
     try:
-        from src.multi_tenant.repositories import VerificationTokenRepository
         from src.multi_tenant.cosmos_client import get_cosmos_manager
         from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
+        from src.multi_tenant.repositories import VerificationTokenRepository
         from src.multi_tenant.widget_otp_verification import _send_otp_email
 
         # Generate 6-digit code
@@ -157,9 +158,9 @@ async def _verify_otp_for_conversation(email: str, code: str, tenant_id: str) ->
     Returns True if the code is valid and consumed, False otherwise.
     """
     try:
-        from src.multi_tenant.repositories import VerificationTokenRepository
         from src.multi_tenant.cosmos_client import get_cosmos_manager
         from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
+        from src.multi_tenant.repositories import VerificationTokenRepository
 
         token_id = f"otp:{tenant_id}:{email}"
         container = get_cosmos_manager().get_container(COLLECTION_VERIFICATION_TOKENS)
@@ -281,10 +282,10 @@ async def _send_sms_otp_for_conversation(phone: str, tenant_id: str) -> bool:
     Returns True if SMS OTP was sent successfully, False otherwise.
     """
     try:
-        from src.multi_tenant.repositories import VerificationTokenRepository
         from src.multi_tenant.cosmos_client import get_cosmos_manager
         from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
-        from src.multi_tenant.sms_verification import hash_code, _send_sms
+        from src.multi_tenant.repositories import VerificationTokenRepository
+        from src.multi_tenant.sms_verification import _send_sms, hash_code
 
         # Generate 6-digit code
         otp_code = str(secrets.randbelow(10**_OTP_LENGTH)).zfill(_OTP_LENGTH)
@@ -336,9 +337,9 @@ async def _verify_sms_otp_for_conversation(phone: str, code: str, tenant_id: str
     Returns True if the code is valid and consumed, False otherwise.
     """
     try:
-        from src.multi_tenant.repositories import VerificationTokenRepository
         from src.multi_tenant.cosmos_client import get_cosmos_manager
         from src.multi_tenant.cosmos_schema import COLLECTION_VERIFICATION_TOKENS
+        from src.multi_tenant.repositories import VerificationTokenRepository
         from src.multi_tenant.sms_verification import hash_code
 
         token_id = f"otp:{tenant_id}:{phone}"
@@ -454,7 +455,7 @@ async def preprocess_identity(
                     conversation_id,
                     operations=[
                         {"op": "set", "path": "/identity_otp_attempts", "value": otp_attempts + 1},
-                        {"op": "set", "path": "/updated_at", "value": datetime.now(timezone.utc).isoformat()},
+                        {"op": "set", "path": "/updated_at", "value": datetime.now(UTC).isoformat()},
                     ],
                 )
             except Exception as exc:
@@ -470,7 +471,7 @@ async def preprocess_identity(
             if is_valid:
                 # Mark conversation as verified
                 try:
-                    now_iso = datetime.now(timezone.utc).isoformat()
+                    now_iso = datetime.now(UTC).isoformat()
                     await conv_repo.patch(
                         tenant_id,
                         conversation_id,
@@ -509,7 +510,7 @@ async def preprocess_identity(
                     sent = await _send_sms_otp_for_conversation(phone=phone, tenant_id=tenant_id)
                     if sent:
                         try:
-                            now_iso = datetime.now(timezone.utc).isoformat()
+                            now_iso = datetime.now(UTC).isoformat()
                             await conv_repo.patch(
                                 tenant_id,
                                 conversation_id,
@@ -574,7 +575,7 @@ async def preprocess_identity(
                     conversation_id,
                     operations=[
                         {"op": "set", "path": "/identity_sms_attempts", "value": sms_attempts + 1},
-                        {"op": "set", "path": "/updated_at", "value": datetime.now(timezone.utc).isoformat()},
+                        {"op": "set", "path": "/updated_at", "value": datetime.now(UTC).isoformat()},
                     ],
                 )
             except Exception as exc:
@@ -590,7 +591,7 @@ async def preprocess_identity(
             if is_valid:
                 # Mark phone as verified (phone_verified, NOT customer_verified)
                 try:
-                    now_iso = datetime.now(timezone.utc).isoformat()
+                    now_iso = datetime.now(UTC).isoformat()
                     await conv_repo.patch(
                         tenant_id,
                         conversation_id,
@@ -632,7 +633,7 @@ async def preprocess_identity(
                 sent = await _send_otp_for_conversation(email=email, tenant_id=tenant_id)
                 if sent:
                     try:
-                        now_iso = datetime.now(timezone.utc).isoformat()
+                        now_iso = datetime.now(UTC).isoformat()
                         await conv_repo.patch(
                             tenant_id,
                             conversation_id,
@@ -676,7 +677,7 @@ async def preprocess_identity(
 
         # Update conversation with email + OTP timestamp
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             await conv_repo.patch(
                 tenant_id,
                 conversation_id,
@@ -732,7 +733,7 @@ async def preprocess_identity(
 
             # Update conversation with phone + SMS OTP timestamp
             try:
-                now_iso = datetime.now(timezone.utc).isoformat()
+                now_iso = datetime.now(UTC).isoformat()
                 await conv_repo.patch(
                     tenant_id,
                     conversation_id,

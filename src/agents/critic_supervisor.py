@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — Critic/Supervisor Agent
 #
 # Validates AI-generated responses for safety (fail-closed gate).
@@ -126,7 +127,7 @@ class CriticSupervisorAgent(AgentRedBaseAgent):
             )
 
             # Immutable Critic system prompt
-            from src.multi_tenant.system_prompt_builder import AgentRole, _PLATFORM_BASE
+            from src.multi_tenant.system_prompt_builder import _PLATFORM_BASE, AgentRole
             critic_system_prompt = _PLATFORM_BASE.get(
                 AgentRole.CRITIC_SUPERVISOR, ""
             )

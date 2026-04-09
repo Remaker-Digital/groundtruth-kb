@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Response explainability — per-response decision trace.
 
 Work Item #86 (Decision #28+/32): Captures the full decision context for
@@ -34,6 +35,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import UTC
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -349,13 +351,13 @@ class DecisionTraceBuilder:
         customer_id: str = "",
         message_index: int = 0,
     ) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
         self._trace = ResponseDecisionTrace(
             conversation_id=conversation_id,
             tenant_id=tenant_id,
             customer_id=customer_id,
             message_index=message_index,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         self._start_time = time.monotonic()
 

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Agent Red Customer Experience — Application lifecycle management.
 
@@ -29,14 +30,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import UTC
 
 from fastapi import FastAPI
 
+from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
 from src.multi_tenant.nats_isolation import (
     close_nats_manager,
     init_nats_manager,
 )
-from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
 from src.multi_tenant.otel_tracing import (
     configure_logging as configure_tenant_logging,
 )
@@ -81,7 +83,7 @@ def _ensure_verification_secret() -> str:
 
     # Try reading from shared temp file (written by first worker/parent)
     try:
-        with open(_VERIFICATION_SECRET_PATH, "r") as f:
+        with open(_VERIFICATION_SECRET_PATH) as f:
             secret = f.read().strip()
             if secret:
                 os.environ["INTERNAL_VERIFICATION_SECRET"] = secret
@@ -150,9 +152,13 @@ def register_middleware(app: FastAPI) -> None:
 
     from fastapi.middleware.cors import CORSMiddleware
 
+    from src.multi_tenant.api_versioning import ApiVersionMiddleware
     from src.multi_tenant.middleware import (
         RateLimitMiddleware,
         TenantAuthMiddleware,
+    )
+    from src.multi_tenant.otel_tracing import (
+        CorrelationMiddleware,
     )
     from src.multi_tenant.pipeline_resilience import (
         TenantConcurrencyMiddleware,
@@ -162,10 +168,6 @@ def register_middleware(app: FastAPI) -> None:
         RequestBodyLimitMiddleware,
         SecurityHeadersMiddleware,
         TrustedProxyMiddleware,
-    )
-    from src.multi_tenant.api_versioning import ApiVersionMiddleware
-    from src.multi_tenant.otel_tracing import (
-        CorrelationMiddleware,
     )
 
     # --- Inner middleware (closest to route handler) ---
@@ -470,9 +472,9 @@ async def _startup_dashboard_services() -> None:
     Required for GET /api/dashboard/* endpoints to return real data.
     """
     try:
-        from src.multi_tenant.usage_dashboard_api import configure_dashboard_services
         from src.multi_tenant.conversation_meter import get_conversation_meter
         from src.multi_tenant.repository import ConversationRepository
+        from src.multi_tenant.usage_dashboard_api import configure_dashboard_services
 
         conv_repo = ConversationRepository()
         meter = get_conversation_meter()
@@ -523,7 +525,7 @@ async def _startup_nats() -> None:
     try:
         await asyncio.wait_for(init_nats_manager(), timeout=10.0)
         logger.info("NATS tenant isolation manager connected")
-    except (asyncio.TimeoutError, Exception):
+    except (TimeoutError, Exception):
         # Non-fatal at startup — NATS may not be available in dev/production
         logger.warning(
             "NATS connection failed at startup — tenant messaging unavailable. "
@@ -618,14 +620,14 @@ async def _startup_chat_services() -> None:
     Non-fatal: chat endpoints return 503 if initialization fails.
     """
     from src.chat.endpoints import configure_chat_services
-    from src.chat.session import configure_conversation_session
     from src.chat.pipeline import configure_chat_pipeline
+    from src.chat.session import configure_conversation_session
 
     try:
-        from src.multi_tenant.repository import ConversationRepository, KnowledgeBaseRepository, TeamMemberRepository
-        from src.multi_tenant.customer_profile_service import get_profile_service
-        from src.multi_tenant.system_prompt_builder import get_prompt_builder
         from src.chat.pipeline import USE_AGENT_CONTAINERS
+        from src.multi_tenant.customer_profile_service import get_profile_service
+        from src.multi_tenant.repository import ConversationRepository, KnowledgeBaseRepository, TeamMemberRepository
+        from src.multi_tenant.system_prompt_builder import get_prompt_builder
 
         conv_repo = ConversationRepository()
         team_repo = TeamMemberRepository()
@@ -646,8 +648,8 @@ async def _startup_chat_services() -> None:
         # Without CriticPolicy, every AI response is replaced with SAFE_FALLBACK_MESSAGE.
         critic = None
         try:
-            from src.multi_tenant.critic_policy import CriticPolicy
             from src.chat.pipeline.constants import get_critic_urls
+            from src.multi_tenant.critic_policy import CriticPolicy
 
             critic_urls = get_critic_urls()
             if critic_urls:
@@ -795,8 +797,8 @@ async def _startup_conversation_vectorizer() -> None:
     """
     try:
         from src.multi_tenant.conversation_vectorizer import get_vectorizer
-        from src.multi_tenant.repository import MemoryVectorRepository
         from src.multi_tenant.gdpr_services import PiiScrubber
+        from src.multi_tenant.repository import MemoryVectorRepository
 
         vector_repo = MemoryVectorRepository()
         vectorizer = get_vectorizer()
@@ -1037,7 +1039,6 @@ async def _startup_admin_gdpr_services() -> None:
 
         # Also wire the same services into the Shopify GDPR webhooks (WI #35)
         from src.integrations.shopify_gdpr_webhooks import configure_shopify_gdpr_services  # noqa: E402
-
         from src.multi_tenant.repositories.domain_index import DomainIndexRepository
 
         configure_shopify_gdpr_services(
@@ -1186,11 +1187,11 @@ async def _startup_superadmin_services() -> None:
         alert_rule_repo = None
         alert_history_repo = None
         try:
-            from src.multi_tenant.repositories.incidents import IncidentRepository
             from src.multi_tenant.repositories.alerts import (
-                AlertRuleRepository,
                 AlertHistoryRepository,
+                AlertRuleRepository,
             )
+            from src.multi_tenant.repositories.incidents import IncidentRepository
 
             incident_repo = IncidentRepository()
             alert_rule_repo = AlertRuleRepository()
@@ -1236,8 +1237,8 @@ async def _startup_superadmin_services() -> None:
 
         # SPEC-1677: Wire tenant account recovery module
         try:
-            from src.multi_tenant.tenant_recovery import configure_tenant_recovery
             from src.multi_tenant.repositories.verification import VerificationTokenRepository
+            from src.multi_tenant.tenant_recovery import configure_tenant_recovery
 
             configure_tenant_recovery(
                 tenant_repo=TenantRepository(),
@@ -1313,7 +1314,7 @@ async def _startup_copilot_docs_ingestion() -> None:
     """
     import asyncio
     import hashlib
-    from datetime import datetime, timezone
+    from datetime import datetime
     from pathlib import Path
 
     from src.multi_tenant.superadmin_api import _monolith as _state
@@ -1414,7 +1415,7 @@ async def _startup_copilot_docs_ingestion() -> None:
                 skipped += 1
                 continue
 
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             doc = AdminDocumentationDocument(
                 id=doc_id,
                 document_category=category,
@@ -1498,11 +1499,11 @@ async def _embed_copilot_docs() -> None:
 
                 embedding = await vectorizer._embed_text(text)
                 if embedding:
-                    from datetime import datetime as _dt, timezone as _tz
+                    from datetime import datetime as _dt
 
                     doc["embedding"] = embedding
                     doc["embedding_model"] = "text-embedding-3-large"
-                    doc["embedded_at"] = _dt.now(_tz.utc).isoformat()
+                    doc["embedded_at"] = _dt.now(UTC).isoformat()
                     # Raw dict — use container upsert_item directly
                     await _state._admin_doc_repo._container.upsert_item(body=doc)
                     embedded += 1
@@ -1531,8 +1532,8 @@ async def _startup_pipeline_observatory() -> None:
 
     # SPEC-1584: Wire PipelineMetricsAggregator with Cosmos client
     try:
-        from src.multi_tenant.pipeline_metrics import configure_aggregator
         from src.multi_tenant.cosmos_client import get_cosmos_manager
+        from src.multi_tenant.pipeline_metrics import configure_aggregator
 
         cosmos = get_cosmos_manager()
         configure_aggregator(cosmos_client=cosmos, cache_ttl=60)
@@ -2211,10 +2212,10 @@ def build_app_lifespan():
       4. Background task shutdown handlers (cancel loops)
       5. Core lifecycle shutdown handlers (close Cosmos, NATS, …)
     """
-    from contextlib import asynccontextmanager
     from collections.abc import AsyncIterator
+    from contextlib import asynccontextmanager
 
-    from src.app.background import _bg_startup_handlers, _bg_shutdown_handlers
+    from src.app.background import _bg_shutdown_handlers, _bg_startup_handlers
 
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncIterator[None]:

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Pipeline package — 6-agent pipeline orchestrator for the Chat API.
 
 Barrel re-export preserving the original ``from src.chat.pipeline import ...``

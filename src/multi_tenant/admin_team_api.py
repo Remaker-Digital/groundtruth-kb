@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Team Management API — merchant team member CRUD (WI #179).
 
 Provides REST endpoints for the merchant admin dashboard's TeamManager
@@ -32,14 +33,13 @@ Dependencies:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.auth import TenantContext, generate_user_api_key, hash_api_key
 from src.multi_tenant.cosmos_schema import (
     ESCALATION_CATEGORIES,
@@ -536,7 +536,7 @@ async def create_team_member(
             detail=f"A team member with email '{request.email}' already exists",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     # Document ID = tenant_id:email for deterministic lookup
     member_id = f"{ctx.tenant_id}:{request.email}"
 
@@ -584,6 +584,7 @@ async def create_team_member(
     # Fire-and-forget: send team invitation email to the invitee
     try:
         import asyncio
+
         from src.multi_tenant.alert_delivery import send_team_invite_alert
 
         inviter = getattr(ctx, "team_member_email", None) or "Your team administrator"
@@ -651,6 +652,7 @@ async def resend_team_invite(
     # Fire-and-forget: re-send invitation email
     try:
         import asyncio
+
         from src.multi_tenant.alert_delivery import send_team_invite_alert
 
         inviter = getattr(ctx, "team_member_email", None) or "Your team administrator"
@@ -760,7 +762,7 @@ async def update_team_member(
     # Build updates — split encrypted fields from safe-to-patch fields.
     # SPEC-1843: encrypted fields (display_name, email) must use
     # read-modify-write via update_encrypted_fields(), not patch().
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     patch_operations: list[dict[str, Any]] = [
         {"op": "set", "path": "/updated_at", "value": now},
     ]
@@ -904,7 +906,7 @@ async def delete_team_member(
     # Hard delete the document
     await repo.delete(ctx.tenant_id, member_id)
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Audit log (best-effort)
     await _audit(
@@ -989,7 +991,7 @@ async def rotate_user_api_key(
     raw_api_key = generate_user_api_key(ctx.tenant_id)
     key_hash = hash_api_key(raw_api_key)
     key_prefix = raw_api_key[:12] + "..."
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     await repo.patch(
         tenant_id=ctx.tenant_id,
@@ -1245,7 +1247,7 @@ async def grant_mfa_opt_out(
     except DocumentNotFoundError:
         raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await repo.patch(
         tenant_id=ctx.tenant_id,
         document_id=member_id,
@@ -1288,7 +1290,7 @@ async def revoke_mfa_opt_out(
     except DocumentNotFoundError:
         raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await repo.patch(
         tenant_id=ctx.tenant_id,
         document_id=member_id,
@@ -1341,7 +1343,7 @@ async def provision_customer_admin(
             "created": False,
         }
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     member_id = f"{tenant_id}:{customer_email}"
 
     raw_api_key = generate_user_api_key(tenant_id)

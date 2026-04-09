@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Agent Marketplace API — browse and install peer agents (SPEC-1865).
 
 Provides REST endpoints for the merchant admin dashboard's Agent Marketplace:
@@ -51,8 +52,8 @@ def _get_binding_repo():
 
 def _invalidate_caches(tenant_id: str) -> None:
     """Invalidate resolution + binding caches after install/uninstall writes."""
-    from src.agents.plugins.overlay import clear_resolution_cache
     from src.agents.plugins.bindings import SkillBindingService
+    from src.agents.plugins.overlay import clear_resolution_cache
     clear_resolution_cache()
     svc = SkillBindingService.get_instance()
     svc.invalidate(tenant_id)

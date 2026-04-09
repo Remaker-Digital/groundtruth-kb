@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """TenantUsageMonitor — progressive throttling for noisy neighbor prevention (WI #51).
 
 Monitors per-tenant resource consumption in a rolling window and applies
@@ -40,7 +41,6 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 

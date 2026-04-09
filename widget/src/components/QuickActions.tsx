@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * QuickActions — contextual prompt button pills in the greeting area (WI #228).
  *

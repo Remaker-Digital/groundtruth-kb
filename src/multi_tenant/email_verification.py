@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Email verification endpoints.
 
 Provides endpoints to request and confirm email verification for
@@ -16,6 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from datetime import UTC
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
@@ -288,7 +290,7 @@ async def confirm_verification(
                 )
             else:
                 # Create preferences document if it doesn't exist
-                from datetime import datetime, timezone
+                from datetime import datetime
 
                 await prefs_repo.upsert(
                     tenant_id=tenant_id,
@@ -297,7 +299,7 @@ async def confirm_verification(
                         "tenant_id": tenant_id,
                         "notification_email": email,
                         "email_verified": True,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": datetime.now(UTC).isoformat(),
                     },
                 )
         except Exception:

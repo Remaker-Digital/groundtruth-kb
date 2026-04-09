@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP Agent Plug-in Dispatch (SPEC-1706).
 
 Dispatches tool invocations to plug-in agents via MCP protocol.

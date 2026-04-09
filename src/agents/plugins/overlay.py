@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Tenant Agent Overlay resolution (SPEC-1854, SPEC-1859).
 
 Computes effective agent/skill configuration by merging the base

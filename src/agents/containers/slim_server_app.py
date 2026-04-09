@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — SLIM Routing Service
 #
 # Standalone SLIM server that provides the peer-to-peer mesh routing service
@@ -21,6 +22,7 @@ import logging
 import os
 import signal
 import sys
+
 from aiohttp import web
 
 logger = logging.getLogger(__name__)

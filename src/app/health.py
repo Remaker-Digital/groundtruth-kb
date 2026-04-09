@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Health and readiness endpoints for Agent Red Customer Experience.
 
 Provides /health (liveness probe) and /ready (readiness probe) endpoints
@@ -14,10 +15,10 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 
+from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
 from src.multi_tenant.nats_isolation import get_nats_manager
 from src.multi_tenant.pipeline_resilience import get_circuit_breaker_registry
 from src.multi_tenant.tenant_secret_service import get_secret_service
-from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,7 @@ def register_health_endpoints(app: FastAPI) -> None:
         metrics: dict[str, Any] = {}
 
         # SSE connections (SPEC-1756)
-        from src.chat.sse_manager import get_sse_manager, GLOBAL_SSE_MAX_CONNECTIONS
+        from src.chat.sse_manager import GLOBAL_SSE_MAX_CONNECTIONS, get_sse_manager
 
         sse = get_sse_manager()
         metrics["active_sse_connections"] = sse.global_connection_count
@@ -219,8 +220,8 @@ def register_health_endpoints(app: FastAPI) -> None:
 
         # Pre-auth tracker count (SPEC-1758)
         from src.multi_tenant.security_hardening import (
-            get_pre_auth_limiter,
             MAX_TRACKED_IPS,
+            get_pre_auth_limiter,
         )
 
         limiter = get_pre_auth_limiter()
@@ -229,8 +230,8 @@ def register_health_endpoints(app: FastAPI) -> None:
 
         # Tenant QA lock count (SPEC-1759)
         from src.multi_tenant.admin_quick_action_api import (
-            _tenant_qa_locks,
             MAX_TENANT_LOCKS,
+            _tenant_qa_locks,
         )
 
         metrics["tenant_lock_count"] = len(_tenant_qa_locks)

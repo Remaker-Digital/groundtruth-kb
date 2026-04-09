@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Allow/block list management + maintenance mode.
 
 Domain sub-module for SPEC-1820 (Allow/Block List Management) and
@@ -19,7 +20,7 @@ Maintenance Mode:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException
@@ -32,7 +33,6 @@ from src.multi_tenant.cosmos_schema import (
     PlatformConfigDocument,
 )
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -274,7 +274,7 @@ async def put_blocklist(
     """Write a block/allow list."""
     _validate_list_type(list_type)
     repo = _get_platform_repo()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
     # Stamp added_at on entries that don't have it
@@ -478,14 +478,14 @@ def is_maintenance_active(state: MaintenanceState) -> bool:
     if not state.enabled:
         return False
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # If scheduled_start is set and in the future, not yet active
     if state.scheduled_start:
         try:
             start = datetime.fromisoformat(state.scheduled_start)
             if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
+                start = start.replace(tzinfo=UTC)
             if now < start:
                 return False
         except (ValueError, TypeError):
@@ -496,7 +496,7 @@ def is_maintenance_active(state: MaintenanceState) -> bool:
         try:
             end = datetime.fromisoformat(state.scheduled_end)
             if end.tzinfo is None:
-                end = end.replace(tzinfo=timezone.utc)
+                end = end.replace(tzinfo=UTC)
             if now > end:
                 return False
         except (ValueError, TypeError):
@@ -549,7 +549,7 @@ async def put_maintenance(
 ) -> MaintenanceWriteResponse:
     """Enable, disable, or schedule maintenance mode."""
     repo = _get_platform_repo()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
     # Read existing for versioning

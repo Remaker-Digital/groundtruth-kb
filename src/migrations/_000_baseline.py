@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Baseline migration — marks v1.0.0 schema as the starting point.
 
 This is a no-op migration. It exists solely to establish the migration

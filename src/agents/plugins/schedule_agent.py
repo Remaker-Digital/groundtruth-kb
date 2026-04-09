@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Schedule Agent — Follow-up Activities and Event Notifications (SPEC-1711).
 
 Manages scheduled follow-up actions (callback reminders, order check-ins,

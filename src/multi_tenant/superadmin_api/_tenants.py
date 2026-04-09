@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Tenant directory, CRUD, tier override, expiry.
 
 Domain sub-module extracted from the superadmin_api monolith.
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Body, Depends, HTTPException, Query
@@ -19,7 +20,6 @@ from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType, TenantTier
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 from src.multi_tenant.superadmin_api._pii_mask import mask_domain, mask_email
 
@@ -254,7 +254,7 @@ async def override_tenant_tier(
         raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
 
     previous_tier = doc.get("tier")
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Patch the tier field
     operations = [
@@ -408,7 +408,7 @@ async def create_tenant(
     try:
         from src.multi_tenant.cosmos_schema import PreferencesDocument
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         prefs_kwargs: dict[str, Any] = {
             "id": f"{result.tenant_id}:1",
             "tenant_id": result.tenant_id,
@@ -439,7 +439,7 @@ async def create_tenant(
                 document_id=result.tenant_id,
                 operations=[
                     {"op": "set", "path": "/expires_at", "value": body.expires_at},
-                    {"op": "set", "path": "/updated_at", "value": datetime.now(timezone.utc).isoformat()},
+                    {"op": "set", "path": "/updated_at", "value": datetime.now(UTC).isoformat()},
                 ],
             )
         except Exception as exc:
@@ -562,6 +562,7 @@ async def resend_welcome_email(
     magic_link_url: str | None = None
     try:
         import secrets as _secrets
+
         from src.multi_tenant.repositories import VerificationTokenRepository
 
         token_repo = VerificationTokenRepository()
@@ -693,7 +694,7 @@ async def set_tenant_expiry(
         raise HTTPException(status_code=404, detail=f"Tenant {tenant_id} not found")
 
     previous_expires_at = tenant_doc.get("expires_at")
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     # Build patch operations
     operations: list[dict[str, Any]] = [
@@ -715,8 +716,8 @@ async def set_tenant_expiry(
         try:
             expires_dt = datetime.fromisoformat(body.expires_at)
             if expires_dt.tzinfo is None:
-                expires_dt = expires_dt.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) < expires_dt:
+                expires_dt = expires_dt.replace(tzinfo=UTC)
+            if datetime.now(UTC) < expires_dt:
                 operations.append(
                     {"op": "set", "path": "/status", "value": "active"},
                 )
@@ -846,7 +847,7 @@ async def test_provision_tenant(
     try:
         from src.multi_tenant.cosmos_schema import PreferencesDocument
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         prefs_kwargs: dict[str, Any] = {
             "id": f"{result.tenant_id}:1",
             "tenant_id": result.tenant_id,
@@ -877,7 +878,7 @@ async def test_provision_tenant(
                 document_id=result.tenant_id,
                 operations=[
                     {"op": "set", "path": "/expires_at", "value": body.expires_at},
-                    {"op": "set", "path": "/updated_at", "value": datetime.now(timezone.utc).isoformat()},
+                    {"op": "set", "path": "/updated_at", "value": datetime.now(UTC).isoformat()},
                 ],
             )
         except Exception as exc:
@@ -976,7 +977,7 @@ async def update_tenant_rate_limit(
             status_code=404, detail=f"Tenant '{tenant_id}' not found"
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Patch the rate_limit_rpm field
     operations = [

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Data retention enforcement service.
 
@@ -28,7 +29,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -124,7 +125,7 @@ class DataRetentionService:
         Returns:
             RetentionScanResult with aggregate deletion counts.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tenants_scanned = 0
         total_convs = 0
         total_profiles = 0

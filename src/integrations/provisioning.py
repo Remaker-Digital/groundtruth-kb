@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Tenant provisioning service.
 
@@ -37,7 +38,7 @@ import hashlib
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -418,7 +419,7 @@ async def provision_tenant(
             "Login credentials cannot be delivered without a valid contact address."
         )
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     # Check if tenant already exists for this channel identifier
     existing_doc: dict[str, Any] | None = None
@@ -596,7 +597,7 @@ async def auto_provision_superadmin(
         key_hash = hash_api_key(raw_key)
         key_prefix = raw_key[:12] + "..."
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         doc = TeamMemberDocument(
             id=member_id,
@@ -658,7 +659,7 @@ async def auto_provision_widget_key(tenant_id: str) -> str | None:
 
         raw_key = generate_widget_key(tenant_id)
         key_hash = hash_widget_key(raw_key)
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         # 1. Patch TenantDocument with key hash (for auth lookup)
         await _tenant_repo.patch(
@@ -750,7 +751,7 @@ async def activate_tenant(
     if not tenant:
         return None
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     operations = [
         {"op": "set", "path": "/status", "value": TenantStatus.ACTIVE.value},
         {"op": "set", "path": "/updated_at", "value": now_iso},
@@ -792,7 +793,7 @@ async def update_tenant(
     if not tenant:
         return None
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     operations: list[dict[str, Any]] = [
         {"op": "set", "path": "/updated_at", "value": now_iso},
     ]
@@ -841,7 +842,7 @@ async def deactivate_tenant(
     if not tenant:
         return None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     now_iso = now.isoformat()
     grace_end_iso = (now + _GRACE_PERIOD).isoformat()
 
@@ -887,7 +888,7 @@ async def flag_payment_issue(
     if not tenant:
         return None
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     operations = [
         {"op": "set", "path": "/status", "value": TenantStatus.PAST_DUE.value},
         {"op": "set", "path": "/updated_at", "value": now_iso},
@@ -1056,7 +1057,7 @@ async def provision_trial_tenant(
     if _tenant_repo is None:
         raise RuntimeError("Tenant repository not configured")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     now_iso = now.isoformat()
     trial_end_iso = (now + timedelta(days=trial_duration_days)).isoformat()
     tenant_id = str(uuid.uuid4())

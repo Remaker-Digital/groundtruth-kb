@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Schema migration framework for Agent Red Customer Experience.
 
 Forward-only migrations for Cosmos DB schema changes. Migrations are

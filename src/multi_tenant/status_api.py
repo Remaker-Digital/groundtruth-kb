@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Public Status API — unauthenticated service status endpoint.
 
 Returns current platform status and active incidents for public

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 TenantConfigProcessor — backward-compatible re-export barrel.
 
@@ -21,6 +22,8 @@ R4 refactoring — session 34.
 
 # Re-export everything from the config package
 from src.multi_tenant.config import (  # noqa: F401
+    _PREFS_DIRECT_FIELDS,
+    _WIDGET_APPEARANCE_FIELDS,
     CACHE_TTL_SECONDS,
     ConfigReadResult,
     ConfigRollbackResult,
@@ -29,8 +32,6 @@ from src.multi_tenant.config import (  # noqa: F401
     NamedConfigSummary,
     TenantConfigProcessor,
     _CacheEntry,
-    _PREFS_DIRECT_FIELDS,
-    _WIDGET_APPEARANCE_FIELDS,
     _config_to_preferences,
     _log_config_change,
     _preferences_to_config,

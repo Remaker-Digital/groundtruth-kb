@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * AnalyticsOverview - Analytics dashboard with summary cards, topic breakdown,
  * and knowledge gaps table.

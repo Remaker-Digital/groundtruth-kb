@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SMS Verification Service (SPEC-1686).
 
 Provides email/SMS choice for verification when a verified phone exists.

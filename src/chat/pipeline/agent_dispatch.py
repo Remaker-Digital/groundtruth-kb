@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Agent dispatch mixin — IC, KR, and RG agent call methods.
 
 Provides intent classification, knowledge retrieval, and response
@@ -133,6 +134,8 @@ class AgentDispatchMixin:
 
         from a2a.types import (
             Message as A2AMessage,
+        )
+        from a2a.types import (
             MessageSendParams,
             Role,
             SendMessageRequest,
@@ -318,6 +321,7 @@ class AgentDispatchMixin:
             else:
                 # Legacy or dual_read: resolve from preferences, then gate
                 import dataclasses as _dc
+
                 from src.multi_tenant.mcp_client import resolve_mcp_configs
 
                 configs = resolve_mcp_configs(prefs, tenant)

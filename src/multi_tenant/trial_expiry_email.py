@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Trial expiry warning emails — sent at 7, 3, and 1 day(s) before trial end.
 
 Follows the same dual-provider pattern as welcome_email.py and

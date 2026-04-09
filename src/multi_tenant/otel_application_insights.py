@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 OpenTelemetry Application Insights exporter integration (SPEC-1834).
 
@@ -285,12 +286,11 @@ def configure_tracing_with_app_insights() -> dict[str, Any]:
         sampling_rate = result["sampling_rate"]
         if sampling_rate < 1.0:
             try:
+                # Re-create provider with sampler
+                from opentelemetry import trace
                 from opentelemetry.sdk.trace.sampling import (
                     TraceIdRatioBased,
                 )
-
-                # Re-create provider with sampler
-                from opentelemetry import trace
 
                 resource = provider.resource
                 sampled_provider = TracerProvider(

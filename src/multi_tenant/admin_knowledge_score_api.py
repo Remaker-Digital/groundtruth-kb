@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Knowledge Score API — knowledge quality metrics and gap review (SPEC-1873).
 
 Provides REST endpoints for knowledge quality observability:
@@ -13,7 +14,7 @@ Professional+ tier gate enforced on all endpoints.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,13 +22,13 @@ from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
-from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.knowledge_score import (
     classify_unanswered,
     cluster_gaps,
     compute_knowledge_score,
     compute_trend,
 )
+from src.multi_tenant.middleware import get_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ async def get_knowledge_score(
     conv_repo = ConversationRepository()
     kb_repo = KnowledgeBaseRepository()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     effective_since = since or (now - timedelta(days=30)).isoformat()
     effective_until = now.isoformat()
 
@@ -161,7 +162,7 @@ async def get_knowledge_score(
                     if isinstance(updated, str):
                         updated = datetime.fromisoformat(updated.replace("Z", "+00:00"))
                     if updated.tzinfo is None:
-                        updated = updated.replace(tzinfo=timezone.utc)
+                        updated = updated.replace(tzinfo=UTC)
                     if updated >= freshness_cutoff:
                         fresh_count += 1
                 except (ValueError, TypeError):
@@ -254,7 +255,7 @@ async def get_gap_review(
 
     repo = ConversationRepository()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     effective_since = since or (now - timedelta(days=30)).isoformat()
     effective_until = until or now.isoformat()
 

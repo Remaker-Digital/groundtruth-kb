@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Langfuse trace exporter — Lane 1 + Lane 2 observability export.
 
 SPEC-1874: Converts ResponseDecisionTrace to Langfuse trace format.

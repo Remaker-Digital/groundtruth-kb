@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Pipeline Metrics Aggregation Engine (SPEC-1584).
 
 Queries conversation documents across all tenants and computes per-agent,

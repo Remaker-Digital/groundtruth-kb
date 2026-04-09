@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Trial tenant management service.
 
@@ -34,7 +35,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -208,7 +209,7 @@ class TrialManagementService:
         Returns:
             The created tenant document dict.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = now + timedelta(days=trial_duration_days)
         tenant_id = str(uuid.uuid4())
 
@@ -293,7 +294,7 @@ class TrialManagementService:
         Returns:
             TrialScanResult with counts of scanned/expired/expiring-soon.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         soon = now + timedelta(days=3)
 
@@ -462,7 +463,7 @@ class TrialManagementService:
         Raises:
             ValueError: If tenant is not a trial or is not found.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
 
         tenant = await self._tenants.read(tenant_id, tenant_id)
@@ -570,7 +571,7 @@ class TrialManagementService:
         Returns:
             DemoDataResult with counts of seeded items.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         conversations_seeded = 0
         profiles_seeded = 0
         articles_seeded = 0
@@ -645,7 +646,7 @@ class TrialManagementService:
         if tier != TenantTier.TRIAL.value:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Parse trial expiry
         expires_at_str = tenant.get("trial_expires_at")
@@ -676,9 +677,7 @@ class TrialManagementService:
 
         # Determine trial status
         tenant_status = tenant.get("status")
-        if tenant_status == TenantStatus.TRIAL_EXPIRED.value:
-            status_code = TrialStatusCode.EXPIRED
-        elif expires_at <= now:
+        if tenant_status == TenantStatus.TRIAL_EXPIRED.value or expires_at <= now:
             status_code = TrialStatusCode.EXPIRED
         elif conversations_remaining <= 0:
             status_code = TrialStatusCode.CAP_REACHED
@@ -729,7 +728,7 @@ class TrialManagementService:
         Returns:
             TrialCleanupResult with counts of cleaned tenants.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         grace_cutoff = now - timedelta(days=TRIAL_EXPIRED_GRACE_DAYS)
 
         # Query expired trial tenants

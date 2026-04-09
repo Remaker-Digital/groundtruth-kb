@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import os
 
-from src.agents.containers.agent_app import create_agent_app
 from src.agents.co_pilot import CoPilotAgent
+from src.agents.containers.agent_app import create_agent_app
 
 
 async def _configure(agent: CoPilotAgent) -> None:

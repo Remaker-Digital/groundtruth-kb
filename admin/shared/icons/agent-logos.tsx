@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * Agent provider logos — real SVG files from integration-logos/ where available,
  * inline SVGs from Simple Icons (CC0 license) as fallback, and the Agent Red

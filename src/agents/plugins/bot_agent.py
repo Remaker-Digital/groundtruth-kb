@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Bot Agent — External AI Agent Conversation MCP Server (SPEC-1708).
 
 Handles agent-to-agent (A2A) conversations with external AI assistants

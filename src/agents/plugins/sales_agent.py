@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Sales Agent — In-line Purchase Completion MCP Server (SPEC-1709).
 
 Enables product discovery, cart management, and checkout within the

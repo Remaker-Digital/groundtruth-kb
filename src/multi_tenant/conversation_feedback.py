@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SPEC-1836: Per-message user feedback (thumbs up/down).
 
 Feedback is stored in the conversation document's `feedback[]` array.
@@ -11,9 +12,8 @@ Comment limit: max 500 characters.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -95,7 +95,7 @@ async def submit_feedback(
     entry: dict[str, Any] = {
         "message_index": message_index,
         "rating": rating,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     if comment is not None:
         entry["comment"] = comment

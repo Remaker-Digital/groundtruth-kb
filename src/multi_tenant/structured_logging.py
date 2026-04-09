@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Structured logging standardization (WI #149).
 
 Provides a JSON-structured log formatter and configuration helper that
@@ -38,9 +39,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # JSON structured formatter
@@ -57,7 +57,7 @@ class StructuredJsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log_entry: dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(
-                record.created, tz=timezone.utc,
+                record.created, tz=UTC,
             ).isoformat(),
             "level": record.levelname,
             "logger": record.name,

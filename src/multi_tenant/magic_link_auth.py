@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Magic link authentication for standalone (Stripe-direct) merchants.
 
 Provides passwordless sign-in via emailed magic links and sign-in codes.
@@ -37,7 +38,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -188,7 +189,7 @@ def create_magic_link_session_token(
 
     Returns (token, expires_at_iso).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(hours=_SESSION_TTL_HOURS)
     payload = {
         "sub": tenant_id,

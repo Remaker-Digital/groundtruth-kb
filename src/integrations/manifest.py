@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Integration Plugin Manifest — declarative integration configuration (SPEC-1761).
 
 Each integration declares its capabilities, authentication requirements,
@@ -12,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-
 
 # ---------------------------------------------------------------------------
 # Enums

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 SLA monitoring and compliance tracking service.
 
@@ -30,7 +31,7 @@ import logging
 import time
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import TenantTier
@@ -456,7 +457,7 @@ class SLAMonitoringService:
             return 0
 
         now = time.monotonic()
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         injected = 0
 
         for snap in reversed(snapshots):  # Process oldest first

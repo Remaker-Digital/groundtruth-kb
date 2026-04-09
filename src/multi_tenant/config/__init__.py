@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Config package — re-exports all public config classes and functions.
 
@@ -14,13 +15,8 @@ R4 refactoring — session 34.
 """
 
 # Result models
-from src.multi_tenant.config.models import (
-    ConfigReadResult,
-    ConfigRollbackResult,
-    ConfigUpdateResult,
-    ConfigVersionInfo,
-    NamedConfigSummary,
-)
+# Audit
+from src.multi_tenant.config.audit import _log_config_change
 
 # Cache
 from src.multi_tenant.config.cache import (
@@ -35,9 +31,13 @@ from src.multi_tenant.config.field_mapping import (
     _config_to_preferences,
     _preferences_to_config,
 )
-
-# Audit
-from src.multi_tenant.config.audit import _log_config_change
+from src.multi_tenant.config.models import (
+    ConfigReadResult,
+    ConfigRollbackResult,
+    ConfigUpdateResult,
+    ConfigVersionInfo,
+    NamedConfigSummary,
+)
 
 # Processor + singleton
 from src.multi_tenant.config.processor import (

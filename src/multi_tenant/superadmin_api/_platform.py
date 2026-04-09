@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Pipeline observatory, service messages, platform admin management.
 
 Domain sub-module extracted from the superadmin_api monolith.
@@ -8,7 +9,7 @@ Endpoints are registered on the shared router from _monolith.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, Query
@@ -18,7 +19,6 @@ from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.pipeline_metrics import get_aggregator
 from src.multi_tenant.superadmin_api import _monolith as _state
 from src.multi_tenant.superadmin_api._pii_mask import mask_brand, mask_email
@@ -939,7 +939,7 @@ async def regenerate_platform_admin_key(
 
     new_raw_key = generate_spa_api_key()
     new_key_hash = hash_api_key(new_raw_key)
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     # Update the platform admin document with the new key hash
     try:
@@ -1119,7 +1119,7 @@ async def create_platform_admin_operator(
     admin_id = str(uuid.uuid4())
     raw_key = generate_spa_api_key()
     key_hash = hash_api_key(raw_key)
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     document = {
         "id": admin_id,
@@ -1220,7 +1220,7 @@ async def deactivate_platform_admin_user(
             detail="The SPA superadmin account cannot be deactivated.",
         )
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     await _state._platform_admin_repo.deactivate_admin(admin_id, now_iso)
 
     # Audit log
@@ -1280,7 +1280,7 @@ async def generate_backup_codes(
     codes = [secrets.token_hex(4) for _ in range(8)]
     code_hashes = [hash_api_key(code) for code in codes]
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     await _state._platform_admin_repo.update_backup_code_hashes(
         admin_id=admin_id,
         hashes=code_hashes,
@@ -1344,7 +1344,7 @@ async def update_notification_email(
     if not admin_id:
         raise HTTPException(status_code=500, detail="Platform admin identity not available.")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     await _state._platform_admin_repo.update_notification_email(
         admin_id=admin_id,
         email=body.email,

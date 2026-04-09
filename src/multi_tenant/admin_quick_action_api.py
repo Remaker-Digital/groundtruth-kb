@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Quick Action API — contextual prompt button management (WI #226-229).
 
 Provides REST endpoints for the merchant admin dashboard's Quick Action
@@ -47,21 +48,20 @@ import logging
 import os
 import uuid
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 
+from src.multi_tenant.activation_service import get_activation_service
 from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import (
     VALID_PAGE_TYPES,
     QuickActionPageAssignment,
     QuickActionPrompt,
 )
-from src.multi_tenant.activation_service import get_activation_service
 from src.multi_tenant.middleware import get_tenant_context
 
 logger = logging.getLogger(__name__)
@@ -260,7 +260,7 @@ def _get_tenant_lock(tenant_id: str) -> asyncio.Lock:
     return lock
 
 
-async def _ensure_qa_draft(ctx: "TenantContext") -> None:
+async def _ensure_qa_draft(ctx: TenantContext) -> None:
     """Ensure a draft document exists before any QA write operation.
 
     This makes the repo methods (which prefer draft-first) naturally
@@ -404,7 +404,7 @@ async def create_quick_action(
         # Ensure draft exists before QA write (D20 fix)
         await _ensure_qa_draft(ctx)
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         action = QuickActionPrompt(
             id=str(uuid.uuid4()),
             label=body.label,
@@ -644,7 +644,7 @@ async def update_quick_action(
     await _ensure_qa_draft(ctx)
 
     # Apply partial update
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     if body.label is not None:
         action["label"] = body.label
     if body.prompt_template is not None:
@@ -753,7 +753,7 @@ async def seed_quick_actions(
     if existing:
         return {"seeded": 0, "message": "Quick actions already exist"}
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     created = []
     for i, starter in enumerate(_STARTER_ACTIONS):
         action = {

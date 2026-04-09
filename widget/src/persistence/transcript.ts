@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * Transcript persistence — stores conversation_id with TTL for
  * transcript continuity across page loads (SPEC-1868).

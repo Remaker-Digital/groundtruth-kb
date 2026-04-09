@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SSE connection management — keepalive, reconnection, tenant limits (WI #129/#131/#133).
 
 Manages Server-Sent Event connections for the chat streaming endpoint.
@@ -360,7 +361,7 @@ class SSEConnectionManager:
                         ),
                         timeout=KEEPALIVE_INTERVAL_SECONDS,
                     )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 yield ":ping\n\n"
                 if self._producer_done.get(conversation_id, False):
                     break
@@ -541,7 +542,7 @@ class SSEConnectionManager:
                     timeout=KEEPALIVE_INTERVAL_SECONDS,
                 )
                 yield event
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No event within keepalive interval — send ping
                 yield None
             except StopAsyncIteration:

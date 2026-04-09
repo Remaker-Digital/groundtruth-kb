@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """CQ-1: Runtime conversation quality scoring (SPEC-0180).
 
 Evaluates every AI response on a 1-5 scale across three dimensions:

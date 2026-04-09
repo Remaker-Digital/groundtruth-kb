@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Scheduled job: Data retention enforcement.
 
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 async def main() -> int:
     """Run data retention enforcement and return exit code."""
+    from src.multi_tenant.data_retention import DataRetentionService
     from src.multi_tenant.repository import (
         AuditLogRepository,
         ConversationRepository,
@@ -33,7 +35,6 @@ async def main() -> int:
         MemoryVectorRepository,
         TenantRepository,
     )
-    from src.multi_tenant.data_retention import DataRetentionService
 
     logger.info("Data retention job starting")
 

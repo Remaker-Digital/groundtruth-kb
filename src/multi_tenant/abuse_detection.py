@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """HV-4 Abuse Detection API — cross-tenant anomalous usage detection.
 
 Provides REST endpoints for the service provider (SUPERADMIN role) to detect
@@ -17,7 +18,7 @@ All endpoints require SUPERADMIN role.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -456,7 +457,7 @@ async def scan_abuse_signals(
     if not _tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     tenant_ids = await _tenant_repo.list_active_tenant_ids()
     total_scanned = len(tenant_ids)
 
@@ -524,7 +525,7 @@ async def get_tenant_abuse_profile(
     except Exception:
         raise HTTPException(status_code=404, detail=f"Tenant not found: {tenant_id}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     signals = await _scan_tenant(tenant_id, tenant_doc, now)
     risk_score = _compute_risk_score(signals)
 
@@ -563,7 +564,7 @@ async def flag_tenant(
     except Exception:
         raise HTTPException(status_code=404, detail=f"Tenant not found: {tenant_id}")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     actor = "spa-console"
 
     if body.flagged:

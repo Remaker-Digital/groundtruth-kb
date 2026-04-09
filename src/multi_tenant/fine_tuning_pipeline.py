@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """FineTuningPipelineService — Layer 4 dedicated model training.
 
 Work Items #93-96 (Decision #31): Per-tenant fine-tuning of GPT-4o-mini
@@ -62,7 +63,7 @@ import json
 import logging
 import uuid
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -785,7 +786,7 @@ class FineTuningPipelineService:
         """
         self._ensure_configured()
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         job_id = str(uuid.uuid4())
 
         # Estimate cost (~$0.003 per 1K training tokens for gpt-4o-mini)
@@ -958,7 +959,7 @@ class FineTuningPipelineService:
             record.openai_job_id or "",
         )
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         new_status = FineTuningStatus(api_status.get("status", "training"))
         record = TrainingJobRecord(
             **{
@@ -1035,7 +1036,7 @@ class FineTuningPipelineService:
             QualityGateReport with per-gate results and overall pass/fail.
         """
         self._ensure_configured()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         gates: list[QualityGateResult] = []
 
@@ -1385,7 +1386,7 @@ class FineTuningPipelineService:
             FineTunedModelRecord with deployment status.
         """
         self._ensure_configured()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         status = FineTuningStatus.AB_TESTING if enable_ab_test else FineTuningStatus.DEPLOYED
         ab_experiment: dict[str, Any] | None = None
@@ -1457,7 +1458,7 @@ class FineTuningPipelineService:
         Returns:
             ABExperimentConfig with experiment parameters.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         experiment = ABExperimentConfig(
             experiment_id=f"exp-{uuid.uuid4().hex[:12]}",
             tenant_id=tenant_id,
@@ -1544,7 +1545,7 @@ class FineTuningPipelineService:
             return None
 
         experiment = ABExperimentConfig(**data)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         if promote:
             experiment.status = "concluded_promote"
@@ -1608,7 +1609,7 @@ class FineTuningPipelineService:
             The rolled-back model record, or None if no models exist.
         """
         self._ensure_configured()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         models = await self.get_model_history(tenant_id)
         if not models:

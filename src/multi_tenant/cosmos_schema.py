@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Cosmos DB schema definitions for multi-tenant Agent Red platform.
 
@@ -33,7 +34,7 @@ Architecture references:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, ClassVar
 
@@ -1007,11 +1008,11 @@ class QuickActionPrompt(BaseModel):
     is_active: bool = Field(default=True, description="Whether this action is available")
     sort_order: int = Field(default=0, description="Display priority (lower = first)")
     created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Creation timestamp (ISO 8601)",
     )
     updated_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Last update timestamp (ISO 8601)",
     )
 

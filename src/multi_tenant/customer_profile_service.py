@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """CustomerProfileService — Layer 1 customer context management.
 
 Work Items #83-85 (Decision #28): CRUD operations for customer profiles,
@@ -35,7 +36,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -199,7 +200,7 @@ class CustomerProfileService:
         if existing is not None:
             return existing
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         profile = CustomerProfileDocument(
             id=f"{tenant_id}:{customer_id}",
             tenant_id=tenant_id,
@@ -261,7 +262,7 @@ class CustomerProfileService:
         # Keep most recent, sorted by date descending
         combined.sort(key=lambda p: p.get("date", ""), reverse=True)
         profile.purchase_history = combined[:MAX_PURCHASE_HISTORY]
-        profile.updated_at = datetime.now(timezone.utc).isoformat()
+        profile.updated_at = datetime.now(UTC).isoformat()
 
         if self._configured:
             await self._repo.upsert_profile(tenant_id, profile)
@@ -282,7 +283,7 @@ class CustomerProfileService:
         combined = profile.product_questions + questions
         combined.sort(key=lambda q: q.get("date", ""), reverse=True)
         profile.product_questions = combined[:MAX_PRODUCT_QUESTIONS]
-        profile.updated_at = datetime.now(timezone.utc).isoformat()
+        profile.updated_at = datetime.now(UTC).isoformat()
 
         if self._configured:
             await self._repo.upsert_profile(tenant_id, profile)
@@ -301,7 +302,7 @@ class CustomerProfileService:
         """
         profile = await self.get_or_create(tenant_id, customer_id)
         profile.region_codes.update(region_codes)
-        profile.updated_at = datetime.now(timezone.utc).isoformat()
+        profile.updated_at = datetime.now(UTC).isoformat()
 
         if self._configured:
             await self._repo.upsert_profile(tenant_id, profile)
@@ -317,7 +318,7 @@ class CustomerProfileService:
         """Replace marketing segmentation codes."""
         profile = await self.get_or_create(tenant_id, customer_id)
         profile.marketing_segments = segments[:MAX_MARKETING_SEGMENTS]
-        profile.updated_at = datetime.now(timezone.utc).isoformat()
+        profile.updated_at = datetime.now(UTC).isoformat()
 
         if self._configured:
             await self._repo.upsert_profile(tenant_id, profile)
@@ -336,7 +337,7 @@ class CustomerProfileService:
         """
         profile = await self.get_or_create(tenant_id, customer_id)
         profile.jurisdiction_codes.update(jurisdiction)
-        profile.updated_at = datetime.now(timezone.utc).isoformat()
+        profile.updated_at = datetime.now(UTC).isoformat()
 
         if self._configured:
             await self._repo.upsert_profile(tenant_id, profile)
@@ -362,7 +363,7 @@ class CustomerProfileService:
         if abandoned_cart is not None:
             profile.cart_contents["abandoned"] = abandoned_cart[:MAX_CART_ITEMS]
 
-        profile.updated_at = datetime.now(timezone.utc).isoformat()
+        profile.updated_at = datetime.now(UTC).isoformat()
 
         if self._configured:
             await self._repo.upsert_profile(tenant_id, profile)
@@ -427,10 +428,10 @@ class CustomerProfileService:
                 changed = True
 
             if changed:
-                existing["extracted_at"] = datetime.now(timezone.utc).isoformat()
+                existing["extracted_at"] = datetime.now(UTC).isoformat()
                 existing["source"] = "user_statement"
                 profile.asserted_identity = existing
-                profile.updated_at = datetime.now(timezone.utc).isoformat()
+                profile.updated_at = datetime.now(UTC).isoformat()
                 if self._configured:
                     await self._repo.upsert_profile(tenant_id, profile)
                     logger.info(
@@ -508,7 +509,7 @@ class CustomerProfileService:
                 changed = True
 
         if changed:
-            profile.updated_at = datetime.now(timezone.utc).isoformat()
+            profile.updated_at = datetime.now(UTC).isoformat()
             if self._configured:
                 await self._repo.upsert_profile(tenant_id, profile)
                 logger.info(
@@ -537,7 +538,7 @@ class CustomerProfileService:
 
         try:
             last = datetime.fromisoformat(profile.last_interaction_at)
-            cutoff = datetime.now(timezone.utc) - timedelta(days=threshold_days)
+            cutoff = datetime.now(UTC) - timedelta(days=threshold_days)
             return last < cutoff
         except (ValueError, TypeError):
             return True
@@ -578,7 +579,7 @@ class CustomerProfileService:
         """
         profile = await self.get_or_create(tenant_id, customer_id)
         profile.consent_status = consent
-        profile.updated_at = datetime.now(timezone.utc).isoformat()
+        profile.updated_at = datetime.now(UTC).isoformat()
 
         if self._configured:
             await self._repo.upsert_profile(tenant_id, profile)

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Scheduled job: Archival pipeline (Cosmos DB → Blob Parquet).
 
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 async def main() -> int:
     """Run archival pipeline and return exit code."""
+    from src.multi_tenant.archival_pipeline import ArchivalPipelineService
     from src.multi_tenant.repository import (
         AuditLogRepository,
         ConversationRepository,
@@ -34,7 +36,6 @@ async def main() -> int:
         MemoryVectorRepository,
         TenantRepository,
     )
-    from src.multi_tenant.archival_pipeline import ArchivalPipelineService
 
     logger.info("Archival pipeline job starting")
 

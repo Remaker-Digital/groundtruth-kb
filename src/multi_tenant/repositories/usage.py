@@ -6,7 +6,7 @@ Usage repository — usage counters, pack balances, and idempotency keys.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -188,7 +188,7 @@ class UsageRepository(TenantScopedRepository):
         DocumentConflictError — providing an additional safety net
         against race conditions.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         doc = IdempotencyKeyDocument(
             id=event_id,
             tenant_id=tenant_id,

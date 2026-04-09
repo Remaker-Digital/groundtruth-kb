@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Shopify Billing API integration.
 
@@ -46,8 +47,6 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.entitlement_service import get_entitlement_service
-
 from src.integrations.provisioning import (
     BillingChannel,
     activate_tenant,
@@ -59,6 +58,7 @@ from src.integrations.shopify_client import (
     ShopifyGraphQLError,
     get_shopify_client,
 )
+from src.multi_tenant.entitlement_service import get_entitlement_service
 
 logger = logging.getLogger(__name__)
 

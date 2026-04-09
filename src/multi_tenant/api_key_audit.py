@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """API key usage audit trail (SPEC-1832).
 
 Records which API key (or auth method) was used for every authenticated
@@ -15,7 +16,7 @@ import asyncio
 import logging
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -195,7 +196,7 @@ def record_api_key_usage(
         path=path,
         method=method,
         status_code=status_code,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         client_ip=client_ip,
         team_member_id=team_member_id,
     ))

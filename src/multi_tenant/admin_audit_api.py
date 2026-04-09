@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Audit Log Query API — compliance reporting and inspection (WI #141).
 
 Provides REST endpoints for querying the append-only audit log. Merchants
@@ -33,7 +34,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -173,7 +174,7 @@ async def list_audit_events(
         )
 
     # Default date range: last 30 days
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if date_from is None:
         date_from = (now - timedelta(days=30)).isoformat()
     if date_to is None:
@@ -269,7 +270,7 @@ async def export_audit_events(
             detail=f"Invalid event_type '{event_type}'.",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if date_from is None:
         date_from = (now - timedelta(days=30)).isoformat()
     if date_to is None:

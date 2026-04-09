@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Zendesk Integration Manifest (SPEC-1775).
 
 Declarative configuration for the Zendesk full helpdesk adapter.

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Knowledge Base API — merchant knowledge management (WI #175).
 
 Provides REST endpoints for the merchant admin dashboard's Knowledge Base
@@ -34,16 +35,15 @@ import csv
 import io
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import Field
 
-from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.activation_service import get_activation_service
+from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.repository import DocumentNotFoundError, KnowledgeBaseRepository
@@ -438,7 +438,7 @@ def _build_entry_response(entry: dict[str, Any], tenant_id: str) -> KnowledgeEnt
     )
 
 
-async def _signal_kb_draft(ctx: "TenantContext") -> None:
+async def _signal_kb_draft(ctx: TenantContext) -> None:
     """Signal that KB content has changed by touching the draft document.
 
     Best-effort — failure here must NOT block the KB write that already
@@ -887,7 +887,7 @@ async def create_knowledge_entry(
             detail=f"Invalid entry_type '{request.entry_type}'. Valid values: {sorted(VALID_ENTRY_TYPES)}",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     entry_id = str(uuid.uuid4())
 
     from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
@@ -999,7 +999,7 @@ async def update_knowledge_entry(
     # Build updates — split encrypted fields from safe-to-patch fields.
     # SPEC-1843: encrypted fields (title, content, description, source_text)
     # must use read-modify-write via update_encrypted_fields(), not patch().
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     patch_operations: list[dict[str, Any]] = [
         {"op": "set", "path": "/updated_at", "value": now},
     ]
@@ -1171,7 +1171,7 @@ async def delete_knowledge_entry(
             detail=f"Knowledge entry {entry_id} not found",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     logger.info(
         "Knowledge entry soft-deleted: id=%s tenant=%s",
@@ -1875,7 +1875,7 @@ async def create_website_source(
         )
 
     # --- Create the source document ---
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     doc = WebsiteSourceDocument(
         id=str(uuid.uuid4()),
         tenant_id=ctx.tenant_id,
@@ -2045,7 +2045,7 @@ async def trigger_crawl(
         raise HTTPException(status_code=409, detail="A crawl is already in progress.")
 
     # Create ingestion job for the crawl
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     job = IngestionJobDocument(
         id=str(uuid.uuid4()),
         tenant_id=ctx.tenant_id,

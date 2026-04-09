@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * Agent Red Brand Theme — shared design tokens for Mantine surfaces.
  *

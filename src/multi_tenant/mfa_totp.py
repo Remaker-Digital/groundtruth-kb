@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 MFA/TOTP service — RFC 6238 time-based one-time password authentication.
 
@@ -21,7 +22,7 @@ import io
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -205,7 +206,7 @@ def create_mfa_session_token(
     Returns:
         Signed JWT string.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": team_member_id,
         "email": email,
@@ -347,7 +348,7 @@ class MfaTotpService:
 
         # Update team member document
         if self._team_repo:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             await self._team_repo.update_member_fields(
                 tenant_id=member["tenant_id"],
                 member_id=member_id,

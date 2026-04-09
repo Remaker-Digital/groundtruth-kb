@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """KR MCP migration to binding system (SPEC-1860).
 
 Migrates the current Knowledge Retrieval MCP tool path from

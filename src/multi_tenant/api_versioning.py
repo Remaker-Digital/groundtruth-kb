@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """API versioning headers middleware (WI #140).
 
 Adds API version information to all responses via headers. This allows

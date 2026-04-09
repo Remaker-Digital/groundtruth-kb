@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """IntentRouter — execution-plan boundary after intent classification (ADR-003).
 
 Deterministic routing engine that maps IC output + tenant config to an
@@ -229,8 +230,8 @@ class IntentRouter:
         # Only as a fallback — exact intent matching always takes precedence.
         if user_message:
             try:
-                from src.chat.pipeline.agent_name_extractor import extract_agent_name
                 from src.agents.plugins.registry import PluginAgentRegistry
+                from src.chat.pipeline.agent_name_extractor import extract_agent_name
 
                 reg = PluginAgentRegistry.get_instance()
                 nl_agent_id = extract_agent_name(user_message, reg)
@@ -278,9 +279,9 @@ class IntentRouter:
         Emits denial event if verification fails.
         """
         try:
-            from src.agents.plugins.registry import PluginAgentRegistry
-            from src.agents.plugins.overlay import resolve_effective_config
             from src.agents.plugins.bindings import SkillBindingService
+            from src.agents.plugins.overlay import resolve_effective_config
+            from src.agents.plugins.registry import PluginAgentRegistry
 
             reg = PluginAgentRegistry.get_instance()
 

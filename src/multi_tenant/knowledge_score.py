@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Knowledge Score Service — observable knowledge quality metrics (SPEC-1873).
 
 Computes a per-tenant knowledge quality score (0-100) from four factors:
@@ -18,7 +19,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -233,7 +234,7 @@ def cluster_gaps(
     for older conversations (exponential with 7-day half-life).
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     # Group by intent
     by_intent: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -263,7 +264,7 @@ def cluster_gaps(
         try:
             last_dt = datetime.fromisoformat(last_occurrence.replace("Z", "+00:00"))
             if last_dt.tzinfo is None:
-                last_dt = last_dt.replace(tzinfo=timezone.utc)
+                last_dt = last_dt.replace(tzinfo=UTC)
             days_ago = (now - last_dt).total_seconds() / 86400
         except (ValueError, TypeError):
             days_ago = 30.0

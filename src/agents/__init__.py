@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — Containerized Agent Package
 #
 # This package contains the 6 AGNTCY-compatible agent implementations,

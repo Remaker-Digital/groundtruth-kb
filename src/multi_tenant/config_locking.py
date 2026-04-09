@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Configuration optimistic locking — prevents concurrent overwrites (C14).
 
 Uses Cosmos DB ETags for optimistic concurrency control. When saving a draft,

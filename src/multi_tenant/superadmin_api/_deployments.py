@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Self-service deployment pipeline.
 
 Provides API endpoints for the SPA Provider Console to trigger builds,
@@ -20,7 +21,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -30,7 +31,6 @@ from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.cosmos_schema import AuditEventType
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -385,11 +385,11 @@ def _update_step(pipeline: dict, step_name: str, **kwargs: Any) -> None:
         if step["name"] == step_name:
             step.update(kwargs)
             if kwargs.get("status") in ("succeeded", "failed", "skipped"):
-                step["completed_at"] = datetime.now(timezone.utc).isoformat()
+                step["completed_at"] = datetime.now(UTC).isoformat()
                 if step.get("started_at"):
                     start = datetime.fromisoformat(step["started_at"])
                     step["duration_s"] = round(
-                        (datetime.now(timezone.utc) - start).total_seconds(), 1
+                        (datetime.now(UTC) - start).total_seconds(), 1
                     )
             break
 
@@ -455,7 +455,7 @@ async def _run_pipeline(pipeline: dict) -> None:
             pipeline["status"] = PipelineStatus.BUILDING.value
             _update_step(pipeline, "build_gateway",
                          status="running",
-                         started_at=datetime.now(timezone.utc).isoformat())
+                         started_at=datetime.now(UTC).isoformat())
             await _persist_pipeline_state(pipeline)
 
             try:
@@ -491,7 +491,7 @@ async def _run_pipeline(pipeline: dict) -> None:
             # Build test host too
             _update_step(pipeline, "build_test_host",
                          status="running",
-                         started_at=datetime.now(timezone.utc).isoformat())
+                         started_at=datetime.now(UTC).isoformat())
             await _persist_pipeline_state(pipeline)
 
             try:
@@ -525,7 +525,7 @@ async def _run_pipeline(pipeline: dict) -> None:
             pipeline["status"] = PipelineStatus.DEPLOYING.value
             _update_step(pipeline, "deploy_gateway",
                          status="running",
-                         started_at=datetime.now(timezone.utc).isoformat())
+                         started_at=datetime.now(UTC).isoformat())
             await _persist_pipeline_state(pipeline)
 
             try:
@@ -546,7 +546,7 @@ async def _run_pipeline(pipeline: dict) -> None:
             # Deploy test host (non-fatal if it fails)
             _update_step(pipeline, "deploy_test_host",
                          status="running",
-                         started_at=datetime.now(timezone.utc).isoformat())
+                         started_at=datetime.now(UTC).isoformat())
             await _persist_pipeline_state(pipeline)
 
             try:
@@ -563,7 +563,7 @@ async def _run_pipeline(pipeline: dict) -> None:
             pipeline["status"] = PipelineStatus.VERIFYING.value
             _update_step(pipeline, "health_check",
                          status="running",
-                         started_at=datetime.now(timezone.utc).isoformat())
+                         started_at=datetime.now(UTC).isoformat())
             await _persist_pipeline_state(pipeline)
 
             fqdn = os.environ.get("CONTAINER_APP_FQDN", "")
@@ -581,7 +581,7 @@ async def _run_pipeline(pipeline: dict) -> None:
                     # Auto-rollback
                     _update_step(pipeline, "rollback",
                                  status="running",
-                                 started_at=datetime.now(timezone.utc).isoformat())
+                                 started_at=datetime.now(UTC).isoformat())
                     await _persist_pipeline_state(pipeline)
 
                     rollback_result = await _rollback(
@@ -622,10 +622,10 @@ async def _run_pipeline(pipeline: dict) -> None:
         # ------------------------------------------------------------------
         _update_step(pipeline, "rollback", status="skipped", detail="Not needed")
         pipeline["status"] = PipelineStatus.SUCCEEDED.value
-        pipeline["completed_at"] = datetime.now(timezone.utc).isoformat()
+        pipeline["completed_at"] = datetime.now(UTC).isoformat()
         start = datetime.fromisoformat(pipeline["started_at"])
         pipeline["duration_s"] = round(
-            (datetime.now(timezone.utc) - start).total_seconds(), 1
+            (datetime.now(UTC) - start).total_seconds(), 1
         )
         await _persist_pipeline_state(pipeline)
         await _record_audit_event(AuditEventType.MODEL_DEPLOYED.value, pipeline)
@@ -638,7 +638,7 @@ async def _run_pipeline(pipeline: dict) -> None:
     except Exception as exc:
         pipeline["status"] = PipelineStatus.FAILED.value
         pipeline["error"] = f"Unexpected pipeline error: {str(exc)[:300]}"
-        pipeline["completed_at"] = datetime.now(timezone.utc).isoformat()
+        pipeline["completed_at"] = datetime.now(UTC).isoformat()
         await _persist_pipeline_state(pipeline)
         await _record_audit_event("DEPLOYMENT_FAILED", pipeline)
         logger.exception("Deployment pipeline %s failed unexpectedly", pipeline["deploy_id"])
@@ -665,7 +665,7 @@ async def trigger_deployment(
     specify it. Each environment can only deploy to itself (SPEC-0058).
     """
     deploy_id = f"deploy-{uuid.uuid4().hex[:12]}"
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     version = request.version or ""
     environment = _detect_environment()
 

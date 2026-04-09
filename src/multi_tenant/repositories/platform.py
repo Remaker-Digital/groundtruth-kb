@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Platform-scoped repositories — platform_config and audit_log collections.
 
@@ -11,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -140,7 +141,7 @@ class AuditLogRepository(PlatformScopedRepository):
         """
         from src.multi_tenant.audit_sanitizer import sanitize_audit_payload
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         time_partition = now.strftime("%Y-%m")
 
         sanitized_payload = sanitize_audit_payload(payload or {})

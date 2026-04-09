@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Google Docs/Drive Knowledge Source Adapter (SPEC-1777).
 
 KnowledgeAdapter implementation for Google Docs and Drive.

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Cross-replica cache invalidation via Redis pub/sub (SPEC-1757).
 
 When multiple Container App replicas each maintain local tenant metadata

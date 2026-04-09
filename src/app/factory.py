@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """FastAPI application factory for Agent Red Customer Experience.
 
 Creates and configures the FastAPI application instance with exception
