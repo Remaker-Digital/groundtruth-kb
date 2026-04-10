@@ -203,8 +203,7 @@ _EXAMPLE_TESTS = [
         "spec_id": "SPEC-003",
         "title": "Complete task records timestamp",
         "description": (
-            "Given an open task, when complete_task is called, "
-            "then the task status is 'done' and completed_at is set."
+            "Given an open task, when complete_task is called, then the task status is 'done' and completed_at is set."
         ),
         "expected_outcome": "Task status changed to 'done', completed_at timestamp is set.",
         "test_type": "unit",

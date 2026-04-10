@@ -20,7 +20,9 @@ class TestADRDCLAssertionGate:
         gate = ADRDCLAssertionGate()
         with pytest.raises(GovernanceGateError, match="non-empty assertions"):
             gate.pre_promote(
-                "ADR-001", "specified", "implemented",
+                "ADR-001",
+                "specified",
+                "implemented",
                 {"type": "architecture_decision", "assertions": ""},
             )
 
@@ -28,7 +30,9 @@ class TestADRDCLAssertionGate:
         gate = ADRDCLAssertionGate()
         with pytest.raises(GovernanceGateError, match="non-empty assertions"):
             gate.pre_promote(
-                "DCL-001", "specified", "implemented",
+                "DCL-001",
+                "specified",
+                "implemented",
                 {"type": "design_constraint", "assertions": None},
             )
 
@@ -36,7 +40,9 @@ class TestADRDCLAssertionGate:
         gate = ADRDCLAssertionGate()
         # Should not raise
         gate.pre_promote(
-            "ADR-001", "specified", "implemented",
+            "ADR-001",
+            "specified",
+            "implemented",
             {"type": "architecture_decision", "assertions": '[{"check": "exists"}]'},
         )
 
@@ -44,7 +50,9 @@ class TestADRDCLAssertionGate:
         gate = ADRDCLAssertionGate()
         # Regular specs don't need assertions for 'implemented'
         gate.pre_promote(
-            "SPEC-100", "specified", "implemented",
+            "SPEC-100",
+            "specified",
+            "implemented",
             {"type": "requirement", "assertions": ""},
         )
 
@@ -52,7 +60,9 @@ class TestADRDCLAssertionGate:
         gate = ADRDCLAssertionGate()
         # ADR going to 'specified' doesn't need assertions
         gate.pre_promote(
-            "ADR-001", "new", "specified",
+            "ADR-001",
+            "new",
+            "specified",
             {"type": "architecture_decision", "assertions": ""},
         )
 
@@ -64,28 +74,44 @@ class TestOwnerApprovalGate:
         gate = OwnerApprovalGate()
         with pytest.raises(GovernanceGateError, match="owner_approved=True"):
             gate.pre_resolve_work_item(
-                "WI-100", "defect", "resolved", False, {"origin": "defect"},
+                "WI-100",
+                "defect",
+                "resolved",
+                False,
+                {"origin": "defect"},
             )
 
     def test_blocks_regression_resolution_without_approval(self):
         gate = OwnerApprovalGate()
         with pytest.raises(GovernanceGateError, match="owner_approved=True"):
             gate.pre_resolve_work_item(
-                "WI-100", "regression", "resolved", False, {"origin": "regression"},
+                "WI-100",
+                "regression",
+                "resolved",
+                False,
+                {"origin": "regression"},
             )
 
     def test_allows_defect_resolution_with_approval(self):
         gate = OwnerApprovalGate()
         # Should not raise
         gate.pre_resolve_work_item(
-            "WI-100", "defect", "resolved", True, {"origin": "defect"},
+            "WI-100",
+            "defect",
+            "resolved",
+            True,
+            {"origin": "defect"},
         )
 
     def test_allows_new_wi_resolution_without_approval(self):
         gate = OwnerApprovalGate()
         # 'new' origin doesn't require owner approval
         gate.pre_resolve_work_item(
-            "WI-100", "new", "resolved", False, {"origin": "new"},
+            "WI-100",
+            "new",
+            "resolved",
+            False,
+            {"origin": "new"},
         )
 
 
@@ -107,7 +133,9 @@ class TestGateRegistry:
         # ADR without assertions should fail
         with pytest.raises(GovernanceGateError):
             registry.run_pre_promote(
-                "ADR-001", "specified", "implemented",
+                "ADR-001",
+                "specified",
+                "implemented",
                 {"type": "architecture_decision", "assertions": ""},
             )
 
@@ -115,7 +143,9 @@ class TestGateRegistry:
         registry = GateRegistry.from_config([], include_builtins=True)
         # Regular spec should pass all gates
         registry.run_pre_promote(
-            "SPEC-100", "specified", "implemented",
+            "SPEC-100",
+            "specified",
+            "implemented",
             {"type": "requirement", "assertions": ""},
         )
 
@@ -123,6 +153,7 @@ class TestGateRegistry:
         class TestGate(GovernanceGate):
             def name(self):
                 return "Test Gate"
+
             def pre_promote(self, spec_id, current_status, target_status, spec_data):
                 if spec_data.get("blocked"):
                     raise GovernanceGateError("Blocked by test gate")

@@ -60,6 +60,7 @@ jobs:
       - name: Run pip-audit
         run: |
           pip install pip-audit
+          mkdir -p .quality
           pip-audit --format=json --output=.quality/pip-audit.json || true
           pip-audit --format=cyclonedx-json --output=.quality/sbom.json || true
           pip-audit

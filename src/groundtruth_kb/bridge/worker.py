@@ -165,12 +165,16 @@ class _FileLock:
 
 
 def _find_codex_exe() -> Path:
-    candidate = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "OpenAI" / "Codex" / "bin" / "codex.exe"
+    candidate = (
+        Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
+        / "OpenAI"
+        / "Codex"
+        / "bin"
+        / "codex.exe"
+    )
     if candidate.exists():
         return candidate
-    raise FileNotFoundError(
-        f"Codex shim not found at {candidate}. Run scripts/install_codex_exec_shim.ps1 first."
-    )
+    raise FileNotFoundError(f"Codex shim not found at {candidate}. Run scripts/install_codex_exec_shim.ps1 first.")
 
 
 def _find_claude_exe() -> Path:
@@ -382,9 +386,7 @@ def resident_worker_should_defer(
 
     payload = resident_worker_health_snapshot(agent, hooks_dir=hooks_dir, project_dir=project_dir) or {}
     active_ids = {
-        str(message_id).strip()
-        for message_id in (payload.get("active_message_ids") or [])
-        if str(message_id).strip()
+        str(message_id).strip() for message_id in (payload.get("active_message_ids") or []) if str(message_id).strip()
     }
     requested_ids = {str(message_id).strip() for message_id in target_ids if str(message_id).strip()}
     if requested_ids and active_ids and requested_ids.issubset(active_ids):
@@ -462,10 +464,7 @@ def _maybe_retry_stale_pending(
     """
     last_retry_at = _parse_iso(state.get("last_retry_sweep_at"))
     now = _now()
-    if (
-        last_retry_at is not None
-        and (now - last_retry_at).total_seconds() < RETRY_SWEEP_INTERVAL_SECONDS
-    ):
+    if last_retry_at is not None and (now - last_retry_at).total_seconds() < RETRY_SWEEP_INTERVAL_SECONDS:
         return 0
 
     state["last_retry_sweep_at"] = now.isoformat()
@@ -621,9 +620,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         max_contexts=args.max_dispatch_targets,
                     )
                     pending_ids = {
-                        str(item.get("id") or "").strip()
-                        for item in new_items
-                        if str(item.get("id") or "").strip()
+                        str(item.get("id") or "").strip() for item in new_items if str(item.get("id") or "").strip()
                     }
                     contexts = [
                         context
@@ -750,7 +747,13 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                             f"worker made no bridge progress: targets={','.join(targets)}",
                             project_dir,
                         )
-                    post_status = "running" if completed.returncode == 0 and made_progress else "idle" if completed.returncode == 0 else "error"
+                    post_status = (
+                        "running"
+                        if completed.returncode == 0 and made_progress
+                        else "idle"
+                        if completed.returncode == 0
+                        else "error"
+                    )
                     if completed.returncode == 0:
                         consecutive_errors = 0  # Phase C: reset on success
                     _write_health(
@@ -759,11 +762,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         status=post_status,
                         last_event_id=last_event_id,
                         last_thread_id=batch_contexts[0]["thread_correlation_id"] if batch_contexts else None,
-                        last_error=(
-                            ((completed.stderr or "").strip() or None)
-                            if completed.returncode
-                            else None
-                        ),
+                        last_error=(((completed.stderr or "").strip() or None) if completed.returncode else None),
                     )
                     if completed.returncode != 0:
                         time.sleep(args.error_backoff_seconds)
@@ -806,8 +805,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-dispatch-targets", type=int, default=DEFAULT_MAX_DISPATCH_TARGETS)
     parser.add_argument("--exec-timeout-seconds", type=int, default=900)
     parser.add_argument("--error-backoff-seconds", type=int, default=5)
-    parser.add_argument("--project-dir", type=str, default=None,
-                        help="Project directory (defaults to CLAUDE_PROJECT_DIR or cwd)")
+    parser.add_argument(
+        "--project-dir", type=str, default=None, help="Project directory (defaults to CLAUDE_PROJECT_DIR or cwd)"
+    )
     return parser
 
 

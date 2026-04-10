@@ -75,8 +75,11 @@ class TestGrepAssertion:
     def test_grep_min_count(self, project_dir: Path) -> None:
         result = run_single_assertion(
             {
-                "type": "grep", "pattern": r"\w+ = \d+", "file": "src/utils.py",
-                "min_count": 2, "description": "two constants",
+                "type": "grep",
+                "pattern": r"\w+ = \d+",
+                "file": "src/utils.py",
+                "min_count": 2,
+                "description": "two constants",
             },
             project_dir,
         )
@@ -213,8 +216,11 @@ class TestSpecAssertions:
             {"type": "grep", "pattern": "def hello", "file": "src/main.py", "description": "hello fn"},
         ]
         db.insert_spec(
-            id="SPEC-T01", title="Test spec", status="implemented",
-            changed_by="test", change_reason="test",
+            id="SPEC-T01",
+            title="Test spec",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
             assertions=assertions,
         )
         spec = db.get_spec("SPEC-T01")
@@ -224,8 +230,11 @@ class TestSpecAssertions:
 
     def test_spec_without_assertions(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(
-            id="SPEC-T02", title="No assertions", status="specified",
-            changed_by="test", change_reason="test",
+            id="SPEC-T02",
+            title="No assertions",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
         )
         spec = db.get_spec("SPEC-T02")
         result = run_spec_assertions(db, spec, "test", project_dir)
@@ -234,8 +243,11 @@ class TestSpecAssertions:
 
     def test_spec_with_text_assertion(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(
-            id="SPEC-T03", title="Text assertion", status="implemented",
-            changed_by="test", change_reason="test",
+            id="SPEC-T03",
+            title="Text assertion",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
             assertions=["Check manually that the UI renders correctly"],
         )
         spec = db.get_spec("SPEC-T03")
@@ -246,13 +258,19 @@ class TestSpecAssertions:
     def test_run_all_assertions(self, db: KnowledgeDB, project_dir: Path) -> None:
         assertions = [{"type": "glob", "pattern": "README.md", "description": "readme exists"}]
         db.insert_spec(
-            id="SPEC-A01", title="With assertion", status="implemented",
-            changed_by="test", change_reason="test",
+            id="SPEC-A01",
+            title="With assertion",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
             assertions=assertions,
         )
         db.insert_spec(
-            id="SPEC-A02", title="No assertion", status="specified",
-            changed_by="test", change_reason="test",
+            id="SPEC-A02",
+            title="No assertion",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
         )
         summary = run_all_assertions(db, project_dir, triggered_by="test")
         assert summary["total_specs"] == 2
@@ -262,13 +280,19 @@ class TestSpecAssertions:
 
     def test_run_single_spec_filter(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(
-            id="SPEC-F01", title="First", status="implemented",
-            changed_by="test", change_reason="test",
+            id="SPEC-F01",
+            title="First",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
             assertions=[{"type": "glob", "pattern": "README.md", "description": "readme"}],
         )
         db.insert_spec(
-            id="SPEC-F02", title="Second", status="implemented",
-            changed_by="test", change_reason="test",
+            id="SPEC-F02",
+            title="Second",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
             assertions=[{"type": "glob", "pattern": "MISSING.md", "description": "missing"}],
         )
         summary = run_all_assertions(db, project_dir, spec_id="SPEC-F01")
@@ -288,8 +312,11 @@ class TestSpecAssertions:
 class TestFormatSummary:
     def test_format_with_failures(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(
-            id="SPEC-FMT1", title="Failing spec", status="implemented",
-            changed_by="test", change_reason="test",
+            id="SPEC-FMT1",
+            title="Failing spec",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
             assertions=[{"type": "glob", "pattern": "NONEXISTENT.xyz", "description": "missing file"}],
         )
         summary = run_all_assertions(db, project_dir)
@@ -303,8 +330,11 @@ class TestFormatSummary:
 
     def test_format_all_passed(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(
-            id="SPEC-FMT2", title="Passing spec", status="implemented",
-            changed_by="test", change_reason="test",
+            id="SPEC-FMT2",
+            title="Passing spec",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
             assertions=[{"type": "glob", "pattern": "README.md", "description": "readme"}],
         )
         summary = run_all_assertions(db, project_dir)
@@ -467,8 +497,11 @@ class TestFileExistsAssertion:
         (project_dir / "src" / "agents" / "containers").mkdir(parents=True, exist_ok=True)
         (project_dir / "src" / "agents" / "containers" / "co_pilot_app.py").write_text("# app", encoding="utf-8")
         result = run_single_assertion(
-            {"type": "file_exists", "path": "src/agents/containers/co_pilot_app.py",
-             "description": "Co-pilot container entry point exists"},
+            {
+                "type": "file_exists",
+                "path": "src/agents/containers/co_pilot_app.py",
+                "description": "Co-pilot container entry point exists",
+            },
             project_dir,
         )
         assert result["passed"] is True
@@ -482,40 +515,63 @@ class TestFileExistsAssertion:
 class TestCountAssertion:
     def test_count_equals(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "count", "pattern": r"\w+ = \d+", "file": "src/utils.py",
-             "operator": "==", "expected": 2, "description": "exactly 2 constants"},
+            {
+                "type": "count",
+                "pattern": r"\w+ = \d+",
+                "file": "src/utils.py",
+                "operator": "==",
+                "expected": 2,
+                "description": "exactly 2 constants",
+            },
             project_dir,
         )
         assert result["passed"] is True
 
     def test_count_not_equals(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "count", "pattern": r"\w+ = \d+", "file": "src/utils.py",
-             "operator": "!=", "expected": 5, "description": "not 5 constants"},
+            {
+                "type": "count",
+                "pattern": r"\w+ = \d+",
+                "file": "src/utils.py",
+                "operator": "!=",
+                "expected": 5,
+                "description": "not 5 constants",
+            },
             project_dir,
         )
         assert result["passed"] is True
 
     def test_count_greater_than(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "count", "pattern": r"\w+ = \d+", "file": "src/utils.py",
-             "operator": ">", "expected": 1, "description": "more than 1"},
+            {
+                "type": "count",
+                "pattern": r"\w+ = \d+",
+                "file": "src/utils.py",
+                "operator": ">",
+                "expected": 1,
+                "description": "more than 1",
+            },
             project_dir,
         )
         assert result["passed"] is True
 
     def test_count_fails_when_not_met(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "count", "pattern": r"\w+ = \d+", "file": "src/utils.py",
-             "operator": "==", "expected": 99, "description": "99 constants"},
+            {
+                "type": "count",
+                "pattern": r"\w+ = \d+",
+                "file": "src/utils.py",
+                "operator": "==",
+                "expected": 99,
+                "description": "99 constants",
+            },
             project_dir,
         )
         assert result["passed"] is False
 
     def test_count_invalid_operator(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "count", "pattern": "x", "file": "src/main.py",
-             "operator": "~=", "expected": 1},
+            {"type": "count", "pattern": "x", "file": "src/main.py", "operator": "~=", "expected": 1},
             project_dir,
         )
         assert result["passed"] is False
@@ -523,8 +579,14 @@ class TestCountAssertion:
 
     def test_count_with_glob_file(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "count", "pattern": "def ", "file": "**/*.py",
-             "operator": ">=", "expected": 1, "description": "at least 1 def"},
+            {
+                "type": "count",
+                "pattern": "def ",
+                "file": "**/*.py",
+                "operator": ">=",
+                "expected": 1,
+                "description": "at least 1 def",
+            },
             project_dir,
         )
         assert result["passed"] is True
@@ -538,40 +600,59 @@ class TestCountAssertion:
 class TestJsonPathAssertion:
     def test_json_path_matches(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "json_path", "file": "config.json", "path": "project.name",
-             "expected": "test", "description": "project name"},
+            {
+                "type": "json_path",
+                "file": "config.json",
+                "path": "project.name",
+                "expected": "test",
+                "description": "project name",
+            },
             project_dir,
         )
         assert result["passed"] is True
 
     def test_json_path_version(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "json_path", "file": "config.json", "path": "project.version",
-             "expected": "1.0.0", "description": "version"},
+            {
+                "type": "json_path",
+                "file": "config.json",
+                "path": "project.version",
+                "expected": "1.0.0",
+                "description": "version",
+            },
             project_dir,
         )
         assert result["passed"] is True
 
     def test_json_path_mismatch(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "json_path", "file": "config.json", "path": "project.name",
-             "expected": "wrong", "description": "wrong name"},
+            {
+                "type": "json_path",
+                "file": "config.json",
+                "path": "project.name",
+                "expected": "wrong",
+                "description": "wrong name",
+            },
             project_dir,
         )
         assert result["passed"] is False
 
     def test_json_path_array_index(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "json_path", "file": "config.json", "path": "items.0.id",
-             "expected": 1, "description": "first item id"},
+            {
+                "type": "json_path",
+                "file": "config.json",
+                "path": "items.0.id",
+                "expected": 1,
+                "description": "first item id",
+            },
             project_dir,
         )
         assert result["passed"] is True
 
     def test_json_path_missing_key(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "json_path", "file": "config.json", "path": "nonexistent.key",
-             "expected": "x"},
+            {"type": "json_path", "file": "config.json", "path": "nonexistent.key", "expected": "x"},
             project_dir,
         )
         assert result["passed"] is False
@@ -579,8 +660,13 @@ class TestJsonPathAssertion:
 
     def test_json_path_toml_file(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "json_path", "file": "pyproject.toml", "path": "project.version",
-             "expected": "1.0.0", "description": "toml version"},
+            {
+                "type": "json_path",
+                "file": "pyproject.toml",
+                "path": "project.version",
+                "expected": "1.0.0",
+                "description": "toml version",
+            },
             project_dir,
         )
         assert result["passed"] is True
@@ -588,8 +674,7 @@ class TestJsonPathAssertion:
     def test_json_path_existence_only(self, project_dir: Path) -> None:
         """No expected value — just check the path exists."""
         result = run_single_assertion(
-            {"type": "json_path", "file": "config.json", "path": "project.name",
-             "description": "name exists"},
+            {"type": "json_path", "file": "config.json", "path": "project.name", "description": "name exists"},
             project_dir,
         )
         assert result["passed"] is True
@@ -603,10 +688,14 @@ class TestJsonPathAssertion:
 class TestAllOfAssertion:
     def test_all_pass(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "all_of", "description": "both exist", "assertions": [
-                {"type": "file_exists", "file": "src/main.py"},
-                {"type": "file_exists", "file": "src/utils.py"},
-            ]},
+            {
+                "type": "all_of",
+                "description": "both exist",
+                "assertions": [
+                    {"type": "file_exists", "file": "src/main.py"},
+                    {"type": "file_exists", "file": "src/utils.py"},
+                ],
+            },
             project_dir,
         )
         assert result["passed"] is True
@@ -615,10 +704,14 @@ class TestAllOfAssertion:
 
     def test_one_fails(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "all_of", "description": "one missing", "assertions": [
-                {"type": "file_exists", "file": "src/main.py"},
-                {"type": "file_exists", "file": "src/nonexistent.py"},
-            ]},
+            {
+                "type": "all_of",
+                "description": "one missing",
+                "assertions": [
+                    {"type": "file_exists", "file": "src/main.py"},
+                    {"type": "file_exists", "file": "src/nonexistent.py"},
+                ],
+            },
             project_dir,
         )
         assert result["passed"] is False
@@ -634,9 +727,12 @@ class TestAllOfAssertion:
     def test_skipped_children_only(self, project_dir: Path) -> None:
         """All non-machine children → skipped, not pass/fail."""
         result = run_single_assertion(
-            {"type": "all_of", "assertions": [
-                {"type": "visual", "description": "UI looks good"},
-            ]},
+            {
+                "type": "all_of",
+                "assertions": [
+                    {"type": "visual", "description": "UI looks good"},
+                ],
+            },
             project_dir,
         )
         assert result.get("skipped") is True
@@ -645,20 +741,28 @@ class TestAllOfAssertion:
 class TestAnyOfAssertion:
     def test_one_passes(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "any_of", "description": "at least one", "assertions": [
-                {"type": "file_exists", "file": "src/nonexistent.py"},
-                {"type": "file_exists", "file": "src/main.py"},
-            ]},
+            {
+                "type": "any_of",
+                "description": "at least one",
+                "assertions": [
+                    {"type": "file_exists", "file": "src/nonexistent.py"},
+                    {"type": "file_exists", "file": "src/main.py"},
+                ],
+            },
             project_dir,
         )
         assert result["passed"] is True
 
     def test_none_pass(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "any_of", "description": "none exist", "assertions": [
-                {"type": "file_exists", "file": "nope1.py"},
-                {"type": "file_exists", "file": "nope2.py"},
-            ]},
+            {
+                "type": "any_of",
+                "description": "none exist",
+                "assertions": [
+                    {"type": "file_exists", "file": "nope1.py"},
+                    {"type": "file_exists", "file": "nope2.py"},
+                ],
+            },
             project_dir,
         )
         assert result["passed"] is False
@@ -666,10 +770,13 @@ class TestAnyOfAssertion:
     def test_skipped_does_not_satisfy_any_of(self, project_dir: Path) -> None:
         """Non-machine (skipped) children do NOT count as passing for any_of."""
         result = run_single_assertion(
-            {"type": "any_of", "assertions": [
-                {"type": "visual", "description": "looks good"},
-                {"type": "file_exists", "file": "nonexistent.py"},
-            ]},
+            {
+                "type": "any_of",
+                "assertions": [
+                    {"type": "visual", "description": "looks good"},
+                    {"type": "file_exists", "file": "nonexistent.py"},
+                ],
+            },
             project_dir,
         )
         assert result["passed"] is False  # visual is skipped, file_exists fails
@@ -685,13 +792,19 @@ class TestAnyOfAssertion:
 class TestCompositionNesting:
     def test_nested_all_of_in_any_of(self, project_dir: Path) -> None:
         result = run_single_assertion(
-            {"type": "any_of", "assertions": [
-                {"type": "all_of", "assertions": [
-                    {"type": "file_exists", "file": "src/main.py"},
-                    {"type": "grep", "pattern": "def hello", "file": "src/main.py"},
-                ]},
-                {"type": "file_exists", "file": "nonexistent.py"},
-            ]},
+            {
+                "type": "any_of",
+                "assertions": [
+                    {
+                        "type": "all_of",
+                        "assertions": [
+                            {"type": "file_exists", "file": "src/main.py"},
+                            {"type": "grep", "pattern": "def hello", "file": "src/main.py"},
+                        ],
+                    },
+                    {"type": "file_exists", "file": "nonexistent.py"},
+                ],
+            },
             project_dir,
         )
         assert result["passed"] is True
@@ -723,14 +836,21 @@ class TestCompositionNesting:
 class TestFormatSummaryComposition:
     def test_format_composition_failure(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(
-            id="SPEC-COMP1", title="Composed spec", status="implemented",
-            changed_by="test", change_reason="test",
-            assertions=[{
-                "type": "all_of", "description": "both required", "assertions": [
-                    {"type": "file_exists", "file": "src/main.py"},
-                    {"type": "file_exists", "file": "MISSING.xyz"},
-                ],
-            }],
+            id="SPEC-COMP1",
+            title="Composed spec",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
+            assertions=[
+                {
+                    "type": "all_of",
+                    "description": "both required",
+                    "assertions": [
+                        {"type": "file_exists", "file": "src/main.py"},
+                        {"type": "file_exists", "file": "MISSING.xyz"},
+                    ],
+                }
+            ],
         )
         summary = run_all_assertions(db, project_dir)
         text = format_summary(summary)

@@ -37,9 +37,14 @@ _MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB — skip binary/huge files
 _MAX_COMPOSITION_DEPTH = 3
 
 _VALID_ASSERTION_TYPES = {
-    "grep", "glob", "grep_absent",
-    "file_exists", "count", "json_path",
-    "all_of", "any_of",
+    "grep",
+    "glob",
+    "grep_absent",
+    "file_exists",
+    "count",
+    "json_path",
+    "all_of",
+    "any_of",
 }
 
 # ---------------------------------------------------------------------------
@@ -175,9 +180,7 @@ def _skip(a_type: str, description: str, detail: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_file_or_glob(
-    file_rel: str, ctx: AssertionContext
-) -> tuple[list[Path] | None, str | None]:
+def _resolve_file_or_glob(file_rel: str, ctx: AssertionContext) -> tuple[list[Path] | None, str | None]:
     """Resolve a file field that may be a direct path or glob pattern.
 
     Returns (file_list, error_detail). If error_detail is not None, resolution failed.
@@ -385,15 +388,15 @@ def _walk_path(data: Any, path: str) -> tuple[Any, str | None]:
             if part in current:
                 current = current[part]
             else:
-                return None, f"Key {part!r} not found at path {'.'.join(parts[:i+1])}"
+                return None, f"Key {part!r} not found at path {'.'.join(parts[: i + 1])}"
         elif isinstance(current, list):
             try:
                 idx = int(part)
                 current = current[idx]
             except (ValueError, IndexError):
-                return None, f"Invalid array index {part!r} at path {'.'.join(parts[:i+1])}"
+                return None, f"Invalid array index {part!r} at path {'.'.join(parts[: i + 1])}"
         else:
-            return None, f"Cannot navigate into {type(current).__name__} at path {'.'.join(parts[:i+1])}"
+            return None, f"Cannot navigate into {type(current).__name__} at path {'.'.join(parts[: i + 1])}"
     return current, None
 
 
@@ -422,6 +425,7 @@ def _run_json_path(a: dict[str, Any], ctx: AssertionContext) -> dict[str, Any]:
     try:
         if suffix == ".toml":
             import tomllib
+
             data = tomllib.loads(content)
         elif suffix in (".json", ".jsonl"):
             data = json.loads(content)
@@ -431,6 +435,7 @@ def _run_json_path(a: dict[str, Any], ctx: AssertionContext) -> dict[str, Any]:
                 data = json.loads(content)
             except json.JSONDecodeError:
                 import tomllib
+
                 data = tomllib.loads(content)
     except Exception as e:
         return _fail("json_path", description, f"Failed to parse {file_rel}: {e}")
@@ -474,9 +479,7 @@ def _run_all_of(a: dict[str, Any], ctx: AssertionContext) -> dict[str, Any]:
     if not children:
         return _fail("all_of", description, "Empty 'assertions' array")
 
-    child_ctx = AssertionContext(
-        project_root=ctx.project_root, depth=ctx.depth + 1, max_depth=ctx.max_depth
-    )
+    child_ctx = AssertionContext(project_root=ctx.project_root, depth=ctx.depth + 1, max_depth=ctx.max_depth)
     child_results = [_dispatch_single(c, child_ctx) for c in children]
     machine_results = [r for r in child_results if not r.get("skipped")]
 
@@ -509,9 +512,7 @@ def _run_any_of(a: dict[str, Any], ctx: AssertionContext) -> dict[str, Any]:
     if not children:
         return _fail("any_of", description, "Empty 'assertions' array")
 
-    child_ctx = AssertionContext(
-        project_root=ctx.project_root, depth=ctx.depth + 1, max_depth=ctx.max_depth
-    )
+    child_ctx = AssertionContext(project_root=ctx.project_root, depth=ctx.depth + 1, max_depth=ctx.max_depth)
     child_results = [_dispatch_single(c, child_ctx) for c in children]
     machine_results = [r for r in child_results if not r.get("skipped")]
 
@@ -558,7 +559,8 @@ def _dispatch_single(assertion: Any, ctx: AssertionContext) -> dict[str, Any]:
 
     if a_type not in _VALID_ASSERTION_TYPES:
         return _skip(
-            a_type, description,
+            a_type,
+            description,
             f"Skipped non-machine assertion type: {a_type!r} (only {sorted(_VALID_ASSERTION_TYPES)} are executable)",
         )
 

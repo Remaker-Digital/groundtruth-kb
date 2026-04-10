@@ -25,8 +25,7 @@ PROFILES: dict[str, ProjectProfile] = {
         name="local-only",
         display_name="Local Only",
         description=(
-            "Minimal setup: KB, CLI, hooks, and rules. "
-            "Single-agent workflow with no bridge, containers, or cloud."
+            "Minimal setup: KB, CLI, hooks, and rules. Single-agent workflow with no bridge, containers, or cloud."
         ),
         includes_bridge=False,
         includes_docker=False,
@@ -51,8 +50,7 @@ PROFILES: dict[str, ProjectProfile] = {
         name="dual-agent-webapp",
         display_name="Dual Agent Web App",
         description=(
-            "Full stack: dual-agent bridge, Docker containers, "
-            "cloud infrastructure stubs, and CI/CD workflows."
+            "Full stack: dual-agent bridge, Docker containers, cloud infrastructure stubs, and CI/CD workflows."
         ),
         includes_bridge=True,
         includes_docker=True,

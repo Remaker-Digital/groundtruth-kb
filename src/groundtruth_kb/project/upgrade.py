@@ -67,11 +67,13 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
     """Compare scaffold version to installed version, plan file updates."""
     manifest = read_manifest(target / "groundtruth.toml")
     if manifest is None:
-        return [UpgradeAction(
-            file="groundtruth.toml",
-            action="skip",
-            reason="No [project] manifest found — run `gt project init` first",
-        )]
+        return [
+            UpgradeAction(
+                file="groundtruth.toml",
+                action="skip",
+                reason="No [project] manifest found — run `gt project init` first",
+            )
+        ]
 
     if manifest.scaffold_version == __version__:
         return []
@@ -82,9 +84,15 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
     # Check managed hooks
     managed = list(_MANAGED_HOOKS)
     if not profile.includes_bridge:
-        managed = [h for h in managed if h.split("/")[-1] in {
-            "assertion-check.py", "spec-classifier.py",
-        }]
+        managed = [
+            h
+            for h in managed
+            if h.split("/")[-1]
+            in {
+                "assertion-check.py",
+                "spec-classifier.py",
+            }
+        ]
 
     for mfile in managed:
         project_path = target / mfile
@@ -105,11 +113,13 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
             continue  # Already current
 
         # Check if user customized the file
-        actions.append(UpgradeAction(
-            file=mfile,
-            action="skip",
-            reason="File differs from template (customized?) — use --force to overwrite",
-        ))
+        actions.append(
+            UpgradeAction(
+                file=mfile,
+                action="skip",
+                reason="File differs from template (customized?) — use --force to overwrite",
+            )
+        )
 
     # Check managed rules
     managed_rules = list(_MANAGED_RULES)
@@ -134,11 +144,13 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
         if project_h == template_h:
             continue
 
-        actions.append(UpgradeAction(
-            file=mfile,
-            action="skip",
-            reason="File differs from template (customized?) — use --force to overwrite",
-        ))
+        actions.append(
+            UpgradeAction(
+                file=mfile,
+                action="skip",
+                reason="File differs from template (customized?) — use --force to overwrite",
+            )
+        )
 
     return actions
 

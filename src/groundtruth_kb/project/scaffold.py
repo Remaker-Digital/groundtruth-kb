@@ -247,35 +247,23 @@ def _render_all_templates(
         "{{PROFILE}}": profile.name,
         "{{ENVIRONMENT_DESCRIPTION}}": "Local workstation bootstrap",
         "{{TEST_STATUS}}": "Not run yet",
-        "{{BRIDGE_INVENTORY_PATH_OR_NA}}": (
-            "BRIDGE-INVENTORY.md" if profile.includes_bridge else "N/A"
-        ),
+        "{{BRIDGE_INVENTORY_PATH_OR_NA}}": ("BRIDGE-INVENTORY.md" if profile.includes_bridge else "N/A"),
         "{{AUTOMATION_SUMMARY_OR_NA}}": (
-            "Bridge resident worker + poller configured"
-            if profile.includes_bridge
-            else "None configured yet"
+            "Bridge resident worker + poller configured" if profile.includes_bridge else "None configured yet"
         ),
         "{{OPS_HEALTH_NOTES}}": "Bootstrap complete. Update after the first working session.",
-        "{{AGENT_OR_PROCESS_1}}": (
-            "prime-builder" if profile.includes_bridge else "builder-agent"
-        ),
+        "{{AGENT_OR_PROCESS_1}}": ("prime-builder" if profile.includes_bridge else "builder-agent"),
         "{{RESPONSIBILITY}}": "Implementation, specs, and project bootstrap",
-        "{{REVIEWER}}": (
-            "codex (Loyal Opposition)" if profile.includes_bridge else "owner"
-        ),
+        "{{REVIEWER}}": ("codex (Loyal Opposition)" if profile.includes_bridge else "owner"),
         "{{NOTES}}": "Replace with your actual collaboration topology.",
-        "{{PATH_TO_ENTRYPOINT}}": (
-            "gt bridge serve (MCP)" if profile.includes_bridge else "TBD"
-        ),
+        "{{PATH_TO_ENTRYPOINT}}": ("gt bridge serve (MCP)" if profile.includes_bridge else "TBD"),
         "{{WHAT_IT_DOES}}": (
             "Synchronous dialog bridge between Prime and Codex"
             if profile.includes_bridge
             else "Document your bridge or automation entrypoint here."
         ),
         "{{HOW_IT_RUNS}}": (
-            "SessionStart hook launches resident worker"
-            if profile.includes_bridge
-            else "Manual start or scheduled run"
+            "SessionStart hook launches resident worker" if profile.includes_bridge else "Manual start or scheduled run"
         ),
         "{{OTHER_PATH}}": "TBD",
         "{{KIND}}": "TBD",
@@ -287,12 +275,9 @@ def _render_all_templates(
         "{{SOURCE}}": ".claude/hooks/",
         "{{FAILURE_SIGNAL}}": "Bridge health check failure",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (
-            "Asynchronous message passing with synchronous dialog semantics. "
-            "Not all messages require replies."
+            "Asynchronous message passing with synchronous dialog semantics. Not all messages require replies."
         ),
-        "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": (
-            "Substantive messages with expected_response field require replies."
-        ),
+        "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": ("Substantive messages with expected_response field require replies."),
         "{{WHEN_TO_RETRY}}": "Non-blocking persistent retry, 3 attempts max, 5-minute interval.",
         "{{STARTUP_OR_LIVENESS_CHECK}}": (
             "Session-start handshake: send 'Report your current operating state' and wait for reply."
@@ -453,17 +438,14 @@ def _write_default_terraform(infra: Path, cloud_provider: str) -> None:
     }.get(cloud_provider, "# Configure your cloud provider here")
 
     (infra / "main.tf").write_text(
-        f'# {{{{PROJECT_NAME}}}} — Infrastructure\n\n{provider_block}\n',
+        f"# {{{{PROJECT_NAME}}}} — Infrastructure\n\n{provider_block}\n",
         encoding="utf-8",
     )
     (infra / "variables.tf").write_text(
-        '# Infrastructure variables\n\nvariable "environment" {\n'
-        '  type    = string\n  default = "staging"\n}\n',
+        '# Infrastructure variables\n\nvariable "environment" {\n  type    = string\n  default = "staging"\n}\n',
         encoding="utf-8",
     )
-    (infra / "outputs.tf").write_text(
-        "# Infrastructure outputs\n", encoding="utf-8"
-    )
+    (infra / "outputs.tf").write_text("# Infrastructure outputs\n", encoding="utf-8")
 
 
 def scaffold_summary(target: Path, profile: str) -> str:
@@ -480,27 +462,33 @@ def scaffold_summary(target: Path, profile: str) -> str:
         "  - .claude/hooks/ and .claude/rules/",
     ]
     if p.includes_bridge:
-        lines.extend([
-            "  - AGENTS.md (Loyal Opposition contract)",
-            "  - BRIDGE-INVENTORY.md",
-            "  - Bridge rules and hooks",
-            "  - independent-progress-assessments/ (Codex reports)",
-        ])
+        lines.extend(
+            [
+                "  - AGENTS.md (Loyal Opposition contract)",
+                "  - BRIDGE-INVENTORY.md",
+                "  - Bridge rules and hooks",
+                "  - independent-progress-assessments/ (Codex reports)",
+            ]
+        )
     if p.includes_docker:
-        lines.extend([
-            "  - Dockerfile + docker-compose.yml",
-            "  - .env.example",
-        ])
+        lines.extend(
+            [
+                "  - Dockerfile + docker-compose.yml",
+                "  - .env.example",
+            ]
+        )
     if p.includes_cloud:
         lines.append("  - infrastructure/terraform/ stubs")
-    lines.extend([
-        "",
-        "Next steps:",
-        f"  1. cd {target}",
-        "  2. Review CLAUDE.md and replace any TBD values",
-        "  3. Run `gt project doctor` to verify workstation readiness",
-        "  4. Run `gt summary` to inspect the knowledge database",
-    ])
+    lines.extend(
+        [
+            "",
+            "Next steps:",
+            f"  1. cd {target}",
+            "  2. Review CLAUDE.md and replace any TBD values",
+            "  3. Run `gt project doctor` to verify workstation readiness",
+            "  4. Run `gt summary` to inspect the knowledge database",
+        ]
+    )
     if p.includes_bridge:
         lines.append("  5. Start a session — the bridge handshake will run automatically")
     return "\n".join(lines)
