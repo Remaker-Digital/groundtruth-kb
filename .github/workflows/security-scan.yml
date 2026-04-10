@@ -14,7 +14,7 @@ on:
       - 'pyproject.toml'
       - 'Dockerfile*'
   push:
-    branches: [develop]
+    branches: [develop, 'hotfix/**']
     paths:
       - 'src/**'
       - 'requirements*.txt'

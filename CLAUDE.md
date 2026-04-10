@@ -51,7 +51,14 @@ All new work in this repository must include:
 
 **Loyal Opposition role (Codex):** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work.
 
+**Bridge collaboration exception:** For bridge runtime, protocol, poller, worker, and handshake work, reverse the usual relationship: Codex is the implementation owner and Prime Builder acts as reviewer. Prime should request review or GO/NO-GO from Codex after Codex bridge work rather than waiting for a Prime-authored bridge proposal.
+
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
+
+**bridge-specific operating exception.**
+- For bridge work, Codex implements first and sends Prime an implementation report or targeted review request.
+- Prime reviews bridge changes and issues GO/NO-GO instead of assuming Codex is only an advisor.
+- Treat any currently required bridge envelope fields as transport compatibility metadata, not as proof that every bridge message requires a reply.
 
 **operating procedure.** 
 - Have your Loyal Opposition review every implementation proposal before you implement anything. 
@@ -156,11 +163,13 @@ Next: [describe task].
 
 Before any session work proceeds, Prime Builder must verify the bridge is alive:
 
-1. **Send** a bridge message to Codex: `"Report your current operating state"` (expected_response: `status_update`, artifact_refs: `["AGENTS.md"]`, action_items: `["Send operating state summary back to prime"]`).
-2. **Wait** for Codex to reply. Poll Prime's inbox every 15 seconds for up to 2 minutes.
-3. **Proceed** only after the reply is received. If no reply arrives within 2 minutes, report the bridge failure to the owner before continuing.
+1. **Send** a bridge request to Codex: `"Report your current operating state"`. If the current runtime still requires envelope metadata, include it as transport compatibility metadata only.
+2. **Listen** for Codex to reply. Poll Prime's inbox every 15 seconds for up to 2 minutes, then retry the request once if needed.
+3. **Proceed** only after the reply is received. If no reply arrives after the retry window, report the bridge failure to the owner before continuing.
 
 This check confirms the Prime↔Codex bridge is operational and both agents can communicate. Do not skip this step.
+
+**Bridge protocol rule:** The bridge is asynchronous message passing, not a universal request/reply protocol. Not all messages are replies, not all messages require replies, and retries should be used only for important requests or deadlines.
 
 ### Protected Behaviors & Removal Rule
 
@@ -213,6 +222,7 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 |--------|---------|-------------|
 | `main` | Production mirror. Always matches the most recent production deployment. | Merge from `develop` at deployment time. |
 | `develop` | Continuous development. All new features, fixes, and experiments land here. | Every session. |
+| `hotfix/*` | Emergency production patches. Branched from `main`, merged back to both `main` and `develop`. | Critical production issues only. |
 
 **Workflow:** `develop` → build/test → deploy to staging → staging verified → merge to `main` → deploy to production.
 
@@ -221,7 +231,15 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 2. Merge to `main` only as part of a production deployment operation.
 3. `main` must always be deployable — it represents what is running in production.
 4. Version tags (v1.98.x) are created on `develop` at build time and propagated to `main` via merge.
-5. Hotfixes: branch from `main`, fix, merge to both `main` and `develop`.
+5. Hotfixes follow the hotfix workflow below.
+
+**Hotfix Workflow:**
+1. Branch from `main` at the current production tag: `hotfix/v{version}-{issue}` (e.g., `hotfix/v1.98.92-critic-timeout`).
+2. Implement the minimal fix. CI (lint, tests, security scan) runs automatically on `hotfix/**` branches.
+3. Deploy the hotfix branch to staging for verification.
+4. After staging verification, merge to `main` and deploy to production (GOV-16 approval required).
+5. Immediately backport: merge `main` to `develop` to prevent divergence.
+6. Delete the hotfix branch after both merges are confirmed.
 
 ---
 

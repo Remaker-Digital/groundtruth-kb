@@ -16,7 +16,7 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/lint.yml'
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'hotfix/**']
     paths:
       - 'src/**'
       - 'tests/**'
