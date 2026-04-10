@@ -144,6 +144,13 @@ def _copy_templates(target: Path, *, include_ci: bool) -> None:
     for source in (templates_dir / "rules").glob("*.md"):
         shutil.copy2(source, rules_target / source.name)
 
+    # Developer config files (from templates/project/)
+    project_templates = templates_dir / "project"
+    for name in (".editorconfig", "Makefile", ".pre-commit-config.yaml"):
+        src = project_templates / name
+        if src.exists():
+            shutil.copy2(src, target / name)
+
     if include_ci:
         workflows_target = target / ".github" / "workflows"
         workflows_target.mkdir(parents=True, exist_ok=True)

@@ -125,6 +125,13 @@ def _copy_base_templates(target: Path) -> None:
         if src.name == "prime-builder.md":
             shutil.copy2(src, rules_target / src.name)
 
+    # Developer config files (from templates/project/)
+    project_templates = templates / "project"
+    for name in (".editorconfig", "Makefile", ".pre-commit-config.yaml"):
+        src = project_templates / name
+        if src.exists():
+            shutil.copy2(src, target / name)
+
     # Generate base pyproject sections
     _write_pyproject_sections(target)
 
