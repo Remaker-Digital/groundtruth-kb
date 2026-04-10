@@ -34,4 +34,4 @@ Engineering discipline for AI-powered systems — from specification to producti
 
 - **Generic examples** are used throughout. When you see `SPEC-001` or "TaskTracker", these are illustrative — substitute your own project's domain.
 - **Forward references** like "(see [Specifications](02-specifications.md))" point to other documents in this series.
-- **Method vs tool**: these documents describe *when* and *why* to do things. For *how* to use the CLI and API, see the KB Tooling guide (coming in a future update).
+- **Method vs tool**: these documents describe *when* and *why* to do things. For *how* to use the CLI and API, see the [KB Tooling guide](10-tooling.md).
