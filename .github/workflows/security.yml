@@ -61,9 +61,11 @@ jobs:
         run: |
           pip install pip-audit
           mkdir -p .quality
-          pip-audit --format=json --output=.quality/pip-audit.json || true
-          pip-audit --format=cyclonedx-json --output=.quality/sbom.json || true
-          pip-audit
+          # PYSEC-2022-42969: py 1.11.0 py.path.svnwc vulnerability — not exploitable
+          # in our usage (transitive dep from CI runner, not imported by our code).
+          pip-audit --ignore-vuln PYSEC-2022-42969 --format=json --output=.quality/pip-audit.json || true
+          pip-audit --ignore-vuln PYSEC-2022-42969 --format=cyclonedx-json --output=.quality/sbom.json || true
+          pip-audit --ignore-vuln PYSEC-2022-42969
         continue-on-error: false
 
       - name: Upload audit results
