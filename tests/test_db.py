@@ -5,22 +5,6 @@ from __future__ import annotations
 import pytest
 
 from groundtruth_kb.db import KnowledgeDB, get_depth, get_parent_id, spec_sort_key
-from groundtruth_kb.gates import GateRegistry
-
-
-@pytest.fixture
-def db(tmp_path) -> KnowledgeDB:
-    """Create a fresh in-memory-like DB in a temp directory."""
-    db_path = tmp_path / "test.db"
-    registry = GateRegistry.from_config([], include_builtins=True)
-    return KnowledgeDB(db_path=db_path, gate_registry=registry)
-
-
-@pytest.fixture
-def db_no_gates(tmp_path) -> KnowledgeDB:
-    """DB without any gates for testing raw behavior."""
-    db_path = tmp_path / "test_nogates.db"
-    return KnowledgeDB(db_path=db_path)
 
 
 class TestSpecifications:

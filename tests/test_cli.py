@@ -11,29 +11,6 @@ from click.testing import CliRunner
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
 
-
-@pytest.fixture()
-def runner() -> CliRunner:
-    return CliRunner()
-
-
-@pytest.fixture()
-def project_dir(tmp_path: Path) -> Path:
-    """Create a project dir with groundtruth.toml and a seeded DB."""
-    toml = tmp_path / "groundtruth.toml"
-    toml.write_text(
-        f'[groundtruth]\ndb_path = "{(tmp_path / "groundtruth.db").as_posix()}"\n'
-        f'project_root = "{tmp_path.as_posix()}"\napp_title = "Test Project"\n',
-        encoding="utf-8",
-    )
-    # Create a simple file for assertions to find
-    src = tmp_path / "src"
-    src.mkdir()
-    (src / "main.py").write_text("def hello():\n    return 'world'\n", encoding="utf-8")
-    (tmp_path / "README.md").write_text("# Test\n", encoding="utf-8")
-    return tmp_path
-
-
 # ---------------------------------------------------------------------------
 # gt init
 # ---------------------------------------------------------------------------
