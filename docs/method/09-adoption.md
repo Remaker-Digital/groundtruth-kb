@@ -29,7 +29,7 @@ groundtruth-kb (upstream)
     └── src/                      ← your application code
 ```
 
-**GroundTruth** provides the method documentation, the knowledge database engine, the governance gate framework, and reference [process templates](../../templates/README.md) for project setup, including templates for capturing bridge and automation configuration. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation. The boundary between them is explicit.
+**GroundTruth** provides the method documentation, the knowledge database engine, the governance gate framework, and reference [process templates](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/templates) for project setup, including templates for capturing bridge and automation configuration. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation. The boundary between them is explicit.
 
 ## Managed vs project-owned files
 
