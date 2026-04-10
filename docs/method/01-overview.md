@@ -99,7 +99,7 @@ GroundTruth supports a two-agent workflow where responsibilities are separated:
 
 **Loyal Opposition** inspects, critiques, and analyzes. This agent reviews plans, code, and configuration for correctness, security, and completeness. Loyal Opposition produces evidence-based reports and does not implement changes. It is responsible for *whether the how is good enough*.
 
-The separation ensures that the agent building the system is not the same agent evaluating it. This catches blind spots, overconfidence, and scope creep. For details, see the Dual-Agent Collaboration guide (coming in a future update).
+The separation ensures that the agent building the system is not the same agent evaluating it. This catches blind spots, overconfidence, and scope creep. For details, see the [Dual-Agent Collaboration guide](06-dual-agent.md).
 
 ## Session discipline
 
@@ -111,7 +111,7 @@ Work is organized into numbered sessions (`S1`, `S2`, ..., `S240`). Each session
 
 Every fifth session is an **audit session** with additional hygiene steps — checking for stale work items, verifying spec coverage, and pruning operational records.
 
-Session discipline prevents context loss across conversations and ensures that any team member (human or AI) can pick up where the last session left off. For details, see the Session Discipline guide (coming in a future update).
+Session discipline prevents context loss across conversations and ensures that any team member (human or AI) can pick up where the last session left off. For details, see the [Session Discipline guide](07-sessions.md).
 
 ## What GroundTruth is NOT
 
