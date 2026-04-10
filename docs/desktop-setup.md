@@ -99,12 +99,16 @@ This creates:
 It also seeds the knowledge database with the standard governance specs plus
 the example domain records.
 
-### 3. Sanity-check the bootstrap
+### 3. Verify the environment
 
 ```bash
 cd my-prototype
+gt project doctor
 gt --config groundtruth.toml summary
 ```
+
+`gt project doctor` checks installed tools, verifies configuration, and
+produces a readiness report highlighting any missing prerequisites.
 
 ### 4. Open the project in your editor and complete the first edits
 

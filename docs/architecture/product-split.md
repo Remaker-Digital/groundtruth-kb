@@ -1,127 +1,103 @@
 # GroundTruth Product Architecture
 
-## Decision Context
+## Overview
 
-On 2026-04-04, the project owner approved a three-layer product split
-for the GroundTruth ecosystem.  This decision was informed by a Loyal
-Opposition gap-closure proposal and a Prime Builder advisory response,
-both delivered and resolved over the prime-bridge collaboration channel.
-
-**Decision memo:** `INSIGHTS-2026-04-04-08-12-00-GROUNDTRUTH-OWNER-DECISION-MEMO.md`
-
-The core finding: GroundTruth v0.1.x is a knowledge-database and
-governance toolkit.  Teams adopting it also need project scaffolding,
-environment configuration, and (optionally) infrastructure provisioning.
-Those capabilities should live in separate packages with distinct
-ownership boundaries, not be folded into the core toolkit.
+GroundTruth is a single Python package (`groundtruth-kb`) organized into
+three functional layers plus an embedded bridge runtime.  All layers ship
+together and are installed from a single wheel.
 
 ---
 
-## Three-Layer Architecture
+## Architecture Layers
 
-### Layer 1 — `groundtruth-kb` (this package)
+### Layer 1 — Core Knowledge Database
 
-The stable upstream core.
+The foundation: an append-only SQLite database with governance gates and
+an assertion engine.
 
-| Capability | Examples |
-|------------|----------|
-| Knowledge database | Append-only SQLite, 9 artifact types, full version history |
-| CLI | `gt init`, `gt bootstrap-desktop`, `gt assert`, `gt seed`, `gt summary`, `gt serve` |
-| Governance framework | Built-in gates, pluggable gate architecture, assertion engine |
-| Method documentation | 11 numbered docs describing the specification-first workflow |
-| Web dashboard | Optional FastAPI UI (`[web]` extra) |
-| Reference templates | CLAUDE.md, MEMORY.md, bridge inventory, hooks, rules, CI/CD workflows |
-
-**Scope boundary:** groundtruth-kb initializes a knowledge database
-(`groundtruth.toml` + `groundtruth.db`) and provides the tools to
-manage specifications, tests, work items, assertions, and the method
-docs/templates that tell teams how to capture operational configuration.
-It includes a lightweight local bootstrap path for same-day prototype work, but
-it does not scaffold full production projects, provision infrastructure,
-configure dual-agent runtimes automatically, or set up cloud environments.
-
-### Layer 2 — `groundtruth-project-kit` (planned, separate package)
-
-The missing bootstrap and scaffolding layer.
-
-| Capability | Description |
+| Capability | CLI commands |
 |------------|-------------|
-| Project scaffold | Generate or retrofit a repo with rules, hooks, bridge files, report templates |
-| Project manifest | Declare project name, owner, stack, cloud provider, agent topology |
-| Profiles | Pre-built configurations: `local-only`, `dual-agent-webapp`, `staging-minimal` |
-| Doctor | Detect installed tools, verify config, produce readiness reports |
-| Upgrade | Update project-owned scaffold files when the kit version changes |
+| Knowledge database | `gt init` — create project config and database |
+| Seed data | `gt seed` — populate governance specs and optional examples |
+| Assertions | `gt assert` — run machine-checkable spec assertions |
+| Web dashboard | `gt serve` — optional FastAPI UI (`[web]` extra) |
+| Summary | `gt summary` — quick project overview |
+| Desktop bootstrap | `gt bootstrap-desktop` — same-day prototype scaffold |
 
-**Planned commands:** `gt project init`, `gt project doctor`, `gt project upgrade`
+### Layer 2 — Project Scaffold
 
-**Scope boundary:** groundtruth-project-kit configures local files and
-validates environment readiness.  It does not create cloud resources,
-external accounts, or production infrastructure without explicit opt-in.
+Project initialization, profile-based setup, and scaffold maintenance.
 
-### Layer 3 — Cloud profiles (future, gated on Phase 2 validation)
-
-Optional infrastructure modules, separated from install.
-
-| Capability | Description |
+| Capability | CLI commands |
 |------------|-------------|
-| IaC generation | Terraform/Bicep for supported deployment profiles |
-| Environment seeding | Test tenants, secrets placeholders, health checks |
-| Post-deploy verification | Runtime checks matching production gate patterns |
+| Project scaffold | `gt project init` — generate or retrofit a repo with rules, hooks, bridge files, and report templates |
+| Profiles | `gt project init --profile <profile>` — pre-built configurations (`local-only`, `dual-agent-webapp`, `staging-minimal`) |
+| Scaffold upgrade | `gt project upgrade` — update project-owned scaffold files when the package version changes |
 
-**Guardrails:** No production provisioning by default.  Production
-requires explicit confirmation and owner approval.  No external account
-creation.  No "environment ready" verdict until runtime checks pass.
+### Layer 3 — Workstation Doctor
 
-**Status:** Design phase.  Will not begin until Phase 2 (project-kit)
-is validated by at least one project besides the reference implementation.
+Environment verification and readiness reporting.
+
+| Capability | CLI commands |
+|------------|-------------|
+| Doctor | `gt project doctor` — detect installed tools, verify config, produce readiness reports |
+
+### Bridge Runtime
+
+Included as the `groundtruth_kb.bridge` module.  Provides the
+Prime Builder / Loyal Opposition coordination channel:
+
+- Message store and thread tracking
+- Synchronous dialog semantics with non-blocking persistent retry
+- Resident worker lifecycle
+- Bridge CLI (`gt bridge` subcommands)
 
 ---
 
-## Dependency Direction
+## Package Contents
 
-```
-groundtruth-project-kit  ──depends-on──►  groundtruth-kb
-cloud-profiles           ──depends-on──►  groundtruth-project-kit
-```
+| Component | Location |
+|-----------|----------|
+| KB engine, CLI, web UI, gates | `groundtruth_kb/` |
+| Bridge runtime | `groundtruth_kb/bridge/` |
+| Project scaffold commands | `gt project init`, `gt project doctor`, `gt project upgrade` |
+| Method documentation | `docs/method/` (11 numbered docs) |
+| Reference templates | `templates/` (CLAUDE.md, MEMORY.md, hooks, rules, CI/CD) |
+| Built-in governance gates | ADRDCLAssertionGate, OwnerApprovalGate |
 
-groundtruth-kb has **no dependency** on project-kit or cloud profiles.
-It remains a standalone toolkit usable without either.
+---
+
+## Scope Boundary
+
+`groundtruth-kb` initializes a knowledge database, provides the tools to
+manage specifications, tests, work items, and assertions, scaffolds
+project structure from profiles, and verifies workstation readiness.
+
+It does not provision cloud infrastructure, create external accounts,
+or deploy applications.  Production infrastructure setup is the
+responsibility of the downstream project.
 
 ---
 
 ## Reference Implementation
 
 Agent Red Customer Experience is the proving ground for the patterns
-that groundtruth-project-kit will productize.  The project-kit will
-extract simplified, reusable versions of:
+that `groundtruth-kb` packages.  The project scaffold extracts
+simplified, reusable versions of:
 
 - Message schema and bridge coordination model
 - Worker lifecycle pattern (resident workers, notification-driven wake)
-- Claim/resolve/negotiate protocol
 - Session hook and rule file conventions
 - Operational expectations (responsiveness, audit, reporting)
-
-The current Agent Red runtime is project-shaped and carries historical
-compatibility logic.  It is the behavioral reference, not the
-distributable artifact.
 
 ---
 
 ## Current Status
 
-| Package | Version | Status |
-|---------|---------|--------|
+| Component | Version | Status |
+|-----------|---------|--------|
 | groundtruth-kb | 0.1.2 | Alpha — extracted from production system (2,000+ specs, 11,000+ tests) |
-| groundtruth-project-kit | — | Design phase (Phase 1: scope clarification, Phase 2: implementation) |
-| Cloud profiles | — | Not started (gated on Phase 2 validation) |
 
 ---
 
-## Approved Phased Delivery
-
-| Phase | Scope | Status |
-|-------|-------|--------|
-| Phase 1 | Clarify product boundaries, fix naming/docs | **In progress** |
-| Phase 2 | Ship groundtruth-project-kit scaffold layer | Approved, not started |
-| Phase 3 | Workstation doctor/bootstrap | Deferred (gate review required) |
-| Phase 4 | Infrastructure bootstrap modules | Deferred (gate review required) |
+*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

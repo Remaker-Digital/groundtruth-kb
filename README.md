@@ -20,10 +20,8 @@ Everything is stored in an append-only SQLite database with full version
 history. No UPDATE, no DELETE — every change is a new version.
 
 groundtruth-kb is the **core toolkit** — it manages the knowledge database,
-governance gates, and assertions.  It does not scaffold full projects,
-provision infrastructure, or configure agent runtimes.  See the
-[product architecture](docs/architecture/product-split.md) for the
-planned ecosystem.
+governance gates, assertions, and project scaffolding.  See the
+[product architecture](docs/architecture/product-split.md) for details.
 
 ## Quick start
 
@@ -56,8 +54,9 @@ This project is in early development. The toolkit is extracted from a
 production system where it has managed 2,000+ specifications and 11,000+
 tests. The extraction and packaging for standalone use is in progress.
 
-A companion package, **groundtruth-project-kit**, is planned for project
-scaffolding, environment doctor, and bootstrap profiles.  See the
+Project scaffolding (`gt project init`), environment verification
+(`gt project doctor`), and scaffold upgrades (`gt project upgrade`) are
+included in the package.  See the
 [product architecture](docs/architecture/product-split.md) for details.
 
 ## Documentation
@@ -93,8 +92,7 @@ The [templates/](templates/README.md) directory contains reference templates for
 setting up a GroundTruth project: rules files, state files, hooks, and agent
 configuration. Copy them into your project and customize the placeholders.
 GroundTruth includes reference templates for capturing bridge and automation
-configuration, but project-specific runtime setup and scaffold automation are
-still planned for [groundtruth-project-kit](docs/architecture/product-split.md).
+configuration.  Use `gt project init --profile <profile>` for automated setup.
 
 ## Contributing
 

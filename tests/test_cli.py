@@ -256,7 +256,8 @@ class TestVersion:
     def test_version(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.2" in result.output
+        from groundtruth_kb import __version__
+        assert __version__ in result.output
 
 
 # ---------------------------------------------------------------------------

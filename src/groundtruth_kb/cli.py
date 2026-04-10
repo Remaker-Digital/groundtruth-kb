@@ -481,3 +481,113 @@ def serve(ctx: click.Context, port: int, host: str) -> None:
     click.echo(f"  Database: {config.db_path}\n")
 
     uvicorn.run(app, host=host, port=effective_port, log_level="info")
+
+
+# ── gt project (Layer 2 + 3) ─────────────────────────────────────────
+
+
+@main.group()
+def project():
+    """Project scaffold, doctor, and upgrade commands."""
+
+
+@project.command("init")
+@click.argument("project_name")
+@click.option(
+    "--profile",
+    type=click.Choice(["local-only", "dual-agent", "dual-agent-webapp"]),
+    default="local-only",
+    help="Scaffold profile (default: local-only).",
+)
+@click.option("--owner", default="", help="Organization or owner name.")
+@click.option("--copyright", "copyright_notice", default="", help="Copyright notice.")
+@click.option(
+    "--cloud-provider",
+    type=click.Choice(["azure", "aws", "gcp", "none"]),
+    default="none",
+    help="Cloud provider for infrastructure stubs.",
+)
+@click.option("--dir", "target_dir", default=None, help="Target directory (default: ./<project_name>).")
+@click.option("--init-git/--no-init-git", default=False, help="Initialize a git repository.")
+@click.option("--include-ci/--no-include-ci", default=True, help="Include CI workflows.")
+@click.option("--seed-example/--no-seed-example", default=True, help="Seed example specs.")
+def project_init(
+    project_name: str,
+    profile: str,
+    owner: str,
+    copyright_notice: str,
+    cloud_provider: str,
+    target_dir: str | None,
+    init_git: bool,
+    include_ci: bool,
+    seed_example: bool,
+) -> None:
+    """Scaffold a new GroundTruth project with the selected profile."""
+    from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project, scaffold_summary
+
+    target = Path(target_dir) if target_dir else Path.cwd() / project_name
+    options = ScaffoldOptions(
+        project_name=project_name,
+        profile=profile,
+        owner=owner,
+        target_dir=target,
+        copyright_notice=copyright_notice,
+        cloud_provider=cloud_provider,
+        init_git=init_git,
+        include_ci=include_ci,
+        seed_example=seed_example,
+    )
+    result = scaffold_project(options)
+    click.echo(scaffold_summary(result, profile))
+
+
+@project.command("doctor")
+@click.option("--auto-install", is_flag=True, default=False, help="Auto-install safe tools.")
+@click.option("--profile", default=None, help="Profile to check against (auto-detected if omitted).")
+@click.option("--dir", "target_dir", default=".", help="Project directory (default: cwd).")
+def project_doctor(auto_install: bool, profile: str | None, target_dir: str) -> None:
+    """Check workstation readiness and optionally install missing tools."""
+    from groundtruth_kb.project.doctor import format_doctor_report, run_doctor
+
+    target = Path(target_dir).resolve()
+
+    # Auto-detect profile from manifest
+    if profile is None:
+        from groundtruth_kb.project.manifest import read_manifest
+
+        manifest = read_manifest(target / "groundtruth.toml")
+        profile = manifest.profile if manifest else "local-only"
+
+    report = run_doctor(target, profile, auto_install=auto_install)
+    click.echo(format_doctor_report(report))
+
+    if report.overall == "fail":
+        raise SystemExit(1)
+
+
+@project.command("upgrade")
+@click.option("--dry-run/--apply", default=True, help="Preview changes without writing (default: dry-run).")
+@click.option("--force", is_flag=True, default=False, help="Overwrite customized files.")
+@click.option("--dir", "target_dir", default=".", help="Project directory (default: cwd).")
+def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
+    """Update scaffold files to match the current GroundTruth version."""
+    from groundtruth_kb.project.upgrade import execute_upgrade, plan_upgrade
+
+    target = Path(target_dir).resolve()
+    actions = plan_upgrade(target)
+
+    if not actions:
+        click.echo("Already at current version. Nothing to upgrade.")
+        return
+
+    for action in actions:
+        status = action.action.upper()
+        click.echo(f"  [{status}] {action.file} — {action.reason}")
+
+    if dry_run:
+        click.echo(f"\n{len(actions)} action(s). Run with --apply to execute.")
+        return
+
+    results = execute_upgrade(target, actions, force=force)
+    for msg in results:
+        click.echo(f"  {msg}")
