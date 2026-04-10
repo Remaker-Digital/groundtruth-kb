@@ -1,45 +1,75 @@
 # GroundTruth Knowledge DB
 
+[![CI](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/codeql.yml/badge.svg)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/codeql.yml)
+[![Security](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/security.yml/badge.svg)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/security.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=mike-remakerdigital_groundtruth&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mike-remakerdigital_groundtruth)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+
 A specification-driven governance toolkit for AI engineering teams.
 
 Track specifications, tests, work items, and architecture decisions with
 append-only versioning. Built for teams that need traceable, auditable
 engineering decisions.
 
-## What is this?
+## At a Glance
 
-GroundTruth implements a method for managing AI system quality:
+| Capability | Description |
+|-----------|-------------|
+| **Specifications** | Decision log for what the system must do |
+| **Tests** | Verify implementation meets specifications |
+| **Work Items** | Track gaps between specs and implementation |
+| **Architecture Decisions** | ADR/DCL workflow for cross-cutting choices |
+| **Assertions** | Continuously verify spec-implementation alignment |
+| **Governance Gates** | Pluggable enforcement at lifecycle transitions |
 
-1. **Specifications** describe what the system must do (decision log, not build spec)
-2. **Tests** verify that the implementation meets the specifications
-3. **Work items** track the gap between specs and implementation
-4. **Architecture decisions** (ADRs) record cross-cutting technical choices
-5. **Assertions** continuously verify that specs and implementation stay aligned
+**Tooling:** CLI (`gt`), Web UI, Python API, project scaffolding,
+CI templates, process templates, dual-agent bridge.
 
-Everything is stored in an append-only SQLite database with full version
-history. No UPDATE, no DELETE — every change is a new version.
+## Architecture
 
-groundtruth-kb is the **core toolkit** — it manages the knowledge database,
-governance gates, assertions, and project scaffolding.  See the
-[product architecture](docs/architecture/product-split.md) for details.
+```
+Layer 3: Workstation Doctor    gt project doctor
+Layer 2: Project Scaffold      gt project init / upgrade
+Layer 1: Core Knowledge DB     gt init / seed / assert / serve
+         Bridge Runtime        dual-agent coordination [optional]
+```
 
-## Quick start
+See the [product architecture](docs/architecture/product-split.md) for details.
+
+## Quick Start
 
 ```bash
-# Install from GitHub (not published to PyPI)
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
+# Install from GitHub
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.2.0"
 
-# Bootstrap a desktop-ready prototype project
-gt bootstrap-desktop my-project --owner "Your Organization" --init-git
+# Create a project with scaffolding
+gt project init my-project --owner "Your Organization" --init-git
 
-# Inspect the seeded project
+# Inspect the seeded knowledge base
 gt --config my-project/groundtruth.toml summary
 
-# Open the web UI (requires [web] extra)
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
+# Run assertions
+gt --config my-project/groundtruth.toml assert
+```
+
+**Web UI** (requires `[web]` extra):
+
+```bash
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.2.0"
 gt --config my-project/groundtruth.toml serve
 # Visit http://localhost:8090
 ```
+
+**Same-day prototype** (includes example data):
+
+```bash
+gt bootstrap-desktop my-prototype --owner "Your Organization" --init-git
+```
+
+> New to GroundTruth? Start with the [getting started guide](docs/bootstrap.md)
+> for a 10-step walkthrough.
 
 ## Why?
 
@@ -51,55 +81,63 @@ discipline layer.
 ## Status
 
 This project is in early development. The toolkit is extracted from a
-production system where it has managed 2,000+ specifications and 11,000+
-tests. The extraction and packaging for standalone use is in progress.
+production system managing 2,000+ specifications and 11,000+ tests.
 
 Project scaffolding (`gt project init`), environment verification
 (`gt project doctor`), and scaffold upgrades (`gt project upgrade`) are
-included in the package.  See the
-[product architecture](docs/architecture/product-split.md) for details.
+available. Three profiles support different team configurations:
+`local-only`, `dual-agent`, and `dual-agent-webapp`.
 
 ## Documentation
 
-The [method documentation](docs/method/README.md) describes the engineering discipline behind GroundTruth:
+The [method documentation](docs/method/README.md) describes the engineering
+discipline behind GroundTruth:
 
-- [Method Overview](docs/method/01-overview.md) — what GroundTruth is, core workflow, governance model
-- [Specifications](docs/method/02-specifications.md) — writing and managing specifications
-- [Testing](docs/method/03-testing.md) — test forms, outside-in testing, pipeline organization
-- [Work Items & Backlog](docs/method/04-work-items.md) — tracking gaps, stage lifecycle, prioritization
-- [Governance](docs/method/05-governance.md) — GOV specs, gates, assertions, protected behaviors
-- [Dual-Agent Collaboration](docs/method/06-dual-agent.md) — Prime Builder + Loyal Opposition
-- [Session Discipline](docs/method/07-sessions.md) — session IDs, wrap-up, audit cadence
-- [Architecture Decisions](docs/method/08-architecture.md) — ADR/DCL/IPR/CVR workflow
-- [Adoption & Promotion](docs/method/09-adoption.md) — upstream/downstream model, update procedures
-- [KB Tooling](docs/method/10-tooling.md) — CLI commands, web UI, Python API, configuration
+| Guide | Topic |
+|-------|-------|
+| [01 — Overview](docs/method/01-overview.md) | Core workflow and governance model |
+| [02 — Specifications](docs/method/02-specifications.md) | Writing and managing specifications |
+| [03 — Testing](docs/method/03-testing.md) | Test forms, outside-in testing, pipeline organization |
+| [04 — Work Items](docs/method/04-work-items.md) | Gap tracking, stage lifecycle, prioritization |
+| [05 — Governance](docs/method/05-governance.md) | GOV specs, gates, assertions, protected behaviors |
+| [06 — Dual-Agent](docs/method/06-dual-agent.md) | Prime Builder + Loyal Opposition collaboration |
+| [07 — Sessions](docs/method/07-sessions.md) | Session IDs, wrap-up, audit cadence |
+| [08 — Architecture](docs/method/08-architecture.md) | ADR/DCL/IPR/CVR workflow |
+| [09 — Adoption](docs/method/09-adoption.md) | Upstream/downstream model, update procedures |
+| [10 — Tooling](docs/method/10-tooling.md) | CLI commands, web UI, Python API, configuration |
+| [11 — Operational Config](docs/method/11-operational-configuration.md) | Bridges, automations, directives, roles |
 
-- [Operational Configuration Capture](docs/method/11-operational-configuration.md) - bridges, automations, directives, and role inventory
-- [Desktop Setup Guide](docs/desktop-setup.md) - same-day client workstation bootstrap and prerequisites
+**Reference:**
+[Assertion Language](docs/reference/assertion-language.md) |
+[Desktop Setup](docs/desktop-setup.md) |
+[Example Project](examples/task-tracker/WALKTHROUGH.md)
 
 ## Getting Started
 
 New to GroundTruth? The [getting started guide](docs/bootstrap.md) walks you
-through setting up the core toolkit in your project: install, init, first spec,
-first test, assertions, web UI, templates, and CI/CD — in 10 steps.
+through setting up the core toolkit: install, init, first spec, first test,
+assertions, web UI, templates, and CI/CD — in 10 steps.
 
-If you need a same-day client workstation setup, start with the
+For a same-day client workstation setup, start with the
 [desktop setup guide](docs/desktop-setup.md).
 
 ## Process Templates
 
-The [templates/](templates/README.md) directory contains reference templates for
-setting up a GroundTruth project: rules files, state files, hooks, and agent
-configuration. Copy them into your project and customize the placeholders.
-GroundTruth includes reference templates for capturing bridge and automation
-configuration.  Use `gt project init --profile <profile>` for automated setup.
+The [templates/](templates/README.md) directory contains reference templates
+for setting up a GroundTruth project: rules files, state files, hooks, and
+agent configuration. Use `gt project init --profile <profile>` for automated
+setup, or copy templates manually and customize the placeholders.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute. We
-especially value feedback about the engineering method itself — tag
-issues with `method-feedback`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute. We especially
+value feedback about the engineering method itself — tag issues with
+`method-feedback`.
 
 ## License
 
 [AGPL-3.0](LICENSE)
+
+---
+
+*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
