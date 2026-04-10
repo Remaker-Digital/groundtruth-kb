@@ -24,13 +24,13 @@ def test_load_from_toml(tmp_path):
     """Config loads values from groundtruth.toml, resolving relative paths against config dir."""
     toml_file = tmp_path / "groundtruth.toml"
     toml_file.write_text(
-        '[groundtruth]\n'
+        "[groundtruth]\n"
         'db_path = "my_project.db"\n'
         'app_title = "My Project KB"\n'
         'brand_mark = "MP"\n'
         'brand_color = "#ff0000"\n'
-        '\n'
-        '[gates]\n'
+        "\n"
+        "[gates]\n"
         'plugins = ["my_module:MyGate"]\n'
     )
     cfg = GTConfig.load(config_path=toml_file)
@@ -45,10 +45,7 @@ def test_load_from_toml(tmp_path):
 def test_env_overrides_toml(tmp_path, monkeypatch):
     """Environment variables override TOML values."""
     toml_file = tmp_path / "groundtruth.toml"
-    toml_file.write_text(
-        '[groundtruth]\n'
-        'app_title = "From TOML"\n'
-    )
+    toml_file.write_text('[groundtruth]\napp_title = "From TOML"\n')
     monkeypatch.setenv("GT_APP_TITLE", "From Env")
     cfg = GTConfig.load(config_path=toml_file)
     assert cfg.app_title == "From Env"
@@ -57,10 +54,7 @@ def test_env_overrides_toml(tmp_path, monkeypatch):
 def test_constructor_overrides_all(tmp_path, monkeypatch):
     """Constructor kwargs override both TOML and env."""
     toml_file = tmp_path / "groundtruth.toml"
-    toml_file.write_text(
-        '[groundtruth]\n'
-        'app_title = "From TOML"\n'
-    )
+    toml_file.write_text('[groundtruth]\napp_title = "From TOML"\n')
     monkeypatch.setenv("GT_APP_TITLE", "From Env")
     cfg = GTConfig.load(config_path=toml_file, app_title="From Constructor")
     assert cfg.app_title == "From Constructor"
@@ -91,9 +85,7 @@ def test_relative_paths_anchored_to_config_dir(tmp_path):
     project_dir.mkdir()
     toml_file = project_dir / "groundtruth.toml"
     toml_file.write_text(
-        '[groundtruth]\n'
-        'db_path = "./groundtruth.db"\n'
-        'project_root = "."\n',
+        '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
     )
     cfg = GTConfig.load(config_path=toml_file)
     # Paths must resolve to the config file's directory, not cwd
@@ -106,8 +98,7 @@ def test_absolute_paths_not_reanchored(tmp_path):
     abs_db = tmp_path / "custom" / "my.db"
     toml_file = tmp_path / "groundtruth.toml"
     toml_file.write_text(
-        f'[groundtruth]\n'
-        f'db_path = "{abs_db.as_posix()}"\n',
+        f'[groundtruth]\ndb_path = "{abs_db.as_posix()}"\n',
     )
     cfg = GTConfig.load(config_path=toml_file)
     assert cfg.db_path == abs_db

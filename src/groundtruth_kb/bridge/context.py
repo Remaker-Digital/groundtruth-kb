@@ -63,11 +63,7 @@ def _message_tags(message: dict[str, Any]) -> set[str]:
     raw_tags = message.get("tags")
     if not isinstance(raw_tags, list):
         return set()
-    return {
-        str(tag).strip().lower()
-        for tag in raw_tags
-        if str(tag).strip()
-    }
+    return {str(tag).strip().lower() for tag in raw_tags if str(tag).strip()}
 
 
 def message_is_session_start_request(message: dict[str, Any]) -> bool:
@@ -318,9 +314,7 @@ def _repair_payload_artifact_refs(
 def summarize_context(agent: str, context: dict[str, Any]) -> str:
     canonical = context["canonical_message"]
     latest_worker = context.get(
-        "latest_non_protocol_codex_message"
-        if agent == "codex"
-        else "latest_non_protocol_prime_message"
+        "latest_non_protocol_codex_message" if agent == "codex" else "latest_non_protocol_prime_message"
     )
     artifact_paths = [item["path"] for item in context.get("referenced_artifacts", [])]
     reasons = ",".join(context.get("wake_reasons", []))
@@ -427,11 +421,7 @@ def select_dispatch_batch(
 
     return {
         "contexts": [context_by_id[message_id] for message_id in selected_ids if message_id in context_by_id],
-        "new_items": [
-            item
-            for item in ordered_new_items
-            if str(item.get("id") or "").strip() in selected_set
-        ],
+        "new_items": [item for item in ordered_new_items if str(item.get("id") or "").strip() in selected_set],
         "target_ids": selected_ids,
         "deferred_ids": ordered_ids[max_targets:],
     }
@@ -495,9 +485,7 @@ def build_contexts(
             context["wake_reasons"] = sorted(reasons)
             context["referenced_artifacts"] = discover_artifacts(context, project_dir=project_dir)
             latest_worker = context.get(
-                "latest_non_protocol_codex_message"
-                if agent == "codex"
-                else "latest_non_protocol_prime_message"
+                "latest_non_protocol_codex_message" if agent == "codex" else "latest_non_protocol_prime_message"
             )
             context["already_reviewed_hint"] = bool(
                 latest_worker and latest_worker.get("id") != context["canonical_message"]["id"]
@@ -556,10 +544,7 @@ def context_requires_action(agent: str, context: dict[str, Any]) -> bool:
         if item.get("sender") == agent
         and item.get("recipient") == peer
         and item.get("message_kind") in ("substantive", "system")
-        and (
-            request_created_at is None
-            or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
-        )
+        and (request_created_at is None or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at))
     ]
     valid_outbound = [item for item in substantive_outbound if item.get("status") != "failed"]
     invalid_outbound = [item for item in substantive_outbound if item.get("status") == "failed"]
@@ -569,10 +554,7 @@ def context_requires_action(agent: str, context: dict[str, Any]) -> bool:
         if item.get("sender") == agent
         and item.get("recipient") == peer
         and item.get("message_kind") == "protocol_ack"
-        and (
-            request_created_at is None
-            or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
-        )
+        and (request_created_at is None or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at))
     ]
     if invalid_outbound:
         return True
@@ -673,10 +655,7 @@ def fast_path_session_start_requests(
         if not peer:
             continue
         thread_messages = context.get("thread_messages") or []
-        session_thread = any(
-            message_is_session_start_request(message)
-            for message in thread_messages
-        )
+        session_thread = any(message_is_session_start_request(message) for message in thread_messages)
         if not session_thread and not message_is_session_start_request(canonical):
             continue
 
@@ -685,10 +664,7 @@ def fast_path_session_start_requests(
                 message_id=canonical["id"],
                 agent=agent,
                 outcome="completed",
-                resolution=(
-                    "Session-start operating-state reply received automatically. "
-                    "No follow-up reply required."
-                ),
+                resolution=("Session-start operating-state reply received automatically. No follow-up reply required."),
             )
             if resolved.get("ok"):
                 handled += 1
@@ -706,10 +682,7 @@ def fast_path_session_start_requests(
             if item.get("sender") == agent
             and item.get("recipient") == peer
             and item.get("message_kind") in ("substantive", "system")
-            and (
-                request_created_at is None
-                or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
-            )
+            and (request_created_at is None or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at))
         ]
         valid_outbound = [item for item in substantive_outbound if item.get("status") != "failed"]
         invalid_outbound = [item for item in substantive_outbound if item.get("status") == "failed"]
@@ -776,10 +749,7 @@ def fast_path_session_start_requests(
             message_id=canonical["id"],
             agent=agent,
             outcome="completed",
-            resolution=(
-                f"Session-start operating-state reply sent via bridge message "
-                f"{result.get('id')}."
-            ),
+            resolution=(f"Session-start operating-state reply sent via bridge message {result.get('id')}."),
         )
         if resolved.get("ok"):
             handled += 1
@@ -796,8 +766,7 @@ def fast_path_session_start_requests(
         )
         if log_fn is not None:
             log_fn(
-                f"session-start fast path replied on thread {context.get('thread_correlation_id')}: "
-                f"{result.get('id')}"
+                f"session-start fast path replied on thread {context.get('thread_correlation_id')}: {result.get('id')}"
             )
     return handled
 
@@ -835,10 +804,7 @@ def repair_terminal_thread_outputs(
             if item.get("sender") == agent
             and item.get("recipient") == peer
             and item.get("message_kind") == "substantive"
-            and (
-                request_created_at is None
-                or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
-            )
+            and (request_created_at is None or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at))
         ]
         valid_outbound = [item for item in substantive_outbound if item.get("status") != "failed"]
         invalid_outbound = [item for item in substantive_outbound if item.get("status") == "failed"]
@@ -848,10 +814,7 @@ def repair_terminal_thread_outputs(
             if item.get("sender") == agent
             and item.get("recipient") == peer
             and item.get("message_kind") == "protocol_ack"
-            and (
-                request_created_at is None
-                or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
-            )
+            and (request_created_at is None or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at))
         ]
         if message_is_closure_only(canonical):
             if canonical_status not in {"completed", "failed"}:
@@ -860,8 +823,7 @@ def repair_terminal_thread_outputs(
                     agent=agent,
                     outcome="completed",
                     resolution=(
-                        "Closure-only or receipt-only traffic on previously handled "
-                        "thread. No new action required."
+                        "Closure-only or receipt-only traffic on previously handled thread. No new action required."
                     ),
                 )
                 if resolved.get("ok"):
@@ -876,8 +838,7 @@ def repair_terminal_thread_outputs(
                     bridge,
                     failed_outbound=invalid_outbound,
                     resolution=(
-                        f"Superseded after closure-only thread cleanup on "
-                        f"{context.get('thread_correlation_id')}."
+                        f"Superseded after closure-only thread cleanup on {context.get('thread_correlation_id')}."
                     ),
                 )
                 > 0
@@ -905,12 +866,12 @@ def repair_terminal_thread_outputs(
                         )
             repaired += int(
                 _supersede_failed_outbound_messages(
-                bridge,
-                failed_outbound=invalid_outbound,
-                resolution=(
-                    f"Superseded by valid substantive outbound bridge message on thread "
-                    f"{context.get('thread_correlation_id')}."
-                ),
+                    bridge,
+                    failed_outbound=invalid_outbound,
+                    resolution=(
+                        f"Superseded by valid substantive outbound bridge message on thread "
+                        f"{context.get('thread_correlation_id')}."
+                    ),
                 )
                 > 0
             )

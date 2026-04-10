@@ -62,14 +62,17 @@ def _run_cmd(cmd: list[str], *, timeout: int = 10) -> tuple[bool, str]:
 def _parse_version(output: str) -> str | None:
     """Extract a version-like string from command output."""
     import re
+
     m = re.search(r"(\d+\.\d+[\.\d]*)", output)
     return m.group(1) if m else None
 
 
 def _version_ge(actual: str, minimum: str) -> bool:
     """Check if actual version >= minimum version."""
+
     def to_tuple(v: str) -> tuple[int, ...]:
         return tuple(int(x) for x in v.split(".") if x.isdigit())
+
     try:
         return to_tuple(actual) >= to_tuple(minimum)
     except (ValueError, TypeError):
@@ -140,52 +143,67 @@ def _check_git() -> ToolCheck:
 
 def _check_docker() -> ToolCheck:
     return _check_tool(
-        "Docker", ["docker", "--version"],
-        required=False, install_hint="https://docs.docker.com/get-docker/",
+        "Docker",
+        ["docker", "--version"],
+        required=False,
+        install_hint="https://docs.docker.com/get-docker/",
     )
 
 
 def _check_node() -> ToolCheck:
     return _check_tool(
-        "Node.js", ["node", "--version"],
-        required=False, min_version="20", install_hint="https://nodejs.org/",
+        "Node.js",
+        ["node", "--version"],
+        required=False,
+        min_version="20",
+        install_hint="https://nodejs.org/",
     )
 
 
 def _check_azure_cli() -> ToolCheck:
     return _check_tool(
-        "Azure CLI", ["az", "--version"],
-        required=False, install_hint="https://aka.ms/installazurecli",
+        "Azure CLI",
+        ["az", "--version"],
+        required=False,
+        install_hint="https://aka.ms/installazurecli",
     )
 
 
 def _check_terraform() -> ToolCheck:
     return _check_tool(
-        "Terraform", ["terraform", "--version"],
-        required=False, install_hint="https://developer.hashicorp.com/terraform/install",
+        "Terraform",
+        ["terraform", "--version"],
+        required=False,
+        install_hint="https://developer.hashicorp.com/terraform/install",
     )
 
 
 def _check_claude_code() -> ToolCheck:
     return _check_tool(
-        "Claude Code", ["claude", "--version"],
-        required=False, install_hint="npm install -g @anthropic-ai/claude-code",
+        "Claude Code",
+        ["claude", "--version"],
+        required=False,
+        install_hint="npm install -g @anthropic-ai/claude-code",
         auto_installable=True,
     )
 
 
 def _check_ruff() -> ToolCheck:
     return _check_tool(
-        "ruff", ["ruff", "--version"],
-        required=False, install_hint="pip install ruff",
+        "ruff",
+        ["ruff", "--version"],
+        required=False,
+        install_hint="pip install ruff",
         auto_installable=True,
     )
 
 
 def _check_gh_cli() -> ToolCheck:
     check = _check_tool(
-        "GitHub CLI", ["gh", "--version"],
-        required=False, install_hint="https://cli.github.com/",
+        "GitHub CLI",
+        ["gh", "--version"],
+        required=False,
+        install_hint="https://cli.github.com/",
     )
     if check.found:
         # Also check auth status
@@ -211,16 +229,23 @@ def _check_groundtruth_toml(target: Path) -> ToolCheck:
         )
     try:
         import tomllib
+
         with open(toml_path, "rb") as f:
             tomllib.load(f)
         return ToolCheck(
-            name="groundtruth.toml", required=True, found=True,
-            status="pass", message="Valid configuration file",
+            name="groundtruth.toml",
+            required=True,
+            found=True,
+            status="pass",
+            message="Valid configuration file",
         )
     except Exception as e:
         return ToolCheck(
-            name="groundtruth.toml", required=True, found=True,
-            status="fail", message=f"Parse error: {e}",
+            name="groundtruth.toml",
+            required=True,
+            found=True,
+            status="fail",
+            message=f"Parse error: {e}",
         )
 
 
@@ -228,31 +253,42 @@ def _check_db_schema(target: Path) -> ToolCheck:
     db_path = target / "groundtruth.db"
     if not db_path.exists():
         return ToolCheck(
-            name="Knowledge DB", required=True, found=False,
-            status="fail", message="groundtruth.db not found",
+            name="Knowledge DB",
+            required=True,
+            found=False,
+            status="fail",
+            message="groundtruth.db not found",
         )
     try:
         import sqlite3
+
         conn = sqlite3.connect(str(db_path))
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()]
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         conn.close()
         expected = {"specifications", "tests", "work_items"}
         if expected.issubset(set(tables)):
             return ToolCheck(
-                name="Knowledge DB", required=True, found=True,
-                status="pass", message=f"Schema OK ({len(tables)} tables)",
+                name="Knowledge DB",
+                required=True,
+                found=True,
+                status="pass",
+                message=f"Schema OK ({len(tables)} tables)",
             )
         missing = expected - set(tables)
         return ToolCheck(
-            name="Knowledge DB", required=True, found=True,
-            status="fail", message=f"Missing tables: {missing}",
+            name="Knowledge DB",
+            required=True,
+            found=True,
+            status="fail",
+            message=f"Missing tables: {missing}",
         )
     except Exception as e:
         return ToolCheck(
-            name="Knowledge DB", required=True, found=True,
-            status="fail", message=f"DB error: {e}",
+            name="Knowledge DB",
+            required=True,
+            found=True,
+            status="fail",
+            message=f"DB error: {e}",
         )
 
 
@@ -260,8 +296,11 @@ def _check_hooks(target: Path, profile_name: str) -> ToolCheck:
     hooks_dir = target / ".claude" / "hooks"
     if not hooks_dir.exists():
         return ToolCheck(
-            name="Hooks", required=True, found=False,
-            status="fail", message=".claude/hooks/ directory not found",
+            name="Hooks",
+            required=True,
+            found=False,
+            status="fail",
+            message=".claude/hooks/ directory not found",
         )
     required_hooks = {"assertion-check.py", "spec-classifier.py"}
     profile = get_profile(profile_name)
@@ -272,12 +311,18 @@ def _check_hooks(target: Path, profile_name: str) -> ToolCheck:
     missing = required_hooks - present
     if missing:
         return ToolCheck(
-            name="Hooks", required=True, found=True,
-            status="warning", message=f"Missing hooks: {', '.join(sorted(missing))}",
+            name="Hooks",
+            required=True,
+            found=True,
+            status="warning",
+            message=f"Missing hooks: {', '.join(sorted(missing))}",
         )
     return ToolCheck(
-        name="Hooks", required=True, found=True,
-        status="pass", message=f"{len(present)} hook(s) present",
+        name="Hooks",
+        required=True,
+        found=True,
+        status="pass",
+        message=f"{len(present)} hook(s) present",
     )
 
 
@@ -285,18 +330,27 @@ def _check_rules(target: Path, profile_name: str) -> ToolCheck:
     rules_dir = target / ".claude" / "rules"
     if not rules_dir.exists():
         return ToolCheck(
-            name="Rules", required=True, found=False,
-            status="fail", message=".claude/rules/ directory not found",
+            name="Rules",
+            required=True,
+            found=False,
+            status="fail",
+            message=".claude/rules/ directory not found",
         )
     present = {f.name for f in rules_dir.glob("*.md")}
     if not present:
         return ToolCheck(
-            name="Rules", required=True, found=True,
-            status="warning", message="No rule files found",
+            name="Rules",
+            required=True,
+            found=True,
+            status="warning",
+            message="No rule files found",
         )
     return ToolCheck(
-        name="Rules", required=True, found=True,
-        status="pass", message=f"{len(present)} rule(s) present",
+        name="Rules",
+        required=True,
+        found=True,
+        status="pass",
+        message=f"{len(present)} rule(s) present",
     )
 
 
@@ -304,24 +358,32 @@ def _check_bridge_health() -> ToolCheck:
     """Check bridge database accessibility (dual-agent only)."""
     try:
         from groundtruth_kb.bridge.runtime import get_bridge_db
+
         conn = get_bridge_db()
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()]
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         conn.close()
         if "messages" in tables:
             return ToolCheck(
-                name="Bridge DB", required=True, found=True,
-                status="pass", message="Bridge database accessible",
+                name="Bridge DB",
+                required=True,
+                found=True,
+                status="pass",
+                message="Bridge database accessible",
             )
         return ToolCheck(
-            name="Bridge DB", required=True, found=True,
-            status="pass", message="Bridge database exists (empty schema — will initialize on first use)",
+            name="Bridge DB",
+            required=True,
+            found=True,
+            status="pass",
+            message="Bridge database exists (empty schema — will initialize on first use)",
         )
     except Exception as e:
         return ToolCheck(
-            name="Bridge DB", required=True, found=True,
-            status="warning", message=f"Bridge DB check: {e}",
+            name="Bridge DB",
+            required=True,
+            found=True,
+            status="warning",
+            message=f"Bridge DB check: {e}",
         )
 
 
@@ -333,7 +395,9 @@ def _auto_install_pip(package: str) -> bool:
     try:
         r = subprocess.run(
             [sys.executable, "-m", "pip", "install", package],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         return r.returncode == 0
     except (subprocess.TimeoutExpired, OSError):
@@ -348,7 +412,9 @@ def _auto_install_npm(package: str) -> bool:
     try:
         r = subprocess.run(
             [npm, "install", "-g", package],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         return r.returncode == 0
     except (subprocess.TimeoutExpired, OSError):

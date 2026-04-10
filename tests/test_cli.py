@@ -220,7 +220,10 @@ class TestConfig:
 
 class TestServe:
     def test_serve_imports_create_app(
-        self, runner: CliRunner, project_dir: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        runner: CliRunner,
+        project_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Verify gt serve wires up create_app and uvicorn (without blocking)."""
         captured: dict = {}
@@ -257,6 +260,7 @@ class TestVersion:
         result = runner.invoke(main, ["--version"])
         assert result.exit_code == 0
         from groundtruth_kb import __version__
+
         assert __version__ in result.output
 
 
@@ -392,10 +396,16 @@ class TestImportValidation:
             json.dumps({"tables": {"nonexistent_table": [{"col": "val"}]}}),
             encoding="utf-8",
         )
-        result = runner.invoke(main, [
-            "--config", str(project_dir / "groundtruth.toml"),
-            "import", str(bad_json), "--merge",
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(project_dir / "groundtruth.toml"),
+                "import",
+                str(bad_json),
+                "--merge",
+            ],
+        )
         assert result.exit_code == 0
         assert "Skipped unknown tables" in result.output or "Imported 0" in result.output
 
@@ -406,10 +416,15 @@ class TestImportValidation:
             json.dumps({"tables": {"specifications": [{"bogus_column": "val"}]}}),
             encoding="utf-8",
         )
-        result = runner.invoke(main, [
-            "--config", str(project_dir / "groundtruth.toml"),
-            "import", str(bad_json),
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(project_dir / "groundtruth.toml"),
+                "import",
+                str(bad_json),
+            ],
+        )
         assert result.exit_code != 0
         assert "Unknown columns" in result.output
 
@@ -420,10 +435,16 @@ class TestImportValidation:
             json.dumps({"tables": {"specifications": [{"bogus_column": "val"}]}}),
             encoding="utf-8",
         )
-        result = runner.invoke(main, [
-            "--config", str(project_dir / "groundtruth.toml"),
-            "import", str(bad_json), "--merge",
-        ])
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(project_dir / "groundtruth.toml"),
+                "import",
+                str(bad_json),
+                "--merge",
+            ],
+        )
         assert result.exit_code == 0
         assert "WARNING" in result.output or "rejected" in result.output
 
@@ -445,7 +466,7 @@ class TestCLIGateConfigWiring:
         toml = tmp_path / "groundtruth.toml"
         toml.write_text(
             f"""[groundtruth]
-db_path = "{(tmp_path / 'test.db').as_posix()}"
+db_path = "{(tmp_path / "test.db").as_posix()}"
 project_root = "{tmp_path.as_posix()}"
 
 [gates]
@@ -472,8 +493,14 @@ spec_ids = ["SPEC-1524"]
         db.insert_spec("SPEC-1524", "Transport test", "implemented", "test", "test")
         with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
             db.insert_test(
-                "TEST-CLI-001", "CLI path test", "SPEC-1524", "e2e",
-                "pass expected", "test", "regression", last_result="pass",
+                "TEST-CLI-001",
+                "CLI path test",
+                "SPEC-1524",
+                "e2e",
+                "pass expected",
+                "test",
+                "regression",
+                last_result="pass",
             )
         db.close()
 
@@ -485,7 +512,7 @@ spec_ids = ["SPEC-1524"]
         toml = tmp_path / "groundtruth.toml"
         toml.write_text(
             f"""[groundtruth]
-db_path = "{(tmp_path / 'test.db').as_posix()}"
+db_path = "{(tmp_path / "test.db").as_posix()}"
 project_root = "{tmp_path.as_posix()}"
 
 [gates]

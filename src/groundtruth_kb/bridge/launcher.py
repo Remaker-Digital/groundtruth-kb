@@ -43,9 +43,7 @@ def _pid_is_running(pid: int) -> bool:
 
             PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
             STILL_ACTIVE = 259
-            handle = ctypes.windll.kernel32.OpenProcess(
-                PROCESS_QUERY_LIMITED_INFORMATION, False, pid
-            )
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
             if not handle:
                 return False
             exit_code = wintypes.DWORD()
@@ -111,16 +109,26 @@ def _start_detached(
         py = str(Path(sys.executable).resolve())
         # Use -m to run the worker module instead of a script path
         arg_parts = [
-            "-m", "groundtruth_kb.bridge.worker",
-            "--agent", agent,
-            "--project-dir", str(project_dir),
-            "--cadence-minutes", str(cadence_minutes),
-            "--timeout-seconds", str(timeout_seconds),
-            "--poll-interval-ms", str(poll_interval_ms),
-            "--limit", str(limit),
-            "--max-dispatch-targets", str(max_dispatch_targets),
-            "--exec-timeout-seconds", str(exec_timeout_seconds),
-            "--error-backoff-seconds", str(error_backoff_seconds),
+            "-m",
+            "groundtruth_kb.bridge.worker",
+            "--agent",
+            agent,
+            "--project-dir",
+            str(project_dir),
+            "--cadence-minutes",
+            str(cadence_minutes),
+            "--timeout-seconds",
+            str(timeout_seconds),
+            "--poll-interval-ms",
+            str(poll_interval_ms),
+            "--limit",
+            str(limit),
+            "--max-dispatch-targets",
+            str(max_dispatch_targets),
+            "--exec-timeout-seconds",
+            str(exec_timeout_seconds),
+            "--error-backoff-seconds",
+            str(error_backoff_seconds),
         ]
         arg_string = " ".join(arg_parts)
 
@@ -147,7 +155,8 @@ def _start_detached(
 
     cmd = [
         sys.executable,
-        "-m", "groundtruth_kb.bridge.worker",
+        "-m",
+        "groundtruth_kb.bridge.worker",
         "--agent",
         agent,
         "--project-dir",
@@ -219,8 +228,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--error-backoff-seconds", type=int, default=5)
     parser.add_argument("--auto-actions", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--json-output", action="store_true", help="Print structured JSON result")
-    parser.add_argument("--project-dir", type=str, default=None,
-                        help="Project directory (defaults to CLAUDE_PROJECT_DIR or cwd)")
+    parser.add_argument(
+        "--project-dir", type=str, default=None, help="Project directory (defaults to CLAUDE_PROJECT_DIR or cwd)"
+    )
     return parser
 
 
@@ -236,7 +246,8 @@ def _try_start_scheduled_task(agent: str) -> bool:
     try:
         result = subprocess.run(
             ["schtasks.exe", "/Run", "/TN", task_name],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         return result.returncode == 0
     except Exception:
@@ -251,7 +262,8 @@ def _scheduled_task_exists(agent: str) -> bool:
     try:
         result = subprocess.run(
             ["schtasks.exe", "/Query", "/TN", task_name],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         return result.returncode == 0
     except Exception:
@@ -262,9 +274,7 @@ def main() -> int:
     _consume_stdin_if_present()
     args = build_parser().parse_args()
 
-    project_dir = Path(args.project_dir) if args.project_dir else Path(
-        os.environ.get("CLAUDE_PROJECT_DIR", Path.cwd())
-    )
+    project_dir = Path(args.project_dir) if args.project_dir else Path(os.environ.get("CLAUDE_PROJECT_DIR", Path.cwd()))
 
     # Step 1: Check if worker is already healthy
     running = _discover_running_worker(project_dir, args.agent)

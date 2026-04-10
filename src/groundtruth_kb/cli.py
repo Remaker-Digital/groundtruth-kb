@@ -75,6 +75,7 @@ def main(ctx: click.Context, config_path: str | None) -> None:
 # gt init
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.argument("project_name", default="my-project")
 @click.option("--dir", "target_dir", type=click.Path(), default=None, help="Target directory (default: ./<name>)")
@@ -176,6 +177,7 @@ def bootstrap_desktop_cmd(
 # gt assert
 # ---------------------------------------------------------------------------
 
+
 @main.command("assert")
 @click.option("--spec", "spec_id", default=None, help="Run assertions for a single spec ID")
 @click.option("--triggered-by", default="cli", help="Trigger label (default: cli)")
@@ -200,6 +202,7 @@ def assert_cmd(ctx: click.Context, spec_id: str | None, triggered_by: str) -> No
 # gt seed
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.option("--example", is_flag=True, help="Load example domain specs and tests")
 @click.pass_context
@@ -218,9 +221,11 @@ def seed(ctx: click.Context, example: bool) -> None:
             click.echo(f"Loaded {ex_count} example specs + tests.")
 
         summary = db.get_summary()
-        click.echo(f"\nDatabase now has {summary['spec_total']} specs, "
-                    f"{summary['test_artifact_count']} tests, "
-                    f"{summary['work_item_total']} work items.")
+        click.echo(
+            f"\nDatabase now has {summary['spec_total']} specs, "
+            f"{summary['test_artifact_count']} tests, "
+            f"{summary['work_item_total']} work items."
+        )
     finally:
         db.close()
 
@@ -228,6 +233,7 @@ def seed(ctx: click.Context, example: bool) -> None:
 # ---------------------------------------------------------------------------
 # gt summary
 # ---------------------------------------------------------------------------
+
 
 @main.command()
 @click.pass_context
@@ -260,6 +266,7 @@ def summary(ctx: click.Context) -> None:
 # gt history
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.option("--limit", default=20, help="Number of recent changes to show")
 @click.pass_context
@@ -274,8 +281,10 @@ def history(ctx: click.Context, limit: int) -> None:
             return
         click.echo(f"\nRecent changes (last {limit}):\n")
         for c in changes:
-            click.echo(f"  [{c['changed_at'][:19]}] {c['table_name']}/{c['record_id']} "
-                        f"v{c['version']} — {c.get('title', '')[:60]}")
+            click.echo(
+                f"  [{c['changed_at'][:19]}] {c['table_name']}/{c['record_id']} "
+                f"v{c['version']} — {c.get('title', '')[:60]}"
+            )
             click.echo(f"    by {c['changed_by']}: {c['change_reason'][:80]}")
         click.echo()
     finally:
@@ -285,6 +294,7 @@ def history(ctx: click.Context, limit: int) -> None:
 # ---------------------------------------------------------------------------
 # gt export
 # ---------------------------------------------------------------------------
+
 
 @main.command("export")
 @click.option("--output", "output_file", type=click.Path(), default=None, help="Output JSON file path")
@@ -304,13 +314,25 @@ def export_cmd(ctx: click.Context, output_file: str | None) -> None:
 # gt import
 # ---------------------------------------------------------------------------
 
-_IMPORTABLE_TABLES = frozenset({
-    "specifications", "test_procedures", "operational_procedures",
-    "assertion_runs", "session_prompts", "environment_config",
-    "documents", "test_coverage", "tests", "test_plans",
-    "test_plan_phases", "work_items", "backlog_snapshots",
-    "testable_elements", "quality_scores",
-})
+_IMPORTABLE_TABLES = frozenset(
+    {
+        "specifications",
+        "test_procedures",
+        "operational_procedures",
+        "assertion_runs",
+        "session_prompts",
+        "environment_config",
+        "documents",
+        "test_coverage",
+        "tests",
+        "test_plans",
+        "test_plan_phases",
+        "work_items",
+        "backlog_snapshots",
+        "testable_elements",
+        "quality_scores",
+    }
+)
 
 
 @main.command("import")
@@ -363,6 +385,7 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
                 # Validate assertions in specifications rows
                 if table_name == "specifications" and "assertions" in row and row["assertions"]:
                     from groundtruth_kb.assertion_schema import validate_assertion_list
+
                     try:
                         raw = row["assertions"]
                         parsed_assertions = json.loads(raw) if isinstance(raw, str) else raw
@@ -371,12 +394,10 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
                             spec_id = row.get("id", "unknown")
                             if not merge:
                                 raise click.ClickException(
-                                    f"Invalid assertions in {spec_id}: "
-                                    f"{'; '.join(validation_errors)}"
+                                    f"Invalid assertions in {spec_id}: {'; '.join(validation_errors)}"
                                 )
                             click.echo(
-                                f"  WARNING: {spec_id}: invalid assertions "
-                                f"skipped ({len(validation_errors)} error(s))",
+                                f"  WARNING: {spec_id}: invalid assertions skipped ({len(validation_errors)} error(s))",
                                 err=True,
                             )
                             rejected += 1
@@ -384,8 +405,7 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
                     except (json.JSONDecodeError, TypeError) as exc:
                         if not merge:
                             raise click.ClickException(
-                                f"Malformed assertions JSON in "
-                                f"{row.get('id', 'unknown')}"
+                                f"Malformed assertions JSON in {row.get('id', 'unknown')}"
                             ) from exc
                         rejected += 1
                         continue
@@ -426,6 +446,7 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
 # gt config
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.pass_context
 def config(ctx: click.Context) -> None:
@@ -448,6 +469,7 @@ def config(ctx: click.Context) -> None:
 # ---------------------------------------------------------------------------
 # gt serve
 # ---------------------------------------------------------------------------
+
 
 @main.command()
 @click.option("--port", default=8090, help="Port for the web UI")

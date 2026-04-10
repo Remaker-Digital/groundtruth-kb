@@ -404,7 +404,8 @@ class KnowledgeDB:
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
             self._conn = sqlite3.connect(
-                str(self.db_path), check_same_thread=self._check_same_thread,
+                str(self.db_path),
+                check_same_thread=self._check_same_thread,
             )
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
@@ -430,8 +431,12 @@ class KnowledgeDB:
             conn.commit()
 
         # Migration 2: Backfill architecture_decision and design_constraint types (GOV-20 Phase 1)
-        conn.execute("UPDATE specifications SET type = 'architecture_decision' WHERE id LIKE 'ADR-%' AND type = 'requirement'")
-        conn.execute("UPDATE specifications SET type = 'design_constraint' WHERE id LIKE 'DCL-%' AND type = 'requirement'")
+        conn.execute(
+            "UPDATE specifications SET type = 'architecture_decision' WHERE id LIKE 'ADR-%' AND type = 'requirement'"
+        )
+        conn.execute(
+            "UPDATE specifications SET type = 'design_constraint' WHERE id LIKE 'DCL-%' AND type = 'requirement'"
+        )
         conn.commit()
 
     @staticmethod
@@ -460,9 +465,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_spec_version(self, spec_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM specifications WHERE id = ?", (spec_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM specifications WHERE id = ?", (spec_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_spec(
@@ -498,6 +501,7 @@ class KnowledgeDB:
         # Validate assertions at write time
         if validate_assertions and assertions:
             from groundtruth_kb.assertion_schema import validate_assertion_list
+
             errors = validate_assertion_list(assertions)
             if errors:
                 raise ValueError(f"Invalid assertions for {id}: {'; '.join(errors)}")
@@ -505,8 +509,10 @@ class KnowledgeDB:
         # Run governance gates on initial insert (for status enforcement)
         if self._gate_registry is not None:
             spec_data = {
-                "type": type, "assertions": json.dumps(assertions) if assertions else None,
-                "title": title, "status": status,
+                "type": type,
+                "assertions": json.dumps(assertions) if assertions else None,
+                "title": title,
+                "status": status,
             }
             if status == "verified":
                 spec_data["linked_tests"] = self.get_tests_for_spec(id)
@@ -520,8 +526,23 @@ class KnowledgeDB:
                (id, version, title, description, priority, scope, section,
                 handle, tags, status, assertions, type, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, description, priority, scope, section,
-             handle, tags_json, status, assertions_json, type, changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                description,
+                priority,
+                scope,
+                section,
+                handle,
+                tags_json,
+                status,
+                assertions_json,
+                type,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_spec(id)
@@ -548,6 +569,7 @@ class KnowledgeDB:
         # Validate assertions at write time if provided
         if validate_assertions and "assertions" in fields and fields["assertions"] is not None:
             from groundtruth_kb.assertion_schema import validate_assertion_list
+
             errors = validate_assertion_list(fields["assertions"])
             if errors:
                 raise ValueError(f"Invalid assertions for {id}: {'; '.join(errors)}")
@@ -563,9 +585,7 @@ class KnowledgeDB:
         section = fields.get("section", current["section"])
         handle = fields.get("handle", current["handle"])
         status = fields.get("status", current["status"])
-        spec_type = self._auto_detect_spec_type(
-            id, fields.get("type", current.get("type", "requirement"))
-        )
+        spec_type = self._auto_detect_spec_type(id, fields.get("type", current.get("type", "requirement")))
 
         # Tags and assertions: use 'is not _UNSET' to allow explicit [] or None
         raw_tags = fields.get("tags", _UNSET)
@@ -583,8 +603,10 @@ class KnowledgeDB:
         # Run governance gates before spec promotion
         if self._gate_registry is not None:
             spec_data = {
-                "type": spec_type, "assertions": assertions_json,
-                "title": title, "status": status,
+                "type": spec_type,
+                "assertions": assertions_json,
+                "title": title,
+                "status": status,
             }
             if status == "verified":
                 spec_data["linked_tests"] = self.get_tests_for_spec(id)
@@ -596,25 +618,42 @@ class KnowledgeDB:
                (id, version, title, description, priority, scope, section,
                 handle, tags, status, assertions, type, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, description, priority, scope, section,
-             handle, tags_json, status, assertions_json, spec_type, changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                description,
+                priority,
+                scope,
+                section,
+                handle,
+                tags_json,
+                status,
+                assertions_json,
+                spec_type,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_spec(id)
 
     def get_spec(self, spec_id: str) -> dict[str, Any] | None:
         """Get the current (latest) version of a specification."""
-        row = self._get_conn().execute(
-            "SELECT * FROM current_specifications WHERE id = ?", (spec_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_specifications WHERE id = ?", (spec_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_spec_history(self, spec_id: str) -> list[dict[str, Any]]:
         """Get all versions of a specification, newest first."""
-        rows = self._get_conn().execute(
-            "SELECT * FROM specifications WHERE id = ? ORDER BY version DESC",
-            (spec_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM specifications WHERE id = ? ORDER BY version DESC",
+                (spec_id,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def list_specs(
@@ -665,10 +704,14 @@ class KnowledgeDB:
 
         E.g., parent_id="245" returns 245.1, 245.2, 245.1.1, etc.
         """
-        rows = self._get_conn().execute(
-            "SELECT * FROM current_specifications WHERE id LIKE ?",
-            (f"{parent_id}.%",),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM current_specifications WHERE id LIKE ?",
+                (f"{parent_id}.%",),
+            )
+            .fetchall()
+        )
         result = [_row_to_dict(r) for r in rows]
         result.sort(key=lambda r: spec_sort_key(r["id"]))
         return result
@@ -687,9 +730,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_test_proc_version(self, proc_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM test_procedures WHERE id = ?", (proc_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM test_procedures WHERE id = ?", (proc_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_test_procedure(
@@ -713,24 +754,36 @@ class KnowledgeDB:
                 last_execution_status, last_executed_at,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, type, content, assertion_count,
-             last_execution_status, last_executed_at,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                type,
+                content,
+                assertion_count,
+                last_execution_status,
+                last_executed_at,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_test_procedure(id)
 
     def get_test_procedure(self, proc_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_test_procedures WHERE id = ?", (proc_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_test_procedures WHERE id = ?", (proc_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_test_procedure_history(self, proc_id: str) -> list[dict[str, Any]]:
-        rows = self._get_conn().execute(
-            "SELECT * FROM test_procedures WHERE id = ? ORDER BY version DESC",
-            (proc_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM test_procedures WHERE id = ? ORDER BY version DESC",
+                (proc_id,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def list_test_procedures(self, *, type: str | None = None) -> list[dict[str, Any]]:
@@ -748,9 +801,11 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_op_version(self, proc_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM operational_procedures WHERE id = ?", (proc_id,)
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM operational_procedures WHERE id = ?", (proc_id,))
+            .fetchone()
+        )
         return (row[0] or 0) + 1
 
     def insert_op_procedure(
@@ -775,27 +830,39 @@ class KnowledgeDB:
                 last_verified_at, last_corrected_at,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, type,
-             json.dumps(variables) if variables else None,
-             json.dumps(steps) if steps else None,
-             json.dumps(known_failure_modes) if known_failure_modes else None,
-             last_verified_at, last_corrected_at,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                type,
+                json.dumps(variables) if variables else None,
+                json.dumps(steps) if steps else None,
+                json.dumps(known_failure_modes) if known_failure_modes else None,
+                last_verified_at,
+                last_corrected_at,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_op_procedure(id)
 
     def get_op_procedure(self, proc_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_operational_procedures WHERE id = ?", (proc_id,)
-        ).fetchone()
+        row = (
+            self._get_conn().execute("SELECT * FROM current_operational_procedures WHERE id = ?", (proc_id,)).fetchone()
+        )
         return _row_to_dict(row) if row else None
 
     def get_op_procedure_history(self, proc_id: str) -> list[dict[str, Any]]:
-        rows = self._get_conn().execute(
-            "SELECT * FROM operational_procedures WHERE id = ? ORDER BY version DESC",
-            (proc_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM operational_procedures WHERE id = ? ORDER BY version DESC",
+                (proc_id,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def list_op_procedures(self, *, type: str | None = None) -> list[dict[str, Any]]:
@@ -813,9 +880,11 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_env_version(self, config_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM environment_config WHERE id = ?", (config_id,)
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM environment_config WHERE id = ?", (config_id,))
+            .fetchone()
+        )
         return (row[0] or 0) + 1
 
     def insert_env_config(
@@ -849,8 +918,7 @@ class KnowledgeDB:
                (id, version, environment, category, key, value, sensitive,
                 notes, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, environment, category, key, value, int(sensitive),
-             notes, changed_by, _now(), change_reason),
+            (id, version, environment, category, key, value, int(sensitive), notes, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_env_config(id)
@@ -881,17 +949,14 @@ class KnowledgeDB:
                (id, version, environment, category, key, value, sensitive,
                 notes, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, environment, category, key, value, int(sensitive),
-             notes, changed_by, _now(), change_reason),
+            (id, version, environment, category, key, value, int(sensitive), notes, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_env_config(id)
 
     def get_env_config(self, config_id: str) -> dict[str, Any] | None:
         """Get the current (latest) version of an environment config entry."""
-        row = self._get_conn().execute(
-            "SELECT * FROM current_environment_config WHERE id = ?", (config_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_environment_config WHERE id = ?", (config_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def list_env_config(
@@ -915,10 +980,14 @@ class KnowledgeDB:
 
     def get_env_config_history(self, config_id: str) -> list[dict[str, Any]]:
         """Get all versions of an environment config entry, newest first."""
-        rows = self._get_conn().execute(
-            "SELECT * FROM environment_config WHERE id = ? ORDER BY version DESC",
-            (config_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM environment_config WHERE id = ? ORDER BY version DESC",
+                (config_id,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -926,9 +995,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_doc_version(self, doc_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM documents WHERE id = ?", (doc_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM documents WHERE id = ?", (doc_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_document(
@@ -953,8 +1020,7 @@ class KnowledgeDB:
                (id, version, title, category, content, tags, status,
                 source_path, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, category, content, tags_json, status,
-             source_path, changed_by, _now(), change_reason),
+            (id, version, title, category, content, tags_json, status, source_path, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_document(id)
@@ -991,20 +1057,20 @@ class KnowledgeDB:
                (id, version, title, category, content, tags, status,
                 source_path, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, category, content, tags_json, status,
-             source_path, changed_by, _now(), change_reason),
+            (id, version, title, category, content, tags_json, status, source_path, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_document(id)
 
     def get_document(self, doc_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_documents WHERE id = ?", (doc_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_documents WHERE id = ?", (doc_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def list_documents(
-        self, *, category: str | None = None, status: str | None = None,
+        self,
+        *,
+        category: str | None = None,
+        status: str | None = None,
         tag: str | None = None,
     ) -> list[dict[str, Any]]:
         query = "SELECT * FROM current_documents WHERE 1=1"
@@ -1031,7 +1097,9 @@ class KnowledgeDB:
         return self.list_specs(type="design_constraint", status=status)
 
     def validate_dcl_constraints(
-        self, dcl_id: str | None = None, project_root: Path | None = None,
+        self,
+        dcl_id: str | None = None,
+        project_root: Path | None = None,
     ) -> list[dict[str, Any]]:
         """Validate design constraint assertions against the codebase.
 
@@ -1061,7 +1129,9 @@ class KnowledgeDB:
         for spec in specs:
             if not spec or not spec.get("assertions"):
                 continue
-            assertion_list = json.loads(spec["assertions"]) if isinstance(spec["assertions"], str) else spec["assertions"]
+            assertion_list = (
+                json.loads(spec["assertions"]) if isinstance(spec["assertions"], str) else spec["assertions"]
+            )
             spec_results = []
             all_passed = True
             for assertion in assertion_list:
@@ -1069,12 +1139,14 @@ class KnowledgeDB:
                 spec_results.append(r)
                 if not r.get("passed") and not r.get("skipped"):
                     all_passed = False
-            results.append({
-                "dcl_id": spec["id"],
-                "title": spec["title"],
-                "passed": all_passed,
-                "results": spec_results,
-            })
+            results.append(
+                {
+                    "dcl_id": spec["id"],
+                    "title": spec["title"],
+                    "passed": all_passed,
+                    "results": spec_results,
+                }
+            )
         return results
 
     def list_implementation_proposals(self, *, wi_id: str | None = None) -> list[dict[str, Any]]:
@@ -1113,8 +1185,7 @@ class KnowledgeDB:
                (spec_id, test_file, test_class, test_function,
                 confidence, match_reason, created_at, created_by)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (spec_id, test_file, test_class, test_function,
-             confidence, match_reason, _now(), created_by),
+            (spec_id, test_file, test_class, test_function, confidence, match_reason, _now(), created_by),
         )
         conn.commit()
 
@@ -1132,9 +1203,16 @@ class KnowledgeDB:
                    (spec_id, test_file, test_class, test_function,
                     confidence, match_reason, created_at, created_by)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (m["spec_id"], m["test_file"], m.get("test_class"),
-                 m["test_function"], m.get("confidence", "high"),
-                 m.get("match_reason"), _now(), created_by),
+                (
+                    m["spec_id"],
+                    m["test_file"],
+                    m.get("test_class"),
+                    m["test_function"],
+                    m.get("confidence", "high"),
+                    m.get("match_reason"),
+                    _now(),
+                    created_by,
+                ),
             )
             count += 1
         conn.commit()
@@ -1142,25 +1220,27 @@ class KnowledgeDB:
 
     def get_test_coverage_for_spec(self, spec_id: str) -> list[dict[str, Any]]:
         """Get all test mappings for a spec."""
-        rows = self._get_conn().execute(
-            "SELECT * FROM test_coverage WHERE spec_id = ? ORDER BY test_file, test_function",
-            (spec_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM test_coverage WHERE spec_id = ? ORDER BY test_file, test_function",
+                (spec_id,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def get_test_coverage_summary(self) -> dict[str, Any]:
         """Get coverage statistics."""
         conn = self._get_conn()
         total_mappings = conn.execute("SELECT COUNT(*) FROM test_coverage").fetchone()[0]
-        specs_covered = conn.execute(
-            "SELECT COUNT(DISTINCT spec_id) FROM test_coverage"
-        ).fetchone()[0]
+        specs_covered = conn.execute("SELECT COUNT(DISTINCT spec_id) FROM test_coverage").fetchone()[0]
         tests_mapped = conn.execute(
             "SELECT COUNT(DISTINCT test_file || ':' || test_function) FROM test_coverage"
         ).fetchone()[0]
-        by_confidence = dict(conn.execute(
-            "SELECT confidence, COUNT(*) FROM test_coverage GROUP BY confidence"
-        ).fetchall())
+        by_confidence = dict(
+            conn.execute("SELECT confidence, COUNT(*) FROM test_coverage GROUP BY confidence").fetchall()
+        )
         return {
             "total_mappings": total_mappings,
             "specs_covered": specs_covered,
@@ -1173,9 +1253,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_test_version(self, test_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM tests WHERE id = ?", (test_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM tests WHERE id = ?", (test_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_test(
@@ -1215,9 +1293,23 @@ class KnowledgeDB:
                 test_function, description, expected_outcome, last_result,
                 last_executed_at, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, spec_id, test_type, test_file, test_class,
-             test_function, description, expected_outcome, last_result,
-             last_executed_at, changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                spec_id,
+                test_type,
+                test_file,
+                test_class,
+                test_function,
+                description,
+                expected_outcome,
+                last_result,
+                last_executed_at,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_test(id)
@@ -1255,23 +1347,33 @@ class KnowledgeDB:
                 test_function, description, expected_outcome, last_result,
                 last_executed_at, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, spec_id, test_type, test_file, test_class,
-             test_function, description, expected_outcome, last_result,
-             last_executed_at, changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                spec_id,
+                test_type,
+                test_file,
+                test_class,
+                test_function,
+                description,
+                expected_outcome,
+                last_result,
+                last_executed_at,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_test(id)
 
     def get_test(self, test_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_tests WHERE id = ?", (test_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_tests WHERE id = ?", (test_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_test_history(self, test_id: str) -> list[dict[str, Any]]:
-        rows = self._get_conn().execute(
-            "SELECT * FROM tests WHERE id = ? ORDER BY version DESC", (test_id,)
-        ).fetchall()
+        rows = self._get_conn().execute("SELECT * FROM tests WHERE id = ? ORDER BY version DESC", (test_id,)).fetchall()
         return [_row_to_dict(r) for r in rows]
 
     def list_tests(
@@ -1303,12 +1405,16 @@ class KnowledgeDB:
 
     def get_untested_specs(self) -> list[dict[str, Any]]:
         """Get specifications that have no tests linked to them (excludes retired)."""
-        rows = self._get_conn().execute(
-            """SELECT s.* FROM current_specifications s
+        rows = (
+            self._get_conn()
+            .execute(
+                """SELECT s.* FROM current_specifications s
                LEFT JOIN current_tests t ON t.spec_id = s.id
                WHERE t.id IS NULL AND s.status != 'retired'
                ORDER BY s.id"""
-        ).fetchall()
+            )
+            .fetchall()
+        )
         result = [_row_to_dict(r) for r in rows]
         result.sort(key=lambda r: spec_sort_key(r["id"]))
         return result
@@ -1318,9 +1424,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_plan_version(self, plan_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM test_plans WHERE id = ?", (plan_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM test_plans WHERE id = ?", (plan_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_test_plan(
@@ -1345,8 +1449,7 @@ class KnowledgeDB:
                (id, version, title, description, status,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, description, status,
-             changed_by, _now(), change_reason),
+            (id, version, title, description, status, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_test_plan(id)
@@ -1372,22 +1475,21 @@ class KnowledgeDB:
                (id, version, title, description, status,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, description, status,
-             changed_by, _now(), change_reason),
+            (id, version, title, description, status, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_test_plan(id)
 
     def get_test_plan(self, plan_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_test_plans WHERE id = ?", (plan_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_test_plans WHERE id = ?", (plan_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_test_plan_history(self, plan_id: str) -> list[dict[str, Any]]:
-        rows = self._get_conn().execute(
-            "SELECT * FROM test_plans WHERE id = ? ORDER BY version DESC", (plan_id,)
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM test_plans WHERE id = ? ORDER BY version DESC", (plan_id,))
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def list_test_plans(self, *, status: str | None = None) -> list[dict[str, Any]]:
@@ -1410,9 +1512,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_phase_version(self, phase_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM test_plan_phases WHERE id = ?", (phase_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM test_plan_phases WHERE id = ?", (phase_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_test_plan_phase(
@@ -1447,9 +1547,21 @@ class KnowledgeDB:
                 gate_criteria, test_ids, last_result, last_executed_at,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, plan_id, phase_order, title, description,
-             gate_criteria, test_ids_json, last_result, last_executed_at,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                plan_id,
+                phase_order,
+                title,
+                description,
+                gate_criteria,
+                test_ids_json,
+                last_result,
+                last_executed_at,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_test_plan_phase(id)
@@ -1486,25 +1598,39 @@ class KnowledgeDB:
                 gate_criteria, test_ids, last_result, last_executed_at,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, plan_id, phase_order, title, description,
-             gate_criteria, test_ids_json, last_result, last_executed_at,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                plan_id,
+                phase_order,
+                title,
+                description,
+                gate_criteria,
+                test_ids_json,
+                last_result,
+                last_executed_at,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_test_plan_phase(id)
 
     def get_test_plan_phase(self, phase_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_test_plan_phases WHERE id = ?", (phase_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_test_plan_phases WHERE id = ?", (phase_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def list_test_plan_phases(self, plan_id: str) -> list[dict[str, Any]]:
         """List current phases for a test plan, ordered by phase_order."""
-        rows = self._get_conn().execute(
-            "SELECT * FROM current_test_plan_phases WHERE plan_id = ? ORDER BY phase_order",
-            (plan_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM current_test_plan_phases WHERE plan_id = ? ORDER BY phase_order",
+                (plan_id,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -1512,9 +1638,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_work_item_version(self, item_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM work_items WHERE id = ?", (item_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM work_items WHERE id = ?", (item_id,)).fetchone()
         return (row[0] or 0) + 1
 
     # Valid stage transitions: created → tested → backlogged → implementing → resolved
@@ -1527,8 +1651,12 @@ class KnowledgeDB:
     }
 
     def _validate_stage_transition(
-        self, wi_id: str, current_stage: str, new_stage: str,
-        *, owner_approved: bool = False,
+        self,
+        wi_id: str,
+        current_stage: str,
+        new_stage: str,
+        *,
+        owner_approved: bool = False,
     ) -> None:
         """Enforce valid work item stage transitions per SPEC-1602."""
         if new_stage == current_stage:
@@ -1558,7 +1686,11 @@ class KnowledgeDB:
             wi = self.get_work_item(wi_id)
             if wi:
                 self._gate_registry.run_pre_resolve_work_item(
-                    wi_id, wi.get("origin", ""), "resolved", owner_approved, wi,
+                    wi_id,
+                    wi.get("origin", ""),
+                    "resolved",
+                    owner_approved,
+                    wi,
                 )
 
     def _wi_has_linked_test(self, wi_id: str) -> bool:
@@ -1571,9 +1703,7 @@ class KnowledgeDB:
 
     def _wi_in_backlog(self, wi_id: str) -> bool:
         """Check if a work item ID appears in any backlog snapshot description."""
-        rows = self._get_conn().execute(
-            "SELECT description FROM current_backlog_snapshots"
-        ).fetchall()
+        rows = self._get_conn().execute("SELECT description FROM current_backlog_snapshots").fetchall()
         for row in rows:
             if row[0] and wi_id in row[0]:
                 return True
@@ -1617,10 +1747,23 @@ class KnowledgeDB:
                 resolution_status, priority, stage,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, description, origin, component,
-             source_spec_id, source_test_id, failure_description,
-             resolution_status, priority, stage,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                description,
+                origin,
+                component,
+                source_spec_id,
+                source_test_id,
+                failure_description,
+                resolution_status,
+                priority,
+                stage,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_work_item(id)
@@ -1662,7 +1805,10 @@ class KnowledgeDB:
         new_stage = fields.get("stage", current_stage)
         # Enforce stage transitions (includes GOV-15 owner approval gate)
         self._validate_stage_transition(
-            id, current_stage, new_stage, owner_approved=owner_approved,
+            id,
+            current_stage,
+            new_stage,
+            owner_approved=owner_approved,
         )
         conn = self._get_conn()
         conn.execute(
@@ -1672,24 +1818,37 @@ class KnowledgeDB:
                 resolution_status, priority, stage,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, description, origin, component,
-             source_spec_id, source_test_id, failure_description,
-             resolution_status, priority, new_stage,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                description,
+                origin,
+                component,
+                source_spec_id,
+                source_test_id,
+                failure_description,
+                resolution_status,
+                priority,
+                new_stage,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_work_item(id)
 
     def get_work_item(self, item_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_work_items WHERE id = ?", (item_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_work_items WHERE id = ?", (item_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_work_item_history(self, item_id: str) -> list[dict[str, Any]]:
-        rows = self._get_conn().execute(
-            "SELECT * FROM work_items WHERE id = ? ORDER BY version DESC", (item_id,)
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM work_items WHERE id = ? ORDER BY version DESC", (item_id,))
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def list_work_items(
@@ -1725,11 +1884,15 @@ class KnowledgeDB:
 
     def get_open_work_items(self) -> list[dict[str, Any]]:
         """Get all work items that are not yet verified (the active backlog)."""
-        rows = self._get_conn().execute(
-            """SELECT * FROM current_work_items
+        rows = (
+            self._get_conn()
+            .execute(
+                """SELECT * FROM current_work_items
                WHERE resolution_status != 'verified'
                ORDER BY priority, id"""
-        ).fetchall()
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -1737,9 +1900,11 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_backlog_version(self, snapshot_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM backlog_snapshots WHERE id = ?", (snapshot_id,)
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM backlog_snapshots WHERE id = ?", (snapshot_id,))
+            .fetchone()
+        )
         return (row[0] or 0) + 1
 
     def insert_backlog_snapshot(
@@ -1770,34 +1935,50 @@ class KnowledgeDB:
                 summary_by_origin, summary_by_component,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, title, description, snapshot_at or _now(),
-             json.dumps(work_item_ids),
-             json.dumps(summary_by_origin) if summary_by_origin else None,
-             json.dumps(summary_by_component) if summary_by_component else None,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                title,
+                description,
+                snapshot_at or _now(),
+                json.dumps(work_item_ids),
+                json.dumps(summary_by_origin) if summary_by_origin else None,
+                json.dumps(summary_by_component) if summary_by_component else None,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_backlog_snapshot(id)
 
     def get_backlog_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            "SELECT * FROM current_backlog_snapshots WHERE id = ?", (snapshot_id,)
-        ).fetchone()
+        row = (
+            self._get_conn().execute("SELECT * FROM current_backlog_snapshots WHERE id = ?", (snapshot_id,)).fetchone()
+        )
         return _row_to_dict(row) if row else None
 
     def get_backlog_snapshot_history(self, snapshot_id: str) -> list[dict[str, Any]]:
-        rows = self._get_conn().execute(
-            "SELECT * FROM backlog_snapshots WHERE id = ? ORDER BY version DESC",
-            (snapshot_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM backlog_snapshots WHERE id = ? ORDER BY version DESC",
+                (snapshot_id,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def list_backlog_snapshots(self, *, limit: int = 20) -> list[dict[str, Any]]:
         """List backlog snapshots, most recent first."""
-        rows = self._get_conn().execute(
-            "SELECT * FROM current_backlog_snapshots ORDER BY snapshot_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM current_backlog_snapshots ORDER BY snapshot_at DESC LIMIT ?",
+                (limit,),
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def create_backlog_snapshot_from_current(
@@ -1851,29 +2032,36 @@ class KnowledgeDB:
             """INSERT INTO assertion_runs
                (spec_id, spec_version, run_at, overall_passed, results, triggered_by)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (spec_id, spec_version, _now(), int(overall_passed),
-             json.dumps(results), triggered_by),
+            (spec_id, spec_version, _now(), int(overall_passed), json.dumps(results), triggered_by),
         )
         conn.commit()
 
     def get_latest_assertion_run(self, spec_id: str) -> dict[str, Any] | None:
-        row = self._get_conn().execute(
-            """SELECT * FROM assertion_runs
+        row = (
+            self._get_conn()
+            .execute(
+                """SELECT * FROM assertion_runs
                WHERE spec_id = ? ORDER BY rowid DESC LIMIT 1""",
-            (spec_id,),
-        ).fetchone()
+                (spec_id,),
+            )
+            .fetchone()
+        )
         return _row_to_dict(row) if row else None
 
     def get_all_latest_assertion_runs(self) -> list[dict[str, Any]]:
         """Get the most recent assertion run for each spec."""
-        rows = self._get_conn().execute(
-            """SELECT a.* FROM assertion_runs a
+        rows = (
+            self._get_conn()
+            .execute(
+                """SELECT a.* FROM assertion_runs a
                INNER JOIN (
                    SELECT spec_id, MAX(rowid) AS max_rowid
                    FROM assertion_runs GROUP BY spec_id
                ) m ON a.spec_id = m.spec_id AND a.rowid = m.max_rowid
                ORDER BY a.spec_id"""
-        ).fetchall()
+            )
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -1881,10 +2069,14 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_session_prompt_version(self, session_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM session_prompts WHERE session_id = ?",
-            (session_id,),
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute(
+                "SELECT MAX(version) FROM session_prompts WHERE session_id = ?",
+                (session_id,),
+            )
+            .fetchone()
+        )
         return (row[0] or 0) + 1
 
     def insert_session_prompt(
@@ -1908,19 +2100,22 @@ class KnowledgeDB:
             """INSERT INTO session_prompts
                (session_id, version, event_type, created_at, prompt_text, context)
                VALUES (?, ?, 'created', ?, ?, ?)""",
-            (session_id, version, _now(), prompt_text,
-             json.dumps(context) if context else None),
+            (session_id, version, _now(), prompt_text, json.dumps(context) if context else None),
         )
         conn.commit()
         return self.get_session_prompt(session_id)
 
     def get_session_prompt(self, session_id: str) -> dict[str, Any] | None:
         """Get the latest event for a specific session's handoff prompt."""
-        row = self._get_conn().execute(
-            """SELECT * FROM session_prompts
+        row = (
+            self._get_conn()
+            .execute(
+                """SELECT * FROM session_prompts
                WHERE session_id = ? ORDER BY rowid DESC LIMIT 1""",
-            (session_id,),
-        ).fetchone()
+                (session_id,),
+            )
+            .fetchone()
+        )
         return _row_to_dict(row) if row else None
 
     def get_next_session_prompt(self) -> dict[str, Any] | None:
@@ -1930,15 +2125,19 @@ class KnowledgeDB:
         Returns the most recently created prompt that hasn't been consumed.
         """
         # Find session_ids whose latest event is 'created'
-        row = self._get_conn().execute(
-            """SELECT p.* FROM session_prompts p
+        row = (
+            self._get_conn()
+            .execute(
+                """SELECT p.* FROM session_prompts p
                INNER JOIN (
                    SELECT session_id, MAX(rowid) AS max_rowid
                    FROM session_prompts GROUP BY session_id
                ) m ON p.session_id = m.session_id AND p.rowid = m.max_rowid
                WHERE p.event_type = 'created'
                ORDER BY p.rowid DESC LIMIT 1"""
-        ).fetchone()
+            )
+            .fetchone()
+        )
         return _row_to_dict(row) if row else None
 
     def consume_session_prompt(self, session_id: str) -> None:
@@ -1952,29 +2151,29 @@ class KnowledgeDB:
             """INSERT INTO session_prompts
                (session_id, version, event_type, created_at, prompt_text, context)
                VALUES (?, ?, 'consumed', ?, ?, ?)""",
-            (session_id, version, _now(),
-             current.get("prompt_text", ""),
-             current.get("context")),
+            (session_id, version, _now(), current.get("prompt_text", ""), current.get("context")),
         )
         conn.commit()
 
     def list_session_prompts(self, *, include_consumed: bool = False) -> list[dict[str, Any]]:
         """List session prompts, optionally including consumed ones."""
         if include_consumed:
-            rows = self._get_conn().execute(
-                "SELECT * FROM session_prompts ORDER BY rowid DESC"
-            ).fetchall()
+            rows = self._get_conn().execute("SELECT * FROM session_prompts ORDER BY rowid DESC").fetchall()
         else:
             # Only show sessions whose latest event is 'created'
-            rows = self._get_conn().execute(
-                """SELECT p.* FROM session_prompts p
+            rows = (
+                self._get_conn()
+                .execute(
+                    """SELECT p.* FROM session_prompts p
                    INNER JOIN (
                        SELECT session_id, MAX(rowid) AS max_rowid
                        FROM session_prompts GROUP BY session_id
                    ) m ON p.session_id = m.session_id AND p.rowid = m.max_rowid
                    WHERE p.event_type = 'created'
                    ORDER BY p.rowid DESC"""
-            ).fetchall()
+                )
+                .fetchall()
+            )
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -1987,6 +2186,7 @@ class KnowledgeDB:
     def parse_session_number(session_id: str) -> int | None:
         """Extract the numeric part from a session ID like 'S98'. Returns None if not parseable."""
         import re
+
         m = re.match(r"[Ss](\d+)$", session_id.strip())
         return int(m.group(1)) if m else None
 
@@ -2045,26 +2245,34 @@ class KnowledgeDB:
                 assertion_strength, change_failure_rate, test_freshness,
                 coverage_delta, composite_score, details)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (session_id, now, spec_coverage, defect_escape_rate,
-             assertion_strength, change_failure_rate, test_freshness,
-             coverage_delta, composite_score,
-             json.dumps(details) if details else None),
+            (
+                session_id,
+                now,
+                spec_coverage,
+                defect_escape_rate,
+                assertion_strength,
+                change_failure_rate,
+                test_freshness,
+                coverage_delta,
+                composite_score,
+                json.dumps(details) if details else None,
+            ),
         )
         conn.commit()
         return self.get_quality_score(session_id)  # type: ignore[return-value]
 
     def get_quality_score(self, session_id: str) -> dict[str, Any] | None:
         """Get the quality score for a specific session."""
-        row = self._get_conn().execute(
-            "SELECT * FROM quality_scores WHERE session_id = ?", (session_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM quality_scores WHERE session_id = ?", (session_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_quality_scores(self, *, last: int = 10) -> list[dict[str, Any]]:
         """Get the most recent quality scores, newest first."""
-        rows = self._get_conn().execute(
-            "SELECT * FROM quality_scores ORDER BY computed_at DESC LIMIT ?", (last,)
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM quality_scores ORDER BY computed_at DESC LIMIT ?", (last,))
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -2132,11 +2340,22 @@ class KnowledgeDB:
         from datetime import datetime
 
         conn = self._get_conn()
-        tables = ["specifications", "test_procedures", "operational_procedures",
-                   "assertion_runs", "session_prompts", "environment_config",
-                   "documents", "test_coverage", "tests", "test_plans",
-                   "test_plan_phases", "work_items", "backlog_snapshots",
-                   "quality_scores"]
+        tables = [
+            "specifications",
+            "test_procedures",
+            "operational_procedures",
+            "assertion_runs",
+            "session_prompts",
+            "environment_config",
+            "documents",
+            "test_coverage",
+            "tests",
+            "test_plans",
+            "test_plan_phases",
+            "work_items",
+            "backlog_snapshots",
+            "quality_scores",
+        ]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
             rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
@@ -2160,9 +2379,7 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def _next_te_version(self, te_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM testable_elements WHERE id = ?", (te_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM testable_elements WHERE id = ?", (te_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_testable_element(
@@ -2202,18 +2419,28 @@ class KnowledgeDB:
                 expected_behavior, spec_id, applicable_dimensions, status,
                 changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (id, version, subsystem, page_or_module, name, element_type,
-             expected_behavior, spec_id, dims_json, status,
-             changed_by, _now(), change_reason),
+            (
+                id,
+                version,
+                subsystem,
+                page_or_module,
+                name,
+                element_type,
+                expected_behavior,
+                spec_id,
+                dims_json,
+                status,
+                changed_by,
+                _now(),
+                change_reason,
+            ),
         )
         conn.commit()
         return self.get_testable_element(id)
 
     def get_testable_element(self, te_id: str) -> dict[str, Any] | None:
         """Get the current (latest) version of a testable element."""
-        row = self._get_conn().execute(
-            "SELECT * FROM current_testable_elements WHERE id = ?", (te_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_testable_elements WHERE id = ?", (te_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def list_testable_elements(
@@ -2255,8 +2482,7 @@ class KnowledgeDB:
         ).fetchall()
         return {
             "subsystems": [
-                {"subsystem": r["subsystem"], "total": r["total"], "active": r["active"]}
-                for r in subsystem_counts
+                {"subsystem": r["subsystem"], "total": r["total"], "active": r["active"]} for r in subsystem_counts
             ],
             "total_elements": sum(r["total"] for r in subsystem_counts),
             "total_active": sum(r["active"] for r in subsystem_counts),
@@ -2264,18 +2490,12 @@ class KnowledgeDB:
 
     def get_summary(self) -> dict[str, Any]:
         conn = self._get_conn()
-        specs = conn.execute(
-            "SELECT status, COUNT(*) as cnt FROM current_specifications GROUP BY status"
-        ).fetchall()
+        specs = conn.execute("SELECT status, COUNT(*) as cnt FROM current_specifications GROUP BY status").fetchall()
         spec_counts = {r["status"]: r["cnt"] for r in specs}
 
-        test_count = conn.execute(
-            "SELECT COUNT(*) FROM current_test_procedures"
-        ).fetchone()[0]
+        test_count = conn.execute("SELECT COUNT(*) FROM current_test_procedures").fetchone()[0]
 
-        op_count = conn.execute(
-            "SELECT COUNT(*) FROM current_operational_procedures"
-        ).fetchone()[0]
+        op_count = conn.execute("SELECT COUNT(*) FROM current_operational_procedures").fetchone()[0]
 
         assertion_stats = conn.execute(
             """SELECT
@@ -2290,17 +2510,11 @@ class KnowledgeDB:
                )"""
         ).fetchone()
 
-        total_versions = conn.execute(
-            "SELECT COUNT(*) FROM specifications"
-        ).fetchone()[0]
+        total_versions = conn.execute("SELECT COUNT(*) FROM specifications").fetchone()[0]
 
-        env_count = conn.execute(
-            "SELECT COUNT(*) FROM current_environment_config"
-        ).fetchone()[0]
+        env_count = conn.execute("SELECT COUNT(*) FROM current_environment_config").fetchone()[0]
 
-        doc_count = conn.execute(
-            "SELECT COUNT(*) FROM current_documents"
-        ).fetchone()[0]
+        doc_count = conn.execute("SELECT COUNT(*) FROM current_documents").fetchone()[0]
 
         # Test coverage stats (legacy — superseded by tests table)
         cov_mappings = conn.execute("SELECT COUNT(*) FROM test_coverage").fetchone()[0]
@@ -2346,9 +2560,20 @@ class KnowledgeDB:
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     d = dict(row)
     # Parse JSON fields — expose as both "field_parsed" (clean) and "_field_parsed" (legacy)
-    for key in ("assertions", "results", "variables", "steps", "known_failure_modes",
-                 "tags", "context", "test_ids", "work_item_ids",
-                 "summary_by_origin", "summary_by_component", "applicable_dimensions"):
+    for key in (
+        "assertions",
+        "results",
+        "variables",
+        "steps",
+        "known_failure_modes",
+        "tags",
+        "context",
+        "test_ids",
+        "work_item_ids",
+        "summary_by_origin",
+        "summary_by_component",
+        "applicable_dimensions",
+    ):
         if key in d and d[key] and isinstance(d[key], str):
             try:
                 parsed = json.loads(d[key])

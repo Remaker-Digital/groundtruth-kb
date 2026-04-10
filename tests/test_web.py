@@ -20,6 +20,7 @@ from groundtruth_kb.web.app import _darken_hex, _validate_hex_color, create_app
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def seeded_db(tmp_path):
     """Create a temporary DB with minimal seed data for route testing."""
@@ -103,6 +104,7 @@ def custom_client(seeded_db, custom_config):
 # Color utility tests
 # ---------------------------------------------------------------------------
 
+
 class TestDarkenHex:
     def test_darken_black(self):
         assert _darken_hex("#000000") == "#000000"
@@ -132,6 +134,7 @@ class TestDarkenHex:
 # ---------------------------------------------------------------------------
 # Route reachability tests — default branding
 # ---------------------------------------------------------------------------
+
 
 class TestRouteReachability:
     """Every route must return 200 (or 200 with content)."""
@@ -203,6 +206,7 @@ class TestRouteReachability:
 # Branding parameterization tests
 # ---------------------------------------------------------------------------
 
+
 class TestDefaultBranding:
     """Default GT branding appears when no custom config is provided."""
 
@@ -260,6 +264,7 @@ class TestCustomBranding:
 # Dynamic content tests
 # ---------------------------------------------------------------------------
 
+
 class TestDynamicContent:
     """Verify dynamic author dropdown and filter behavior."""
 
@@ -304,6 +309,7 @@ class TestDynamicContent:
 # Color validation tests (Codex follow-up)
 # ---------------------------------------------------------------------------
 
+
 class TestColorValidation:
     """Validate hex color handling for malformed inputs."""
 
@@ -336,6 +342,7 @@ class TestColorValidation:
 # Edge case branding tests (Codex follow-up)
 # ---------------------------------------------------------------------------
 
+
 class TestBrandingEdgeCases:
     """Edge cases identified by Codex advisory review."""
 
@@ -343,7 +350,8 @@ class TestBrandingEdgeCases:
         from starlette.testclient import TestClient
 
         config = GTConfig(
-            db_path=tmp_path / "test.db", project_root=tmp_path,
+            db_path=tmp_path / "test.db",
+            project_root=tmp_path,
             brand_mark="",
         )
         client = TestClient(create_app(config, seeded_db))
@@ -355,7 +363,8 @@ class TestBrandingEdgeCases:
         from starlette.testclient import TestClient
 
         config = GTConfig(
-            db_path=tmp_path / "test.db", project_root=tmp_path,
+            db_path=tmp_path / "test.db",
+            project_root=tmp_path,
             brand_color="not-valid",
         )
         client = TestClient(create_app(config, seeded_db))
@@ -367,7 +376,8 @@ class TestBrandingEdgeCases:
         from starlette.testclient import TestClient
 
         config = GTConfig(
-            db_path=tmp_path / "test.db", project_root=tmp_path,
+            db_path=tmp_path / "test.db",
+            project_root=tmp_path,
             logo_url="/static/logo.png",
         )
         client = TestClient(create_app(config, seeded_db))
@@ -381,7 +391,8 @@ class TestBrandingEdgeCases:
 
         long_footer = "(c) 2026 " + "A" * 200 + ". All rights reserved."
         config = GTConfig(
-            db_path=tmp_path / "test.db", project_root=tmp_path,
+            db_path=tmp_path / "test.db",
+            project_root=tmp_path,
             legal_footer=long_footer,
         )
         client = TestClient(create_app(config, seeded_db))
