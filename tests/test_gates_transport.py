@@ -142,10 +142,12 @@ class TestTransportGateRegistryIntegration:
         registry = GateRegistry.from_config(
             gate_paths=["groundtruth_kb.gates_transport:TransportEvidenceGate"],
             include_builtins=False,
-            gate_config={"TransportEvidenceGate": {
-                "spec_ids": ["SPEC-1524"],
-                "project_root": str(tmp_path),
-            }},
+            gate_config={
+                "TransportEvidenceGate": {
+                    "spec_ids": ["SPEC-1524"],
+                    "project_root": str(tmp_path),
+                }
+            },
         )
         assert len(registry._gates) == 1
         gate = registry._gates[0]
@@ -186,8 +188,14 @@ class TestTransportGateDBIntegration:
         # Should block — gated spec, no test_file
         with pytest.raises(GovernanceGateError, match="test_file is required"):
             db.insert_test(
-                "TEST-001", "Transport test", "SPEC-1524", "e2e", "pass expected",
-                "test", "test", last_result="pass",
+                "TEST-001",
+                "Transport test",
+                "SPEC-1524",
+                "e2e",
+                "pass expected",
+                "test",
+                "test",
+                last_result="pass",
             )
 
     def test_db_allows_test_pass_with_evidence(self, tmp_path: Path):
@@ -205,8 +213,15 @@ class TestTransportGateDBIntegration:
         db.insert_spec("SPEC-1524", "Transport test", "specified", "test", "test")
         # Should succeed — real test file
         result = db.insert_test(
-            "TEST-001", "Transport test", "SPEC-1524", "e2e", "pass expected",
-            "test", "test", test_file="tests/test_transport.py", last_result="pass",
+            "TEST-001",
+            "Transport test",
+            "SPEC-1524",
+            "e2e",
+            "pass expected",
+            "test",
+            "test",
+            test_file="tests/test_transport.py",
+            last_result="pass",
         )
         assert result["last_result"] == "pass"
 
@@ -221,8 +236,14 @@ class TestTransportGateDBIntegration:
         db.insert_spec("SPEC-1524", "Transport test", "specified", "test", "test")
         # Non-pass results should not trigger gate
         result = db.insert_test(
-            "TEST-001", "Transport test", "SPEC-1524", "e2e", "pass expected",
-            "test", "test", last_result="fail",
+            "TEST-001",
+            "Transport test",
+            "SPEC-1524",
+            "e2e",
+            "pass expected",
+            "test",
+            "test",
+            last_result="fail",
         )
         assert result["last_result"] == "fail"
 
@@ -253,8 +274,15 @@ class TestTransportGateDBIntegration:
 
         db.insert_spec("SPEC-1524", "Transport test", "implemented", "test", "initial")
         db.insert_test(
-            "TEST-001", "Transport test", "SPEC-1524", "e2e", "pass expected",
-            "test", "test", test_file="tests/test_transport.py", last_result="pass",
+            "TEST-001",
+            "Transport test",
+            "SPEC-1524",
+            "e2e",
+            "pass expected",
+            "test",
+            "test",
+            test_file="tests/test_transport.py",
+            last_result="pass",
         )
         # Should succeed — all evidence present
         result = db.update_spec("SPEC-1524", "test", "promote", status="verified")

@@ -161,10 +161,7 @@ def run_handshake(
             if json_output:
                 print(json.dumps(success))
             else:
-                print(
-                    "Prime operating-state reply received: "
-                    f"{success['reply_summary']}"
-                )
+                print(f"Prime operating-state reply received: {success['reply_summary']}")
             return 0
 
         remaining = deadline - time.monotonic()

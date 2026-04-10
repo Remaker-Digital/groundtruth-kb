@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 try:
     from mcp.server import FastMCP
+
     _HAS_MCP = True
 except ImportError:
     _HAS_MCP = False
@@ -51,8 +52,7 @@ if _HAS_MCP:
     mcp = FastMCP(
         name="prime-bridge",
         instructions=(
-            "Synchronous local message bridge between Codex and Prime Builder "
-            "with long-poll notification support."
+            "Synchronous local message bridge between Codex and Prime Builder with long-poll notification support."
         ),
     )
 else:
@@ -121,9 +121,7 @@ def _peer_collaboration_message(sender: str, recipient: str) -> bool:
 
 def _is_absolute_path(p: str) -> bool:
     """Detect absolute paths (Windows drive letters or Unix root)."""
-    return bool(p) and (
-        p.startswith("/") or (len(p) >= 3 and p[1] == ":" and p[2] in ("/", "\\"))
-    )
+    return bool(p) and (p.startswith("/") or (len(p) >= 3 and p[1] == ":" and p[2] in ("/", "\\")))
 
 
 def _normalize_artifact_refs(value: Any) -> list[Any]:
@@ -305,18 +303,10 @@ def _derive_thread_state(conn: sqlite3.Connection, thread_id: str) -> dict[str, 
     items = [_row_to_dict(row) for row in rows]
     root = items[0]
     latest = items[-1]
-    substantive = [
-        item for item in items
-        if item.get("message_kind") in {"substantive", "status_update", "system"}
-    ]
+    substantive = [item for item in items if item.get("message_kind") in {"substantive", "status_update", "system"}]
     latest_substantive = substantive[-1] if substantive else root
     participants = sorted(
-        {
-            party
-            for item in items
-            for party in (item.get("sender"), item.get("recipient"))
-            if party in PEER_AGENTS
-        }
+        {party for item in items for party in (item.get("sender"), item.get("recipient")) if party in PEER_AGENTS}
     )
 
     latest_status = latest_substantive.get("status") or latest.get("status", "pending")
@@ -596,10 +586,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 
 def _migrate_to_v3(conn: sqlite3.Connection, from_version: int) -> None:
     """One-time migration: collapse 7 states -> 3, merge structured fields into payload, drop threads."""
-    columns = {
-        row[1]
-        for row in conn.execute("PRAGMA table_info(messages)").fetchall()
-    }
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()}
     if not columns:
         return  # Fresh DB, no migration needed
 
@@ -616,7 +603,9 @@ def _migrate_to_v3(conn: sqlite3.Connection, from_version: int) -> None:
     has_validation_errors = "validation_errors" in columns
 
     if any([has_expected_response, has_response_window, has_action_items, has_validation_errors]):
-        rows = conn.execute("SELECT id, payload, expected_response, response_window, action_items, validation_errors FROM messages").fetchall()
+        rows = conn.execute(
+            "SELECT id, payload, expected_response, response_window, action_items, validation_errors FROM messages"
+        ).fetchall()
         for row in rows:
             payload = _loads_json(row["payload"], dict, {})
             changed = False
@@ -708,9 +697,7 @@ def _migrate_to_v3(conn: sqlite3.Connection, from_version: int) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_inbox ON messages(recipient, status, priority DESC, created_at ASC)"
     )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id, created_at ASC)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id, created_at ASC)")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_thread_covering ON messages(thread_id, created_at, status, sender, recipient)"
     )
@@ -767,9 +754,7 @@ def _latest_notification_event_id(agent: str | None = None) -> int:
                 (agent,),
             ).fetchone()
         else:
-            row = conn.execute(
-                "SELECT COALESCE(MAX(event_id), 0) AS max_event_id FROM notifications"
-            ).fetchone()
+            row = conn.execute("SELECT COALESCE(MAX(event_id), 0) AS max_event_id FROM notifications").fetchone()
     if row is None:
         return 0
     return int(row["max_event_id"] or 0)
@@ -862,9 +847,7 @@ def describe_thread_context(
         (item for item in reversed(non_protocol) if item.get("sender") == "prime"),
         None,
     )
-    terminal_messages = [
-        item for item in thread_messages if item.get("status") in FINAL_STATUSES
-    ]
+    terminal_messages = [item for item in thread_messages if item.get("status") in FINAL_STATUSES]
 
     thread_id = resolved.get("thread_id") or resolved["id"]
     with _conn() as conn:
@@ -987,20 +970,25 @@ def send_correction_message(
         ).fetchone()
         if failed_row is None:
             return {
-                "ok": False, "id": None, "status": "missing",
+                "ok": False,
+                "id": None,
+                "status": "missing",
                 "validation_errors": [f"unknown failed_message_id: {failed_message_id}"],
                 "notification_event_ids": [],
             }
         if failed_row["status"] != "failed":
             return {
-                "ok": False, "id": failed_message_id,
+                "ok": False,
+                "id": failed_message_id,
                 "status": str(failed_row["status"]),
                 "validation_errors": [f"message is not failed: {failed_message_id}"],
                 "notification_event_ids": [],
             }
         if failed_row["sender"] not in PEER_AGENTS or failed_row["recipient"] not in PEER_AGENTS:
             return {
-                "ok": False, "id": failed_message_id, "status": "unsupported",
+                "ok": False,
+                "id": failed_message_id,
+                "status": "unsupported",
                 "validation_errors": ["correction helper only supports peer-to-peer failed messages"],
                 "notification_event_ids": [],
             }
@@ -1018,8 +1006,12 @@ def send_correction_message(
             payload = row_dict.get("payload") or {}
             if row_dict.get("status") != "failed" and str(payload.get("response_type", "")).lower() == "correction":
                 return {
-                    "ok": True, "id": row_dict["id"], "status": row_dict["status"],
-                    "validation_errors": [], "notification_event_ids": [], "deduped": True,
+                    "ok": True,
+                    "id": row_dict["id"],
+                    "status": row_dict["status"],
+                    "validation_errors": [],
+                    "notification_event_ids": [],
+                    "deduped": True,
                 }
 
         subject = f"Correction: failed bridge message {failed_message_id}"
@@ -1039,7 +1031,15 @@ def send_correction_message(
         }
         tags = ["bridge-sync", "correction", "system"]
         message_id, status, validation_errors, event_ids = _insert_message(
-            conn, sender, recipient, subject, body, payload, tags, priority, failed_message_id,
+            conn,
+            sender,
+            recipient,
+            subject,
+            body,
+            payload,
+            tags,
+            priority,
+            failed_message_id,
         )
         conn.commit()
 
@@ -1141,11 +1141,7 @@ def resolve_message(
             return {"ok": False, "id": message_id, "status": "missing"}
 
         row_dict = _row_to_dict(row)
-        allowed = (
-            agent == "owner"
-            or row_dict.get("recipient") == agent
-            or row_dict.get("recipient") == "any"
-        )
+        allowed = agent == "owner" or row_dict.get("recipient") == agent or row_dict.get("recipient") == "any"
         if not allowed:
             return {"ok": False, "id": message_id, "status": "forbidden"}
 
@@ -1387,15 +1383,11 @@ def list_threads(
 def health() -> str:
     """Health check: message counts + notification summary."""
     with _conn() as conn:
-        message_rows = conn.execute(
-            "SELECT status, COUNT(*) AS n FROM messages GROUP BY status"
-        ).fetchall()
-        notification_rows = conn.execute(
-            "SELECT agent, COUNT(*) AS n FROM notifications GROUP BY agent"
-        ).fetchall()
-        max_event_id = conn.execute(
-            "SELECT COALESCE(MAX(event_id), 0) AS max_event_id FROM notifications"
-        ).fetchone()["max_event_id"]
+        message_rows = conn.execute("SELECT status, COUNT(*) AS n FROM messages GROUP BY status").fetchall()
+        notification_rows = conn.execute("SELECT agent, COUNT(*) AS n FROM notifications GROUP BY agent").fetchall()
+        max_event_id = conn.execute("SELECT COALESCE(MAX(event_id), 0) AS max_event_id FROM notifications").fetchone()[
+            "max_event_id"
+        ]
         pending_by_agent = conn.execute(
             """
             SELECT recipient, COUNT(*) AS n FROM messages
