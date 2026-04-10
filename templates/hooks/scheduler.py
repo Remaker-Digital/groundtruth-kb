@@ -30,7 +30,7 @@ def find_next_scheduled_prompt():
                 stripped = line.strip()
                 if stripped.startswith("- [ ]"):
                     # Extract the prompt text after the checkbox.
-                    prompt_text = stripped[len("- [ ]"):].strip()
+                    prompt_text = stripped[len("- [ ]") :].strip()
                     if prompt_text:
                         return prompt_text
     except OSError:
@@ -45,10 +45,7 @@ def main():
     if scheduled_prompt:
         # Output the scheduled prompt as additional context.
         # The hook system will append this to the user's prompt.
-        print(
-            f"[Scheduled task from .claude/SCHEDULE.md]\n"
-            f"{scheduled_prompt}"
-        )
+        print(f"[Scheduled task from .claude/SCHEDULE.md]\n{scheduled_prompt}")
 
     sys.exit(0)
 

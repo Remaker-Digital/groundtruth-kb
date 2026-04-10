@@ -293,7 +293,7 @@ def _handle_notification_batch(
         details = event.get("details") or {}
         _append_log(
             log_file,
-            f"signal event: type={event_type} ref={message_ref} subject={event.get('subject','')} details={json.dumps(details, sort_keys=True)}",
+            f"signal event: type={event_type} ref={message_ref} subject={event.get('subject', '')} details={json.dumps(details, sort_keys=True)}",
         )
         if _notification_should_wake(agent, event):
             summary["wake_refs"].append(message_ref)
@@ -396,9 +396,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
         return 1
     peer = peer_for[args.agent]
     bridge_db_path = getattr(bridge, "DB_PATH", None)
-    write_enabled = args.auto_actions and bool(bridge_db_path) and os.access(
-        str(bridge_db_path), os.W_OK
-    )
+    write_enabled = args.auto_actions and bool(bridge_db_path) and os.access(str(bridge_db_path), os.W_OK)
 
     hooks_dir = project_dir / ".claude" / "hooks"
     lock_file = hooks_dir / f".bridge-poller-{args.agent}.lock"
@@ -458,9 +456,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                     write_enabled=write_enabled,
                     resident_worker_healthy=resident_worker_healthy,
                 )
-                wake_candidates = dedupe_preserve_order(
-                    [*handled["wake_candidates"], *signals["wake_refs"]]
-                )
+                wake_candidates = dedupe_preserve_order([*handled["wake_candidates"], *signals["wake_refs"]])
                 trigger = "poller-notification"
                 wake_launched = 0
                 should_defer, defer_state = _resident_worker_should_defer_wake(
@@ -541,9 +537,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         write_enabled=write_enabled,
                         resident_worker_healthy=resident_worker_healthy,
                     )
-                    wake_candidates = dedupe_preserve_order(
-                        [*handled["wake_candidates"], *signals["wake_refs"]]
-                    )
+                    wake_candidates = dedupe_preserve_order([*handled["wake_candidates"], *signals["wake_refs"]])
                     trigger = "poller-notification"
                     should_defer, defer_state = _resident_worker_should_defer_wake(
                         args.agent,
@@ -619,8 +613,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=2.0,
         help="Sleep duration after loop errors",
     )
-    parser.add_argument("--project-dir", type=str, default=None,
-                        help="Project directory (defaults to CLAUDE_PROJECT_DIR or cwd)")
+    parser.add_argument(
+        "--project-dir", type=str, default=None, help="Project directory (defaults to CLAUDE_PROJECT_DIR or cwd)"
+    )
     return parser
 
 

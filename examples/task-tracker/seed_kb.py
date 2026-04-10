@@ -32,14 +32,20 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
 
     # ── Governance specs ──────────────────────────────────────────────
     gov_specs = [
-        ("GOV-01", "Spec-first: create specs before implementation",
-         "When the owner describes requirements, record or verify specifications "
-         "before writing any implementation code.",
-         [{"type": "glob", "pattern": "groundtruth.db", "description": "Knowledge database exists"}]),
-        ("GOV-03", "Test clarity: every test has unambiguous pass/fail",
-         "Every test must produce an unambiguous pass or fail result. "
-         "Subjective or vague test outcomes are not acceptable.",
-         []),
+        (
+            "GOV-01",
+            "Spec-first: create specs before implementation",
+            "When the owner describes requirements, record or verify specifications "
+            "before writing any implementation code.",
+            [{"type": "glob", "pattern": "groundtruth.db", "description": "Knowledge database exists"}],
+        ),
+        (
+            "GOV-03",
+            "Test clarity: every test has unambiguous pass/fail",
+            "Every test must produce an unambiguous pass or fail result. "
+            "Subjective or vague test outcomes are not acceptable.",
+            [],
+        ),
     ]
     for sid, title, desc, assertions in gov_specs:
         if db.get_spec(sid):
@@ -47,26 +53,58 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
             continue
         print(f"  CREATE {sid}: {title}")
         if not dry_run:
-            db.insert_spec(sid, title, "implemented", BY, REASON,
-                           description=desc, type="governance", assertions=assertions or None)
+            db.insert_spec(
+                sid,
+                title,
+                "implemented",
+                BY,
+                REASON,
+                description=desc,
+                type="governance",
+                assertions=assertions or None,
+            )
 
     # ── Domain specs ──────────────────────────────────────────────────
     domain_specs = [
-        ("SPEC-001", "Users can create tasks with title and description",
-         "The API must accept POST /tasks with title (required, max 200 chars) "
-         "and description (optional). Returns 201 with the created task.",
-         [{"type": "grep", "file": "src/task_tracker/app.py",
-           "pattern": "POST.*tasks|post.*tasks|create_task",
-           "description": "Task creation endpoint exists"}]),
-        ("SPEC-002", "Tasks transition through created -> in_progress -> done",
-         "Tasks start as 'created'. Valid transitions: created->in_progress, "
-         "in_progress->done. Invalid transitions return 400.", None),
-        ("SPEC-003", "Tasks can be assigned to a user",
-         "PATCH /tasks/{id} with an assignee field stores the user ID on the task.", None),
-        ("SPEC-004", "Task list returns results in creation order",
-         "GET /tasks returns all tasks ordered by creation time (oldest first).", None),
-        ("SPEC-005", "Deleted tasks return 404 on subsequent GET",
-         "After DELETE /tasks/{id}, a GET to the same ID returns 404.", None),
+        (
+            "SPEC-001",
+            "Users can create tasks with title and description",
+            "The API must accept POST /tasks with title (required, max 200 chars) "
+            "and description (optional). Returns 201 with the created task.",
+            [
+                {
+                    "type": "grep",
+                    "file": "src/task_tracker/app.py",
+                    "pattern": "POST.*tasks|post.*tasks|create_task",
+                    "description": "Task creation endpoint exists",
+                }
+            ],
+        ),
+        (
+            "SPEC-002",
+            "Tasks transition through created -> in_progress -> done",
+            "Tasks start as 'created'. Valid transitions: created->in_progress, "
+            "in_progress->done. Invalid transitions return 400.",
+            None,
+        ),
+        (
+            "SPEC-003",
+            "Tasks can be assigned to a user",
+            "PATCH /tasks/{id} with an assignee field stores the user ID on the task.",
+            None,
+        ),
+        (
+            "SPEC-004",
+            "Task list returns results in creation order",
+            "GET /tasks returns all tasks ordered by creation time (oldest first).",
+            None,
+        ),
+        (
+            "SPEC-005",
+            "Deleted tasks return 404 on subsequent GET",
+            "After DELETE /tasks/{id}, a GET to the same ID returns 404.",
+            None,
+        ),
     ]
     for sid, title, desc, assertions in domain_specs:
         if db.get_spec(sid):
@@ -74,8 +112,7 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
             continue
         print(f"  CREATE {sid}: {title}")
         if not dry_run:
-            db.insert_spec(sid, title, "implemented", BY, REASON,
-                           description=desc, assertions=assertions)
+            db.insert_spec(sid, title, "implemented", BY, REASON, description=desc, assertions=assertions)
 
     # ── Architecture decision ─────────────────────────────────────────
     if not db.get_spec("ADR-001"):
@@ -84,7 +121,9 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
             db.insert_spec(
                 "ADR-001",
                 "Use in-memory dict store for task data",
-                "implemented", BY, REASON,
+                "implemented",
+                BY,
+                REASON,
                 type="architecture_decision",
                 description=(
                     "Context: For this example project, we need a data store for tasks. "
@@ -98,12 +137,14 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
                     "Consequences: simpler setup, no migration complexity, "
                     "but not suitable for production use."
                 ),
-                assertions=[{
-                    "type": "grep",
-                    "file": "src/task_tracker/models.py",
-                    "pattern": "class TaskStore",
-                    "description": "In-memory TaskStore class exists",
-                }],
+                assertions=[
+                    {
+                        "type": "grep",
+                        "file": "src/task_tracker/models.py",
+                        "pattern": "class TaskStore",
+                        "description": "In-memory TaskStore class exists",
+                    }
+                ],
             )
     else:
         print("  SKIP ADR-001 (exists)")
@@ -115,48 +156,108 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
             db.insert_spec(
                 "DCL-001",
                 "No external database dependency in the application",
-                "implemented", BY, REASON,
+                "implemented",
+                BY,
+                REASON,
                 type="design_constraint",
                 description=(
                     "Derived from ADR-001. The task-tracker application must not "
                     "depend on any external database library."
                 ),
-                assertions=[{
-                    "type": "grep_absent",
-                    "file": "src/task_tracker/models.py",
-                    "pattern": "sqlalchemy|psycopg|pymongo",
-                    "description": "No external DB library imports in models",
-                }],
+                assertions=[
+                    {
+                        "type": "grep_absent",
+                        "file": "src/task_tracker/models.py",
+                        "pattern": "sqlalchemy|psycopg|pymongo",
+                        "description": "No external DB library imports in models",
+                    }
+                ],
             )
     else:
         print("  SKIP DCL-001 (exists)")
 
     # ── Tests ─────────────────────────────────────────────────────────
     tests = [
-        ("TEST-001", "POST /tasks returns 201", "SPEC-001", "e2e",
-         "POST /tasks with valid title returns 201 and task ID",
-         "tests/test_api.py", "TestCreateTask", "test_create_returns_201"),
-        ("TEST-002", "POST /tasks with no title returns error", "SPEC-001", "e2e",
-         "POST /tasks with empty body returns 422",
-         "tests/test_api.py", "TestCreateTask", "test_create_without_title_returns_422"),
-        ("TEST-003", "Invalid status transition returns 400", "SPEC-002", "e2e",
-         "Attempting created->done returns 400",
-         "tests/test_api.py", "TestStatusTransitions", "test_invalid_transition_returns_400"),
-        ("TEST-004", "Valid transition created -> in_progress succeeds", "SPEC-002", "e2e",
-         "PATCH status=in_progress on a created task returns 200",
-         "tests/test_api.py", "TestStatusTransitions", "test_valid_transition_succeeds"),
-        ("TEST-005", "PATCH with assignee stores user ID", "SPEC-003", "e2e",
-         "Updating assignee field persists the value",
-         "tests/test_api.py", "TestAssignment", "test_assignee_stored"),
-        ("TEST-006", "GET /tasks returns tasks in creation order", "SPEC-004", "e2e",
-         "Three tasks created sequentially are returned in that order",
-         "tests/test_api.py", "TestListOrder", "test_list_order"),
-        ("TEST-007", "DELETE then GET returns 404", "SPEC-005", "e2e",
-         "After deleting a task, GET returns 404",
-         "tests/test_api.py", "TestDelete", "test_delete_then_get_returns_404"),
-        ("TEST-008", "POST /tasks with title > 200 chars returns error", "SPEC-001", "e2e",
-         "Title exceeding max_length=200 returns 422 (WI-001 remediation)",
-         "tests/test_api.py", "TestCreateTask", "test_create_with_overlength_title_returns_422"),
+        (
+            "TEST-001",
+            "POST /tasks returns 201",
+            "SPEC-001",
+            "e2e",
+            "POST /tasks with valid title returns 201 and task ID",
+            "tests/test_api.py",
+            "TestCreateTask",
+            "test_create_returns_201",
+        ),
+        (
+            "TEST-002",
+            "POST /tasks with no title returns error",
+            "SPEC-001",
+            "e2e",
+            "POST /tasks with empty body returns 422",
+            "tests/test_api.py",
+            "TestCreateTask",
+            "test_create_without_title_returns_422",
+        ),
+        (
+            "TEST-003",
+            "Invalid status transition returns 400",
+            "SPEC-002",
+            "e2e",
+            "Attempting created->done returns 400",
+            "tests/test_api.py",
+            "TestStatusTransitions",
+            "test_invalid_transition_returns_400",
+        ),
+        (
+            "TEST-004",
+            "Valid transition created -> in_progress succeeds",
+            "SPEC-002",
+            "e2e",
+            "PATCH status=in_progress on a created task returns 200",
+            "tests/test_api.py",
+            "TestStatusTransitions",
+            "test_valid_transition_succeeds",
+        ),
+        (
+            "TEST-005",
+            "PATCH with assignee stores user ID",
+            "SPEC-003",
+            "e2e",
+            "Updating assignee field persists the value",
+            "tests/test_api.py",
+            "TestAssignment",
+            "test_assignee_stored",
+        ),
+        (
+            "TEST-006",
+            "GET /tasks returns tasks in creation order",
+            "SPEC-004",
+            "e2e",
+            "Three tasks created sequentially are returned in that order",
+            "tests/test_api.py",
+            "TestListOrder",
+            "test_list_order",
+        ),
+        (
+            "TEST-007",
+            "DELETE then GET returns 404",
+            "SPEC-005",
+            "e2e",
+            "After deleting a task, GET returns 404",
+            "tests/test_api.py",
+            "TestDelete",
+            "test_delete_then_get_returns_404",
+        ),
+        (
+            "TEST-008",
+            "POST /tasks with title > 200 chars returns error",
+            "SPEC-001",
+            "e2e",
+            "Title exceeding max_length=200 returns 422 (WI-001 remediation)",
+            "tests/test_api.py",
+            "TestCreateTask",
+            "test_create_with_overlength_title_returns_422",
+        ),
     ]
     for tid, title, spec_id, ttype, outcome, tfile, tcls, tfunc in tests:
         if db.get_test(tid):
@@ -164,9 +265,19 @@ def seed(db: KnowledgeDB, dry_run: bool = False) -> None:
             continue
         print(f"  CREATE {tid}: {title}")
         if not dry_run:
-            db.insert_test(tid, title, spec_id, ttype, outcome, BY, REASON,
-                           test_file=tfile, test_class=tcls, test_function=tfunc,
-                           last_result="pass")
+            db.insert_test(
+                tid,
+                title,
+                spec_id,
+                ttype,
+                outcome,
+                BY,
+                REASON,
+                test_file=tfile,
+                test_class=tcls,
+                test_function=tfunc,
+                last_result="pass",
+            )
 
     # ── Work item (defect found during review) ────────────────────────
     if not db.get_work_item("WI-001"):

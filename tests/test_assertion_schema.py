@@ -41,9 +41,15 @@ class TestValidAssertions:
         assert errors == []
 
     def test_valid_count(self) -> None:
-        errors = validate_assertion({
-            "type": "count", "pattern": "x", "file": "a.py", "operator": "==", "expected": 5,
-        })
+        errors = validate_assertion(
+            {
+                "type": "count",
+                "pattern": "x",
+                "file": "a.py",
+                "operator": "==",
+                "expected": 5,
+            }
+        )
         assert errors == []
 
     def test_valid_json_path(self) -> None:
@@ -51,13 +57,15 @@ class TestValidAssertions:
         assert errors == []
 
     def test_valid_all_of(self) -> None:
-        errors = validate_assertion({
-            "type": "all_of",
-            "assertions": [
-                {"type": "file_exists", "file": "a.py"},
-                {"type": "grep", "pattern": "x", "file": "b.py"},
-            ],
-        })
+        errors = validate_assertion(
+            {
+                "type": "all_of",
+                "assertions": [
+                    {"type": "file_exists", "file": "a.py"},
+                    {"type": "grep", "pattern": "x", "file": "b.py"},
+                ],
+            }
+        )
         assert errors == []
 
     def test_non_machine_type_passes(self) -> None:
@@ -88,15 +96,25 @@ class TestInvalidAssertions:
         assert any("file" in e.lower() or "path" in e.lower() for e in errors)
 
     def test_count_invalid_operator(self) -> None:
-        errors = validate_assertion({
-            "type": "count", "pattern": "x", "file": "a.py", "operator": "~=",
-        })
+        errors = validate_assertion(
+            {
+                "type": "count",
+                "pattern": "x",
+                "file": "a.py",
+                "operator": "~=",
+            }
+        )
         assert any("operator" in e.lower() for e in errors)
 
     def test_count_non_integer_expected(self) -> None:
-        errors = validate_assertion({
-            "type": "count", "pattern": "x", "file": "a.py", "expected": "five",
-        })
+        errors = validate_assertion(
+            {
+                "type": "count",
+                "pattern": "x",
+                "file": "a.py",
+                "expected": "five",
+            }
+        )
         assert any("integer" in e.lower() for e in errors)
 
     def test_json_path_missing_path(self) -> None:
@@ -132,12 +150,14 @@ class TestPathSafety:
 
     def test_nested_child_path_checked(self) -> None:
         """Path safety checks propagate into composition children."""
-        errors = validate_assertion({
-            "type": "all_of",
-            "assertions": [
-                {"type": "grep", "pattern": "x", "file": "../escape.py"},
-            ],
-        })
+        errors = validate_assertion(
+            {
+                "type": "all_of",
+                "assertions": [
+                    {"type": "grep", "pattern": "x", "file": "../escape.py"},
+                ],
+            }
+        )
         assert any("traversal" in e.lower() for e in errors)
 
 
@@ -148,10 +168,12 @@ class TestPathSafety:
 
 class TestValidateAssertionList:
     def test_valid_list(self) -> None:
-        errors = validate_assertion_list([
-            {"type": "grep", "pattern": "x", "file": "a.py"},
-            {"type": "glob", "pattern": "*.md"},
-        ])
+        errors = validate_assertion_list(
+            [
+                {"type": "grep", "pattern": "x", "file": "a.py"},
+                {"type": "glob", "pattern": "*.md"},
+            ]
+        )
         assert errors == []
 
     def test_none_returns_empty(self) -> None:
@@ -162,10 +184,12 @@ class TestValidateAssertionList:
         assert any("list" in e.lower() for e in errors)
 
     def test_mixed_valid_invalid(self) -> None:
-        errors = validate_assertion_list([
-            {"type": "grep", "pattern": "x", "file": "a.py"},
-            {"type": "grep"},  # missing pattern and file
-        ])
+        errors = validate_assertion_list(
+            [
+                {"type": "grep", "pattern": "x", "file": "a.py"},
+                {"type": "grep"},  # missing pattern and file
+            ]
+        )
         assert len(errors) >= 2  # at least 'missing pattern' + 'missing file'
         assert all("assertions[1]" in e for e in errors)
 
@@ -186,15 +210,21 @@ class TestDBWriteValidation:
     def test_insert_spec_rejects_invalid_assertions(self, db: KnowledgeDB) -> None:
         with pytest.raises(ValueError, match="Invalid assertions"):
             db.insert_spec(
-                id="SPEC-BAD", title="Bad", status="specified",
-                changed_by="test", change_reason="test",
+                id="SPEC-BAD",
+                title="Bad",
+                status="specified",
+                changed_by="test",
+                change_reason="test",
                 assertions=[{"type": "grep"}],  # missing pattern + file
             )
 
     def test_insert_spec_accepts_valid_assertions(self, db: KnowledgeDB) -> None:
         spec = db.insert_spec(
-            id="SPEC-GOOD", title="Good", status="specified",
-            changed_by="test", change_reason="test",
+            id="SPEC-GOOD",
+            title="Good",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
             assertions=[{"type": "glob", "pattern": "*.md"}],
         )
         assert spec["id"] == "SPEC-GOOD"
@@ -202,8 +232,11 @@ class TestDBWriteValidation:
     def test_insert_spec_validation_opt_out(self, db: KnowledgeDB) -> None:
         """validate_assertions=False skips validation (for migration tooling)."""
         spec = db.insert_spec(
-            id="SPEC-MIGR", title="Migration", status="specified",
-            changed_by="test", change_reason="test",
+            id="SPEC-MIGR",
+            title="Migration",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
             assertions=[{"type": "grep"}],  # would normally fail
             validate_assertions=False,
         )
@@ -212,8 +245,11 @@ class TestDBWriteValidation:
     def test_insert_spec_accepts_legacy_file_exists_shape(self, db: KnowledgeDB) -> None:
         """The exact row shape from SPEC-0180 should pass validation."""
         spec = db.insert_spec(
-            id="SPEC-FE", title="File exists legacy", status="specified",
-            changed_by="test", change_reason="test",
+            id="SPEC-FE",
+            title="File exists legacy",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
             assertions=[{"type": "file_exists", "path": "src/chat/quality_scorer.py"}],
         )
         assert spec["id"] == "SPEC-FE"

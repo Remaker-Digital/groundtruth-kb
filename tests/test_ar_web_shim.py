@@ -38,9 +38,15 @@ def ar_config(tmp_path: Path) -> GTConfig:
 def ar_client(ar_config: GTConfig) -> TestClient:
     db = KnowledgeDB(db_path=ar_config.db_path, check_same_thread=False)
     db.insert_spec(
-        id="SPEC-0001", title="Governance Spec", description="Test",
-        status="verified", priority="P0", scope="governance", section="core",
-        changed_by="seed", change_reason="shim test seed",
+        id="SPEC-0001",
+        title="Governance Spec",
+        description="Test",
+        status="verified",
+        priority="P0",
+        scope="governance",
+        section="core",
+        changed_by="seed",
+        change_reason="shim test seed",
     )
     app = create_app(ar_config, db)
     client = TestClient(app)
