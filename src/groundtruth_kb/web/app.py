@@ -90,9 +90,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         summary = db.get_summary()
         recent = db.get_history(limit=20)
         return templates.TemplateResponse(
-            "dashboard.html",
-            {
-                "request": request,
+            request=request,
+            name="dashboard.html",
+            context={
                 "summary": summary,
                 "recent": recent,
             },
@@ -123,9 +123,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         handles = sorted(set(s["handle"] for s in all_specs if s.get("handle")))
 
         return templates.TemplateResponse(
-            "specs.html",
-            {
-                "request": request,
+            request=request,
+            name="specs.html",
+            context={
                 "specs": specs,
                 "statuses": statuses,
                 "priorities": priorities,
@@ -153,9 +153,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         parent_id = get_parent_id(spec_id)
         parent = db.get_spec(parent_id) if parent_id else None
         return templates.TemplateResponse(
-            "spec_detail.html",
-            {
-                "request": request,
+            request=request,
+            name="spec_detail.html",
+            context={
                 "spec": spec,
                 "history": history,
                 "children": children,
@@ -170,9 +170,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         all_procs = db.list_test_procedures()
         types = sorted(set(p["type"] for p in all_procs if p["type"]))
         return templates.TemplateResponse(
-            "tests.html",
-            {
-                "request": request,
+            request=request,
+            name="tests.html",
+            context={
                 "procedures": procedures,
                 "types": types,
                 "filters": {"type": type},
@@ -186,9 +186,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
             return HTMLResponse("<h1>Test procedure not found</h1>", status_code=404)
         history = db.get_test_procedure_history(proc_id)
         return templates.TemplateResponse(
-            "test_detail.html",
-            {
-                "request": request,
+            request=request,
+            name="test_detail.html",
+            context={
                 "proc": proc,
                 "history": history,
             },
@@ -200,9 +200,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         all_procs = db.list_op_procedures()
         types = sorted(set(p["type"] for p in all_procs if p["type"]))
         return templates.TemplateResponse(
-            "ops.html",
-            {
-                "request": request,
+            request=request,
+            name="ops.html",
+            context={
                 "procedures": procedures,
                 "types": types,
                 "filters": {"type": type},
@@ -216,9 +216,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
             return HTMLResponse("<h1>Operational procedure not found</h1>", status_code=404)
         history = db.get_op_procedure_history(proc_id)
         return templates.TemplateResponse(
-            "op_detail.html",
-            {
-                "request": request,
+            request=request,
+            name="op_detail.html",
+            context={
                 "proc": proc,
                 "history": history,
             },
@@ -235,9 +235,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         environments = sorted(set(c["environment"] for c in all_configs))
         categories = sorted(set(c["category"] for c in all_configs))
         return templates.TemplateResponse(
-            "env.html",
-            {
-                "request": request,
+            request=request,
+            name="env.html",
+            context={
                 "configs": configs,
                 "environments": environments,
                 "categories": categories,
@@ -252,9 +252,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
             return HTMLResponse("<h1>Environment config not found</h1>", status_code=404)
         history = db.get_env_config_history(config_id)
         return templates.TemplateResponse(
-            "env_detail.html",
-            {
-                "request": request,
+            request=request,
+            name="env_detail.html",
+            context={
                 "config": config_entry,
                 "history": history,
             },
@@ -271,9 +271,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         all_changes = db.get_history(limit=500)
         authors = sorted(set(c["changed_by"] for c in all_changes if c.get("changed_by")))
         return templates.TemplateResponse(
-            "history.html",
-            {
-                "request": request,
+            request=request,
+            name="history.html",
+            context={
                 "changes": changes,
                 "authors": authors,
                 "filters": {"changed_by": changed_by, "table": table},
@@ -287,9 +287,9 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
             spec = db.get_spec(run["spec_id"])
             run["spec_title"] = spec["title"] if spec else "Unknown"
         return templates.TemplateResponse(
-            "assertions.html",
-            {
-                "request": request,
+            request=request,
+            name="assertions.html",
+            context={
                 "runs": runs,
             },
         )
