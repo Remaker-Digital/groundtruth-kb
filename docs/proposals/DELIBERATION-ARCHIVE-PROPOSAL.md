@@ -70,28 +70,56 @@ New table in groundtruth-kb SQLite database:
 
 ```sql
 CREATE TABLE deliberations (
-    id          TEXT    NOT NULL,
-    version     INTEGER NOT NULL,
-    spec_id     TEXT,                    -- FK to specifications.id (nullable)
-    work_item_id TEXT,                   -- FK to work_items.id (nullable)
-    source_type TEXT    NOT NULL,        -- lo_review | proposal | owner_conversation | report | session_harvest
-    source_ref  TEXT,                    -- bridge message_id, file path, thread_id, or session_id
-    title       TEXT    NOT NULL,        -- Short summary for listing
-    summary     TEXT    NOT NULL,        -- 2-5 sentence distillation of the deliberation
-    content     TEXT    NOT NULL,        -- Full deliberation text
-    participants TEXT,                   -- JSON array: ["prime", "codex", "owner"]
-    outcome     TEXT,                    -- go | no_go | deferred | owner_decision | informational
-    session_id  TEXT,                    -- Session ID (e.g., "S277") for temporal context
-    changed_by  TEXT    NOT NULL,
-    changed_at  TEXT    NOT NULL,
-    change_reason TEXT  NOT NULL,
+    id              TEXT    NOT NULL,
+    version         INTEGER NOT NULL,
+    spec_id         TEXT,                -- Primary FK to specifications.id (nullable; use relation table for multi-link)
+    work_item_id    TEXT,                -- Primary FK to work_items.id (nullable; use relation table for multi-link)
+    source_type     TEXT    NOT NULL,    -- lo_review | proposal | owner_conversation | report | session_harvest | bridge_thread
+    source_ref      TEXT,                -- bridge message_id, file path, thread_id, or session_id
+    title           TEXT    NOT NULL,    -- Short summary for listing
+    summary         TEXT    NOT NULL,    -- 2-5 sentence distillation of the deliberation
+    content         TEXT    NOT NULL,    -- Full deliberation text (redacted; see redaction policy)
+    content_hash    TEXT,                -- SHA-256 of raw pre-redaction content for dedup and audit
+    participants    TEXT,                -- JSON array: ["prime", "codex", "owner"]
+    outcome         TEXT,                -- go | no_go | deferred | owner_decision | informational
+    session_id      TEXT,                -- Session ID (e.g., "S277") for temporal context
+    sensitivity     TEXT    DEFAULT 'normal',  -- normal | contains_redacted | restricted
+    redaction_state TEXT    DEFAULT 'clean',   -- clean | redacted | raw_allowed
+    redaction_notes TEXT,                -- What was redacted and why (audit trail)
+    origin_project  TEXT,                -- Project identifier for cross-project transfer
+    origin_repo     TEXT,                -- Repository URL for provenance
+    changed_by      TEXT    NOT NULL,
+    changed_at      TEXT    NOT NULL,
+    change_reason   TEXT    NOT NULL,
     UNIQUE(id, version)
 );
 
+-- Primary link indexes (fast lookup by single spec/WI)
 CREATE INDEX idx_deliberations_spec_id ON deliberations(spec_id);
 CREATE INDEX idx_deliberations_work_item_id ON deliberations(work_item_id);
 CREATE INDEX idx_deliberations_source_type ON deliberations(source_type);
 CREATE INDEX idx_deliberations_session_id ON deliberations(session_id);
+CREATE INDEX idx_deliberations_source_ref ON deliberations(source_ref);
+
+-- Multi-link relation tables (for reviews covering multiple specs/WIs)
+CREATE TABLE deliberation_specs (
+    deliberation_id TEXT NOT NULL,
+    spec_id         TEXT NOT NULL,
+    role            TEXT DEFAULT 'related',  -- primary | related | referenced
+    UNIQUE(deliberation_id, spec_id)
+);
+
+CREATE TABLE deliberation_work_items (
+    deliberation_id TEXT NOT NULL,
+    work_item_id    TEXT NOT NULL,
+    role            TEXT DEFAULT 'related',  -- primary | related | referenced
+    UNIQUE(deliberation_id, work_item_id)
+);
+
+CREATE INDEX idx_dspecs_delib ON deliberation_specs(deliberation_id);
+CREATE INDEX idx_dspecs_spec ON deliberation_specs(spec_id);
+CREATE INDEX idx_dwis_delib ON deliberation_work_items(deliberation_id);
+CREATE INDEX idx_dwis_wi ON deliberation_work_items(work_item_id);
 
 CREATE VIEW current_deliberations AS
 SELECT d.* FROM deliberations d
@@ -135,8 +163,12 @@ The `summary` field (2-5 sentences) exists for listing and scanning. The `conten
 - Truncating review rounds ("see round 1 above" — include the actual text)
 - Omitting rejected alternatives ("we considered X but chose Y" without explaining why X was rejected)
 - Stripping context ("phone OTP required" without "because unverified callers waste agent time and create support liability")
+- Dropping command/tool evidence (omitting file paths, line numbers, or test output from reviews)
+- Collapsing multi-agent disagreement into a single summary (each agent's position and reasoning must be preserved)
+- Omitting owner constraints and business context from decision records
+- Redacting without preserving a redaction marker and source hash (a redaction must be traceable — never silently delete content)
 
-**ChromaDB chunking:** For deliberations exceeding 2,000 words, the content is split into overlapping chunks (512 tokens, 64-token overlap) and indexed as multiple ChromaDB documents sharing the same deliberation ID. Search results are deduplicated by deliberation ID, returning the highest-scoring chunk's score.
+**ChromaDB chunking:** For deliberations exceeding 2,000 words, the content is split into overlapping chunks (512 tokens, 64-token overlap). Each chunk is indexed as a **separate ChromaDB document with a unique chunk ID** in the format `DELIB-NNNN::chunk-000`, `DELIB-NNNN::chunk-001`, etc. Each chunk document's metadata carries `deliberation_id`, `chunk_index`, `chunk_count`, `content_hash`, and `source_ref` for reassembly and deduplication. Search results are deduplicated by `metadata.deliberation_id`, returning the highest-scoring chunk's score.
 
 **Storage impact:** At ~2,000 words average per deliberation and ~500 deliberations per project, the raw content is ~1M words (~5MB text, ~50MB ChromaDB with embeddings). This is negligible relative to the KB's current ~40MB SQLite database.
 
@@ -183,7 +215,7 @@ fixtures updated for new escalation flow. No remaining concerns.""",
     change_reason="Archive Phase 4 deliberation for SPEC-1879"
 )
 
-# Semantic search
+# Semantic search (works with ChromaDB; falls back to SQLite LIKE if ChromaDB unavailable)
 results = db.search_deliberations(
     query="why do we require phone OTP before escalation",
     limit=5
@@ -194,9 +226,24 @@ results = db.search_deliberations(
 results = db.list_deliberations(spec_id="SPEC-1879")
 results = db.list_deliberations(source_type="lo_review", session_id="S270")
 results = db.list_deliberations(work_item_id="WI-3030")
+results = db.list_deliberations(source_ref="bridge:msg-4462577a")  # dedup lookup
 
 # Get deliberations for a spec (complements get_tests_for_spec)
+# Searches both primary spec_id AND deliberation_specs relation table
 deliberations = db.get_deliberations_for_spec("SPEC-1879")
+
+# Multi-link: attach a deliberation to additional specs/WIs
+db.link_deliberation_spec("DELIB-0042", "SPEC-1881", role="related")
+db.link_deliberation_work_item("DELIB-0042", "WI-3031", role="related")
+
+# Idempotent insert for harvest (skips if source_ref + content_hash already exists)
+db.upsert_deliberation_source(
+    source_type="lo_review",
+    source_ref="bridge:msg-4462577a",
+    content="...",
+    # ... other fields
+    # Returns existing deliberation if source_ref+content_hash match
+)
 ```
 
 ### 3.4 Source Types
@@ -207,13 +254,14 @@ deliberations = db.get_deliberations_for_spec("SPEC-1879")
 | `proposal` | When Prime sends an implementation proposal | Proposed approach, alternatives considered, constraints |
 | `owner_conversation` | When owner provides reasoning for a decision | Business context, priorities, constraints, motivations |
 | `report` | When a post-implementation report is created | What changed, what was tested, what gaps remain |
+| `bridge_thread` | When a multi-message bridge exchange completes | Full thread text with both agents' positions preserved |
 | `session_harvest` | At session end, via session-init hook on next session | Key reasoning segments extracted from prior session |
 
 ### 3.5 Session Harvest Hook
 
 A new session-initialization hook extracts deliberation context from the previous session:
 
-**Trigger:** Session start (after assertion-check hook, before bridge sweep)
+**Trigger:** Session start, **after Phase A bridge sweep and Prime handshake** (not before — harvest must not add latency to the bridge obligation path). Alternatively, session wrap is an acceptable trigger if startup latency is a concern.
 
 **Behavior:**
 1. Read the prior session's wrap-up prompt from `session_prompts` table
@@ -260,24 +308,30 @@ Both Prime Builder and Loyal Opposition must have full read/write access:
 
 | Item | Detail |
 |------|--------|
-| Add `deliberations` table to SCHEMA_SQL | Append-only, same pattern as all other tables |
+| Add `deliberations` table to SCHEMA_SQL | Append-only with redaction fields (`sensitivity`, `redaction_state`, `redaction_notes`, `content_hash`, `origin_project`, `origin_repo`) |
+| Add `deliberation_specs` and `deliberation_work_items` relation tables | Multi-link support for reviews covering multiple specs/WIs |
 | Add `current_deliberations` view | Standard latest-version view |
-| Add ChromaDB as optional dependency | `chromadb>=0.5.0,<0.7` in `[project.optional-dependencies]` |
-| Implement `insert_deliberation()` | Writes to SQLite + ChromaDB collection |
-| Implement `search_deliberations()` | ChromaDB semantic search, returns with SQLite metadata |
-| Implement `list_deliberations()` | Structured query by spec_id, work_item_id, source_type, session_id |
-| Implement `get_deliberations_for_spec()` | Convenience method mirroring `get_tests_for_spec()` |
-| Tests | Unit tests for CRUD, search relevance, spec linking |
+| Add ChromaDB as optional dependency | `chromadb>=0.5.0,<0.7` in `[project.optional-dependencies]`; pre-cache model download outside startup path |
+| Implement `insert_deliberation()` | Redact → hash → write to SQLite + ChromaDB. Unique chunk IDs (`DELIB-NNNN::chunk-NNN`) for long content |
+| Implement `upsert_deliberation_source()` | Idempotent insert keyed on `(source_type, source_ref, content_hash)` for harvest dedup |
+| Implement `search_deliberations()` | ChromaDB semantic search with SQLite LIKE fallback when ChromaDB unavailable |
+| Implement `list_deliberations()` | Structured query by spec_id, work_item_id, source_type, session_id, **source_ref** |
+| Implement `get_deliberations_for_spec()` | Searches both primary `spec_id` AND `deliberation_specs` relation table |
+| Implement `link_deliberation_spec()` / `link_deliberation_work_item()` | Multi-link helpers |
+| Implement credential/PII redaction scanner | Pattern-based detection: API keys, tokens, phone numbers, emails, IPs. Replace with `[REDACTED:type]` markers |
+| Implement `rebuild_deliberation_index()` | Rebuild ChromaDB from SQLite canonical data |
+| Tests | CRUD, search relevance, spec linking, multi-link, dedup, redaction (secrets never in ChromaDB), SQLite-only fallback |
 
 ### Phase 2: Session Harvest Hook (Agent Red)
 
 | Item | Detail |
 |------|--------|
-| Create `.claude/hooks/session-harvest.py` | Runs at session start, after assertion-check |
-| Bridge thread harvester | Extract deliberation from completed review threads |
-| Report harvester | Index new CODEX-INSIGHT-DROPBOX reports |
-| Owner conversation harvester | Extract decision context from session prompts |
-| Deduplication | Skip already-harvested sources (track via source_ref) |
+| Create `.claude/hooks/session-harvest.py` | Runs **after Phase A bridge sweep and handshake**, or at session wrap |
+| Bridge thread harvester | Extract deliberation from completed review threads (source_type: `bridge_thread`) |
+| Report harvester | Index new CODEX-INSIGHT-DROPBOX reports (source_type: `report`) |
+| Owner conversation harvester | Extract decision context from session prompts (source_type: `owner_conversation`) |
+| Deduplication | Idempotent via `upsert_deliberation_source()` keyed on `source_ref` + `content_hash` |
+| Redaction gate | Run credential/PII scan on all harvested content before insert |
 
 ### Phase 3: Backfill + Validation
 
@@ -303,7 +357,7 @@ Both Prime Builder and Loyal Opposition must have full read/write access:
 | Risk | Mitigation |
 |------|-----------|
 | ChromaDB adds ~50MB to install footprint | Make it optional; SQLite-only mode works without semantic search |
-| Deliberation content could contain sensitive info | Same access controls as specs/tests; no external API calls |
+| Deliberation content could contain sensitive info | **Owner decision (2026-04-10): scan and redact.** Even in a single-user environment, avoid locking into a model that creates data hygiene debt. Implementation: (a) run credential/PII scan before insert using pattern-based detection (API keys, tokens, phone numbers, email addresses, IP addresses); (b) store redacted content by default — replace detected values with `[REDACTED:type]` markers; (c) preserve `content_hash` (SHA-256 of pre-redaction text) for dedup and audit; (d) record what was redacted in `redaction_notes`; (e) set `sensitivity` and `redaction_state` schema fields; (f) add tests proving secrets/PII are never indexed in ChromaDB. Raw source is not stored — redaction is the default and only mode. |
 | Harvest hook adds session start latency | Bound to 30s max; skip if no new sources since last harvest |
 | ChromaDB index diverges from SQLite | Rebuild command: `db.rebuild_deliberation_index()` |
 | Over-harvesting creates noise | Source type filtering + outcome field enable focused queries |
