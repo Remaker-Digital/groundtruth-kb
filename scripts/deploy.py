@@ -70,6 +70,13 @@ FQDNS = {
 HEALTH_TIMEOUT_S = 120
 HEALTH_POLL_S = 10
 
+# Scaling configuration per environment (WI-3156).
+# deploy.py enforces these after every deploy to prevent drift.
+SCALING_CONFIG: dict[str, dict[str, int]] = {
+    "staging": {"min_replicas": 1, "max_replicas": 5},
+    "production": {"min_replicas": 2, "max_replicas": 10},
+}
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -149,6 +156,34 @@ def verify_acr_tag(repo: str, tag: str) -> bool:
         log(f"  WARNING: Could not verify ACR tag (az CLI issue)")
         return True  # proceed anyway — deploy will fail if image missing
     return tag in output
+
+
+def enforce_scaling(app_name: str, environment: str) -> bool:
+    """Enforce minReplicas/maxReplicas on a container app (WI-3156).
+
+    Prevents scaling drift caused by deploys that only update the image.
+    """
+    config = SCALING_CONFIG.get(environment)
+    if not config:
+        return True
+
+    min_r = config["min_replicas"]
+    max_r = config["max_replicas"]
+    cmd = (
+        f"az containerapp update "
+        f"--name {app_name} "
+        f"--resource-group {RESOURCE_GROUP} "
+        f"--min-replicas {min_r} "
+        f"--max-replicas {max_r} "
+        f"--output none"
+    )
+    log(f"  Enforcing scaling: min={min_r} max={max_r} on {app_name}...")
+    code, output = _run(cmd, timeout=120)
+    if code != 0:
+        log(f"  WARNING: Scaling enforcement failed: {output}")
+        return False
+    log(f"  Scaling enforced.")
+    return True
 
 
 def deploy_container(app_name: str, image: str) -> bool:
@@ -518,6 +553,9 @@ def main() -> int:
     if not deploy_container(app_name, gw_image):
         _close_log()
         return 1
+
+    # 2b. Enforce scaling (WI-3156: prevent minReplicas drift)
+    enforce_scaling(app_name, args.environment)
 
     # 3. Deploy test host (both environments)
     th_app = TEST_HOST_APPS.get(args.environment)
