@@ -2,9 +2,9 @@
 
 **Status:** PLAN-OF-RECORD (default resume target after interrupts)
 **Created:** S270 (2026-04-08)
-**Version:** 4 — incorporates Codex advisory review corrections (S271)
+**Version:** 6 — Step 11 closed S275 (budget tests already present, 15/15 pass); Step 10 closed S271
 **Owner approval:** Pending
-**Codex review:** v3 advisory review received (2026-04-09). v4 re-review pending.
+**Codex review:** v4 CI GO received (2026-04-09, commit 3c5b6359 all shards green).
 **Spec refs:** SPEC-1879, GOV-16, GOV-17
 **Target:** v1.98.91 production-ready build
 
@@ -69,23 +69,23 @@ transport mock). Pre-existing, not introduced by SPEC-1879. Classification:
 - `test_s180_provider`, `test_superadmin_diagnostics`, `test_vectorization_scanner`: TBD
 **Gate:** Residual failures must be classified. None may be SPEC-1879 regressions.
 
-### Step 10: Fix Phase 3 P2 follow-up — pre-chat error rendering
+### Step 10: Fix Phase 3 P2 follow-up — pre-chat error rendering ✅ (already implemented)
 
-**Why:** Codex's Phase 3 GO noted that `phoneOtpError` is stored on transport
-failure but never rendered on the pre-chat form. The customer sees nothing when
-SMS send fails — the form just stays loading.
-**Files:** `widget/src/components/PreChatForm.tsx` (add error prop),
-`widget/src/components/Panel.tsx` (pass phoneOtpError to PreChatForm).
-**Gate:** Error message visible on pre-chat form when SMS send fails.
+**Closed 2026-04-09.** Codex confirmed code was already present on `develop`:
+- `widget/src/components/Panel.tsx:428,:532,:939` — sets and passes `phoneOtpError` as `phoneError` prop to PreChatForm
+- `widget/src/components/PreChatForm.tsx:49,:157-172` — `phoneError?: string` prop renders conditionally
 
-### Step 11: Fix escalation budget test depth (non-blocking but recommended)
+No further action needed. Negative path smoke test (transport failure → error on pre-chat) is
+still required in Step 14 to confirm the rendering at runtime.
 
-**Why:** Codex noted that `execute_with_budget` success path is untested in
-escalation tests. The `_make_budget()` fixture uses `MagicMock` which doesn't
-exercise the real async budget execution path.
-**Files:** `tests/chat/test_escalation_identity_gate.py`
-**Gate:** At least one test exercises the awaited budget path without coroutine
-warnings.
+### Step 11: Fix escalation budget test depth (non-blocking but recommended) ✅ (already implemented)
+
+**Closed S275.** `TestEscalationBudgetPath` class already exists with 3 tests:
+- `test_real_budget_awaits_handler` — real PipelineTimeoutBudget, `assert_awaited_once()`
+- `test_real_budget_with_verified_phone` — phone-only identity with real budget
+- `test_real_budget_timeout_degrades_gracefully` — 50ms budget, 10s handler, graceful degradation
+
+All 15 tests pass locally (1.82s). Gate satisfied: 3 tests exercise the awaited budget path.
 
 ### Step 12: v1.98.91 build + staging deploy
 
@@ -95,11 +95,13 @@ warnings.
 - [x] Phase 3 Codex GO (3 remediation rounds, commit 7fdff6f3)
 - [x] Phase 4 Codex GO (commit f4b44dde)
 - [x] CI lint GREEN
-- [ ] CI tests GREEN (Step 8-9)
-- [ ] Phase 3 P2 follow-up fixed (Step 10)
+- [x] CI tests GREEN — 3c5b6359 all shards green, Codex GO 2026-04-09 (Step 8-9)
+- [x] Phase 3 P2 follow-up confirmed implemented (Step 10 ✅)
 
-**Action:** Run `python build.py --version 1.98.91` to build API gateway image.
-Deploy to staging via `python deploy.py --env staging`.
+**Action:** Run `python scripts/build.py v1.98.91` to build and push all images.
+Deploy to staging via `python scripts/deploy.py staging v1.98.91`.
+
+_Corrected 2026-04-10: Codex advisory INSIGHTS-2026-04-10-00-12-07 — script paths and positional arg signatures updated to match actual repo entrypoints._
 
 ### Step 13: ACS SMS provisioning verification (owner + staging)
 
@@ -160,8 +162,8 @@ v1.98.91, we must validate that the production baseline is correct.
 ### Step 15: Production deploy (GOV-16 gate)
 
 **Preconditions (all must be met):**
-- [ ] CI green (Steps 8-9)
-- [ ] Phase 3 P2 fixed (Step 10)
+- [x] CI green (Steps 8-9) — 3c5b6359 Codex GO
+- [x] Phase 3 P2 fixed (Step 10) — already implemented, confirmed
 - [ ] v1.98.91 built and deployed to staging (Step 12)
 - [ ] ACS SMS verified on staging (Step 13)
 - [ ] E2E phone OTP smoke test passed (Step 14)
@@ -206,8 +208,8 @@ CI fixes and follow-up work can proceed freely on `develop`.
 
 | Item | Source | Priority |
 |------|--------|----------|
-| Escalation budget success path test | Codex Phase 4 GO | Low |
-| Pre-chat form phone error rendering | Codex Phase 3 GO | Medium (promoted to Step 10) |
+| Escalation budget success path test | Codex Phase 4 GO | ✅ CLOSED — TestEscalationBudgetPath (3 tests, S275) |
+| Pre-chat form phone error rendering | Codex Phase 3 GO | ✅ CLOSED — code already present (Panel.tsx:939, PreChatForm.tsx:157-172) |
 | Widget-level automated tests for phone path | Codex Phase 3 v2 NO-GO | Medium |
 | Python 3.14 local test timeout issue | S270 investigation | Low |
 

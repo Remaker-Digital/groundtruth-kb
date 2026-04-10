@@ -76,7 +76,11 @@ def _get_retrieval_param(key: str, default: Any) -> Any:
 
 # Stop words for BM25 tokenization
 _STOP = frozenset(
-    ["a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "shall", "should", "may", "might", "can", "could", "of", "in", "to", "for", "with", "on", "at", "by", "from", "as", "into", "through", "during", "before", "after", "above", "below", "between", "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "it", "its", "they", "them", "their", "this", "that", "these", "those", "and", "but", "or", "nor", "not", "so", "yet"]
+    "a an the is are was were be been being have has had do does did "
+    "will would shall should may might can could of in to for with on "
+    "at by from as into through during before after above below between "
+    "i me my we our you your he him his she her it its they them their "
+    "this that these those and but or nor not so yet".split()
 )
 
 

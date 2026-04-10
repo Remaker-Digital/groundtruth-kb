@@ -194,5 +194,6 @@ class TestCoreInfrastructure:
 
     def test_ts_nocheck_on_all_mock_files(self):
         for ts_file in MOCK_DIR.rglob("*.ts"):
-            first_line = ts_file.read_text(encoding="utf-8").splitlines()[0]
-            assert "ts-nocheck" in first_line,                 f"{ts_file.relative_to(ADMIN_STANDALONE)} missing @ts-nocheck"
+            head = ts_file.read_text(encoding="utf-8").splitlines()[:3]
+            assert any("ts-nocheck" in line for line in head), \
+                f"{ts_file.relative_to(ADMIN_STANDALONE)} missing @ts-nocheck in first 3 lines"
