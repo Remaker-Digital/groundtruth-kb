@@ -43,6 +43,9 @@ dev = [
     "httpx>=0.27",
     "interrogate>=1.7",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+]
 
 [project.scripts]
 gt = "groundtruth_kb.cli:main"

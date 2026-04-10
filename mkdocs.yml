@@ -1,0 +1,70 @@
+# mkdocs-material configuration for GroundTruth KB documentation
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+site_name: GroundTruth KB
+site_url: https://remaker-digital.github.io/groundtruth-kb/
+site_description: Specification-driven governance toolkit for AI engineering teams
+site_author: Remaker Digital
+
+repo_name: Remaker-Digital/groundtruth-kb
+repo_url: https://github.com/Remaker-Digital/groundtruth-kb
+
+copyright: "&copy; 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC"
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+  - tables
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Bootstrap Guide: bootstrap.md
+      - Desktop Setup: desktop-setup.md
+  - Method:
+      - Overview: method/01-overview.md
+      - Specifications: method/02-specifications.md
+      - Testing: method/03-testing.md
+      - Work Items: method/04-work-items.md
+      - Governance: method/05-governance.md
+      - Dual-Agent: method/06-dual-agent.md
+      - Sessions: method/07-sessions.md
+      - Architecture Decisions: method/08-architecture.md
+      - Adoption: method/09-adoption.md
+      - Tooling: method/10-tooling.md
+      - Operational Config: method/11-operational-configuration.md
+  - Reference:
+      - Assertion Language: reference/assertion-language.md
+  - Architecture:
+      - Product Split: architecture/product-split.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md

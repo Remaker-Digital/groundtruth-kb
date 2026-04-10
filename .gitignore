@@ -9,3 +9,4 @@ tmp-review-config/
 dist/
 *.egg-info/
 .venv/
+site/
