@@ -16,6 +16,8 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from src.multi_tenant.widget_otp_verification import (
+    _OTP_TOKEN_TYPE,
+    _SMS_OTP_TOKEN_TYPE,
     _generate_otp,
     decode_customer_token,
     router,
@@ -324,3 +326,154 @@ class TestVerifyOtpEndpoint:
             assert resp.status_code == 200
             data = resp.json()
             assert data["verified"] is False
+
+    async def test_verify_otp_wrong_code_increments_attempt_counter(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_container = MagicMock()
+        mock_container.read_item = AsyncMock(return_value={
+            "id": "otp:test-tenant-001:alice@example.com",
+            "otp_code": "123456",
+            "used": False,
+            "verify_attempts": 2,
+        })
+        mock_container.patch_item = AsyncMock(return_value={})
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/verify", json={
+                    "email": "alice@example.com",
+                    "code": "999999",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["verified"] is False
+            mock_container.patch_item.assert_awaited_once_with(
+                item="otp:test-tenant-001:alice@example.com",
+                partition_key=_OTP_TOKEN_TYPE,
+                patch_operations=[
+                    {"op": "incr", "path": "/verify_attempts", "value": 1},
+                ],
+            )
+
+    async def test_verify_otp_returns_false_when_locked_after_max_attempts(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_container = MagicMock()
+        mock_container.read_item = AsyncMock(return_value={
+            "id": "otp:test-tenant-001:alice@example.com",
+            "otp_code": "123456",
+            "used": False,
+            "verify_attempts": 5,
+        })
+        mock_container.patch_item = AsyncMock(return_value={})
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/verify", json={
+                    "email": "alice@example.com",
+                    "code": "123456",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["verified"] is False
+            mock_container.patch_item.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+class TestSmsOtpEndpoints:
+    """Test POST /api/chat/otp/send-sms and /api/chat/otp/verify-sms."""
+
+    async def test_send_sms_returns_transport_failure_response(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_token_repo = MagicMock()
+        mock_token_repo.delete_token = AsyncMock(return_value=True)
+        mock_token_repo.create_token = AsyncMock(return_value={"id": "otp:test-tenant-001:+12125550100"})
+
+        mock_container = MagicMock()
+        mock_container.patch_item = AsyncMock(return_value={})
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.widget_otp_verification._check_tier_gate", new_callable=AsyncMock, return_value=True),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+            patch("src.multi_tenant.sms_verification._send_sms", new_callable=AsyncMock, side_effect=RuntimeError("ACS down")),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/send-sms", json={
+                    "phone": "+12125550100",
+                    "name": "Alice",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["sent"] is False
+            assert "Unable to send verification code" in data["message"]
+
+    async def test_verify_sms_wrong_code_increments_attempt_counter(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_container = MagicMock()
+        mock_container.read_item = AsyncMock(return_value={
+            "id": "otp:test-tenant-001:+12125550100",
+            "otp_code_hash": "hash:123456",
+            "used": False,
+            "verify_attempts": 1,
+        })
+        mock_container.patch_item = AsyncMock(return_value={})
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+            patch("src.multi_tenant.sms_verification.hash_code", side_effect=lambda code: f"hash:{code}"),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/verify-sms", json={
+                    "phone": "+12125550100",
+                    "code": "999999",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["verified"] is False
+            mock_container.patch_item.assert_awaited_once_with(
+                item="otp:test-tenant-001:+12125550100",
+                partition_key=_SMS_OTP_TOKEN_TYPE,
+                patch_operations=[
+                    {"op": "incr", "path": "/verify_attempts", "value": 1},
+                ],
+            )

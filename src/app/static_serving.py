@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Static file serving for Agent Red Customer Experience.
 
 Mounts the Shopify embedded admin SPA, the provider admin console SPA,

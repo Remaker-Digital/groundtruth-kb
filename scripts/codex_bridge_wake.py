@@ -23,6 +23,7 @@ from bridge_worker_context import (
     build_contexts,
     build_prompt,
     context_requires_action,
+    fast_path_session_start_requests,
     repair_terminal_thread_outputs,
     select_dispatch_batch,
 )
@@ -261,7 +262,7 @@ def main() -> int:
             )
             batch_contexts = batch["contexts"]
             batch_new_items = batch["new_items"]
-            wake_targets = set(batch["target_ids"])
+            wake_targets = batch["target_ids"]
             deferred_targets = batch["deferred_ids"]
 
             if not batch_new_items and not batch_contexts:
@@ -277,7 +278,7 @@ def main() -> int:
             pre_repair_count = repair_terminal_thread_outputs(
                 bridge,
                 agent=args.agent,
-                target_refs=sorted(wake_targets),
+                target_refs=wake_targets,
                 project_dir=PROJECT_DIR,
                 log_fn=lambda message: _append_agent_log(args.agent, message),
             )
@@ -285,6 +286,20 @@ def main() -> int:
                 _append_agent_log(
                     args.agent,
                     f"pre-dispatch terminal repair handled {pre_repair_count} target(s); re-evaluate bridge queue before heavy worker execution",
+                )
+                return 0
+
+            fast_path_count = fast_path_session_start_requests(
+                bridge,
+                agent=args.agent,
+                target_refs=wake_targets,
+                project_dir=PROJECT_DIR,
+                log_fn=lambda message: _append_agent_log(args.agent, message),
+            )
+            if fast_path_count > 0:
+                _append_agent_log(
+                    args.agent,
+                    f"session-start fast path handled {fast_path_count} target(s); re-evaluate bridge queue before heavy worker execution",
                 )
                 return 0
 
@@ -305,7 +320,7 @@ def main() -> int:
             for message_id in wake_targets:
                 state.setdefault("last_wake_by_message", {})[message_id] = _now_iso()
             state["last_triggered_at"] = _now_iso()
-            state["last_triggered_ids"] = sorted(wake_targets)
+            state["last_triggered_ids"] = list(wake_targets)
             state["last_trigger"] = args.trigger
             _save_state(args.agent, state)
 
@@ -316,7 +331,7 @@ def main() -> int:
             repair_terminal_thread_outputs(
                 bridge,
                 agent=args.agent,
-                target_refs=sorted(wake_targets),
+                target_refs=wake_targets,
                 project_dir=PROJECT_DIR,
                 log_fn=lambda message: _append_agent_log(args.agent, message),
             )

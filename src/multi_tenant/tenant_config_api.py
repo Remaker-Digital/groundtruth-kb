@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Configuration API — RESTful endpoints for tenant configuration management.
 
 Work Item #65 (Decision #22): Layer 3 of the 5-layer tenant configuration
@@ -54,17 +55,16 @@ Dependencies:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.activation_service import (
     get_activation_service,
 )
+from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType, TenantTier
 from src.multi_tenant.middleware import get_tenant_context
@@ -443,7 +443,7 @@ def _generate_ai_greeting(
     Uses templates (not LLM) for speed — no latency added to config fetch.
     """
     brand = config.get("brand_name") or config.get("widget_agent_display_name") or "us"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     hour = now.hour
 
     if 5 <= hour < 12:
@@ -492,7 +492,7 @@ async def _ensure_widget_key_hash(tenant_id: str, widget_key: str) -> None:
             return  # Already correct
 
         # Hash is missing or stale — repair it
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         await repo.patch(
             tenant_id,
             tenant_id,
@@ -1503,7 +1503,7 @@ async def deactivate_config(
             detail="Configuration is already deactivated.",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await activation_svc._prefs_repo.patch(
         tenant_id=ctx.tenant_id,
         document_id=active["id"],

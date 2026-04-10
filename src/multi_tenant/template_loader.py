@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Category Template Loader (KA-3: Knowledge Automation).
 
 Loads industry-specific knowledge templates from JSON files and applies
@@ -16,8 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -117,7 +117,7 @@ class TemplateLoader:
         from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
 
         repo = KnowledgeBaseRepository()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         for article in articles:
             try:

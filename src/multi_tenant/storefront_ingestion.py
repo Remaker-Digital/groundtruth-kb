@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Storefront Ingestion Service (KA-1: Knowledge Automation).
 
 Orchestrates bulk knowledge base population from merchant storefronts.
@@ -16,8 +17,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -253,7 +253,7 @@ class StorefrontIngestionService:
         will pick it up and execute it.
         """
         job_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         job = IngestionJobDocument(
             id=job_id,
@@ -289,7 +289,7 @@ class StorefrontIngestionService:
 
     async def cancel_job(self, tenant_id: str, job_id: str) -> dict[str, Any]:
         """Cancel a pending or running job."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self._job_repo.patch(
             tenant_id,
             job_id,
@@ -305,7 +305,7 @@ class StorefrontIngestionService:
         Updates job status to RUNNING, processes based on job_type,
         then marks COMPLETED or FAILED.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Mark as running
         try:
@@ -344,7 +344,7 @@ class StorefrontIngestionService:
                 raise ValueError(f"Unknown job type: {job_type}")
 
             # Mark completed
-            completed_at = datetime.now(timezone.utc).isoformat()
+            completed_at = datetime.now(UTC).isoformat()
             await self._job_repo.patch(
                 tenant_id,
                 job_id,
@@ -367,7 +367,7 @@ class StorefrontIngestionService:
 
         except Exception as exc:
             # Mark failed
-            failed_at = datetime.now(timezone.utc).isoformat()
+            failed_at = datetime.now(UTC).isoformat()
             try:
                 await self._job_repo.patch(
                     tenant_id,
@@ -547,7 +547,7 @@ class StorefrontIngestionService:
                 content_parts.append(f"Price: {min_amt} – {max_amt} {currency}")
 
         content = "\n\n".join(content_parts)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Extract metadata
         tags = product.get("tags", [])
@@ -616,7 +616,7 @@ class StorefrontIngestionService:
                 if not title or len(description) < 30:
                     continue
 
-                now = datetime.now(timezone.utc).isoformat()
+                now = datetime.now(UTC).isoformat()
                 entry = {
                     "id": str(uuid.uuid4()),
                     "tenant_id": tenant_id,
@@ -686,7 +686,7 @@ class StorefrontIngestionService:
                 if len(body) < MIN_CONTENT_LENGTH:
                     continue
 
-                now = datetime.now(timezone.utc).isoformat()
+                now = datetime.now(UTC).isoformat()
                 entry = {
                     "id": str(uuid.uuid4()),
                     "tenant_id": tenant_id,
@@ -728,7 +728,7 @@ class StorefrontIngestionService:
         source_config: dict[str, Any],
     ) -> dict[str, Any]:
         """Ingest KB content by crawling a URL."""
-        from src.multi_tenant.document_parser import crawl_url, chunks_to_kb_entries
+        from src.multi_tenant.document_parser import chunks_to_kb_entries, crawl_url
 
         start_url = source_config["start_url"]
         max_pages = min(source_config.get("max_pages", 10), URL_MAX_PAGES)

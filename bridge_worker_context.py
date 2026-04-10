@@ -13,6 +13,8 @@ ARTIFACT_NAME_RE = re.compile(
     r"\b(?:INSIGHTS-[A-Za-z0-9-]+\.md|BRIDGE-RESPONSIVENESS-LEDGER\.md|[A-Za-z0-9._-]+\.(?:md|json|txt))\b"
 )
 DEFAULT_MAX_DISPATCH_TARGETS = 6
+SESSION_START_SUBJECT = "Session start: report current operating state"
+SESSION_START_BODY = "Report your current operating state"
 
 
 def _now() -> datetime:
@@ -37,6 +39,76 @@ def agent_peer(agent: str) -> str:
 
 def agent_display(agent: str) -> str:
     return "Codex" if agent == "codex" else "Prime"
+
+
+def dedupe_preserve_order(values: list[str]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return ordered
+
+
+def _message_tags(message: dict[str, Any]) -> set[str]:
+    raw_tags = message.get("tags")
+    if not isinstance(raw_tags, list):
+        return set()
+    return {
+        str(tag).strip().lower()
+        for tag in raw_tags
+        if str(tag).strip()
+    }
+
+
+def message_is_session_start_request(message: dict[str, Any]) -> bool:
+    subject = str(message.get("subject") or "").strip()
+    body = str(message.get("body") or "").strip().rstrip(".")
+    return subject == SESSION_START_SUBJECT and body == SESSION_START_BODY
+
+
+def message_is_closure_only(message: dict[str, Any]) -> bool:
+    subject = str(message.get("subject") or "").strip().lower()
+    body = str(message.get("body") or "").strip().lower()
+    resolution = str(message.get("resolution") or "").strip().lower()
+    tags = _message_tags(message)
+    text = "\n".join(fragment for fragment in (subject, body, resolution) if fragment)
+
+    if "thread completed with outcome" in text:
+        return True
+    if "closure-only" in text or "receipt-only" in text:
+        return True
+    if "duplicate session-start probe" in text:
+        return True
+    if "session-start probe:" in text and "reply sent" in text:
+        return True
+    if "bridge-sync" in tags and ({"completed", "failed"} & tags):
+        return True
+    return False
+
+
+def prioritize_inbox_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    default_created_at = datetime.max.replace(tzinfo=timezone.utc)
+    enumerated = list(enumerate(items))
+
+    def _sort_key(entry: tuple[int, dict[str, Any]]) -> tuple[int, int, datetime, int]:
+        original_index, item = entry
+        if message_is_session_start_request(item):
+            bucket = 0
+        elif message_is_closure_only(item):
+            bucket = 2
+        else:
+            bucket = 1
+        try:
+            priority = -int(item.get("priority") or 0)
+        except (TypeError, ValueError):
+            priority = 0
+        created_at = _parse_iso(item.get("created_at")) or default_created_at
+        return (bucket, priority, created_at, original_index)
+
+    return [item for _, item in sorted(enumerated, key=_sort_key)]
 
 
 def iter_text_fragments(value: Any) -> list[str]:
@@ -331,8 +403,9 @@ def select_dispatch_batch(
             context_by_id[canonical_id] = context
             context_order.append(canonical_id)
 
+    ordered_new_items = prioritize_inbox_items(new_items)
     ordered_ids: list[str] = []
-    for item in new_items:
+    for item in ordered_new_items:
         message_id = str(item.get("id") or "").strip()
         if message_id and message_id not in ordered_ids:
             ordered_ids.append(message_id)
@@ -340,12 +413,18 @@ def select_dispatch_batch(
         if canonical_id not in ordered_ids:
             ordered_ids.append(canonical_id)
 
+    ordered_ids = dedupe_preserve_order(ordered_ids)
+
     selected_ids = ordered_ids[:max_targets]
     selected_set = set(selected_ids)
 
     return {
         "contexts": [context_by_id[message_id] for message_id in selected_ids if message_id in context_by_id],
-        "new_items": [item for item in new_items if str(item.get("id") or "").strip() in selected_set],
+        "new_items": [
+            item
+            for item in ordered_new_items
+            if str(item.get("id") or "").strip() in selected_set
+        ],
         "target_ids": selected_ids,
         "deferred_ids": ordered_ids[max_targets:],
     }
@@ -382,7 +461,7 @@ def build_contexts(
 
     reasons_by_id: dict[str, set[str]] = {}
 
-    for item in new_items:
+    for item in prioritize_inbox_items(new_items):
         reasons_by_id.setdefault(item["id"], set()).add("new")
     for message_ref in explicit_refs:
         context = _worker_context(bridge, message_ref, agent=agent)
@@ -519,6 +598,203 @@ def _supersede_failed_outbound_messages(
     return resolved
 
 
+def _load_worker_health_snapshot(
+    agent: str,
+    *,
+    project_dir: Path = PROJECT_DIR,
+) -> dict[str, Any]:
+    path = project_dir / ".claude" / "hooks" / f".bridge-worker-{agent}-health.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _build_operating_state_message(
+    bridge: Any,
+    *,
+    agent: str,
+    project_dir: Path = PROJECT_DIR,
+) -> tuple[str, str]:
+    self_health = _load_worker_health_snapshot(agent, project_dir=project_dir)
+    peer_health = _load_worker_health_snapshot(agent_peer(agent), project_dir=project_dir)
+    inbox = bridge.list_inbox(agent=agent, status="pending", limit=20)
+    pending_count = int(inbox.get("count", 0) or 0)
+
+    self_status = str(self_health.get("status") or "unknown").upper()
+    peer_status = str(peer_health.get("status") or "unknown").upper()
+    active_targets = [
+        str(message_id).strip()
+        for message_id in (self_health.get("active_message_ids") or [])
+        if str(message_id).strip()
+    ]
+    subject_suffix = self_status if self_status != "UNKNOWN" else "online"
+    subject = f"{agent_display(agent)} operating state: {subject_suffix}"
+
+    lines = [
+        f"{agent_display(agent)} operating state: {self_status}.",
+        "",
+        f"Bridge inbox: {pending_count} pending message(s).",
+        f"Peer worker status: {peer_status}.",
+    ]
+    if active_targets:
+        lines.append(f"Active dispatch targets: {', '.join(active_targets[:3])}.")
+    return subject, "\n".join(lines)
+
+
+def fast_path_session_start_requests(
+    bridge: Any,
+    *,
+    agent: str,
+    target_refs: list[str],
+    project_dir: Path = PROJECT_DIR,
+    log_fn: Callable[[str], None] | None = None,
+) -> int:
+    handled = 0
+    contexts = build_contexts(
+        bridge,
+        agent=agent,
+        explicit_refs=target_refs,
+        new_items=[],
+        project_dir=project_dir,
+        log_fn=log_fn,
+    )
+    for context in contexts:
+        canonical = context.get("canonical_message") or {}
+        peer = _peer_sender_for_context(agent, context)
+        if not peer:
+            continue
+        thread_messages = context.get("thread_messages") or []
+        session_thread = any(
+            message_is_session_start_request(message)
+            for message in thread_messages
+        )
+        if not session_thread and not message_is_session_start_request(canonical):
+            continue
+
+        if not message_is_session_start_request(canonical):
+            resolved = bridge.resolve_message(
+                message_id=canonical["id"],
+                agent=agent,
+                outcome="completed",
+                resolution=(
+                    "Session-start operating-state reply received automatically. "
+                    "No follow-up reply required."
+                ),
+            )
+            if resolved.get("ok"):
+                handled += 1
+                if log_fn is not None:
+                    log_fn(
+                        f"session-start fast path auto-resolved reply on thread "
+                        f"{context.get('thread_correlation_id')}: {canonical.get('id')}"
+                    )
+            continue
+
+        request_created_at = _parse_iso(canonical.get("created_at"))
+        substantive_outbound = [
+            item
+            for item in thread_messages
+            if item.get("sender") == agent
+            and item.get("recipient") == peer
+            and item.get("message_kind") in ("substantive", "system")
+            and (
+                request_created_at is None
+                or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
+            )
+        ]
+        valid_outbound = [item for item in substantive_outbound if item.get("status") != "failed"]
+        invalid_outbound = [item for item in substantive_outbound if item.get("status") == "failed"]
+
+        if valid_outbound:
+            if str(canonical.get("status") or "").strip().lower() not in {"completed", "failed"}:
+                resolved = bridge.resolve_message(
+                    message_id=canonical["id"],
+                    agent=agent,
+                    outcome="completed",
+                    resolution=(
+                        f"Session-start operating-state reply already exists on thread "
+                        f"{context.get('thread_correlation_id')}."
+                    ),
+                )
+                if resolved.get("ok"):
+                    handled += 1
+            handled += int(
+                _supersede_failed_outbound_messages(
+                    bridge,
+                    failed_outbound=invalid_outbound,
+                    resolution=(
+                        f"Superseded by valid session-start operating-state reply on "
+                        f"{context.get('thread_correlation_id')}."
+                    ),
+                )
+                > 0
+            )
+            continue
+
+        artifact_refs = _repair_payload_artifact_refs(context, project_dir=project_dir)
+        subject, body = _build_operating_state_message(
+            bridge,
+            agent=agent,
+            project_dir=project_dir,
+        )
+        payload = {
+            "expected_response": "status_update",
+            "artifact_refs": artifact_refs,
+            "action_items": [
+                "Use this operating-state report to confirm bridge liveness for the current session.",
+                "Do not request another session-start status update unless bridge state changes materially.",
+            ],
+        }
+        result = bridge.send_message(
+            sender=agent,
+            recipient=peer,
+            subject=subject,
+            body=body,
+            payload_json=json.dumps(payload),
+            tags_json=json.dumps(["bridge-sync", "session-start", "status"]),
+            priority=max(1, int(canonical.get("priority") or 1)),
+            correlation_id=context.get("thread_correlation_id"),
+        )
+        if result.get("status") == "failed":
+            if log_fn is not None:
+                log_fn(
+                    f"session-start fast path failed validation for thread "
+                    f"{context.get('thread_correlation_id')}: {result.get('validation_errors')}"
+                )
+            continue
+
+        resolved = bridge.resolve_message(
+            message_id=canonical["id"],
+            agent=agent,
+            outcome="completed",
+            resolution=(
+                f"Session-start operating-state reply sent via bridge message "
+                f"{result.get('id')}."
+            ),
+        )
+        if resolved.get("ok"):
+            handled += 1
+        handled += int(
+            _supersede_failed_outbound_messages(
+                bridge,
+                failed_outbound=invalid_outbound,
+                resolution=(
+                    f"Superseded by session-start operating-state reply {result.get('id')} "
+                    f"on thread {context.get('thread_correlation_id')}."
+                ),
+            )
+            > 0
+        )
+        if log_fn is not None:
+            log_fn(
+                f"session-start fast path replied on thread {context.get('thread_correlation_id')}: "
+                f"{result.get('id')}"
+            )
+    return handled
+
+
 def repair_terminal_thread_outputs(
     bridge: Any,
     *,
@@ -570,6 +846,37 @@ def repair_terminal_thread_outputs(
                 or ((_parse_iso(item.get("created_at")) or _now()) > request_created_at)
             )
         ]
+        if message_is_closure_only(canonical):
+            if canonical_status not in {"completed", "failed"}:
+                resolved = bridge.resolve_message(
+                    message_id=canonical["id"],
+                    agent=agent,
+                    outcome="completed",
+                    resolution=(
+                        "Closure-only or receipt-only traffic on previously handled "
+                        "thread. No new action required."
+                    ),
+                )
+                if resolved.get("ok"):
+                    repaired += 1
+                    if log_fn is not None:
+                        log_fn(
+                            f"terminal repair closed closure-only thread without peer resend: "
+                            f"{context.get('thread_correlation_id')}"
+                        )
+            repaired += int(
+                _supersede_failed_outbound_messages(
+                    bridge,
+                    failed_outbound=invalid_outbound,
+                    resolution=(
+                        f"Superseded after closure-only thread cleanup on "
+                        f"{context.get('thread_correlation_id')}."
+                    ),
+                )
+                > 0
+            )
+            continue
+
         if valid_outbound:
             if canonical_status not in {"completed", "failed"}:
                 latest_valid = valid_outbound[-1]

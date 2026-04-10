@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """3rd-Party MCP Server Integrations — External Service Connectors (SPEC-1712).
 
 Manages connections to external MCP servers (Stripe, Shopify, Square,

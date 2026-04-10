@@ -15,6 +15,10 @@ Categories:
 import pathlib
 import sqlite3
 
+import pytest
+
+pytestmark = pytest.mark.local_env
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 ADMIN = ROOT / "admin"
 STANDALONE = ADMIN / "standalone"

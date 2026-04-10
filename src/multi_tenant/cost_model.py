@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Parameterized cost model calculator.
 
@@ -31,7 +32,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from src.multi_tenant.entitlement_service import get_entitlement_service
+from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS, get_entitlement_service
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,9 @@ def _get_pack_pricing() -> dict[int, float]:
 STRIPE_FEE_PCT = 0.029
 STRIPE_FEE_FIXED = 0.30
 STRIPE_TAX_FEE = 0.50  # Per Stripe Tax transaction
+
+# Re-export from entitlement config for backward compat (used by performance tests)
+TIER_PRICING: dict[str, dict] = FROZEN_ENTITLEMENTS["pricing"]
 
 
 # ---------------------------------------------------------------------------

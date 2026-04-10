@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * TeamManager utility functions — date formatting and dark-mode detection.
  *

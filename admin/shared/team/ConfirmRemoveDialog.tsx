@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * ConfirmRemoveDialog — Modal confirmation for removing a team member.
  *

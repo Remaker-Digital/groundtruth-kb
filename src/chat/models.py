@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Chat API Pydantic models — request/response schemas for the conversation API.
 
@@ -20,12 +21,11 @@ Architecture references:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -91,7 +91,7 @@ class ChatMessage(BaseModel):
     role: MessageRole = Field(description="Who sent the message")
     content: str = Field(description="Message text content")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO 8601 timestamp",
     )
     message_id: str | None = Field(
@@ -609,6 +609,6 @@ class WebSocketMessage(BaseModel):
         description="Who sent this message (customer_id or agent_id)",
     )
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO 8601 timestamp",
     )

@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * SLATrends — SLA uptime & latency time-series with error budget gauges.
  *

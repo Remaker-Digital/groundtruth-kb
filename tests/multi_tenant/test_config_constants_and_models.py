@@ -188,10 +188,10 @@ class TestConfigRollbackResult:
 class TestGateRank:
     """Verify _GATE_RANK maps TierGate enum values to correct rank ordering."""
 
-    def test_gate_rank_has_three_entries(self):
+    def test_gate_rank_has_four_entries(self):
         from src.multi_tenant.schema.validation import _GATE_RANK
 
-        assert len(_GATE_RANK) == 3
+        assert len(_GATE_RANK) == 4
 
     def test_gate_rank_ordering(self):
         """ALL < PROFESSIONAL_PLUS < ENTERPRISE_ONLY."""

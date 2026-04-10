@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP credential cache — in-memory TTL cache for per-tenant MCP credentials.
 
 Wraps Key Vault credential retrieval with a 5-minute TTL cache to avoid
@@ -27,7 +28,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

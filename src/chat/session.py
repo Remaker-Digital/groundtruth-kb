@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Conversation lifecycle management for the Chat API.
 
@@ -26,7 +27,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.chat.models import (
@@ -231,7 +232,7 @@ class ConversationSession:
                 logger.debug("Trial cap check failed for %s, allowing", tenant_id)
 
         conversation_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # ADR-004: Resolve canonical customer identity (find-or-create).
         # Falls back to legacy resolver when no customer_profile_repo is configured.
@@ -341,7 +342,7 @@ class ConversationSession:
         if turn_count >= MAX_TURNS:
             raise TurnLimitReachedError(request.conversation_id, turn_count)
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         message_id = str(uuid.uuid4())
 
         # PII scrubbing: redact emails/phones from stored transcript
@@ -432,7 +433,7 @@ class ConversationSession:
                 raise TurnLimitReachedError(request.conversation_id, turn_count)
 
             # Build message
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             message_id = str(uuid.uuid4())
             stored_content = request.content
             if self._pii_scrubber:
@@ -512,7 +513,7 @@ class ConversationSession:
         Returns:
             The assigned message_id.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         message_id = str(uuid.uuid4())
 
         # PII scrubbing: redact emails/phones from stored AI response
@@ -599,7 +600,7 @@ class ConversationSession:
         Returns:
             The assigned message_id.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         message_id = str(uuid.uuid4())
 
         message_dict: dict[str, Any] = {
@@ -753,7 +754,7 @@ class ConversationSession:
         # Calculate duration
         duration_seconds = _calculate_duration(
             doc.get("started_at", ""),
-            datetime.now(timezone.utc).isoformat(),
+            datetime.now(UTC).isoformat(),
         )
 
         logger.info(
@@ -940,7 +941,7 @@ class ConversationSession:
         """
         await self._get_active_conversation(tenant_id, conversation_id)
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         system_msg: dict[str, Any] = {
             "role": MessageRole.SYSTEM.value,
             "content": "Conversation escalated to a human agent.",
@@ -1189,7 +1190,7 @@ async def _resolve_canonical_customer_id(
         return None, None
 
     legacy_id = visitor.customer_id or visitor.email or None
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # 1. Direct canonical_id (future: widget sends it)
     if visitor.customer_id and visitor.customer_id.startswith("cid_"):

@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 // @ts-nocheck
 /**
  * Mock handlers — Provider alert rules and history.

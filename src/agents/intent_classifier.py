@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — Intent Classification Agent
 #
 # Classifies customer messages into one of 17 intent categories using

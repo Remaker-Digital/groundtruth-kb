@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP mutation safety — policy models and evaluation logic.
 
 Defines the mutation safety framework for gating MCP tool invocations

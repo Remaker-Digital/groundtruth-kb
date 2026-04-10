@@ -6,13 +6,14 @@
 
 ---
 
-## Canonical Production Approval Path (S251 OM-1)
+## Canonical Production Approval Path (S251 OM-1, updated S271)
 
-> **The only script that may yield a production GO is `scripts/release_pipeline.py`.**
+> **The canonical production deployment command is `scripts/deploy_pipeline.py --env production`.**
 >
-> Helper scripts (`deploy_orchestrator.py`, `deploy_ui.py`, `deploy.py`) are smoke
-> tools for rapid staging iteration. Their exit codes MUST NOT be used as the basis
-> for production promotion decisions.
+> `scripts/release_pipeline.py` now delegates to `deploy_pipeline.py` for all
+> production deployments. Helper scripts (`deploy_orchestrator.py`, `deploy_ui.py`,
+> `deploy.py`) are smoke tools for rapid staging iteration only. Their exit codes
+> MUST NOT be used as the basis for production promotion decisions.
 
 ## Purpose
 

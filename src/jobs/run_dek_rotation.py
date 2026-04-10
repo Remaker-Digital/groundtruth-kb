@@ -19,7 +19,7 @@ import asyncio
 import base64
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ async def _get_dek_age_days(tenant_id: str) -> float | None:
             updated = s.get("updated") or s.get("created")
             if updated:
                 last_rotated = datetime.fromisoformat(updated)
-                age = datetime.now(timezone.utc) - last_rotated
+                age = datetime.now(UTC) - last_rotated
                 return age.total_seconds() / 86400.0
     return None
 
@@ -265,6 +265,7 @@ async def run_rotation(
 async def _bootstrap() -> None:
     """Initialize Cosmos DB and encryption service for standalone CLI usage."""
     import os
+
     from src.multi_tenant.cosmos_client import get_cosmos_manager
     from src.multi_tenant.envelope_encryption import (
         EnvelopeEncryptionService,

@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * TwoFaChallenge — 2FA verification screen for admin magic link flow.
  *

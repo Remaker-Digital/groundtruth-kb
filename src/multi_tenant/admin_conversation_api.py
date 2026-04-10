@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Conversation Inbox API — merchant conversation management (WI #171, C8, C9).
 
 Provides REST endpoints for the merchant admin dashboard's Conversation
@@ -34,14 +35,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import ConversationStatus
 from src.multi_tenant.middleware import get_tenant_context
@@ -943,7 +943,7 @@ async def assign_agent(
             detail=f"Conversation {conversation_id} not found",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     logger.info(
         "Agent assigned: conv=%s agent=%s tenant=%s",
@@ -1010,7 +1010,7 @@ async def escalate_conversation(
         if resolved_at_str:
             try:
                 resolved_at = datetime.fromisoformat(resolved_at_str)
-                hours_since = (datetime.now(timezone.utc) - resolved_at).total_seconds() / 3600
+                hours_since = (datetime.now(UTC) - resolved_at).total_seconds() / 3600
                 re_escalation_allowed = hours_since <= 24
             except (ValueError, TypeError):
                 pass  # Malformed timestamp — treat as outside window
@@ -1020,7 +1020,7 @@ async def escalate_conversation(
                 detail="Conversation was resolved more than 24 hours ago and can no longer be escalated",
             )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     doc_id = doc.get("id", conversation_id)
 
     # Determine category and assignment
@@ -1175,7 +1175,7 @@ async def resolve_conversation(
             detail="Conversation is already resolved",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     doc_id = doc.get("id", conversation_id)
 
     try:
@@ -1250,7 +1250,7 @@ async def add_note(
     """
     repo = _get_repo()
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     note_id = str(uuid.uuid4())
 
     note = {
@@ -1335,7 +1335,7 @@ async def archive_conversation(
             detail="Conversation is already archived",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     doc_id = doc.get("id", conversation_id)
 
     try:
@@ -1481,12 +1481,12 @@ async def set_agent_override(
     repo = _get_repo()
     doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
     doc_id = doc.get("id", conversation_id)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     if request.agent_id is not None:
         # --- Validate the agent ---
-        from src.agents.plugins.registry import PluginAgentRegistry
         from src.agents.plugins.bindings import SkillBindingService
+        from src.agents.plugins.registry import PluginAgentRegistry
 
         reg = PluginAgentRegistry.get_instance()
         agent_defn = reg.get(request.agent_id)

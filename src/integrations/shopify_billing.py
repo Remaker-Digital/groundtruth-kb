@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Shopify Billing API integration.
 
@@ -46,8 +47,6 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.entitlement_service import get_entitlement_service
-
 from src.integrations.provisioning import (
     BillingChannel,
     activate_tenant,
@@ -59,6 +58,7 @@ from src.integrations.shopify_client import (
     ShopifyGraphQLError,
     get_shopify_client,
 )
+from src.multi_tenant.entitlement_service import get_entitlement_service
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +236,9 @@ mutation appUsageRecordCreate(
 # Query the current active subscription
 _ACTIVE_SUBSCRIPTION_QUERY = """
 query {
+    shop {
+        email
+    }
     currentAppInstallation {
         activeSubscriptions {
             id
@@ -531,6 +534,9 @@ async def confirm_subscription(
     client = get_shopify_client()
     data = await client.execute(_ACTIVE_SUBSCRIPTION_QUERY)
 
+    # SPEC-1882: extract shop owner email for superadmin contact gate
+    shop_email = data.get("shop", {}).get("email")
+
     installation = data.get("currentAppInstallation", {})
     subscriptions = installation.get("activeSubscriptions", [])
 
@@ -591,6 +597,7 @@ async def confirm_subscription(
         interval=sub_info.get("interval"),
         shopify_shop_domain=shop_domain,
         shopify_subscription_id=active_sub["id"],
+        customer_email=shop_email,
     )
 
     # Immediately activate — Shopify collects payment during approval

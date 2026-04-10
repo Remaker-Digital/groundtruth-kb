@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Incident repository — CRUD for status page incidents.
 
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from azure.cosmos.exceptions import (
@@ -56,7 +57,7 @@ class IncidentRepository:
 
         Returns the created document.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         incident_id = f"inc-{uuid.uuid4().hex[:12]}"
         status = IncidentStatus.INVESTIGATING.value
 
@@ -162,7 +163,7 @@ class IncidentRepository:
         moved to the new partition. Cosmos DB does not support partition
         key changes, so we delete + recreate.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         update_entry = {
             "timestamp": now,
             "status": new_status,

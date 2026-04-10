@@ -2282,10 +2282,13 @@ class TestConversationCreationGate:
         ctx = MagicMock()
         ctx.tenant_id = PROFESSIONAL_TENANT_ID
         ctx.tier = TenantTier.PROFESSIONAL
+        ctx.team_member_role = None  # Widget visitor, not team member
 
         req = ConversationStartRequest()
 
         with patch("src.chat.endpoints.PreferencesRepository", return_value=prefs_repo_mock), \
+             patch("src.chat.endpoints._session", MagicMock()), \
+             patch("src.chat.endpoints._pipeline", MagicMock()), \
              pytest.raises(HTTPException) as exc_info:
             await start_conversation(request=req, ctx=ctx)
 
@@ -2308,10 +2311,13 @@ class TestConversationCreationGate:
         ctx = MagicMock()
         ctx.tenant_id = PROFESSIONAL_TENANT_ID
         ctx.tier = TenantTier.PROFESSIONAL
+        ctx.team_member_role = None  # Widget visitor, not team member
 
         req = ConversationStartRequest()
 
         with patch("src.chat.endpoints.PreferencesRepository", return_value=prefs_repo_mock), \
+             patch("src.chat.endpoints._session", MagicMock()), \
+             patch("src.chat.endpoints._pipeline", MagicMock()), \
              pytest.raises(HTTPException) as exc_info:
             await start_conversation(request=req, ctx=ctx)
 

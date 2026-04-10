@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Standalone Admin SPA — production merchant admin (password-gated).
 
@@ -22,7 +23,6 @@ import secrets as _secrets
 import time as _time
 
 import argon2
-
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from starlette.responses import Response as StarletteResponse

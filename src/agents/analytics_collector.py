@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — Analytics Collector Agent
 #
 # Receives span/metric data from all pipeline agents and persists it.

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Archival pipeline service — Cosmos DB to Azure Blob Storage (Parquet).
 
@@ -45,7 +46,7 @@ from __future__ import annotations
 import io
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -166,7 +167,7 @@ class ArchivalPipelineService:
         Returns:
             ArchivalScanResult with aggregate archival counts.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tenants_scanned = 0
         total_docs = 0
         total_bytes = 0
@@ -350,7 +351,7 @@ class ArchivalPipelineService:
                 "cool_to_archive_days": 90,
                 "archive_delete_years": 7,
             },
-            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
         }
 
         if self._audit:

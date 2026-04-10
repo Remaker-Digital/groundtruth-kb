@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Log retention policy and archival (SPEC-1837).
 
 Enforces configurable retention periods for audit logs, API key usage records,
@@ -10,7 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ def compute_cutoff_date(
         return None  # Unlimited — never archive
 
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     return now - timedelta(days=retention_days)
 
@@ -97,7 +98,7 @@ def build_archive_path(
     Returns path like: tenant-001/audit_logs/2026/03/archive-2026-03-17.ndjson.gz
     """
     if date is None:
-        date = datetime.now(timezone.utc)
+        date = datetime.now(UTC)
 
     return ARCHIVE_PATH_TEMPLATE.format(
         tenant_id=tenant_id,
@@ -140,7 +141,7 @@ def identify_expired_records(
         try:
             ts = datetime.fromisoformat(ts_str)
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
             if ts < cutoff:
                 expired.append(record)
             else:
@@ -176,7 +177,7 @@ def get_retention_summary(
 
     Returns dict with retention days per collection and computed cutoff dates.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     collections = {}
 
     for collection in DEFAULT_RETENTION_DAYS:

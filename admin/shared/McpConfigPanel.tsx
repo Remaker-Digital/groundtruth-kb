@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * McpConfigPanel — Stripe MCP credential management and connection testing.
  *

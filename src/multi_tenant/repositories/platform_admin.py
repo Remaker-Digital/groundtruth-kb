@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Repository for the platform_admins collection (SPEC-1667).
 
 Stores Service Provider Administrator credentials, completely isolated

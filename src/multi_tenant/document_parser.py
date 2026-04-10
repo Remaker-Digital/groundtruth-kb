@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Document parsing pipeline for Knowledge Base uploads (WI #214-216).
 
 Parses uploaded files (PDF, DOCX, CSV, TXT) and web pages (URL) into
@@ -35,7 +36,7 @@ import os
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -763,8 +764,9 @@ async def crawl_url(
             )
         ]
 
-    import httpx
     from urllib.parse import urljoin, urlparse
+
+    import httpx
 
     max_pages = max(1, min(max_pages, CRAWL_MAX_PAGES_HARD_LIMIT))
     start_parsed = urlparse(start_url)
@@ -1031,9 +1033,9 @@ async def crawl_website(
         )
 
     import asyncio
+    from urllib.parse import urljoin, urlparse
 
     import httpx
-    from urllib.parse import urljoin, urlparse
 
     max_pages = max(1, min(max_pages, CRAWL_MAX_PAGES_HARD_LIMIT))
     start_parsed = urlparse(start_url)
@@ -1234,7 +1236,7 @@ def chunks_to_kb_entries(
     if not parse_result.success:
         return []
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     entries: list[dict[str, Any]] = []
 
     # For single-chunk results, use the parent_entry_id as the ID itself

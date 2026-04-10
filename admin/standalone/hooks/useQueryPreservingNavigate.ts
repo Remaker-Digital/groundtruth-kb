@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * useQueryPreservingNavigate — navigate() wrapper that carries forward URL search params.
  *

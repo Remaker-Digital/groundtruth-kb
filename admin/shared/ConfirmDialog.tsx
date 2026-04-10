@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * ConfirmDialog — Reusable confirmation modal for destructive or important actions.
  *

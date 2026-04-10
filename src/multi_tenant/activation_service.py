@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """ActivationService — Save → Activate configuration lifecycle manager.
 
 Replaces the wizard (OnboardingWizard) and test mode (TestModeService) with
@@ -37,7 +38,7 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -191,7 +192,7 @@ class ActivationService:
         set ``activated_at`` to now (best approximation).
         """
         if "config_state" not in doc or doc.get("config_state") is None:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             await self._prefs_repo.patch(
                 tenant_id=tenant_id,
                 document_id=doc["id"],
@@ -312,7 +313,7 @@ class ActivationService:
                     # collision with discarded drafts at the same version.
                     draft_version = active_version + 1
                     draft_uid = uuid.uuid4().hex[:8]
-                    now = datetime.now(timezone.utc).isoformat()
+                    now = datetime.now(UTC).isoformat()
 
                     base_config.update(
                         {
@@ -398,7 +399,7 @@ class ActivationService:
                 errors=[{"field": "_system", "message": "Service not configured"}],
             )
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         try:
             async with self._lock:
@@ -577,7 +578,7 @@ class ActivationService:
                         key_hash = hash_widget_key(existing_key)
                         current_hash = tenant_doc.get("widget_key_hash")
                         if current_hash != key_hash:
-                            now_iso = datetime.now(timezone.utc).isoformat()
+                            now_iso = datetime.now(UTC).isoformat()
                             await self._tenant_repo.patch(
                                 tenant_id,
                                 tenant_id,
@@ -603,7 +604,7 @@ class ActivationService:
 
         raw_key = generate_widget_key(tenant_id)
         key_hash = hash_widget_key(raw_key)
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         # Write raw key to preferences doc (for admin UI + activation gate)
         await self._prefs_repo.patch(
@@ -849,7 +850,7 @@ class ActivationService:
                 if draft is None:
                     active = await self._prefs_repo.get_active(tenant_id)
                     if active and active.get("deactivated_at"):
-                        now = datetime.now(timezone.utc).isoformat()
+                        now = datetime.now(UTC).isoformat()
                         await self._prefs_repo.patch(
                             tenant_id=tenant_id,
                             document_id=active["id"],
@@ -885,7 +886,7 @@ class ActivationService:
 
                 previous = await self._prefs_repo.get_previous(tenant_id)
 
-                now = datetime.now(timezone.utc).isoformat()
+                now = datetime.now(UTC).isoformat()
 
                 # Step 1: Clear any existing 'previous' document
                 if previous:
@@ -1102,7 +1103,7 @@ class ActivationService:
                         error="No previous configuration to restore",
                     )
 
-                now = datetime.now(timezone.utc).isoformat()
+                now = datetime.now(UTC).isoformat()
 
                 # Discard any draft first
                 draft = await self._prefs_repo.get_draft(tenant_id)

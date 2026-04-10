@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Conversation vectorization pipeline — Layer 2 memory.
 
 Work Items #87-88 (Decision #29): Post-conversation vectorization and
@@ -37,7 +38,7 @@ Dependencies:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -306,7 +307,7 @@ class ConversationVectorizer:
         embeddings = await self._embed_texts(chunks)
 
         # Step 4: Store
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         conversation_date = now  # Use current time as conversation date
         # Try to extract from first message timestamp
         if messages and messages[0].get("timestamp"):
@@ -497,7 +498,7 @@ class ConversationVectorizer:
         if depth_days is None:
             return None  # Unlimited
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=depth_days)
+        cutoff = datetime.now(UTC) - timedelta(days=depth_days)
         return cutoff.isoformat()
 
 

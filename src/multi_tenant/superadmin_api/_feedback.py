@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Feedback analytics (SPEC-1836).
 
 Provides aggregate feedback metrics across tenants and conversations.
@@ -8,7 +9,7 @@ Endpoints are registered on the shared router from _monolith.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, Query
 
@@ -86,7 +87,7 @@ async def get_feedback_metrics(
     if not conv_repo:
         raise HTTPException(status_code=503, detail="Conversation repository not configured")
 
-    period_end = datetime.now(timezone.utc)
+    period_end = datetime.now(UTC)
     period_start = period_end - timedelta(days=days)
 
     # Query conversations with feedback in the time range
@@ -198,7 +199,7 @@ async def get_tenant_feedback(
     if not conv_repo:
         raise HTTPException(status_code=503, detail="Conversation repository not configured")
 
-    period_start = datetime.now(timezone.utc) - timedelta(days=days)
+    period_start = datetime.now(UTC) - timedelta(days=days)
 
     try:
         results = await conv_repo.query(

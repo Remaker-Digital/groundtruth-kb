@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Slack Integration Manifest (SPEC-1776).
 
 Declarative configuration for the Slack channel adapter.

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Router registration for Agent Red Customer Experience.
 
 Imports all 45 API routers and provides a single function to register
@@ -11,58 +12,58 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from src.chat.endpoints import router as chat_router
 from src.integrations.provisioning import router as provisioning_router
+from src.integrations.shopify_billing import router as shopify_billing_router
+from src.integrations.shopify_gdpr_webhooks import router as shopify_gdpr_router
 from src.integrations.stripe_checkout import router as checkout_router
 from src.integrations.stripe_packs import router as packs_router
 from src.integrations.stripe_portal import router as portal_router
 from src.integrations.stripe_usage import router as usage_router
 from src.integrations.stripe_webhooks import router as webhooks_router
-from src.integrations.shopify_billing import router as shopify_billing_router
-from src.multi_tenant.usage_dashboard_api import router as dashboard_router
-from src.multi_tenant.tenant_config_api import router as config_router
-from src.chat.endpoints import router as chat_router
-from src.multi_tenant.admin_conversation_api import router as admin_inbox_router
-from src.multi_tenant.admin_knowledge_api import router as admin_knowledge_router
-from src.multi_tenant.admin_analytics_api import router as admin_analytics_router
-from src.multi_tenant.admin_team_api import router as admin_team_router
-from src.multi_tenant.admin_gdpr_api import router as admin_gdpr_router
-from src.integrations.shopify_gdpr_webhooks import router as shopify_gdpr_router
-from src.multi_tenant.admin_audit_api import router as admin_audit_router
-from src.multi_tenant.trial_management import trial_router
-from src.multi_tenant.security_hardening import rotation_router
-from src.multi_tenant.admin_customer_profile_api import router as admin_profile_router
-from src.multi_tenant.admin_apikey_api import router as admin_apikey_router
-from src.multi_tenant.admin_integration_api import router as admin_integration_router
-from src.multi_tenant.admin_quick_action_api import router as admin_quick_action_router
-from src.multi_tenant.superadmin_api import router as superadmin_router
-from src.multi_tenant.email_verification import router as email_verify_router
-from src.multi_tenant.magic_link_auth import router as magic_link_router
-from src.multi_tenant.admin_mfa_auth import router as admin_mfa_auth_router
-from src.multi_tenant.status_api import router as status_router
-from src.multi_tenant.support_diagnostics import router as diagnostics_router
 from src.multi_tenant.abuse_detection import router as abuse_router
+from src.multi_tenant.addon_checkout import router as addon_checkout_router
+from src.multi_tenant.admin_agent_api import router as admin_agent_router
+from src.multi_tenant.admin_analytics_api import router as admin_analytics_router
+from src.multi_tenant.admin_apikey_api import router as admin_apikey_router
+from src.multi_tenant.admin_audit_api import router as admin_audit_router
+from src.multi_tenant.admin_contact_api import router as admin_contact_router
+from src.multi_tenant.admin_conversation_api import router as admin_inbox_router
+from src.multi_tenant.admin_customer_profile_api import router as admin_profile_router
+from src.multi_tenant.admin_fine_tuning_api import router as admin_fine_tuning_router
+from src.multi_tenant.admin_gdpr_api import router as admin_gdpr_router
+from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
+from src.multi_tenant.admin_integration_api import router as admin_integration_router
+from src.multi_tenant.admin_knowledge_api import router as admin_knowledge_router
+from src.multi_tenant.admin_knowledge_score_api import router as admin_knowledge_score_router
+from src.multi_tenant.admin_marketplace_api import router as admin_marketplace_router
+from src.multi_tenant.admin_mfa_auth import router as admin_mfa_auth_router
+from src.multi_tenant.admin_presets_api import router as admin_presets_router
+from src.multi_tenant.admin_preview_api import router as admin_preview_router
+from src.multi_tenant.admin_quick_action_api import router as admin_quick_action_router
+from src.multi_tenant.admin_team_api import router as admin_team_router
+from src.multi_tenant.avatar_upload import router as avatar_router
+from src.multi_tenant.communication_capture import router as capture_router
 from src.multi_tenant.config_locking import router as config_lock_router
 from src.multi_tenant.cost_analytics import router as cost_router
-from src.multi_tenant.avatar_upload import router as avatar_router
-from src.multi_tenant.launcher_image_upload import router as launcher_image_router
-from src.multi_tenant.tier_upgrade import router as tier_upgrade_router
-from src.multi_tenant.addon_checkout import router as addon_checkout_router
-from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
-from src.multi_tenant.admin_contact_api import router as admin_contact_router
-from src.multi_tenant.superadmin_contact_api import router as superadmin_contact_router
-from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
-from src.multi_tenant.admin_preview_api import router as admin_preview_router
-from src.multi_tenant.admin_knowledge_score_api import router as admin_knowledge_score_router
-from src.multi_tenant.admin_fine_tuning_api import router as admin_fine_tuning_router
-from src.multi_tenant.admin_agent_api import router as admin_agent_router
-from src.multi_tenant.widget_otp_verification import router as widget_otp_router
-from src.multi_tenant.spa_recovery import router as spa_recovery_router
-from src.multi_tenant.tenant_recovery import router as tenant_recovery_router
-from src.multi_tenant.tenant_recovery import recovery_verify_router
-from src.multi_tenant.communication_capture import router as capture_router
 from src.multi_tenant.email_change import router as email_change_router
-from src.multi_tenant.admin_presets_api import router as admin_presets_router
-from src.multi_tenant.admin_marketplace_api import router as admin_marketplace_router
+from src.multi_tenant.email_verification import router as email_verify_router
+from src.multi_tenant.launcher_image_upload import router as launcher_image_router
+from src.multi_tenant.magic_link_auth import router as magic_link_router
+from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
+from src.multi_tenant.security_hardening import rotation_router
+from src.multi_tenant.spa_recovery import router as spa_recovery_router
+from src.multi_tenant.status_api import router as status_router
+from src.multi_tenant.superadmin_api import router as superadmin_router
+from src.multi_tenant.superadmin_contact_api import router as superadmin_contact_router
+from src.multi_tenant.support_diagnostics import router as diagnostics_router
+from src.multi_tenant.tenant_config_api import router as config_router
+from src.multi_tenant.tenant_recovery import recovery_verify_router
+from src.multi_tenant.tenant_recovery import router as tenant_recovery_router
+from src.multi_tenant.tier_upgrade import router as tier_upgrade_router
+from src.multi_tenant.trial_management import trial_router
+from src.multi_tenant.usage_dashboard_api import router as dashboard_router
+from src.multi_tenant.widget_otp_verification import router as widget_otp_router
 
 
 def register_routers(app: FastAPI) -> None:

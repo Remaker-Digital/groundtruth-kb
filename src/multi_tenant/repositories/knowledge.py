@@ -6,7 +6,7 @@ Knowledge base repository — knowledge_bases collection (product/FAQ data).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import COLLECTION_KNOWLEDGE_BASES
@@ -193,7 +193,7 @@ class KnowledgeBaseRepository(TenantScopedRepository):
         document_id: str,
     ) -> dict[str, Any]:
         """Soft-delete a knowledge base entry (set is_active = false)."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=document_id,
@@ -372,7 +372,7 @@ class KnowledgeBaseRepository(TenantScopedRepository):
         **fields: Any,
     ) -> dict[str, Any]:
         """Patch specific fields on a website source document."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         operations = [
             {"op": "set", "path": f"/{key}", "value": value}
             for key, value in fields.items()
@@ -445,7 +445,7 @@ class KnowledgeBaseRepository(TenantScopedRepository):
         Cross-partition query used by the background refresh scheduler.
         Filters: auto_refresh enabled, not currently crawling, past due.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.cross_partition_query(
             query_text=(
                 "SELECT * FROM c "

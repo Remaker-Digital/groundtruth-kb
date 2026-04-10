@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 FastAPI middleware and dependencies for tenant resolution and rate limiting.
 
@@ -38,7 +39,9 @@ import logging
 import os
 import time
 from collections import defaultdict
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -63,15 +66,13 @@ from src.multi_tenant.auth import (
     verify_verification_token,
     verify_widget_key,
 )
-from src.multi_tenant.magic_link_auth import verify_magic_link_session_token
 from src.multi_tenant.cosmos_schema import (
     PLATFORM_ADMIN_TENANT_ID,
     TeamMemberRole,
     TenantStatus,
     TenantTier,
 )
-
-from datetime import datetime, timezone
+from src.multi_tenant.magic_link_auth import verify_magic_link_session_token
 
 logger = logging.getLogger(__name__)
 
@@ -487,8 +488,8 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         try:
             expires = datetime.fromisoformat(trial_expires_at)
             if expires.tzinfo is None:
-                expires = expires.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) > expires:
+                expires = expires.replace(tzinfo=UTC)
+            if datetime.now(UTC) > expires:
                 raise AuthenticationError(
                     f"Trial period has expired for tenant {tenant_id}. "
                     "Please subscribe to a paid plan to continue.",
@@ -522,8 +523,8 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         try:
             expires = datetime.fromisoformat(expires_at)
             if expires.tzinfo is None:
-                expires = expires.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) > expires:
+                expires = expires.replace(tzinfo=UTC)
+            if datetime.now(UTC) > expires:
                 raise AuthenticationError(
                     f"Access has expired for tenant {tenant_id}. "
                     "Please contact your service provider.",
@@ -1258,7 +1259,7 @@ def is_admin_only_path(path: str) -> bool:
     return any(path.startswith(p) for p in _ADMIN_ONLY_PREFIXES)
 
 
-def enforce_rbac(path: str, ctx: "TenantContext") -> None:
+def enforce_rbac(path: str, ctx: TenantContext) -> None:
     """Enforce RBAC on the given path for the given context.
 
     Raises HTTPException(403) if the caller lacks permission.
@@ -1375,7 +1376,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # SPEC-1754: When REDIS_URL is configured, delegate rate limiting to
         # the shared RedisRateLimitBackend for distributed enforcement across
         # replicas. Falls back to local shards if Redis becomes unavailable.
-        from src.multi_tenant.security_hardening import get_rate_limit_backend, RedisRateLimitBackend
+        from src.multi_tenant.security_hardening import RedisRateLimitBackend, get_rate_limit_backend
 
         self._shared_backend = get_rate_limit_backend()
         self._use_redis = isinstance(self._shared_backend, RedisRateLimitBackend)

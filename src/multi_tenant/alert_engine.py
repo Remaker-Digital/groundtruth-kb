@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Alert evaluation engine — evaluates rules against platform metrics.
 
@@ -20,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import operator as op_module
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import AlertSeverity
@@ -273,7 +274,7 @@ class AlertEngine:
         try:
             triggered_at = datetime.fromisoformat(triggered_at_str)
             cooldown_until = triggered_at + timedelta(minutes=cooldown_minutes)
-            return datetime.now(timezone.utc) < cooldown_until
+            return datetime.now(UTC) < cooldown_until
         except (ValueError, TypeError):
             return False
 

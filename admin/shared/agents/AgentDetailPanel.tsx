@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * AgentDetailPanel — right panel showing agent overview, unified skills
  * table with inline toggle/select controls, and provider logo.

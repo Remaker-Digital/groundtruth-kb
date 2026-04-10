@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """CQ-6: Quality-aware escalation (SPEC-0185 / WI-1516).
 
 Provides quality-driven escalation recommendations.  When the AI's

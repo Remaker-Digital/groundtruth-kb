@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Tenant Agent Overlay CRUD (SPEC-1854, WI-1666, WI-4013/4014).
 
 Admin endpoints for managing per-tenant, per-agent configuration overlays
@@ -22,7 +23,6 @@ from pydantic import Field
 from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -48,8 +48,8 @@ def _invalidate_caches(tenant_id: str | None = None) -> None:
     Codex Finding 1: no second TTL cache — write-path invalidation is
     mandatory before any caching layer is acceptable.
     """
-    from src.agents.plugins.overlay import clear_resolution_cache
     from src.agents.plugins.bindings import SkillBindingService
+    from src.agents.plugins.overlay import clear_resolution_cache
     clear_resolution_cache()
     svc = SkillBindingService.get_instance()
     svc.invalidate(tenant_id)
@@ -507,8 +507,8 @@ async def list_tenant_available_skills(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> list[EffectiveSkillModel]:
     """List skills that pass all three resolution layers (SPEC-1859 req 7)."""
-    from src.agents.plugins.overlay import list_available_skills
     from src.agents.plugins.bindings import SkillBindingService
+    from src.agents.plugins.overlay import list_available_skills
 
     # WI-4014: Hydrate binding cache before sync resolve_skill reads
     _svc = SkillBindingService.get_instance()

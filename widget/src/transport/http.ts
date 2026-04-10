@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * HTTP transport — client→server message delivery.
  *
@@ -434,16 +435,21 @@ export async function verifyOtp(
 // SMS OTP (SPEC-1879 Phase 3)
 // ---------------------------------------------------------------------------
 
-/** Send a 6-digit OTP code via SMS to the customer's phone. */
+/** Send a 6-digit OTP code via SMS to the customer's phone.
+ * Returns the full backend response including the message field,
+ * which may contain tier-gate or other backend-authored outcomes. */
 export async function sendPhoneOtp(
   phone: string,
   name?: string,
-): Promise<boolean> {
-  const resp = await request<{ sent: boolean }>('POST', '/api/chat/otp/send-sms', {
+): Promise<{ sent: boolean; message: string | null; reason: string | null }> {
+  const resp = await request<{ sent: boolean; message?: string; reason?: string }>('POST', '/api/chat/otp/send-sms', {
     phone,
     name: name ?? '',
   });
-  return resp.ok;
+  if (resp.ok && resp.data) {
+    return { sent: resp.data.sent, message: resp.data.message ?? null, reason: resp.data.reason ?? null };
+  }
+  return { sent: false, message: null, reason: null };
 }
 
 /** Verify a 6-digit SMS OTP code. Returns verified phone on success. */

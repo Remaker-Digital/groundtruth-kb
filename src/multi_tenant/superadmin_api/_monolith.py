@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- shared state, router, and configuration functions.
 
 This module holds module-level service references, the shared router, and

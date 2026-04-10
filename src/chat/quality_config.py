@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """CQ-7: Merchant quality configuration (SPEC-0186 / WI-1517).
 
 Tenant-level quality thresholds and preferences.  Merchants can

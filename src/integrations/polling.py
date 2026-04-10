@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Polling Scheduler & Cursor Management (SPEC-1767).
 
 Background polling scheduler for integrations that use polling or hybrid
@@ -23,7 +24,8 @@ import asyncio
 import enum
 import logging
 import time
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

@@ -18,8 +18,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
-import os
 import logging
+import os
 import time
 from typing import Any
 
@@ -268,6 +268,7 @@ async def run_migration(*, dry_run: bool = False, tenant_id: str | None = None) 
 async def _bootstrap() -> None:
     """Initialize Cosmos DB and encryption service for standalone CLI usage."""
     import os
+
     from src.multi_tenant.cosmos_client import get_cosmos_manager
     from src.multi_tenant.envelope_encryption import (
         EnvelopeEncryptionService,

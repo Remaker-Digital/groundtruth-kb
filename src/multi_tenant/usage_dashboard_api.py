@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Usage Dashboard API — billing transparency endpoints (Decision #25, WI #73-74).
 
 Provides REST endpoints for the three-layer usage transparency model:
@@ -36,7 +37,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -44,7 +45,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
 
@@ -225,7 +225,7 @@ async def get_usage_dashboard(
     meter = _get_meter()
 
     if billing_period is None:
-        billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
+        billing_period = datetime.now(UTC).strftime("%Y-%m")
 
     if meter is None:
         # Services not yet initialised — return zeroed fallback
@@ -294,7 +294,7 @@ async def get_daily_volume(
     repo = _get_repo()
 
     if billing_period is None:
-        billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
+        billing_period = datetime.now(UTC).strftime("%Y-%m")
 
     if repo is None:
         # Services not yet initialised — return empty fallback
@@ -416,7 +416,7 @@ async def list_conversations(
     meter = _get_meter()
 
     if billing_period is None:
-        billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
+        billing_period = datetime.now(UTC).strftime("%Y-%m")
 
     if repo is None or meter is None:
         # Services not yet initialised — return empty fallback
@@ -552,7 +552,7 @@ async def export_conversations_csv(
     repo = _get_repo()
 
     if billing_period is None:
-        billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
+        billing_period = datetime.now(UTC).strftime("%Y-%m")
 
     if repo is None:
         # Services not yet initialised — return empty CSV

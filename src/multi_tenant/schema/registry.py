@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Schema registry -- YAML-driven field registry with lazy singleton.
 
 Loads 78 field definitions from fields.yaml and provides accessor functions
@@ -17,10 +18,10 @@ import yaml
 
 from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.schema.models import (
+    SUPPORTED_LANGUAGES,
     ConfigFieldDefinition,
     ConfigFieldType,
     OnboardingStep,
-    SUPPORTED_LANGUAGES,
     TierGate,
     ValidationRule,
 )
@@ -58,7 +59,7 @@ def _load_fields_from_yaml(
     """
     yaml_path = path or _FIELDS_YAML_PATH
 
-    with open(yaml_path, "r", encoding="utf-8") as f:
+    with open(yaml_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     raw_fields = data.get("fields", [])

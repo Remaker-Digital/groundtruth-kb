@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Stripe webhook handler.
 
@@ -24,7 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import stripe
@@ -703,7 +704,7 @@ async def handle_payment_failed(event: dict) -> dict:
         result["currency"],
         result["attempt_count"],
         (
-            datetime.fromtimestamp(result["next_payment_attempt"], tz=timezone.utc).isoformat()
+            datetime.fromtimestamp(result["next_payment_attempt"], tz=UTC).isoformat()
             if result["next_payment_attempt"]
             else "no_retry"
         ),

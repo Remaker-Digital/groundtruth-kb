@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP Agent Plug-in Architecture (SPEC-1706).
 
 Configuration-driven plug-in system for MCP agent servers.

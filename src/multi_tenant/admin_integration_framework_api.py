@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Integration Framework API — SPEC-1771 endpoint extensions.
 
 New endpoints for the Integration Framework (SPEC-1761+) that use
@@ -19,13 +20,13 @@ Routes:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.middleware import get_tenant_context, TenantContext
+from src.multi_tenant.middleware import TenantContext, get_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +163,7 @@ def _record_event(
         "integration_id": integration_id,
         "tenant_id": tenant_id,
         "event_type": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "actor": actor,
         "details": details or {},
     })
@@ -340,7 +341,7 @@ async def trigger_sync(
     _sync_state[key] = {
         **state,
         "last_sync_status": "in_progress",
-        "last_sync_at": datetime.now(timezone.utc),
+        "last_sync_at": datetime.now(UTC),
     }
 
     _record_event(
@@ -412,9 +413,9 @@ async def get_action_config(
 ):
     """Get available actions and HITL configuration for an integration."""
     from src.integrations.action_executor import (
+        _DEFAULT_HITL_POLICY,
         ActionType,
         HITLPolicy,
-        _DEFAULT_HITL_POLICY,
     )
 
     registry = _get_registry()
@@ -455,9 +456,9 @@ async def update_action_config(
 ):
     """Update HITL configuration for action types."""
     from src.integrations.action_executor import (
+        _DEFAULT_HITL_POLICY,
         ActionType,
         HITLPolicy,
-        _DEFAULT_HITL_POLICY,
     )
 
     registry = _get_registry()

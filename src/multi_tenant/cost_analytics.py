@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Cost and unit economics analytics for the service provider.
 
 Provides per-tenant cost attribution based on conversation volume,
@@ -27,7 +28,7 @@ may differ due to reserved capacity, tier discounts, or rounding.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -228,7 +229,7 @@ async def get_cost_overview(
     days: int = Query(30, ge=1, le=365, description="Lookback period in days"),
 ) -> CostOverview:
     """Return cross-tenant cost estimates for the specified period."""
-    until = datetime.now(timezone.utc)
+    until = datetime.now(UTC)
     since = until - timedelta(days=days)
 
     try:
@@ -324,7 +325,7 @@ async def get_tenant_cost(
     days: int = Query(30, ge=1, le=365, description="Lookback period in days"),
 ) -> TenantCostProfile:
     """Return detailed cost breakdown for a single tenant."""
-    until = datetime.now(timezone.utc)
+    until = datetime.now(UTC)
     since = until - timedelta(days=days)
 
     # Verify tenant exists

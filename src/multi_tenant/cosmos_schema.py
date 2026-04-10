@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Cosmos DB schema definitions for multi-tenant Agent Red platform.
 
@@ -33,7 +34,7 @@ Architecture references:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, ClassVar
 
@@ -301,8 +302,16 @@ class TenantDocument(BaseModel):
     shopify_shop_domain: str | None = Field(default=None, description="*.myshopify.com")
     shopify_subscription_id: str | None = Field(default=None, description="Shopify gid://...")
 
+    # Display name (SPEC-1881: human-readable tenant label for SPA)
+    display_name: str | None = Field(
+        default=None,
+        description="Human-readable tenant name for operator-facing surfaces. "
+        "Default: {contact_email}-001. Unique across tenants.",
+    )
+
     # Contact (PII: direct)
     customer_email: str | None = Field(default=None, description="Primary contact email")
+    customer_phone: str | None = Field(default=None, description="Primary contact phone (E.164)")
 
     # GDPR consent (Decision #10)
     consent_status: ConsentStatus = Field(
@@ -999,11 +1008,11 @@ class QuickActionPrompt(BaseModel):
     is_active: bool = Field(default=True, description="Whether this action is available")
     sort_order: int = Field(default=0, description="Display priority (lower = first)")
     created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Creation timestamp (ISO 8601)",
     )
     updated_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Last update timestamp (ISO 8601)",
     )
 

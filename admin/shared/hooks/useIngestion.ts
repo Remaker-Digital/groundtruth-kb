@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * Ingestion hooks — start, monitor, and cancel storefront ingestion jobs.
  *

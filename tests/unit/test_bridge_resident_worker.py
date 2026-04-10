@@ -4,8 +4,17 @@ import json
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-import bridge_resident_worker as resident_worker
+# Bridge modules live at repo root — ensure it's on sys.path for CI
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+import pytest  # noqa: E402
+
+if sys.platform != "win32":
+    pytest.skip("bridge_resident_worker requires msvcrt (Windows-only)", allow_module_level=True)
+
+import bridge_resident_worker as resident_worker  # noqa: E402
 
 
 def test_resident_worker_is_healthy_for_recent_busy_worker(tmp_path) -> None:

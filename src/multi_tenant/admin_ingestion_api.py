@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Ingestion API — Knowledge Automation (KA-2).
 
 REST endpoints for triggering and monitoring storefront ingestion jobs

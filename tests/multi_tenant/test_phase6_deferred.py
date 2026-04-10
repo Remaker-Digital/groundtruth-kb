@@ -8,6 +8,10 @@ SPEC-0823 (RAG + memory), SPEC-0297 (backup encryption).
 """
 from __future__ import annotations
 
+import os
+
+import pytest
+
 import time
 
 
@@ -23,6 +27,15 @@ class TestCustomerAdminProvisioning:
         """provision_customer_admin function is importable."""
         from src.multi_tenant.admin_team_api import provision_customer_admin
         assert callable(provision_customer_admin)
+
+    @pytest.fixture(autouse=True)
+    def _ensure_seed_env(self):
+        """Ensure SEED_FQDN is set so seed_tenant.py can be imported."""
+        prev = os.environ.get("SEED_FQDN")
+        os.environ.setdefault("SEED_FQDN", "test-placeholder.azurecontainerapps.io")
+        yield
+        if prev is None:
+            os.environ.pop("SEED_FQDN", None)
 
     def test_seed_tenant_has_customer_admin(self):
         """seed_tenant.py TEAM_MEMBERS includes a customer admin."""

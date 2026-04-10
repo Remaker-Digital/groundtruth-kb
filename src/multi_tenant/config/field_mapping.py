@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 PreferencesDocument ↔ config schema field mapping.
 
@@ -10,12 +11,11 @@ and bidirectional conversion functions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import PreferencesDocument
 from src.multi_tenant.tenant_config_schema import get_field_registry
-
 
 # ---------------------------------------------------------------------------
 # Direct field mapping
@@ -173,7 +173,7 @@ def _config_to_preferences(
     Returns:
         PreferencesDocument ready for persistence.
     """
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Extract fields that map directly to PreferencesDocument
     prefs_kwargs: dict[str, Any] = {}

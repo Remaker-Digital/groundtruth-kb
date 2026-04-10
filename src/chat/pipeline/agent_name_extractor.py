@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """NL agent name extraction for peer agent escalation (SPEC-1864).
 
 Extracts agent names from natural language messages like "transfer to sales"

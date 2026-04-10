@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * PreChatForm — collects customer information before starting a chat.
  *
@@ -46,6 +47,7 @@ interface PreChatFormProps {
   onSubmit: (data: Record<string, string>) => void;
   onSkip?: () => void;
   isLoading: boolean;
+  phoneError?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +63,7 @@ function validateField(field: FormField, value: string, locale: Locale): string 
     return locale.fieldInvalidEmail;
   }
   if (field.type === 'phone' && value.trim() && !PHONE_E164_REGEX.test(value.trim())) {
-    return 'Please enter a valid phone number (e.g. +15551234567)';
+    return locale.fieldInvalidPhone;
   }
   return null;
 }
@@ -77,6 +79,7 @@ export const PreChatForm: FunctionComponent<PreChatFormProps> = ({
   onSubmit,
   onSkip,
   isLoading,
+  phoneError,
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -151,6 +154,25 @@ export const PreChatForm: FunctionComponent<PreChatFormProps> = ({
       >
         {locale.preChatTitle}
       </div>
+
+      {/* Phone transport error banner (SPEC-1879 Phase 3 P2) */}
+      {phoneError && (
+        <div
+          role="alert"
+          style={{
+            padding: `${tokens.space2} ${tokens.space3}`,
+            marginBottom: tokens.space3,
+            backgroundColor: `${tokens.colorError}14`,
+            border: `${tokens.borderWidth} solid ${tokens.colorError}`,
+            borderRadius: tokens.borderRadius,
+            fontSize: tokens.fontSizeSm,
+            fontFamily: tokens.fontFamily,
+            color: tokens.colorError,
+          }}
+        >
+          {phoneError}
+        </div>
+      )}
 
       <form
         onSubmit={handleSubmit}

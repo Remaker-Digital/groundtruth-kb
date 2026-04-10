@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Zendesk Helpdesk Adapter (SPEC-1775).
 
 Full HelpdeskAdapter + KnowledgeAdapter implementation for Zendesk.

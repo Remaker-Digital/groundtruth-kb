@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * ArticleEditor — create / edit form for a single KB article.
  * Handles title, category (existing or new), status, content textarea,

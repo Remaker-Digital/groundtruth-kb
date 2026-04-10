@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP mutation executor — Critic-gated, idempotent mutation execution.
 
 Orchestrates the full mutation execution pipeline:
@@ -28,7 +29,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.mutation_policy import (
@@ -103,7 +104,7 @@ class MutationLogDocument:
             str(result.tool_result)[:200] if result.tool_result else None
         )
         self.error_reason = result.error_reason
-        self.created_at = datetime.now(timezone.utc).isoformat()
+        self.created_at = datetime.now(UTC).isoformat()
         self.ttl = MUTATION_LOG_TTL_SECONDS
 
     def to_dict(self) -> dict[str, Any]:

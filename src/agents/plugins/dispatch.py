@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP Agent Plug-in Dispatch (SPEC-1706).
 
 Dispatches tool invocations to plug-in agents via MCP protocol.
@@ -230,7 +231,7 @@ class PluginDispatcher:
                 result = await session.call_tool(mcp_tool_name, arguments)
                 return result
 
-        except (ImportError, AttributeError):
+        except (ImportError, AttributeError, TypeError):
             logger.warning(
                 "AGNTCY SDK not available or incompatible — falling back to HTTP for %s",
                 defn.agent_id,

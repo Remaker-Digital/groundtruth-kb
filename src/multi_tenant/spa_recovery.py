@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SPA Emergency Key Recovery (SPEC-1678).
 
 Provides an *unauthenticated* endpoint for platform admins who have lost
@@ -22,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -159,7 +160,7 @@ async def recover_spa_key(
     admin_id = admin.get("admin_id", admin.get("id"))
     new_raw_key = generate_spa_api_key()
     new_key_hash = hash_api_key(new_raw_key)
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     # Update key hash
     await _platform_admin_repo.update_api_key_hash(

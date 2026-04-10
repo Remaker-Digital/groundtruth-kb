@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Two-Layer Credential Vault (SPEC-1765).
 
 Extends TenantSecretService with a two-layer encryption scheme:

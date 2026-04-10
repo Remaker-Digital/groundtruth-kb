@@ -41,8 +41,9 @@ class _MapBridge:
 
 
 class _RepairBridge:
-    def __init__(self, context: dict) -> None:
+    def __init__(self, context: dict, *, pending_items: list[dict] | None = None) -> None:
         self._context = context
+        self._pending_items = pending_items or []
         self.sent_messages: list[dict] = []
         self.resolved_messages: list[dict] = []
 
@@ -87,6 +88,11 @@ class _RepairBridge:
             }
         )
         return {"ok": True}
+
+    def list_inbox(self, *, agent: str, status: str, limit: int) -> dict:
+        assert agent == "codex"
+        assert status == "pending"
+        return {"count": len(self._pending_items), "items": copy.deepcopy(self._pending_items[:limit])}
 
 
 def test_build_contexts_prefers_structured_artifact_refs(tmp_path) -> None:
@@ -336,6 +342,205 @@ def test_repair_terminal_thread_outputs_sends_valid_peer_message_and_supersedes_
     ]
 
 
+def test_repair_terminal_thread_outputs_closes_closure_only_threads_without_peer_resend(tmp_path) -> None:
+    bridge = _RepairBridge(
+        {
+            "canonical_message": {
+                "id": "m-close",
+                "status": "pending",
+                "priority": 2,
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Re: Session start: report current operating state — COMPLETED",
+                "body": (
+                    "Thread completed with outcome COMPLETED.\n\n"
+                    "Closure-only notification. No action required."
+                ),
+                "tags": ["bridge-sync", "review", "completed"],
+            },
+            "thread_correlation_id": "m-close",
+            "artifact_refs": [],
+            "thread_messages": [
+                {
+                    "id": "bad-close-reply",
+                    "sender": "codex",
+                    "recipient": "prime",
+                    "message_kind": "substantive",
+                    "status": "failed",
+                    "subject": "Re: Session start: report current operating state — COMPLETED",
+                    "body": "Closure-only response should not be re-sent.",
+                }
+            ],
+            "latest_non_protocol_codex_message": None,
+            "latest_non_protocol_prime_message": None,
+        }
+    )
+
+    repaired = context_builder.repair_terminal_thread_outputs(
+        bridge,
+        agent="codex",
+        target_refs=["m-close"],
+        project_dir=tmp_path,
+    )
+
+    assert repaired == 2
+    assert bridge.sent_messages == []
+    assert bridge.resolved_messages == [
+        {
+            "message_id": "m-close",
+            "agent": "codex",
+            "outcome": "completed",
+            "resolution": "Closure-only or receipt-only traffic on previously handled thread. No new action required.",
+        },
+        {
+            "message_id": "bad-close-reply",
+            "agent": "owner",
+            "outcome": "failed",
+            "resolution": "Superseded after closure-only thread cleanup on m-close.",
+        },
+    ]
+
+
+def test_fast_path_session_start_requests_replies_without_worker_dispatch(tmp_path) -> None:
+    hooks_dir = tmp_path / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / ".bridge-worker-codex-health.json").write_text(
+        json.dumps(
+            {
+                "status": "idle",
+                "active_message_ids": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (hooks_dir / ".bridge-worker-prime-health.json").write_text(
+        json.dumps(
+            {
+                "status": "running",
+                "active_message_ids": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    bridge = _RepairBridge(
+        {
+            "canonical_message": {
+                "id": "m-session",
+                "status": "pending",
+                "priority": 1,
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Session start: report current operating state",
+                "body": "Report your current operating state",
+                "artifact_refs": ["AGENTS.md"],
+            },
+            "thread_correlation_id": "m-session",
+            "artifact_refs": ["AGENTS.md"],
+            "thread_messages": [],
+            "latest_non_protocol_codex_message": None,
+            "latest_non_protocol_prime_message": None,
+        },
+        pending_items=[
+            {
+                "id": "m-session",
+                "subject": "Session start: report current operating state",
+            }
+        ],
+    )
+
+    handled = context_builder.fast_path_session_start_requests(
+        bridge,
+        agent="codex",
+        target_refs=["m-session"],
+        project_dir=tmp_path,
+    )
+
+    assert handled == 1
+    assert len(bridge.sent_messages) == 1
+    sent = bridge.sent_messages[0]
+    assert sent["subject"] == "Codex operating state: IDLE"
+    assert "Bridge inbox: 1 pending message(s)." in sent["body"]
+    assert "Peer worker status: RUNNING." in sent["body"]
+    assert bridge.resolved_messages == [
+        {
+            "message_id": "m-session",
+            "agent": "codex",
+            "outcome": "completed",
+            "resolution": "Session-start operating-state reply sent via bridge message repair-1.",
+        }
+    ]
+
+
+def test_fast_path_session_start_requests_auto_resolves_session_start_replies(tmp_path) -> None:
+    bridge = _RepairBridge(
+        {
+            "canonical_message": {
+                "id": "m-session-reply",
+                "status": "pending",
+                "priority": 2,
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Prime operating state — session start reply",
+                "body": "Prime Builder operating state report.",
+            },
+            "thread_correlation_id": "m-session-thread",
+            "artifact_refs": ["AGENTS.md"],
+            "thread_messages": [
+                {
+                    "id": "m-session-root",
+                    "sender": "codex",
+                    "recipient": "prime",
+                    "subject": "Session start: report current operating state",
+                    "body": "Report your current operating state.",
+                    "status": "completed",
+                },
+                {
+                    "id": "m-session-reply",
+                    "sender": "prime",
+                    "recipient": "codex",
+                    "subject": "Prime operating state — session start reply",
+                    "body": "Prime Builder operating state report.",
+                    "status": "pending",
+                },
+            ],
+            "latest_non_protocol_codex_message": {
+                "id": "m-session-root",
+                "sender": "codex",
+                "recipient": "prime",
+                "subject": "Session start: report current operating state",
+                "body": "Report your current operating state.",
+                "status": "completed",
+            },
+            "latest_non_protocol_prime_message": {
+                "id": "m-session-reply",
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Prime operating state — session start reply",
+                "body": "Prime Builder operating state report.",
+                "status": "pending",
+            },
+        }
+    )
+
+    handled = context_builder.fast_path_session_start_requests(
+        bridge,
+        agent="codex",
+        target_refs=["m-session-reply"],
+        project_dir=tmp_path,
+    )
+
+    assert handled == 1
+    assert bridge.sent_messages == []
+    assert bridge.resolved_messages == [
+        {
+            "message_id": "m-session-reply",
+            "agent": "codex",
+            "outcome": "completed",
+            "resolution": "Session-start operating-state reply received automatically. No follow-up reply required.",
+        }
+    ]
+
+
 def test_repair_terminal_thread_outputs_closes_ack_only_threads_after_protocol_change(tmp_path) -> None:
     artifact = tmp_path / "CLAUDE.md"
     artifact.write_text("bridge proof", encoding="utf-8")
@@ -479,3 +684,41 @@ def test_select_dispatch_batch_caps_targets_and_preserves_order() -> None:
     assert [item["canonical_message"]["id"] for item in batch["contexts"]] == ["m-2"]
     assert batch["new_items"] == [{"id": "m-2"}, {"id": "m-4"}]
     assert "due_claimed" not in batch  # v3: no claimed state
+
+
+def test_select_dispatch_batch_prioritizes_session_start_ahead_of_closure_traffic() -> None:
+    contexts = [
+        {"canonical_message": {"id": "m-handshake"}},
+        {"canonical_message": {"id": "m-review"}},
+        {"canonical_message": {"id": "m-close"}},
+    ]
+    new_items = [
+        {
+            "id": "m-close",
+            "subject": "Re: Session start: report current operating state — COMPLETED",
+            "body": "Thread completed with outcome COMPLETED.\n\nClosure-only notification. No action required.",
+            "priority": 2,
+        },
+        {
+            "id": "m-handshake",
+            "subject": "Session start: report current operating state",
+            "body": "Report your current operating state",
+            "priority": 1,
+        },
+        {
+            "id": "m-review",
+            "subject": "Re-review request: bridge fix",
+            "body": "Please review the bridge patch.",
+            "priority": 2,
+        },
+    ]
+
+    batch = context_builder.select_dispatch_batch(
+        contexts,
+        new_items,
+        max_targets=2,
+    )
+
+    assert batch["target_ids"] == ["m-handshake", "m-review"]
+    assert batch["deferred_ids"] == ["m-close"]
+    assert [item["id"] for item in batch["new_items"]] == ["m-handshake", "m-review"]

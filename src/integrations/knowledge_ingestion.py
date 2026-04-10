@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Multi-Source Knowledge Ingestion Pipeline (SPEC-1770).
 
 Extends the knowledge vectorizer with content normalization from diverse

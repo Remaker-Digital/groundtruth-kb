@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Configuration Suggestion Engine (KA-4: Knowledge Automation).
 
 Heuristic analysis of KB articles and storefront content to generate

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Multi-Tenant OAuth Manager (SPEC-1764).
 
 Manages OAuth2 authorization code flows for external integrations.

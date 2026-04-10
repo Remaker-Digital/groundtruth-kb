@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Fail-closed Critic/Supervisor safety enforcement.
 
@@ -49,7 +50,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -732,7 +733,7 @@ class CriticPolicy:
             except Exception:
                 details[base_url] = False
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # P1-3: Per-tenant breaker counts
         open_count = sum(1 for b in self._breakers.values() if b.is_open)

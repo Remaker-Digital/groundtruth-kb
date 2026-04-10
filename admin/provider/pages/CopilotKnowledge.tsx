@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * CopilotKnowledge — Co-Pilot Knowledge Management page (SPEC-1578).
  *

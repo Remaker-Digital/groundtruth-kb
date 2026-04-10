@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SPEC-1840: Quality Data Normalization.
 
 Normalizes test result values across the Knowledge Database,

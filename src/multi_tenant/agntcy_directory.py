@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — AGNTCY Directory Integration
 #
 # Provides dynamic agent discovery via the AGNTCY Directory registry,

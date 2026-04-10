@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Tenant Admin — Agent Lifecycle API (Phase 4a, WI-4016).
 
 Tenant-scoped agent overlay and skill binding management for the
@@ -56,8 +57,8 @@ def _get_binding_repo():
 
 def _invalidate_caches(tenant_id: str) -> None:
     """Invalidate resolution + binding caches on write."""
-    from src.agents.plugins.overlay import clear_resolution_cache
     from src.agents.plugins.bindings import SkillBindingService
+    from src.agents.plugins.overlay import clear_resolution_cache
     clear_resolution_cache()
     svc = SkillBindingService.get_instance()
     svc.invalidate(tenant_id)
@@ -352,8 +353,8 @@ async def get_effective_config(
     _validate_tier_gate(ctx, agent_id)
     tenant_id = ctx.tenant_id
 
-    from src.agents.plugins.overlay import resolve_for_tenant
     from src.agents.plugins.bindings import SkillBindingService
+    from src.agents.plugins.overlay import resolve_for_tenant
 
     # Hydrate binding cache before sync resolution
     svc = SkillBindingService.get_instance()
@@ -559,8 +560,8 @@ async def list_available_skills(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> list[EffectiveSkillModel]:
     """List skills that pass all three resolution layers."""
-    from src.agents.plugins.overlay import list_available_skills as _list_available
     from src.agents.plugins.bindings import SkillBindingService
+    from src.agents.plugins.overlay import list_available_skills as _list_available
 
     tenant_id = ctx.tenant_id
 

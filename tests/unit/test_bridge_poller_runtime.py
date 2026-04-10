@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import bridge_poller
-import prime_bridge_runtime as runtime
+# Bridge modules live at repo root — ensure it's on sys.path for CI
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+import pytest  # noqa: E402
+
+if sys.platform != "win32":
+    pytest.skip("bridge_poller requires msvcrt (Windows-only)", allow_module_level=True)
+
+import bridge_poller  # noqa: E402
+import prime_bridge_runtime as runtime  # noqa: E402
 
 
 def _valid_payload() -> str:
@@ -400,7 +409,7 @@ def test_clear_failed_messages_leaves_recent_failed_rows_untouched(
     assert failed_inbox["items"][0]["id"] == failed["id"]
 
 
-def test_handle_inbox_defers_to_resident_worker_when_healthy(tmp_path: Path) -> None:
+def test_handle_inbox_keeps_candidates_visible_even_when_resident_worker_is_healthy(tmp_path: Path) -> None:
     item = {
         "id": "m-healthy",
         "sender": "prime",
@@ -424,9 +433,64 @@ def test_handle_inbox_defers_to_resident_worker_when_healthy(tmp_path: Path) -> 
         resident_worker_healthy=True,
     )
 
-    assert handled["resident_deferrals"] == 1
-    assert handled["wake_candidates"] == []
-    assert handled["surfaced"] == 0
+    assert handled["resident_deferrals"] == 0
+    assert handled["wake_candidates"] == ["m-healthy"]
+    assert handled["surfaced"] == 1
+
+
+def test_handle_inbox_prioritizes_session_start_above_closure_traffic(tmp_path: Path) -> None:
+    bridge = _FakeBridge(
+        [
+            {
+                "id": "m-close",
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Re: Session start: report current operating state — COMPLETED",
+                "body": "Thread completed with outcome COMPLETED.\n\nClosure-only notification. No action required.",
+                "status": "pending",
+                "priority": 2,
+                "payload": {"expected_response": "status_update"},
+                "tags": ["bridge-sync", "review", "completed"],
+                "message_kind": "substantive",
+            },
+            {
+                "id": "m-handshake",
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Session start: report current operating state",
+                "body": "Report your current operating state",
+                "status": "pending",
+                "priority": 1,
+                "payload": {"expected_response": "status_update"},
+                "tags": [],
+                "message_kind": "substantive",
+            },
+            {
+                "id": "m-review",
+                "sender": "prime",
+                "recipient": "codex",
+                "subject": "Review this quickly",
+                "body": "Please review the bridge patch.",
+                "status": "pending",
+                "priority": 2,
+                "payload": {"expected_response": "advisory_review"},
+                "tags": [],
+                "message_kind": "substantive",
+            },
+        ]
+    )
+
+    handled = bridge_poller._handle_inbox(
+        bridge,
+        "codex",
+        "prime",
+        tmp_path / "poller.log",
+        state={"last_wake_by_message": {}},
+        project_dir=tmp_path,
+        write_enabled=True,
+    )
+
+    assert handled["wake_candidates"] == ["m-handshake", "m-review", "m-close"]
 
 
 def test_resident_worker_busy_on_other_thread_does_not_defer_wake(tmp_path: Path) -> None:
@@ -484,6 +548,33 @@ def test_launch_agent_wake_caps_message_ids(monkeypatch, tmp_path: Path) -> None
     cmd = launched[0]
     passed_ids = [cmd[index + 1] for index, value in enumerate(cmd[:-1]) if value == "--message-id"]
     assert passed_ids == launched_ids
+
+
+def test_launch_agent_wake_preserves_message_order_when_deduping(monkeypatch, tmp_path: Path) -> None:
+    launched: list[list[str]] = []
+
+    class _DummyProcess:
+        pass
+
+    def _fake_popen(cmd: list[str], **_: object) -> _DummyProcess:
+        launched.append(cmd)
+        return _DummyProcess()
+
+    monkeypatch.setattr(bridge_poller.subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(bridge_poller.sys, "executable", str(tmp_path / "python.exe"))
+    wake_script = tmp_path / "scripts" / "codex_bridge_wake.py"
+    wake_script.parent.mkdir(parents=True)
+    wake_script.write_text("# wake", encoding="utf-8")
+
+    launched_ids = bridge_poller._launch_agent_wake(
+        "codex",
+        tmp_path,
+        ["m-handshake", "m-close", "m-handshake", "m-review"],
+        tmp_path / "poller.log",
+        trigger="poller-notification",
+    )
+
+    assert launched_ids == ["m-handshake", "m-close", "m-review"]
 
 
 def test_retry_pending_message(tmp_path: Path, monkeypatch) -> None:

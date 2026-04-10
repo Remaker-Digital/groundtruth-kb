@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — Co-Pilot Agent (SPEC-1557)
 #
 # Dedicated handler for admin team member conversations. Retrieves product

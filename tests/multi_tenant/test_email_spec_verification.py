@@ -223,17 +223,17 @@ class TestSpec0689KeyRegenerationNotice:
     'If lost, you can regenerate your API key...'"""
 
     def test_welcome_email_keys_available_in_console(self):
-        """Welcome email directs users to admin console for keys."""
+        """Welcome email directs users to admin console (SPEC-1673: keys not in email)."""
         from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY
 
         assert "admin dashboard" in _WELCOME_EMAIL_BODY.lower()
-        assert "never sent via email" in _WELCOME_EMAIL_BODY.lower()
+        assert "sign in to dashboard" in _WELCOME_EMAIL_BODY.lower()
 
     def test_welcome_email_has_security_messaging(self):
-        """Welcome email explains key security practice."""
+        """Welcome email directs users to dashboard (keys removed per SPEC-1673)."""
         from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY
 
-        assert "security" in _WELCOME_EMAIL_BODY.lower() or "never sent" in _WELCOME_EMAIL_BODY.lower()
+        assert "admin dashboard" in _WELCOME_EMAIL_BODY.lower()
 
 
 # ---------------------------------------------------------------------------

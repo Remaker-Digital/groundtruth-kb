@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * PipelineObservatory -- Pipeline Observatory page (SPEC-1585..1587, SPEC-1786).
  *

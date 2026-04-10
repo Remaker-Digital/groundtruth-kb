@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red — Response Generator Container Entry Point
 #
 # Run: uvicorn src.agents.containers.response_generator_app:app --port 8083

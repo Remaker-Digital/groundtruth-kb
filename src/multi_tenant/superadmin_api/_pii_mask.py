@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """PII masking helpers for superadmin API responses.
 
 SPEC-1843 (ZK Pillar 3): platform operator MUST NOT read tenant data.

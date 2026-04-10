@@ -297,7 +297,7 @@ class TestTenantComparisonDisplayNames:
             response = client.get("/api/superadmin/pipeline/tenants")
             assert response.status_code == 200
             tenant = response.json()["tenants"][0]
-            assert tenant["displayName"] == "Alice's Shop"
+            assert tenant["displayName"] == "Ali***"  # ZK masking via mask_brand()
             assert tenant["tier"] == "professional"
         finally:
             _state._tenant_repo = original
@@ -319,7 +319,7 @@ class TestTenantComparisonDisplayNames:
             client = TestClient(app, raise_server_exceptions=False)
             response = client.get("/api/superadmin/pipeline/tenants")
             assert response.status_code == 200
-            assert response.json()["tenants"][0]["displayName"] == "bob@store.com"
+            assert response.json()["tenants"][0]["displayName"] == "b***@store.com"  # ZK masking via mask_email()
         finally:
             _state._tenant_repo = original
 
@@ -404,7 +404,7 @@ class TestTenantComparisonDisplayNames:
             client = TestClient(app, raise_server_exceptions=False)
             response = client.get("/api/superadmin/pipeline/tenants")
             tenant = response.json()["tenants"][0]
-            assert tenant["displayName"] == "My Shop"
+            assert tenant["displayName"] == "My ***"  # ZK masking via mask_brand()
             assert tenant["tenantId"] == "uuid-123"
         finally:
             _state._tenant_repo = original

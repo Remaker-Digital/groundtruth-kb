@@ -173,8 +173,8 @@ class TestNewAlertTypes:
         assert alert.severity == AlertSeverity.CRITICAL
 
     def test_total_alert_types(self):
-        """All 12 alert types accounted for."""
-        assert len(AlertType) == 12
+        """All 13 alert types accounted for (QUALITY_DROP added for quality regression alerts)."""
+        assert len(AlertType) == 13
 
 
 # ---------------------------------------------------------------------------

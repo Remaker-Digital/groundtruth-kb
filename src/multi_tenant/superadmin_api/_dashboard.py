@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Dashboard, billing, SLA, queues, compliance, secrets, integrations.
 
 Domain sub-module extracted from the superadmin_api monolith.
@@ -10,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, Query
@@ -18,7 +19,6 @@ from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.cosmos_schema import AuditEventType
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 from src.multi_tenant.superadmin_api._tenants import TenantDistributionSummary, tenant_summary
 
@@ -340,7 +340,7 @@ async def provider_dashboard(
 
 ) -> DashboardHealthResponse:
     """Get the unified provider operations dashboard data."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     result = DashboardHealthResponse(timestamp=now)
 
@@ -456,7 +456,7 @@ async def billing_health(
     if not _state._tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Get all tenant IDs + metadata
     tenant_data: list[dict[str, Any]] = []
@@ -570,10 +570,10 @@ async def sla_trends(
     """
     try:
         from src.multi_tenant.repositories.sla_snapshots import SLASnapshotRepository
-        from src.multi_tenant.sla_monitoring import SLAMonitoringService, SLA_TARGETS
+        from src.multi_tenant.sla_monitoring import SLA_TARGETS, SLAMonitoringService
 
         repo = SLASnapshotRepository()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Fetch snapshots based on range
         if range_days <= 3:
@@ -714,7 +714,7 @@ async def compliance_summary(
     if _state._tenant_repo is None:
         raise HTTPException(status_code=503, detail="Service not configured")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     tenant_ids = await _state._tenant_repo.list_active_tenant_ids()
     tenants: list[TenantComplianceInfo] = []
     errors: list[dict[str, str]] = []

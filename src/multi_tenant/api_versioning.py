@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """API versioning headers middleware (WI #140).
 
 Adds API version information to all responses via headers. This allows
@@ -37,7 +38,7 @@ API_VERSION = "1.0.0"
 # Product release version — updated with each deployment.
 # This is displayed in the admin sidebar footer and returned via
 # the X-Product-Version response header on all API calls.
-PRODUCT_VERSION = "1.98.90"
+PRODUCT_VERSION = "1.98.92"
 
 # Deprecated paths — these still work but clients should migrate.
 # Format: {path_prefix: deprecation_message}

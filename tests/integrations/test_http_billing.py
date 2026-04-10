@@ -25,7 +25,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import stripe
 
-from tests.helpers.fake_tenant_repo import FakeTenantRepo, run_sync
+from tests.helpers.fake_tenant_repo import FakeDomainIndexRepo, FakeTenantRepo, run_sync
 
 
 # ---------------------------------------------------------------------------
@@ -140,11 +140,13 @@ def _fake_provisioning_repo():
 
     Ensures provisioning functions (provision_tenant, get_tenant, etc.)
     read and write from an in-memory store instead of Cosmos DB.
+    Includes FakeDomainIndexRepo for SPEC-1644 domain lookups.
     """
     from src.integrations.provisioning import configure_provisioning_repo
 
     repo = FakeTenantRepo()
-    configure_provisioning_repo(repo, team_repo=None)
+    domain_index = FakeDomainIndexRepo()
+    configure_provisioning_repo(repo, team_repo=None, domain_index_repo=domain_index)
     yield repo
     configure_provisioning_repo(None, team_repo=None)
 
@@ -646,6 +648,7 @@ class TestStripeWebhooks:
             interval="month",
             stripe_customer_id="cus_cancel_001",
             stripe_subscription_id="sub_cancel_001",
+            customer_email="cancel@example.com",
         ))
 
         event = _make_stripe_event(
@@ -723,6 +726,7 @@ class TestStripeWebhooks:
             tier="starter",
             interval="month",
             stripe_customer_id="cus_fail_001",
+            customer_email="fail@example.com",
         ))
 
         event = _make_stripe_event(
@@ -907,6 +911,7 @@ class TestShopifyBilling:
         This path is auth-exempt.
         """
         mock_shopify_client.execute.return_value = {
+            "shop": {"email": "merchant@test-shop.com"},
             "currentAppInstallation": {
                 "activeSubscriptions": [
                     {
@@ -956,6 +961,7 @@ class TestShopifyBilling:
     ):
         """HTTP-BILL-31: GET /api/shopify/billing/status — returns subscription status."""
         mock_shopify_client.execute.return_value = {
+            "shop": {"email": "merchant@test-shop.com"},
             "currentAppInstallation": {
                 "activeSubscriptions": [
                     {
@@ -1068,6 +1074,7 @@ class TestTenantEndpoints:
             billing_channel=BillingChannel.SHOPIFY,
             tier="starter",
             shopify_shop_domain="lookup-shop.myshopify.com",
+            customer_email="lookup@example.com",
         ))
 
         resp = starter_client.get(
@@ -1089,6 +1096,7 @@ class TestTenantEndpoints:
             tier="professional",
             interval="month",
             stripe_customer_id="cus_detail_001",
+            customer_email="detail@example.com",
         ))
 
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
@@ -1118,6 +1126,7 @@ class TestPackPurchaseWithTenantId:
             tier="starter",
             interval="month",
             stripe_customer_id="cus_tenant_pack_001",
+            customer_email="tenant-pack@example.com",
         ))
 
         resp = starter_client.post(

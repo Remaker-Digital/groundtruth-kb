@@ -30,7 +30,11 @@ from pathlib import Path
 
 import msvcrt
 
-from bridge_worker_context import DEFAULT_MAX_DISPATCH_TARGETS
+from bridge_worker_context import (
+    DEFAULT_MAX_DISPATCH_TARGETS,
+    dedupe_preserve_order,
+    prioritize_inbox_items,
+)
 from bridge_resident_worker import resident_worker_should_defer
 
 DIRECT_WAKE_EVENT_TYPES = {"message.failed"}
@@ -142,7 +146,7 @@ def _launch_agent_wake(
         _append_log(log_file, f"wake skipped: script missing at {wake_script}")
         return []
 
-    unique_ids = sorted(set(message_ids))
+    unique_ids = dedupe_preserve_order(message_ids)
     launch_ids = unique_ids[:DEFAULT_MAX_DISPATCH_TARGETS]
     deferred_ids = unique_ids[DEFAULT_MAX_DISPATCH_TARGETS:]
     if deferred_ids:
@@ -289,7 +293,7 @@ def _handle_notification_batch(
         if _notification_should_wake(agent, event):
             summary["wake_refs"].append(message_ref)
 
-    summary["wake_refs"] = sorted(set(summary["wake_refs"]))
+    summary["wake_refs"] = dedupe_preserve_order(summary["wake_refs"])
     return summary
 
 
@@ -323,7 +327,7 @@ def _handle_inbox(
         "wake_candidates": [],
     }
     inbox = bridge.list_inbox(agent=agent, status="pending", limit=100)
-    items = inbox.get("items", [])
+    items = prioritize_inbox_items(inbox.get("items", []))
     wake_candidates: list[str] = []
 
     for item in items:
@@ -364,14 +368,6 @@ def _handle_inbox(
                 _append_log(log_file, f"suppressed repeat wake: {message_id} :: {subject}")
                 continue
 
-            if resident_worker_healthy:
-                summary["resident_deferrals"] += 1
-                _append_log(
-                    log_file,
-                    f"resident worker healthy; deferring substantive wake: {message_id} :: {subject}",
-                )
-                continue
-
             summary["surfaced"] += 1
             _append_log(log_file, f"surfaced substantive work (no auto-accept): {message_id} :: {subject}")
             wake_candidates.append(message_id)
@@ -379,7 +375,7 @@ def _handle_inbox(
             summary["errors"] += 1
             _append_log(log_file, f"error handling {message_id}: {exc}")
 
-    summary["wake_candidates"] = sorted(set(wake_candidates))
+    summary["wake_candidates"] = dedupe_preserve_order(wake_candidates)
     return summary
 
 
@@ -461,8 +457,8 @@ def run(args: argparse.Namespace) -> int:
                     write_enabled=write_enabled,
                     resident_worker_healthy=resident_worker_healthy,
                 )
-                wake_candidates = sorted(
-                    set(handled["wake_candidates"]) | set(signals["wake_refs"])
+                wake_candidates = dedupe_preserve_order(
+                    [*handled["wake_candidates"], *signals["wake_refs"]]
                 )
                 trigger = "poller-notification"
                 wake_launched = 0
@@ -544,8 +540,8 @@ def run(args: argparse.Namespace) -> int:
                         write_enabled=write_enabled,
                         resident_worker_healthy=resident_worker_healthy,
                     )
-                    wake_candidates = sorted(
-                        set(handled["wake_candidates"]) | set(signals["wake_refs"])
+                    wake_candidates = dedupe_preserve_order(
+                        [*handled["wake_candidates"], *signals["wake_refs"]]
                     )
                     trigger = "poller-notification"
                     resident_worker_should_defer, resident_worker_state = _resident_worker_should_defer_wake(

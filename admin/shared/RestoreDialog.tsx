@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * RestoreDialog — Confirmation modal for restoring the previous activation snapshot.
  *

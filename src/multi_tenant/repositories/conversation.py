@@ -6,7 +6,7 @@ Conversation repository — conversations collection lifecycle and billing queri
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from azure.core import MatchConditions
@@ -133,7 +133,7 @@ class ConversationRepository(TenantScopedRepository):
         SPEC-1843: All message content passes through _pre_write encryption.
         """
         self._validate_tenant_id(tenant_id)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Read current document (decrypts via _post_read)
         doc = await self.read(tenant_id, conversation_id)
@@ -171,7 +171,7 @@ class ConversationRepository(TenantScopedRepository):
         SPEC-1843: All message content passes through _pre_write encryption.
         """
         self._validate_tenant_id(tenant_id)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         doc = await self.read(tenant_id, conversation_id)
 
@@ -256,7 +256,7 @@ class ConversationRepository(TenantScopedRepository):
         status: ConversationStatus,
     ) -> dict[str, Any]:
         """Mark a conversation as ended."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=conversation_id,
@@ -394,7 +394,7 @@ class ConversationRepository(TenantScopedRepository):
         agent_id: str,
     ) -> dict[str, Any]:
         """Assign a human agent to a conversation (post-escalation)."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=conversation_id,
@@ -411,7 +411,7 @@ class ConversationRepository(TenantScopedRepository):
         note: dict[str, Any],
     ) -> dict[str, Any]:
         """Append an internal merchant note to a conversation."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         return await self.patch(
             tenant_id=tenant_id,
             document_id=conversation_id,
@@ -794,7 +794,7 @@ class ConversationRepository(TenantScopedRepository):
         try:
             latest_end_dt = datetime.fromisoformat(latest_end.replace("Z", "+00:00"))
         except (ValueError, AttributeError):
-            latest_end_dt = datetime.now(timezone.utc)
+            latest_end_dt = datetime.now(UTC)
 
         followup_window_end = (latest_end_dt + timedelta(hours=72)).isoformat()
 

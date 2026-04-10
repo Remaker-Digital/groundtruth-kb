@@ -25,6 +25,7 @@ markers = [
     "visual: visual regression tests requiring Playwright + Vite dev server (Layer 1-2)",
     "nats: tests requiring a live NATS JetStream server (nats://localhost:4222)",
     "property: property-based tests using Hypothesis (SPEC-1843)",
+    "local_env: tests requiring local environment files (.env.local, SCHEDULE.md, etc.)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",
@@ -82,6 +83,11 @@ ignore = [
     "B905",    # zip-without-explicit-strict — too noisy for existing code
     "SIM108",  # use-ternary-operator — sometimes if/else is clearer
     "UP007",   # non-pep604-annotation — X | Y vs Optional[X] preference
+    # Deferred improvements (tracked for future tightening):
+    "B904",    # raise-without-from-inside-except — reliability/debuggability debt (106 findings in src/); adopt incrementally, not style-only
+    "UP042",   # replace-str-enum — StrEnum migration deferred to Python 3.12 cleanup pass
+    "SIM105",  # suppressible-exception — contextlib.suppress preference, low impact
+    "SIM102",  # collapsible-if — readability preference, case-by-case
 ]
 
 [tool.ruff.lint.per-file-ignores]

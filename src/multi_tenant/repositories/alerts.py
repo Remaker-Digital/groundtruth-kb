@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Alert repositories — CRUD for alert rules and alert history.
 
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from azure.cosmos.exceptions import (
@@ -59,7 +60,7 @@ class AlertRuleRepository:
         runbook_url: str = "",
     ) -> dict[str, Any]:
         """Create a new alert rule."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         rule_id = f"rule-{uuid.uuid4().hex[:12]}"
 
         doc = {
@@ -137,7 +138,7 @@ class AlertRuleRepository:
         updates: dict[str, Any],
     ) -> dict[str, Any] | None:
         """Update a rule via patch operations."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         ops: list[dict[str, Any]] = [
             {"op": "set", "path": "/updated_at", "value": now},
         ]
@@ -200,7 +201,7 @@ class AlertHistoryRepository:
         tenant_id: str = "",
     ) -> dict[str, Any]:
         """Log an alert firing event."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         alert_date = now.strftime("%Y-%m-%d")
         alert_id = f"alert-{uuid.uuid4().hex[:12]}"
 

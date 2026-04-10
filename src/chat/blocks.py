@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Structured Answer Blocks — heuristic extraction from AI responses (SPEC-1867).
 
 Detects structural patterns in AI response text and converts them to
@@ -17,8 +18,8 @@ Extraction is heuristic/regex only (no LLM call).
 
 from __future__ import annotations
 
-import re
 import logging
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)

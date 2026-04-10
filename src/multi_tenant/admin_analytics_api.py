@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Analytics API — aggregated conversation metrics (WI #176-178).
 
 Provides REST endpoints for the merchant admin dashboard's Analytics
@@ -29,13 +30,12 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.repository import ConversationRepository
@@ -180,12 +180,12 @@ def _get_repo() -> ConversationRepository:
 
 def _default_since() -> str:
     """Default date range start: 30 days ago."""
-    return (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    return (datetime.now(UTC) - timedelta(days=30)).isoformat()
 
 
 def _default_until() -> str:
     """Default date range end: now."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ---------------------------------------------------------------------------

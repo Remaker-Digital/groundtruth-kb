@@ -6,7 +6,7 @@ Tenant repository — tenants collection CRUD + lookup by channel ID.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -218,7 +218,7 @@ class TenantRepository(TenantScopedRepository):
         Used by the trial expiry scanner background task.
         Performs a cross-partition query — call infrequently (hourly).
         """
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         results: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query=(
@@ -247,7 +247,7 @@ class TenantRepository(TenantScopedRepository):
             within_iso: ISO 8601 upper-bound timestamp. Tenants expiring
                 before this time (but still in the future) are returned.
         """
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         results: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query=(
@@ -281,7 +281,7 @@ class TenantRepository(TenantScopedRepository):
         Used by the access expiry scanner background task.
         Performs a cross-partition query — call infrequently (hourly).
         """
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         results: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query=(
@@ -312,7 +312,7 @@ class TenantRepository(TenantScopedRepository):
             within_iso: ISO 8601 upper-bound timestamp. Tenants expiring
                 before this time (but still in the future) are returned.
         """
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         results: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query=(
@@ -335,7 +335,7 @@ class TenantRepository(TenantScopedRepository):
         self, tenant_id: str, status: TenantStatus,
     ) -> dict[str, Any]:
         """Update a tenant's lifecycle status."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         operations = [
             {"op": "set", "path": "/status", "value": status.value},
             {"op": "set", "path": "/updated_at", "value": now},

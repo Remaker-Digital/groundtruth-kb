@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * Panel — the main conversation panel rendered inside an iframe.
  *
@@ -375,29 +376,65 @@ export const Panel: FunctionComponent<PanelProps> = ({
   /** Handle pre-chat form submission — route through OTP if verification enabled. */
   const handlePreChatSubmit = useCallback(async (data: Record<string, string>) => {
     const store = getStore();
+    if (store.getState().isLoading) return; // Double-submit guard (all paths)
     const verificationMode = (activeConfig as Record<string, unknown>).customer_email_verification as string ?? 'required';
     const email = data.email || '';
+    const phone = data.phone || '';
 
-    // If verification is disabled or no email provided, go straight to conversation
-    if (verificationMode === 'disabled' || !email) {
+    // If verification is disabled, go straight to conversation
+    if (verificationMode === 'disabled') {
       beginConversation(data);
       return;
     }
 
-    // Store pre-chat data and email for OTP flow
-    store.setState({
-      preChatData: data,
-      customerEmail: email,
-      isLoading: true,
-      otpError: null,
-    });
+    // Email OTP path (takes precedence over phone when both present)
+    if (email) {
+      store.setState({
+        preChatData: data,
+        customerEmail: email,
+        isLoading: true,
+        otpError: null,
+      });
+      await apiSendOtp(email, data.name || '');
+      store.setState({ view: 'otp', isLoading: false });
+      return;
+    }
 
-    // Send OTP
-    await apiSendOtp(email, data.name || '');
+    // Phone SMS OTP path (SPEC-1879 Phase 3)
+    // Backend SmsSendResponse always returns sent=true (anti-enumeration).
+    // Uses structured `reason` field for programmatic branching.
+    if (phone) {
+      store.setState({
+        preChatData: data,
+        customerPhone: phone,
+        isLoading: true,
+        phoneOtpError: null,
+      });
+      const sendResult = await apiSendPhoneOtp(phone, data.name || '');
+      const isTierBlocked = sendResult.reason === 'tier_blocked'
+        || (sendResult.sent && sendResult.message?.toLowerCase().includes('not available'));
 
-    // Transition to OTP screen
-    store.setState({ view: 'otp', isLoading: false });
-  }, [beginConversation, activeConfig]);
+      if (sendResult.sent && !isTierBlocked) {
+        // SMS actually sent — transition to OTP entry screen
+        store.setState({ view: 'phone_otp', isLoading: false });
+      } else if (isTierBlocked) {
+        // Tier-gated — business decision: proceed without verification
+        store.setState({ isLoading: false, phoneOtpError: null });
+        beginConversation(data);
+      } else {
+        // Transport/network failure — do NOT bypass verification.
+        // Show error and stay on pre-chat form so customer can retry.
+        store.setState({
+          isLoading: false,
+          phoneOtpError: activeLocale.phoneSendFailed ?? 'Unable to send verification code. Please try again.',
+        });
+      }
+      return;
+    }
+
+    // No email or phone — go straight to conversation
+    beginConversation(data);
+  }, [beginConversation, activeConfig, activeLocale]);
 
   /** Skip pre-chat form — continue as anonymous guest. */
   const handlePreChatSkip = useCallback(() => {
@@ -452,8 +489,8 @@ export const Panel: FunctionComponent<PanelProps> = ({
   /** Verify phone SMS OTP code (SPEC-1879 Phase 3). */
   const handlePhoneOtpVerify = useCallback(async (code: string) => {
     const store = getStore();
-    const { customerPhone, preChatData } = store.getState();
-    if (!customerPhone) return;
+    const { customerPhone, preChatData, isLoading } = store.getState();
+    if (!customerPhone || isLoading) return; // Double-submit guard
 
     store.setState({ isLoading: true, phoneOtpError: null });
 
@@ -471,15 +508,35 @@ export const Panel: FunctionComponent<PanelProps> = ({
     }
   }, [beginConversation, activeLocale]);
 
-  /** Resend phone SMS OTP code (SPEC-1879 Phase 3). */
-  const handlePhoneOtpResend = useCallback(async () => {
+  /** Resend phone SMS OTP code (SPEC-1879 Phase 3).
+   * Returns true if cooldown should start (success or intentional tier-gate),
+   * false if a transport error occurred (error is surfaced; cooldown suppressed). */
+  const handlePhoneOtpResend = useCallback(async (): Promise<boolean> => {
     const store = getStore();
-    const { customerPhone, preChatData } = store.getState();
-    if (!customerPhone) return;
+    const { customerPhone, preChatData, isLoading } = store.getState();
+    if (!customerPhone || isLoading) return false;
 
-    await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
-    store.setState({ phoneOtpError: null });
-  }, []);
+    store.setState({ isLoading: true, phoneOtpError: null });
+
+    const result = await apiSendPhoneOtp(customerPhone, preChatData?.name || '');
+    // Tier-gate: prefer structured reason field, fall back to message string
+    const isBlocked = result.reason === 'tier_blocked'
+      || (result.message && result.message.toLowerCase().includes('not available'));
+    if (isBlocked) {
+      store.setState({ isLoading: false, phoneOtpError: result.message });
+      return true; // intentional outcome — start cooldown to prevent hammering
+    }
+    if (!result.sent) {
+      // Transport/network failure — surface error, do not start cooldown
+      store.setState({
+        isLoading: false,
+        phoneOtpError: activeLocale.phoneSendFailed ?? 'Unable to send verification code. Please try again.',
+      });
+      return false;
+    }
+    store.setState({ isLoading: false, phoneOtpError: null });
+    return true;
+  }, [activeLocale]);
 
   /** Skip phone OTP verification (SPEC-1879, optional mode only). */
   const handlePhoneOtpSkip = useCallback(() => {
@@ -880,6 +937,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
             onSubmit={handlePreChatSubmit}
             onSkip={handlePreChatSkip}
             isLoading={state.isLoading}
+            phoneError={state.phoneOtpError ?? undefined}
           />
         </div>
       )}
@@ -912,7 +970,11 @@ export const Panel: FunctionComponent<PanelProps> = ({
             locale={activeLocale}
             phone={state.customerPhone}
             onVerify={handlePhoneOtpVerify}
-            onSkip={handlePhoneOtpSkip}
+            onSkip={
+              ((activeConfig as Record<string, unknown>).customer_email_verification as string) === 'optional'
+                ? handlePhoneOtpSkip
+                : undefined
+            }
             onResend={handlePhoneOtpResend}
             isLoading={state.isLoading}
             error={state.phoneOtpError ?? undefined}

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Google Docs/Drive Integration Manifest (SPEC-1777).
 
 Declarative configuration for the Google Docs knowledge source adapter.

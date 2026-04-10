@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Pipeline constants, environment configuration, and error classification.
 
 Contains USE_AGENT_CONTAINERS feature flag, agent HTTP endpoint URLs,

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Test pipeline trigger and diagnostic data export.
 
 Domain sub-module for SPEC-1826 (SPA Test Execution Trigger) and
@@ -25,7 +26,7 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, Query
@@ -38,7 +39,6 @@ from src.multi_tenant.cosmos_schema import (
     PlatformConfigDocument,
 )
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -367,7 +367,7 @@ async def trigger_test_run(
         )
 
     run_id = f"run-{uuid.uuid4().hex[:12]}"
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
     if body.dry_run:
@@ -554,7 +554,7 @@ async def _run_verification_background(
         # Mark run as error in Cosmos
         try:
             repo = _get_platform_repo()
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             error_doc = PlatformConfigDocument(
                 id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
                 config_type=_TEST_RUN_CONFIG_TYPE,
@@ -617,7 +617,7 @@ async def _dispatch_to_test_host(
             logger.warning("Test host busy — run %s rejected: %s", run_id, resp.text)
             # Mark as error in Cosmos
             repo = _get_platform_repo()
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             await repo.set_config(PlatformConfigDocument(
                 id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
                 config_type=_TEST_RUN_CONFIG_TYPE,
@@ -641,7 +641,7 @@ async def _dispatch_to_test_host(
         logger.error("Failed to dispatch to test host: %s", err_detail, exc_info=True)
         try:
             repo = _get_platform_repo()
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             await repo.set_config(PlatformConfigDocument(
                 id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
                 config_type=_TEST_RUN_CONFIG_TYPE,
@@ -1074,7 +1074,7 @@ async def get_test_run_status(run_id: str) -> PipelineRunStatusResponse:
         if started:
             try:
                 started_dt = datetime.fromisoformat(started)
-                elapsed = (datetime.now(timezone.utc) - started_dt).total_seconds()
+                elapsed = (datetime.now(UTC) - started_dt).total_seconds()
                 if elapsed > _STALE_RUN_TIMEOUT_S:
                     run_status = "error"
                     value["status"] = "error"
@@ -1245,7 +1245,7 @@ async def diagnostic_logs(
 
     from datetime import timedelta
     cutoff = (
-        datetime.now(timezone.utc) - timedelta(minutes=since_minutes)
+        datetime.now(UTC) - timedelta(minutes=since_minutes)
     ).isoformat()
 
     query = (
@@ -1325,7 +1325,7 @@ async def diagnostic_traces(
 
     from datetime import timedelta
     cutoff = (
-        datetime.now(timezone.utc) - timedelta(minutes=since_minutes)
+        datetime.now(UTC) - timedelta(minutes=since_minutes)
     ).isoformat()
 
     query = (
@@ -1394,7 +1394,7 @@ async def diagnostic_metrics(
     Currently returns data from platform_config metrics store.
     """
     from datetime import timedelta
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     period_start = (now - timedelta(minutes=since_minutes)).isoformat()
     period_end = now.isoformat()
 
@@ -1440,7 +1440,7 @@ async def diagnostic_drift() -> ConfigDriftResponse:
     from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS
 
     repo = _get_platform_repo()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     drift_entries: list[ConfigDriftEntry] = []
 
     # Check entitlement documents
@@ -1517,7 +1517,7 @@ async def diagnostic_drift() -> ConfigDriftResponse:
 )
 async def diagnostic_health() -> SystemHealthResponse:
     """Return a comprehensive system health snapshot."""
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     services: dict[str, dict[str, Any]] = {}
 
     # Check Cosmos DB
@@ -1758,7 +1758,7 @@ async def get_api_key_usage(
     except Exception:
         buffer_pending = 0
 
-    period_start = datetime.now(timezone.utc) - timedelta(days=days)
+    period_start = datetime.now(UTC) - timedelta(days=days)
 
     # Query audit log for api_key_usage events
     try:

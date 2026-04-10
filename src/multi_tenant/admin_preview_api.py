@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Preview API — conversation preview with message insights (SPEC-1872).
 
 Provides REST endpoints for operator-visible preview/test mode:
@@ -16,7 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -87,7 +88,7 @@ _daily_counts: dict[str, tuple[str, int]] = {}  # tenant_id -> (date_str, count)
 
 def _check_daily_limit(tenant_id: str) -> None:
     """Enforce DAILY_PREVIEW_LIMIT per tenant per day."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     key = tenant_id
     date_str, count = _daily_counts.get(key, ("", 0))
     if date_str != today:
@@ -264,7 +265,7 @@ async def get_preview_trace(
     """
     _enforce_tier_gate(ctx)
 
-    from src.chat.session import ConversationSession, ConversationNotFoundError
+    from src.chat.session import ConversationNotFoundError, ConversationSession
 
     session = ConversationSession()
     try:

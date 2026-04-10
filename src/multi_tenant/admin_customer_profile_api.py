@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Admin Customer Profile API — Layer 1 profile management (WI #142).
 
 Provides REST endpoints for the merchant admin dashboard to view and manage

@@ -51,6 +51,9 @@ def _mock_profile(
     """Build a mock CustomerProfileDocument."""
     profile = MagicMock()
     profile.customer_id = customer_id
+    # ADR-004: canonical identity fields
+    profile.canonical_id = ""
+    profile.contact_attributes = []
     profile.consent_status = ConsentStatus(consent_status)
     profile.purchase_history = [{"product_id": "prod-1"}]
     profile.product_questions = []

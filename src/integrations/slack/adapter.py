@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Slack Channel Adapter (SPEC-1776).
 
 ChannelAdapter implementation for Slack.  Bot behavior: @mention trigger,

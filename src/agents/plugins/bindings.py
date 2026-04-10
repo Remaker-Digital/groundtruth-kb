@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Agent Skill Binding service (SPEC-1856, SPEC-1857, SPEC-1858, WI-4014).
 
 Manages per-tenant, per-agent, per-skill authorization bindings.

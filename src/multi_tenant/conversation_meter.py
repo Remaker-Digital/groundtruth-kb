@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Billable conversation metering service.
 
@@ -45,7 +46,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -283,13 +284,13 @@ class ConversationMeter:
             The end reason, or None if the conversation should continue.
         """
         if now is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
         # 30-minute idle timeout
         try:
             last_active = datetime.fromisoformat(last_activity_at)
             if last_active.tzinfo is None:
-                last_active = last_active.replace(tzinfo=timezone.utc)
+                last_active = last_active.replace(tzinfo=UTC)
             idle_seconds = (now - last_active).total_seconds()
             if idle_seconds >= IDLE_TIMEOUT_SECONDS:
                 return ConversationEndReason.IDLE_TIMEOUT
@@ -328,7 +329,7 @@ class ConversationMeter:
         Returns:
             The created ConversationDocument.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         is_billable = self.is_conversation_billable(conversation_id)
 
         doc = ConversationDocument(
@@ -454,7 +455,7 @@ class ConversationMeter:
             tenant_id: Tenant partition key.
             conversation_id: Conversation receiving its first chunk.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         try:
             await self._conversations.patch(
                 tenant_id=tenant_id,
@@ -563,7 +564,7 @@ class ConversationMeter:
             consumed_from_included = True
         else:
             # Beyond included allowance — try packs first
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             active_packs = await self._usage.get_active_packs(tenant_id, now_iso)
 
             if active_packs:
@@ -819,7 +820,7 @@ class ConversationMeter:
         usage_pct = (total / included * 100) if included > 0 else 0.0
 
         # Get pack balance
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         active_packs = await self._usage.get_active_packs(tenant_id, now_iso)
         pack_balance = sum(p.get("remaining", 0) for p in active_packs)
 
@@ -906,7 +907,7 @@ class ConversationMeter:
 
         needs_review = discrepancy_pct > RECONCILIATION_DISCREPANCY_THRESHOLD
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # Update the counter with reconciliation data
         doc_id = f"{tenant_id}:{billing_period}"
@@ -978,11 +979,11 @@ class ConversationMeter:
 
             # Parse billing period to get start/end timestamps
             year, month = billing_period.split("-")
-            start = datetime(int(year), int(month), 1, tzinfo=timezone.utc)
+            start = datetime(int(year), int(month), 1, tzinfo=UTC)
             if int(month) == 12:
-                end = datetime(int(year) + 1, 1, 1, tzinfo=timezone.utc)
+                end = datetime(int(year) + 1, 1, 1, tzinfo=UTC)
             else:
-                end = datetime(int(year), int(month) + 1, 1, tzinfo=timezone.utc)
+                end = datetime(int(year), int(month) + 1, 1, tzinfo=UTC)
 
             # Stripe Billing Meter Event Summaries
             summaries = client.v1.billing.meters.list_event_summaries(
@@ -1023,7 +1024,7 @@ class ConversationMeter:
         Returns:
             List of MeterResults for conversations that were closed.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = (now - timedelta(seconds=IDLE_TIMEOUT_SECONDS)).isoformat()
 
         # Find active conversations with last_activity before the cutoff
@@ -1105,7 +1106,7 @@ class ConversationMeter:
     @staticmethod
     def _current_billing_period() -> str:
         """Get the current billing period string (YYYY-MM)."""
-        return datetime.now(timezone.utc).strftime("%Y-%m")
+        return datetime.now(UTC).strftime("%Y-%m")
 
 
 # ---------------------------------------------------------------------------

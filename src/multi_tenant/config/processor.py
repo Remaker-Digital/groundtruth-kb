@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 TenantConfigProcessor — validation, cleansing, versioning, and caching.
 
@@ -49,19 +50,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
-from src.multi_tenant.cosmos_schema import (
-    AuditEventType,
-    PreferencesDocument,
-    TenantTier,
-)
-from src.multi_tenant.tenant_config_schema import (
-    ConfigValidationResult,
-    resolve_defaults,
-    validate_config,
-)
 
 from src.multi_tenant.config.audit import _log_config_change
 from src.multi_tenant.config.cache import CACHE_TTL_SECONDS, _CacheEntry
@@ -77,6 +67,16 @@ from src.multi_tenant.config.models import (
     ConfigUpdateResult,
     ConfigVersionInfo,
     NamedConfigSummary,
+)
+from src.multi_tenant.cosmos_schema import (
+    AuditEventType,
+    PreferencesDocument,
+    TenantTier,
+)
+from src.multi_tenant.tenant_config_schema import (
+    ConfigValidationResult,
+    resolve_defaults,
+    validate_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -823,7 +823,7 @@ class TenantConfigProcessor:
             "version": new_version,
             "is_current": False,  # Appearance versions don't affect main config
             "appearance_name": name,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "created_by": actor,
         }
         # Populate widget fields

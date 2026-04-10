@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Tenant provisioning service.
 
@@ -37,7 +38,7 @@ import hashlib
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -241,6 +242,39 @@ def _doc_to_record(doc: dict[str, Any]) -> TenantRecord:
     )
 
 
+async def _generate_display_name(contact: str) -> str:
+    """Generate a unique display_name from a contact address (SPEC-1881).
+
+    Format: {contact}-001, incrementing ordinal if the name already exists.
+    Requires a cross-partition query to check uniqueness.
+    """
+    if not contact:
+        contact = "unnamed"
+
+    # Find existing display_names with this contact prefix
+    ordinal = 1
+    while True:
+        candidate = f"{contact}-{ordinal:03d}"
+        # Check if this display_name already exists
+        if _tenant_repo is not None:
+            try:
+                results = await _tenant_repo.cross_partition_query(
+                    query_text="SELECT c.id FROM c WHERE c.display_name = @name",
+                    parameters=[{"name": "@name", "value": candidate}],
+                )
+                if not results:
+                    return candidate
+            except Exception:
+                # If query fails (method not available), use candidate as-is
+                return candidate
+        else:
+            return candidate
+        ordinal += 1
+        if ordinal > 999:
+            # Safety valve — fall back to contact + UUID fragment
+            return f"{contact}-{uuid.uuid4().hex[:8]}"
+
+
 async def _lookup_tenant(
     tenant_id: str | None = None,
     stripe_customer_id: str | None = None,
@@ -347,6 +381,7 @@ async def provision_tenant(
     shopify_shop_domain: str | None = None,
     shopify_subscription_id: str | None = None,
     customer_email: str | None = None,
+    customer_phone: str | None = None,
 ) -> TenantRecord:
     """Provision a new tenant after checkout completion.
 
@@ -377,7 +412,14 @@ async def provision_tenant(
     if _tenant_repo is None:
         raise RuntimeError("Tenant repository not configured")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    # SPEC-1882: Hard gate — superadmin contact required for credential delivery
+    if not customer_email and not customer_phone:
+        raise ValueError(
+            "Tenant creation requires a superadministrator email or phone number. "
+            "Login credentials cannot be delivered without a valid contact address."
+        )
+
+    now_iso = datetime.now(UTC).isoformat()
 
     # Check if tenant already exists for this channel identifier
     existing_doc: dict[str, Any] | None = None
@@ -463,6 +505,9 @@ async def provision_tenant(
     # Create new tenant
     tenant_id = str(uuid.uuid4())
 
+    # SPEC-1881: Generate unique display_name from contact address
+    display_name = await _generate_display_name(customer_email or customer_phone or "")
+
     from src.multi_tenant.cosmos_schema import TenantDocument
 
     doc = TenantDocument(
@@ -478,6 +523,8 @@ async def provision_tenant(
         shopify_shop_domain=shopify_shop_domain,
         shopify_subscription_id=shopify_subscription_id,
         customer_email=customer_email,
+        customer_phone=customer_phone,
+        display_name=display_name,
         created_at=now_iso,
         updated_at=now_iso,
     )
@@ -550,7 +597,7 @@ async def auto_provision_superadmin(
         key_hash = hash_api_key(raw_key)
         key_prefix = raw_key[:12] + "..."
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         doc = TeamMemberDocument(
             id=member_id,
@@ -612,7 +659,7 @@ async def auto_provision_widget_key(tenant_id: str) -> str | None:
 
         raw_key = generate_widget_key(tenant_id)
         key_hash = hash_widget_key(raw_key)
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         # 1. Patch TenantDocument with key hash (for auth lookup)
         await _tenant_repo.patch(
@@ -704,7 +751,7 @@ async def activate_tenant(
     if not tenant:
         return None
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     operations = [
         {"op": "set", "path": "/status", "value": TenantStatus.ACTIVE.value},
         {"op": "set", "path": "/updated_at", "value": now_iso},
@@ -746,7 +793,7 @@ async def update_tenant(
     if not tenant:
         return None
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     operations: list[dict[str, Any]] = [
         {"op": "set", "path": "/updated_at", "value": now_iso},
     ]
@@ -795,7 +842,7 @@ async def deactivate_tenant(
     if not tenant:
         return None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     now_iso = now.isoformat()
     grace_end_iso = (now + _GRACE_PERIOD).isoformat()
 
@@ -841,7 +888,7 @@ async def flag_payment_issue(
     if not tenant:
         return None
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     operations = [
         {"op": "set", "path": "/status", "value": TenantStatus.PAST_DUE.value},
         {"op": "set", "path": "/updated_at", "value": now_iso},
@@ -1010,7 +1057,7 @@ async def provision_trial_tenant(
     if _tenant_repo is None:
         raise RuntimeError("Tenant repository not configured")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     now_iso = now.isoformat()
     trial_end_iso = (now + timedelta(days=trial_duration_days)).isoformat()
     tenant_id = str(uuid.uuid4())

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Tenant configuration JSON schema -- field definitions, validation, and metadata.
 
 Work Item #63 (Decision #22): Layer 1 of the 5-layer tenant configuration system.
@@ -16,10 +17,6 @@ All definitions have been moved to ``src.multi_tenant.schema``:
 # ``from src.multi_tenant.tenant_config_schema import X`` paths continue to work.
 from src.multi_tenant.schema import (  # noqa: F401
     AUTO_OPEN_MAX_DELAY,
-    ConfigFieldDefinition,
-    ConfigFieldType,
-    ConfigValidationError,
-    ConfigValidationResult,
     DOCS_BASE_URL,
     HEX_COLOR_PATTERN,
     MAX_ADDITIONAL_LANGUAGES,
@@ -31,8 +28,8 @@ from src.multi_tenant.schema import (  # noqa: F401
     MAX_CUSTOM_INSTRUCTIONS_LENGTH,
     MAX_ESCALATION_KEYWORD_LENGTH,
     MAX_ESCALATION_KEYWORDS_COUNT,
-    MAX_FAREWELL_LENGTH,
     MAX_FALLBACK_LENGTH,
+    MAX_FAREWELL_LENGTH,
     MAX_GREETING_LENGTH,
     MAX_OFFLINE_MESSAGE_LENGTH,
     MAX_PAGE_RULE_LENGTH,
@@ -41,8 +38,12 @@ from src.multi_tenant.schema import (  # noqa: F401
     MAX_POLICY_TEXT_LENGTH,
     MAX_PRECHAT_FIELDS_COUNT,
     MAX_WIDGET_TITLE_LENGTH,
-    OnboardingStep,
     SUPPORTED_LANGUAGES,
+    ConfigFieldDefinition,
+    ConfigFieldType,
+    ConfigValidationError,
+    ConfigValidationResult,
+    OnboardingStep,
     TierGate,
     ValidationRule,
     export_schema_for_api,

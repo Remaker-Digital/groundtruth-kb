@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * English locale strings for the chat widget.
  *
@@ -39,6 +40,7 @@ export interface Locale {
   yesterday: string;
   fieldRequired: string;
   fieldInvalidEmail: string;
+  fieldInvalidPhone: string;
   fileTooLarge: string;
   fileUploading: string;
   reportIssue: string;
@@ -62,6 +64,7 @@ export interface Locale {
   phoneOtpPrompt: string;
   phoneOtpResend: string;
   phoneOtpInvalid: string;
+  phoneSendFailed: string;
   consentPrompt: string;
   consentAccept: string;
   consentDecline: string;
@@ -129,6 +132,7 @@ export const en: Locale = {
   yesterday: 'Yesterday',
   fieldRequired: 'This field is required',
   fieldInvalidEmail: 'Please enter a valid email',
+  fieldInvalidPhone: 'Please enter a valid phone number (e.g. +15551234567)',
   fileTooLarge: 'File must be under 10MB',
   fileUploading: 'Uploading...',
   reportIssue: 'Report an issue',
@@ -152,6 +156,7 @@ export const en: Locale = {
   phoneOtpPrompt: 'Enter the code we sent to your phone.',
   phoneOtpResend: 'Resend SMS code',
   phoneOtpInvalid: 'Invalid code. Please check your SMS and try again.',
+  phoneSendFailed: 'Unable to send verification code. Please try again.',
   consentPrompt: 'We use your conversation history to provide personalized support. You can change this at any time.',
   consentAccept: 'Allow',
   consentDecline: 'No thanks',

@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * PhoneOtpVerification — 6-digit code entry screen for SMS phone verification.
  *
@@ -22,7 +23,7 @@ interface PhoneOtpVerificationProps {
   phone: string;
   onVerify: (code: string) => void;
   onSkip?: () => void;
-  onResend: () => void;
+  onResend: () => Promise<boolean>;
   isLoading: boolean;
   error?: string;
 }
@@ -43,12 +44,22 @@ export const PhoneOtpVerification: FunctionComponent<PhoneOtpVerificationProps> 
 }) => {
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const resendInFlightRef = useRef(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendPending, setResendPending] = useState(false);
 
   // Auto-focus first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
+
+  // Clear digit inputs on verification failure so the customer starts fresh
+  useEffect(() => {
+    if (error) {
+      setDigits(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    }
+  }, [error]);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -110,11 +121,22 @@ export const PhoneOtpVerification: FunctionComponent<PhoneOtpVerificationProps> 
     [digits, onVerify],
   );
 
-  const handleResend = useCallback(() => {
-    if (resendCooldown > 0) return;
-    onResend();
-    setResendCooldown(60);
-  }, [resendCooldown, onResend]);
+  const handleResend = useCallback(async () => {
+    if (resendCooldown > 0 || resendInFlightRef.current || isLoading) return;
+
+    resendInFlightRef.current = true;
+    setResendPending(true);
+    try {
+      const success = await onResend();
+    // Only start cooldown if the send succeeded or was an intentional tier-gate outcome.
+    // On transport failure onResend() returns false — suppress cooldown so the
+    // customer can retry immediately without being locked out for 60 seconds.
+    if (success) setResendCooldown(60);
+    } finally {
+      resendInFlightRef.current = false;
+      setResendPending(false);
+    }
+  }, [isLoading, onResend, resendCooldown]);
 
   // Mask phone for display: show country code + last 3 digits
   const maskedPhone = phone.length > 6
@@ -122,6 +144,7 @@ export const PhoneOtpVerification: FunctionComponent<PhoneOtpVerificationProps> 
     : phone;
 
   const isComplete = digits.every((d) => d !== '');
+  const resendDisabled = resendCooldown > 0 || resendPending || isLoading;
 
   return (
     <div
@@ -245,15 +268,15 @@ export const PhoneOtpVerification: FunctionComponent<PhoneOtpVerificationProps> 
       <button
         type="button"
         onClick={handleResend}
-        disabled={resendCooldown > 0}
+        disabled={resendDisabled}
         style={{
           background: 'none',
           border: 'none',
           padding: `${tokens.space3} 0`,
           fontSize: tokens.fontSizeXs,
           fontFamily: tokens.fontFamily,
-          color: resendCooldown > 0 ? tokens.colorTextMuted : tokens.colorPrimary,
-          cursor: resendCooldown > 0 ? 'default' : 'pointer',
+          color: resendDisabled ? tokens.colorTextMuted : tokens.colorPrimary,
+          cursor: resendDisabled ? 'default' : 'pointer',
           textAlign: 'center',
           textDecoration: 'none',
           outline: 'none',

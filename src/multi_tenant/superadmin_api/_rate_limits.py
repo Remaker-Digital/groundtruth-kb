@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Superadmin API -- Rate limit and back-off/retry configuration.
 
 Domain sub-module for SPEC-1819 (Code-Free Runtime Configuration — rate limits)
@@ -21,7 +22,7 @@ Back-off / Retry:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, Query
@@ -34,7 +35,6 @@ from src.multi_tenant.cosmos_schema import (
     PlatformConfigDocument,
 )
 from src.multi_tenant.middleware import get_tenant_context
-
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -270,7 +270,7 @@ async def put_rate_limit(
         )
 
     repo = _get_platform_repo()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
     # Read existing to get current version
@@ -581,7 +581,7 @@ async def put_retry_config(
         )
 
     repo = _get_platform_repo()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
     # Read existing to get current version

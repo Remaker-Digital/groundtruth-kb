@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 // @ts-nocheck
 /**
  * Shopify Vite mock API plugin — configureServer hook that intercepts /api/* requests.

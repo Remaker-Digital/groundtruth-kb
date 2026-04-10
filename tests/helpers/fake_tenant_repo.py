@@ -78,6 +78,20 @@ class FakeTenantRepo:
                 doc[field] = op["value"]
         return copy.deepcopy(doc)
 
+    async def update_encrypted_fields(
+        self,
+        tenant_id: str,
+        document_id: str,
+        fields: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update encrypted fields (in fake, just a direct set)."""
+        doc = self.store.get(tenant_id)
+        if doc is None:
+            raise RuntimeError(f"Document not found: {tenant_id}")
+        for key, value in fields.items():
+            doc[key] = value
+        return copy.deepcopy(doc)
+
     async def find_by_stripe_customer_id(
         self, stripe_customer_id: str,
     ) -> dict[str, Any] | None:
@@ -104,6 +118,26 @@ class FakeTenantRepo:
             if doc.get("api_key_hash") == api_key_hash:
                 return copy.deepcopy(doc)
         return None
+
+
+class FakeDomainIndexRepo:
+    """In-memory implementation of DomainIndexRepository for testing.
+
+    Maps domain identifiers (stripe_customer_id, shopify_shop_domain)
+    to tenant IDs, supporting lookup, upsert, and delete.
+    """
+
+    def __init__(self) -> None:
+        self.index: dict[str, str] = {}
+
+    async def lookup(self, domain: str) -> str | None:
+        return self.index.get(domain)
+
+    async def upsert(self, domain: str, tenant_id: str, channel: str = "") -> None:
+        self.index[domain] = tenant_id
+
+    async def delete(self, domain: str) -> None:
+        self.index.pop(domain, None)
 
 
 def run_sync(coro: Any) -> Any:

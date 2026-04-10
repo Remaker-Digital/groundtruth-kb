@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Knowledge Base staleness detection and refresh service (WI #219-222).
 
 Tracks content freshness, computes staleness scores, and triggers
@@ -28,7 +29,7 @@ Architecture references:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ def compute_staleness_score(
         Staleness score between 0.0 and 1.0.
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
     if freshness_windows is None:
         freshness_windows = DEFAULT_FRESHNESS_WINDOWS
 
@@ -138,7 +139,7 @@ def compute_staleness_score(
         try:
             verified_dt = datetime.fromisoformat(last_verified.replace("Z", "+00:00"))
             if verified_dt.tzinfo is None:
-                verified_dt = verified_dt.replace(tzinfo=timezone.utc)
+                verified_dt = verified_dt.replace(tzinfo=UTC)
             days_since_verified = (now - verified_dt).total_seconds() / 86400
             verification_ratio = min(days_since_verified / window_days, 1.0)
             score += verification_ratio * 0.2
@@ -162,7 +163,7 @@ def _get_reference_date(entry: dict[str, Any], now: datetime) -> datetime:
             try:
                 dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 candidates.append(dt)
             except (ValueError, AttributeError):
                 pass
@@ -173,7 +174,7 @@ def _get_reference_date(entry: dict[str, Any], now: datetime) -> datetime:
             try:
                 dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 candidates.append(dt)
             except (ValueError, AttributeError):
                 pass
@@ -394,7 +395,7 @@ class StalenessService:
         """
         self._ensure_configured()
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         await self._kb_repo.patch(
             tenant_id=tenant_id,

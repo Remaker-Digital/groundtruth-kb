@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * TenantDirectory — Cross-tenant directory with filtering and pagination.
  *
@@ -52,16 +53,20 @@ interface TenantSummary {
 
 interface TenantItem {
   tenantId: string;
+  displayName: string | null;
   status: string;
   tier: string | null;
   billingChannel: string | null;
-  // SPEC-1843: customerEmail and shopifyShopDomain removed
+  customerEmail: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   deactivatedAt: string | null;
   consentStatus: string | null;
   expiresAt: string | null;
 }
+
+type SortField = 'displayName' | 'status' | 'tier' | 'billingChannel' | 'customerEmail' | 'createdAt' | 'expiresAt';
+type SortDir = 'asc' | 'desc';
 
 interface TenantListResponse {
   tenants: TenantItem[];
@@ -186,6 +191,10 @@ export function TenantDirectoryPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  // Sorting (SPEC-1881)
+  const [sortField, setSortField] = useState<SortField>('displayName');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
 
   // Create Tenant modal state (P0-PROV-1)
   const [createOpen, setCreateOpen] = useState(false);
@@ -421,6 +430,40 @@ export function TenantDirectoryPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  // Client-side sort (SPEC-1881: all columns sortable)
+  const sortedTenants = useMemo(() => {
+    const sorted = [...tenants].sort((a, b) => {
+      const aVal = (a[sortField] ?? '') as string;
+      const bVal = (b[sortField] ?? '') as string;
+      const cmp = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [tenants, sortField, sortDir]);
+
+  const toggleSort = useCallback((field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  }, [sortField]);
+
+  const SortHeader = useCallback(({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <Table.Th
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => toggleSort(field)}
+    >
+      <Group gap={4} wrap="nowrap">
+        {children}
+        <Text size="xs" c="dimmed">
+          {sortField === field ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+        </Text>
+      </Group>
+    </Table.Th>
+  ), [sortField, sortDir, toggleSort]);
+
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="center">
@@ -493,33 +536,32 @@ export function TenantDirectoryPage() {
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Tenant ID</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Tier</Table.Th>
-                <Table.Th>Channel</Table.Th>
-                <Table.Th>Email</Table.Th>
-                <Table.Th>Created</Table.Th>
-                <Table.Th>Expires</Table.Th>
+                <SortHeader field="displayName">Tenant</SortHeader>
+                <SortHeader field="status">Status</SortHeader>
+                <SortHeader field="tier">Tier</SortHeader>
+                <SortHeader field="billingChannel">Channel</SortHeader>
+                <SortHeader field="customerEmail">Email</SortHeader>
+                <SortHeader field="createdAt">Created</SortHeader>
+                <SortHeader field="expiresAt">Expires</SortHeader>
                 <Table.Th w={50} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {tenants.length === 0 ? (
+              {sortedTenants.length === 0 ? (
                 <Table.Tr>
                   <Table.Td colSpan={8}>
                     <Text c="dimmed" ta="center" py="md">No tenants found</Text>
                   </Table.Td>
                 </Table.Tr>
               ) : (
-                tenants.map((t) => {
+                sortedTenants.map((t) => {
                   const days = t.expiresAt ? daysUntil(t.expiresAt) : null;
                   return (
                     <Table.Tr key={t.tenantId}>
                       <Table.Td>
                         <TenantName tenantId={t.tenantId} info={{
-                          // SPEC-1843: PII fields removed — display tenantId only
-                          displayName: t.tenantId,
-                          isUuid: true,
+                          displayName: t.displayName || t.tenantId,
+                          isUuid: !t.displayName,
                         }} />
                       </Table.Td>
                       <Table.Td>
@@ -544,7 +586,7 @@ export function TenantDirectoryPage() {
                         <Text size="xs" c={tokens.textMuted}>{t.billingChannel ?? '—'}</Text>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="xs" c={tokens.textMuted}>{t.tenantId}</Text>
+                        <Text size="xs" c={tokens.textMuted}>{t.customerEmail ?? '—'}</Text>
                       </Table.Td>
                       <Table.Td>
                         <Text size="xs" c="dimmed">

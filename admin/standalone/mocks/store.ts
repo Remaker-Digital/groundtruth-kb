@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 // @ts-nocheck
 /**
  * Mock data store — in-memory mutable state for all mock API handlers.

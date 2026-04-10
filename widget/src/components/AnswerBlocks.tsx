@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * AnswerBlocks — renders structured answer blocks within agent messages (SPEC-1867).
  *

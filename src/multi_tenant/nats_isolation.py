@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 NATS tenant isolation — topic namespace, subscription authorization, lifecycle.
 
@@ -48,7 +49,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -57,6 +58,8 @@ from nats.aio.client import Client as NATSClient
 from nats.aio.msg import Msg
 from nats.errors import (
     ConnectionClosedError,
+)
+from nats.errors import (
     TimeoutError as NATSTimeoutError,
 )
 from nats.js.api import (
@@ -989,7 +992,7 @@ class TenantNATSManager:
         Returns:
             NATSHealthStatus with connection and stream details.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         if not self.is_connected:
             return NATSHealthStatus(

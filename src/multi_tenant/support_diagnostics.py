@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """HV-1: Support Diagnostics API — per-tenant diagnostic snapshots.
 
 Provider-level (SPA) API that gives the platform operator diagnostic
@@ -22,7 +23,7 @@ Architecture notes:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -233,7 +234,7 @@ async def _collect_conversation_stats(tenant_id: str) -> ConversationStats:
     from src.multi_tenant.repositories import ConversationRepository
 
     conv_repo = ConversationRepository()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since_24h = (now - timedelta(hours=24)).isoformat()
     since_7d = (now - timedelta(days=7)).isoformat()
 
@@ -392,7 +393,7 @@ async def get_tenant_diagnostic(
 
     tenant_id = resolved_tenant_id
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     errors: list[str] = []
 
     snapshot = TenantDiagnosticSnapshot(
@@ -509,7 +510,7 @@ async def get_tenant_errors(
             )
 
     audit_repo = AuditLogRepository()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     # Query for error-level events (event types containing "error" or "fail")
     # Use cross-partition query since audit_log is partitioned by time_partition

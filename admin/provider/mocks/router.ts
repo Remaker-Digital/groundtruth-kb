@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 // @ts-nocheck
 /**
  * Mock API router — Express-style path matching for Vite dev server middleware.

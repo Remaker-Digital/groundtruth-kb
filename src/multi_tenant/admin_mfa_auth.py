@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Two-stage 2FA authentication endpoints for admin console.
 
@@ -28,7 +29,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -124,7 +125,7 @@ def create_pending_2fa_token(
 
     Returns (token, expires_at_iso).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(minutes=_PENDING_TOKEN_LIFETIME_MINUTES)
     payload = {
         "sub": tenant_id,

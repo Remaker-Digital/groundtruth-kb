@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 GDPR compliance services — PII scrubbing, data export, data deletion, consent management.
 
@@ -54,7 +55,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 from src.multi_tenant.cosmos_schema import (
@@ -293,7 +294,7 @@ class GracePeriodManager:
         Returns:
             GracePeriodResult with start and end timestamps.
         """
-        now = start_time or datetime.now(timezone.utc)
+        now = start_time or datetime.now(UTC)
 
         if channel == BillingChannel.SHOPIFY:
             hours = SHOPIFY_GRACE_PERIOD_HOURS
@@ -337,9 +338,9 @@ class GracePeriodManager:
 
         # Ensure timezone-aware comparison
         if ends_at.tzinfo is None:
-            ends_at = ends_at.replace(tzinfo=timezone.utc)
+            ends_at = ends_at.replace(tzinfo=UTC)
 
-        return datetime.now(timezone.utc) >= ends_at
+        return datetime.now(UTC) >= ends_at
 
     def get_grace_hours(self, channel: BillingChannel) -> int:
         """Get the grace period duration in hours for a billing channel."""
@@ -870,7 +871,7 @@ class DataExportService:
             ExportResult with all exported data and metadata.
         """
         export_id = f"export-{uuid.uuid4()}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         logger.info(
             "Starting tenant data export: export_id=%s tenant=%s",
@@ -934,7 +935,7 @@ class DataExportService:
             ExportResult with all exported customer data.
         """
         export_id = f"export-{uuid.uuid4()}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         logger.info(
             "Starting customer data export: export_id=%s tenant=%s customer=%s",
@@ -1064,7 +1065,7 @@ class DataDeletionService:
             GracePeriodActiveError: If grace period hasn't expired and force=False.
         """
         deletion_id = f"delete-{uuid.uuid4()}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         logger.info(
             "Starting tenant data deletion: deletion_id=%s tenant=%s force=%s",
@@ -1151,7 +1152,7 @@ class DataDeletionService:
             DeletionResult with deletion details.
         """
         deletion_id = f"delete-{uuid.uuid4()}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         logger.info(
             "Starting customer data deletion: deletion_id=%s tenant=%s customer=%s",
@@ -1327,7 +1328,7 @@ class ConsentManager:
                         {
                             "op": "set",
                             "path": "/updated_at",
-                            "value": datetime.now(timezone.utc).isoformat(),
+                            "value": datetime.now(UTC).isoformat(),
                         },
                     ],
                 )
@@ -1398,7 +1399,7 @@ class ConsentManager:
                             {
                                 "op": "set",
                                 "path": "/updated_at",
-                                "value": datetime.now(timezone.utc).isoformat(),
+                                "value": datetime.now(UTC).isoformat(),
                             },
                         ],
                     )

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Backup Encryption and Key Management (SPEC-0297).
 
 Provides encryption, key management, and offloading to warm/cold storage

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """ChatPipeline orchestrator — main pipeline entry point.
 
 Contains the ChatPipeline class which inherits from AgentDispatchMixin,
@@ -34,8 +35,8 @@ from src.chat.pipeline.agent_dispatch import AgentDispatchMixin
 from src.chat.pipeline.analytics import AnalyticsMixin
 from src.chat.pipeline.constants import (
     AGENT_URLS,
+    _classify_openai_error,
 )
-from src.chat.pipeline.constants import _classify_openai_error
 from src.chat.pipeline.critic_escalation import CriticEscalationMixin
 from src.chat.session import ConversationSession
 from src.multi_tenant.conversation_meter import ConversationMeter
@@ -184,10 +185,10 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         Phase 3 dead code sweep) and CoPilot. Analytics, Critic, and
         Escalation agent instances removed in S224.
         """
+        from src.agents.co_pilot import CoPilotAgent
         from src.agents.intent_classifier import IntentClassifierAgent
         from src.agents.knowledge_retrieval import KnowledgeRetrievalAgent
         from src.agents.response_generator import ResponseGeneratorAgent
-        from src.agents.co_pilot import CoPilotAgent
         from src.multi_tenant.repositories.platform import AdminDocumentationRepository
 
         self._ic_agent = IntentClassifierAgent(openai_client=self._openai_client)
@@ -208,7 +209,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         self,
         tenant_id: str,
         customer_id: str | None,
-        tier: "TenantTier | None" = None,
+        tier: TenantTier | None = None,
     ) -> None:
         """Pre-load customer context before the first message arrives.
 
@@ -988,6 +989,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             try:
                 from src.observability.langfuse_exporter import (
                     LANGFUSE_ENABLED,
+                )
+                from src.observability.langfuse_exporter import (
                     export_trace as langfuse_export,
                 )
                 if LANGFUSE_ENABLED:
@@ -1104,8 +1107,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         customer_message: str,
         agent_id: str,
         skill_id: str | None,
-        budget: "PipelineTimeoutBudget",
-        trace: "DecisionTraceBuilder",
+        budget: PipelineTimeoutBudget,
+        trace: DecisionTraceBuilder,
         trace_id: str | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Route a customer message to a peer agent via binding-enforced dispatch.
@@ -1289,8 +1292,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         system_prompt: str,
         conversation_history: list[dict[str, str]],
         team_member_role: str,
-        budget: "PipelineTimeoutBudget",
-        trace: "DecisionTraceBuilder",
+        budget: PipelineTimeoutBudget,
+        trace: DecisionTraceBuilder,
         trace_id: str | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Route an admin team member message to the Co-pilot agent.

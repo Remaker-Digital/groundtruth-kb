@@ -1,3 +1,4 @@
+// © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 /**
  * OnboardingWizard — First-login modal that guides merchants through:
  *   Step 1: Select product category (from template registry) + optional storefront URL

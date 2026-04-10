@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Persistent Memory dashboard API — WI#139 capability.
 
@@ -21,7 +22,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.middleware import get_tenant_context, TenantContext
+from src.multi_tenant.middleware import TenantContext, get_tenant_context
 
 logger = logging.getLogger(__name__)
 

@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SPEC-1833: Cosmos DB Health in Readiness Probe.
 
 Provides a cached, timeout-protected Cosmos DB connectivity check
@@ -88,7 +89,7 @@ async def _perform_check() -> dict[str, Any]:
             timeout=_COSMOS_TIMEOUT_SECONDS,
         )
         return result
-    except asyncio.TimeoutError:
+    except TimeoutError:
         elapsed_ms = round((time.monotonic() - start) * 1000, 1)
         logger.warning("Cosmos DB readiness check timed out after %sms", elapsed_ms)
         return {

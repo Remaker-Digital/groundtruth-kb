@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Welcome email — sent once when a new tenant is provisioned.
 
 Delivers the admin console URL and onboarding guidance. API keys are

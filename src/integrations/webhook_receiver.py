@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Universal Webhook Receiver (SPEC-1766).
 
 Auth-exempt endpoint that receives webhooks from external integrations.
@@ -24,7 +25,8 @@ import hmac
 import json
 import logging
 import time
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

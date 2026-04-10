@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Internal Integration Event Bus (SPEC-1778).
 
 Fire-and-forget event bus for integration lifecycle events.  Handlers
@@ -21,9 +22,10 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

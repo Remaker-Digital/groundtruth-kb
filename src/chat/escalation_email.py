@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Async email-bridge escalation — send transcript emails to customer and agent.
 
 When the AI escalates a conversation, this module sends two emails:
@@ -224,9 +225,10 @@ async def send_escalation_emails(
             conversation_id=conversation_id,
         )
         # Use _send_acs_email_sync directly to add replyTo field
-        from src.multi_tenant.alert_delivery import SENDER_ADDRESS
-        from azure.core.pipeline.policies import RetryPolicy
         from azure.communication.email import EmailClient
+        from azure.core.pipeline.policies import RetryPolicy
+
+        from src.multi_tenant.alert_delivery import SENDER_ADDRESS
 
         retry_policy = RetryPolicy(
             retry_total=2,

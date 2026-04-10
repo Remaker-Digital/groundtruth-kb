@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Background tasks for Agent Red Customer Experience.
 
 - Idle conversation scanner — closes conversations exceeding 30-min idle timeout.
@@ -18,8 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI
 
@@ -189,7 +189,7 @@ async def _sla_snapshot_loop() -> None:
 
     while True:
         try:
-            now_utc = datetime.now(timezone.utc)
+            now_utc = datetime.now(UTC)
             monitor = get_sla_monitor()
             repo = SLASnapshotRepository()
 
@@ -343,16 +343,16 @@ async def _recover_orphaned_jobs() -> None:
     after a container restart.
     """
     try:
-        from src.multi_tenant.storefront_ingestion import IngestionJobRepository
         from src.multi_tenant.cosmos_schema import IngestionJobStatus
+        from src.multi_tenant.storefront_ingestion import IngestionJobRepository
 
         repo = IngestionJobRepository()
-        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)).isoformat()
 
         orphans = await repo.get_orphaned_running(cutoff)
         for job in orphans:
             try:
-                now = datetime.now(timezone.utc).isoformat()
+                now = datetime.now(UTC).isoformat()
                 await repo.patch(
                     job["tenant_id"],
                     job["id"],
@@ -413,15 +413,15 @@ async def _ingestion_processor_loop() -> None:
         # Periodic orphan recovery — catch RUNNING jobs stuck >30 min
         # (supplements the one-time startup recovery in _recover_orphaned_jobs)
         try:
-            from src.multi_tenant.storefront_ingestion import IngestionJobRepository
             from src.multi_tenant.cosmos_schema import IngestionJobStatus
+            from src.multi_tenant.storefront_ingestion import IngestionJobRepository
 
             repo = IngestionJobRepository()
-            cutoff = (datetime.now(timezone.utc) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)).isoformat()
+            cutoff = (datetime.now(UTC) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)).isoformat()
             orphans = await repo.get_orphaned_running(cutoff)
             for job in orphans:
                 try:
-                    datetime.now(timezone.utc).isoformat()
+                    datetime.now(UTC).isoformat()
                     await repo.patch(
                         job["tenant_id"],
                         job["id"],
@@ -529,7 +529,7 @@ async def _archival_sweep_loop() -> None:
                         limit=to_archive,
                     )
 
-                    now = datetime.now(timezone.utc).isoformat()
+                    now = datetime.now(UTC).isoformat()
                     archived_count = 0
                     for conv in candidates:
                         try:
@@ -647,7 +647,7 @@ async def _trial_scanner_loop() -> None:
                     continue
 
                 try:
-                    now_iso = datetime.now(timezone.utc).isoformat()
+                    now_iso = datetime.now(UTC).isoformat()
                     await tenant_repo.patch(
                         tenant_id=tid,
                         document_id=tid,
@@ -744,7 +744,7 @@ async def _trial_warning_loop() -> None:
             warnings_sent = 0
 
             for days, tier_label in _WARNING_TIERS:
-                within_iso = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+                within_iso = (datetime.now(UTC) + timedelta(days=days)).isoformat()
 
                 try:
                     expiring = await tenant_repo.list_expiring_trials(within_iso)
@@ -780,7 +780,7 @@ async def _trial_warning_loop() -> None:
                         if sent:
                             # Mark warning as sent to prevent duplicates
                             new_warnings = already_sent + [tier_label]
-                            now_iso = datetime.now(timezone.utc).isoformat()
+                            now_iso = datetime.now(UTC).isoformat()
                             await tenant_repo.patch(
                                 tenant_id=tid,
                                 document_id=tid,
@@ -883,7 +883,7 @@ async def _expiry_scanner_loop() -> None:
                     continue
 
                 try:
-                    now_iso = datetime.now(timezone.utc).isoformat()
+                    now_iso = datetime.now(UTC).isoformat()
                     await tenant_repo.patch(
                         tenant_id=tid,
                         document_id=tid,
@@ -980,7 +980,7 @@ async def _expiry_warning_loop() -> None:
             warnings_sent = 0
 
             for days, tier_label in _EXPIRY_WARNING_TIERS:
-                within_iso = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+                within_iso = (datetime.now(UTC) + timedelta(days=days)).isoformat()
 
                 try:
                     expiring = await tenant_repo.list_expiring_tenants(within_iso)
@@ -1015,7 +1015,7 @@ async def _expiry_warning_loop() -> None:
 
                         if sent:
                             new_warnings = already_sent + [tier_label]
-                            now_iso = datetime.now(timezone.utc).isoformat()
+                            now_iso = datetime.now(UTC).isoformat()
                             await tenant_repo.patch(
                                 tenant_id=tid,
                                 document_id=tid,
@@ -1193,7 +1193,7 @@ async def _vectorization_scanner_loop() -> None:
 
                             # Mark as vectorized regardless of consent
                             # (prevents re-processing)
-                            now_iso = datetime.now(timezone.utc).isoformat()
+                            now_iso = datetime.now(UTC).isoformat()
                             await conv_repo.patch(
                                 tenant_id=tid,
                                 document_id=conv_id,
@@ -1283,9 +1283,9 @@ async def _website_refresh_loop() -> None:
 
     while True:
         try:
+            from src.multi_tenant.cosmos_schema import IngestionJobType
             from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
             from src.multi_tenant.storefront_ingestion import get_ingestion_service
-            from src.multi_tenant.cosmos_schema import IngestionJobType
 
             repo = KnowledgeBaseRepository()
             ingestion = get_ingestion_service()

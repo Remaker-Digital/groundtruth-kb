@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Adaptive Rate Limiter for External APIs (SPEC-1774).
 
 Outbound rate limiting to protect against 429 bans from external APIs.
@@ -23,8 +24,9 @@ import asyncio
 import logging
 import random
 import time
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 from src.integrations.models import IntegrationError, RateLimitError
 

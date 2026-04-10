@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Pipeline resilience — concurrency control, timeout orchestration, circuit breakers.
 
@@ -439,7 +440,7 @@ class PipelineTimeoutBudget:
 
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             elapsed = (time.monotonic() - stage_start) * 1000
 
             self._stage_results.append(StageResult(

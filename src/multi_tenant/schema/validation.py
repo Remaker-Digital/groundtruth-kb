@@ -17,7 +17,6 @@ from src.multi_tenant.schema.models import (
     ValidationRule,
 )
 
-
 # ---------------------------------------------------------------------------
 # Tier ranking helpers (shared between validate_field and validate_config)
 # ---------------------------------------------------------------------------

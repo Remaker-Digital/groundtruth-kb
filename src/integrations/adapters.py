@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Adapter Protocol Interfaces — typed contracts for integrations (SPEC-1763).
 
 Four Protocol-based adapter interfaces that all integration adapters must
@@ -18,7 +19,6 @@ from src.integrations.models import (
     NormalizedOrder,
     NormalizedTicket,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpdesk Adapter

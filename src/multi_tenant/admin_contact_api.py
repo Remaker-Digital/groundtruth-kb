@@ -18,7 +18,7 @@ from __future__ import annotations
 import html
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -110,7 +110,7 @@ def _build_html_body(
 ) -> str:
     """Build an HTML email body with tenant identity context."""
     topic_label = TOPIC_LABELS.get(topic, topic)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     safe_message = html.escape(message).replace("\n", "<br>")
 
     return f"""\
@@ -249,7 +249,7 @@ async def send_contact_message(
     tier = ctx.tier.value if ctx.tier else None
 
     # ── Persist to Cosmos BEFORE email (SPEC-1588) ──────────────
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     message_id = str(uuid.uuid4())
 
     if _contact_repo is not None:

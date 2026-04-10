@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Tenant Account Recovery by SPA (SPEC-1677).
 
 Allows the Service Provider Administrator to:
@@ -25,7 +26,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from fastapi import APIRouter, Query, Request
@@ -142,7 +143,7 @@ async def activate_recovery_address(
     if _tenant_repo is None:
         return JSONResponse(status_code=503, content={"error": "Service not configured"})
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     admin_id = getattr(ctx, "platform_admin_id", "unknown") if ctx else "unknown"
 
     await _tenant_repo.update_recovery_address(
@@ -317,7 +318,7 @@ async def verify_recovery_token(
         )
 
     # Issue session JWT (same format as magic link sessions)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": tenant,
         "email": doc.get("email", ""),

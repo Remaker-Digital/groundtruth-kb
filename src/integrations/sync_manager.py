@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Bidirectional Sync Manager with Echo Prevention (SPEC-1768).
 
 Prevents infinite loops in bidirectional sync by marking outbound
@@ -15,7 +16,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

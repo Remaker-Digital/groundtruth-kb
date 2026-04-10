@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Chat API endpoints — 6 FastAPI routes for customer conversations.
 
@@ -34,6 +35,7 @@ import asyncio
 import json
 import logging
 import uuid
+from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -168,9 +170,9 @@ async def _load_tenant_context(
         logger.debug("Tenant document load failed for %s — using defaults", ctx.tenant_id)
 
     if tenant_doc is None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         tenant_doc = TenantDocument(
             id=ctx.tenant_id,
             tenant_id=ctx.tenant_id,
@@ -947,7 +949,7 @@ async def report_issue(
     creates an audit log entry for the merchant to review.
     """
     import uuid
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     session = _get_session()
 
@@ -969,7 +971,7 @@ async def report_issue(
     issue_message = ChatMessage(
         role=MessageRole.SYSTEM,
         content=f"[Issue Report] Type: {request.issue_type} | Details: {request.details}",
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         message_id=issue_id,
         metadata={
             "type": "issue_report",
@@ -996,8 +998,8 @@ async def report_issue(
 
     # Audit log entry
     try:
-        from src.multi_tenant.repository import AuditLogRepository
         from src.multi_tenant.cosmos_schema import AuditEventType
+        from src.multi_tenant.repository import AuditLogRepository
 
         audit_repo = AuditLogRepository()
         await audit_repo.log_event(
@@ -1023,6 +1025,7 @@ async def report_issue(
     # Fire-and-forget — delivery failure must not block the response.
     try:
         import asyncio
+
         from src.multi_tenant.alert_delivery import send_escalation_alert
 
         _issue_label = request.issue_type.replace("_", " ").title()
@@ -1078,7 +1081,7 @@ async def submit_message_feedback(
     Only AI messages can receive feedback — customer and system messages
     return 422.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     session = _get_session()
 
@@ -1107,7 +1110,7 @@ async def submit_message_feedback(
         )
 
     # Build the feedback payload
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     feedback_data = {
         "feedback_rating": request.rating,
         "feedback_at": now_iso,
@@ -1197,7 +1200,7 @@ async def update_consent(
     permanently on the profile. Otherwise, consent is only recorded on
     the conversation document for this session.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from src.multi_tenant.cosmos_schema import ConsentStatus
 
@@ -1221,7 +1224,7 @@ async def update_consent(
     except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     # Update customer profile if we have a customer_id
     customer_id = state.customer_id if hasattr(state, "customer_id") else None

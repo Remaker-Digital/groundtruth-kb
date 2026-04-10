@@ -99,6 +99,10 @@ _EXCLUDED_PATHS = [
     re.compile(r'docker-compose'),
     # Security penetration tests (intentionally contain fake credentials)
     re.compile(r'tests[/\\]security[/\\]test_live_penetration'),
+    # Test fixtures: conftest.py contains deterministic synthetic API keys
+    # (arsk_test_*, ar_spa_plat_test_*, pk_live_abcd*) used by test auth helpers.
+    # Reviewed S271: no real credentials present.
+    re.compile(r'tests[/\\]conftest\.py$'),
     # Visual evidence artifacts (must record actual URLs tested)
     re.compile(r'logs[/\\]visual-evidence[/\\]'),
 ]

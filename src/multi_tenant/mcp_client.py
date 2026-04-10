@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """MCP client for external tool server integration (AGNTCY Phase 3).
 
 All MCP connections route through ``AgntcyFactory.create_client("MCP", ...)``
@@ -403,7 +404,7 @@ class AgentRedMcpClient:
                 server_name=self._config.server_name,
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             elapsed_ms = (time.monotonic() - start) * 1000
             if self._breaker:
                 self._breaker.record_failure()

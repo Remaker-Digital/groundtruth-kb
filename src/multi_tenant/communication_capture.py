@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Communication Capture & Audit Infrastructure (SPEC-1687).
 
 Provides two operational modes controlled by the ENABLE_EMAIL_CAPTURE
@@ -28,7 +29,7 @@ import logging
 import os
 import threading
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Query
@@ -62,7 +63,7 @@ class CommunicationEvent:
     body: str = ""  # only populated in capture mode
     token_hash: str = ""  # SHA-256 of any embedded token/code
     timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
     ttl_minutes: int = 0  # informational -- how long the token is valid
     metadata: dict[str, Any] = field(default_factory=dict)

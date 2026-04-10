@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 # Agent Red Customer Experience — Escalation Handler Agent
 #
 # Evaluates escalation context when the Intent Classifier detects an

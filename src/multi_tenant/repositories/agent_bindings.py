@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 Agent Skill Binding repository — agent_bindings collection (SPEC-1856, WI-4012).
 
@@ -11,7 +12,7 @@ per Codex Finding 3 — skill_id already embeds agent identity).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -58,7 +59,7 @@ class AgentSkillBindingRepository(TenantScopedRepository):
         enabled: bool = True,
     ) -> dict[str, Any]:
         """Create or replace a skill binding."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         doc = AgentSkillBindingDocument(
             id=skill_id,
             tenant_id=tenant_id,

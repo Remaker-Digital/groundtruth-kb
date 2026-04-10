@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """SPEC-1841: Untested Spec Backfill Program.
 
 Identifies implemented/verified specs with 0 linked tests, categorizes

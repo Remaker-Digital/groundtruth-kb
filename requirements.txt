@@ -19,6 +19,7 @@ uvicorn[standard]>=0.32.0
 
 # Azure integrations
 azure-communication-email>=1.0.0
+azure-communication-sms>=1.0.0
 azure-cosmos>=4.7.0
 azure-identity>=1.19.0
 azure-keyvault-keys>=4.9.0
@@ -56,6 +57,7 @@ PyJWT>=2.9.0
 # MFA/TOTP (RB-5: multi-factor authentication)
 pyotp>=2.9.0
 qrcode>=7.4.0
+Pillow>=10.0.0
 
 # Data serialization (archival pipeline — Parquet format)
 pyarrow>=18.0.0

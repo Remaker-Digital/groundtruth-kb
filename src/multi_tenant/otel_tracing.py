@@ -1,3 +1,4 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 OpenTelemetry tenant-aware tracing and correlation ID propagation.
 
