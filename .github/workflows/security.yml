@@ -55,7 +55,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install package
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,web]"
 
       - name: Run pip-audit
         run: |
