@@ -1,0 +1,57 @@
+# {{PROJECT_NAME}} Local Development Stack
+#
+# Usage:
+#   docker compose up -d        # Start all services
+#   docker compose logs -f app  # Follow application logs
+#   docker compose down         # Stop and remove containers
+#
+# Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
+# All rights reserved.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: {{PROJECT_NAME}}-app
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env.local
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+    container_name: {{PROJECT_NAME}}-db
+    ports:
+      - "8081:8081"
+      - "10250:10250"
+      - "10251:10251"
+      - "10252:10252"
+      - "10253:10253"
+      - "10254:10254"
+    environment:
+      - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
+      - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
+    healthcheck:
+      test: ["CMD", "curl", "-fsk", "https://localhost:8081/_explorer/emulator.pem"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    volumes:
+      - cosmos-data:/tmp/cosmos/appdata
+
+volumes:
+  cosmos-data:
+    driver: local

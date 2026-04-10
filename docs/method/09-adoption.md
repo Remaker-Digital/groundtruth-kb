@@ -2,11 +2,11 @@
 
 GroundTruth is designed as **upstream infrastructure** that downstream projects consume. This document defines the contract between **groundtruth-kb** (the core toolkit) and the projects that adopt it.
 
-> **Note:** A companion package, **groundtruth-project-kit**, is planned
-> for project scaffolding, bootstrap profiles, and environment doctor
-> capabilities.  See the [product architecture](../architecture/product-split.md)
-> for the full ecosystem design.  The contract below applies specifically
-> to groundtruth-kb.
+> **Note:** Project scaffolding (`gt project init`), bootstrap profiles,
+> and environment doctor (`gt project doctor`) are included in the
+> `groundtruth-kb` package.  See the
+> [product architecture](../architecture/product-split.md) for the full
+> architecture.  The contract below applies to groundtruth-kb.
 
 ## Upstream/downstream model
 
@@ -15,13 +15,9 @@ groundtruth-kb (upstream)
     │
     ├── Method documentation
     ├── KB engine + CLI + web UI
-    └── Governance gates (built-in + plugin)
-         │
-         ▼
-   groundtruth-project-kit (planned)
-    │
-    ├── Project scaffolding       ← bootstrap profiles, doctor, bridge config
-    └── gt project init/doctor    ← planned CLI commands
+    ├── Governance gates (built-in + plugin)
+    ├── Project scaffolding       ← gt project init (profiles, doctor, upgrade)
+    └── Bridge runtime            ← groundtruth_kb.bridge module
          │
          ▼
    Your project (downstream)
@@ -83,14 +79,7 @@ Not every improvement discovered in a downstream project belongs upstream. Use t
 - Extends the KB schema for your project's needs (via migrations in your codebase)
 - Implements business logic that only applies to your product
 
-**Belongs in groundtruth-project-kit** when the change:
-
-- Is reusable scaffolding (bootstrap profiles, project manifest templates)
-- Adds environment detection or doctor checks (tool presence, auth validation)
-- Provides automated bridge runtime scaffolding or dual-agent setup patterns
-- Generates project-owned files from parameterized profiles
-
-**Gray area — ask yourself:** "Would a stranger starting a new GroundTruth project benefit from this?" If yes, promote upstream to groundtruth-kb. If it's reusable scaffolding, it likely belongs in groundtruth-project-kit. If only your team would use it, keep it local.
+**Gray area — ask yourself:** "Would a stranger starting a new GroundTruth project benefit from this?" If yes, promote upstream to groundtruth-kb. If only your team would use it, keep it local.
 
 ## Promotion workflow
 

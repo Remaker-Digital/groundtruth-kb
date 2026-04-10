@@ -5,9 +5,8 @@ and customize for your needs.
 
 These templates are **generic starting points** that become project-owned
 after copying — GroundTruth does not manage or overwrite them after initial
-setup.  Project-specific customization (bridge runtimes, cloud deployment,
-dual-agent configuration) is planned for
-[groundtruth-project-kit](../docs/architecture/product-split.md).
+setup.  Use `gt project init --profile <profile>` for automated,
+profile-based project setup.
 
 Reference capture templates for bridges and automations are included here;
 automated setup of those runtimes is still out of scope.
@@ -74,7 +73,5 @@ If your project uses a bridge, multiple agents, or recurring automation, also
 customize `BRIDGE-INVENTORY.md` so the runtime entrypoints, directives, role
 descriptions, and schedules are discoverable from the project.
 
-The manual placeholder approach is intentional for groundtruth-kb.
-Automated profile-based customization (e.g., `gt project init --profile
-dual-agent-webapp`) is a planned [groundtruth-project-kit](../docs/architecture/product-split.md)
-capability.
+For automated profile-based customization, use `gt project init --profile
+dual-agent-webapp` instead of manual template copying.

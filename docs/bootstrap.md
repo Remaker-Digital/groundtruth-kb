@@ -10,9 +10,9 @@ process templates, and CI/CD.
 
 **This guide does NOT cover** cloud infrastructure provisioning or a full
 Agent Red deployment topology. For the fastest client workstation path, use the
-[desktop setup guide](desktop-setup.md). Richer scaffold automation and cloud
-bootstrap remain part of the planned
-[groundtruth-project-kit](architecture/product-split.md) package.
+[desktop setup guide](desktop-setup.md).  For profile-based project setup,
+use `gt project init --profile <profile>` (see
+[product architecture](architecture/product-split.md)).
 
 ## Prerequisites
 
@@ -32,10 +32,16 @@ Verify the installation:
 gt --version
 ```
 
-## Fastest path: desktop bootstrap
+## Fastest path: project init
 
-If you want a same-day prototype scaffold with templates, hooks, rules, seed
-data, and optional git initialization, use:
+For a profile-based scaffold with templates, hooks, rules, seed data, and
+optional git initialization, use:
+
+```bash
+gt project init my-project --profile local-only --owner "Your Organization" --init-git
+```
+
+Alternatively, for a lightweight same-day prototype:
 
 ```bash
 gt bootstrap-desktop my-project --owner "Your Organization" --init-git

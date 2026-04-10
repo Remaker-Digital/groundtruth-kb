@@ -120,9 +120,10 @@ When reviewing bridge or automation changes, verify:
 4. The scheduled tasks and automations are explicitly listed.
 5. The state file captures any live operational facts that future sessions need.
 
-## Boundary with future scaffolding
+## Relationship to project scaffolding
 
-`groundtruth-kb` provides the method, templates, and capture contract.
-Future scaffolding or automated bridge setup may live in a separate project-kit
-package. Even if scaffolding moves elsewhere, the requirement to capture the
-resulting configuration remains part of the GroundTruth method.
+`groundtruth-kb` provides the method, templates, capture contract, and
+project scaffolding commands (`gt project init`, `gt project doctor`,
+`gt project upgrade`).  The scaffold generates initial configuration files,
+but the requirement to keep that configuration accurate and up to date
+remains part of the GroundTruth method.

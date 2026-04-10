@@ -22,7 +22,7 @@ Engineering discipline for AI-powered systems — from specification to producti
 
 | Document | Description |
 |----------|-------------|
-| [Product Architecture](../architecture/product-split.md) | groundtruth-kb vs groundtruth-project-kit scope split |
+| [Product Architecture](../architecture/product-split.md) | Single-package architecture: core KB, project scaffold, workstation doctor, bridge runtime |
 
 ## Prerequisites
 
