@@ -17,7 +17,6 @@ import os
 import re
 import sys
 
-
 # Credential patterns to detect.
 # Each tuple: (compiled regex, human-readable description).
 CREDENTIAL_PATTERNS = [

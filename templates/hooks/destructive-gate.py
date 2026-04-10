@@ -17,7 +17,6 @@ import os
 import re
 import sys
 
-
 # Patterns that indicate destructive operations.
 # Each tuple: (compiled regex, human-readable description).
 DESTRUCTIVE_PATTERNS = [

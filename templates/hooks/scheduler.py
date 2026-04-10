@@ -16,7 +16,6 @@ All rights reserved.
 import os
 import sys
 
-
 SCHEDULE_PATH = os.path.join(".claude", "SCHEDULE.md")
 
 
@@ -26,7 +25,7 @@ def find_next_scheduled_prompt():
         return None
 
     try:
-        with open(SCHEDULE_PATH, "r", encoding="utf-8") as f:
+        with open(SCHEDULE_PATH, encoding="utf-8") as f:
             for line in f:
                 stripped = line.strip()
                 if stripped.startswith("- [ ]"):
@@ -34,7 +33,7 @@ def find_next_scheduled_prompt():
                     prompt_text = stripped[len("- [ ]"):].strip()
                     if prompt_text:
                         return prompt_text
-    except (IOError, OSError):
+    except OSError:
         return None
 
     return None
