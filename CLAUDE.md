@@ -51,21 +51,17 @@ All new work in this repository must include:
 
 **Loyal Opposition role (Codex):** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work.
 
-**Bridge collaboration exception:** For bridge runtime, protocol, poller, worker, and handshake work, reverse the usual relationship: Codex is the implementation owner and Prime Builder acts as reviewer. Prime should request review or GO/NO-GO from Codex after Codex bridge work rather than waiting for a Prime-authored bridge proposal.
+**GroundTruth KB vision filter:** For GroundTruth-related work, prefer choices that reduce the owner's role to adding or refining specifications, answering clarification questions, and making explicit trade-off decisions. Flag approaches that leave routine implementation, deployment plumbing, traceability reconciliation, generated-artifact inspection, or cross-agent process state with the owner.
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
-**bridge-specific operating exception.**
-- For bridge work, Codex implements first and sends Prime an implementation report or targeted review request.
-- Prime reviews bridge changes and issues GO/NO-GO instead of assuming Codex is only an advisor.
-- Treat any currently required bridge envelope fields as transport compatibility metadata, not as proof that every bridge message requires a reply.
-
-**operating procedure.** 
-- Have your Loyal Opposition review every implementation proposal before you implement anything. 
-- Have your Loyal Opposition review the post-implementation report you produce after every implementation work session. 
-- Do not proceed to the next task or step without a GO agreement from your Loyal Opposition. 
-- If your Loyal Opposition stops responding, investigate and resolve the blockage. 
-- Do not delete post-implementation reports. 
+**operating procedure.** File-based bridge protocol. See `.claude/rules/file-bridge-protocol.md`.
+- **Propose:** Save proposal to `bridge/{name}-001.md`, add NEW entry to `bridge/INDEX.md`.
+- **Review:** Codex scans INDEX for NEW/REVISED entries, reviews, adds GO or NO-GO version.
+- **Execute:** After Codex GO, implement code, tests, and verify.
+- **Report:** Save post-implementation report as new version, add NEW entry for verification.
+- **Verify:** Codex reviews report and adds VERIFIED or NO-GO version.
+- Both agents scan the index every 3 minutes via scheduled automation.
 - Before you deploy any build, ask this question: Is Agent Red ready for a full production deployment?
 
 ---
@@ -159,17 +155,13 @@ Key files: CLAUDE.md, memory/MEMORY.md
 Next: [describe task].
 ```
 
-### Session Start: Bridge Liveness Check (Mandatory)
+### Session Start: Bridge Index Scan (Mandatory)
 
-Before any session work proceeds, Prime Builder must verify the bridge is alive:
+At session start, scan `bridge/INDEX.md` for pending work:
 
-1. **Send** a bridge request to Codex: `"Report your current operating state"`. If the current runtime still requires envelope metadata, include it as transport compatibility metadata only.
-2. **Listen** for Codex to reply. Poll Prime's inbox every 15 seconds for up to 2 minutes, then retry the request once if needed.
-3. **Proceed** only after the reply is received. If no reply arrives after the retry window, report the bridge failure to the owner before continuing.
-
-This check confirms the Prime↔Codex bridge is operational and both agents can communicate. Do not skip this step.
-
-**Bridge protocol rule:** The bridge is asynchronous message passing, not a universal request/reply protocol. Not all messages are replies, not all messages require replies, and retries should be used only for important requests or deadlines.
+1. **Read** `bridge/INDEX.md` and look for entries with GO or NO-GO status that haven't been actioned.
+2. **Report** any findings: "Bridge scan: N entries need attention" or "Bridge scan: clear."
+3. **Process** the oldest actionable entry first (GO → implement, NO-GO → revise).
 
 ### Protected Behaviors & Removal Rule
 
@@ -188,7 +180,7 @@ This check confirms the Prime↔Codex bridge is operational and both agents can 
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
 - **DO NOT create new markdown files** to store canonical project knowledge or session memory outside approved exception paths.
-- **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
+- **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
 
 ### Session Wrap-Up & Handoff
