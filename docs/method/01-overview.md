@@ -2,6 +2,11 @@
 
 GroundTruth is an engineering discipline layer for teams building AI-powered systems. It provides traceable specifications, automated assertions, and structured governance so that what was decided, why it was decided, and whether the implementation still matches are always answerable questions.
 
+The project vision is a software factory where the owner supplies specifications,
+clarifications, and trade-off decisions, while the pipeline produces a
+production-deployable SaaS application ready for Azure. See [Vision](00-vision.md)
+for the operational decision filter derived from that goal.
+
 ## The problem
 
 AI systems change fast. Models improve, prompts get rewritten, integrations shift, and business requirements evolve — often within the same week. Without discipline, teams lose track of:
