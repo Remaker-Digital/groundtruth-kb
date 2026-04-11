@@ -332,6 +332,44 @@ class TestM16:
         m = db.compute_m16_verified_with_passing_tests_rate()
         assert m["numerator"] == 0
 
+    def test_verified_with_empty_test_file(self, db):
+        """test_file='' (empty string) is not executable evidence."""
+        db.insert_spec(id="S-VE", title="VE", status="specified", changed_by="t", change_reason="v1")
+        db.update_spec("S-VE", changed_by="t", change_reason="v", status="verified")
+        db.insert_test(
+            id="T-EMPTY",
+            title="Empty",
+            spec_id="S-VE",
+            test_type="unit",
+            expected_outcome="pass",
+            test_file="",
+            last_result="pass",
+            last_executed_at="2026-04-10T00:00:00+00:00",
+            changed_by="t",
+            change_reason="t",
+        )
+        m = db.compute_m16_verified_with_passing_tests_rate()
+        assert m["numerator"] == 0
+
+    def test_verified_with_whitespace_test_file(self, db):
+        """test_file='  ' (whitespace only) is not executable evidence."""
+        db.insert_spec(id="S-VW", title="VW", status="specified", changed_by="t", change_reason="v1")
+        db.update_spec("S-VW", changed_by="t", change_reason="v", status="verified")
+        db.insert_test(
+            id="T-WS",
+            title="Whitespace",
+            spec_id="S-VW",
+            test_type="unit",
+            expected_outcome="pass",
+            test_file="   ",
+            last_result="pass",
+            last_executed_at="2026-04-10T00:00:00+00:00",
+            changed_by="t",
+            change_reason="t",
+        )
+        m = db.compute_m16_verified_with_passing_tests_rate()
+        assert m["numerator"] == 0
+
     def test_no_verified_specs(self, db):
         db.insert_spec(id="S-I", title="I", status="implemented", changed_by="t", change_reason="t")
         m = db.compute_m16_verified_with_passing_tests_rate()
@@ -425,8 +463,9 @@ class TestM18:
 
     def test_empty_db(self, db):
         m = db.compute_m18_implemented_without_test_count()
-        assert m["value"] == 0
+        assert m["value"] is None
         assert m["denominator"] == 0
+        assert m["status"] == "not_applicable"
 
 
 # ===========================================================================
@@ -444,7 +483,4 @@ class TestGetLifecycleMetrics:
     def test_empty_db_all_not_applicable(self, db):
         metrics = db.get_lifecycle_metrics()
         for mid, val in metrics.items():
-            if mid == "M18":
-                assert val["value"] == 0  # Count metric, not ratio
-            else:
-                assert val["value"] is None, f"{mid} should be None on empty DB"
+            assert val["value"] is None, f"{mid} should be None on empty DB"
