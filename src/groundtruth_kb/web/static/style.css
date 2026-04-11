@@ -324,3 +324,106 @@ a:hover { text-decoration: underline; }
     font-size: 0.75rem;
     letter-spacing: 0.15em;
 }
+
+/* ── Pipeline metric cards ────────────────────────── */
+.metric-group-title {
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+}
+
+.metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.metric-id {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--brand);
+    background: rgba(37, 99, 235, 0.15);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+}
+
+.metric-title {
+    font-size: 0.85rem;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+}
+
+.metric-unit {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+    margin-bottom: 0.5rem;
+}
+
+.metric-detail {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.health-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.health-green { background: var(--pass); }
+.health-amber { background: #f59e0b; }
+.health-red { background: var(--fail); }
+.health-na { background: var(--border); }
+
+.metric-drilldown {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+}
+.metric-drilldown summary {
+    cursor: pointer;
+    color: var(--brand);
+}
+.metric-drilldown ul {
+    margin: 0.5rem 0 0 1rem;
+    padding: 0;
+    list-style: none;
+}
+.metric-drilldown li {
+    margin-bottom: 0.25rem;
+}
+.metric-drilldown a {
+    color: var(--brand);
+    text-decoration: none;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+}
+.metric-drilldown a:hover {
+    text-decoration: underline;
+}
