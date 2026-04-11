@@ -36,6 +36,9 @@ web = [
 bridge = [
     "mcp>=1.0",
 ]
+search = [
+    "chromadb>=1.0.0,<2",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",

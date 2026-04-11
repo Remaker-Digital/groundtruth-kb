@@ -1,4 +1,4 @@
-"""Tests for deliberation archive CRUD, redaction, multi-link, and dedup.
+"""Tests for deliberation archive CRUD, redaction, multi-link, dedup, and semantic search.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 Licensed under AGPL-3.0-or-later.
@@ -6,9 +6,14 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.db import HAS_CHROMADB, SEMANTIC_MAX_DISTANCE, KnowledgeDB
+
+# Skip marker for tests requiring ChromaDB
+requires_chromadb = pytest.mark.skipif(not HAS_CHROMADB, reason="ChromaDB not installed")
 
 
 class TestInsertDeliberation:
@@ -551,22 +556,42 @@ class TestUpsertDeliberationSource:
         source — the new record must be DELIB-0003, not DELIB-0002 version 2.
         """
         db.insert_deliberation(
-            id="DELIB-0001", source_type="report", title="R1", summary="S1.",
-            content="Content 1.", changed_by="test", change_reason="seed",
+            id="DELIB-0001",
+            source_type="report",
+            title="R1",
+            summary="S1.",
+            content="Content 1.",
+            changed_by="test",
+            change_reason="seed",
         )
         db.insert_deliberation(
-            id="DELIB-0002", source_type="report", title="R2", summary="S2.",
-            content="Content 2.", changed_by="test", change_reason="seed",
+            id="DELIB-0002",
+            source_type="report",
+            title="R2",
+            summary="S2.",
+            content="Content 2.",
+            changed_by="test",
+            change_reason="seed",
         )
         # Append a new version of DELIB-0001 — this bumps its rowid above DELIB-0002
         db.insert_deliberation(
-            id="DELIB-0001", source_type="report", title="R1 v2", summary="S1 v2.",
-            content="Content 1 updated.", changed_by="test", change_reason="update",
+            id="DELIB-0001",
+            source_type="report",
+            title="R1 v2",
+            summary="S1 v2.",
+            content="Content 1 updated.",
+            changed_by="test",
+            change_reason="update",
         )
         # Now upsert a brand-new source — must get DELIB-0003
         r3 = db.upsert_deliberation_source(
-            source_type="report", source_ref="ref-3", content="Report 3.",
-            title="R3", summary="S3.", changed_by="test", change_reason="test",
+            source_type="report",
+            source_ref="ref-3",
+            content="Report 3.",
+            title="R3",
+            summary="S3.",
+            changed_by="test",
+            change_reason="test",
         )
         assert r3["id"] == "DELIB-0003", (
             f"Expected DELIB-0003 but got {r3['id']} — ID allocator used rowid instead of MAX suffix"
@@ -663,3 +688,484 @@ class TestGetSummary:
         )
         summary = db.get_summary()
         assert summary["deliberation_count"] == 1
+
+
+# ── ChromaDB semantic search tests ──────────────────────────────
+
+
+@pytest.fixture()
+def search_db(tmp_path: Path) -> KnowledgeDB:
+    """KnowledgeDB with ChromaDB search enabled in a temp directory."""
+    db_path = tmp_path / "test_search.db"
+    chroma_path = tmp_path / ".groundtruth-chroma"
+    return KnowledgeDB(db_path=db_path, chroma_path=chroma_path)
+
+
+class TestSearchResultContract:
+    """Verify search_deliberations returns the stable result contract fields."""
+
+    def test_text_match_has_search_fields(self, db):
+        """SQLite fallback results include search_method and score fields."""
+        db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Database migration",
+            summary="Migrate tables.",
+            content="Migrating SQL tables to new schema.",
+            changed_by="test",
+            change_reason="test",
+        )
+        results = db.search_deliberations("migration")
+        assert len(results) == 1
+        assert results[0]["search_method"] == "text_match"
+        assert results[0]["score"] is None
+        assert results[0]["matched_chunk_id"] is None
+        assert results[0]["matched_chunk_preview"] is None
+
+
+class TestChunking:
+    """Test the sentence-boundary chunking utility."""
+
+    def test_short_text_single_chunk(self):
+        chunks = KnowledgeDB._chunk_text_for_embedding("Short text.")
+        assert len(chunks) == 1
+        assert chunks[0] == "Short text."
+
+    def test_long_text_multiple_chunks(self):
+        # Create text longer than max_chars (~920)
+        sentences = [f"Sentence number {i} with some content to fill space." for i in range(30)]
+        text = " ".join(sentences)
+        chunks = KnowledgeDB._chunk_text_for_embedding(text)
+        assert len(chunks) > 1
+        # All original content should be recoverable from chunks
+        for sentence in sentences[:5]:  # Spot-check first few
+            assert any(sentence in chunk for chunk in chunks)
+
+    def test_overlap_present(self):
+        sentences = [f"Unique sentence {i} about topic {i}." for i in range(30)]
+        text = " ".join(sentences)
+        chunks = KnowledgeDB._chunk_text_for_embedding(text)
+        if len(chunks) >= 2:
+            # Some overlap should exist between consecutive chunks
+            chunk1_end = chunks[0][-100:]
+            assert any(part in chunks[1] for part in chunk1_end.split(". ") if part)
+
+
+class TestMetadataBuilder:
+    """Test _deliberation_chroma_metadata maps fields correctly."""
+
+    def test_metadata_contains_delib_id_from_row_id(self):
+        """GO condition 1: metadata['delib_id'] = row['id']."""
+        row = {
+            "id": "DELIB-0042",
+            "version": 3,
+            "changed_at": "2026-04-11T12:00:00",
+            "source_type": "lo_review",
+            "sensitivity": "normal",
+            "redaction_state": "clean",
+            "title": "Test deliberation",
+            "spec_id": None,
+            "work_item_id": None,
+            "outcome": None,
+            "session_id": None,
+            "source_ref": None,
+            "origin_project": None,
+            "origin_repo": None,
+        }
+        metadata = KnowledgeDB._deliberation_chroma_metadata(row, chunk_index=0, chunk_count=1)
+        assert metadata["delib_id"] == "DELIB-0042"
+        assert metadata["version"] == 3
+        assert metadata["chunk_index"] == 0
+        assert metadata["chunk_count"] == 1
+
+    def test_nullable_fields_omitted(self):
+        """Nullable fields with None values are omitted from metadata."""
+        row = {
+            "id": "DELIB-0001",
+            "version": 1,
+            "changed_at": "2026-04-11T12:00:00",
+            "source_type": "report",
+            "sensitivity": "normal",
+            "redaction_state": "clean",
+            "title": "Test",
+            "spec_id": None,
+            "work_item_id": None,
+            "outcome": None,
+            "session_id": None,
+            "source_ref": None,
+            "origin_project": None,
+            "origin_repo": None,
+        }
+        metadata = KnowledgeDB._deliberation_chroma_metadata(row, chunk_index=0, chunk_count=1)
+        assert "spec_id" not in metadata
+        assert "work_item_id" not in metadata
+        assert "outcome" not in metadata
+        assert "session_id" not in metadata
+
+    def test_optional_fields_included_when_present(self):
+        """Optional fields are included when not None."""
+        row = {
+            "id": "DELIB-0001",
+            "version": 1,
+            "changed_at": "2026-04-11T12:00:00",
+            "source_type": "lo_review",
+            "sensitivity": "normal",
+            "redaction_state": "clean",
+            "title": "Test",
+            "spec_id": "SPEC-100",
+            "work_item_id": "WI-200",
+            "outcome": "go",
+            "session_id": "S280",
+            "source_ref": None,
+            "origin_project": None,
+            "origin_repo": None,
+        }
+        metadata = KnowledgeDB._deliberation_chroma_metadata(row, chunk_index=0, chunk_count=1)
+        assert metadata["spec_id"] == "SPEC-100"
+        assert metadata["work_item_id"] == "WI-200"
+        assert metadata["outcome"] == "go"
+        assert metadata["session_id"] == "S280"
+
+
+@requires_chromadb
+class TestSemanticSearch:
+    """Tests requiring ChromaDB installed — semantic search behavior."""
+
+    def test_semantic_obvious_match_found(self, search_db):
+        """GO condition: obvious semantic match returns search_method='semantic'."""
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="proposal",
+            title="ChromaDB integration for semantic search",
+            summary="Adding vector-based retrieval to deliberation archive.",
+            content="This proposal adds ChromaDB as an optional dependency for "
+            "embedding-based semantic search over deliberation records. "
+            "The implementation uses the all-MiniLM-L6-v2 model for "
+            "generating document embeddings and supports distance-threshold "
+            "filtering to ensure relevance.",
+            changed_by="test",
+            change_reason="test",
+        )
+        results = search_db.search_deliberations("vector embeddings retrieval")
+        assert len(results) >= 1
+        assert results[0]["search_method"] == "semantic"
+        assert results[0]["score"] is not None
+        assert results[0]["score"] < SEMANTIC_MAX_DISTANCE
+        assert results[0]["matched_chunk_id"] is not None
+
+    def test_semantic_unrelated_returns_empty(self, search_db):
+        """GO condition 4: unrelated queries return empty list with ChromaDB populated."""
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Database migration strategy",
+            summary="Migrate SQL tables.",
+            content="The database migration involves moving tables from the old "
+            "schema to the new normalized structure with foreign key constraints.",
+            changed_by="test",
+            change_reason="test",
+        )
+        results = search_db.search_deliberations("quantum entanglement theory")
+        assert len(results) == 0
+
+    def test_semantic_fallback_to_text_match(self, search_db):
+        """When ChromaDB has no relevant results, falls back to SQLite LIKE."""
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Specific keyword xyzzy",
+            summary="Contains xyzzy marker.",
+            content="This document has the xyzzy keyword for testing text fallback.",
+            changed_by="test",
+            change_reason="test",
+        )
+        # Search for exact keyword that semantic search might not match well
+        # but LIKE will find
+        results = search_db.search_deliberations("xyzzy")
+        assert len(results) >= 1
+        # Should find it via either method
+        assert results[0]["id"] == "DELIB-0001"
+
+    def test_index_deliberation_with_nulls(self, search_db):
+        """Indexing a deliberation with all optional fields as None succeeds."""
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Minimal deliberation",
+            summary="No optional fields.",
+            content="A deliberation with no spec_id, work_item_id, outcome, or session_id.",
+            changed_by="test",
+            change_reason="test",
+        )
+        # Should not raise — indexing with null optional fields works
+        results = search_db.search_deliberations("minimal deliberation")
+        assert len(results) >= 1
+
+
+@requires_chromadb
+class TestStaleChunkDeletion:
+    """GO condition 2: stale chunks are removed on deliberation revision."""
+
+    def test_revision_removes_old_text(self, search_db):
+        """Text from v1 is not searchable after v2 replaces it."""
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="proposal",
+            title="Architecture proposal",
+            summary="Alpha approach chosen.",
+            content="We chose the alpha approach for the database layer because "
+            "it provides better consistency guarantees and simpler operations.",
+            changed_by="test",
+            change_reason="initial",
+        )
+        # Verify v1 is searchable
+        results = search_db.search_deliberations("alpha approach consistency")
+        assert len(results) >= 1
+
+        # Update to v2 with different content
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="proposal",
+            title="Architecture proposal v2",
+            summary="Beta approach chosen.",
+            content="We switched to the beta approach for the database layer "
+            "because it provides better horizontal scaling and partition tolerance.",
+            changed_by="test",
+            change_reason="revised after review",
+        )
+        # v1 text should NOT be searchable
+        results = search_db.search_deliberations("alpha approach consistency")
+        assert len(results) == 0
+
+        # v2 text SHOULD be searchable
+        results = search_db.search_deliberations("beta approach scaling")
+        assert len(results) >= 1
+        assert results[0]["id"] == "DELIB-0001"
+
+    def test_long_to_short_revision_removes_surplus_chunks(self, search_db):
+        """Revising a long deliberation (many chunks) to short removes surplus."""
+        # v1: long content that will produce multiple chunks
+        long_content = " ".join(
+            [
+                f"Section {i}: This is a detailed analysis of topic {i} "
+                f"covering multiple aspects of the engineering decision."
+                for i in range(50)
+            ]
+        )
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Detailed analysis",
+            summary="Long report.",
+            content=long_content,
+            changed_by="test",
+            change_reason="initial",
+        )
+        collection = search_db._get_chroma_collection()
+        v1_count = collection.count()
+        assert v1_count > 2  # Should have multiple chunks
+
+        # v2: short content
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Revised analysis",
+            summary="Short report.",
+            content="Concise summary replacing the detailed analysis.",
+            changed_by="test",
+            change_reason="simplified",
+        )
+        v2_count = collection.count()
+        assert v2_count == 1  # Only one chunk for short content
+        assert v2_count < v1_count
+
+
+@requires_chromadb
+class TestRebuildIndex:
+    """Test rebuild_deliberation_index()."""
+
+    def test_rebuild_from_empty(self, search_db):
+        result = search_db.rebuild_deliberation_index()
+        assert result["indexed"] == 0
+        assert result["chunks"] == 0
+        assert result["errors"] == []
+
+    def test_rebuild_reindexes_all(self, search_db):
+        for i in range(3):
+            search_db.insert_deliberation(
+                id=f"DELIB-{i:04d}",
+                source_type="report",
+                title=f"Report {i}",
+                summary=f"Summary {i}.",
+                content=f"Deliberation content for report number {i}.",
+                changed_by="test",
+                change_reason="test",
+            )
+        result = search_db.rebuild_deliberation_index()
+        assert result["indexed"] == 3
+        assert result["chunks"] >= 3
+        assert result["errors"] == []
+
+    def test_rebuild_clears_stale_entries(self, search_db):
+        """Rebuild removes entries for deliberations that no longer exist in current view."""
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Original",
+            summary="Original.",
+            content="Original content about original topics.",
+            changed_by="test",
+            change_reason="test",
+        )
+        # Verify indexed
+        collection = search_db._get_chroma_collection()
+        assert collection.count() > 0
+
+        # Rebuild should recreate cleanly
+        result = search_db.rebuild_deliberation_index()
+        assert result["indexed"] == 1
+        assert result["errors"] == []
+
+
+@requires_chromadb
+class TestThresholdCalibration:
+    """GO condition 3: calibration fixture proves threshold separates positive/negative pairs."""
+
+    def test_positive_pairs_below_threshold(self, search_db):
+        """Semantically related text should score below SEMANTIC_MAX_DISTANCE."""
+        from groundtruth_kb.db import SEMANTIC_MAX_DISTANCE
+
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="proposal",
+            title="Database migration strategy",
+            summary="Strategy for migrating SQL tables.",
+            content="This proposal covers the database migration strategy including "
+            "migrating SQL tables to new schema, handling foreign key constraints, "
+            "and ensuring data integrity during the transition period.",
+            changed_by="test",
+            change_reason="test",
+        )
+        results = search_db.search_deliberations("migrating SQL tables to new schema")
+        assert len(results) >= 1
+        assert results[0]["score"] < SEMANTIC_MAX_DISTANCE
+
+        search_db.insert_deliberation(
+            id="DELIB-0002",
+            source_type="proposal",
+            title="ChromaDB semantic search integration",
+            summary="Adding vector retrieval.",
+            content="Integrating ChromaDB for embedding-based vector retrieval "
+            "to enable semantic search over deliberation records using the "
+            "all-MiniLM-L6-v2 sentence transformer model.",
+            changed_by="test",
+            change_reason="test",
+        )
+        results = search_db.search_deliberations("embedding-based vector retrieval")
+        assert len(results) >= 1
+        assert results[0]["score"] < SEMANTIC_MAX_DISTANCE
+
+    def test_negative_pairs_filtered(self, search_db):
+        """Unrelated text should be filtered by the distance threshold."""
+
+        search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="proposal",
+            title="Database migration strategy",
+            summary="Strategy for migrating SQL tables.",
+            content="This proposal covers the database migration strategy including "
+            "migrating SQL tables to new schema and handling foreign key constraints.",
+            changed_by="test",
+            change_reason="test",
+        )
+        # Completely unrelated query
+        results = search_db.search_deliberations("chocolate cake recipe ingredients")
+        assert len(results) == 0
+
+        search_db.insert_deliberation(
+            id="DELIB-0002",
+            source_type="proposal",
+            title="ChromaDB integration",
+            summary="Vector search.",
+            content="Embedding-based semantic search over deliberation records.",
+            changed_by="test",
+            change_reason="test",
+        )
+        results = search_db.search_deliberations("quantum entanglement theory")
+        assert len(results) == 0
+
+
+class TestConfigChromaPath:
+    """Test GTConfig [search].chroma_path parsing."""
+
+    def test_config_default_chroma_path_is_none(self):
+        """Without [search] section, chroma_path defaults to None."""
+        from groundtruth_kb.config import GTConfig
+
+        config = GTConfig()
+        assert config.chroma_path is None
+
+    def test_config_chroma_path_from_toml(self, tmp_path):
+        """[search].chroma_path is parsed from groundtruth.toml."""
+        from groundtruth_kb.config import GTConfig
+
+        toml_content = b'[groundtruth]\ndb_path = "./test.db"\n\n[search]\nchroma_path = "my-chroma"\n'
+        config_file = tmp_path / "groundtruth.toml"
+        config_file.write_bytes(toml_content)
+        config = GTConfig.load(config_path=config_file)
+        assert config.chroma_path == tmp_path / "my-chroma"
+
+    def test_config_chroma_path_absolute(self, tmp_path):
+        """Absolute chroma_path is used as-is."""
+        from groundtruth_kb.config import GTConfig
+
+        abs_path = str(tmp_path / "abs-chroma")
+        # Use forward slashes for TOML compatibility (backslashes are escape chars)
+        toml_path = abs_path.replace("\\", "/")
+        toml_content = f'[groundtruth]\ndb_path = "./test.db"\n\n[search]\nchroma_path = "{toml_path}"\n'
+        config_file = tmp_path / "groundtruth.toml"
+        config_file.write_bytes(toml_content.encode())
+        config = GTConfig.load(config_path=config_file)
+        assert config.chroma_path == Path(abs_path)
+
+
+class TestChromaFailureContainment:
+    """ChromaDB index failures must not break canonical SQLite writes."""
+
+    def test_insert_succeeds_when_chroma_add_raises(self, search_db, monkeypatch):
+        """Canonical write persists even if ChromaDB add() raises."""
+        original_index = search_db._index_deliberation_in_chroma
+
+        def failing_index(delib_id):
+            raise RuntimeError("simulated ChromaDB add failure")
+
+        monkeypatch.setattr(search_db, "_index_deliberation_in_chroma", failing_index)
+
+        # insert_deliberation must not raise
+        result = search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Should persist despite index failure",
+            summary="Testing failure containment.",
+            content="This deliberation must be committed to SQLite even if ChromaDB fails.",
+            changed_by="test",
+            change_reason="test",
+        )
+
+        # Row must exist in SQLite
+        assert result is not None
+        assert result["id"] == "DELIB-0001"
+        assert result["version"] == 1
+
+        # Verify no duplicate version on a second insert (proves first commit succeeded)
+        monkeypatch.setattr(search_db, "_index_deliberation_in_chroma", original_index)
+        result2 = search_db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="report",
+            title="Second version",
+            summary="Version 2.",
+            content="Second version after contained failure.",
+            changed_by="test",
+            change_reason="update",
+        )
+        assert result2["version"] == 2

@@ -613,3 +613,35 @@ def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
     results = execute_upgrade(target, actions, force=force)
     for msg in results:
         click.echo(f"  {msg}")
+
+
+# ── gt deliberations ──────────────────────────────────────────────
+
+
+@main.group()
+def deliberations():
+    """Deliberation archive commands."""
+
+
+@deliberations.command("rebuild-index")
+@click.pass_context
+def deliberations_rebuild_index(ctx: click.Context) -> None:
+    """Rebuild the ChromaDB semantic search index from SQLite.
+
+    Drops and recreates the ChromaDB collection, re-indexing all current
+    deliberations. SQLite remains the source of truth.
+    """
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(
+        db_path=config.db_path,
+        chroma_path=config.chroma_path,
+    )
+    result = db.rebuild_deliberation_index()
+    if result.get("errors") and result["errors"] == ["ChromaDB not installed"]:
+        click.echo("Error: ChromaDB is not installed. Install with: pip install groundtruth-kb[search]")
+        raise SystemExit(1)
+    click.echo(f"Indexed {result['indexed']} deliberation(s), {result['chunks']} chunk(s).")
+    if result.get("errors"):
+        click.echo(f"Errors ({len(result['errors'])}):")
+        for err in result["errors"]:
+            click.echo(f"  {err}")

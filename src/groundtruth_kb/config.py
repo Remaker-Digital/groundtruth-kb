@@ -30,6 +30,7 @@ class GTConfig:
 
     db_path: Path = field(default_factory=lambda: Path("./groundtruth.db"))
     project_root: Path = field(default_factory=lambda: Path("."))
+    chroma_path: Path | None = None
     app_title: str = _DEFAULT_APP_TITLE
     brand_mark: str = _DEFAULT_BRAND_MARK
     brand_color: str = _DEFAULT_BRAND_COLOR
@@ -66,7 +67,7 @@ class GTConfig:
         merged = {**file_values, **env_values, **{k: v for k, v in overrides.items() if v is not None}}
 
         # Convert path strings to Path objects, anchored to config file directory
-        for key in ("db_path", "project_root"):
+        for key in ("db_path", "project_root", "chroma_path"):
             if key in merged and isinstance(merged[key], str):
                 p = Path(merged[key])
                 if not p.is_absolute():
@@ -102,6 +103,11 @@ def _load_toml(config_path: Path | None) -> dict:
     gate_config_section = gates_section.get("config", {})
     if gate_config_section:
         result["gate_config"] = dict(gate_config_section)
+
+    # Search section: [search]
+    search_section = data.get("search", {})
+    if "chroma_path" in search_section:
+        result["chroma_path"] = search_section["chroma_path"]
 
     return result
 
