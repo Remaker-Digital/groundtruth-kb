@@ -20,6 +20,7 @@ import hashlib
 import json
 import re
 import sqlite3
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -268,6 +269,20 @@ CREATE TABLE IF NOT EXISTS quality_scores (
     UNIQUE(session_id)
 );
 
+-- Pipeline lifecycle events (SPEC-2099) — append-only event log
+CREATE TABLE IF NOT EXISTS pipeline_events (
+    id              TEXT    NOT NULL PRIMARY KEY,
+    event_type      TEXT    NOT NULL,
+    session_id      TEXT,
+    artifact_id     TEXT,
+    artifact_type   TEXT,
+    artifact_version INTEGER,
+    timestamp       TEXT    NOT NULL,
+    duration_ms     INTEGER,
+    metadata        TEXT,
+    changed_by      TEXT    NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS deliberations (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -335,6 +350,9 @@ CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
 CREATE INDEX IF NOT EXISTS idx_te_status ON testable_elements(status);
 CREATE INDEX IF NOT EXISTS idx_quality_scores_session ON quality_scores(session_id);
+CREATE INDEX IF NOT EXISTS idx_pe_event_type_ts ON pipeline_events(event_type, timestamp);
+CREATE INDEX IF NOT EXISTS idx_pe_artifact ON pipeline_events(artifact_type, artifact_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_pe_session_ts ON pipeline_events(session_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_deliberations_id_version ON deliberations(id, version);
 CREATE INDEX IF NOT EXISTS idx_deliberations_spec_id ON deliberations(spec_id);
 CREATE INDEX IF NOT EXISTS idx_deliberations_work_item_id ON deliberations(work_item_id);
@@ -601,7 +619,20 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        try:
+            self._record_event(
+                conn,
+                "spec_transition",
+                changed_by,
+                artifact_id=id,
+                artifact_type="spec",
+                artifact_version=version,
+                metadata={"from_status": "new", "to_status": status, "change_reason": change_reason},
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         return self.get_spec(id)
 
     def update_spec(
@@ -693,7 +724,21 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        try:
+            if current["status"] != status:
+                self._record_event(
+                    conn,
+                    "spec_transition",
+                    changed_by,
+                    artifact_id=id,
+                    artifact_type="spec",
+                    artifact_version=version,
+                    metadata={"from_status": current["status"], "to_status": status, "change_reason": change_reason},
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         return self.get_spec(id)
 
     def get_spec(self, spec_id: str) -> dict[str, Any] | None:
@@ -1368,7 +1413,26 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        try:
+            self._record_event(
+                conn,
+                "test_created",
+                changed_by,
+                artifact_id=id,
+                artifact_type="test",
+                artifact_version=version,
+                metadata={
+                    "spec_id": spec_id,
+                    "test_type": test_type,
+                    "test_file": test_file,
+                    "last_result": last_result,
+                    "last_executed_at": last_executed_at,
+                },
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         return self.get_test(id)
 
     def update_test(
@@ -1422,7 +1486,31 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        try:
+            result_changed = last_result != current["last_result"]
+            executed_changed = last_executed_at != current["last_executed_at"]
+            if result_changed or executed_changed:
+                self._record_event(
+                    conn,
+                    "test_executed",
+                    changed_by,
+                    artifact_id=id,
+                    artifact_type="test",
+                    artifact_version=version,
+                    metadata={
+                        "spec_id": spec_id,
+                        "test_type": test_type,
+                        "test_file": test_file,
+                        "previous_last_result": current["last_result"],
+                        "last_result": last_result,
+                        "previous_last_executed_at": current["last_executed_at"],
+                        "last_executed_at": last_executed_at,
+                    },
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         return self.get_test(id)
 
     def get_test(self, test_id: str) -> dict[str, Any] | None:
@@ -1822,7 +1910,28 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        try:
+            self._record_event(
+                conn,
+                "wi_created",
+                changed_by,
+                artifact_id=id,
+                artifact_type="work_item",
+                artifact_version=version,
+                metadata={
+                    "origin": origin,
+                    "component": component,
+                    "priority": priority,
+                    "resolution_status": resolution_status,
+                    "stage": stage,
+                    "source_spec_id": source_spec_id,
+                    "source_test_id": source_test_id,
+                },
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         return self.get_work_item(id)
 
     def update_work_item(
@@ -1893,7 +2002,32 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        try:
+            actually_resolving = resolution_status == "resolved" and current["resolution_status"] != "resolved"
+            if actually_resolving:
+                self._record_event(
+                    conn,
+                    "wi_resolved",
+                    changed_by,
+                    artifact_id=id,
+                    artifact_type="work_item",
+                    artifact_version=version,
+                    metadata={
+                        "origin": origin,
+                        "component": component,
+                        "priority": priority,
+                        "resolution_status": resolution_status,
+                        "stage": new_stage,
+                        "previous_resolution_status": current["resolution_status"],
+                        "previous_stage": current.get("stage"),
+                        "source_spec_id": source_spec_id,
+                        "source_test_id": source_test_id,
+                    },
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         return self.get_work_item(id)
 
     def get_work_item(self, item_id: str) -> dict[str, Any] | None:
@@ -2091,7 +2225,20 @@ class KnowledgeDB:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (spec_id, spec_version, _now(), int(overall_passed), json.dumps(results), triggered_by),
         )
-        conn.commit()
+        try:
+            self._record_event(
+                conn,
+                "assertion_run",
+                triggered_by,
+                artifact_id=spec_id,
+                artifact_type="spec",
+                artifact_version=spec_version,
+                metadata={"overall_passed": overall_passed, "triggered_by": triggered_by, "result_count": len(results)},
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     def get_latest_assertion_run(self, spec_id: str) -> dict[str, Any] | None:
         row = (
@@ -2412,6 +2559,11 @@ class KnowledgeDB:
             "work_items",
             "backlog_snapshots",
             "quality_scores",
+            "testable_elements",
+            "deliberations",
+            "deliberation_specs",
+            "deliberation_work_items",
+            "pipeline_events",
         ]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
@@ -2546,6 +2698,121 @@ class KnowledgeDB:
         }
 
     # ------------------------------------------------------------------
+    # Pipeline Events (SPEC-2099)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _record_event(
+        conn: sqlite3.Connection,
+        event_type: str,
+        changed_by: str,
+        *,
+        session_id: str | None = None,
+        artifact_id: str | None = None,
+        artifact_type: str | None = None,
+        artifact_version: int | None = None,
+        duration_ms: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Record a lifecycle event WITHIN an existing transaction.
+
+        Does NOT commit — the caller commits alongside the artifact mutation.
+        """
+        event_id = str(uuid.uuid4())
+        now = _now()
+        conn.execute(
+            """INSERT INTO pipeline_events
+               (id, event_type, session_id, artifact_id, artifact_type,
+                artifact_version, timestamp, duration_ms, metadata, changed_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                event_id,
+                event_type,
+                session_id,
+                artifact_id,
+                artifact_type,
+                artifact_version,
+                now,
+                duration_ms,
+                json.dumps(metadata) if metadata else None,
+                changed_by,
+            ),
+        )
+        return event_id
+
+    def record_event(
+        self,
+        event_type: str,
+        changed_by: str,
+        *,
+        session_id: str | None = None,
+        artifact_id: str | None = None,
+        artifact_type: str | None = None,
+        artifact_version: int | None = None,
+        duration_ms: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Record a lifecycle event (public API for external callers).
+
+        Commits immediately in its own transaction.
+        """
+        conn = self._get_conn()
+        event_id = self._record_event(
+            conn,
+            event_type,
+            changed_by,
+            session_id=session_id,
+            artifact_id=artifact_id,
+            artifact_type=artifact_type,
+            artifact_version=artifact_version,
+            duration_ms=duration_ms,
+            metadata=metadata,
+        )
+        conn.commit()
+        return event_id
+
+    def list_events(
+        self,
+        *,
+        event_type: str | None = None,
+        artifact_id: str | None = None,
+        artifact_type: str | None = None,
+        session_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Query pipeline events with optional filters."""
+        conn = self._get_conn()
+        query = "SELECT * FROM pipeline_events WHERE 1=1"
+        params: list[Any] = []
+        if event_type:
+            query += " AND event_type = ?"
+            params.append(event_type)
+        if artifact_id:
+            query += " AND artifact_id = ?"
+            params.append(artifact_id)
+        if artifact_type:
+            query += " AND artifact_type = ?"
+            params.append(artifact_type)
+        if session_id:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_events_for_artifact(self, artifact_type: str, artifact_id: str) -> list[dict[str, Any]]:
+        """Get all lifecycle events for a specific artifact, chronological."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT * FROM pipeline_events
+               WHERE artifact_type = ? AND artifact_id = ?
+               ORDER BY timestamp ASC""",
+            (artifact_type, artifact_id),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
     # Deliberations
     # ------------------------------------------------------------------
 
@@ -2587,9 +2854,7 @@ class KnowledgeDB:
         return result, "; ".join(notes) if notes else None
 
     def _next_deliberation_version(self, delib_id: str) -> int:
-        row = self._get_conn().execute(
-            "SELECT MAX(version) FROM deliberations WHERE id = ?", (delib_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT MAX(version) FROM deliberations WHERE id = ?", (delib_id,)).fetchone()
         return (row[0] or 0) + 1
 
     def insert_deliberation(
@@ -2618,19 +2883,19 @@ class KnowledgeDB:
         pre-redaction text is stored in content_hash for dedup and audit.
         """
         valid_source_types = {
-            "lo_review", "proposal", "owner_conversation",
-            "report", "session_harvest", "bridge_thread",
+            "lo_review",
+            "proposal",
+            "owner_conversation",
+            "report",
+            "session_harvest",
+            "bridge_thread",
         }
         if source_type not in valid_source_types:
-            raise ValueError(
-                f"Invalid source_type '{source_type}'; must be one of {sorted(valid_source_types)}"
-            )
+            raise ValueError(f"Invalid source_type '{source_type}'; must be one of {sorted(valid_source_types)}")
 
         valid_outcomes = {"go", "no_go", "deferred", "owner_decision", "informational", None}
         if outcome not in valid_outcomes:
-            raise ValueError(
-                f"Invalid outcome '{outcome}'; must be one of {sorted(o for o in valid_outcomes if o)}"
-            )
+            raise ValueError(f"Invalid outcome '{outcome}'; must be one of {sorted(o for o in valid_outcomes if o)}")
 
         # Hash raw content before redaction (for dedup)
         content_hash = hashlib.sha256(content.encode()).hexdigest()
@@ -2652,10 +2917,27 @@ class KnowledgeDB:
                 origin_project, origin_repo, changed_by, changed_at, change_reason)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                id, version, spec_id, work_item_id, source_type, source_ref,
-                title, summary, redacted_content, content_hash, participants_json,
-                outcome, session_id, sensitivity, redaction_state, redaction_notes,
-                origin_project, origin_repo, changed_by, _now(), change_reason,
+                id,
+                version,
+                spec_id,
+                work_item_id,
+                source_type,
+                source_ref,
+                title,
+                summary,
+                redacted_content,
+                content_hash,
+                participants_json,
+                outcome,
+                session_id,
+                sensitivity,
+                redaction_state,
+                redaction_notes,
+                origin_project,
+                origin_repo,
+                changed_by,
+                _now(),
+                change_reason,
             ),
         )
         conn.commit()
@@ -2704,16 +2986,16 @@ class KnowledgeDB:
 
     def get_deliberation(self, delib_id: str) -> dict[str, Any] | None:
         """Get the current (latest) version of a deliberation."""
-        row = self._get_conn().execute(
-            "SELECT * FROM current_deliberations WHERE id = ?", (delib_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM current_deliberations WHERE id = ?", (delib_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_deliberation_history(self, delib_id: str) -> list[dict[str, Any]]:
         """Get all versions of a deliberation."""
-        rows = self._get_conn().execute(
-            "SELECT * FROM deliberations WHERE id = ? ORDER BY version", (delib_id,)
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM deliberations WHERE id = ? ORDER BY version", (delib_id,))
+            .fetchall()
+        )
         return [_row_to_dict(r) for r in rows]
 
     def list_deliberations(
@@ -2781,9 +3063,7 @@ class KnowledgeDB:
         ).fetchall()
         return [_row_to_dict(r) for r in rows]
 
-    def link_deliberation_spec(
-        self, deliberation_id: str, spec_id: str, role: str = "related"
-    ) -> None:
+    def link_deliberation_spec(self, deliberation_id: str, spec_id: str, role: str = "related") -> None:
         """Link a deliberation to an additional spec via the relation table."""
         conn = self._get_conn()
         conn.execute(
@@ -2793,9 +3073,7 @@ class KnowledgeDB:
         )
         conn.commit()
 
-    def link_deliberation_work_item(
-        self, deliberation_id: str, work_item_id: str, role: str = "related"
-    ) -> None:
+    def link_deliberation_work_item(self, deliberation_id: str, work_item_id: str, role: str = "related") -> None:
         """Link a deliberation to an additional work item via the relation table."""
         conn = self._get_conn()
         conn.execute(
@@ -2805,9 +3083,7 @@ class KnowledgeDB:
         )
         conn.commit()
 
-    def search_deliberations(
-        self, query: str, *, limit: int = 5
-    ) -> list[dict[str, Any]]:
+    def search_deliberations(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
         """Search deliberations by text content (SQLite LIKE fallback).
 
         ChromaDB semantic search is added in Session B. This provides
@@ -2892,6 +3168,7 @@ class KnowledgeDB:
             "backlog_snapshot_count": backlog_count,
             "testable_element_count": te_count,
             "deliberation_count": delib_count,
+            "pipeline_event_count": conn.execute("SELECT COUNT(*) FROM pipeline_events").fetchone()[0],
         }
 
 

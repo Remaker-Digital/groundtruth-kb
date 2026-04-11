@@ -169,3 +169,104 @@ class TestGateRegistry:
     def test_import_invalid_path(self):
         with pytest.raises(ValueError, match="must be 'module:ClassName'"):
             GateRegistry.from_config(["no_colon_here"])
+
+
+class TestOwnerApprovalGateDBPath:
+    """DB integration test: OwnerApprovalGate through the full KnowledgeDB path.
+
+    Reproduces the P1 bug from Codex strategic assessment (INSIGHTS-2026-04-10-23-20):
+    gates.py:126 passed wi_id as origin, bypassing the gate.
+    """
+
+    def test_defect_wi_resolution_blocked_without_approval(self, tmp_path):
+        """Defect WI resolved via update_work_item without owner_approved must raise."""
+        from groundtruth_kb.db import KnowledgeDB
+
+        db_path = tmp_path / "gate_test.db"
+        registry = GateRegistry.from_config([], include_builtins=True)
+        db = KnowledgeDB(db_path=db_path, gate_registry=registry)
+
+        db.insert_work_item(
+            id="WI-GATE-001",
+            title="Defect for gate test",
+            origin="defect",
+            component="test",
+            resolution_status="open",
+            stage="created",
+            changed_by="test",
+            change_reason="gate integration test",
+        )
+
+        with pytest.raises(GovernanceGateError, match="owner_approved=True"):
+            db.update_work_item(
+                "WI-GATE-001",
+                changed_by="test",
+                change_reason="attempt resolve without approval",
+                resolution_status="resolved",
+                stage="resolved",
+                owner_approved=False,
+            )
+
+        # WI should still be open
+        wi = db.get_work_item("WI-GATE-001")
+        assert wi["resolution_status"] == "open"
+
+    def test_defect_wi_resolution_allowed_with_approval(self, tmp_path):
+        """Defect WI resolved with owner_approved=True must succeed."""
+        from groundtruth_kb.db import KnowledgeDB
+
+        db_path = tmp_path / "gate_test2.db"
+        registry = GateRegistry.from_config([], include_builtins=True)
+        db = KnowledgeDB(db_path=db_path, gate_registry=registry)
+
+        db.insert_work_item(
+            id="WI-GATE-002",
+            title="Defect for gate test",
+            origin="defect",
+            component="test",
+            resolution_status="open",
+            stage="created",
+            changed_by="test",
+            change_reason="gate integration test",
+        )
+
+        db.update_work_item(
+            "WI-GATE-002",
+            changed_by="test",
+            change_reason="resolve with approval",
+            resolution_status="resolved",
+            stage="resolved",
+            owner_approved=True,
+        )
+
+        wi = db.get_work_item("WI-GATE-002")
+        assert wi["resolution_status"] == "resolved"
+
+    def test_regression_wi_resolution_blocked_without_approval(self, tmp_path):
+        """Regression WI resolved without owner_approved must raise."""
+        from groundtruth_kb.db import KnowledgeDB
+
+        db_path = tmp_path / "gate_test3.db"
+        registry = GateRegistry.from_config([], include_builtins=True)
+        db = KnowledgeDB(db_path=db_path, gate_registry=registry)
+
+        db.insert_work_item(
+            id="WI-GATE-003",
+            title="Regression for gate test",
+            origin="regression",
+            component="test",
+            resolution_status="open",
+            stage="created",
+            changed_by="test",
+            change_reason="gate integration test",
+        )
+
+        with pytest.raises(GovernanceGateError, match="owner_approved=True"):
+            db.update_work_item(
+                "WI-GATE-003",
+                changed_by="test",
+                change_reason="attempt resolve without approval",
+                resolution_status="resolved",
+                stage="resolved",
+                owner_approved=False,
+            )

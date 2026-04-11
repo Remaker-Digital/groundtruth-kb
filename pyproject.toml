@@ -78,7 +78,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 # db.py is extracted from a proven codebase — suppress legacy style issues
-"src/groundtruth_kb/db.py" = ["E501", "SIM102", "SIM105", "SIM110"]
+"src/groundtruth_kb/db.py" = ["E501", "SIM102", "SIM105", "SIM108", "SIM110"]
 # Bridge runtime extracted from production — suppress legacy style issues
 "src/groundtruth_kb/bridge/*.py" = ["E501", "SIM102", "SIM103", "SIM105", "SIM108", "B904"]
 
