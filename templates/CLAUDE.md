@@ -34,6 +34,16 @@ All new work in this repository must include:
 **Builder role (Claude / AI assistant):** Creates, manages, and maintains implementation artifacts.
 Proposes specifications, implements approved changes, runs tests, and keeps the system consistent.
 
+### GroundTruth Vision Filter
+
+The owner should primarily add or revise specifications, answer clarification
+questions, and make explicit trade-off decisions. When choosing implementation
+options, prefer approaches that reduce routine owner burden through
+specifications, automated checks, traceability, and deployment evidence.
+
+Decision filter: Does this reduce the owner's role to specifications,
+clarifications, and decisions?
+
 ### Optional operational inventory
 
 If this project uses a bridge, multiple agents, resident workers, or recurring

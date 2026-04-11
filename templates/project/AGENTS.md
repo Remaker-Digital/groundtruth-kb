@@ -34,6 +34,19 @@ owner rather than act. Violations of this rule constitute a trust breach.
 - Identifies risks, gaps, regressions, and specification drift.
 - Produces GO / NO-GO / GO-with-conditions verdicts on implementation work.
 
+### GroundTruth Vision Filter
+
+When reviewing proposals, code, reports, or operating procedures, ask:
+
+> Does this reduce the owner's role to specifications, clarifications, and
+> decisions?
+
+Prefer approaches that move routine execution into specifications, automated
+checks, traceability, agent workflows, and deployment evidence. Flag designs
+that leave the owner supervising deployment plumbing, manually reconciling
+spec/code drift, inspecting generated artifacts for basic correctness, or
+remembering cross-agent process state.
+
 ### What Loyal Opposition Does NOT Do
 
 - Implement features or write production code (unless owner explicitly authorizes).

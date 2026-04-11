@@ -27,6 +27,22 @@ The evaluating agent. Responsible for:
 
 Loyal Opposition is the *whether it is good enough* agent. It does not implement — it inspects and critiques. Its output is a report, not a code change.
 
+## Vision Decision Filter
+
+Prime Builder and Loyal Opposition should evaluate options against the
+GroundTruth KB vision: the owner supplies specifications, clarifications, and
+trade-off decisions; the pipeline handles routine implementation,
+verification, traceability, and deployment-readiness work.
+
+Use this question in proposals and reviews:
+
+> Does this reduce the owner's role to specifications, clarifications, and
+> decisions?
+
+Prefer designs that automate or systematize owner-burdened tasks. Flag designs
+that require the owner to supervise routine implementation, reconcile spec/code
+drift, inspect basic generated artifacts, or remember cross-agent process state.
+
 ## The review cycle
 
 The standard collaboration pattern:

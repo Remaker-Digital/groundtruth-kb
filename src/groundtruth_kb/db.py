@@ -16,7 +16,9 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -266,6 +268,46 @@ CREATE TABLE IF NOT EXISTS quality_scores (
     UNIQUE(session_id)
 );
 
+CREATE TABLE IF NOT EXISTS deliberations (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    spec_id TEXT,
+    work_item_id TEXT,
+    source_type TEXT NOT NULL,
+    source_ref TEXT,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    content TEXT NOT NULL,
+    content_hash TEXT,
+    participants TEXT,
+    outcome TEXT,
+    session_id TEXT,
+    sensitivity TEXT DEFAULT 'normal',
+    redaction_state TEXT DEFAULT 'clean',
+    redaction_notes TEXT,
+    origin_project TEXT,
+    origin_repo TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS deliberation_specs (
+    deliberation_id TEXT NOT NULL,
+    spec_id TEXT NOT NULL,
+    role TEXT DEFAULT 'related',
+    UNIQUE(deliberation_id, spec_id)
+);
+
+CREATE TABLE IF NOT EXISTS deliberation_work_items (
+    deliberation_id TEXT NOT NULL,
+    work_item_id TEXT NOT NULL,
+    role TEXT DEFAULT 'related',
+    UNIQUE(deliberation_id, work_item_id)
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -293,6 +335,16 @@ CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
 CREATE INDEX IF NOT EXISTS idx_te_status ON testable_elements(status);
 CREATE INDEX IF NOT EXISTS idx_quality_scores_session ON quality_scores(session_id);
+CREATE INDEX IF NOT EXISTS idx_deliberations_id_version ON deliberations(id, version);
+CREATE INDEX IF NOT EXISTS idx_deliberations_spec_id ON deliberations(spec_id);
+CREATE INDEX IF NOT EXISTS idx_deliberations_work_item_id ON deliberations(work_item_id);
+CREATE INDEX IF NOT EXISTS idx_deliberations_source_type ON deliberations(source_type);
+CREATE INDEX IF NOT EXISTS idx_deliberations_session_id ON deliberations(session_id);
+CREATE INDEX IF NOT EXISTS idx_deliberations_source_ref ON deliberations(source_ref);
+CREATE INDEX IF NOT EXISTS idx_dspecs_delib ON deliberation_specs(deliberation_id);
+CREATE INDEX IF NOT EXISTS idx_dspecs_spec ON deliberation_specs(spec_id);
+CREATE INDEX IF NOT EXISTS idx_dwis_delib ON deliberation_work_items(deliberation_id);
+CREATE INDEX IF NOT EXISTS idx_dwis_wi ON deliberation_work_items(work_item_id);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -349,6 +401,11 @@ CREATE VIEW IF NOT EXISTS current_testable_elements AS
 SELECT t.* FROM testable_elements t
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM testable_elements GROUP BY id) m
 ON t.id = m.id AND t.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_deliberations AS
+SELECT d.* FROM deliberations d
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM deliberations GROUP BY id) m
+ON d.id = m.id AND d.version = m.max_v;
 """
 
 
@@ -2488,6 +2545,284 @@ class KnowledgeDB:
             "total_active": sum(r["active"] for r in subsystem_counts),
         }
 
+    # ------------------------------------------------------------------
+    # Deliberations
+    # ------------------------------------------------------------------
+
+    # Redaction patterns for credential/PII scanning
+    _REDACTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+        ("api_key", re.compile(r"(?:api[_-]?key|apikey)\s*[:=]\s*['\"]?[\w\-]{16,}['\"]?", re.IGNORECASE)),
+        # Authorization header: "Authorization: Bearer <token>" or "Bearer <token>"
+        ("bearer_header", re.compile(r"(?:Authorization\s*:\s*)?Bearer\s+[\w\-\.~+/]+=*", re.IGNORECASE)),
+        # token=/token:/bearer=/bearer: explicit separator forms
+        ("token", re.compile(r"(?:token|bearer)\s*[:=]\s*['\"]?[\w\-\.]{20,}['\"]?", re.IGNORECASE)),
+        ("secret", re.compile(r"(?:secret|password|passwd)\s*[:=]\s*['\"]?[^\s'\"]{8,}['\"]?", re.IGNORECASE)),
+        ("connection_string", re.compile(r"(?:mongodb|postgres|mysql|redis|amqp)://[^\s\"']+", re.IGNORECASE)),
+        # Azure SharedAccessKey connection strings (captures full key up to ; or end)
+        ("azure_sas_key", re.compile(r"SharedAccessKey=[A-Za-z0-9+/=]{20,}(?:;|$)", re.IGNORECASE)),
+        # GitHub PAT prefixes: ghp_, gho_, ghs_, ghr_, github_pat_
+        ("github_pat", re.compile(r"(?:ghp|gho|ghs|ghr)_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}", re.IGNORECASE)),
+        # OpenAI / Stripe / generic service key prefixes
+        ("service_key", re.compile(r"(?:sk|pk)[-_](?:live|test|prod)[-_][A-Za-z0-9]{20,}", re.IGNORECASE)),
+        ("phone", re.compile(r"\+\d{10,15}")),
+        ("email", re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")),
+        ("ip_address", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")),
+        ("aws_key", re.compile(r"AKIA[0-9A-Z]{16}")),
+    ]
+
+    @classmethod
+    def redact_content(cls, text: str) -> tuple[str, str | None]:
+        """Scan text for credentials/PII and replace with [REDACTED:type] markers.
+
+        Returns (redacted_text, redaction_notes). If nothing was redacted,
+        redaction_notes is None.
+        """
+        notes: list[str] = []
+        result = text
+        for label, pattern in cls._REDACTION_PATTERNS:
+            matches = pattern.findall(result)
+            if matches:
+                result = pattern.sub(f"[REDACTED:{label}]", result)
+                notes.append(f"{label}: {len(matches)} occurrence(s)")
+        return result, "; ".join(notes) if notes else None
+
+    def _next_deliberation_version(self, delib_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM deliberations WHERE id = ?", (delib_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_deliberation(
+        self,
+        id: str,
+        source_type: str,
+        title: str,
+        summary: str,
+        content: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        spec_id: str | None = None,
+        work_item_id: str | None = None,
+        source_ref: str | None = None,
+        participants: list[str] | None = None,
+        outcome: str | None = None,
+        session_id: str | None = None,
+        sensitivity: str = "normal",
+        origin_project: str | None = None,
+        origin_repo: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new version of a deliberation record.
+
+        Content is redacted before storage. The SHA-256 hash of the
+        pre-redaction text is stored in content_hash for dedup and audit.
+        """
+        valid_source_types = {
+            "lo_review", "proposal", "owner_conversation",
+            "report", "session_harvest", "bridge_thread",
+        }
+        if source_type not in valid_source_types:
+            raise ValueError(
+                f"Invalid source_type '{source_type}'; must be one of {sorted(valid_source_types)}"
+            )
+
+        valid_outcomes = {"go", "no_go", "deferred", "owner_decision", "informational", None}
+        if outcome not in valid_outcomes:
+            raise ValueError(
+                f"Invalid outcome '{outcome}'; must be one of {sorted(o for o in valid_outcomes if o)}"
+            )
+
+        # Hash raw content before redaction (for dedup)
+        content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+        # Redact credentials/PII
+        redacted_content, redaction_notes = self.redact_content(content)
+        redaction_state = "redacted" if redaction_notes else "clean"
+        if redaction_notes:
+            sensitivity = "contains_redacted"
+
+        version = self._next_deliberation_version(id)
+        participants_json = json.dumps(participants) if participants else None
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO deliberations
+               (id, version, spec_id, work_item_id, source_type, source_ref,
+                title, summary, content, content_hash, participants, outcome,
+                session_id, sensitivity, redaction_state, redaction_notes,
+                origin_project, origin_repo, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                id, version, spec_id, work_item_id, source_type, source_ref,
+                title, summary, redacted_content, content_hash, participants_json,
+                outcome, session_id, sensitivity, redaction_state, redaction_notes,
+                origin_project, origin_repo, changed_by, _now(), change_reason,
+            ),
+        )
+        conn.commit()
+        return self.get_deliberation(id)
+
+    def upsert_deliberation_source(
+        self,
+        source_type: str,
+        source_ref: str,
+        content: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Idempotent insert keyed on (source_ref, content_hash).
+
+        If a deliberation with the same source_ref and content_hash already
+        exists, returns the existing record without modification. Otherwise
+        inserts a new deliberation.
+        """
+        content_hash = hashlib.sha256(content.encode()).hexdigest()
+        conn = self._get_conn()
+        existing = conn.execute(
+            """SELECT id FROM current_deliberations
+               WHERE source_ref = ? AND content_hash = ?""",
+            (source_ref, content_hash),
+        ).fetchone()
+        if existing:
+            return self.get_deliberation(existing["id"])
+
+        # Generate next DELIB ID — use MAX numeric suffix, not last rowid,
+        # so append-only versioning of lower IDs does not corrupt allocation.
+        row = conn.execute(
+            "SELECT MAX(CAST(SUBSTR(id, 7) AS INTEGER)) FROM deliberations WHERE id LIKE 'DELIB-%'"
+        ).fetchone()
+        if row and row[0] is not None:
+            new_id = f"DELIB-{row[0] + 1:04d}"
+        else:
+            new_id = "DELIB-0001"
+
+        return self.insert_deliberation(
+            id=new_id,
+            source_type=source_type,
+            source_ref=source_ref,
+            content=content,
+            **kwargs,
+        )
+
+    def get_deliberation(self, delib_id: str) -> dict[str, Any] | None:
+        """Get the current (latest) version of a deliberation."""
+        row = self._get_conn().execute(
+            "SELECT * FROM current_deliberations WHERE id = ?", (delib_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_deliberation_history(self, delib_id: str) -> list[dict[str, Any]]:
+        """Get all versions of a deliberation."""
+        rows = self._get_conn().execute(
+            "SELECT * FROM deliberations WHERE id = ? ORDER BY version", (delib_id,)
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def list_deliberations(
+        self,
+        *,
+        spec_id: str | None = None,
+        work_item_id: str | None = None,
+        source_type: str | None = None,
+        session_id: str | None = None,
+        source_ref: str | None = None,
+        outcome: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current deliberations with optional filters."""
+        query = "SELECT * FROM current_deliberations WHERE 1=1"
+        params: list[Any] = []
+        if spec_id is not None:
+            query += " AND spec_id = ?"
+            params.append(spec_id)
+        if work_item_id is not None:
+            query += " AND work_item_id = ?"
+            params.append(work_item_id)
+        if source_type is not None:
+            query += " AND source_type = ?"
+            params.append(source_type)
+        if session_id is not None:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        if source_ref is not None:
+            query += " AND source_ref = ?"
+            params.append(source_ref)
+        if outcome is not None:
+            query += " AND outcome = ?"
+            params.append(outcome)
+        query += " ORDER BY rowid DESC"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_deliberations_for_spec(self, spec_id: str) -> list[dict[str, Any]]:
+        """Get all deliberations linked to a spec (primary FK + relation table)."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT DISTINCT d.* FROM current_deliberations d
+               WHERE d.spec_id = ?
+               UNION
+               SELECT DISTINCT d.* FROM current_deliberations d
+               INNER JOIN deliberation_specs ds ON d.id = ds.deliberation_id
+               WHERE ds.spec_id = ?
+               ORDER BY rowid DESC""",
+            (spec_id, spec_id),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_deliberations_for_work_item(self, work_item_id: str) -> list[dict[str, Any]]:
+        """Get all deliberations linked to a work item (primary FK + relation table)."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT DISTINCT d.* FROM current_deliberations d
+               WHERE d.work_item_id = ?
+               UNION
+               SELECT DISTINCT d.* FROM current_deliberations d
+               INNER JOIN deliberation_work_items dw ON d.id = dw.deliberation_id
+               WHERE dw.work_item_id = ?
+               ORDER BY rowid DESC""",
+            (work_item_id, work_item_id),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def link_deliberation_spec(
+        self, deliberation_id: str, spec_id: str, role: str = "related"
+    ) -> None:
+        """Link a deliberation to an additional spec via the relation table."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT OR REPLACE INTO deliberation_specs
+               (deliberation_id, spec_id, role) VALUES (?, ?, ?)""",
+            (deliberation_id, spec_id, role),
+        )
+        conn.commit()
+
+    def link_deliberation_work_item(
+        self, deliberation_id: str, work_item_id: str, role: str = "related"
+    ) -> None:
+        """Link a deliberation to an additional work item via the relation table."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT OR REPLACE INTO deliberation_work_items
+               (deliberation_id, work_item_id, role) VALUES (?, ?, ?)""",
+            (deliberation_id, work_item_id, role),
+        )
+        conn.commit()
+
+    def search_deliberations(
+        self, query: str, *, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """Search deliberations by text content (SQLite LIKE fallback).
+
+        ChromaDB semantic search is added in Session B. This provides
+        the SQLite LIKE fallback that works without ChromaDB.
+        """
+        conn = self._get_conn()
+        pattern = f"%{query}%"
+        rows = conn.execute(
+            """SELECT * FROM current_deliberations
+               WHERE content LIKE ? OR summary LIKE ? OR title LIKE ?
+               ORDER BY rowid DESC LIMIT ?""",
+            (pattern, pattern, pattern, limit),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
     def get_summary(self) -> dict[str, Any]:
         conn = self._get_conn()
         specs = conn.execute("SELECT status, COUNT(*) as cnt FROM current_specifications GROUP BY status").fetchall()
@@ -2534,6 +2869,8 @@ class KnowledgeDB:
 
         te_count = conn.execute("SELECT COUNT(*) FROM current_testable_elements").fetchone()[0]
 
+        delib_count = conn.execute("SELECT COUNT(*) FROM current_deliberations").fetchone()[0]
+
         return {
             "spec_counts": spec_counts,
             "spec_total": sum(spec_counts.values()),
@@ -2554,6 +2891,7 @@ class KnowledgeDB:
             "work_item_total": sum(work_item_counts.values()),
             "backlog_snapshot_count": backlog_count,
             "testable_element_count": te_count,
+            "deliberation_count": delib_count,
         }
 
 
@@ -2568,6 +2906,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "known_failure_modes",
         "tags",
         "context",
+        "participants",
         "test_ids",
         "work_item_ids",
         "summary_by_origin",

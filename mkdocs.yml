@@ -51,6 +51,7 @@ nav:
       - Bootstrap Guide: bootstrap.md
       - Desktop Setup: desktop-setup.md
   - Method:
+      - Vision: method/00-vision.md
       - Overview: method/01-overview.md
       - Specifications: method/02-specifications.md
       - Testing: method/03-testing.md
