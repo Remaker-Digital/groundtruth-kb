@@ -3127,6 +3127,13 @@ class KnowledgeDB:
         ("email", re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")),
         ("ip_address", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")),
         ("aws_key", re.compile(r"AKIA[0-9A-Z]{16}")),
+        # Agent Red API key families (ar_live_, ar_user_, ar_spa_plat_, pk_live_, arsk_)
+        # Character class includes hyphen for secrets.token_urlsafe() output
+        ("ar_live_key", re.compile(r"\bar_live_[A-Za-z0-9_-]{10,}")),
+        ("ar_user_key", re.compile(r"\bar_user_[A-Za-z0-9_-]{10,}")),
+        ("ar_spa_plat_key", re.compile(r"\bar_spa_plat_[A-Za-z0-9_-]{10,}")),
+        ("pk_live_key", re.compile(r"\bpk_live_[A-Za-z0-9_-]{10,}")),
+        ("arsk_key", re.compile(r"\barsk_[A-Za-z0-9_-]{10,}")),
     ]
 
     @classmethod
