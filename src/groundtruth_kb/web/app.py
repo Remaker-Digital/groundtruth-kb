@@ -280,6 +280,16 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
             },
         )
 
+    @app.get("/pipeline", response_class=HTMLResponse)
+    async def pipeline_dashboard(request: Request):
+        metrics = db.get_lifecycle_metrics()
+        summary = db.get_summary()
+        return templates.TemplateResponse(
+            request=request,
+            name="pipeline.html",
+            context={"metrics": metrics, "summary": summary},
+        )
+
     @app.get("/assertions", response_class=HTMLResponse)
     async def assertions(request: Request):
         runs = db.get_all_latest_assertion_runs()

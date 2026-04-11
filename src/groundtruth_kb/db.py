@@ -3082,7 +3082,7 @@ class KnowledgeDB:
                WHERE s.status IN ('implemented', 'verified')
                AND NOT EXISTS (SELECT 1 FROM current_tests t WHERE t.spec_id = s.id)"""
         ).fetchall()
-        return self._metric(len(rows), denominator=total_impl, unit="count", spec_ids=[r["id"] for r in rows[:20]])
+        return self._metric(len(rows), denominator=total_impl, unit="count", spec_ids=[r["id"] for r in rows])
 
     def get_lifecycle_metrics(self, *, last_n_days: int | None = None) -> dict[str, Any]:
         """Compute all available Phase 1 lifecycle metrics.

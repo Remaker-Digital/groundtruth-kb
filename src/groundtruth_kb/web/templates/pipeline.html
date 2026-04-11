@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Pipeline Dashboard{% endblock %}
+{% block content %}
+<h1>Pipeline Dashboard</h1>
+
+<div class="card-grid">
+    <div class="card">
+        <div class="card-label">Total Specs</div>
+        <div class="card-value">{{ summary.spec_total }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Test Procedures</div>
+        <div class="card-value">{{ summary.test_procedure_count }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Work Items</div>
+        <div class="card-value">{{ summary.work_item_total }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Pipeline Events</div>
+        <div class="card-value">{{ summary.pipeline_event_count }}</div>
+    </div>
+</div>
+
+{# ── Throughput ────────────────────────────────────── #}
+<h2 class="metric-group-title">Throughput</h2>
+<div class="metric-grid">
+    {% set m2 = metrics.get("M2", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M2</span>
+            <span class="health-dot {{ 'health-green' if m2.value is not none and m2.value <= 3 else 'health-amber' if m2.value is not none and m2.value <= 5 else 'health-red' if m2.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Spec Revision Rounds</div>
+        <div class="metric-value">{{ "%.1f"|format(m2.value) if m2.value is not none else "N/A" }}</div>
+        <div class="metric-unit">{{ m2.get("unit", "versions") }}</div>
+        <div class="metric-detail">
+            {% if m2.get("sample_count") is not none %}{{ m2.sample_count }} specs sampled{% if m2.get("min") is not none %} ({{ m2.min }}–{{ m2.max }}){% endif %}{% endif %}
+        </div>
+    </div>
+
+    {% set m4 = metrics.get("M4", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M4</span>
+            <span class="health-dot {{ 'health-green' if m4.value is not none and m4.value <= 72 else 'health-amber' if m4.value is not none and m4.value <= 168 else 'health-red' if m4.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Spec-to-Implemented Duration</div>
+        <div class="metric-value">{{ "%.1f"|format(m4.value) if m4.value is not none else "N/A" }}</div>
+        <div class="metric-unit">{{ m4.get("unit", "hours") }}</div>
+        <div class="metric-detail">
+            {% if m4.get("sample_count") is not none %}{{ m4.sample_count }} specs{% if m4.get("median") is not none %} (median: {{ "%.1f"|format(m4.median) }}h){% endif %}{% endif %}
+        </div>
+    </div>
+</div>
+
+{# ── Quality ───────────────────────────────────────── #}
+<h2 class="metric-group-title">Quality</h2>
+<div class="metric-grid">
+    {% set m6 = metrics.get("M6", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M6</span>
+            <span class="health-dot {{ 'health-green' if m6.value is not none and m6.value <= 0.1 else 'health-amber' if m6.value is not none and m6.value <= 0.3 else 'health-red' if m6.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Defect Injection Rate</div>
+        <div class="metric-value">{{ "%.0f"|format(m6.value * 100) ~ "%" if m6.value is not none else "N/A" }}</div>
+        <div class="metric-unit">defects / specs implemented</div>
+        <div class="metric-detail">
+            {% if m6.get("numerator") is not none %}{{ m6.numerator }} defects / {{ m6.denominator }} specs{% endif %}
+        </div>
+    </div>
+
+    {% set m10 = metrics.get("M10", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M10</span>
+            <span class="health-dot {{ 'health-green' if m10.value is not none and m10.value <= 48 else 'health-amber' if m10.value is not none and m10.value <= 168 else 'health-red' if m10.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Defect Resolution Time</div>
+        <div class="metric-value">{{ "%.1f"|format(m10.value) if m10.value is not none else "N/A" }}</div>
+        <div class="metric-unit">{{ m10.get("unit", "hours") }}</div>
+        <div class="metric-detail">
+            {% if m10.get("sample_count") is not none %}{{ m10.sample_count }} resolved{% if m10.get("median") is not none %} (median: {{ "%.1f"|format(m10.median) }}h){% endif %}{% endif %}
+        </div>
+    </div>
+
+    {% set m11 = metrics.get("M11", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M11</span>
+            <span class="health-dot {{ 'health-green' if m11.value is not none and m11.value <= 0.05 else 'health-amber' if m11.value is not none and m11.value <= 0.15 else 'health-red' if m11.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Regression Rate</div>
+        <div class="metric-value">{{ "%.0f"|format(m11.value * 100) ~ "%" if m11.value is not none else "N/A" }}</div>
+        <div class="metric-unit">failed / total assertion runs</div>
+        <div class="metric-detail">
+            {% if m11.get("numerator") is not none %}{{ m11.numerator }} failed / {{ m11.denominator }} runs{% endif %}
+        </div>
+    </div>
+</div>
+
+{# ── Coverage ──────────────────────────────────────── #}
+<h2 class="metric-group-title">Coverage</h2>
+<div class="metric-grid">
+    {% set m16 = metrics.get("M16", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M16</span>
+            <span class="health-dot {{ 'health-green' if m16.value is not none and m16.value >= 0.8 else 'health-amber' if m16.value is not none and m16.value >= 0.5 else 'health-red' if m16.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Verified with Passing Tests</div>
+        <div class="metric-value">{{ "%.0f"|format(m16.value * 100) ~ "%" if m16.value is not none else "N/A" }}</div>
+        <div class="metric-unit">verified specs with all tests passing</div>
+        <div class="metric-detail">
+            {% if m16.get("numerator") is not none %}{{ m16.numerator }} of {{ m16.denominator }} verified specs{% endif %}
+        </div>
+    </div>
+
+    {% set m17 = metrics.get("M17", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M17</span>
+            <span class="health-dot {{ 'health-green' if m17.value is not none and m17.value <= 0.1 else 'health-amber' if m17.value is not none and m17.value <= 0.3 else 'health-red' if m17.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Stale Test Ratio</div>
+        <div class="metric-value">{{ "%.0f"|format(m17.value * 100) ~ "%" if m17.value is not none else "N/A" }}</div>
+        <div class="metric-unit">tests older than 30 days or never run</div>
+        <div class="metric-detail">
+            {% if m17.get("numerator") is not none %}{{ m17.numerator }} stale / {{ m17.denominator }} total{% endif %}
+        </div>
+    </div>
+
+    {% set m18 = metrics.get("M18", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M18</span>
+            <span class="health-dot {{ 'health-green' if m18.value is not none and m18.value == 0 else 'health-amber' if m18.value is not none and m18.value <= 5 else 'health-red' if m18.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Specs Without Tests</div>
+        <div class="metric-value">{{ m18.value if m18.value is not none else "N/A" }}</div>
+        <div class="metric-unit">implemented specs with no linked tests</div>
+        <div class="metric-detail">
+            {% if m18.get("denominator") is not none %}of {{ m18.denominator }} implemented/verified{% endif %}
+        </div>
+        {% if m18.get("spec_ids") %}
+        <details class="metric-drilldown">
+            <summary>Show affected specs</summary>
+            <ul>
+                {% for sid in m18.spec_ids[:20] %}
+                <li><a href="/specs/{{ sid }}">{{ sid }}</a></li>
+                {% endfor %}
+                {% if m18.spec_ids|length > 20 %}
+                <li class="text-muted">... and {{ m18.spec_ids|length - 20 }} more</li>
+                {% endif %}
+            </ul>
+        </details>
+        {% endif %}
+    </div>
+</div>
+
+{# ── Lifecycle ─────────────────────────────────────── #}
+<h2 class="metric-group-title">Lifecycle</h2>
+<div class="metric-grid">
+    {% set m12 = metrics.get("M12", {}) %}
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-id">M12</span>
+            <span class="health-dot {{ 'health-green' if m12.value is not none and m12.value <= 0.2 else 'health-amber' if m12.value is not none and m12.value <= 0.4 else 'health-red' if m12.value is not none else 'health-na' }}"></span>
+        </div>
+        <div class="metric-title">Spec Retirement Rate</div>
+        <div class="metric-value">{{ "%.0f"|format(m12.value * 100) ~ "%" if m12.value is not none else "N/A" }}</div>
+        <div class="metric-unit">retired / (retired + active)</div>
+        <div class="metric-detail">
+            {% if m12.get("numerator") is not none %}{{ m12.numerator }} retired / {{ m12.denominator }} total{% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
