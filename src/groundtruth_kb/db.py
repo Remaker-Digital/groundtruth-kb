@@ -3020,7 +3020,7 @@ class KnowledgeDB:
             ).fetchall()
             if not tests:
                 continue  # No tests = not verified with evidence
-            all_pass = all(t["last_result"] == "pass" and t["test_file"] is not None for t in tests)
+            all_pass = all(t["last_result"] == "pass" and bool((t["test_file"] or "").strip()) for t in tests)
             if all_pass:
                 verified_with_evidence += 1
         denom = len(verified_specs)
@@ -3054,14 +3054,16 @@ class KnowledgeDB:
     def compute_m18_implemented_without_test_count(self) -> dict[str, Any]:
         """M18: Implemented/verified specs with zero current linked tests."""
         conn = self._get_conn()
+        total_impl = conn.execute(
+            "SELECT COUNT(*) FROM current_specifications WHERE status IN ('implemented', 'verified')"
+        ).fetchone()[0]
+        if total_impl == 0:
+            return self._metric(None, numerator=0, denominator=0, unit="count", status="not_applicable")
         rows = conn.execute(
             """SELECT s.id FROM current_specifications s
                WHERE s.status IN ('implemented', 'verified')
                AND NOT EXISTS (SELECT 1 FROM current_tests t WHERE t.spec_id = s.id)"""
         ).fetchall()
-        total_impl = conn.execute(
-            "SELECT COUNT(*) FROM current_specifications WHERE status IN ('implemented', 'verified')"
-        ).fetchone()[0]
         return self._metric(len(rows), denominator=total_impl, unit="count", spec_ids=[r["id"] for r in rows[:20]])
 
     def get_lifecycle_metrics(self, *, last_n_days: int | None = None) -> dict[str, Any]:
