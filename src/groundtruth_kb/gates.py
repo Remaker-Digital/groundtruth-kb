@@ -123,7 +123,7 @@ class GateRegistry:
         self, wi_id: str, origin: str, resolution: str, owner_approved: bool, wi_data: dict[str, Any]
     ) -> None:
         for gate in self._gates:
-            gate.pre_resolve_work_item(wi_id, wi_id, resolution, owner_approved, wi_data)
+            gate.pre_resolve_work_item(wi_id, origin, resolution, owner_approved, wi_data)
 
     def run_pre_test_pass(self, test_id: str, spec_id: str, test_file: str | None, test_data: dict[str, Any]) -> None:
         """Run all registered gates' pre_test_pass hooks."""

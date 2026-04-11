@@ -129,10 +129,10 @@ class TestInsertDeliberation:
                 id=f"DELIB-{i:04d}",
                 source_type="lo_review",
                 title=f"Test {outcome}",
-                summary=f"Summary.",
-                content=f"Content.",
+                summary="Summary.",
+                content="Content.",
                 changed_by="test",
-                change_reason=f"test",
+                change_reason="test",
                 outcome=outcome,
             )
             assert result["outcome"] == outcome
