@@ -309,6 +309,54 @@ class TestRedaction:
         )
         assert notes is not None
 
+    def test_redact_ar_live_key(self):
+        """Agent Red ar_live_ keys must be redacted."""
+        key = "ar_live_" + "abc123def456_ghijklm"
+        text = f"Tenant key: {key}"
+        redacted, notes = KnowledgeDB.redact_content(text)
+        assert key not in redacted, "ar_live_ key survived redaction"
+        assert "[REDACTED:ar_live_key]" in redacted
+        assert notes is not None
+
+    def test_redact_ar_user_key(self):
+        """Agent Red ar_user_ keys must be redacted."""
+        key = "ar_user_" + "rema_yZR6wMz-VDlVJhbd"
+        text = f"API key: {key}"
+        redacted, notes = KnowledgeDB.redact_content(text)
+        assert key not in redacted, "ar_user_ key survived redaction"
+        assert "[REDACTED:ar_user_key]" in redacted
+
+    def test_redact_ar_spa_plat_key(self):
+        """Agent Red ar_spa_plat_ keys must be redacted."""
+        key = "ar_spa_plat_" + "mdbq-Sm3vE5Qj3d4H"
+        text = f"SPA key: {key}"
+        redacted, notes = KnowledgeDB.redact_content(text)
+        assert key not in redacted, "ar_spa_plat_ key survived redaction"
+        assert "[REDACTED:ar_spa_plat_key]" in redacted
+
+    def test_redact_pk_live_key(self):
+        """Agent Red pk_live_ keys must be redacted."""
+        key = "pk_live_" + "a7f3c9e1b2c3_d4e5f6a7"
+        text = f"Widget key: {key}"
+        redacted, notes = KnowledgeDB.redact_content(text)
+        assert key not in redacted, "pk_live_ key survived redaction"
+        assert "[REDACTED:pk_live_key]" in redacted
+
+    def test_redact_arsk_key(self):
+        """Agent Red arsk_ keys must be redacted."""
+        key = "arsk_" + "test_pro_key_002_extra"
+        text = f"Service key: {key}"
+        redacted, notes = KnowledgeDB.redact_content(text)
+        assert key not in redacted, "arsk_ key survived redaction"
+        assert "[REDACTED:arsk_key]" in redacted
+
+    def test_redact_ar_key_with_hyphen(self):
+        """Agent Red keys with hyphens (token_urlsafe output) must be redacted."""
+        key = "ar_user_" + "rema_yZR6wMz-VDlV-JhbdRPW1Vh01TkytKcQ3"
+        text = f"Generated key: {key}."
+        redacted, notes = KnowledgeDB.redact_content(text)
+        assert key not in redacted, "Hyphen-containing AR key survived redaction"
+
     def test_redact_no_false_positives_on_plain_text(self):
         """Plain prose must not be corrupted by redaction patterns."""
         text = "We decided to use append-only versioning for audit trail integrity."
