@@ -31,6 +31,22 @@ if TYPE_CHECKING:
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
 
+# ChromaDB optional dependency
+try:
+    import chromadb
+
+    HAS_CHROMADB = True
+except ImportError:
+    chromadb = None  # type: ignore[assignment]
+    HAS_CHROMADB = False
+
+# Semantic search constants
+SEMANTIC_MAX_DISTANCE = 1.5  # L2 distance threshold for relevance filtering
+CHUNK_MAX_TOKENS = 230  # Safe margin below all-MiniLM-L6-v2's 256 wordpiece limit
+CHUNK_OVERLAP_TOKENS = 30  # Overlap between consecutive chunks
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+_CHROMA_COLLECTION_NAME = "deliberations"
+
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS specifications (
@@ -469,8 +485,10 @@ class KnowledgeDB:
         db_path: str | Path | None = None,
         gate_registry: GateRegistry | None = None,
         check_same_thread: bool = True,
+        chroma_path: str | Path | None = None,
     ):
         self.db_path = Path(db_path) if db_path else DB_PATH
+        self._chroma_path = Path(chroma_path) if chroma_path else None
         self._conn: sqlite3.Connection | None = None
         self._gate_registry = gate_registry
         self._check_same_thread = check_same_thread
@@ -3215,6 +3233,15 @@ class KnowledgeDB:
             ),
         )
         conn.commit()
+
+        # Sync to ChromaDB (delete stale + index current).
+        # ChromaDB is optional and rebuildable — failures must not make
+        # the canonical SQLite write appear failed.
+        try:
+            self._index_deliberation_in_chroma(id)
+        except Exception:
+            pass  # Index can be rebuilt later via rebuild_deliberation_index()
+
         return self.get_deliberation(id)
 
     def upsert_deliberation_source(
@@ -3357,12 +3384,212 @@ class KnowledgeDB:
         )
         conn.commit()
 
-    def search_deliberations(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
-        """Search deliberations by text content (SQLite LIKE fallback).
+    # ── ChromaDB semantic search integration ──────────────────────
 
-        ChromaDB semantic search is added in Session B. This provides
-        the SQLite LIKE fallback that works without ChromaDB.
+    def _get_chroma_collection(self) -> Any | None:
+        """Get or create the ChromaDB deliberations collection.
+
+        Returns None if ChromaDB is not installed or not configured.
+        Creates the persistence directory lazily on first use.
         """
+        if not HAS_CHROMADB:
+            return None
+        if not hasattr(self, "_chroma_client"):
+            chroma_path = getattr(self, "_chroma_path", None)
+            if chroma_path is None:
+                chroma_path = self.db_path.parent / ".groundtruth-chroma"
+            chroma_path = Path(chroma_path)
+            chroma_path.mkdir(parents=True, exist_ok=True)
+            self._chroma_client = chromadb.PersistentClient(path=str(chroma_path))
+        return self._chroma_client.get_or_create_collection(
+            name=_CHROMA_COLLECTION_NAME,
+            metadata={"hnsw:space": "l2"},
+        )
+
+    @staticmethod
+    def _deliberation_chroma_metadata(row: dict, *, chunk_index: int, chunk_count: int) -> dict:
+        """Build ChromaDB metadata from a deliberation row.
+
+        Maps SQLite ``id`` to Chroma ``delib_id``. Required fields are
+        always present; optional fields are omitted when None.
+        """
+        metadata = {
+            "delib_id": row["id"],
+            "version": row["version"],
+            "changed_at": row["changed_at"],
+            "source_type": row["source_type"],
+            "sensitivity": row.get("sensitivity", "normal"),
+            "redaction_state": row.get("redaction_state", "clean"),
+            "chunk_index": chunk_index,
+            "chunk_count": chunk_count,
+            "title": row["title"],
+        }
+        optional_fields = [
+            "spec_id",
+            "work_item_id",
+            "outcome",
+            "session_id",
+            "source_ref",
+            "origin_project",
+            "origin_repo",
+        ]
+        metadata.update({k: row[k] for k in optional_fields if row.get(k) is not None})
+        return metadata
+
+    @staticmethod
+    def _chunk_text_for_embedding(text: str) -> list[str]:
+        """Split text into chunks sized for the embedding model.
+
+        Uses sentence-boundary splitting with token-aware sizing.
+        Each chunk targets CHUNK_MAX_TOKENS wordpieces with
+        CHUNK_OVERLAP_TOKENS overlap from the previous chunk.
+
+        Falls back to character estimation: ~4 chars per wordpiece for
+        English prose, avoiding a hard dependency on the tokenizer.
+        """
+        chars_per_token = 4  # Conservative estimate for English
+        max_chars = CHUNK_MAX_TOKENS * chars_per_token  # ~920 chars
+        overlap_chars = CHUNK_OVERLAP_TOKENS * chars_per_token  # ~120 chars
+
+        if len(text) <= max_chars:
+            return [text]
+
+        sentences = _SENTENCE_SPLIT_RE.split(text)
+        chunks: list[str] = []
+        current_chunk: list[str] = []
+        current_len = 0
+
+        for sentence in sentences:
+            sentence_len = len(sentence)
+            if sentence_len > max_chars:
+                # Rare: single sentence exceeds limit — split mid-sentence
+                if current_chunk:
+                    chunks.append(" ".join(current_chunk))
+                for i in range(0, sentence_len, max_chars - overlap_chars):
+                    chunks.append(sentence[i : i + max_chars])
+                current_chunk = []
+                current_len = 0
+                continue
+
+            if current_len + sentence_len > max_chars and current_chunk:
+                chunk_text = " ".join(current_chunk)
+                chunks.append(chunk_text)
+                # Overlap: keep trailing sentences that fit in overlap budget
+                overlap_parts: list[str] = []
+                overlap_len = 0
+                for s in reversed(current_chunk):
+                    if overlap_len + len(s) > overlap_chars:
+                        break
+                    overlap_parts.insert(0, s)
+                    overlap_len += len(s)
+                current_chunk = overlap_parts + [sentence]
+                current_len = overlap_len + sentence_len
+            else:
+                current_chunk.append(sentence)
+                current_len += sentence_len
+
+        if current_chunk:
+            chunks.append(" ".join(current_chunk))
+
+        return chunks
+
+    def _index_deliberation_in_chroma(self, delib_id: str) -> int:
+        """Index the current version of a deliberation in ChromaDB.
+
+        Deletes any existing entries for this delib_id first (stale chunk
+        removal), then indexes the current version's chunks.
+
+        Returns the number of chunks indexed, or 0 if ChromaDB unavailable.
+        """
+        collection = self._get_chroma_collection()
+        if collection is None:
+            return 0
+
+        # Delete stale entries for this deliberation
+        try:
+            collection.delete(where={"delib_id": delib_id})
+        except Exception:
+            pass  # Collection may be empty or delib_id not present
+
+        # Get current version
+        row = self.get_deliberation(delib_id)
+        if row is None:
+            return 0
+
+        # Only index redacted content — secrets never enter ChromaDB
+        content = row["content"]
+        chunks = self._chunk_text_for_embedding(content)
+
+        ids = []
+        documents = []
+        metadatas = []
+        for i, chunk in enumerate(chunks):
+            chunk_id = f"{delib_id}::v{row['version']}::chunk-{i:03d}"
+            metadata = self._deliberation_chroma_metadata(row, chunk_index=i, chunk_count=len(chunks))
+            ids.append(chunk_id)
+            documents.append(chunk)
+            metadatas.append(metadata)
+
+        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        return len(chunks)
+
+    def search_deliberations(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
+        """Search deliberations semantically via ChromaDB with SQLite LIKE fallback.
+
+        Uses ChromaDB semantic search if available, with distance-threshold
+        filtering. Falls back to SQLite LIKE if ChromaDB is unavailable or
+        if no semantic results survive the relevance filter.
+
+        Returns list of dicts with all deliberation row fields plus:
+          - search_method: "semantic" | "text_match"
+          - score: float (L2 distance, lower=better) | None for text_match
+          - matched_chunk_id: str | None
+          - matched_chunk_preview: str | None (first 200 chars of matched chunk)
+        """
+        # Try semantic search first
+        collection = self._get_chroma_collection()
+        if collection is not None and collection.count() > 0:
+            try:
+                results = collection.query(
+                    query_texts=[query],
+                    n_results=min(limit * 3, 30),  # Over-fetch for dedup
+                )
+                if results and results["ids"] and results["ids"][0]:
+                    # Filter by distance threshold and deduplicate by delib_id
+                    seen_delib_ids: dict[str, dict[str, Any]] = {}
+                    for idx, (doc_id, distance) in enumerate(
+                        zip(results["ids"][0], results["distances"][0], strict=True)
+                    ):
+                        if distance > SEMANTIC_MAX_DISTANCE:
+                            continue
+                        metadata = results["metadatas"][0][idx]
+                        delib_id = metadata.get("delib_id", "")
+                        # Keep best (lowest distance) per delib_id
+                        if delib_id not in seen_delib_ids or distance < seen_delib_ids[delib_id]["score"]:
+                            doc_text = results["documents"][0][idx] if results["documents"] else ""
+                            seen_delib_ids[delib_id] = {
+                                "score": distance,
+                                "matched_chunk_id": doc_id,
+                                "matched_chunk_preview": doc_text[:200] if doc_text else None,
+                            }
+
+                    if seen_delib_ids:
+                        # Fetch full deliberation rows and merge semantic metadata
+                        semantic_results = []
+                        for delib_id, match_info in sorted(seen_delib_ids.items(), key=lambda x: x[1]["score"])[:limit]:
+                            row = self.get_deliberation(delib_id)
+                            if row:
+                                row["search_method"] = "semantic"
+                                row["score"] = match_info["score"]
+                                row["matched_chunk_id"] = match_info["matched_chunk_id"]
+                                row["matched_chunk_preview"] = match_info["matched_chunk_preview"]
+                                semantic_results.append(row)
+                        if semantic_results:
+                            return semantic_results
+            except Exception:
+                pass  # Fall through to SQLite LIKE
+
+        # SQLite LIKE fallback
         conn = self._get_conn()
         pattern = f"%{query}%"
         rows = conn.execute(
@@ -3371,7 +3598,56 @@ class KnowledgeDB:
                ORDER BY rowid DESC LIMIT ?""",
             (pattern, pattern, pattern, limit),
         ).fetchall()
-        return [_row_to_dict(r) for r in rows]
+        results_list = []
+        for r in rows:
+            d = _row_to_dict(r)
+            d["search_method"] = "text_match"
+            d["score"] = None
+            d["matched_chunk_id"] = None
+            d["matched_chunk_preview"] = None
+            results_list.append(d)
+        return results_list
+
+    def rebuild_deliberation_index(self) -> dict[str, Any]:
+        """Rebuild ChromaDB collection from SQLite canonical data.
+
+        Drops the existing collection and re-indexes all current
+        deliberations. SQLite is always the source of truth.
+
+        Returns: {"indexed": N, "chunks": M, "errors": []}
+        """
+        if not HAS_CHROMADB:
+            return {"indexed": 0, "chunks": 0, "errors": ["ChromaDB not installed"]}
+
+        # Drop and recreate collection
+        client = self._get_chroma_collection()
+        if client is None:
+            return {"indexed": 0, "chunks": 0, "errors": ["ChromaDB client unavailable"]}
+
+        # Delete the collection and recreate
+        try:
+            self._chroma_client.delete_collection(_CHROMA_COLLECTION_NAME)
+        except Exception:
+            pass
+        # Clear cached collection reference
+        if hasattr(self, "_chroma_client"):
+            pass  # Client persists; collection is recreated on next get_or_create
+
+        # Re-index all current deliberations
+        conn = self._get_conn()
+        rows = conn.execute("SELECT id FROM current_deliberations").fetchall()
+        indexed = 0
+        total_chunks = 0
+        errors: list[str] = []
+        for row in rows:
+            try:
+                chunks = self._index_deliberation_in_chroma(row["id"])
+                total_chunks += chunks
+                indexed += 1
+            except Exception as e:
+                errors.append(f"{row['id']}: {e}")
+
+        return {"indexed": indexed, "chunks": total_chunks, "errors": errors}
 
     def get_summary(self) -> dict[str, Any]:
         conn = self._get_conn()

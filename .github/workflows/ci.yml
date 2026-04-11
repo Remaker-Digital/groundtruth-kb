@@ -46,3 +46,22 @@ jobs:
           print(f'Templates: {tpl}')
           assert tpl.exists(), 'Templates must be packaged in wheel'
           "
+
+  test-search:
+    runs-on: ubuntu-latest
+    name: "test (search / 3.12)"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies with search extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,web,search]"
+
+      - name: Run tests (including semantic search)
+        run: pytest -v --tb=short -k "deliberation"
