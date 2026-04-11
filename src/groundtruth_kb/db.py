@@ -2813,6 +2813,278 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
+    # Lifecycle Metrics (SPEC-2100)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _metric(
+        value: Any,
+        *,
+        numerator: int | None = None,
+        denominator: int | None = None,
+        unit: str = "ratio",
+        sample_count: int | None = None,
+        **extra: Any,
+    ) -> dict[str, Any]:
+        """Build a structured metric result with metadata."""
+        result: dict[str, Any] = {"value": value, "unit": unit}
+        if numerator is not None:
+            result["numerator"] = numerator
+        if denominator is not None:
+            result["denominator"] = denominator
+        if sample_count is not None:
+            result["sample_count"] = sample_count
+        result.update(extra)
+        return result
+
+    def compute_m2_spec_revision_rounds(self) -> dict[str, Any]:
+        """M2: Average spec versions before reaching 'implemented' status."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT s.id, MIN(s.version) as impl_version
+               FROM specifications s
+               WHERE s.status = 'implemented'
+               GROUP BY s.id"""
+        ).fetchall()
+        if not rows:
+            return self._metric(None, unit="versions", sample_count=0, status="not_applicable")
+        versions = [r["impl_version"] for r in rows]
+        avg = sum(versions) / len(versions)
+        return self._metric(
+            round(avg, 2), unit="versions", sample_count=len(versions), min=min(versions), max=max(versions)
+        )
+
+    def compute_m4_spec_to_implemented_duration(self) -> dict[str, Any]:
+        """M4: Average elapsed time from first 'specified' to first 'implemented' version."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT s.id,
+                      MIN(CASE WHEN s.status = 'specified' THEN s.changed_at END) as first_specified,
+                      MIN(CASE WHEN s.status = 'implemented' THEN s.changed_at END) as first_implemented
+               FROM specifications s
+               WHERE s.status IN ('specified', 'implemented')
+               GROUP BY s.id
+               HAVING first_specified IS NOT NULL AND first_implemented IS NOT NULL"""
+        ).fetchall()
+        if not rows:
+            return self._metric(None, unit="hours", sample_count=0, status="not_applicable")
+        durations = []
+        for r in rows:
+            try:
+                spec_ts = datetime.fromisoformat(r["first_specified"])
+                impl_ts = datetime.fromisoformat(r["first_implemented"])
+                hours = (impl_ts - spec_ts).total_seconds() / 3600
+                if hours >= 0:
+                    durations.append(hours)
+            except (ValueError, TypeError):
+                continue
+        if not durations:
+            return self._metric(None, unit="hours", sample_count=0, status="not_applicable")
+        durations.sort()
+        avg = sum(durations) / len(durations)
+        median = durations[len(durations) // 2]
+        return self._metric(
+            round(avg, 2),
+            unit="hours",
+            sample_count=len(durations),
+            min=round(min(durations), 2),
+            max=round(max(durations), 2),
+            median=round(median, 2),
+        )
+
+    def compute_m6_defect_injection_rate(self, *, last_n_days: int | None = None) -> dict[str, Any]:
+        """M6: Defect WIs created / specs implemented in the same time window."""
+        conn = self._get_conn()
+        time_filter = ""
+        if last_n_days is not None:
+            cutoff = (datetime.now(UTC) - __import__("datetime").timedelta(days=last_n_days)).isoformat()
+            time_filter = f" AND changed_at >= '{cutoff}'"
+
+        defect_count = conn.execute(
+            f"SELECT COUNT(DISTINCT id) FROM work_items WHERE origin = 'defect' AND version = 1{time_filter}"
+        ).fetchone()[0]
+
+        impl_count = conn.execute(
+            f"""SELECT COUNT(DISTINCT id) FROM specifications
+                WHERE status = 'implemented'{time_filter}
+                AND id NOT IN (SELECT id FROM specifications WHERE status = 'implemented' AND version < (
+                    SELECT MIN(version) FROM specifications s2 WHERE s2.id = specifications.id AND s2.status = 'implemented'{time_filter}
+                ))"""
+        ).fetchone()[0]
+        # Simpler: count specs that first became implemented in the window
+        impl_count = conn.execute(
+            f"""SELECT COUNT(DISTINCT s.id) FROM specifications s
+                WHERE s.status = 'implemented'{time_filter}
+                AND NOT EXISTS (
+                    SELECT 1 FROM specifications s2 WHERE s2.id = s.id AND s2.status = 'implemented'
+                    AND s2.changed_at < s.changed_at
+                )"""
+        ).fetchone()[0]
+
+        if impl_count == 0:
+            return self._metric(None, numerator=defect_count, denominator=0, unit="ratio", status="not_applicable")
+        rate = defect_count / impl_count
+        return self._metric(round(rate, 4), numerator=defect_count, denominator=impl_count, unit="ratio")
+
+    def compute_m10_defect_resolution_duration(self) -> dict[str, Any]:
+        """M10: Average time from wi_created(defect) to wi_resolved, event-backed."""
+        conn = self._get_conn()
+        # Find defect WIs with both created and resolved events
+        rows = conn.execute(
+            """SELECT e1.artifact_id,
+                      MIN(e1.timestamp) as created_at,
+                      MIN(e2.timestamp) as resolved_at
+               FROM pipeline_events e1
+               JOIN pipeline_events e2 ON e1.artifact_id = e2.artifact_id
+                    AND e2.artifact_type = 'work_item' AND e2.event_type = 'wi_resolved'
+               WHERE e1.artifact_type = 'work_item' AND e1.event_type = 'wi_created'
+               GROUP BY e1.artifact_id"""
+        ).fetchall()
+        # Filter to defects using metadata
+        defect_created = conn.execute(
+            """SELECT artifact_id FROM pipeline_events
+               WHERE event_type = 'wi_created' AND artifact_type = 'work_item'
+               AND json_extract(metadata, '$.origin') = 'defect'"""
+        ).fetchall()
+        defect_ids = {r["artifact_id"] for r in defect_created}
+
+        total_defects = len(defect_ids)
+        durations = []
+        for r in rows:
+            if r["artifact_id"] not in defect_ids:
+                continue
+            try:
+                c = datetime.fromisoformat(r["created_at"])
+                r_ts = datetime.fromisoformat(r["resolved_at"])
+                hours = (r_ts - c).total_seconds() / 3600
+                if hours >= 0:
+                    durations.append(hours)
+            except (ValueError, TypeError):
+                continue
+
+        skipped = total_defects - len(durations)
+        if not durations:
+            return self._metric(
+                None, unit="hours", sample_count=0, skipped_missing_event_count=skipped, status="not_applicable"
+            )
+        durations.sort()
+        avg = sum(durations) / len(durations)
+        median = durations[len(durations) // 2]
+        return self._metric(
+            round(avg, 2),
+            unit="hours",
+            sample_count=len(durations),
+            min=round(min(durations), 2),
+            max=round(max(durations), 2),
+            median=round(median, 2),
+            skipped_missing_event_count=skipped,
+        )
+
+    def compute_m11_regression_rate(self) -> dict[str, Any]:
+        """M11: Failed assertion runs / total assertion runs (aggregate, not per-session)."""
+        conn = self._get_conn()
+        stats = conn.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN overall_passed = 0 THEN 1 ELSE 0 END) as failed FROM assertion_runs"
+        ).fetchone()
+        total = stats["total"] or 0
+        failed = stats["failed"] or 0
+        if total == 0:
+            return self._metric(None, numerator=0, denominator=0, unit="ratio", status="not_applicable")
+        rate = failed / total
+        return self._metric(round(rate, 6), numerator=failed, denominator=total, unit="ratio")
+
+    def compute_m12_spec_retirement_rate(self) -> dict[str, Any]:
+        """M12: retired / (retired + active) where active = implemented + verified + specified."""
+        conn = self._get_conn()
+        counts = conn.execute("SELECT status, COUNT(*) as cnt FROM current_specifications GROUP BY status").fetchall()
+        status_map = {r["status"]: r["cnt"] for r in counts}
+        retired = status_map.get("retired", 0)
+        active = sum(status_map.get(s, 0) for s in ("specified", "implemented", "verified"))
+        denom = retired + active
+        if denom == 0:
+            return self._metric(None, numerator=0, denominator=0, unit="ratio", status="not_applicable")
+        rate = retired / denom
+        return self._metric(round(rate, 4), numerator=retired, denominator=denom, unit="ratio")
+
+    def compute_m16_verified_with_passing_tests_rate(self) -> dict[str, Any]:
+        """M16: Verified specs where ALL linked tests have last_result='pass' and test_file is not null."""
+        conn = self._get_conn()
+        verified_specs = conn.execute("SELECT id FROM current_specifications WHERE status = 'verified'").fetchall()
+        if not verified_specs:
+            return self._metric(None, numerator=0, denominator=0, unit="ratio", status="not_applicable")
+        verified_with_evidence = 0
+        for spec_row in verified_specs:
+            sid = spec_row["id"]
+            tests = conn.execute(
+                "SELECT last_result, test_file FROM current_tests WHERE spec_id = ?", (sid,)
+            ).fetchall()
+            if not tests:
+                continue  # No tests = not verified with evidence
+            all_pass = all(t["last_result"] == "pass" and t["test_file"] is not None for t in tests)
+            if all_pass:
+                verified_with_evidence += 1
+        denom = len(verified_specs)
+        return self._metric(
+            round(verified_with_evidence / denom, 4),
+            numerator=verified_with_evidence,
+            denominator=denom,
+            unit="ratio",
+        )
+
+    def compute_m17_stale_test_ratio(self, *, now: str | None = None) -> dict[str, Any]:
+        """M17: Tests with last_executed_at >30 days old or null / total tests.
+
+        Args:
+            now: ISO timestamp to use as "current time" (for deterministic tests).
+                 Defaults to actual current time.
+        """
+        conn = self._get_conn()
+        total = conn.execute("SELECT COUNT(*) FROM current_tests").fetchone()[0]
+        if total == 0:
+            return self._metric(None, numerator=0, denominator=0, unit="ratio", status="not_applicable")
+        if now is None:
+            now = _now()
+        cutoff = (datetime.fromisoformat(now) - __import__("datetime").timedelta(days=30)).isoformat()
+        stale = conn.execute(
+            "SELECT COUNT(*) FROM current_tests WHERE last_executed_at IS NULL OR last_executed_at < ?",
+            (cutoff,),
+        ).fetchone()[0]
+        return self._metric(round(stale / total, 4), numerator=stale, denominator=total, unit="ratio")
+
+    def compute_m18_implemented_without_test_count(self) -> dict[str, Any]:
+        """M18: Implemented/verified specs with zero current linked tests."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT s.id FROM current_specifications s
+               WHERE s.status IN ('implemented', 'verified')
+               AND NOT EXISTS (SELECT 1 FROM current_tests t WHERE t.spec_id = s.id)"""
+        ).fetchall()
+        total_impl = conn.execute(
+            "SELECT COUNT(*) FROM current_specifications WHERE status IN ('implemented', 'verified')"
+        ).fetchone()[0]
+        return self._metric(len(rows), denominator=total_impl, unit="count", spec_ids=[r["id"] for r in rows[:20]])
+
+    def get_lifecycle_metrics(self, *, last_n_days: int | None = None) -> dict[str, Any]:
+        """Compute all available Phase 1 lifecycle metrics.
+
+        Args:
+            last_n_days: Time window filter (applied where supported). None = all time.
+
+        Returns dict keyed by metric ID (M2, M4, etc.) with structured values.
+        """
+        return {
+            "M2": self.compute_m2_spec_revision_rounds(),
+            "M4": self.compute_m4_spec_to_implemented_duration(),
+            "M6": self.compute_m6_defect_injection_rate(last_n_days=last_n_days),
+            "M10": self.compute_m10_defect_resolution_duration(),
+            "M11": self.compute_m11_regression_rate(),
+            "M12": self.compute_m12_spec_retirement_rate(),
+            "M16": self.compute_m16_verified_with_passing_tests_rate(),
+            "M17": self.compute_m17_stale_test_ratio(),
+            "M18": self.compute_m18_implemented_without_test_count(),
+        }
+
+    # ------------------------------------------------------------------
     # Deliberations
     # ------------------------------------------------------------------
 
