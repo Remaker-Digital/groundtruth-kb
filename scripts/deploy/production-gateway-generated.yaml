@@ -72,7 +72,7 @@ properties:
       - name: STRIPE_WEBHOOK_SECRET
         value: ***REMOVED_SECRET***
       - name: ADMIN_PREVIEW_API_KEY
-        value: ar_user_stag_qejkqo2vSBoS-QceOJ8eg4wS0Gy82G5H
+        value: __ADMIN_PREVIEW_API_KEY__  # substituted at deploy time from Key Vault
       - name: SHOPIFY_API_KEY
         value: 4c6cf726cd1f9f5389caf48f78af9735
       - name: SHOPIFY_API_SECRET
@@ -108,7 +108,7 @@ properties:
       - name: SMTP_FROM
         value: mike@remakerdigital.com
       - name: SUPERADMIN_PREVIEW_API_KEY
-        value: ar_stg_XAx07GhWPBVOanIjNK1DYhDQcXj3Q9RL
+        value: __SUPERADMIN_PREVIEW_API_KEY__  # substituted at deploy time from Key Vault
       - name: DEPLOY_TIMESTAMP
         value: '1772035249'
       - name: TRUSTED_PROXY

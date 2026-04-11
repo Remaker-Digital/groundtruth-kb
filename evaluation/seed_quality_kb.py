@@ -31,9 +31,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import sys
 import time
 
 import requests
@@ -42,14 +40,12 @@ import requests
 # Configuration (override via env vars for multi-tenant support)
 # ---------------------------------------------------------------------------
 
-PROD_URL = os.environ.get(
-    "QUALITY_PROD_URL",
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-)
-API_KEY = os.environ.get(
-    "QUALITY_API_KEY",
-    "ar_user_rema_uB7sJ28x8vR458RH8FJsrHaBBNhR0HUu",  # default: remaker-digital-001
-)
+PROD_URL = os.environ.get("QUALITY_PROD_URL")
+if not PROD_URL:
+    raise RuntimeError("QUALITY_PROD_URL environment variable is required")
+API_KEY = os.environ.get("QUALITY_API_KEY")
+if not API_KEY:
+    raise RuntimeError("QUALITY_API_KEY environment variable is required")
 
 # ---------------------------------------------------------------------------
 # KB Articles — derived from response_quality.json knowledge_context fields
@@ -341,7 +337,7 @@ def main() -> None:
         time.sleep(0.3)  # Avoid rate limiting
 
     # Verify
-    print(f"\n--- Verification ---")
+    print("\n--- Verification ---")
     time.sleep(1)
     existing = list_existing(API_KEY)
     print(f"  KB entries in tenant: {len(existing)}")

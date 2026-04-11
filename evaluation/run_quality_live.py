@@ -16,8 +16,12 @@ from datetime import datetime
 
 import requests
 
-PROD_URL = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
-WIDGET_KEY = os.getenv("PREVIEW_WIDGET_KEY", "pk_live_c79a2bd0_960a9c23")
+PROD_URL = os.getenv("QUALITY_PROD_URL")
+if not PROD_URL:
+    raise RuntimeError("QUALITY_PROD_URL environment variable is required")
+WIDGET_KEY = os.getenv("PREVIEW_WIDGET_KEY")
+if not WIDGET_KEY:
+    raise RuntimeError("PREVIEW_WIDGET_KEY environment variable is required")
 RESULTS_DIR = "evaluation/results"
 DATASET_PATH = "evaluation/datasets/response_quality.json"
 
@@ -122,11 +126,11 @@ def run_scenario(scenario: dict) -> dict:
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    with open(DATASET_PATH, "r", encoding="utf-8") as f:
+    with open(DATASET_PATH, encoding="utf-8") as f:
         data = json.load(f)
     scenarios = data["scenarios"]
 
-    print(f"=== Conversation Quality Test Run ===")
+    print("=== Conversation Quality Test Run ===")
     print(f"Date: {datetime.now().isoformat()[:19]}")
     print(f"Target: {PROD_URL}")
     print(f"Scenarios: {len(scenarios)}")
@@ -139,23 +143,23 @@ def main():
     for i, scenario in enumerate(scenarios):
         sid = scenario["id"]
         cat = scenario["category"]
-        print(f"[{i+1:2d}/25] {sid} [{cat:20s}]", end=" ", flush=True)
+        print(f"[{i + 1:2d}/25] {sid} [{cat:20s}]", end=" ", flush=True)
 
         result = run_scenario(scenario)
         responses[sid] = result
         timing_data[sid] = result["response_time_ms"]
 
         if result.get("error"):
-            print(f'FAIL ({result["error"]})')
+            print(f"FAIL ({result['error']})")
             pipeline_errors += 1
         elif result["response"]:
             resp_preview = result["response"][:60].replace("\n", " ")
             print(f'OK  {result["response_time_ms"]:5d}ms  {len(result["response"]):4d}ch  "{resp_preview}..."')
         else:
-            print(f'NO_RESPONSE  {result["response_time_ms"]}ms')
+            print(f"NO_RESPONSE  {result['response_time_ms']}ms")
 
     # Save raw responses
-    raw_path = os.path.join(RESULTS_DIR, f'quality-raw-{datetime.now().strftime("%Y-%m-%d")}.json')
+    raw_path = os.path.join(RESULTS_DIR, f"quality-raw-{datetime.now().strftime('%Y-%m-%d')}.json")
     with open(raw_path, "w") as f:
         json.dump({"responses": responses, "pipeline_errors": pipeline_errors, "timing": timing_data}, f, indent=2)
 
@@ -163,7 +167,7 @@ def main():
     avg_time = int(sum(timing_data.values()) / len(timing_data)) if timing_data else 0
     max_time = max(timing_data.values()) if timing_data else 0
 
-    print(f"\n--- Summary ---")
+    print("\n--- Summary ---")
     print(f"Pipeline errors: {pipeline_errors}/{len(scenarios)}")
     print(f"Responses collected: {resp_count}/{len(scenarios)}")
     print(f"Avg response time: {avg_time}ms")
@@ -171,14 +175,17 @@ def main():
 
     # Run quality pilot scoring
     import sys
+
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from evaluation.pilots.quality_pilot import run_pilot
 
     report = run_pilot(responses)
 
-    print(f"\n=== Quality Pilot Report ===")
-    print(f"Total: {report.total_scenarios} | Passed: {report.passed_scenarios} | Failed: {report.failed_scenarios} | Rate: {report.pass_rate:.1f}%")
-    print(f"\nScores (1-5, thresholds: F>=3.5, R>=3.5, T>=3.0, O>=3.5):")
+    print("\n=== Quality Pilot Report ===")
+    print(
+        f"Total: {report.total_scenarios} | Passed: {report.passed_scenarios} | Failed: {report.failed_scenarios} | Rate: {report.pass_rate:.1f}%"
+    )
+    print("\nScores (1-5, thresholds: F>=3.5, R>=3.5, T>=3.0, O>=3.5):")
     f_ok = "PASS" if report.avg_faithfulness >= 3.5 else "FAIL"
     r_ok = "PASS" if report.avg_relevancy >= 3.5 else "FAIL"
     t_ok = "PASS" if report.avg_tone >= 3.0 else "FAIL"
@@ -191,16 +198,16 @@ def main():
     contains_rate = sum(1 for r in report.results if r.contains_pass) / len(report.results) * 100
     excludes_rate = sum(1 for r in report.results if r.excludes_pass) / len(report.results) * 100
     esc_acc = sum(1 for r in report.results if r.escalation_correct) / len(report.results) * 100
-    print(f"\nPass Rates:")
+    print("\nPass Rates:")
     print(f"  Contains:   {contains_rate:.0f}% ({'PASS' if contains_rate >= 80 else 'FAIL'}, >=80%)")
     print(f"  Excludes:   {excludes_rate:.0f}% ({'PASS' if excludes_rate >= 90 else 'FAIL'}, >=90%)")
     print(f"  Escalation: {esc_acc:.0f}% ({'PASS' if esc_acc >= 90 else 'FAIL'}, >=90%)")
 
-    print(f"\nBy Category:")
+    print("\nBy Category:")
     for cat, score in sorted(report.category_scores.items()):
         print(f"  {cat:20s}: {score:.2f}")
 
-    print(f"\nBy Difficulty:")
+    print("\nBy Difficulty:")
     for diff, score in sorted(report.difficulty_scores.items()):
         print(f"  {diff:10s}: {score:.2f}")
 
@@ -208,7 +215,9 @@ def main():
     if failing:
         print(f"\nFailing Scenarios ({len(failing)}):")
         for r in failing:
-            print(f"  {r.scenario_id} [{r.category}/{r.difficulty}] F={r.faithfulness_score:.1f} R={r.relevancy_score:.1f} T={r.tone_score:.1f} O={r.overall_score:.1f}")
+            print(
+                f"  {r.scenario_id} [{r.category}/{r.difficulty}] F={r.faithfulness_score:.1f} R={r.relevancy_score:.1f} T={r.tone_score:.1f} O={r.overall_score:.1f}"
+            )
             for issue in r.issues[:3]:
                 print(f"    - {issue}")
 
@@ -231,9 +240,9 @@ def main():
     else:
         verdict = "FAIL"
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"VERDICT: {verdict}")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
 
     # Save report
     report_data = {
@@ -264,7 +273,7 @@ def main():
         "verdict": verdict,
     }
 
-    report_path = os.path.join(RESULTS_DIR, f'quality-report-{datetime.now().strftime("%Y-%m-%d")}.json')
+    report_path = os.path.join(RESULTS_DIR, f"quality-report-{datetime.now().strftime('%Y-%m-%d')}.json")
     with open(report_path, "w") as f:
         json.dump(report_data, f, indent=2)
     print(f"\nReport: {report_path}")

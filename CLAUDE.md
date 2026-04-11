@@ -56,6 +56,9 @@ All new work in this repository must include:
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
 **operating procedure.** File-based bridge protocol. See `.claude/rules/file-bridge-protocol.md`.
+- **DO NOT implement anything without first preparing an implementation proposal and having it reviewed by Codex.**
+- **All implementation proposals MUST be reviewed by Codex before any code is written.**
+- **All post-implementation reports MUST be reviewed by Codex before committing.**
 - **Propose:** Save proposal to `bridge/{name}-001.md`, add NEW entry to `bridge/INDEX.md`.
 - **Review:** Codex scans INDEX for NEW/REVISED entries, reviews, adds GO or NO-GO version.
 - **Execute:** After Codex GO, implement code, tests, and verify.
@@ -162,6 +165,26 @@ At session start, scan `bridge/INDEX.md` for pending work:
 1. **Read** `bridge/INDEX.md` and look for entries with GO or NO-GO status that haven't been actioned.
 2. **Report** any findings: "Bridge scan: N entries need attention" or "Bridge scan: clear."
 3. **Process** the oldest actionable entry first (GO → implement, NO-GO → revise).
+
+### Session Start: Bridge Poller (Mandatory)
+
+After the initial bridge scan, create a recurring in-session poller:
+
+```
+CronCreate: cron="*/3 * * * *", recurring=true, prompt="Read bridge/INDEX.md. If the latest status on any document is GO or NO-GO that hasn't been actioned, report it and act: GO → implement per work list, NO-GO → read findings and revise. Otherwise report 'Bridge scan: clear.'"
+```
+
+This ensures Codex responses are detected and processed within 3 minutes throughout the session. The poller is session-scoped and dies when the session ends — this is intentional, since polling is only useful while someone is working.
+
+Also create an hourly watchdog that restarts the poller if it dies mid-session:
+
+```
+CronCreate: cron="17 * * * *", recurring=true, prompt="Check if the bridge poller is running by listing cron jobs. If no job with 'bridge/INDEX.md' exists, recreate it with the 3-minute bridge scan prompt. Report: 'Poller watchdog: poller alive' or 'Poller watchdog: poller restarted'."
+```
+
+### Session Start: Active Work List (Mandatory)
+
+After the bridge scan, read `memory/work_list.md`. If it contains unchecked items, continue working through the list following the standard bridge protocol (propose → Codex GO → implement → post-impl report → Codex VERIFIED → commit → drop from list). Owner pre-approval is granted for all items on the list.
 
 ### Protected Behaviors & Removal Rule
 
