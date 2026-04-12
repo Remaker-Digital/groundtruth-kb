@@ -2,55 +2,64 @@
 
 ## Overview
 
-GroundTruth is a single Python package (`groundtruth-kb`) organized into
-three functional layers plus an embedded bridge runtime.  All layers ship
-together and are installed from a single wheel.
+GroundTruth is a single Python package (`groundtruth-kb`) organized into three
+functional layers plus file-bridge automation guidance for dual-agent projects.
+All layers ship together and are installed from a single wheel.
 
 ---
 
 ## Architecture Layers
 
-### Layer 1 — Core Knowledge Database
+### Layer 1 - Core Knowledge Database
 
-The foundation: an append-only SQLite database with governance gates and
-an assertion engine.
+The foundation: an append-only SQLite database with governance gates and an
+assertion engine.
 
 | Capability | CLI commands |
-|------------|-------------|
-| Knowledge database | `gt init` — create project config and database |
-| Seed data | `gt seed` — populate governance specs and optional examples |
-| Assertions | `gt assert` — run machine-checkable spec assertions |
-| Web dashboard | `gt serve` — optional FastAPI UI (`[web]` extra) |
-| Summary | `gt summary` — quick project overview |
-| Desktop bootstrap | `gt bootstrap-desktop` — same-day prototype scaffold |
+|------------|--------------|
+| Knowledge database | `gt init` - create project config and database |
+| Seed data | `gt seed` - populate governance specs and optional examples |
+| Assertions | `gt assert` - run machine-checkable spec assertions |
+| Web dashboard | `gt serve` - optional FastAPI UI (`[web]` extra) |
+| Summary | `gt summary` - quick project overview |
+| Desktop bootstrap | `gt bootstrap-desktop` - same-day prototype scaffold |
 
-### Layer 2 — Project Scaffold
+### Layer 2 - Project Scaffold
 
 Project initialization, profile-based setup, and scaffold maintenance.
 
 | Capability | CLI commands |
-|------------|-------------|
-| Project scaffold | `gt project init` — generate or retrofit a repo with rules, hooks, bridge files, and report templates |
-| Profiles | `gt project init --profile <profile>` — pre-built configurations (`local-only`, `dual-agent-webapp`, `staging-minimal`) |
-| Scaffold upgrade | `gt project upgrade` — update project-owned scaffold files when the package version changes |
+|------------|--------------|
+| Project scaffold | `gt project init` - generate or retrofit a repo with rules, hooks, bridge inventory, and report templates |
+| Profiles | `gt project init --profile <profile>` - pre-built configurations (`local-only`, `dual-agent`, `dual-agent-webapp`) |
+| Scaffold upgrade | `gt project upgrade` - update managed scaffold files when the package version changes |
 
-### Layer 3 — Workstation Doctor
+### Layer 3 - Workstation Doctor
 
 Environment verification and readiness reporting.
 
 | Capability | CLI commands |
-|------------|-------------|
-| Doctor | `gt project doctor` — detect installed tools, verify config, produce readiness reports |
+|------------|--------------|
+| Doctor | `gt project doctor` - detect installed tools, verify config, produce readiness reports |
 
-### Bridge Runtime
+### File Bridge Automation
 
-Included as the `groundtruth_kb.bridge` module.  Provides the
-Prime Builder / Loyal Opposition coordination channel:
+Dual-agent projects use a project-owned file bridge:
 
-- Message store and thread tracking
-- Synchronous dialog semantics with non-blocking persistent retry
-- Resident worker lifecycle
-- Bridge CLI (`gt bridge` subcommands)
+- `bridge/INDEX.md` is the authoritative review queue.
+- Bridge documents under `bridge/` hold implementation reports, reviews, and
+  verdicts.
+- Prime Builder writes `NEW` and `REVISED`.
+- Loyal Opposition writes `GO`, `NO-GO`, and terminal `VERIFIED`.
+- OS-level pollers run the Prime and Loyal Opposition scans independently of
+  active chat sessions.
+- `BRIDGE-INVENTORY.md` captures scheduler names, scripts, prompts, CLI
+  commands, plugins, MCP servers, skills, logs, locks, and recovery procedure.
+- `bridge-os-poller-setup-prompt.md` provides a reusable setup prompt for
+  Claude Code or Codex.
+
+The older SQLite/MCP bridge runtime remains in the package only as legacy
+compatibility code. New projects should not use it as the active bridge.
 
 ---
 
@@ -59,36 +68,38 @@ Prime Builder / Loyal Opposition coordination channel:
 | Component | Location |
 |-----------|----------|
 | KB engine, CLI, web UI, gates | `groundtruth_kb/` |
-| Bridge runtime | `groundtruth_kb/bridge/` |
+| Legacy SQLite/MCP bridge runtime | `groundtruth_kb/bridge/` |
 | Project scaffold commands | `gt project init`, `gt project doctor`, `gt project upgrade` |
-| Method documentation | `docs/method/` (11 numbered docs) |
-| Reference templates | `templates/` (CLAUDE.md, MEMORY.md, hooks, rules, CI/CD) |
+| Method documentation | `docs/method/` |
+| File bridge setup docs | `docs/method/12-file-bridge-automation.md` |
+| Reference templates | `templates/` (CLAUDE.md, AGENTS.md, MEMORY.md, bridge inventory, setup prompt, hooks, rules, CI/CD) |
 | Built-in governance gates | ADRDCLAssertionGate, OwnerApprovalGate |
 
 ---
 
 ## Scope Boundary
 
-`groundtruth-kb` initializes a knowledge database, provides the tools to
-manage specifications, tests, work items, and assertions, scaffolds
-project structure from profiles, and verifies workstation readiness.
+`groundtruth-kb` initializes a knowledge database, provides the tools to manage
+specifications, tests, work items, and assertions, scaffolds project structure
+from profiles, and verifies workstation readiness.
 
-It does not provision cloud infrastructure, create external accounts,
-or deploy applications.  Production infrastructure setup is the
-responsibility of the downstream project.
+It does not provision cloud infrastructure, create external accounts, install
+OS scheduled tasks, or deploy applications. Production infrastructure and
+project-specific bridge poller setup are the responsibility of the downstream
+project, using the package templates and setup prompt.
 
 ---
 
 ## Reference Implementation
 
-Agent Red Customer Experience is the proving ground for the patterns
-that `groundtruth-kb` packages.  The project scaffold extracts
-simplified, reusable versions of:
+Agent Red Customer Engagement is the proving ground for the patterns that
+`groundtruth-kb` packages. The current reusable dual-agent pattern is:
 
-- Message schema and bridge coordination model
-- Worker lifecycle pattern (resident workers, notification-driven wake)
+- File bridge queue and status protocol
+- OS-level scheduled pollers
+- Prompt and agent-configuration capture
 - Session hook and rule file conventions
-- Operational expectations (responsiveness, audit, reporting)
+- Operational expectations for evidence, auditability, and owner burden
 
 ---
 
@@ -96,8 +107,8 @@ simplified, reusable versions of:
 
 | Component | Version | Status |
 |-----------|---------|--------|
-| groundtruth-kb | 0.1.2 | Alpha — extracted from production system (2,000+ specs, 11,000+ tests) |
+| groundtruth-kb | 0.1.2 | Alpha - extracted from production system (2,000+ specs, 11,000+ tests) |
 
 ---
 
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

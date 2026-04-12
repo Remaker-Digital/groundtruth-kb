@@ -37,8 +37,7 @@ PROFILES: dict[str, ProjectProfile] = {
         name="dual-agent",
         display_name="Dual Agent",
         description=(
-            "Prime Builder + Loyal Opposition with bridge runtime, "
-            "coordination protocol, and Codex bootstrap documents."
+            "Prime Builder + Loyal Opposition with file bridge protocol, setup prompt, and Codex bootstrap documents."
         ),
         includes_bridge=True,
         includes_docker=False,
@@ -50,7 +49,8 @@ PROFILES: dict[str, ProjectProfile] = {
         name="dual-agent-webapp",
         display_name="Dual Agent Web App",
         description=(
-            "Full stack: dual-agent bridge, Docker containers, cloud infrastructure stubs, and CI/CD workflows."
+            "Full stack: file bridge dual-agent workflow, Docker containers, cloud infrastructure stubs, "
+            "and CI/CD workflows."
         ),
         includes_bridge=True,
         includes_docker=True,

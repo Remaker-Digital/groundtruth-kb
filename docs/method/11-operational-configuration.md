@@ -2,7 +2,7 @@
 
 GroundTruth projects often depend on operational control surfaces that live
 outside application code: bridges, hooks, rule files, scheduled jobs,
-resident workers, automation definitions, and markdown directives that shape
+pollers, automation definitions, and markdown directives that shape
 agent behavior. If those surfaces are not captured, a project can preserve
 specifications and tests while still losing the actual operating model.
 

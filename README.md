@@ -25,7 +25,7 @@ engineering decisions.
 | **Governance Gates** | Pluggable enforcement at lifecycle transitions |
 
 **Tooling:** CLI (`gt`), Web UI, Python API, project scaffolding,
-CI templates, process templates, dual-agent bridge.
+CI templates, process templates, dual-agent file bridge setup.
 
 ## Architecture
 
@@ -33,7 +33,7 @@ CI templates, process templates, dual-agent bridge.
 Layer 3: Workstation Doctor    gt project doctor
 Layer 2: Project Scaffold      gt project init / upgrade
 Layer 1: Core Knowledge DB     gt init / seed / assert / serve
-         Bridge Runtime        dual-agent coordination [optional]
+         File Bridge Setup     dual-agent coordination templates [optional]
 ```
 
 See the [product architecture](docs/architecture/product-split.md) for details.

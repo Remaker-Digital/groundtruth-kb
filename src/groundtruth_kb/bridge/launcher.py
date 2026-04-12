@@ -1,8 +1,11 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Bridge worker health-check and recovery fallback.
+"""Legacy bridge worker health-check and recovery fallback.
 
-Phase B (S259): The canonical runtime is Windows Scheduled Tasks, not this
-script.  When called from a SessionStart hook, this script:
+This module belongs to the archived SQLite/MCP bridge runtime and is retained
+for compatibility. New dual-agent projects should use project-owned file bridge
+OS pollers instead.
+
+When called from a SessionStart hook, this script:
 
   1. Checks if the worker is already healthy (scheduled task running).
   2. If healthy, reports OK and exits.
@@ -10,7 +13,7 @@ script.  When called from a SessionStart hook, this script:
   4. If the scheduled task is not registered, falls back to detached process
      launch (legacy behavior) and logs a warning.
 
-Install the scheduled tasks first:
+For legacy deployments, install the scheduled tasks first:
   scripts/register_bridge_runtime_tasks.ps1
 """
 

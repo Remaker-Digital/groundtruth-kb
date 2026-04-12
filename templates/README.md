@@ -23,7 +23,7 @@ project-owned boundary.
 |----------|---------|---------|
 | `CLAUDE.md` | Project rules and procedures for AI assistants | Project root |
 | `MEMORY.md` | Session state and operational memory | Project root |
-| `BRIDGE-INVENTORY.md` | Optional inventory of bridge runtime, directives, roles, and automations | Project root |
+| `BRIDGE-INVENTORY.md` | Optional inventory of bridge directives, roles, schedules, prompts, and automations | Project root |
 | `bridge-os-poller-setup-prompt.md` | Prompt for configuring durable file bridge OS pollers and agent setup | Project root or operations docs |
 | `hooks/assertion-check.py` | SessionStart hook — run assertions on session start | `.claude/hooks/` |
 | `hooks/spec-classifier.py` | UserPromptSubmit hook — detect spec language, enforce spec-first | `.claude/hooks/` |

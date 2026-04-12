@@ -1,98 +1,74 @@
 # Prime Bridge Collaboration Protocol
 
-This rule defines mandatory collaboration behavior between agents over the
-bridge. The model is synchronous dialog -- the sender maintains awareness of
-the exchange across its full lifetime.
+This rule defines mandatory collaboration behavior between Prime Builder and
+Loyal Opposition agents over the file bridge.
 
 ## Operating Model
 
-- The bridge is the canonical coordination channel.
-- **Synchronous dialog:** the sender tracks the state of each exchange until
-  resolution. Not fire-and-forget.
-- **Non-blocking persistent retry:** send a message, continue working,
-  background retries re-queue notifications until the peer responds. Never
-  block waiting for a reply.
-- Do not wait for owner confirmation for ordinary execution sequencing.
-- Treat bridge messages with the same urgency as direct owner requests.
+- The active bridge is file-based.
+- `bridge/INDEX.md` is the authoritative queue.
+- Bridge documents under `bridge/` are the auditable exchange artifacts.
+- Entries in the index are newest-first.
+- Only the latest status for each document entry is actionable.
+- The archived SQLite/MCP bridge runtime is legacy compatibility code and must
+  not be used as the active coordination channel for new projects.
 
-## Message States
+## Status Semantics
 
-Three states only:
+| Status | Written by | Meaning |
+|--------|------------|---------|
+| `NEW` | Prime Builder | New implementation report or review request |
+| `REVISED` | Prime Builder | Revised submission after a prior verdict |
+| `GO` | Loyal Opposition | Work is accepted or may proceed |
+| `NO-GO` | Loyal Opposition | Blockers remain; Prime Builder must respond |
+| `VERIFIED` | Loyal Opposition | Terminal verification; no Prime response is expected |
 
-| State | Meaning |
-|-------|---------|
-| `pending` | Message sent, awaiting processing or reply. |
-| `completed` | Successfully resolved. |
-| `failed` | Validation failure, permanent error, or superseded. |
+## Directional Rules
 
-There are no claimed, accepted, or SLA breach states.
+### Prime Builder to Loyal Opposition
 
-## Message Semantics
+Prime Builder writes `NEW` or `REVISED` entries when review is needed.
 
-Messages carry a `payload` JSON envelope with:
+The submission must include:
 
-- `expected_response`: what the sender needs back (`advisory_review`,
-  `go_no_go`, `status_update`, `task_handoff`, `correction`, `escalation`)
-- `artifact_refs`: repo-relative file paths and KB references relevant to
-  the exchange (never absolute paths)
-- `action_items`: specific numbered deliverables (not open-ended requests)
+- summary of work performed or proposed
+- artifact paths and relevant KB IDs
+- verification already performed
+- specific review questions or acceptance criteria
+- known risks, gaps, or owner decisions needed
 
-Message kinds: `substantive`, `status_update`, `system`. Protocol
-acknowledgements are not supported -- all replies must be substantive.
+### Loyal Opposition to Prime Builder
 
-## Thread Continuity
+Loyal Opposition processes latest `NEW` and `REVISED` entries, then writes the
+next numbered bridge file with one of:
 
-- Threads are identified by `thread_id` derived from `correlation_id`.
-- Replies MUST carry a `correlation_id` referencing the original message
-  or thread.
-- Thread state is derived from messages at query time (no cached thread
-  table).
-- Sender and recipient must both be participants in the referenced thread.
+- `GO`
+- `NO-GO`
+- `VERIFIED`
 
-## Message Lifecycle
+Every verdict must include evidence inspected, findings, impact, recommended
+action, and verification performed.
 
-### On Receiving a Message
+### Prime Builder Response
 
-1. Inspect thread context before narrating pickup.
-2. If structured `artifact_refs` are present, treat them as first-read source.
-3. Execute the work.
-4. Send a substantive reply with `correlation_id` back to the sender.
-5. Resolve the original inbound request as `completed` or `failed`.
+Prime Builder processes latest `GO` and `NO-GO` entries.
 
-### On Completing Work
+- `GO`: proceed or close as directed by the verdict.
+- `NO-GO`: fix blockers and write a `REVISED` entry.
+- `VERIFIED`: terminal; do not respond unless the owner explicitly reopens the
+  work.
 
-Send a correlated completion response that includes:
+## Polling and Scheduling
 
-- **Outcome:** complete or blocked.
-- **Evidence inspected:** file paths, commit hashes.
-- **Artifacts produced:** IDs, paths, report filenames.
-- **Gaps remaining:** any open items or owner decisions needed.
+Routine collaboration must not depend on manual owner prompting.
 
-### Malformed Messages
-
-- Messages that fail validation are persisted as `failed` with correction
-  guidance.
-- Use `send_correction_message()` for failed peer messages.
-- Do not claim or process failed messages.
-
-## Non-Blocking Persistent Retry
-
-The resident worker automatically retries stale pending outbound messages
-every 5 minutes. This is the primary retry mechanism.
-
-- **Autonomous:** scans for outbound messages pending longer than 3 minutes
-  and calls `retry_pending_message()`.
-- **Bounded:** capped at 3 retries per message to prevent storms.
-- **Non-blocking:** the sender continues working while retries happen.
-- Retry metadata tracked in `payload._retry` (count, last_at, max).
-
-## Session Start Sweep
-
-At session start, both agents MUST:
-
-1. Query for all pending messages via `list_inbox(agent=..., status="pending")`.
-2. Process each one with a substantive reply or resolve it.
-3. Report the count: "Bridge sweep: N messages processed."
+- Use separate OS-level pollers for Prime Builder and Loyal Opposition.
+- Each poller reads `bridge/INDEX.md`, filters by latest status, acquires a
+  lock, and invokes its CLI only when real work exists.
+- Each poller logs clear scans, dispatched work, command exits, stdout, and
+  stderr.
+- App-native automations may be supplemental but are not the reliability
+  boundary unless durable run records prove they dispatch across sessions.
 
 ## Escalation Boundary
 
@@ -101,8 +77,22 @@ Escalate to the owner only when:
 - The action exceeds prior approval.
 - A destructive action is required.
 - There is a true owner-only product or risk decision.
-- Retry limit reached and peer appears offline.
+- The bridge protocol itself is ambiguous or contradictory.
+- A scheduled poller repeatedly fails and cannot be recovered from documented
+  procedures.
+
+## Configuration Capture
+
+Keep `BRIDGE-INVENTORY.md` current with:
+
+- scheduler task names and intervals
+- poller scripts and hidden launchers
+- log and lock paths
+- CLI commands and working directories
+- exact prompt text or prompt file paths
+- plugins, MCP servers, skills, and config files required by each agent
+- health checks and recovery procedure
 
 ---
 
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

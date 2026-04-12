@@ -1,9 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Bridge Resident Worker — long-lived daemon that processes bridge messages.
+"""Legacy bridge resident worker for the SQLite/MCP bridge runtime.
 
-Polls for notifications and dispatches agent sessions to handle pending
-bridge work. Includes autonomous retry, failed residue cleanup, and
-health reporting.
+Retained for compatibility with older database-backed bridge deployments. New
+dual-agent projects should use project-owned file bridge OS pollers instead.
 """
 
 from __future__ import annotations

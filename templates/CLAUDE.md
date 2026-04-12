@@ -46,7 +46,7 @@ clarifications, and decisions?
 
 ### Optional operational inventory
 
-If this project uses a bridge, multiple agents, resident workers, or recurring
+If this project uses a bridge, multiple agents, scheduled pollers, or recurring
 automations, maintain `BRIDGE-INVENTORY.md` (or an equivalent project-owned
 inventory file) and keep it aligned with runtime entrypoints, schedules,
 directives, and role exceptions.

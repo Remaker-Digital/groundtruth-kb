@@ -1,7 +1,11 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""groundtruth_kb.bridge — Reusable inter-agent message bridge.
+"""Legacy SQLite/MCP inter-agent message bridge.
 
-Synchronous dialog model (v3) for Codex <-> Prime Builder coordination.
+This package is retained for compatibility with projects that still depend on
+the older database-backed Prime Bridge runtime. New GroundTruth dual-agent
+projects should use the file bridge pattern documented in
+docs/method/12-file-bridge-automation.md and should not use this package as
+their active coordination channel.
 """
 
 from groundtruth_kb.bridge.handshake import run_handshake

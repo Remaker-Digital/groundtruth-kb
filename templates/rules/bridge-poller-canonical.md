@@ -1,67 +1,79 @@
 # Bridge Poller Canonical Instructions
 
-This file is the canonical source of truth for bridge poller behavior.
-It applies to any automation, scheduled task, or wake prompt that keeps
-the Prime Builder <-> Loyal Opposition bridge operational.
+This file is the canonical source of truth for file bridge poller behavior.
+It applies to any automation, scheduled task, or wake prompt that keeps the
+Prime Builder <-> Loyal Opposition bridge operational.
 
 ## Core Rule
 
-The bridge is message-driven and notification-driven with synchronous
-dialog semantics. The sender tracks each exchange across its full lifetime.
-
-The insight dropbox is a secondary artifact store and fallback signal only.
-It is not the primary trigger for bridge work.
+The active bridge is file-based. The authoritative queue is `bridge/INDEX.md`.
+Pollers must inspect the latest status for each bridge document entry and must
+not use the archived SQLite/MCP bridge runtime as the active queue.
 
 The owner is an observer unless the owner explicitly intervenes.
 
 ## Required Behavior
 
-### 1. Sweep the Live Bridge First
+### 1. Read the File Bridge Index First
 
-- Query pending inbox items for the target agent.
-- Prefer any canonical bridge snapshot or wake context provided by the runtime.
+- Open `bridge/INDEX.md`.
+- Treat document entries as newest-first.
+- For each document entry, inspect only the latest status line.
+- Historical status lines are evidence, not current work.
 
-### 2. Prioritize Live Bridge Obligations
+### 2. Use Direction-Specific Filters
 
-- If there is live bridge work (pending messages), process it before any
-  report scanning or exploratory analysis.
+Loyal Opposition pollers process only latest statuses:
 
-### 3. Work Threads Directly with the Peer Agent
+- `NEW`
+- `REVISED`
 
-- Read the message and any referenced artifacts.
-- Send the reply directly to the peer agent over the bridge.
-- Resolve or close the message when complete (`completed` or `failed`).
+Prime Builder pollers process only latest statuses:
+
+- `GO`
+- `NO-GO`
+
+`VERIFIED` is terminal. It must not trigger Prime Builder action.
+
+### 3. Process Work Through Numbered Bridge Files
+
+- Read the referenced bridge document and supporting artifacts.
+- Perform the required review or response.
+- Write the next numbered bridge document.
+- Add the corresponding latest status line at the top of that document entry
+  in `bridge/INDEX.md`.
 
 ### 4. Do Not Route Through the Owner
 
-- Do not wait for owner relay when a direct bridge reply is possible.
+- Do not wait for owner relay when the bridge entry is actionable.
 - Only surface a blocker to the owner when a true external decision is
-  required (product decisions, destructive actions, scope changes).
+  required, such as product direction, destructive action, or scope change.
 
-### 5. Use Report Scanning as Fallback Only
+### 5. Use OS Scheduler State as the Reliability Boundary
 
-- If the bridge is clear, the poller may scan report directories for
-  new content not reflected in bridge traffic.
-- If a new report is found, summarize it and send a bridge note to the
-  peer agent.
+- Recurring bridge scans should run from an OS scheduler.
+- App-native automations may be supplemental, but they are not authoritative
+  unless they produce durable run records across sessions.
+- Each scheduled run should log clear scans as well as dispatched work.
 
 ## Guardrails
 
 - Do not auto-accept substantive work before inspecting context.
-- If a message has `failed` status, do not process it. Send a correction
-  message instead.
-- Process work end-to-end without waiting for the owner unless blocked
-  by a real external dependency.
-- Use `retry_pending_message()` for messages that need re-delivery, not
-  duplicate `send_message()` calls.
+- Do not scan historical statuses as if they are current.
+- Do not reprocess `VERIFIED` entries.
+- Use a lock file so overlapping scheduled runs cannot create duplicate bridge
+  documents.
+- Keep prompt text, CLI commands, scheduler names, logs, locks, and required
+  plugins/skills documented in `BRIDGE-INVENTORY.md`.
 
 ## Output Expectations
 
-- If live bridge work was processed: report a concise processing summary.
-- If only fallback reports were synced: report that no live bridge work
-  existed and that report sync occurred.
-- If nothing required action: report that the bridge is clear.
+- If bridge work was processed: report the document entry, input status,
+  output status, and new bridge file.
+- If nothing required action: report that the file bridge scan was clear.
+- If the scan failed: report the failing path, command, exit code, and log
+  location.
 
 ---
 
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

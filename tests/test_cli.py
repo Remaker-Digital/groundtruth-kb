@@ -274,11 +274,13 @@ class TestBootstrapDesktop:
         claude_text = (target / "CLAUDE.md").read_text(encoding="utf-8")
         bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
         bridge_prompt = (target / "bridge-os-poller-setup-prompt.md").read_text(encoding="utf-8")
+        gitignore_text = (target / ".gitignore").read_text(encoding="utf-8")
         assert "{{PROJECT_NAME}}" not in claude_text
         assert "client-prototype" in claude_text
         assert "Acme Labs" in claude_text
         assert "{{AGENT_OR_PROCESS_1}}" not in bridge_text
         assert "bridge/INDEX.md" in bridge_prompt
+        assert "PRIME_BRIDGE_DB" not in gitignore_text
 
         db = KnowledgeDB(db_path=target / "groundtruth.db")
         try:
@@ -287,6 +289,35 @@ class TestBootstrapDesktop:
             assert summary["test_artifact_count"] >= 3
         finally:
             db.close()
+
+    def test_project_init_dual_agent_uses_file_bridge_defaults(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "dual-agent-project"
+        result = runner.invoke(
+            main,
+            [
+                "project",
+                "init",
+                "dual-agent-project",
+                "--profile",
+                "dual-agent",
+                "--dir",
+                str(target),
+                "--owner",
+                "Acme Labs",
+                "--no-include-ci",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (target / "BRIDGE-INVENTORY.md").exists()
+        assert (target / "bridge-os-poller-setup-prompt.md").exists()
+
+        bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
+        gitignore_text = (target / ".gitignore").read_text(encoding="utf-8")
+        assert "bridge/INDEX.md" in bridge_text
+        assert "gt bridge serve" not in bridge_text
+        assert "groundtruth_kb.bridge.worker" not in bridge_text
+        assert "bridge.db" not in gitignore_text
+        assert "bridge-automation/logs" in gitignore_text
 
     def test_bootstrap_desktop_rejects_non_empty_target(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "occupied"

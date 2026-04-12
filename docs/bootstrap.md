@@ -194,7 +194,7 @@ cp "$TEMPLATES/rules/"*.md .claude/rules/
 Edit `CLAUDE.md`, `MEMORY.md`, `BRIDGE-INVENTORY.md`, and the bridge setup
 prompt to replace placeholders with your project's details.
 
-If your project uses a bridge, multiple agents, resident workers, or recurring
+If your project uses a bridge, multiple agents, scheduled pollers, or recurring
 automations, keep `BRIDGE-INVENTORY.md` and the related rule/state files
 updated with:
 

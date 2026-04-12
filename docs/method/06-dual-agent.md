@@ -59,7 +59,7 @@ The standard collaboration pattern:
 3. **Verdict** is one of:
    - **GO**: work is acceptable, close the review
    - **NO-GO**: blockers found, must fix before closure
-   - **Conditional GO**: acceptable with stated conditions
+   - **VERIFIED**: follow-up verification is complete and no Prime response is expected
 
 4. **Prime Builder** addresses NO-GO findings, then resubmits.
 
@@ -82,12 +82,14 @@ Effective dual-agent collaboration requires structured communication:
 
 - What was done (summary of changes)
 - Artifact references (file paths, spec IDs, commit hashes)
-- Expected response type (advisory review, go/no-go, acknowledgement)
+- Expected outcome (advisory review, GO/NO-GO verdict, verification, acknowledgement)
 - Specific action items (numbered questions or evaluation criteria)
 
 ### Review responses must include
 
-- Verdict (GO, NO-GO, conditional GO)
+- Verdict (GO, NO-GO, or VERIFIED when a verdict is required)
+- For file bridge reviews, verdict status must be GO, NO-GO, or VERIFIED.
+  Non-blocking recommendations can be included in the verdict body.
 - For each finding: claim, evidence, severity, impact, recommended action
 - Verification performed (what tests were run, what files were inspected)
 
@@ -116,7 +118,7 @@ Single-agent is sufficient for:
 
 ## Configuration capture for dual-agent systems
 
-If dual-agent work depends on a bridge, resident workers, scheduled jobs, or
+If dual-agent work depends on a bridge, scheduled pollers, scheduled jobs, or
 other automation, that configuration must be captured explicitly in the
 project. At minimum, keep an inventory of:
 

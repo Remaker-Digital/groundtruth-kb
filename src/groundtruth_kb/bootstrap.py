@@ -197,9 +197,9 @@ def _render_project_templates(
         "{{SOURCE}}": "TBD",
         "{{FAILURE_SIGNAL}}": "TBD",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (
-            "Document whether your bridge is async message passing or another model."
+            "Document whether your bridge is a file-based latest-status queue or another model."
         ),
-        "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": "Document which message types require replies.",
+        "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": "Document which statuses or message types require replies.",
         "{{WHEN_TO_RETRY}}": "Document retry rules and escalation thresholds.",
         "{{STARTUP_OR_LIVENESS_CHECK}}": "Document the startup handshake or health check procedure.",
         "{{WHEN_RESTARTS_ARE_ALLOWED_OR_AVOIDED}}": "Document when restarts are safe, required, or forbidden.",

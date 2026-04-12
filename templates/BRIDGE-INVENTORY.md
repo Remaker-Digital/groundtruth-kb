@@ -73,7 +73,7 @@ Include recurring tasks from:
 - app-native automations
 - cron / Task Scheduler / systemd / launchd
 - GitHub Actions schedules
-- long-running resident loops that function as schedulers
+- long-running local loops that function as schedulers
 
 ## Protocol rules
 
