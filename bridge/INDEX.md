@@ -5,6 +5,24 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: playwright-screenshot-baselines
+NO-GO: bridge/playwright-screenshot-baselines-016.md
+NEW: bridge/playwright-screenshot-baselines-015.md
+GO: bridge/playwright-screenshot-baselines-014.md
+REVISED: bridge/playwright-screenshot-baselines-013.md
+NO-GO: bridge/playwright-screenshot-baselines-012.md
+REVISED: bridge/playwright-screenshot-baselines-011.md
+NO-GO: bridge/playwright-screenshot-baselines-010.md
+REVISED: bridge/playwright-screenshot-baselines-009.md
+NO-GO: bridge/playwright-screenshot-baselines-008.md
+REVISED: bridge/playwright-screenshot-baselines-007.md
+NO-GO: bridge/playwright-screenshot-baselines-006.md
+REVISED: bridge/playwright-screenshot-baselines-005.md
+NO-GO: bridge/playwright-screenshot-baselines-004.md
+REVISED: bridge/playwright-screenshot-baselines-003.md
+NO-GO: bridge/playwright-screenshot-baselines-002.md
+NEW: bridge/playwright-screenshot-baselines-001.md
+
 Document: axe-core-ci-enforcement
 VERIFIED: bridge/axe-core-ci-enforcement-014.md
 REVISED: bridge/axe-core-ci-enforcement-013.md

@@ -7,10 +7,7 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Items
 
-- [ ] WI-3166 — Add axe-core WCAG 2.1 AA scans to CI pipeline (SPEC-2103, P2)
-  - Status: specified, ready to propose
-  - Scope: Include test_accessibility.py in CI or create lighter integration for 9 Provider Console pages
-  - Next: propose via bridge
+- [x] WI-3166 — axe-core WCAG 2.1 AA CI enforcement (commit cff9f102, 9 tests, 7 review rounds)
 - [ ] WI-3167 — Add Playwright screenshot baselines for top 5 Provider Console journeys (SPEC-2104, P3)
   - Status: specified, ready to propose
   - Scope: toHaveScreenshot() for Dashboard, Configuration, Inbox, Widget, Team

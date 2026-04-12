@@ -4,13 +4,14 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-/** Deterministic daily volume — fixed values, no Math.random(). */
+/** Deterministic daily volume — fixed values, fixed dates, no Math.random(). */
 function generateDailyVolume(days: number) {
   const base = [32, 28, 41, 25, 38, 19, 35, 30, 44, 22, 37, 27, 40, 24, 33, 29, 43, 21, 36, 26, 39, 23, 34, 31, 42, 20, 38, 28, 35, 30];
   const result = [];
-  const now = new Date();
+  // Fixed reference date for deterministic mock data (visual regression safe).
+  const ref = new Date("2026-03-10T12:00:00Z");
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
+    const d = new Date(ref);
     d.setDate(d.getDate() - i);
     const total = base[i % base.length];
     result.push({

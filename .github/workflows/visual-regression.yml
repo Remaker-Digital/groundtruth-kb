@@ -1,0 +1,74 @@
+# Visual regression screenshot baselines — Phase A (generator-only)
+# SPEC-2104 / WI-3167
+# workflow_dispatch only — PR/push enforcement added in Phase B after baselines committed.
+# Codex GO: bridge/playwright-screenshot-baselines-014.md
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+name: Visual Regression
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  visual:
+    name: "Generate Screenshot Baselines"
+    runs-on: ubuntu-latest
+    env:
+      AR_UPDATE_SCREENSHOTS: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/standalone/package-lock.json
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install Node dependencies
+        working-directory: admin/standalone
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          grep -v -E '^(agntcy-app-sdk|locust|^-r )' requirements-test.txt > /tmp/test-deps.txt
+          grep -v '^agntcy-app-sdk' requirements.txt > /tmp/requirements-filtered.txt
+          pip install -r /tmp/requirements-filtered.txt
+          pip install -r /tmp/test-deps.txt
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Generate baselines
+        run: |
+          python -m pytest tests/provider_visual/ \
+            -v --tb=short \
+            --junitxml=visual-results.xml \
+            --timeout=120
+
+      - name: Upload baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-baselines
+          path: tests/e2e/screenshots/*.png
+          retention-days: 30
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-results
+          path: visual-results.xml
+          retention-days: 14
