@@ -7,38 +7,31 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Items
 
-- [ ] WI-3142 — Narrow conftest.py exclusion in credential-scan
-  - Status: IMPLEMENTED. Post-impl report submitted (bridge/credential-scan-narrowing-013.md), awaiting Codex VERIFIED
-  - Changes: credential-scan.py rewritten, 24/24 tests pass, eval/archive/deploy files remediated
-  - Next: wait for Codex VERIFIED, then commit
-- [ ] WI-3162 — Backfill existing LO reports into deliberation archive
-  - Status: REVISED v013 submitted, awaiting Codex review
-  - v013 fixes: multi-signal section extraction (mixed GO/NO-GO → informational + warning), narrowed unparsed-signal scan to structured locations only
-  - Next: wait for Codex review of v013
-- [x] UI-EVAL — Evaluate visual/UX testing tools (S281, complete)
-- [x] UI-SPEC — Specs created: SPEC-2102 (Chromatic CI), SPEC-2103 (axe-core CI), SPEC-2104 (visual baselines)
-- [ ] WI-3165 — Activate Chromatic visual regression CI (SPEC-2102, P2)
-  - Status: specified, ready to implement
-  - Scope: GitHub Actions workflow + CHROMATIC_PROJECT_TOKEN + baseline capture
-  - Next: propose via bridge → implement
-- [ ] WI-3166 — Add axe-core WCAG 2.1 AA to CI (SPEC-2103, P2)
-  - Status: specified, ready to implement
-  - Scope: Include test_accessibility.py in CI or create lighter integration
-  - Next: after WI-3165
-- [ ] WI-3167 — Playwright screenshot baselines (SPEC-2104, P3)
-  - Status: specified, ready to implement
-  - Scope: toHaveScreenshot() for top 5 Provider Console pages
+- [ ] WI-3166 — Add axe-core WCAG 2.1 AA scans to CI pipeline (SPEC-2103, P2)
+  - Status: specified, ready to propose
+  - Scope: Include test_accessibility.py in CI or create lighter integration for 9 Provider Console pages
+  - Next: propose via bridge
+- [ ] WI-3167 — Add Playwright screenshot baselines for top 5 Provider Console journeys (SPEC-2104, P3)
+  - Status: specified, ready to propose
+  - Scope: toHaveScreenshot() for Dashboard, Configuration, Inbox, Widget, Team
   - Next: after WI-3166
+
+## Owner Actions Pending
+
+- [ ] Create Chromatic project at chromatic.com + set CHROMATIC_PROJECT_TOKEN GitHub secret (WI-3165)
+
+## Completed (S281)
+
+- [x] WI-3142 — credential-scan narrowing (commit 1e3107ea, 33 tests, 9 proposal + 3 verification rounds)
+- [x] WI-3162 — LO report backfill (commit fb0e5d7e, 53 tests, 9 proposal + 4 verification rounds)
+- [x] WI-3165 — Chromatic CI activation (commit 1979d06a, 2 proposal + 2 verification rounds)
+- [x] UI-EVAL — Tool research complete (Chromatic already installed)
+- [x] UI-SPEC — 3 specs (SPEC-2102/2103/2104) + 3 WIs (WI-3165/3166/3167)
 
 ## Completed (S280)
 
-- [x] WI-0929 — wont_fix (pre-existing)
-- [x] WI-0970 — wont_fix (pre-existing)
-- [x] WI-0971 — wont_fix (pre-existing)
-- [x] WI-0972 — wont_fix (pre-existing)
-- [x] WI-0973 — wont_fix (pre-existing)
-- [x] WI-0974 — wont_fix (pre-existing)
-- [x] WI-3141 — Resolved: already fixed (shell=True probe + _skip_no_az)
-- [x] WI-3160 — Resolved: SPEC-2101 pipeline dashboard (commit 5a38838)
-- [x] WI-3163 — Resolved: 52 deliberation tests (commit c72cb25)
-- [x] WI-3164 — Resolved: ruff lint/format both clean after S280 work
+- [x] WI-0929..0974 — wont_fix (pre-existing)
+- [x] WI-3141 — already fixed
+- [x] WI-3160 — pipeline dashboard
+- [x] WI-3163 — deliberation tests
+- [x] WI-3164 — ruff lint/format

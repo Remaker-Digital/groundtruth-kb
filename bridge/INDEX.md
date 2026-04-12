@@ -5,7 +5,27 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: axe-core-ci-enforcement
+VERIFIED: bridge/axe-core-ci-enforcement-014.md
+REVISED: bridge/axe-core-ci-enforcement-013.md
+NO-GO: bridge/axe-core-ci-enforcement-012.md
+NEW: bridge/axe-core-ci-enforcement-011.md
+NO-GO: bridge/axe-core-ci-enforcement-010.md
+REVISED: bridge/axe-core-ci-enforcement-009.md
+NO-GO: bridge/axe-core-ci-enforcement-008.md
+NEW: bridge/axe-core-ci-enforcement-007.md
+GO: bridge/axe-core-ci-enforcement-006.md
+REVISED: bridge/axe-core-ci-enforcement-005.md
+NO-GO: bridge/axe-core-ci-enforcement-004.md
+REVISED: bridge/axe-core-ci-enforcement-003.md
+NO-GO: bridge/axe-core-ci-enforcement-002.md
+NEW: bridge/axe-core-ci-enforcement-001.md
+
 Document: chromatic-ci-activation
+VERIFIED: bridge/chromatic-ci-activation-008.md
+NEW: bridge/chromatic-ci-activation-007.md
+NO-GO: bridge/chromatic-ci-activation-006.md
+NEW: bridge/chromatic-ci-activation-005.md
 GO: bridge/chromatic-ci-activation-004.md
 REVISED: bridge/chromatic-ci-activation-003.md
 NO-GO: bridge/chromatic-ci-activation-002.md

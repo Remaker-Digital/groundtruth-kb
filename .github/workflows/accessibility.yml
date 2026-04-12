@@ -1,0 +1,108 @@
+# axe-core WCAG 2.1 AA CI enforcement (SPEC-2103 / WI-3166)
+# Runs accessibility scans against the standalone admin SPA in mock mode.
+# Critical/serious WCAG violations fail the build.
+# Codex GO: bridge/axe-core-ci-enforcement-006.md
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+name: Accessibility
+
+on:
+  pull_request:
+    paths:
+      - 'admin/**'
+      - 'tests/accessibility/**'
+      - 'tests/e2e/a11y_helpers.py'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/accessibility.yml'
+  push:
+    branches: [main, 'hotfix/**']
+    paths:
+      - 'admin/**'
+      - 'tests/accessibility/**'
+      - 'tests/e2e/a11y_helpers.py'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: a11y-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  accessibility:
+    name: "axe-core WCAG 2.1 AA"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/standalone/package-lock.json
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install Node dependencies
+        working-directory: admin/standalone
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          grep -v -E '^(agntcy-app-sdk|locust|^-r )' requirements-test.txt > /tmp/test-deps.txt
+          grep -v '^agntcy-app-sdk' requirements.txt > /tmp/requirements-filtered.txt
+          pip install -r /tmp/requirements-filtered.txt
+          pip install -r /tmp/test-deps.txt
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Run accessibility tests
+        run: |
+          python -m pytest tests/accessibility/ \
+            -v --tb=short \
+            --junitxml=a11y-results.xml \
+            --timeout=120
+
+      - name: Generate step summary
+        if: always()
+        run: |
+          python -c "
+          import xml.etree.ElementTree as ET
+          try:
+              tree = ET.parse('a11y-results.xml')
+              root = tree.getroot()
+              tests = int(root.attrib.get('tests', 0))
+              failures = int(root.attrib.get('failures', 0))
+              errors = int(root.attrib.get('errors', 0))
+              status = 'PASS' if failures == 0 and errors == 0 else 'FAIL'
+              print(f'## Accessibility ({status})')
+              print(f'| Metric | Value |')
+              print(f'|--------|-------|')
+              print(f'| Pages scanned | {tests} |')
+              print(f'| Violations | {failures} |')
+              print(f'| Errors | {errors} |')
+          except Exception as e:
+              print(f'## Accessibility (no results)')
+              print(f'Error: {e}')
+          " >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-results
+          path: a11y-results.xml
+          retention-days: 14
