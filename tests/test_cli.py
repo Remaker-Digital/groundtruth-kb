@@ -266,16 +266,19 @@ class TestBootstrapDesktop:
         assert (target / "CLAUDE.md").exists()
         assert (target / "MEMORY.md").exists()
         assert (target / "BRIDGE-INVENTORY.md").exists()
+        assert (target / "bridge-os-poller-setup-prompt.md").exists()
         assert (target / ".claude" / "hooks" / "assertion-check.py").exists()
         assert (target / ".claude" / "rules" / "prime-builder.md").exists()
         assert (target / ".github" / "workflows" / "test.yml").exists()
 
         claude_text = (target / "CLAUDE.md").read_text(encoding="utf-8")
         bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
+        bridge_prompt = (target / "bridge-os-poller-setup-prompt.md").read_text(encoding="utf-8")
         assert "{{PROJECT_NAME}}" not in claude_text
         assert "client-prototype" in claude_text
         assert "Acme Labs" in claude_text
         assert "{{AGENT_OR_PROCESS_1}}" not in bridge_text
+        assert "bridge/INDEX.md" in bridge_prompt
 
         db = KnowledgeDB(db_path=target / "groundtruth.db")
         try:

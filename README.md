@@ -106,6 +106,7 @@ discipline behind GroundTruth:
 | [09 — Adoption](docs/method/09-adoption.md) | Upstream/downstream model, update procedures |
 | [10 — Tooling](docs/method/10-tooling.md) | CLI commands, web UI, Python API, configuration |
 | [11 — Operational Config](docs/method/11-operational-configuration.md) | Bridges, automations, directives, roles |
+| [12 - File Bridge Automation](docs/method/12-file-bridge-automation.md) | Durable file bridge polling, prompts, plugins, skills, and scheduler capture |
 
 **Reference:**
 [Assertion Language](docs/reference/assertion-language.md) |
@@ -125,8 +126,9 @@ For a same-day client workstation setup, start with the
 
 The [templates/](templates/README.md) directory contains reference templates
 for setting up a GroundTruth project: rules files, state files, hooks, and
-agent configuration. Use `gt project init --profile <profile>` for automated
-setup, or copy templates manually and customize the placeholders.
+agent configuration, including a file bridge OS-poller setup prompt. Use
+`gt project init --profile <profile>` for automated setup, or copy templates
+manually and customize the placeholders.
 
 ## Contributing
 

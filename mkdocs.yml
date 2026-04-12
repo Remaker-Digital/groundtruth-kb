@@ -63,6 +63,7 @@ nav:
       - Adoption: method/09-adoption.md
       - Tooling: method/10-tooling.md
       - Operational Config: method/11-operational-configuration.md
+      - File Bridge Automation: method/12-file-bridge-automation.md
   - Reference:
       - Assertion Language: reference/assertion-language.md
   - Architecture:

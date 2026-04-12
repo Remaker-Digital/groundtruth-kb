@@ -145,6 +145,11 @@ def _copy_dual_agent_templates(target: Path) -> None:
     if bi.exists():
         shutil.copy2(bi, target / "BRIDGE-INVENTORY.md")
 
+    # File bridge setup prompt
+    bridge_prompt = templates / "bridge-os-poller-setup-prompt.md"
+    if bridge_prompt.exists():
+        shutil.copy2(bridge_prompt, target / "bridge-os-poller-setup-prompt.md")
+
     # AGENTS.md
     agents_template = templates / "project" / "AGENTS.md"
     if agents_template.exists():
@@ -473,6 +478,7 @@ def scaffold_summary(target: Path, profile: str) -> str:
             [
                 "  - AGENTS.md (Loyal Opposition contract)",
                 "  - BRIDGE-INVENTORY.md",
+                "  - bridge-os-poller-setup-prompt.md",
                 "  - Bridge rules and hooks",
                 "  - independent-progress-assessments/ (Codex reports)",
             ]

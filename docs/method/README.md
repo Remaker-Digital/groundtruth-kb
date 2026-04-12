@@ -18,6 +18,7 @@ Engineering discipline for AI-powered systems — from specification to producti
 | 09 | [Adoption & Promotion](09-adoption.md) | Upstream/downstream model, managed files, update procedures |
 | 10 | [KB Tooling](10-tooling.md) | Installation, CLI commands, web UI, configuration |
 | 11 | [Operational Configuration Capture](11-operational-configuration.md) | How to capture bridges, automations, directives, and role configuration |
+| 12 | [File Bridge Automation](12-file-bridge-automation.md) | Durable file bridge polling, status semantics, prompts, plugins, skills, and scheduler capture |
 
 ## Architecture documents
 

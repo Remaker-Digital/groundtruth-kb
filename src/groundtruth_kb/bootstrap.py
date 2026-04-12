@@ -133,6 +133,9 @@ def _copy_templates(target: Path, *, include_ci: bool) -> None:
     templates_dir = get_templates_dir()
     for template_name in ("CLAUDE.md", "MEMORY.md", "BRIDGE-INVENTORY.md"):
         shutil.copy2(templates_dir / template_name, target / template_name)
+    bridge_prompt = templates_dir / "bridge-os-poller-setup-prompt.md"
+    if bridge_prompt.exists():
+        shutil.copy2(bridge_prompt, target / "bridge-os-poller-setup-prompt.md")
 
     hooks_target = target / ".claude" / "hooks"
     hooks_target.mkdir(parents=True, exist_ok=True)
@@ -241,6 +244,7 @@ def bootstrap_summary(target: Path, *, include_ci: bool, init_git: bool, seed_ex
         "  - groundtruth.toml",
         "  - groundtruth.db",
         "  - CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md",
+        "  - bridge-os-poller-setup-prompt.md",
         "  - .claude/hooks and .claude/rules",
         f"  - CI workflows: {'yes' if include_ci else 'no'}",
         f"  - Git initialized: {'yes' if init_git else 'no'}",
@@ -248,7 +252,8 @@ def bootstrap_summary(target: Path, *, include_ci: bool, init_git: bool, seed_ex
         "",
         "Next steps:",
         f"  1. cd {target}",
-        "  2. Open CLAUDE.md, MEMORY.md, and BRIDGE-INVENTORY.md and replace the remaining TBD values.",
+        "  2. Open CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md, and the bridge setup prompt.",
+        "     Replace remaining TBD and angle-bracket values.",
         "  3. Run `gt --config groundtruth.toml summary`.",
         "  4. Open the project in your editor and start the first session.",
     ]

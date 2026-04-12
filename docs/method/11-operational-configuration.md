@@ -7,6 +7,8 @@ agent behavior. If those surfaces are not captured, a project can preserve
 specifications and tests while still losing the actual operating model.
 
 This document defines the minimum capture contract for those control surfaces.
+For the concrete durable file-bridge polling pattern, see
+[File Bridge Automation](12-file-bridge-automation.md).
 
 ## Capture rule
 
@@ -28,6 +30,7 @@ At minimum, capture the following categories when they exist:
 - Message stores, spool files, or runtime databases
 - Hook scripts that trigger bridge or automation behavior
 - Health-check or recovery scripts
+- Prompt files or inline prompts used by scheduled agent runs
 
 ### 2. Directive and instruction surfaces
 
@@ -35,6 +38,7 @@ At minimum, capture the following categories when they exist:
 - Rule files under agent-specific config directories
 - Prompt templates, session bootstrap files, and runbooks
 - Markdown files that define role boundaries, review procedure, or protocol rules
+- Plugin, MCP server, and skill dependencies that change what an agent can do
 
 ### 3. Scheduled tasks and automations
 
@@ -90,6 +94,7 @@ A usable bridge inventory should answer:
 - Where are the code artifacts and config files?
 - Which markdown files define behavior or role boundaries?
 - Which scheduled tasks or automations exist, and where are they defined?
+- Which prompts, plugins, MCP servers, and skills are required?
 - Who owns implementation, who reviews, and what exceptions apply?
 - What protocol model does the bridge use?
 - What is the startup health check and retry behavior?

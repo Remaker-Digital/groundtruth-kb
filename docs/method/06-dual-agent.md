@@ -127,4 +127,5 @@ project. At minimum, keep an inventory of:
 - protocol, retry, handshake, and recovery rules
 
 See [Operational Configuration Capture](11-operational-configuration.md) for
-the full capture contract.
+the full capture contract and [File Bridge Automation](12-file-bridge-automation.md)
+for the durable file-bridge polling pattern.
