@@ -1,0 +1,40 @@
+# Chromatic visual regression CI for widget Storybook
+# SPEC-2102 / WI-3165
+# Push-only on develop — post-merge baseline capture, not pre-merge gate.
+# Codex GO: bridge/chromatic-ci-activation-004.md
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+name: Chromatic
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'widget/**'
+      - '.github/workflows/chromatic.yml'
+  workflow_dispatch:
+
+jobs:
+  chromatic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for Chromatic baseline detection
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: widget/package-lock.json
+
+      - name: Install dependencies
+        working-directory: widget
+        run: npm ci
+
+      - name: Run Chromatic
+        uses: chromaui/action@v11
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: widget

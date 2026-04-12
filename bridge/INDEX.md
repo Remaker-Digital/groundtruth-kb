@@ -5,6 +5,12 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: chromatic-ci-activation
+GO: bridge/chromatic-ci-activation-004.md
+REVISED: bridge/chromatic-ci-activation-003.md
+NO-GO: bridge/chromatic-ci-activation-002.md
+NEW: bridge/chromatic-ci-activation-001.md
+
 Document: lo-report-backfill
 VERIFIED: bridge/lo-report-backfill-026.md
 NEW: bridge/lo-report-backfill-025.md

@@ -15,18 +15,20 @@ Do not wait for owner approval between items. Continue unsupervised.
   - Status: REVISED v013 submitted, awaiting Codex review
   - v013 fixes: multi-signal section extraction (mixed GO/NO-GO → informational + warning), narrowed unparsed-signal scan to structured locations only
   - Next: wait for Codex review of v013
-- [ ] UI-EVAL — Evaluate visual/UX testing tools for Agent Red pipeline
-  - Goal: Add UI testing tools that improve appearance, usability, consistency with minimal owner work
-  - Scope: Research Applitools vs Percy vs Chromatic pricing/fit for our TypeScript + Playwright stack
-  - Next: tool evaluation research
-- [ ] UI-SPEC — Create specifications for UI quality testing track (GOV-01)
-  - Depends on: UI-EVAL (tool selection informs spec scope)
-  - Scope: Spec the testing layers (Playwright workflows, axe-core a11y, visual regression, AI UX critique)
-  - Next: after UI-EVAL
-- [ ] UI-PILOT — Implement Playwright + axe-core for top user journeys
-  - Depends on: UI-SPEC (specs before code, GOV-01)
-  - Scope: Add axe-core to existing Playwright suite, cover top 5 user journeys
-  - Next: after UI-SPEC
+- [x] UI-EVAL — Evaluate visual/UX testing tools (S281, complete)
+- [x] UI-SPEC — Specs created: SPEC-2102 (Chromatic CI), SPEC-2103 (axe-core CI), SPEC-2104 (visual baselines)
+- [ ] WI-3165 — Activate Chromatic visual regression CI (SPEC-2102, P2)
+  - Status: specified, ready to implement
+  - Scope: GitHub Actions workflow + CHROMATIC_PROJECT_TOKEN + baseline capture
+  - Next: propose via bridge → implement
+- [ ] WI-3166 — Add axe-core WCAG 2.1 AA to CI (SPEC-2103, P2)
+  - Status: specified, ready to implement
+  - Scope: Include test_accessibility.py in CI or create lighter integration
+  - Next: after WI-3165
+- [ ] WI-3167 — Playwright screenshot baselines (SPEC-2104, P3)
+  - Status: specified, ready to implement
+  - Scope: toHaveScreenshot() for top 5 Provider Console pages
+  - Next: after WI-3166
 
 ## Completed (S280)
 
