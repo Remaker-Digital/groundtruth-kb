@@ -752,8 +752,15 @@ def search_db(tmp_path: Path) -> KnowledgeDB:
 class TestSearchResultContract:
     """Verify search_deliberations returns the stable result contract fields."""
 
-    def test_text_match_has_search_fields(self, db):
-        """SQLite fallback results include search_method and score fields."""
+    def test_text_match_has_search_fields(self, db, monkeypatch):
+        """SQLite fallback results include search_method and score fields.
+
+        Patches HAS_CHROMADB to False so insert_deliberation does not
+        auto-index into ChromaDB, guaranteeing the LIKE fallback path.
+        """
+        import groundtruth_kb.db as _db_mod
+
+        monkeypatch.setattr(_db_mod, "HAS_CHROMADB", False)
         db.insert_deliberation(
             id="DELIB-0001",
             source_type="report",
