@@ -1,10 +1,10 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Prime Bridge Runtime — Synchronous Dialog Model (v3).
+"""Legacy Prime Bridge Runtime - SQLite/MCP synchronous dialog model.
 
-Synchronous inter-agent message bridge between Codex and Prime Builder.
-Three message states: pending -> completed | failed.
-Thread state derived from messages at query time (no cached threads table).
-Non-blocking persistent retry for unresolved exchanges.
+This module is retained for compatibility with projects that still depend on
+the older database-backed bridge. New GroundTruth dual-agent projects should
+use the file bridge pattern documented in
+docs/method/12-file-bridge-automation.md instead.
 """
 
 from __future__ import annotations

@@ -5,19 +5,22 @@ Execute phases A through C in order before beginning any assigned work.
 
 ---
 
-## Phase A: Bridge Sweep and Prime Handshake
+## Phase A: File Bridge Sweep
 
-1. **Query inbox.** Call `list_inbox(agent="codex", status="pending")`.
-2. **Process each pending message.** Read the payload, inspect referenced
-   artifacts, and send a substantive reply with `correlation_id`.
-3. **Resolve processed messages.** Mark each as `completed` or `failed`.
-4. **Send liveness signal.** Send a status message to Prime Builder:
-   "Codex online. Bridge sweep complete. N messages processed."
-5. **Report.** Log the sweep result: message count, any anomalies, bridge
-   health assessment.
+1. **Read the index.** Open `bridge/INDEX.md` if it exists.
+2. **Identify actionable entries.** Process document entries whose latest
+   status is `NEW` or `REVISED`. Entries are newest-first; historical status
+   lines are evidence, not current work.
+3. **Review each entry.** Read the referenced bridge document and relevant
+   artifacts.
+4. **Write the response.** Create the next numbered bridge document and add a
+   `GO`, `NO-GO`, or `VERIFIED` line at the top of the document entry in
+   `bridge/INDEX.md`.
+5. **Report.** Log the result: "File bridge scan: N entries processed."
 
-If the bridge is unreachable after 2 minutes of polling, report the failure
-to the owner before continuing.
+If `bridge/INDEX.md` is missing, report that the file bridge is not initialized
+and continue with Phase B. Do not use the archived SQLite/MCP bridge runtime as
+the active queue for new projects.
 
 ---
 
@@ -26,11 +29,11 @@ to the owner before continuing.
 Load and internalize the following documents in order:
 
 1. `CLAUDE.md` -- Project rules, governance, and procedures.
-2. `memory/MEMORY.md` -- Current project state, versions, recent sessions.
-3. `AGENTS.md` -- Loyal Opposition operating contract (this governs your
-   behavior for the entire session).
-4. `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md` -- Open items,
-   pending decisions, and completed work from prior sessions.
+2. `MEMORY.md` -- Current project state, versions, recent sessions.
+3. `AGENTS.md` -- Loyal Opposition operating contract, if present.
+4. `BRIDGE-INVENTORY.md` -- Bridge scripts, prompts, schedules, and recovery.
+5. `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md` -- Open items,
+   pending decisions, and completed work from prior sessions, if present.
 
 Note any discrepancies between documents. If MEMORY.md and CLAUDE.md conflict,
 CLAUDE.md takes precedence (rules over state).
@@ -39,18 +42,16 @@ CLAUDE.md takes precedence (rules over state).
 
 ## Phase C: Check for Pending Review Requests
 
-1. **Scan bridge messages** for any with `expected_response: advisory_review`
-   or `expected_response: go_no_go` that arrived since last session.
-2. **Check the insight dropbox** for any reports that reference unresolved
-   items requiring follow-up.
-3. **Prioritize.** If there are pending review requests, they take priority
-   over new exploratory analysis. Process them before starting new work.
+1. Confirm whether any latest `NEW` or `REVISED` entries remain in
+   `bridge/INDEX.md`.
+2. Check the insight dropbox for reports that reference unresolved items.
+3. Prioritize pending bridge review requests over exploratory analysis.
 
 Report your readiness state:
 
-```
+```text
 Codex session [session_id] initialized.
-- Bridge: [healthy/degraded/offline]
+- File bridge: [clear/actionable/degraded/not initialized]
 - Documents loaded: [count]
 - Pending reviews: [count]
 - Ready to proceed: [yes/no + reason if no]
@@ -58,4 +59,4 @@ Codex session [session_id] initialized.
 
 ---
 
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

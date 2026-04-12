@@ -184,11 +184,16 @@ def _copy_dual_agent_templates(target: Path) -> None:
     if settings_template.exists():
         shutil.copy2(settings_template, target / ".claude" / "settings.local.json")
 
-    # .gitignore additions for bridge
+    # .gitignore additions for file bridge automation runtime state
     gi = target / ".gitignore"
     content = gi.read_text(encoding="utf-8") if gi.exists() else ""
-    additions = "\n# Bridge database\nbridge.db\nprime_bridge.db\n"
-    if "bridge.db" not in content:
+    additions = (
+        "\n# File bridge automation runtime state\n"
+        "independent-progress-assessments/bridge-automation/logs/\n"
+        "independent-progress-assessments/bridge-automation/*.lock\n"
+        "independent-progress-assessments/bridge-automation/*.tmp\n"
+    )
+    if "bridge-automation/logs" not in content:
         gi.write_text(content + additions, encoding="utf-8")
 
 
@@ -261,41 +266,46 @@ def _render_all_templates(
         "{{TEST_STATUS}}": "Not run yet",
         "{{BRIDGE_INVENTORY_PATH_OR_NA}}": ("BRIDGE-INVENTORY.md" if profile.includes_bridge else "N/A"),
         "{{AUTOMATION_SUMMARY_OR_NA}}": (
-            "Bridge resident worker + poller configured" if profile.includes_bridge else "None configured yet"
+            "File bridge inventory and setup prompt included; configure OS pollers per project"
+            if profile.includes_bridge
+            else "None configured yet"
         ),
         "{{OPS_HEALTH_NOTES}}": "Bootstrap complete. Update after the first working session.",
         "{{AGENT_OR_PROCESS_1}}": ("prime-builder" if profile.includes_bridge else "builder-agent"),
         "{{RESPONSIBILITY}}": "Implementation, specs, and project bootstrap",
         "{{REVIEWER}}": ("codex (Loyal Opposition)" if profile.includes_bridge else "owner"),
         "{{NOTES}}": "Replace with your actual collaboration topology.",
-        "{{PATH_TO_ENTRYPOINT}}": ("gt bridge serve (MCP)" if profile.includes_bridge else "TBD"),
+        "{{PATH_TO_ENTRYPOINT}}": ("bridge/INDEX.md + project-owned OS pollers" if profile.includes_bridge else "TBD"),
         "{{WHAT_IT_DOES}}": (
-            "Synchronous dialog bridge between Prime and Codex"
+            "File bridge queue for Prime Builder and Loyal Opposition review handoffs"
             if profile.includes_bridge
             else "Document your bridge or automation entrypoint here."
         ),
         "{{HOW_IT_RUNS}}": (
-            "SessionStart hook launches resident worker" if profile.includes_bridge else "Manual start or scheduled run"
+            "OS scheduler invokes project-owned scanner scripts"
+            if profile.includes_bridge
+            else "Manual start or scheduled run"
         ),
         "{{OTHER_PATH}}": "TBD",
         "{{KIND}}": "TBD",
         "{{PURPOSE}}": "Replace with the actual purpose for this control surface.",
         "{{WHEN_TO_UPDATE}}": "Whenever the runtime or coordination rules change.",
-        "{{AUTOMATION_NAME}}": "bridge-resident-worker",
-        "{{SCHEDULE}}": "Session start (hook-driven)",
-        "{{EXECUTOR}}": "groundtruth_kb.bridge.worker",
-        "{{SOURCE}}": ".claude/hooks/",
-        "{{FAILURE_SIGNAL}}": "Bridge health check failure",
+        "{{AUTOMATION_NAME}}": "file-bridge-os-pollers",
+        "{{SCHEDULE}}": "Project-defined OS scheduler interval",
+        "{{EXECUTOR}}": "claude -p / codex exec via project-owned scanner scripts",
+        "{{SOURCE}}": "bridge-os-poller-setup-prompt.md and BRIDGE-INVENTORY.md",
+        "{{FAILURE_SIGNAL}}": "No recent scan logs or stale actionable bridge entries",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (
-            "Asynchronous message passing with synchronous dialog semantics. Not all messages require replies."
+            "File-based latest-status queue in bridge/INDEX.md. Entries are newest-first."
         ),
-        "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": ("Substantive messages with expected_response field require replies."),
-        "{{WHEN_TO_RETRY}}": "Non-blocking persistent retry, 3 attempts max, 5-minute interval.",
-        "{{STARTUP_OR_LIVENESS_CHECK}}": (
-            "Session-start handshake: send 'Report your current operating state' and wait for reply."
+        "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": (
+            "Latest NEW/REVISED entries require Loyal Opposition verdicts; latest GO/NO-GO entries "
+            "require Prime responses."
         ),
+        "{{WHEN_TO_RETRY}}": "Scheduled re-scan after the next interval; lock files prevent overlapping runs.",
+        "{{STARTUP_OR_LIVENESS_CHECK}}": ("Read bridge/INDEX.md, scheduler state, and recent scan logs."),
         "{{WHEN_RESTARTS_ARE_ALLOWED_OR_AVOIDED}}": (
-            "Restart only for code deployment, bad session state, or instruction reload."
+            "No long-running bridge process is required; update scheduled tasks after scanner or prompt changes."
         ),
         "{{ENV_CONFIG_IDS_OR_NOTES}}": "Add KB IDs or notes here.",
         "{{PROCEDURE_IDS_OR_NOTES}}": "Add KB IDs or notes here.",
@@ -375,7 +385,7 @@ approval from the owner.
 - **Output:** evidence-based reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
 
 ## Startup Checklist
-1. Run bridge sweep: check for pending messages
+1. Run file bridge sweep: check bridge/INDEX.md for latest NEW or REVISED entries
 2. Read project CLAUDE.md and MEMORY.md
 3. Report operating state to Prime Builder
 
@@ -432,8 +442,8 @@ def _write_default_env_example(target: Path) -> None:
 ENVIRONMENT=development
 LOG_LEVEL=INFO
 
-# GroundTruth bridge (dual-agent mode)
-PRIME_BRIDGE_DB=~/.claude/prime-bridge/bridge.db
+# GroundTruth file bridge (dual-agent mode)
+# Configure project-owned OS pollers from bridge-os-poller-setup-prompt.md.
 
 # Azure OpenAI (if using AI features)
 # AZURE_OPENAI_ENDPOINT=

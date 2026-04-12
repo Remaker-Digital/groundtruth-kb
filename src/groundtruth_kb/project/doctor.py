@@ -354,37 +354,38 @@ def _check_rules(target: Path, profile_name: str) -> ToolCheck:
     )
 
 
-def _check_bridge_health() -> ToolCheck:
-    """Check bridge database accessibility (dual-agent only)."""
-    try:
-        from groundtruth_kb.bridge.runtime import get_bridge_db
+def _check_file_bridge_setup(target: Path) -> ToolCheck:
+    """Check file bridge configuration capture for dual-agent projects."""
+    inventory = target / "BRIDGE-INVENTORY.md"
+    setup_prompt = target / "bridge-os-poller-setup-prompt.md"
+    index = target / "bridge" / "INDEX.md"
 
-        conn = get_bridge_db()
-        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-        conn.close()
-        if "messages" in tables:
-            return ToolCheck(
-                name="Bridge DB",
-                required=True,
-                found=True,
-                status="pass",
-                message="Bridge database accessible",
-            )
+    missing = [path.name for path in (inventory, setup_prompt) if not path.exists()]
+    if missing:
         return ToolCheck(
-            name="Bridge DB",
+            name="File Bridge Config",
+            required=True,
+            found=False,
+            status="warning",
+            message=f"Missing file bridge setup artifact(s): {', '.join(missing)}",
+        )
+
+    if index.exists():
+        return ToolCheck(
+            name="File Bridge Config",
             required=True,
             found=True,
             status="pass",
-            message="Bridge database exists (empty schema — will initialize on first use)",
+            message="File bridge inventory, setup prompt, and bridge/INDEX.md present",
         )
-    except Exception as e:
-        return ToolCheck(
-            name="Bridge DB",
-            required=True,
-            found=True,
-            status="warning",
-            message=f"Bridge DB check: {e}",
-        )
+
+    return ToolCheck(
+        name="File Bridge Config",
+        required=True,
+        found=True,
+        status="pass",
+        message="File bridge inventory and setup prompt present; create bridge/INDEX.md when enabling pollers",
+    )
 
 
 # ── Auto-install ──────────────────────────────────────────────────────
@@ -494,7 +495,7 @@ def run_doctor(
     checks.append(_check_rules(target, profile))
 
     if p.includes_bridge:
-        checks.append(_check_bridge_health())
+        checks.append(_check_file_bridge_setup(target))
 
     # Auto-install pass
     if auto_install:

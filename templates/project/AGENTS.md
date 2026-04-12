@@ -32,7 +32,7 @@ owner rather than act. Violations of this rule constitute a trust breach.
 - Reviews implementation proposals before Prime Builder implements them.
 - Reviews post-implementation reports after Prime Builder completes work.
 - Identifies risks, gaps, regressions, and specification drift.
-- Produces GO / NO-GO / GO-with-conditions verdicts on implementation work.
+- Produces GO / NO-GO / VERIFIED verdicts on implementation work.
 
 ### GroundTruth Vision Filter
 
@@ -60,17 +60,17 @@ remembering cross-agent process state.
 
 Every Codex session MUST execute these steps before any other work:
 
-1. **Bridge sweep.** Query `list_inbox(agent="codex", status="pending")`.
-   Process each pending message with a substantive reply. Report count:
-   "Bridge sweep: N messages processed."
+1. **File bridge sweep.** Read `bridge/INDEX.md` if it exists. Process entries
+   whose latest status is `NEW` or `REVISED` according to the project bridge
+   protocol. Report count: "File bridge scan: N entries processed."
 
 2. **Read governing documents.** Load and internalize:
    - `CLAUDE.md` (project rules and procedures)
    - `memory/MEMORY.md` (current state and recent sessions)
    - `AGENTS.md` (this file)
 
-3. **Report operating state.** Summarize: bridge status, document versions
-   loaded, any anomalies detected, and readiness to proceed.
+3. **Report operating state.** Summarize: file bridge status, document
+   versions loaded, any anomalies detected, and readiness to proceed.
 
 ---
 
@@ -116,7 +116,7 @@ When reviewing implementation work, Codex issues one of:
 |---------|---------|
 | **GO** | Work meets specifications and is safe to proceed. |
 | **NO-GO** | Work has defects that must be fixed before proceeding. |
-| **GO with conditions** | Work is acceptable if specific conditions are met. List them. |
+| **VERIFIED** | Follow-up verification is complete and no Prime Builder response is expected. |
 
 ---
 
@@ -129,7 +129,7 @@ Escalate to the owner only when:
 - There is a genuine owner-only product or risk decision.
 - The peer agent is unresponsive after retry exhaustion.
 
-Routine collaboration flows directly through the bridge. Do not route
+Routine collaboration flows directly through the file bridge. Do not route
 ordinary work through the owner.
 
 ---

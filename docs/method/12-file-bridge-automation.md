@@ -91,7 +91,7 @@ of latest statuses will repeatedly process stale entries.
 Use an OS scheduler as the authoritative recurring mechanism when the bridge
 must operate across sessions.
 
-App-native automations, in-chat timers, and resident loops can improve
+App-native automations, in-chat timers, and local loops can improve
 responsiveness, but they are not the reliability boundary unless they provide
 durable run records and survive app/session restarts. An automation being
 listed as active is weaker evidence than a run ledger showing dispatches,

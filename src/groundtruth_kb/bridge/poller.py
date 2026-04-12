@@ -1,17 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Prime Bridge periodic notification poller.
+"""Legacy periodic notification poller for the SQLite/MCP bridge runtime.
 
-Runs as a lightweight background process that long-polls bridge notifications
-and automatically handles new peer messages to keep bridge coordination fluid
-without manual inbox checks.
-
-Behavior:
-- Polls notifications with wait_for_notifications() in a timed loop.
-- Detects new peer messages and wakes follow-up handling without auto-accepting
-  substantive work.
-- Treats message.failed notifications as direct wake signals for the sending agent.
-- Persists last processed notification event ID to disk.
-- Uses a file lock to prevent duplicate pollers per agent.
+Retained for compatibility with older database-backed bridge deployments. New
+dual-agent projects should use project-owned file bridge OS pollers instead.
 """
 
 from __future__ import annotations

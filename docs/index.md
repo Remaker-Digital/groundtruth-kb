@@ -23,7 +23,7 @@ engineering decisions.
 Layer 3: Workstation Doctor    gt project doctor
 Layer 2: Project Scaffold      gt project init / upgrade
 Layer 1: Core Knowledge DB     gt init / seed / assert / serve
-         Bridge Runtime        dual-agent coordination [optional]
+         File Bridge Setup     dual-agent coordination templates [optional]
 ```
 
 ## Quick Start
@@ -44,4 +44,4 @@ See the [Bootstrap Guide](bootstrap.md) for a complete 10-step walkthrough.
 - **Project Scaffolding** — three profiles for different team configurations
 - **CI Templates** — test, build, and deploy workflow templates
 - **Process Templates** — CLAUDE.md, MEMORY.md, hooks, and rules
-- **Bridge Runtime** — dual-agent coordination (Prime Builder + Loyal Opposition)
+- **File Bridge Setup** — dual-agent coordination templates (Prime Builder + Loyal Opposition)

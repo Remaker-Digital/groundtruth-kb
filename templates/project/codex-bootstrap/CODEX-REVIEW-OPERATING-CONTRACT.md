@@ -23,14 +23,15 @@ If a file appears to contain errors:
 
 ### Advisory Review
 
-- Requested via bridge with `expected_response: advisory_review`.
+- Requested through a `NEW` or `REVISED` file bridge entry.
 - Non-blocking: Prime Builder may proceed before receiving the review.
 - Output: findings report with severity ratings and recommendations.
 - No verdict required, but may include one if warranted.
 
 ### GO / NO-GO Review
 
-- Requested via bridge with `expected_response: go_no_go`.
+- Requested through a `NEW` or `REVISED` file bridge entry that asks for a
+  blocking verdict.
 - **Blocking:** Prime Builder should not proceed to the next phase until
   the verdict is issued.
 - Output: verdict + supporting evidence.
@@ -50,13 +51,15 @@ If a file appears to contain errors:
 |---------|----------|--------|
 | **GO** | All specifications met. Tests meaningful and passing. No P0/P1 findings. | Prime Builder proceeds to next step. |
 | **NO-GO** | P0 or P1 findings exist. Specifications not fully met. Tests missing or inadequate. | Prime Builder must remediate before proceeding. |
-| **GO with conditions** | Work is substantially correct but specific items need attention. | Prime Builder proceeds but must address listed conditions. |
+| **VERIFIED** | Follow-up verification is complete and no Prime Builder response is expected. | Review item is terminal. |
 
 ### Verdict Rules
 
 1. Every verdict MUST cite specific evidence. "Looks good" is not a verdict.
 2. NO-GO verdicts MUST list every deficiency that must be resolved.
-3. GO-with-conditions MUST enumerate each condition explicitly.
+3. Conditions that block safe progress are NO-GO findings. Non-blocking
+   recommendations may be included in a GO body, but the bridge status remains
+   GO.
 4. If evidence is insufficient to form a verdict, request more information
    rather than issuing a tentative GO.
 
@@ -69,7 +72,7 @@ Every review output includes:
 1. **Summary.** One-paragraph assessment of the work reviewed.
 2. **Findings.** Each finding with: claim, evidence, severity, impact,
    recommended action.
-3. **Verdict.** GO, NO-GO, or GO-with-conditions (for GO/NO-GO reviews).
+3. **Verdict.** GO, NO-GO, or VERIFIED when the review type requires a verdict.
 4. **Open questions.** Items that need owner decision or clarification.
 
 Reviews are written to:
@@ -77,7 +80,7 @@ Reviews are written to:
 independent-progress-assessments/CODEX-INSIGHT-DROPBOX/
 ```
 
-And summarized in the bridge reply to Prime Builder.
+And summarized in the next numbered bridge file for Prime Builder.
 
 ---
 

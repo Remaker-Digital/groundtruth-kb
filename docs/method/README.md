@@ -24,7 +24,7 @@ Engineering discipline for AI-powered systems — from specification to producti
 
 | Document | Description |
 |----------|-------------|
-| [Product Architecture](../architecture/product-split.md) | Single-package architecture: core KB, project scaffold, workstation doctor, bridge runtime |
+| [Product Architecture](../architecture/product-split.md) | Single-package architecture: core KB, project scaffold, workstation doctor, and file bridge setup |
 
 ## Prerequisites
 

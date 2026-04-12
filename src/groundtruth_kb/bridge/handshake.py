@@ -1,9 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Codex session-start handshake with Prime.
+"""Legacy Codex session-start handshake with Prime.
 
-Sends the required session-start request to Prime, waits for a reply on the
-same bridge thread, and exits non-zero if the reply is not received before the
-timeout.
+This module uses the archived SQLite/MCP bridge runtime. New dual-agent
+projects should use the file bridge protocol and OS pollers instead.
 """
 
 from __future__ import annotations
