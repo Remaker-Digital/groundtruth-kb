@@ -26,6 +26,22 @@ Include:
 - health-check or recovery scripts
 - message stores or runtime databases when relevant
 
+## File bridge protocol
+
+If this project uses the file bridge pattern, capture the exact status rules.
+
+| Direction | Watches for latest status | Writes status | Terminal statuses |
+|-----------|---------------------------|---------------|-------------------|
+| Prime Builder -> Loyal Opposition | NEW, REVISED | GO, NO-GO, VERIFIED | VERIFIED |
+| Loyal Opposition -> Prime Builder | GO, NO-GO | NEW, REVISED | VERIFIED |
+
+Notes:
+- `bridge/INDEX.md` is the authoritative queue when the file bridge is active.
+- Entries are newest-first. Only the latest status for each document entry is
+  actionable.
+- `VERIFIED` is terminal and must not trigger Prime Builder action.
+- Archived bridge runtimes or inactive queues should be marked inactive here.
+
 ## Directive and instruction surfaces
 
 | Path | Kind | Purpose | Update trigger |
@@ -36,6 +52,16 @@ Include:
 
 Include markdown files, rule files, prompt files, runbooks, and any other
 control documents that change bridge or automation behavior.
+
+## Agent CLI, prompts, plugins, and skills
+
+| Agent / process | CLI command | Prompt source | Config files | Plugins / MCP / skills |
+|-----------------|-------------|---------------|--------------|------------------------|
+| Prime Builder | TBD | TBD | TBD | TBD |
+| Loyal Opposition | TBD | TBD | TBD | TBD |
+
+Capture the exact prompt passed to scheduled runs, or the path to the prompt
+file. Prompt text is operational configuration when it changes bridge behavior.
 
 ## Scheduled tasks and automations
 

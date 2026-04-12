@@ -183,6 +183,7 @@ TEMPLATES=$(python -c "from groundtruth_kb import get_templates_dir; print(get_t
 cp "$TEMPLATES/CLAUDE.md" ./CLAUDE.md
 cp "$TEMPLATES/MEMORY.md" ./MEMORY.md
 cp "$TEMPLATES/BRIDGE-INVENTORY.md" ./BRIDGE-INVENTORY.md
+cp "$TEMPLATES/bridge-os-poller-setup-prompt.md" ./bridge-os-poller-setup-prompt.md
 
 # Hooks for Claude Code
 mkdir -p .claude/hooks .claude/rules
@@ -190,7 +191,8 @@ cp "$TEMPLATES/hooks/"*.py .claude/hooks/
 cp "$TEMPLATES/rules/"*.md .claude/rules/
 ```
 
-Edit `CLAUDE.md` and `MEMORY.md` to replace the `{{PLACEHOLDER}}` values with your project's details.
+Edit `CLAUDE.md`, `MEMORY.md`, `BRIDGE-INVENTORY.md`, and the bridge setup
+prompt to replace placeholders with your project's details.
 
 If your project uses a bridge, multiple agents, resident workers, or recurring
 automations, keep `BRIDGE-INVENTORY.md` and the related rule/state files
