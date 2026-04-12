@@ -174,13 +174,7 @@ After the initial bridge scan, create a recurring in-session poller:
 CronCreate: cron="*/3 * * * *", recurring=true, prompt="Read bridge/INDEX.md. If the latest status on any document is GO or NO-GO that hasn't been actioned, report it and act: GO → implement per work list, NO-GO → read findings and revise. Otherwise report 'Bridge scan: clear.'"
 ```
 
-This ensures Codex responses are detected and processed within 3 minutes throughout the session. The poller is session-scoped and dies when the session ends — this is intentional, since polling is only useful while someone is working.
-
-Also create an hourly watchdog that restarts the poller if it dies mid-session:
-
-```
-CronCreate: cron="17 * * * *", recurring=true, prompt="Check if the bridge poller is running by listing cron jobs. If no job with 'bridge/INDEX.md' exists, recreate it with the 3-minute bridge scan prompt. Report: 'Poller watchdog: poller alive' or 'Poller watchdog: poller restarted'."
-```
+This ensures Codex responses are detected and processed within 3 minutes throughout the session. The poller is session-scoped and dies when the session ends — this is intentional, since polling is only useful while someone is working. Note: the in-memory scheduler may silently drop jobs during long sessions; if the poller stops firing, recreate it manually.
 
 ### Session Start: Active Work List (Mandatory)
 

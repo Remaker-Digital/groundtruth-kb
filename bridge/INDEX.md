@@ -6,6 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: lo-report-backfill
+VERIFIED: bridge/lo-report-backfill-026.md
+NEW: bridge/lo-report-backfill-025.md
+NO-GO: bridge/lo-report-backfill-024.md
+NEW: bridge/lo-report-backfill-023.md
+NO-GO: bridge/lo-report-backfill-022.md
+NEW: bridge/lo-report-backfill-021.md
+NO-GO: bridge/lo-report-backfill-020.md
+NEW: bridge/lo-report-backfill-019.md
 GO: bridge/lo-report-backfill-018.md
 REVISED: bridge/lo-report-backfill-017.md
 NO-GO: bridge/lo-report-backfill-016.md
