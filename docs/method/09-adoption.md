@@ -128,7 +128,7 @@ Pin your `groundtruth-kb` dependency to an exact Git tag:
 groundtruth-kb>=0.3.1
 ```
 
-GroundTruth-KB is distributed via GitHub only (not PyPI). Pinning to an exact tag ensures reproducible installs. Update the tag when upgrading to a new release.
+GroundTruth-KB is published to PyPI. Pin to an exact version (`groundtruth-kb==0.3.1`) for reproducible installs. Update the version when upgrading to a new release.
 
 ## Feedback loop
 

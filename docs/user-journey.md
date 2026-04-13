@@ -403,16 +403,16 @@ Sarah: Deploy to production.
 
 ## How GroundTruth Features Map to Sarah's Journey
 
-| Feature | Role | Phase |
-|---------|------|-------|
-| Schema Enrichment | Tracks authority, testability, stability on every spec | 2 |
-| Change Impact Analysis | Shows blast radius when requirements change | 3, 4 |
-| Quality Gate | Scores spec quality, flags gaps to fill | 2, 5 |
-| Constraint Propagation | Links architecture decisions to affected specs | 3 |
-| Requirement Intake | Classifies natural language input as requirements | 1 |
-| Scaffold Generator | Generates seed specs and project structure | 0 |
-| Session Health Dashboard | Shows progress metrics at session boundaries | 4, 5 |
-| Provenance Reconciliation | Catches orphans, duplicates, authority conflicts | 5 |
+| ID | Feature | Role | Phase |
+|----|---------|------|-------|
+| F1 | Schema Enrichment | Tracks authority, testability, stability on every spec | 2 |
+| F2 | Change Impact Analysis | Shows blast radius when requirements change | 3, 4 |
+| F3 | Quality Gate | Scores spec quality, flags gaps to fill | 2, 5 |
+| F4 | Constraint Propagation | Links architecture decisions to affected specs | 3 |
+| F5 | Requirement Intake | Classifies natural language input as requirements | 1 |
+| F6 | Scaffold Generator | Generates seed specs and project structure | 0 |
+| F7 | Session Health Dashboard | Shows progress metrics at session boundaries | 4, 5 |
+| F8 | Provenance Reconciliation | Catches orphans, duplicates, authority conflicts | 5 |
 
 ---
 

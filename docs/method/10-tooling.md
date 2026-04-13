@@ -5,7 +5,7 @@ This guide covers the practical use of the GroundTruth CLI, web UI, and configur
 ## Installation
 
 ```bash
-# Install from GitHub (not published to PyPI)
+# Install from PyPI
 pip install groundtruth-kb
 ```
 
