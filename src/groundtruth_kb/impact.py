@@ -135,6 +135,51 @@ def _classify_blast_radius(related_count: int, config: ImpactConfig) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _find_dependents(db: KnowledgeDB, spec_id: str) -> list[dict[str, Any]]:
+    """Find specs that depend on spec_id via affected_by linkages.
+
+    Traversal: max depth 2 (direct + 1 transitive level).
+    Cycle-safe via visited set.  Dedup at shallowest depth.
+    Returns sorted by (depth, spec_id).
+    """
+    if not spec_id or spec_id == "<unsaved>":
+        return []
+
+    visited: set[str] = {spec_id}
+    result_map: dict[str, dict[str, Any]] = {}
+
+    # Depth 1: direct dependents
+    direct = db.get_specs_affected_by(spec_id)
+    for s in direct:
+        sid = s["id"]
+        if sid not in visited:
+            visited.add(sid)
+            result_map[sid] = {
+                "id": sid,
+                "title": s.get("title", ""),
+                "depth": 1,
+                "via": spec_id,
+            }
+
+    # Depth 2: transitive dependents (one more level)
+    for d in list(result_map.values()):
+        if d["depth"] != 1:
+            continue
+        transitive = db.get_specs_affected_by(d["id"])
+        for s in transitive:
+            sid = s["id"]
+            if sid not in visited:
+                visited.add(sid)
+                result_map[sid] = {
+                    "id": sid,
+                    "title": s.get("title", ""),
+                    "depth": 2,
+                    "via": d["id"],
+                }
+
+    return sorted(result_map.values(), key=lambda x: (x["depth"], x["id"]))
+
+
 def _get_spec_tags(spec: dict[str, Any]) -> set[str]:
     """Extract tags as a set from a spec dict (handles parsed or raw)."""
     parsed = spec.get("tags_parsed")
@@ -212,8 +257,28 @@ def compute_impact_analysis(
         related,
     )
 
-    # --- Recommendation ---
-    if blast_radius == "systemic":
+    # --- F2-B: Dependents via affected_by traversal ---
+    dependents = _find_dependents(db, spec_id)
+
+    # --- F2-B: Authority distribution ---
+    authority_dist: dict[str, int] = {}
+    for s in related:
+        auth = s.get("authority") or "null"
+        authority_dist[auth] = authority_dist.get(auth, 0) + 1
+
+    # --- F2-B: Testability summary ---
+    testability_summary: dict[str, int] = {}
+    for s in related:
+        tb = s.get("testability") or "null"
+        testability_summary[tb] = testability_summary.get(tb, 0) + 1
+
+    # --- Recommendation (with F2-B authority awareness) ---
+    high_authority = authority_dist.get("stated", 0) + authority_dist.get("inherited", 0)
+    if blast_radius == "systemic" and high_authority == 0 and related_count > 0:
+        recommendation = (
+            "Systemic blast radius, but all related specs have low-confidence authority. Review may be lower priority."
+        )
+    elif blast_radius == "systemic":
         recommendation = "High-impact change. Review all related specs before proceeding."
     elif potential_conflicts:
         recommendation = "Conflicts detected. Resolve assertion contradictions before proceeding."
@@ -228,10 +293,12 @@ def compute_impact_analysis(
         "blast_radius": blast_radius,
         "related_spec_count": related_count,
         "related_specs": related,
-        "dependents": [],  # Phase A — Phase B adds affected_by_parsed lookup
+        "dependents": dependents,
         "applicable_constraints": applicable_constraints,
         "potential_conflicts": potential_conflicts,
         "annotations": annotations,
         "touches_architecture": len(applicable_constraints) > 0,
         "recommendation": recommendation,
+        "authority_distribution": authority_dist,
+        "testability_summary": testability_summary,
     }

@@ -1,4 +1,4 @@
-"""Tests for F4-A: Cross-Cutting Constraint Propagation (Phase A — Read-Only)."""
+"""Tests for F4: Cross-Cutting Constraint Propagation (Phase A + B)."""
 
 from __future__ import annotations
 
@@ -150,3 +150,148 @@ class TestF4AConstraintPropagation:
             )
         constraints = db.check_constraints_for_spec(section="core")
         assert len(constraints) >= 3
+
+
+class TestF4BConstraintPropagation:
+    """Tests for F4-B: constraint linkage writes via propagate_constraint()."""
+
+    def _setup_constraint(self, db, section="data-access"):
+        """Create an ADR + functional specs in the same section."""
+        db.insert_spec(
+            id="ADR-100",
+            title="Isolation Policy",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
+            section=section,
+            type="architecture_decision",
+        )
+        db.insert_spec(
+            id="SPEC-100",
+            title="User Query",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
+            section=section,
+        )
+        db.insert_spec(
+            id="SPEC-101",
+            title="Data Export",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
+            section=section,
+        )
+
+    def test_f4b_dry_run_propagation(self, db):
+        """Dry-run reports affected specs without creating new versions."""
+        self._setup_constraint(db)
+        v_before = db.get_spec("SPEC-100")["version"]
+
+        result = db.propagate_constraint("ADR-100", dry_run=True)
+        assert result["dry_run"] is True
+        assert result["newly_linked"] == 2
+        assert result["already_linked"] == 0
+        ids = [a["id"] for a in result["affected_specs"]]
+        assert "SPEC-100" in ids
+        assert "SPEC-101" in ids
+
+        # No version change
+        assert db.get_spec("SPEC-100")["version"] == v_before
+
+    def test_f4b_write_propagation(self, db):
+        """Write propagation creates new versions with affected_by linkage."""
+        self._setup_constraint(db)
+
+        result = db.propagate_constraint("ADR-100", dry_run=False)
+        assert result["newly_linked"] == 2
+        assert result["dry_run"] is False
+
+        spec = db.get_spec("SPEC-100")
+        assert "ADR-100" in (spec.get("affected_by_parsed") or [])
+
+    def test_f4b_already_linked_skip(self, db):
+        """Second propagation shows already_linked, no new versions."""
+        self._setup_constraint(db)
+        db.propagate_constraint("ADR-100", dry_run=False)
+        v_after_first = db.get_spec("SPEC-100")["version"]
+
+        result = db.propagate_constraint("ADR-100", dry_run=False)
+        assert result["already_linked"] == 2
+        assert result["newly_linked"] == 0
+
+        # No version change
+        assert db.get_spec("SPEC-100")["version"] == v_after_first
+
+    def test_f4b_excludes_constraint_peers(self, db):
+        """Propagation returns only functional specs, not ADR/DCL peers."""
+        self._setup_constraint(db)
+        db.insert_spec(
+            id="DCL-100",
+            title="Query Limit",
+            status="specified",
+            changed_by="test",
+            change_reason="test",
+            section="data-access",
+            type="design_constraint",
+        )
+
+        result = db.propagate_constraint("ADR-100", dry_run=True)
+        ids = [a["id"] for a in result["affected_specs"]]
+        assert "DCL-100" not in ids
+        assert "ADR-100" not in ids
+        assert "SPEC-100" in ids
+
+    def test_f4b_link_removal_with_reason(self, db):
+        """Removing a link creates a new version with change_reason."""
+        self._setup_constraint(db)
+        db.propagate_constraint("ADR-100", dry_run=False)
+        v_before = db.get_spec("SPEC-100")["version"]
+
+        result = db.remove_constraint_link(
+            "SPEC-100",
+            "ADR-100",
+            change_reason="Scope narrowing: SPEC-100 no longer in isolation scope",
+        )
+        assert result["removed"] is True
+
+        spec = db.get_spec("SPEC-100")
+        assert "ADR-100" not in (spec.get("affected_by_parsed") or [])
+        assert spec["version"] == v_before + 1
+        assert spec["change_reason"] == "Scope narrowing: SPEC-100 no longer in isolation scope"
+
+    def test_f4b_link_removal_idempotent(self, db):
+        """Removing a constraint not in affected_by returns removed=False."""
+        self._setup_constraint(db)
+
+        result = db.remove_constraint_link(
+            "SPEC-100",
+            "ADR-999",
+            change_reason="test removal",
+        )
+        assert result["removed"] is False
+
+    def test_f4b_append_only_versioning(self, db):
+        """Propagation creates version N+1; original version preserved."""
+        self._setup_constraint(db)
+        v_original = db.get_spec("SPEC-100")["version"]
+
+        db.propagate_constraint("ADR-100", dry_run=False)
+        spec = db.get_spec("SPEC-100")
+        assert spec["version"] == v_original + 1
+
+        # Original version still in history
+        history = db.get_spec_history("SPEC-100")
+        versions = [h["version"] for h in history]
+        assert v_original in versions
+        assert v_original + 1 in versions
+
+    def test_f4b_changed_by_and_reason_audit(self, db):
+        """New version has changed_by='constraint-propagation' and non-empty reason."""
+        self._setup_constraint(db)
+        db.propagate_constraint("ADR-100", dry_run=False)
+
+        spec = db.get_spec("SPEC-100")
+        assert spec["changed_by"] == "constraint-propagation"
+        assert "ADR-100" in spec["change_reason"]
+        assert len(spec["change_reason"]) > 0
