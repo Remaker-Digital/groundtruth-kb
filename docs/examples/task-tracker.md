@@ -192,7 +192,7 @@ of GroundTruth is released:
 
 1. Update the dependency:
    ```bash
-   pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+   pip install groundtruth-kb
    ```
 2. Run assertions: `gt --config groundtruth.toml assert`
 3. Run tests: `pytest tests/ -v`

@@ -98,7 +98,7 @@ When a new GroundTruth release is available:
 1. **Read the changelog.** Identify breaking changes, new features, and deprecations.
 2. **Update the dependency** (update the tag in your requirements file):
    ```
-   groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0
+   groundtruth-kb>=0.3.1
    ```
    Then reinstall: `pip install -r requirements.txt`
 3. **Run assertions.** Verify that your existing specifications and assertions still pass with the new version.
@@ -125,7 +125,7 @@ Pin your `groundtruth-kb` dependency to an exact Git tag:
 
 ```
 # requirements.txt or pyproject.toml
-groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0
+groundtruth-kb>=0.3.1
 ```
 
 GroundTruth-KB is distributed via GitHub only (not PyPI). Pinning to an exact tag ensures reproducible installs. Update the tag when upgrading to a new release.

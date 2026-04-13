@@ -1,8 +1,11 @@
 # 0. Vision
 
+> For a concrete walkthrough of this vision in practice, see
+> [The User Journey](../user-journey.md).
+
 GroundTruth KB exists to support a software factory: the owner of a software
 development project delivers specifications to the pipeline, and the pipeline
-produces a production-deployable SaaS application ready for Azure.
+produces a production-deployable SaaS application.
 
 During development, the owner's responsibility should be limited to:
 

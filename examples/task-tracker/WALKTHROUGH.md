@@ -182,7 +182,7 @@ Look at the three workflow files in `.github/workflows/`:
 This project consumes `groundtruth-kb` as a dependency. When a new version
 of GroundTruth is released:
 
-1. Update the dependency: `pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"`
+1. Update the dependency: `pip install groundtruth-kb`
 2. Run assertions: `gt --config groundtruth.toml assert`
 3. Run tests: `pytest tests/ -v`
 4. If everything passes, you're on the new version

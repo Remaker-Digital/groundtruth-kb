@@ -56,6 +56,6 @@ jobs:
 
       - name: Run post-deploy assertions
         run: |
-          pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+          pip install groundtruth-kb
           gt --config groundtruth.toml assert
           echo "Post-deploy assertions passed"

@@ -23,7 +23,7 @@ use `gt project init my-project --profile <profile>` (see
 ## Step 1: Install GroundTruth
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install groundtruth-kb
 ```
 
 Verify the installation:
@@ -166,7 +166,7 @@ If the assertion passes (the file and pattern exist), you'll see a passing resul
 The web UI requires the `[web]` extra:
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install "groundtruth-kb[web]"
 gt serve
 ```
 

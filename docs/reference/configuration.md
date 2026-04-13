@@ -96,7 +96,7 @@ The `chroma_path` setting has three levels:
 !!! note "Requires search extra"
     ChromaDB features require the `[search]` extra:
     ```bash
-    pip install "groundtruth-kb[search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+    pip install "groundtruth-kb[search]"
     ```
 
 ## Environment Variables

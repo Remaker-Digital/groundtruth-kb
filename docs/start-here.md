@@ -27,12 +27,12 @@ flowchart TD
 ## Step 1: Install GroundTruth
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install groundtruth-kb
 ```
 
-!!! note "GitHub-only distribution"
-    GroundTruth-KB is installed directly from GitHub, not PyPI.
-    Always pin to an exact release tag for reproducible installs.
+!!! tip "Pinned installs"
+    For reproducible installs, pin to an exact version:
+    `pip install groundtruth-kb==0.3.1`
 
 ## Step 2: Verify Installation
 
@@ -43,7 +43,7 @@ gt --version
 Expected output:
 
 ```
-gt, version 0.3.0
+gt, version 0.3.1
 ```
 
 ## Step 3: Create a New Project
@@ -168,7 +168,7 @@ change reasons.
 Install the web extra:
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install "groundtruth-kb[web]"
 ```
 
 Then start the server:

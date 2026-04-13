@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/codeql.yml/badge.svg)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/codeql.yml)
 [![Security](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/security.yml/badge.svg)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/security.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=mike-remakerdigital_groundtruth&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mike-remakerdigital_groundtruth)
+[![PyPI](https://img.shields.io/pypi/v/groundtruth-kb.svg)](https://pypi.org/project/groundtruth-kb/)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -41,8 +42,8 @@ See the [product architecture](docs/architecture/product-split.md) for details.
 ## Quick Start
 
 ```bash
-# Install from GitHub
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+# Install from PyPI
+pip install groundtruth-kb
 
 # Create a project with scaffolding
 gt project init my-project --owner "Your Organization" --init-git
@@ -57,7 +58,7 @@ gt --config my-project/groundtruth.toml assert
 **Web UI** (requires `[web]` extra):
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install "groundtruth-kb[web]"
 gt --config my-project/groundtruth.toml serve
 # Visit http://localhost:8090
 ```
@@ -68,8 +69,9 @@ gt --config my-project/groundtruth.toml serve
 gt bootstrap-desktop my-prototype --owner "Your Organization" --init-git
 ```
 
-> New to GroundTruth? Start with the [getting started guide](docs/bootstrap.md)
-> for a 10-step walkthrough.
+> **New to GroundTruth?** Read [The User Journey](docs/user-journey.md) to see
+> what building a product with GroundTruth looks like end-to-end. Then follow
+> the [getting started guide](docs/bootstrap.md) for a 10-step technical walkthrough.
 
 ## Why?
 
