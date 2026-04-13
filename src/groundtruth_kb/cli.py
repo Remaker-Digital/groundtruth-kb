@@ -332,6 +332,7 @@ _IMPORTABLE_TABLES = frozenset(
         "testable_elements",
         "quality_scores",
         "spec_quality_scores",
+        "session_snapshots",
     }
 )
 
@@ -423,6 +424,23 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
                             raise click.ClickException(f"Invalid flags in quality score {spec_ref}: {exc}") from exc
                         click.echo(
                             f"  WARNING: {spec_ref}: invalid flags skipped ({exc})",
+                            err=True,
+                        )
+                        rejected += 1
+                        continue
+
+                # F7: Validate data JSON in session_snapshots rows
+                if table_name == "session_snapshots" and "data" in row and row["data"] is not None:
+                    try:
+                        parsed_data = json.loads(row["data"]) if isinstance(row["data"], str) else row["data"]
+                        if not isinstance(parsed_data, dict):
+                            raise ValueError("session snapshot data must be a JSON object")
+                    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                        sid = row.get("session_id", "?")
+                        if not merge:
+                            raise click.ClickException(f"Invalid snapshot data for {sid}: {exc}") from exc
+                        click.echo(
+                            f"  WARNING: {sid}: invalid snapshot data skipped ({exc})",
                             err=True,
                         )
                         rejected += 1
@@ -673,3 +691,58 @@ def deliberations_rebuild_index(ctx: click.Context) -> None:
         click.echo(f"Errors ({len(result['errors'])}):")
         for err in result["errors"]:
             click.echo(f"  {err}")
+
+
+# ── F7: Health dashboard commands ─────────────────────────────────────
+
+
+@main.group(invoke_without_command=True)
+@click.pass_context
+def health(ctx: click.Context) -> None:
+    """Session health dashboard commands."""
+    if ctx.invoked_subcommand is not None:
+        return
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    delta = db.compute_session_delta()
+    from groundtruth_kb.health import render_health_text
+
+    click.echo(render_health_text(delta.get("current", {})))
+    if delta.get("no_prior"):
+        click.echo("\n  (No prior snapshot for comparison)")
+    elif delta.get("deltas"):
+        click.echo("\n  Deltas from last snapshot:")
+        for k, v in delta["deltas"].items():
+            sign = "+" if v >= 0 else ""
+            click.echo(f"    {k}: {sign}{v}")
+
+
+@health.command("snapshot")
+@click.argument("session_id")
+@click.pass_context
+def health_snapshot(ctx: click.Context, session_id: str) -> None:
+    """Capture a health snapshot for a session and display it."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    snap = db.capture_session_snapshot(session_id)
+    from groundtruth_kb.health import render_health_text
+
+    click.echo(render_health_text(snap))
+
+
+@health.command("trends")
+@click.option("-n", "--limit", default=5, help="Number of recent snapshots.")
+@click.pass_context
+def health_trends(ctx: click.Context, limit: int) -> None:
+    """Show recent health snapshots with deltas."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    history = db.get_snapshot_history(limit=limit)
+    if not history:
+        click.echo("No health snapshots recorded yet.")
+        return
+    from groundtruth_kb.health import render_health_text
+
+    for snap in history:
+        click.echo(f"\n--- {snap['session_id']} ({snap['captured_at']}) ---")
+        click.echo(render_health_text(snap.get("data_parsed", {})))
