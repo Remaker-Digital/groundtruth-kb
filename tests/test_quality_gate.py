@@ -226,3 +226,16 @@ class TestF3QualityGate:
         assert len(history) >= 2
         # Most recent first
         assert history[0]["scored_at"] >= history[1]["scored_at"]
+
+    def test_f3_distribution_no_double_count(self, db):
+        """Two sessions for one spec in the same second → distribution total == 1.
+
+        Regression test from NO-GO bridge/gtkb-phase2-implementation-008.md (Finding 3).
+        """
+        self._make_spec(db, spec_id="SPEC-014")
+        # Persist twice immediately — both get the same scored_at if within a second
+        db.persist_quality_scores("S-FIRST")
+        db.persist_quality_scores("S-SECOND")
+
+        dist = db.get_quality_distribution()
+        assert dist["total"] == 1, f"Expected 1 spec in distribution, got {dist['total']}"

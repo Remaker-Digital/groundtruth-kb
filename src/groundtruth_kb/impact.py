@@ -61,8 +61,10 @@ def _detect_conflicts(
     (exact string) and the same match_target (exact string) but have different
     assertion_types.
 
-    When either target has file_is_glob=True, the comparison is skipped and
-    an annotation is recorded (literal-vs-glob false-negative).
+    The literal-vs-glob false-negative applies only when file_target strings
+    differ and at least one side is a glob.  When both targets have the same
+    file_target string (exact match), they are always compared regardless of
+    glob status.
     """
     conflicts: list[dict[str, Any]] = []
     annotations: list[str] = []
@@ -80,8 +82,28 @@ def _detect_conflicts(
                 if not rt.file_target:
                     continue
 
-                # If either side is a glob, skip — document the false-negative
-                if st.file_is_glob or rt.file_is_glob:
+                # Exact-string file_target comparison first — always honored
+                if st.file_target == rt.file_target:
+                    if (
+                        st.match_target
+                        and rt.match_target
+                        and st.match_target == rt.match_target
+                        and st.assertion_type != rt.assertion_type
+                    ):
+                        conflicts.append(
+                            {
+                                "type": "assertion_conflict",
+                                "spec_a": spec_id,
+                                "spec_a_assertion_type": st.assertion_type,
+                                "spec_b": rel_id,
+                                "spec_b_assertion_type": rt.assertion_type,
+                                "file_target": st.file_target,
+                                "match_target": st.match_target,
+                            }
+                        )
+                elif st.file_is_glob or rt.file_is_glob:
+                    # Different file targets, at least one is a glob —
+                    # document the literal-vs-glob false-negative
                     note_key = f"{st.file_target}|{rt.file_target}"
                     if note_key not in seen_glob_notes:
                         seen_glob_notes.add(note_key)
@@ -90,28 +112,6 @@ def _detect_conflicts(
                             f"{st.file_target!r} with {rt.file_target!r} "
                             f"(one or both are globs)"
                         )
-                    continue
-
-                # Exact-string comparison
-                if st.file_target != rt.file_target:
-                    continue
-                if (
-                    st.match_target
-                    and rt.match_target
-                    and st.match_target == rt.match_target
-                    and st.assertion_type != rt.assertion_type
-                ):
-                    conflicts.append(
-                        {
-                            "type": "assertion_conflict",
-                            "spec_a": spec_id,
-                            "spec_a_assertion_type": st.assertion_type,
-                            "spec_b": rel_id,
-                            "spec_b_assertion_type": rt.assertion_type,
-                            "file_target": st.file_target,
-                            "match_target": st.match_target,
-                        }
-                    )
 
     return conflicts, annotations
 
@@ -159,13 +159,22 @@ def compute_impact_analysis(
     if spec is None:
         return {"error": f"Spec {spec_id} not found"}
 
-    # --- Related specs: same section ---
+    # --- Related specs: section OR scope overlap ---
     section = spec.get("section")
+    scope = spec.get("scope")
+    seen_ids: set[str] = set()
     related: list[dict[str, Any]] = []
-    if section:
-        for s in db.list_specs():
-            if s["id"] != spec_id and s.get("section") == section:
-                related.append(s)
+    for s in db.list_specs():
+        if s["id"] == spec_id or s["id"] in seen_ids:
+            continue
+        match = False
+        if section and s.get("section") and s["section"] == section:
+            match = True
+        if scope and s.get("scope") and s["scope"] == scope:
+            match = True
+        if match:
+            related.append(s)
+            seen_ids.add(s["id"])
 
     related_count = len(related)
     blast_radius = _classify_blast_radius(related_count, cfg)
@@ -181,12 +190,25 @@ def compute_impact_analysis(
         related,
     )
 
+    # --- Recommendation ---
+    if blast_radius == "systemic":
+        recommendation = "High-impact change. Review all related specs before proceeding."
+    elif potential_conflicts:
+        recommendation = "Conflicts detected. Resolve assertion contradictions before proceeding."
+    elif applicable_constraints:
+        recommendation = "Architectural constraints apply. Verify compliance with ADR/DCL specs."
+    else:
+        recommendation = "Low-risk change. Proceed with standard review."
+
     return {
         "spec_id": spec_id,
         "blast_radius": blast_radius,
         "related_spec_count": related_count,
+        "related_specs": related,
+        "dependents": [],  # Phase A — Phase B adds affected_by_parsed lookup
         "applicable_constraints": applicable_constraints,
         "potential_conflicts": potential_conflicts,
         "annotations": annotations,
         "touches_architecture": len(applicable_constraints) > 0,
+        "recommendation": recommendation,
     }
