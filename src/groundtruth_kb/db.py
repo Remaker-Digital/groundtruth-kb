@@ -477,6 +477,88 @@ def get_depth(spec_id: str) -> int:
     return spec_id.count(".")
 
 
+# --- F1: Schema Enrichment sentinels and validators ---
+
+_UNSET = object()  # Sentinel: caller did not provide this argument
+_CARRY_FORWARD = object()  # Sentinel: carry forward from previous version (update only)
+
+_VALID_AUTHORITIES = frozenset({"stated", "inferred", "provisional", "inherited", "unknown"})
+_VALID_TESTABILITIES = frozenset({"automatable", "observable", "structural", "untestable"})
+_VALID_COMPLEXITY_CEILINGS = frozenset({"simple", "moderate", "complex"})
+_VALID_DECISION_AUTHORITIES = frozenset({"owner", "ai", "either"})
+
+
+def _normalize_provisional(authority: Any, provisional_until: Any) -> tuple:
+    """Enforce provisional lifecycle invariants INV-1 through INV-4.
+
+    Returns (authority, provisional_until) after normalization.
+    """
+    if provisional_until is not None:
+        if authority is _UNSET or authority is None:
+            authority = "provisional"
+        elif authority != "provisional":
+            raise ValueError(f"provisional_until requires authority='provisional', got {authority!r}")
+    else:
+        if authority is not None and authority is not _UNSET and authority == "provisional":
+            raise ValueError("authority='provisional' requires provisional_until to be set")
+    return authority, provisional_until
+
+
+def _validate_authority(authority: str) -> None:
+    """Validate authority is one of the approved enum values."""
+    if authority not in _VALID_AUTHORITIES:
+        raise ValueError(f"Invalid authority: {authority!r}. Must be one of {sorted(_VALID_AUTHORITIES)}")
+
+
+def _validate_testability(testability: str) -> None:
+    """Validate testability is one of the approved enum values."""
+    if testability not in _VALID_TESTABILITIES:
+        raise ValueError(f"Invalid testability: {testability!r}. Must be one of {sorted(_VALID_TESTABILITIES)}")
+
+
+def _validate_constraints(constraints: Any) -> None:
+    """Validate constraints is None or a dict with approved known-key rules."""
+    if constraints is None:
+        return
+    if not isinstance(constraints, dict):
+        raise ValueError(f"constraints must be a dict, got {type(constraints).__name__}")
+    cc = constraints.get("complexity_ceiling")
+    if cc is not None and cc not in _VALID_COMPLEXITY_CEILINGS:
+        raise ValueError(
+            f"constraints.complexity_ceiling must be one of {sorted(_VALID_COMPLEXITY_CEILINGS)}, got {cc!r}"
+        )
+    da = constraints.get("decision_authority")
+    if da is not None and da not in _VALID_DECISION_AUTHORITIES:
+        raise ValueError(
+            f"constraints.decision_authority must be one of {sorted(_VALID_DECISION_AUTHORITIES)}, got {da!r}"
+        )
+    ea = constraints.get("excluded_approaches")
+    if ea is not None:
+        if not isinstance(ea, list):
+            raise ValueError(f"constraints.excluded_approaches must be a list, got {type(ea).__name__}")
+        for i, item in enumerate(ea):
+            if not isinstance(item, str):
+                raise ValueError(f"constraints.excluded_approaches[{i}] must be a string, got {type(item).__name__}")
+
+
+def _validate_affected_by(affected_by: Any) -> None:
+    """Validate affected_by is None or a list of strings."""
+    if affected_by is None:
+        return
+    if not isinstance(affected_by, list):
+        raise ValueError(f"affected_by must be a list, got {type(affected_by).__name__}")
+    for i, item in enumerate(affected_by):
+        if not isinstance(item, str):
+            raise ValueError(f"affected_by[{i}] must be a string, got {type(item).__name__}")
+
+
+def _validate_provisional_until(provisional_until: Any) -> None:
+    """Validate provisional_until is None or a non-empty spec ID string."""
+    if provisional_until is not None:
+        if not isinstance(provisional_until, str) or not provisional_until.strip():
+            raise ValueError("provisional_until must be a non-empty string")
+
+
 class KnowledgeDB:
     """Append-only knowledge database."""
 
@@ -532,6 +614,20 @@ class KnowledgeDB:
         )
         conn.commit()
 
+        # Migration 3: F1 Schema Enrichment — add 5 new columns to specifications
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
+        f1_columns = {
+            "authority": "TEXT",
+            "provisional_until": "TEXT",
+            "constraints": "TEXT",
+            "affected_by": "TEXT",
+            "testability": "TEXT",
+        }
+        for col_name, col_type in f1_columns.items():
+            if col_name not in cols:
+                conn.execute(f"ALTER TABLE specifications ADD COLUMN {col_name} {col_type}")
+        conn.commit()
+
     @staticmethod
     def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
         """Auto-detect spec type from ID prefix when declared as default 'requirement'."""
@@ -578,6 +674,11 @@ class KnowledgeDB:
         assertions: list[dict] | None = None,
         type: str = "requirement",
         validate_assertions: bool = True,
+        authority: Any = _UNSET,
+        provisional_until: str | None = None,
+        constraints: dict | None = None,
+        affected_by: list[str] | None = None,
+        testability: str | None = None,
     ) -> dict[str, Any]:
         """Insert a new version of a specification.
 
@@ -588,6 +689,14 @@ class KnowledgeDB:
                   as default 'requirement'.
             validate_assertions: If True (default), validate assertion definitions
                   before writing. Set False only for tested migration tooling.
+            authority: Spec authority — 'stated', 'inferred', 'provisional', 'inherited',
+                  or 'unknown'. Defaults to 'stated' on new insert when omitted.
+            provisional_until: Spec ID this provisional spec is waiting on. Requires
+                  authority='provisional' (auto-set if authority omitted).
+            constraints: JSON-serializable dict of constraints metadata.
+            affected_by: List of spec/ADR/DCL IDs that affect this spec.
+            testability: Testability classification — 'automatable', 'observable',
+                  'structural', or 'untestable'.
         """
         type = self._auto_detect_spec_type(id, type)
 
@@ -598,6 +707,23 @@ class KnowledgeDB:
             errors = validate_assertion_list(assertions)
             if errors:
                 raise ValueError(f"Invalid assertions for {id}: {'; '.join(errors)}")
+
+        # F1: Normalize provisional lifecycle FIRST (while _UNSET preserved)
+        authority, provisional_until = _normalize_provisional(authority, provisional_until)
+        # F1: Apply new-insert default AFTER normalization
+        if authority is _UNSET:
+            authority = "stated"
+        # F1: Validate enriched fields
+        if authority is not None:
+            _validate_authority(authority)
+        if testability is not None:
+            _validate_testability(testability)
+        _validate_constraints(constraints)
+        _validate_affected_by(affected_by)
+        _validate_provisional_until(provisional_until)
+        # F1: Serialize JSON fields
+        constraints_json = json.dumps(constraints) if constraints is not None else None
+        affected_by_json = json.dumps(affected_by) if affected_by is not None else None
 
         # Run governance gates on initial insert (for status enforcement)
         if self._gate_registry is not None:
@@ -617,8 +743,10 @@ class KnowledgeDB:
         conn.execute(
             """INSERT INTO specifications
                (id, version, title, description, priority, scope, section,
-                handle, tags, status, assertions, type, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                handle, tags, status, assertions, type,
+                authority, provisional_until, constraints, affected_by, testability,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -632,6 +760,11 @@ class KnowledgeDB:
                 status,
                 assertions_json,
                 type,
+                authority,
+                provisional_until,
+                constraints_json,
+                affected_by_json,
+                testability,
                 changed_by,
                 _now(),
                 change_reason,
@@ -664,6 +797,11 @@ class KnowledgeDB:
     ) -> dict[str, Any]:
         """Create a new version of a spec, carrying forward unchanged fields.
 
+        F1 enriched fields (authority, provisional_until, constraints, affected_by,
+        testability) follow the carry-forward rule: if omitted, the previous version's
+        value is preserved. JSON fields (constraints, affected_by) carry forward as raw
+        storage strings without re-validation or re-serialization.
+
         Args:
             validate_assertions: If True (default), validate assertion definitions
                   before writing. Set False only for tested migration tooling.
@@ -682,8 +820,6 @@ class KnowledgeDB:
 
         version = self._next_spec_version(id)
         # Merge: new fields override current values
-        # Use _UNSET sentinel so callers can explicitly pass None or [] to clear fields
-        _UNSET = object()
         title = fields.get("title", current["title"])
         description = fields.get("description", current["description"])
         priority = fields.get("priority", current["priority"])
@@ -693,7 +829,7 @@ class KnowledgeDB:
         status = fields.get("status", current["status"])
         spec_type = self._auto_detect_spec_type(id, fields.get("type", current.get("type", "requirement")))
 
-        # Tags and assertions: use 'is not _UNSET' to allow explicit [] or None
+        # Tags and assertions: use module-level _UNSET to allow explicit [] or None
         raw_tags = fields.get("tags", _UNSET)
         if raw_tags is not _UNSET:
             tags_json = json.dumps(raw_tags) if raw_tags is not None else None
@@ -705,6 +841,56 @@ class KnowledgeDB:
             assertions_json = json.dumps(raw_assertions) if raw_assertions is not None else None
         else:
             assertions_json = current["assertions"]
+
+        # --- F1: 8-step carry-forward for enriched fields ---
+        # Step 1: Already done — current = self.get_spec(id) above
+
+        # Step 2: Extract with sentinels
+        authority = fields.get("authority", _UNSET)
+        provisional_until = fields.get("provisional_until", _CARRY_FORWARD)
+        testability = fields.get("testability", _UNSET)
+
+        # Step 3: Resolve carry-forward BEFORE normalization
+        if authority is _UNSET:
+            authority = current.get("authority")
+        if provisional_until is _CARRY_FORWARD:
+            provisional_until = current.get("provisional_until")
+        if testability is _UNSET:
+            testability = current.get("testability")
+
+        # Step 4: INV-4 — changing authority AWAY from provisional clears provisional_until
+        prev_authority = current.get("authority")
+        if prev_authority == "provisional" and authority != "provisional" and authority is not None:
+            provisional_until = None
+
+        # Step 5: Normalize provisional lifecycle
+        authority, provisional_until = _normalize_provisional(authority, provisional_until)
+
+        # Step 6: Default — if still _UNSET after carry-forward, keep None (legacy rows)
+        if authority is _UNSET:
+            authority = None
+
+        # Step 7: Validate all F1 fields
+        if authority is not None:
+            _validate_authority(authority)
+        if testability is not None:
+            _validate_testability(testability)
+        _validate_provisional_until(provisional_until)
+
+        # F1 JSON fields: provided → validate + serialize; omitted → raw carry-forward
+        if "constraints" in fields:
+            constraints_val = fields["constraints"]
+            _validate_constraints(constraints_val)
+            constraints_raw = json.dumps(constraints_val) if constraints_val is not None else None
+        else:
+            constraints_raw = current.get("constraints")  # raw JSON string from _row_to_dict
+
+        if "affected_by" in fields:
+            affected_by_val = fields["affected_by"]
+            _validate_affected_by(affected_by_val)
+            affected_by_raw = json.dumps(affected_by_val) if affected_by_val is not None else None
+        else:
+            affected_by_raw = current.get("affected_by")  # raw JSON string from _row_to_dict
 
         # Run governance gates before spec promotion
         if self._gate_registry is not None:
@@ -718,12 +904,15 @@ class KnowledgeDB:
                 spec_data["linked_tests"] = self.get_tests_for_spec(id)
             self._gate_registry.run_pre_promote(id, current["status"], status, spec_data)
 
+        # Step 8: INSERT new version row with resolved values
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO specifications
                (id, version, title, description, priority, scope, section,
-                handle, tags, status, assertions, type, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                handle, tags, status, assertions, type,
+                authority, provisional_until, constraints, affected_by, testability,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -737,6 +926,11 @@ class KnowledgeDB:
                 status,
                 assertions_json,
                 spec_type,
+                authority,
+                provisional_until,
+                constraints_raw,
+                affected_by_raw,
+                testability,
                 changed_by,
                 _now(),
                 change_reason,
@@ -786,6 +980,8 @@ class KnowledgeDB:
         tag: str | None = None,
         search: str | None = None,
         type: str | None = None,
+        authority: str | None = None,
+        testability: str | None = None,
     ) -> list[dict[str, Any]]:
         """List current specifications with optional filters."""
         query = "SELECT * FROM current_specifications WHERE 1=1"
@@ -814,8 +1010,43 @@ class KnowledgeDB:
         if search:
             query += " AND (title LIKE ? OR description LIKE ?)"
             params.extend([f"%{search}%", f"%{search}%"])
+        if authority:
+            query += " AND authority = ?"
+            params.append(authority)
+        if testability:
+            query += " AND testability = ?"
+            params.append(testability)
         rows = self._get_conn().execute(query, params).fetchall()
         result = [_row_to_dict(r) for r in rows]
+        result.sort(key=lambda r: spec_sort_key(r["id"]))
+        return result
+
+    def get_provisional_specs(self) -> list[dict[str, Any]]:
+        """Return current specs where authority='provisional' and provisional_until IS NOT NULL."""
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM current_specifications WHERE authority = 'provisional' AND provisional_until IS NOT NULL"
+            )
+            .fetchall()
+        )
+        result = [_row_to_dict(r) for r in rows]
+        result.sort(key=lambda r: spec_sort_key(r["id"]))
+        return result
+
+    def get_specs_affected_by(self, constraint_id: str) -> list[dict[str, Any]]:
+        """Return current specs whose affected_by list contains exactly constraint_id.
+
+        Uses JSON parsing for exact containment — not SQL LIKE substring matching.
+        This prevents false positives like 'ADR-1' matching 'ADR-10'.
+        """
+        rows = self._get_conn().execute("SELECT * FROM current_specifications WHERE affected_by IS NOT NULL").fetchall()
+        result = []
+        for row in rows:
+            d = _row_to_dict(row)
+            parsed = d.get("affected_by_parsed")
+            if parsed and isinstance(parsed, list) and constraint_id in parsed:
+                result.append(d)
         result.sort(key=lambda r: spec_sort_key(r["id"]))
         return result
 
@@ -3746,6 +3977,8 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "summary_by_origin",
         "summary_by_component",
         "applicable_dimensions",
+        "constraints",
+        "affected_by",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:
