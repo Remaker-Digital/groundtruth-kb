@@ -30,8 +30,16 @@ The origin matters because it determines governance requirements. Defect and reg
 
 Work items move through five stages:
 
-```
-created → tested → backlogged → implementing → resolved
+```mermaid
+stateDiagram-v2
+    [*] --> created
+    created --> tested: test linked (GOV-12)
+    created --> resolved: cancelled
+    tested --> backlogged: added to snapshot
+    tested --> resolved: cancelled
+    backlogged --> implementing: work begins
+    backlogged --> resolved: superseded
+    implementing --> resolved: tests pass
 ```
 
 **Created**: The work item exists but no test has been linked yet.

@@ -17,8 +17,13 @@ Good specifications:
 
 Every specification moves through a defined lifecycle:
 
-```
-specified → implemented → verified → retired
+```mermaid
+stateDiagram-v2
+    [*] --> specified
+    specified --> implemented: code satisfies requirement
+    implemented --> verified: tests prove satisfaction
+    verified --> retired: business need removed
+    specified --> retired: requirement abandoned
 ```
 
 **Specified**: The requirement has been agreed upon and recorded. No implementation exists yet, or the implementation does not yet satisfy the spec.

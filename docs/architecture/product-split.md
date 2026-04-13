@@ -31,7 +31,7 @@ Project initialization, profile-based setup, and scaffold maintenance.
 | Capability | CLI commands |
 |------------|--------------|
 | Project scaffold | `gt project init` - generate or retrofit a repo with rules, hooks, bridge inventory, and report templates |
-| Profiles | `gt project init --profile <profile>` - pre-built configurations (`local-only`, `dual-agent`, `dual-agent-webapp`) |
+| Profiles | `gt project init my-project --profile <profile>` - pre-built configurations (`local-only`, `dual-agent`, `dual-agent-webapp`) |
 | Scaffold upgrade | `gt project upgrade` - update managed scaffold files when the package version changes |
 
 ### Layer 3 - Workstation Doctor
@@ -107,7 +107,7 @@ Agent Red Customer Engagement is the proving ground for the patterns that
 
 | Component | Version | Status |
 |-----------|---------|--------|
-| groundtruth-kb | 0.1.2 | Alpha - extracted from production system (2,000+ specs, 11,000+ tests) |
+| groundtruth-kb | 0.3.0 | Beta - extracted from production system (2,000+ specs, 11,000+ tests) |
 
 ---
 

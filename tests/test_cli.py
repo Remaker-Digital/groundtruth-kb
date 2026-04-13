@@ -189,6 +189,46 @@ class TestConfig:
         assert "Test Project" in result.output
         assert "db_path" in result.output
 
+    def test_config_chroma_path_explicit(self, runner: CliRunner, project_dir: Path) -> None:
+        """When chroma_path is set in config, gt config shows the explicit path."""
+        toml_path = project_dir / "groundtruth.toml"
+        text = toml_path.read_text()
+        text += '\n[search]\nchroma_path = "./my-chroma"\n'
+        toml_path.write_text(text)
+        result = runner.invoke(main, ["--config", str(toml_path), "config"])
+        assert result.exit_code == 0
+        assert "my-chroma" in result.output
+        assert "unset" not in result.output
+
+    def test_config_chroma_path_unset_chromadb_installed(self, runner: CliRunner, project_dir: Path) -> None:
+        """When chroma_path is unset and chromadb is importable, show runtime fallback."""
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "config"])
+        assert result.exit_code == 0
+        # chromadb is installed in the test environment
+        assert "unset" in result.output
+        assert "runtime fallback" in result.output
+
+    def test_config_chroma_path_unset_no_chromadb(
+        self,
+        runner: CliRunner,
+        project_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When chroma_path is unset and chromadb is absent, show not-installed."""
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "chromadb":
+                raise ImportError("mocked")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "config"])
+        assert result.exit_code == 0
+        assert "chromadb not installed" in result.output
+
 
 # ---------------------------------------------------------------------------
 # gt serve

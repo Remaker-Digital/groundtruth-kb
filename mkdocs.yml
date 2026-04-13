@@ -38,7 +38,11 @@ markdown_extensions:
   - admonition
   - pymdownx.highlight:
       anchor_linenums: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - toc:
@@ -48,6 +52,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
+      - Start Here: start-here.md
       - Bootstrap Guide: bootstrap.md
       - Desktop Setup: desktop-setup.md
   - Method:
@@ -64,8 +69,14 @@ nav:
       - Tooling: method/10-tooling.md
       - Operational Config: method/11-operational-configuration.md
       - File Bridge Automation: method/12-file-bridge-automation.md
+      - Deliberation Archive: method/13-deliberation-archive.md
   - Reference:
+      - CLI Reference: reference/cli.md
+      - Configuration: reference/configuration.md
       - Assertion Language: reference/assertion-language.md
+      - Templates: reference/templates.md
+  - Examples:
+      - Task Tracker: examples/task-tracker.md
   - Architecture:
       - Product Split: architecture/product-split.md
   - Contributing: contributing.md

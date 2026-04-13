@@ -462,6 +462,16 @@ def config(ctx: click.Context) -> None:
     click.echo(f"  brand_color:       {cfg.brand_color}")
     click.echo(f"  logo_url:          {cfg.logo_url}")
     click.echo(f"  legal_footer:      {cfg.legal_footer or '(none)'}")
+    if cfg.chroma_path is not None:
+        click.echo(f"  chroma_path:       {cfg.chroma_path}")
+    else:
+        try:
+            import chromadb as _chromadb  # noqa: F401
+
+            fallback = cfg.db_path.parent / ".groundtruth-chroma"
+            click.echo(f"  chroma_path:       (unset — runtime fallback: {fallback})")
+        except ImportError:
+            click.echo("  chroma_path:       (unset — chromadb not installed)")
     click.echo(f"  governance_gates:  {cfg.governance_gates or '(builtins only)'}")
     click.echo(f"{'=' * 50}\n")
 
@@ -638,7 +648,10 @@ def deliberations_rebuild_index(ctx: click.Context) -> None:
     )
     result = db.rebuild_deliberation_index()
     if result.get("errors") and result["errors"] == ["ChromaDB not installed"]:
-        click.echo("Error: ChromaDB is not installed. Install with: pip install groundtruth-kb[search]")
+        click.echo(
+            "Error: ChromaDB is not installed. Install with:\n"
+            '  pip install "groundtruth-kb[search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"'
+        )
         raise SystemExit(1)
     click.echo(f"Indexed {result['indexed']} deliberation(s), {result['chunks']} chunk(s).")
     if result.get("errors"):

@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-12
+
 ### Added
+- **Start Here** first-run guide with verified command sequence
+- **CLI Reference** documenting all 14 commands with options and examples
+- **Configuration Reference** with full `groundtruth.toml` field inventory
+- **Deliberation Archive Guide** for the review/decision capture system
+- 10+ Mermaid diagrams across method, architecture, and reference docs
+- Examples and templates sections in docs site navigation
+- Docs drift prevention CI workflow (version pins, CLI coverage, link checks)
+- `gt config` now displays `chroma_path` when configured or defaulted
 - SonarCloud analysis workflow with coverage reporting
 - CodeQL weekly security scanning
 - Semgrep SAST and pip-audit dependency scanning
@@ -17,10 +27,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `develop` branch for active development
 
 ### Fixed
+- All install references updated to v0.3.0 (previously mixed v0.1.2/v0.2.0)
+- PyPI-style install examples removed (GitHub-installable only)
+- CLI error message for missing ChromaDB uses GitHub install form
+- `gt project init` snippets in docs include required PROJECT_NAME argument
 - TemplateResponse updated to keyword-arg API for Starlette 0.37+
 - ruff format applied to all source files
 - pip-audit `mkdir` for output directory in CI
 - CI installs `[web]` extras for test imports
+
+## [0.2.1] - 2026-04-12
+
+### Fixed
+- Text-match contract test monkeypatches `HAS_CHROMADB` for
+  ChromaDB-enabled environments
+
+_Note: Git tag v0.2.1 exists but `__version__` was not updated in this
+release. The package reports 0.2.0 when installed from the v0.2.1 tag._
 
 ## [0.2.0] - 2026-04-07
 
@@ -75,7 +98,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Process templates (CLAUDE.md, MEMORY.md, hooks, rules)
 - AGPL-3.0-or-later license
 
-[Unreleased]: https://github.com/Remaker-Digital/groundtruth-kb/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Remaker-Digital/groundtruth-kb/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Remaker-Digital/groundtruth-kb/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/Remaker-Digital/groundtruth-kb/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Remaker-Digital/groundtruth-kb/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/Remaker-Digital/groundtruth-kb/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Remaker-Digital/groundtruth-kb/compare/v0.1.0...v0.1.1

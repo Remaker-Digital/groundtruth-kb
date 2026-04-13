@@ -5,7 +5,7 @@ and customize for your needs.
 
 These templates are **generic starting points** that become project-owned
 after copying — GroundTruth does not manage or overwrite them after initial
-setup.  Use `gt project init --profile <profile>` for automated,
+setup.  Use `gt project init my-project --profile <profile>` for automated,
 profile-based project setup.
 
 Reference capture templates for bridges and automations are included here.
@@ -81,5 +81,5 @@ discoverable from the project. For file-based Prime Builder + Loyal Opposition
 bridges, start from `bridge-os-poller-setup-prompt.md` and then record the
 resulting setup in `BRIDGE-INVENTORY.md`.
 
-For automated profile-based customization, use `gt project init --profile
+For automated profile-based customization, use `gt project init my-project --profile
 dual-agent-webapp` instead of manual template copying.

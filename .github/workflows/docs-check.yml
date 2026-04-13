@@ -1,0 +1,53 @@
+# Documentation drift prevention — verifies CLI coverage, snippet correctness,
+# nav file references, version consistency, Python prereq, install tags,
+# ChromaDB message shape, and mkdocs build integrity.
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+name: Docs Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'templates/**'
+      - 'examples/**'
+      - 'README.md'
+      - 'pyproject.toml'
+      - 'src/groundtruth_kb/__init__.py'
+      - 'src/groundtruth_kb/cli.py'
+      - 'mkdocs.yml'
+      - 'scripts/check_docs_cli_coverage.py'
+      - '.github/workflows/docs-check.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'templates/**'
+      - 'examples/**'
+      - 'README.md'
+      - 'pyproject.toml'
+      - 'src/groundtruth_kb/__init__.py'
+      - 'src/groundtruth_kb/cli.py'
+      - 'mkdocs.yml'
+      - 'scripts/check_docs_cli_coverage.py'
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -e ".[docs]"
+
+      - name: Check documentation drift
+        run: python scripts/check_docs_cli_coverage.py
+
+      - name: Build docs (strict mode)
+        run: mkdocs build --strict

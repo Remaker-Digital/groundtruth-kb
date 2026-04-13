@@ -29,6 +29,23 @@ Projects can add their own governance specs. The only requirement is that each c
 
 Gates are enforcement hooks that run at artifact lifecycle transitions. They are the mechanism by which governance rules become more than suggestions.
 
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant KB as Knowledge DB
+    participant Gate as Governance Gate
+
+    Agent->>KB: promote spec to "implemented"
+    KB->>Gate: pre_promote(spec, status)
+    alt gate passes
+        Gate-->>KB: OK
+        KB-->>Agent: promotion complete
+    else gate fails
+        Gate-->>KB: GovernanceGateError
+        KB-->>Agent: transition blocked
+    end
+```
+
 ### Built-in gates
 
 GroundTruth ships with two gates:

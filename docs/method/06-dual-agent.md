@@ -47,6 +47,30 @@ drift, inspect basic generated artifacts, or remember cross-agent process state.
 
 The standard collaboration pattern:
 
+```mermaid
+sequenceDiagram
+    participant P as Prime Builder
+    participant B as Bridge
+    participant L as Loyal Opposition
+
+    P->>B: Submit proposal (NEW)
+    B->>L: Poller detects NEW
+    L->>B: Review verdict (GO / NO-GO)
+    alt GO
+        B->>P: Poller detects GO
+        P->>P: Implement
+        P->>B: Post-impl report (NEW)
+        B->>L: Poller detects NEW
+        L->>B: Verification (VERIFIED)
+    else NO-GO
+        B->>P: Poller detects NO-GO
+        P->>P: Address findings
+        P->>B: Revised proposal (REVISED)
+        B->>L: Poller detects REVISED
+        L->>B: Re-review (GO / NO-GO)
+    end
+```
+
 1. **Prime Builder** completes a unit of work and sends it for review. The submission includes: what was done, what files changed, what tests pass, and specific questions for the reviewer.
 
 2. **Loyal Opposition** inspects the work against specifications, governance rules, and architectural constraints. Each significant finding includes:

@@ -22,8 +22,11 @@ GroundTruth addresses this by making **specifications the source of truth** — 
 
 Every GroundTruth project maintains three artifact types that reinforce each other:
 
-```
-Specifications ←→ Tests ←→ Implementation
+```mermaid
+graph LR
+    S[Specifications] <-->|"verified by"| T[Tests]
+    T <-->|"exercise"| I[Implementation]
+    I <-->|"described by"| S
 ```
 
 **Specifications** describe what the system must do. They function as a decision log — recording what was agreed and why — not as a build specification dictating how to construct the system. A good specification is as stable as the business need it captures.
@@ -41,6 +44,20 @@ When any one of these changes, the other two must be checked:
 ## Core workflow
 
 The standard GroundTruth workflow moves from agreement to verification in seven steps:
+
+```mermaid
+flowchart TD
+    A[1. Specify] --> B[2. Identify gaps]
+    B --> C[3. Create tests]
+    C --> D[4. Prioritize backlog]
+    D --> E[5. Implement]
+    E --> F[6. Verify]
+    F -->|PASS| G[7. Resolve]
+    F -->|FAIL| H{Diagnose}
+    H -->|spec wrong| A
+    H -->|test wrong| C
+    H -->|code wrong| E
+```
 
 1. **Specify** — The owner describes what the system must do. Record as specifications in the knowledge database.
 2. **Identify gaps** — Compare specs against the current implementation. Create work items for each gap.
