@@ -39,7 +39,7 @@ from pathlib import Path
 
 # AR-specific paths
 _CONFIG_PATH = Path(__file__).resolve().parent / "groundtruth.toml"
-DB_PATH = Path(__file__).resolve().parent / "knowledge.db"
+DB_PATH = Path(__file__).resolve().parent.parent.parent / "groundtruth.db"
 
 # Patch the package-level default so KnowledgeDB() uses AR's path
 import groundtruth_kb.db as _gt_db
@@ -88,10 +88,19 @@ class KnowledgeDB(_KnowledgeDB):
         db_path: str | Path | None = None,
         gate_registry: GateRegistry | None = None,
         check_same_thread: bool = True,
+        chroma_path: str | Path | None = None,
     ):
         if gate_registry is None:
             gate_registry = _default_registry
-        super().__init__(db_path=db_path, gate_registry=gate_registry, check_same_thread=check_same_thread)
+        # Default chroma_path from groundtruth.toml config if not explicitly provided
+        if chroma_path is None and _config.chroma_path is not None:
+            chroma_path = _config.chroma_path
+        super().__init__(
+            db_path=db_path,
+            gate_registry=gate_registry,
+            check_same_thread=check_same_thread,
+            chroma_path=chroma_path,
+        )
 
 
 __all__ = [

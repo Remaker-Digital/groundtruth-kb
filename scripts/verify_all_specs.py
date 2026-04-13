@@ -14,7 +14,7 @@ import sqlite3
 import sys
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
-DB_PATH = PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"
+DB_PATH = PROJECT_ROOT / "groundtruth.db"
 
 
 def check_assertion(assertion, project_root: pathlib.Path) -> tuple[bool, str]:

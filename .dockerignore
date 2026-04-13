@@ -107,8 +107,12 @@ infrastructure/
 *.tfstate.backup
 *.tfvars
 
-# Knowledge DB (51MB SQLite, development-only)
+# Knowledge DB (development-only, not runtime)
 tools/knowledge-db/
+groundtruth.db
+groundtruth.db.backup-*
+groundtruth.db.pre-backfill-*
+.groundtruth-chroma/
 
 # Scripts — included for Dockerfile.test (test host uses test_pipeline.py).
 # scripts/

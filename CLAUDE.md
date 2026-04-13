@@ -71,7 +71,7 @@ All new work in this repository must include:
 
 ## Artifacts and Change Control
 
-**9 managed artifact types + 2 supporting records** in KB (`tools/knowledge-db/knowledge.db`). See `CLAUDE-ARCHITECTURE.md` § Artifact Inventory for full table/schema details.
+**9 managed artifact types + 2 supporting records** in KB (`groundtruth.db`). See `CLAUDE-ARCHITECTURE.md` § Artifact Inventory for full table/schema details.
 
 **Key principles:** Append-only versioning (`UNIQUE(id, version)`), no UPDATE/DELETE. Orchestrating artifacts (test plan, backlog) reference other artifacts by ID without duplicating content (SPEC-1499).
 
@@ -199,6 +199,16 @@ After the bridge scan, read `memory/work_list.md`. If it contains unchecked item
 - **DO NOT create new markdown files** to store canonical project knowledge or session memory outside approved exception paths.
 - **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
+
+### Deliberation Archive Protocol
+
+**Deliberation search is mandatory before proposals and reviews.** See `.claude/rules/deliberation-protocol.md` for full rules.
+
+- **Before proposing:** Search `search_deliberations()` for prior reviews on the same spec/WI/component. Cite DELIB-IDs in proposals.
+- **Before reviewing:** Search for prior deliberations. Add "Prior Deliberations" section to reviews.
+- **Owner decisions:** Archive immediately as `source_type=owner_conversation`.
+- **Session wrap:** Harvest runs automatically as part of `kb-session-wrap`.
+- **LO reports:** Include SPEC/WI IDs in report headers for linkage coverage.
 
 ### Session Wrap-Up & Handoff
 

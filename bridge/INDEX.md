@@ -5,7 +5,68 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: groundtruth-db-migration
+VERIFIED: bridge/groundtruth-db-migration-026.md
+NEW: bridge/groundtruth-db-migration-025.md
+GO: bridge/groundtruth-db-migration-024.md
+REVISED: bridge/groundtruth-db-migration-023.md
+NO-GO: bridge/groundtruth-db-migration-022.md
+REVISED: bridge/groundtruth-db-migration-021.md
+NO-GO: bridge/groundtruth-db-migration-020.md
+REVISED: bridge/groundtruth-db-migration-019.md
+NO-GO: bridge/groundtruth-db-migration-018.md
+REVISED: bridge/groundtruth-db-migration-017.md
+NO-GO: bridge/groundtruth-db-migration-016.md
+REVISED: bridge/groundtruth-db-migration-015.md
+NO-GO: bridge/groundtruth-db-migration-014.md
+REVISED: bridge/groundtruth-db-migration-013.md
+NO-GO: bridge/groundtruth-db-migration-012.md
+REVISED: bridge/groundtruth-db-migration-011.md
+NO-GO: bridge/groundtruth-db-migration-010.md
+REVISED: bridge/groundtruth-db-migration-009.md
+NO-GO: bridge/groundtruth-db-migration-008.md
+REVISED: bridge/groundtruth-db-migration-007.md
+NO-GO: bridge/groundtruth-db-migration-006.md
+REVISED: bridge/groundtruth-db-migration-005.md
+NO-GO: bridge/groundtruth-db-migration-004.md
+REVISED: bridge/groundtruth-db-migration-003.md
+NO-GO: bridge/groundtruth-db-migration-002.md
+NEW: bridge/groundtruth-db-migration-001.md
+
+Document: groundtruth-docs-completion
+VERIFIED: bridge/groundtruth-docs-completion-016.md
+REVISED: bridge/groundtruth-docs-completion-015.md
+NO-GO: bridge/groundtruth-docs-completion-014.md
+REVISED: bridge/groundtruth-docs-completion-013.md
+NO-GO: bridge/groundtruth-docs-completion-012.md
+REVISED: bridge/groundtruth-docs-completion-011.md
+NO-GO: bridge/groundtruth-docs-completion-010.md
+REVISED: bridge/groundtruth-docs-completion-009.md
+NO-GO: bridge/groundtruth-docs-completion-008.md
+NEW: bridge/groundtruth-docs-completion-007.md
+GO: bridge/groundtruth-docs-completion-006.md
+REVISED: bridge/groundtruth-docs-completion-005.md
+NO-GO: bridge/groundtruth-docs-completion-004.md
+REVISED: bridge/groundtruth-docs-completion-003.md
+NO-GO: bridge/groundtruth-docs-completion-002.md
+NEW: bridge/groundtruth-docs-completion-001.md
+
+Document: deliberation-archive-completion
+VERIFIED: bridge/deliberation-archive-completion-012.md
+REVISED: bridge/deliberation-archive-completion-011.md
+NO-GO: bridge/deliberation-archive-completion-010.md
+NEW: bridge/deliberation-archive-completion-009.md
+GO: bridge/deliberation-archive-completion-008.md
+REVISED: bridge/deliberation-archive-completion-007.md
+NO-GO: bridge/deliberation-archive-completion-006.md
+REVISED: bridge/deliberation-archive-completion-005.md
+NO-GO: bridge/deliberation-archive-completion-004.md
+REVISED: bridge/deliberation-archive-completion-003.md
+NEW: bridge/deliberation-archive-completion-001.md
+
 Document: playwright-screenshot-baselines
+VERIFIED: bridge/playwright-screenshot-baselines-018.md
+NEW: bridge/playwright-screenshot-baselines-017.md
 NO-GO: bridge/playwright-screenshot-baselines-016.md
 NEW: bridge/playwright-screenshot-baselines-015.md
 GO: bridge/playwright-screenshot-baselines-014.md

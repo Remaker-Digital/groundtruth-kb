@@ -372,7 +372,7 @@ def _load_kb(kb_path: str | None = None):
     )
     from db import KnowledgeDB
 
-    path = kb_path or str(Path(__file__).resolve().parents[1] / "tools" / "knowledge-db" / "knowledge.db")
+    path = kb_path or str(Path(__file__).resolve().parents[1] / "groundtruth.db")
     return KnowledgeDB(path)
 
 
@@ -663,7 +663,7 @@ def main():
         "--kb-path",
         type=str,
         default=None,
-        help="Path to knowledge.db (default: tools/knowledge-db/knowledge.db)",
+        help="Path to groundtruth.db (default: groundtruth.db at repo root)",
     )
     args = parser.parse_args()
 

@@ -22,7 +22,7 @@ PROVIDER = ADMIN / "provider"
 SHOPIFY = ADMIN / "shopify"
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 ROOT = Path(__file__).resolve().parents[2]
-KB_PATH = ROOT / "tools" / "knowledge-db" / "knowledge.db"
+KB_PATH = ROOT / "groundtruth.db"
 
 
 # ═══════════════════════════════════════════════════════════════════════

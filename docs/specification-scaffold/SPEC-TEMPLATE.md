@@ -4,6 +4,8 @@ This document defines the canonical format for specifications stored in the grou
 
 ## Database Fields
 
+> **Storage schema — not API input shape.** This table describes how fields are stored in SQLite. When calling `db.insert_spec(...)` or `db.update_spec(...)` via the Python API, pass `tags` and `assertions` as Python lists (not JSON-encoded strings); `changed_at` is set automatically by the database layer and must not be passed as an argument. See the [Example Specification](#example-specification) and [Python API](#python-api) sections below for the correct call shape.
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | TEXT | Yes | Unique identifier. Prefix determines type: `SPEC-*` (requirement), `GOV-*` (governance), `PB-*` (protected behavior), `ADR-*` (architecture decision), `DCL-*` (design constraint) |
@@ -14,12 +16,12 @@ This document defines the canonical format for specifications stored in the grou
 | `scope` | TEXT | No | Component or area: `API`, `Admin`, `Widget`, `Infrastructure`, `Test`, etc. |
 | `section` | TEXT | No | Organizational grouping within scope |
 | `handle` | TEXT | No | Machine-readable slug for programmatic reference |
-| `tags` | TEXT | No | JSON array of tags for filtering: `["multi-tenant", "security"]` |
+| `tags` | TEXT | No | **Stored as** JSON array string (e.g., `'["multi-tenant", "security"]'`). **Pass as** Python list to the API: `tags=["multi-tenant", "security"]` |
 | `status` | TEXT | Yes | `specified`, `implemented`, `verified`, or `retired` |
 | `type` | TEXT | No | See Type Taxonomy below |
-| `assertions` | TEXT | No | JSON array of machine-verifiable checks (see Assertions below) |
+| `assertions` | TEXT | No | **Stored as** JSON array string. **Pass as** Python list of dicts to the API: `assertions=[{"type": "grep", ...}]` |
 | `changed_by` | TEXT | Yes | Author of this version (e.g., `owner`, `claude-session-277`) |
-| `changed_at` | TEXT | Yes | ISO 8601 timestamp |
+| `changed_at` | TEXT | DB-managed | ISO 8601 timestamp — set automatically by the database layer. **Do not pass to `insert_spec()` or `update_spec()`** |
 | `change_reason` | TEXT | Yes | Explanation for the change (audit trail) |
 
 ## Type Taxonomy
@@ -115,7 +117,7 @@ db.insert_spec(
 ```python
 from groundtruth_kb import KnowledgeDB
 
-db = KnowledgeDB("knowledge.db")
+db = KnowledgeDB("groundtruth.db")
 
 # Create a new spec
 db.insert_spec(

@@ -25,7 +25,7 @@ STANDALONE = ADMIN / "standalone"
 SHARED = ADMIN / "shared"
 WIDGET = ROOT / "widget"
 SCRIPTS = ROOT / "scripts"
-KB_PATH = ROOT / "tools" / "knowledge-db" / "knowledge.db"
+KB_PATH = ROOT / "groundtruth.db"
 TESTS_DIR = ROOT / "tests"
 E2E_DIR = TESTS_DIR / "e2e_live"
 

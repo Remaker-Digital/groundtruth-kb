@@ -21,7 +21,7 @@ This directory contains the foundational specification templates and boilerplate
    from groundtruth_kb import KnowledgeDB
    import json
 
-   db = KnowledgeDB("path/to/knowledge.db")
+   db = KnowledgeDB("path/to/groundtruth.db")
    with open("initial-specifications.json") as f:
        specs = json.load(f)
    for spec in specs:

@@ -106,7 +106,9 @@ desktop.ini
 # =============================================================================
 *.db-shm
 *.db-wal
-groundtruth.db
+groundtruth.db.backup-*
+groundtruth.db.pre-backfill-*
+.groundtruth-chroma/
 
 # =============================================================================
 # Docker
@@ -217,9 +219,8 @@ legal/contracts/signed/
 
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
-# Knowledge DB exports and backups (local only)
+# Knowledge DB exports (local only)
 tools/knowledge-db/knowledge-export-*.json
-tools/knowledge-db/knowledge.db.backup-*
 
 # Codex auto-generated dependencies (local only)
 .codex_pydeps/

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT / "tools" / "knowledge-db" / "knowledge.db"
+DB_PATH = ROOT / "groundtruth.db"
 
 CREATED_BY = "batch6_widget_ui_s112"
 

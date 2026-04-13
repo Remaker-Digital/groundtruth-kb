@@ -128,7 +128,7 @@ kdb.insert_work_item(
 print('Resolved WI-0772 as deferred')
 
 # Check remaining open count
-conn = sqlite3.connect('tools/knowledge-db/knowledge.db')
+conn = sqlite3.connect('groundtruth.db')
 remaining = conn.execute("SELECT COUNT(*) FROM current_work_items WHERE resolution_status = 'open'").fetchone()[0]
 rows = conn.execute("""
     SELECT id, title FROM current_work_items WHERE resolution_status = 'open' ORDER BY id

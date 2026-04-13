@@ -584,7 +584,7 @@ def main() -> int:
     args = parser.parse_args()
 
     # Safety guard: never delete without --force
-    db_path = Path(__file__).parent / "knowledge.db"
+    db_path = Path(__file__).parent.parent.parent / "groundtruth.db"
     if not args.dry_run and db_path.exists():
         if not args.force:
             print("ERROR: Database already exists. Re-seeding will DESTROY all runtime state")
@@ -600,7 +600,7 @@ def main() -> int:
         import shutil
         from datetime import datetime, timezone
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        backup_path = db_path.parent / f"knowledge.db.backup-{timestamp}"
+        backup_path = db_path.parent / f"groundtruth.db.backup-{timestamp}"
         shutil.copy2(str(db_path), str(backup_path))
         print(f"Backed up to: {backup_path}")
         db_path.unlink()

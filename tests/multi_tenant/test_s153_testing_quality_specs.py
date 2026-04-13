@@ -19,7 +19,7 @@ pytestmark = pytest.mark.local_env
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = ROOT / "tests"
 E2E_DIR = TESTS / "e2e_live"
-KB_PATH = ROOT / "tools" / "knowledge-db" / "knowledge.db"
+KB_PATH = ROOT / "groundtruth.db"
 SCRIPTS = ROOT / "scripts"
 
 

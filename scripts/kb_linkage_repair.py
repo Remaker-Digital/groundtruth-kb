@@ -21,7 +21,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
 import db as kbmod
 
-DB_PATH = PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"
+DB_PATH = PROJECT_ROOT / "groundtruth.db"
 REPO = PROJECT_ROOT
 DRY_RUN = "--dry-run" in sys.argv
 CHANGED_BY = "S218-linkage-repair"

@@ -12,7 +12,7 @@
 | Variable | Value |
 |----------|-------|
 | `SESSION_ID` | Current session identifier (e.g., S97) |
-| `KNOWLEDGE_DB` | `tools/knowledge-db/knowledge.db` |
+| `KNOWLEDGE_DB` | `groundtruth.db` |
 | `MEMORY_FILE` | `memory/MEMORY.md` |
 | `CLAUDE_MD` | `CLAUDE.md` |
 | `SCHEDULE_FILE` | `.claude/SCHEDULE.md` |
