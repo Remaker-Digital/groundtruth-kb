@@ -407,3 +407,106 @@ class TestF2ARegressions:
         assert result["spec_id"] == "SPEC-NEW"
         assert result["operation"] == "add"
         assert result["related_spec_count"] >= 1
+
+
+class TestF2BDependentsAndMetadata:
+    """Tests for F2-B: dependents traversal, authority, testability."""
+
+    # ------------------------------------------------------------------
+    # B1. Direct dependent
+    # ------------------------------------------------------------------
+    def test_direct_dependent(self, db):
+        """SPEC-A has affected_by=[SPEC-TARGET]; SPEC-A appears as depth=1 dependent."""
+        _insert_spec(db, "SPEC-TARGET", "core")
+        _insert_spec(db, "SPEC-A", "core", affected_by=["SPEC-TARGET"])
+
+        result = _impact(db, "SPEC-TARGET")
+        dep_ids = [d["id"] for d in result["dependents"]]
+        assert "SPEC-A" in dep_ids
+        dep = next(d for d in result["dependents"] if d["id"] == "SPEC-A")
+        assert dep["depth"] == 1
+        assert dep["via"] == "SPEC-TARGET"
+
+    # ------------------------------------------------------------------
+    # B2. Transitive dependent (depth=2 cap)
+    # ------------------------------------------------------------------
+    def test_transitive_dependent(self, db):
+        """Chain: SPEC-C → SPEC-B → SPEC-TARGET; SPEC-C at depth=2."""
+        _insert_spec(db, "SPEC-TARGET", "core")
+        _insert_spec(db, "SPEC-B", "core", affected_by=["SPEC-TARGET"])
+        _insert_spec(db, "SPEC-C", "other", affected_by=["SPEC-B"])
+
+        result = _impact(db, "SPEC-TARGET")
+        dep_ids = [d["id"] for d in result["dependents"]]
+        assert "SPEC-B" in dep_ids
+        assert "SPEC-C" in dep_ids
+        dep_c = next(d for d in result["dependents"] if d["id"] == "SPEC-C")
+        assert dep_c["depth"] == 2
+        assert dep_c["via"] == "SPEC-B"
+
+    # ------------------------------------------------------------------
+    # B3. No dependents
+    # ------------------------------------------------------------------
+    def test_no_dependents(self, db):
+        """Spec with no affected_by references has empty dependents."""
+        _insert_spec(db, "SPEC-LONELY", "isolated")
+
+        result = _impact(db, "SPEC-LONELY")
+        assert result["dependents"] == []
+
+    # ------------------------------------------------------------------
+    # B4. Cycle safety
+    # ------------------------------------------------------------------
+    def test_cycle_safety(self, db):
+        """Mutual affected_by: no infinite loop, each spec appears once."""
+        _insert_spec(db, "SPEC-X", "core", affected_by=["SPEC-Y"])
+        _insert_spec(db, "SPEC-Y", "core", affected_by=["SPEC-X"])
+
+        result = _impact(db, "SPEC-X")
+        dep_ids = [d["id"] for d in result["dependents"]]
+        assert "SPEC-Y" in dep_ids
+        assert dep_ids.count("SPEC-Y") == 1  # No duplicates
+
+    # ------------------------------------------------------------------
+    # B5. Deduplication at shallowest depth
+    # ------------------------------------------------------------------
+    def test_deduplication(self, db):
+        """SPEC-D references both SPEC-TARGET and SPEC-A (a direct dependent);
+        appears once at depth=1."""
+        _insert_spec(db, "SPEC-TARGET", "core")
+        _insert_spec(db, "SPEC-A", "core", affected_by=["SPEC-TARGET"])
+        _insert_spec(db, "SPEC-D", "core", affected_by=["SPEC-TARGET", "SPEC-A"])
+
+        result = _impact(db, "SPEC-TARGET")
+        dep_d = [d for d in result["dependents"] if d["id"] == "SPEC-D"]
+        assert len(dep_d) == 1
+        assert dep_d[0]["depth"] == 1  # Shallowest
+
+    # ------------------------------------------------------------------
+    # B6. Authority distribution
+    # ------------------------------------------------------------------
+    def test_authority_distribution(self, db):
+        """Related specs with different authorities produce correct distribution."""
+        _insert_spec(db, "SPEC-TARGET", "core")
+        _insert_spec(db, "SPEC-S", "core", authority="stated")
+        _insert_spec(db, "SPEC-I", "core", authority="inferred")
+        _insert_spec(db, "SPEC-U", "core", authority="unknown")
+
+        result = _impact(db, "SPEC-TARGET")
+        dist = result["authority_distribution"]
+        assert dist.get("stated", 0) == 1
+        assert dist.get("inferred", 0) == 1
+        assert dist.get("unknown", 0) == 1
+
+    # ------------------------------------------------------------------
+    # B7. Systemic all-provisional recommendation
+    # ------------------------------------------------------------------
+    def test_systemic_all_provisional_recommendation(self, db):
+        """Systemic blast radius with all provisional specs → softer recommendation."""
+        for i in range(25):
+            _insert_spec(db, f"SPEC-{i}", "mass", authority="inferred")
+        _insert_spec(db, "SPEC-TARGET", "mass", authority="inferred")
+
+        result = _impact(db, "SPEC-TARGET")
+        assert result["blast_radius"] == "systemic"
+        assert "lower priority" in result["recommendation"]

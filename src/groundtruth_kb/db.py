@@ -1321,6 +1321,120 @@ class KnowledgeDB:
             "constraint_count": len(constraint_specs),
         }
 
+    # --- F4-B: Constraint Propagation (Phase B — Linkage Writes) ---
+
+    def _find_specs_for_constraint(self, constraint: dict[str, Any]) -> list[dict[str, Any]]:
+        """Inverse of _find_matching_constraints: find functional specs
+        whose section/scope/tags overlap with a constraint spec.
+
+        Excludes ADR/DCL peer specs and the source constraint itself.
+        """
+        c_section = constraint.get("section")
+        c_scope = constraint.get("scope")
+        c_tags_raw = constraint.get("tags_parsed")
+        c_tags = set(c_tags_raw) if isinstance(c_tags_raw, list) else set()
+        c_id = constraint.get("id")
+
+        result: list[dict[str, Any]] = []
+        for spec in self.list_specs():
+            if spec.get("type") in ("architecture_decision", "design_constraint"):
+                continue
+            if spec["id"] == c_id:
+                continue
+            match = False
+            if c_section and spec.get("section") and spec["section"] == c_section:
+                match = True
+            if c_scope and spec.get("scope") and spec["scope"] == c_scope:
+                match = True
+            if c_tags and not match:
+                s_tags_raw = spec.get("tags_parsed")
+                s_tags = set(s_tags_raw) if isinstance(s_tags_raw, list) else set()
+                if c_tags & s_tags:
+                    match = True
+            if match:
+                result.append(spec)
+        return result
+
+    def propagate_constraint(
+        self,
+        constraint_id: str,
+        *,
+        dry_run: bool = True,
+    ) -> dict[str, Any]:
+        """Link a constraint to all matching functional specs via affected_by.
+
+        Each linkage creates a new spec version (append-only).
+        """
+        constraint = self.get_spec(constraint_id)
+        if constraint is None:
+            return {"error": f"Constraint {constraint_id} not found"}
+
+        matching = self._find_specs_for_constraint(constraint)
+        affected: list[dict[str, Any]] = []
+        newly_linked = 0
+        already_linked = 0
+
+        for spec in matching:
+            current_affected_by = spec.get("affected_by_parsed") or []
+            if not isinstance(current_affected_by, list):
+                current_affected_by = []
+
+            if constraint_id in current_affected_by:
+                affected.append({"id": spec["id"], "title": spec["title"], "action": "already_linked"})
+                already_linked += 1
+            else:
+                if not dry_run:
+                    new_affected_by = current_affected_by + [constraint_id]
+                    self.update_spec(
+                        spec["id"],
+                        "constraint-propagation",
+                        f"Linked constraint {constraint_id}: {constraint.get('title', '')}",
+                        affected_by=new_affected_by,
+                    )
+                affected.append({"id": spec["id"], "title": spec["title"], "action": "linked"})
+                newly_linked += 1
+
+        return {
+            "constraint_id": constraint_id,
+            "constraint_title": constraint.get("title", ""),
+            "dry_run": dry_run,
+            "affected_specs": affected,
+            "newly_linked": newly_linked,
+            "already_linked": already_linked,
+        }
+
+    def remove_constraint_link(
+        self,
+        spec_id: str,
+        constraint_id: str,
+        *,
+        changed_by: str = "constraint-propagation",
+        change_reason: str,
+    ) -> dict[str, Any]:
+        """Remove a constraint from a spec's affected_by list.
+
+        Creates a new spec version (append-only audit trail).
+        """
+        spec = self.get_spec(spec_id)
+        if spec is None:
+            return {"spec_id": spec_id, "constraint_id": constraint_id, "removed": False}
+
+        current = spec.get("affected_by_parsed") or []
+        if not isinstance(current, list):
+            current = []
+
+        if constraint_id not in current:
+            return {"spec_id": spec_id, "constraint_id": constraint_id, "removed": False}
+
+        new_affected_by = [x for x in current if x != constraint_id]
+        self.update_spec(
+            spec_id,
+            changed_by,
+            change_reason,
+            affected_by=new_affected_by if new_affected_by else None,
+        )
+        return {"spec_id": spec_id, "constraint_id": constraint_id, "removed": True}
+
     # --- F2-A: Change Impact Analysis (Phase A — Advisory) ---
 
     def compute_impact(
