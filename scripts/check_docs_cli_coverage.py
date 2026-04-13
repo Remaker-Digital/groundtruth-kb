@@ -6,7 +6,7 @@ Verifies that:
 2. No gt project init snippets are missing PROJECT_NAME argument
 3. MkDocs nav references existing files
 4. Version consistency across docs, templates, README, CLI source
-5. No bare PyPI-style install commands (must use GitHub @tag)
+5. No stale GitHub-only install commands (must use PyPI syntax)
 6. Python prerequisite matches pyproject.toml
 7. gt --version expected output matches __version__
 8. Install tag consistency (all @vX.Y.Z refs use the same tag)
@@ -221,32 +221,34 @@ def check_version_consistency() -> list[str]:
     return failures
 
 
-def check_no_bare_pypi_install() -> list[str]:
-    """Check that all pip install groundtruth-kb lines use a GitHub direct reference.
+def check_no_stale_github_install() -> list[str]:
+    """Check that current install commands use PyPI, not stale GitHub direct refs.
 
-    Every install command must contain '@' (the direct-reference marker),
-    e.g. ``pip install "groundtruth-kb @ git+https://...@vX.Y.Z"``.
-    Bare ``pip install groundtruth-kb`` and extras-only
-    ``pip install "groundtruth-kb[search]"`` both fail because the package
-    is not published to PyPI.
+    Since v0.3.1, groundtruth-kb is published to PyPI. Current install guidance
+    should use ``pip install groundtruth-kb`` or ``pip install "groundtruth-kb[extra]"``.
+    GitHub direct references (``@ git+https://...``) in docs are stale unless they
+    are in the changelog, the publish workflow smoke test, or explicitly framed as
+    source-install alternatives.
     """
     failures: list[str] = []
-    # Match pip install with groundtruth-kb as the package argument (possibly
-    # quoted, possibly with extras). Excludes comments containing the name.
-    install_pattern = re.compile(r'pip\s+install\s+[^#]*["\']?groundtruth-kb(?:\[|\s|["\']|$)')
+    git_ref_pattern = re.compile(r'groundtruth-kb.*@\s*git\+https://')
+
+    # Files where GitHub direct refs are intentionally kept
+    intentional_git_refs = {
+        ROOT / ".github" / "workflows" / "publish.yml",  # smoke test
+    }
 
     for filepath in _collect_scannable_files():
-        if _is_changelog(filepath):
+        if _is_changelog(filepath) or filepath in intentional_git_refs:
             continue
         text = filepath.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), 1):
-            # Strip inline comments before matching
             code_part = line.split("#")[0] if "#" in line else line
-            if install_pattern.search(code_part) and "@" not in code_part:
+            if git_ref_pattern.search(code_part):
                 rel = filepath.relative_to(ROOT)
                 failures.append(
-                    f"{rel}:{i}: pip install without GitHub direct reference "
-                    f"(line must contain '@' for git+https install)"
+                    f"{rel}:{i}: stale GitHub direct install reference "
+                    f"(use PyPI: pip install groundtruth-kb)"
                 )
 
     return failures
@@ -336,7 +338,7 @@ def main() -> int:
         ("gt project init snippets", check_project_init_snippets),
         ("mkdocs.yml nav references", check_mkdocs_nav),
         ("version consistency", check_version_consistency),
-        ("bare PyPI install detection", check_no_bare_pypi_install),
+        ("stale GitHub install detection", check_no_stale_github_install),
         ("Python prerequisite", check_python_prerequisite),
         ("gt --version output", check_gt_version_output),
         ("ChromaDB install message", check_chromadb_install_message),

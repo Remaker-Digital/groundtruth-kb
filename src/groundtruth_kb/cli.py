@@ -650,7 +650,7 @@ def deliberations_rebuild_index(ctx: click.Context) -> None:
     if result.get("errors") and result["errors"] == ["ChromaDB not installed"]:
         click.echo(
             "Error: ChromaDB is not installed. Install with:\n"
-            '  pip install "groundtruth-kb[search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"'
+            '  pip install "groundtruth-kb[search]"'
         )
         raise SystemExit(1)
     click.echo(f"Indexed {result['indexed']} deliberation(s), {result['chunks']} chunk(s).")
