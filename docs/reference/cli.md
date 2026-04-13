@@ -463,6 +463,50 @@ the authoritative source of truth.
 
 ---
 
+## Health Commands
+
+Session health dashboard for monitoring project metrics over time.
+
+### gt health
+
+Show current health with delta from the last captured snapshot.
+
+```
+gt health
+```
+
+When no prior snapshot exists, displays current metrics without deltas.
+
+### gt health snapshot
+
+Capture a health snapshot for a session and display the report.
+
+```
+gt health snapshot <SESSION_ID>
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `SESSION_ID` | argument | *required* | Session identifier (e.g., S288) |
+
+Captures lifecycle metrics, summary, quality distribution, and constraint
+coverage as a snapshot. Uses `INSERT OR REPLACE` so repeated captures for
+the same session replace the previous snapshot.
+
+### gt health trends
+
+Show recent health snapshots with rendered reports.
+
+```
+gt health trends [-n <LIMIT>]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `-n` / `--limit` | integer | `5` | Number of recent snapshots to display |
+
+---
+
 ## Command Tree
 
 ```
@@ -480,6 +524,9 @@ gt [--config <path>] [--version]
 ├── export [--output]
 ├── import <FILE> [--merge]
 ├── serve [--port] [--host]
+├── health
+│   ├── snapshot <SESSION_ID>
+│   └── trends [-n <LIMIT>]
 ├── project
 │   ├── init <PROJECT_NAME> [--profile] [--owner] [--copyright]
 │   │   [--cloud-provider] [--dir] [--init-git/--no-init-git]

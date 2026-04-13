@@ -302,6 +302,13 @@ CREATE TABLE IF NOT EXISTS spec_quality_scores (
     UNIQUE(spec_id, spec_version, session_id)
 );
 
+-- F7: Session health snapshots
+CREATE TABLE IF NOT EXISTS session_snapshots (
+    session_id TEXT NOT NULL PRIMARY KEY,
+    captured_at TEXT NOT NULL,
+    data TEXT NOT NULL
+);
+
 -- Pipeline lifecycle events (SPEC-2099) — append-only event log
 CREATE TABLE IF NOT EXISTS pipeline_events (
     id              TEXT    NOT NULL PRIMARY KEY,
@@ -1459,6 +1466,107 @@ class KnowledgeDB:
             msg = f"config must be an ImpactConfig instance, got {type(config).__name__}"
             raise TypeError(msg)
         return compute_impact_analysis(self, operation, spec_data, config=config)
+
+    # --- F7: Session Health Dashboard ---
+
+    def capture_session_snapshot(self, session_id: str) -> dict[str, Any]:
+        """Capture a health snapshot of current DB state.
+
+        Uses INSERT OR REPLACE — repeated captures for the same session_id
+        replace the previous snapshot (latest-snapshot replacement contract).
+        """
+        data = {
+            "lifecycle_metrics": self.get_lifecycle_metrics(),
+            "summary": self.get_summary(),
+            "quality_distribution": self.get_quality_distribution(),
+            "constraint_coverage": self.get_constraint_coverage(),
+            "captured_at": _now(),
+        }
+        data_json = json.dumps(data)
+        self._get_conn().execute(
+            "INSERT OR REPLACE INTO session_snapshots (session_id, captured_at, data) VALUES (?, ?, ?)",
+            (session_id, data["captured_at"], data_json),
+        )
+        self._get_conn().commit()
+        return {"session_id": session_id, **data}
+
+    def get_session_snapshot(self, session_id: str) -> dict[str, Any] | None:
+        """Retrieve a stored snapshot by session ID."""
+        row = self._get_conn().execute("SELECT * FROM session_snapshots WHERE session_id = ?", (session_id,)).fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["data_parsed"] = json.loads(d["data"]) if d.get("data") else {}
+        return d
+
+    def get_snapshot_history(self, limit: int = 10) -> list[dict[str, Any]]:
+        """Retrieve recent snapshots ordered by captured_at DESC."""
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM session_snapshots ORDER BY captured_at DESC LIMIT ?", (limit,))
+            .fetchall()
+        )
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["data_parsed"] = json.loads(d["data"]) if d.get("data") else {}
+            result.append(d)
+        return result
+
+    def compute_session_delta(self, current_session: str | None = None) -> dict[str, Any]:
+        """Compute health metric deltas.
+
+        When current_session is None: compares live DB state with the most
+        recent stored snapshot.
+        When current_session is provided: compares that snapshot with the
+        previous one.
+        """
+        if current_session is None:
+            # Live state vs last snapshot
+            current_data = {
+                "lifecycle_metrics": self.get_lifecycle_metrics(),
+                "summary": self.get_summary(),
+                "quality_distribution": self.get_quality_distribution(),
+                "constraint_coverage": self.get_constraint_coverage(),
+            }
+            history = self.get_snapshot_history(limit=1)
+            if not history:
+                return {"current": current_data, "previous": None, "deltas": {}, "no_prior": True}
+            previous_data = history[0].get("data_parsed", {})
+        else:
+            snap = self.get_session_snapshot(current_session)
+            if snap is None:
+                return {"current": None, "previous": None, "deltas": {}, "no_prior": True}
+            current_data = snap.get("data_parsed", {})
+            # Find the snapshot just before this one (by rowid, not timestamp,
+            # to handle same-second captures deterministically)
+            rows = (
+                self._get_conn()
+                .execute(
+                    "SELECT * FROM session_snapshots WHERE rowid < (SELECT rowid FROM session_snapshots WHERE session_id = ?) ORDER BY rowid DESC LIMIT 1",
+                    (current_session,),
+                )
+                .fetchall()
+            )
+            if not rows:
+                return {"current": current_data, "previous": None, "deltas": {}, "no_prior": True}
+            prev = dict(rows[0])
+            previous_data = json.loads(prev["data"]) if prev.get("data") else {}
+
+        # Compute deltas for lifecycle metrics
+        deltas: dict[str, Any] = {}
+        cur_metrics = current_data.get("lifecycle_metrics", {})
+        prev_metrics = previous_data.get("lifecycle_metrics", {})
+        for key in cur_metrics:
+            cur_val = cur_metrics[key].get("value") if isinstance(cur_metrics[key], dict) else None
+            prev_val = prev_metrics.get(key, {}).get("value") if isinstance(prev_metrics.get(key), dict) else None
+            if cur_val is not None and prev_val is not None:
+                try:
+                    deltas[key] = round(float(cur_val) - float(prev_val), 6)
+                except (TypeError, ValueError):
+                    pass
+
+        return {"current": current_data, "previous": previous_data, "deltas": deltas, "no_prior": False}
 
     def list_children(self, parent_id: str) -> list[dict[str, Any]]:
         """List current specs that are direct or nested children of parent_id.
@@ -3224,6 +3332,7 @@ class KnowledgeDB:
             "deliberation_work_items",
             "pipeline_events",
             "spec_quality_scores",
+            "session_snapshots",
         ]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
