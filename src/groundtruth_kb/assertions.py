@@ -47,6 +47,111 @@ _VALID_ASSERTION_TYPES = {
     "any_of",
 }
 
+# Types that use the standard (file, pattern) pairing for target extraction.
+_GREP_STYLE_TYPES = {"grep", "grep_absent", "count"}
+
+
+# ---------------------------------------------------------------------------
+# Typed assertion target (F2/F8 shared extraction)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AssertionTarget:
+    """Typed target extracted from a machine assertion for impact analysis.
+
+    Used by F2 (Change Impact Analysis) and F8 (Provenance Reconciliation)
+    to build a machine-interpretable target set from assertion definitions.
+    """
+
+    assertion_type: str
+    file_target: str | None = None
+    match_target: str | None = None
+    file_is_glob: bool = False
+
+
+def _extract_assertion_targets(assertion: Any) -> list[AssertionTarget]:
+    """Extract typed targets from a single assertion dict.
+
+    Shared helper that mirrors the runner's normalization logic without
+    executing checks.  All grep-style types (grep, grep_absent, count)
+    share a single extraction path through _normalize_assertion().
+
+    Returns an empty list for non-machine assertions (plain text, unknown types).
+    Recurses into all_of/any_of children.
+    """
+    if not isinstance(assertion, dict):
+        return []
+
+    a_type = assertion.get("type", "")
+    if not a_type or a_type not in _VALID_ASSERTION_TYPES:
+        return []
+
+    normalized = _normalize_assertion(assertion)
+
+    # --- Composition operators: recurse ---
+    if a_type in ("all_of", "any_of"):
+        targets: list[AssertionTarget] = []
+        for child in normalized.get("assertions", []):
+            targets.extend(_extract_assertion_targets(child))
+        return targets
+
+    # --- json_path: file + dotted path ---
+    if a_type == "json_path":
+        file_target = normalized.get("file")
+        path_expr = normalized.get("path")
+        if file_target:
+            return [
+                AssertionTarget(
+                    assertion_type=a_type,
+                    file_target=file_target,
+                    match_target=path_expr or None,
+                    file_is_glob=False,
+                )
+            ]
+        return []
+
+    # --- file_exists: file only ---
+    if a_type == "file_exists":
+        file_target = normalized.get("file")
+        if file_target:
+            return [
+                AssertionTarget(
+                    assertion_type=a_type,
+                    file_target=file_target,
+                    file_is_glob=False,
+                )
+            ]
+        return []
+
+    # --- glob: pattern is the file target, always a glob ---
+    if a_type == "glob":
+        pattern = normalized.get("pattern")
+        if pattern:
+            return [
+                AssertionTarget(
+                    assertion_type=a_type,
+                    file_target=pattern,
+                    file_is_glob=True,
+                )
+            ]
+        return []
+
+    # --- Standard (file, pattern) pairing: grep, grep_absent, count ---
+    file_target = normalized.get("file")
+    match_target = normalized.get("pattern")
+    if file_target:
+        return [
+            AssertionTarget(
+                assertion_type=a_type,
+                file_target=file_target,
+                match_target=match_target or None,
+                file_is_glob=bool("*" in file_target),
+            )
+        ]
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Phase 0: Path confinement
 # ---------------------------------------------------------------------------
