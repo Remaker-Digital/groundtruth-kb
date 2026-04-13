@@ -231,7 +231,7 @@ def check_no_stale_github_install() -> list[str]:
     source-install alternatives.
     """
     failures: list[str] = []
-    git_ref_pattern = re.compile(r'groundtruth-kb.*@\s*git\+https://')
+    git_ref_pattern = re.compile(r"groundtruth-kb.*@\s*git\+https://")
 
     # Files where GitHub direct refs are intentionally kept
     intentional_git_refs = {
@@ -247,8 +247,7 @@ def check_no_stale_github_install() -> list[str]:
             if git_ref_pattern.search(code_part):
                 rel = filepath.relative_to(ROOT)
                 failures.append(
-                    f"{rel}:{i}: stale GitHub direct install reference "
-                    f"(use PyPI: pip install groundtruth-kb)"
+                    f"{rel}:{i}: stale GitHub direct install reference (use PyPI: pip install groundtruth-kb)"
                 )
 
     return failures
