@@ -1,11 +1,15 @@
-# Verify and attach built artifacts to GitHub Releases.
+# Build, verify, and publish groundtruth-kb.
 #
-# groundtruth-kb is distributed as a GitHub-installable package:
-#   pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.1"
+# Install from PyPI:
+#   pip install groundtruth-kb
 #
-# This workflow runs on Release creation to verify the wheel builds
-# cleanly and attaches built artifacts to the Release for reference.
-# The package is NOT published to PyPI. Distribution is GitHub-only.
+# Install from GitHub (pinned version):
+#   pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+#
+# This workflow runs on Release creation to:
+#   1. Build and verify the wheel
+#   2. Attach artifacts to the GitHub Release
+#   3. Publish to PyPI via Trusted Publishers (OIDC)
 #
 # Copyright (c) 2026 Remaker Digital. Licensed under AGPL-3.0-or-later.
 
@@ -60,3 +64,25 @@ jobs:
           for f in dist/*; do
             gh release upload "${{ github.event.release.tag_name }}" "$f" --clobber
           done
+
+      - name: Upload artifacts for publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    needs: build-verify
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
