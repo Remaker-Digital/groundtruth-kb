@@ -294,3 +294,62 @@ class TestF2AAssertionTargetExtraction:
             match_target="TODO",
             file_is_glob=True,
         )
+
+
+class TestF2ARegressions:
+    """Regression tests from NO-GO bridge/gtkb-phase2-implementation-008.md."""
+
+    # ------------------------------------------------------------------
+    # R1. Scope-only overlap (Finding 1)
+    # ------------------------------------------------------------------
+    def test_scope_only_overlap(self, db):
+        """Two specs with same scope but different sections are related."""
+        _insert_spec(db, "SPEC-A", "auth", scope="shared-scope")
+        _insert_spec(db, "SPEC-B", "billing", scope="shared-scope")
+
+        result = db.compute_impact("SPEC-A")
+        related_ids = [s["id"] for s in result["related_specs"]]
+        assert "SPEC-B" in related_ids
+        assert result["related_spec_count"] >= 1
+
+    # ------------------------------------------------------------------
+    # R2. Report shape includes approved fields (Finding 1)
+    # ------------------------------------------------------------------
+    def test_report_shape(self, db):
+        """compute_impact returns related_specs, dependents, recommendation."""
+        _insert_spec(db, "SPEC-A", "widget")
+
+        result = db.compute_impact("SPEC-A")
+        assert "related_specs" in result
+        assert "dependents" in result
+        assert "recommendation" in result
+        assert isinstance(result["related_specs"], list)
+        assert isinstance(result["dependents"], list)
+        assert isinstance(result["recommendation"], str)
+        # Phase A: dependents is always empty
+        assert result["dependents"] == []
+
+    # ------------------------------------------------------------------
+    # R3. Same-glob conflict detection (Finding 2)
+    # ------------------------------------------------------------------
+    def test_same_glob_conflict(self, db):
+        """Two specs with identical glob file_target and same pattern but
+        conflicting types are flagged as a conflict."""
+        _insert_spec(
+            db,
+            "SPEC-A",
+            "imports",
+            assertions=[{"type": "grep", "file": "src/**/*.py", "pattern": "import os"}],
+        )
+        _insert_spec(
+            db,
+            "SPEC-B",
+            "imports",
+            assertions=[{"type": "grep_absent", "file": "src/**/*.py", "pattern": "import os"}],
+        )
+
+        result = db.compute_impact("SPEC-A")
+        assert len(result["potential_conflicts"]) >= 1
+        conflict = result["potential_conflicts"][0]
+        assert conflict["file_target"] == "src/**/*.py"
+        assert conflict["match_target"] == "import os"

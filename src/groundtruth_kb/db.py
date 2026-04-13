@@ -1224,16 +1224,20 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     def get_quality_distribution(self) -> dict:
-        """Aggregate quality distribution across latest scores per spec."""
+        """Aggregate quality distribution across latest scores per spec.
+
+        Uses rowid as deterministic tie-breaker when multiple scores share
+        the same scored_at timestamp for one spec.
+        """
         rows = (
             self._get_conn()
             .execute(
                 """SELECT tier, COUNT(*) as count, AVG(overall) as avg_score
                    FROM spec_quality_scores sq
                    INNER JOIN (
-                       SELECT spec_id, MAX(scored_at) as latest
+                       SELECT spec_id, MAX(rowid) as latest_rowid
                        FROM spec_quality_scores GROUP BY spec_id
-                   ) latest ON sq.spec_id = latest.spec_id AND sq.scored_at = latest.latest
+                   ) latest ON sq.spec_id = latest.spec_id AND sq.rowid = latest.latest_rowid
                    GROUP BY tier"""
             )
             .fetchall()
