@@ -1,6 +1,7 @@
 """Tests for F2-A: Change Impact Analysis (Phase A).
 
-15 test cases per approved v6 scope (bridge/gtkb-spec-pipeline-f2-011.md).
+15 test cases per approved v6 scope (bridge/gtkb-spec-pipeline-f2-011.md),
+plus regression tests from NO-GO reviews.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 Licensed under AGPL-3.0-or-later.
@@ -34,6 +35,13 @@ def _insert_spec(db, id, section, assertions=None, **kw):
     )
 
 
+def _impact(db, spec_id, *, operation="modify", config=None):
+    """Helper: call compute_impact with the approved (operation, spec_data) API."""
+    spec = db.get_spec(spec_id)
+    assert spec is not None, f"Spec {spec_id} not found in DB"
+    return db.compute_impact(operation, spec, config=config)
+
+
 class TestF2AChangeImpactAnalysis:
     """15 tests for F2-A: Change Impact Analysis Phase A."""
 
@@ -46,7 +54,7 @@ class TestF2AChangeImpactAnalysis:
             _insert_spec(db, f"SPEC-{i}", "widget")
         _insert_spec(db, "SPEC-TARGET", "widget")
 
-        result = db.compute_impact("SPEC-TARGET")
+        result = _impact(db, "SPEC-TARGET", operation="add")
         assert result["blast_radius"] == "contained"
         assert result["related_spec_count"] == 3
 
@@ -59,7 +67,7 @@ class TestF2AChangeImpactAnalysis:
             _insert_spec(db, f"SPEC-{i}", "core")
         _insert_spec(db, "SPEC-TARGET", "core")
 
-        result = db.compute_impact("SPEC-TARGET")
+        result = _impact(db, "SPEC-TARGET", operation="add")
         assert result["blast_radius"] == "systemic"
         assert result["related_spec_count"] == 25
 
@@ -79,7 +87,7 @@ class TestF2AChangeImpactAnalysis:
         )
         _insert_spec(db, "SPEC-TARGET", "data-access")
 
-        result = db.compute_impact("SPEC-TARGET")
+        result = _impact(db, "SPEC-TARGET")
         constraint_ids = [c["id"] for c in result["applicable_constraints"]]
         assert "ADR-001" in constraint_ids
         assert result["touches_architecture"] is True
@@ -102,7 +110,7 @@ class TestF2AChangeImpactAnalysis:
             assertions=[{"type": "grep_absent", "file": "src/auth.py", "pattern": "def login"}],
         )
 
-        result = db.compute_impact("SPEC-A")
+        result = _impact(db, "SPEC-A")
         assert len(result["potential_conflicts"]) >= 1
         conflict = result["potential_conflicts"][0]
         assert conflict["file_target"] == "src/auth.py"
@@ -126,7 +134,7 @@ class TestF2AChangeImpactAnalysis:
             assertions=[{"type": "visual", "description": "Check color"}],
         )
 
-        result = db.compute_impact("SPEC-A")
+        result = _impact(db, "SPEC-A")
         assert result["potential_conflicts"] == []
 
     # ------------------------------------------------------------------
@@ -139,7 +147,7 @@ class TestF2AChangeImpactAnalysis:
         _insert_spec(db, "SPEC-TARGET", "payments")
 
         config = ImpactConfig(contained_threshold=2)
-        result = db.compute_impact("SPEC-TARGET", config=config)
+        result = _impact(db, "SPEC-TARGET", config=config)
         assert result["blast_radius"] == "moderate"
         assert result["related_spec_count"] == 3
 
@@ -206,7 +214,7 @@ class TestF2AAssertionTargetExtraction:
             assertions=[{"type": "json_path", "file": "config.json", "path": "server.host"}],
         )
 
-        result = db.compute_impact("SPEC-A")
+        result = _impact(db, "SPEC-A")
         assert result["potential_conflicts"] == []
 
     # ------------------------------------------------------------------
@@ -259,7 +267,7 @@ class TestF2AAssertionTargetExtraction:
             assertions=[{"type": "grep", "file": "src/**/*.py", "pattern": "import os"}],
         )
 
-        result = db.compute_impact("SPEC-A")
+        result = _impact(db, "SPEC-A")
         # No conflict flagged — this is the documented false-negative
         assert result["potential_conflicts"] == []
         # But an annotation documents the limitation
@@ -297,29 +305,30 @@ class TestF2AAssertionTargetExtraction:
 
 
 class TestF2ARegressions:
-    """Regression tests from NO-GO bridge/gtkb-phase2-implementation-008.md."""
+    """Regression tests from NO-GO reviews."""
 
     # ------------------------------------------------------------------
-    # R1. Scope-only overlap (Finding 1)
+    # R1. Scope-only overlap (NO-GO -008 Finding 1)
     # ------------------------------------------------------------------
     def test_scope_only_overlap(self, db):
         """Two specs with same scope but different sections are related."""
         _insert_spec(db, "SPEC-A", "auth", scope="shared-scope")
         _insert_spec(db, "SPEC-B", "billing", scope="shared-scope")
 
-        result = db.compute_impact("SPEC-A")
+        result = _impact(db, "SPEC-A")
         related_ids = [s["id"] for s in result["related_specs"]]
         assert "SPEC-B" in related_ids
         assert result["related_spec_count"] >= 1
 
     # ------------------------------------------------------------------
-    # R2. Report shape includes approved fields (Finding 1)
+    # R2. Report shape includes approved fields (NO-GO -008 Finding 1)
     # ------------------------------------------------------------------
     def test_report_shape(self, db):
-        """compute_impact returns related_specs, dependents, recommendation."""
+        """compute_impact returns operation, related_specs, dependents, recommendation."""
         _insert_spec(db, "SPEC-A", "widget")
 
-        result = db.compute_impact("SPEC-A")
+        result = _impact(db, "SPEC-A")
+        assert "operation" in result
         assert "related_specs" in result
         assert "dependents" in result
         assert "recommendation" in result
@@ -330,7 +339,7 @@ class TestF2ARegressions:
         assert result["dependents"] == []
 
     # ------------------------------------------------------------------
-    # R3. Same-glob conflict detection (Finding 2)
+    # R3. Same-glob conflict detection (NO-GO -008 Finding 2)
     # ------------------------------------------------------------------
     def test_same_glob_conflict(self, db):
         """Two specs with identical glob file_target and same pattern but
@@ -348,8 +357,53 @@ class TestF2ARegressions:
             assertions=[{"type": "grep_absent", "file": "src/**/*.py", "pattern": "import os"}],
         )
 
-        result = db.compute_impact("SPEC-A")
+        result = _impact(db, "SPEC-A")
         assert len(result["potential_conflicts"]) >= 1
         conflict = result["potential_conflicts"][0]
         assert conflict["file_target"] == "src/**/*.py"
         assert conflict["match_target"] == "import os"
+
+    # ------------------------------------------------------------------
+    # R4. Tag-only overlap (NO-GO -010 Finding 2)
+    # ------------------------------------------------------------------
+    def test_tag_only_overlap(self, db):
+        """Two specs with same tag but different section/scope are related."""
+        _insert_spec(db, "SPEC-A", "auth", tags=["security"])
+        _insert_spec(db, "SPEC-B", "billing", tags=["security"])
+
+        result = _impact(db, "SPEC-A")
+        related_ids = [s["id"] for s in result["related_specs"]]
+        assert "SPEC-B" in related_ids
+
+    # ------------------------------------------------------------------
+    # R5. Approved API shape (NO-GO -010 Finding 1)
+    # ------------------------------------------------------------------
+    def test_approved_api_shape(self, db):
+        """compute_impact accepts (operation, spec_data) positional args."""
+        _insert_spec(db, "SPEC-A", "widget")
+        spec = db.get_spec("SPEC-A")
+
+        # The approved API: (operation, spec_data, *, config)
+        result = db.compute_impact("add", spec)
+        assert result["operation"] == "add"
+        assert result["spec_id"] == "SPEC-A"
+
+    # ------------------------------------------------------------------
+    # R6. Pre-insert analysis with spec_data dict (NO-GO -010 Finding 1)
+    # ------------------------------------------------------------------
+    def test_pre_insert_analysis(self, db):
+        """compute_impact works with a spec_data dict not yet persisted."""
+        # Create some related specs in the DB
+        _insert_spec(db, "SPEC-EXISTING", "widget")
+
+        # Analyze a proposed spec that doesn't exist yet
+        proposed = {
+            "id": "SPEC-NEW",
+            "section": "widget",
+            "scope": None,
+            "tags": None,
+        }
+        result = db.compute_impact("add", proposed)
+        assert result["spec_id"] == "SPEC-NEW"
+        assert result["operation"] == "add"
+        assert result["related_spec_count"] >= 1

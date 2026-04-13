@@ -135,9 +135,21 @@ def _classify_blast_radius(related_count: int, config: ImpactConfig) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _get_spec_tags(spec: dict[str, Any]) -> set[str]:
+    """Extract tags as a set from a spec dict (handles parsed or raw)."""
+    parsed = spec.get("tags_parsed")
+    if isinstance(parsed, list):
+        return set(parsed)
+    raw = spec.get("tags")
+    if isinstance(raw, list):
+        return set(raw)
+    return set()
+
+
 def compute_impact_analysis(
     db: KnowledgeDB,
-    spec_id: str,
+    operation: str,
+    spec_data: dict[str, Any],
     *,
     config: ImpactConfig | None = None,
 ) -> dict[str, Any]:
@@ -145,23 +157,25 @@ def compute_impact_analysis(
 
     Args:
         db: KnowledgeDB instance.
-        spec_id: ID of the spec to analyze.
+        operation: The planned operation — "add", "modify", or "remove".
+        spec_data: Spec dict (may or may not be persisted yet).  Must contain
+            at least the fields used for overlap: ``section``, ``scope``,
+            ``tags``/``tags_parsed``, and ``assertions``/``_assertions_parsed``.
         config: Optional thresholds (defaults to ImpactConfig()).
 
     Returns:
-        dict with keys: spec_id, blast_radius, related_spec_count,
-        applicable_constraints, potential_conflicts, annotations,
-        touches_architecture.
+        dict with keys: spec_id, operation, blast_radius, related_spec_count,
+        related_specs, dependents, applicable_constraints, potential_conflicts,
+        annotations, touches_architecture, recommendation.
     """
     cfg = config or ImpactConfig()
+    spec_id = spec_data.get("id", "<unsaved>")
 
-    spec = db.get_spec(spec_id)
-    if spec is None:
-        return {"error": f"Spec {spec_id} not found"}
+    # --- Related specs: section OR scope OR tags overlap ---
+    section = spec_data.get("section")
+    scope = spec_data.get("scope")
+    spec_tags = _get_spec_tags(spec_data)
 
-    # --- Related specs: section OR scope overlap ---
-    section = spec.get("section")
-    scope = spec.get("scope")
     seen_ids: set[str] = set()
     related: list[dict[str, Any]] = []
     for s in db.list_specs():
@@ -172,6 +186,10 @@ def compute_impact_analysis(
             match = True
         if scope and s.get("scope") and s["scope"] == scope:
             match = True
+        if spec_tags and not match:
+            other_tags = _get_spec_tags(s)
+            if spec_tags & other_tags:
+                match = True
         if match:
             related.append(s)
             seen_ids.add(s["id"])
@@ -180,10 +198,14 @@ def compute_impact_analysis(
     blast_radius = _classify_blast_radius(related_count, cfg)
 
     # --- Applicable constraints via F4-A ---
-    applicable_constraints = db.check_constraints_for_spec(spec_id)
+    applicable_constraints = db.check_constraints_for_spec(
+        section=section,
+        scope=scope,
+        tags=list(spec_tags) if spec_tags else None,
+    )
 
     # --- Assertion-target conflict detection ---
-    spec_targets = _targets_for_spec(spec)
+    spec_targets = _targets_for_spec(spec_data)
     potential_conflicts, annotations = _detect_conflicts(
         spec_id,
         spec_targets,
@@ -202,6 +224,7 @@ def compute_impact_analysis(
 
     return {
         "spec_id": spec_id,
+        "operation": operation,
         "blast_radius": blast_radius,
         "related_spec_count": related_count,
         "related_specs": related,

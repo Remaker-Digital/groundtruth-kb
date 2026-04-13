@@ -1325,11 +1325,17 @@ class KnowledgeDB:
 
     def compute_impact(
         self,
-        spec_id: str,
+        operation: str,
+        spec_data: dict[str, Any],
         *,
         config: Any | None = None,
     ) -> dict[str, Any]:
         """Compute advisory change-impact analysis for a specification.
+
+        Args:
+            operation: Planned operation — "add", "modify", or "remove".
+            spec_data: Spec dict (may or may not be persisted yet).
+            config: Optional :class:`~groundtruth_kb.impact.ImpactConfig`.
 
         Delegates to :func:`groundtruth_kb.impact.compute_impact_analysis`.
         """
@@ -1338,7 +1344,7 @@ class KnowledgeDB:
         if config is not None and not isinstance(config, ImpactConfig):
             msg = f"config must be an ImpactConfig instance, got {type(config).__name__}"
             raise TypeError(msg)
-        return compute_impact_analysis(self, spec_id, config=config)
+        return compute_impact_analysis(self, operation, spec_data, config=config)
 
     def list_children(self, parent_id: str) -> list[dict[str, Any]]:
         """List current specs that are direct or nested children of parent_id.
