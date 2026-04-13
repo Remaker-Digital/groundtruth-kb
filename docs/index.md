@@ -26,15 +26,19 @@ Layer 1: Core Knowledge DB     gt init / seed / assert / serve
          File Bridge Setup     dual-agent coordination templates [optional]
 ```
 
+**New here?** Read [The User Journey](user-journey.md) to see what building
+a product with GroundTruth looks like — from first install to production.
+
 ## Quick Start
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install groundtruth-kb
 gt project init my-project --owner "Your Organization" --init-git
 gt --config my-project/groundtruth.toml summary
 ```
 
-See the [Bootstrap Guide](bootstrap.md) for a complete 10-step walkthrough.
+See the [Start Here](start-here.md) guide for a complete walkthrough, or the
+[Bootstrap Guide](bootstrap.md) for a 10-step technical reference.
 
 ## Tooling
 

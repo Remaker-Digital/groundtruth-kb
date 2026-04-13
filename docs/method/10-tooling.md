@@ -6,19 +6,19 @@ This guide covers the practical use of the GroundTruth CLI, web UI, and configur
 
 ```bash
 # Install from GitHub (not published to PyPI)
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install groundtruth-kb
 ```
 
 For the web UI (optional):
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install "groundtruth-kb[web]"
 ```
 
 For development (tests, linting):
 
 ```bash
-pip install "groundtruth-kb[dev] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install "groundtruth-kb[dev]"
 ```
 
 ## Initializing a project

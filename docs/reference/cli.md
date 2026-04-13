@@ -296,7 +296,7 @@ gt serve [--port <n>] [--host <addr>]
 !!! note "Requires web extra"
     The web UI requires additional dependencies. Install with:
     ```bash
-    pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+    pip install "groundtruth-kb[web]"
     ```
 
 **Examples:**
@@ -451,7 +451,7 @@ the authoritative source of truth.
 !!! note "Requires search extra"
     ChromaDB must be installed for this command:
     ```bash
-    pip install "groundtruth-kb[search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+    pip install "groundtruth-kb[search]"
     ```
 
 **Exit codes:**

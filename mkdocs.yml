@@ -52,6 +52,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
+      - User Journey: user-journey.md
       - Start Here: start-here.md
       - Bootstrap Guide: bootstrap.md
       - Desktop Setup: desktop-setup.md
