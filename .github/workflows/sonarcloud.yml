@@ -37,6 +37,6 @@ jobs:
           pytest --cov=groundtruth_kb --cov-report=xml:coverage.xml tests/
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v7
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
