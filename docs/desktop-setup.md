@@ -66,14 +66,14 @@ local-first setup that supports:
 ### 1. Install GroundTruth from GitHub
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
 ```
 
 Optional extras:
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
-pip install "groundtruth-kb[dev] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+pip install "groundtruth-kb[dev] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
 ```
 
 ### 2. Bootstrap a desktop-ready project

@@ -29,7 +29,7 @@ Layer 1: Core Knowledge DB     gt init / seed / assert / serve
 ## Quick Start
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.2.0"
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
 gt project init my-project --owner "Your Organization" --init-git
 gt --config my-project/groundtruth.toml summary
 ```

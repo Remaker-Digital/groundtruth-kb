@@ -1,14 +1,19 @@
 # Task Tracker Walkthrough
 
-A step-by-step guide through the GroundTruth method using this example project.
-By the end, you will have explored every layer: specifications, tests, governance,
-assertions, architecture decisions, work items, the review cycle, CI/CD, and the
-upstream promotion model.
+A step-by-step guide through the GroundTruth method using the bundled example
+project. By the end, you will have explored every layer: specifications, tests,
+governance, assertions, architecture decisions, work items, the review cycle,
+CI/CD, and the upstream promotion model.
+
+!!! tip "Source code"
+    The example project lives at
+    [`examples/task-tracker/`](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/examples/task-tracker)
+    in the repository.
 
 ## Prerequisites
 
 - Python 3.11+
-- `groundtruth-kb` installed (clone the repo and `pip install -e .`)
+- `groundtruth-kb` installed (see [Start Here](../start-here.md))
 
 ## Step 1: Set up the project
 
@@ -27,8 +32,9 @@ pip install -e ".[dev]"
 gt --config groundtruth.toml summary
 ```
 
-You should see: 7 specs (5 domain + 2 governance), 7 tests, 1 work item, 1 document.
-This database was pre-seeded by `seed_kb.py` to give you something real to inspect.
+You should see: 7 specs (5 domain + 2 governance), 7 tests, 1 work item,
+1 document. This database was pre-seeded by `seed_kb.py` to give you
+something real to inspect.
 
 ## Step 3: Browse with the web UI
 
@@ -37,13 +43,13 @@ pip install -e ".[web]"  # from groundtruth-kb repo root
 gt --config groundtruth.toml serve
 ```
 
-Open http://localhost:8090. Browse the specs, tests, and history tabs.
-Notice that every change has a version, author, and timestamp.
+Open [http://localhost:8090](http://localhost:8090). Browse the specs, tests,
+and history tabs. Notice that every change has a version, author, and timestamp.
 
 ## Step 4: Read a specification
 
-In the web UI, click on **SPEC-001** ("Users can create tasks with title and description").
-Notice:
+In the web UI, click on **SPEC-001** ("Users can create tasks with title and
+description"). Notice:
 
 - **Status:** implemented (code exists that satisfies this spec)
 - **Description:** states the requirement in business terms, not implementation terms
@@ -59,9 +65,10 @@ Browse to **ADR-001** ("Use in-memory dict store for task data"). This records:
 - **Decision:** in-memory dict (not SQLite or PostgreSQL)
 - **Trade-offs:** simpler setup, no persistence across restarts
 
-Then look at **DCL-001** ("No external database dependency"). This is a machine-checkable
-rule derived from ADR-001, with a `grep_absent` assertion ensuring no `sqlalchemy`,
-`psycopg`, or `pymongo` imports appear in the models file.
+Then look at **DCL-001** ("No external database dependency"). This is a
+machine-checkable rule derived from ADR-001, with a `grep_absent` assertion
+ensuring no `sqlalchemy`, `psycopg`, or `pymongo` imports appear in the
+models file.
 
 ## Step 6: Run assertions
 
@@ -69,7 +76,8 @@ rule derived from ADR-001, with a `grep_absent` assertion ensuring no `sqlalchem
 gt --config groundtruth.toml assert
 ```
 
-All assertions should pass. These verify that the codebase still matches the specs.
+All assertions should pass. These verify that the codebase still matches
+the specs.
 
 ## Step 7: Run the tests
 
@@ -105,8 +113,8 @@ curl -X PATCH http://localhost:8000/tasks/TASK-0001 \
 
 ## Step 9: Simulate a regression
 
-Edit `src/task_tracker/app.py` and temporarily rename the `create_task` function
-to `_create_task_disabled`. Now run assertions:
+Edit `src/task_tracker/app.py` and temporarily rename the `create_task`
+function to `_create_task_disabled`. Now run assertions:
 
 ```bash
 gt --config groundtruth.toml assert
@@ -153,8 +161,9 @@ db.close()
 
 ## Step 12: Understand the review cycle
 
-Read [REVIEW-EXAMPLE.md](REVIEW-EXAMPLE.md) in this directory. It shows a
-complete Loyal Opposition review cycle:
+The example includes a
+[review example](https://github.com/Remaker-Digital/groundtruth-kb/blob/main/examples/task-tracker/REVIEW-EXAMPLE.md)
+showing a complete Loyal Opposition review cycle:
 
 1. Prime Builder submits work for review
 2. Reviewer finds a defect (P2: unbounded title length)
@@ -167,29 +176,29 @@ This is the quality gate that catches issues before they reach production.
 
 ## Step 13: Understand the CI/CD pipeline
 
-Look at the three workflow files in `.github/workflows/`:
+The example project includes three workflow files in `.github/workflows/`:
 
 - **test.yml** — runs on every push: `pytest` + `ruff` + `gt assert`. If any
-  assertion fails, the CI build fails. This is the automated equivalent of
-  running Step 6 and Step 7 on every commit.
+  assertion fails, the CI build fails.
 - **build.yml** — runs on version tags (`v*`): builds a Docker image and pushes
-  to a container registry. The Dockerfile in this project shows the build target.
-- **deploy.yml** — manual trigger with environment selection. This is a
-  parameterized stub — customize the deployment section for your cloud provider.
+  to a container registry.
+- **deploy.yml** — manual trigger with environment selection. A parameterized
+  stub to customize for your cloud provider.
 
 ## Step 14: Understand upstream promotion
 
 This project consumes `groundtruth-kb` as a dependency. When a new version
 of GroundTruth is released:
 
-1. Update the dependency: `pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"`
+1. Update the dependency:
+   ```bash
+   pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
+   ```
 2. Run assertions: `gt --config groundtruth.toml assert`
 3. Run tests: `pytest tests/ -v`
 4. If everything passes, you're on the new version
 
-If you discover an improvement that would benefit all GroundTruth projects
-(not just yours), file an issue upstream with the `method-feedback` label.
-See the [Adoption guide](../../docs/method/09-adoption.md) for the full
+See the [Adoption guide](../method/09-adoption.md) for the full
 upstream/downstream contract.
 
 ## What you've learned
@@ -203,3 +212,7 @@ upstream/downstream contract.
 - **Review cycles** produce evidence-based GO/NO-GO verdicts
 - **CI/CD** automates testing, building, and deployment
 - **Upstream promotion** keeps your project aligned with the method
+
+---
+
+*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

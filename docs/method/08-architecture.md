@@ -11,7 +11,16 @@ Cross-cutting technical decisions — choosing a database, adopting a communicat
 | **IPR** (Implementation Proposal) | `IPR-*` | Pre-implementation proof: work item reviewed against ADR/DCL |
 | **CVR** (Constraint Verification) | `CVR-*` | Post-implementation proof of DCL compliance |
 
-These form a chain: **ADR** records the decision → **DCL** makes it machine-checkable → **IPR** proves the plan respects it → **CVR** proves the implementation complies.
+These form a chain:
+
+```mermaid
+flowchart LR
+    ADR[ADR\nDecision] --> DCL[DCL\nConstraint]
+    DCL --> IPR[IPR\nProposal proof]
+    IPR --> IMPL[Implementation]
+    IMPL --> CVR[CVR\nCompliance proof]
+    CVR -.->|validates| DCL
+```
 
 ## Architecture Decision Records (ADR)
 

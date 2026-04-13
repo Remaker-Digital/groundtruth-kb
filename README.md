@@ -42,7 +42,7 @@ See the [product architecture](docs/architecture/product-split.md) for details.
 
 ```bash
 # Install from GitHub
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.2.0"
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
 
 # Create a project with scaffolding
 gt project init my-project --owner "Your Organization" --init-git
@@ -57,7 +57,7 @@ gt --config my-project/groundtruth.toml assert
 **Web UI** (requires `[web]` extra):
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.2.0"
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
 gt --config my-project/groundtruth.toml serve
 # Visit http://localhost:8090
 ```
@@ -127,7 +127,7 @@ For a same-day client workstation setup, start with the
 The [templates/](templates/README.md) directory contains reference templates
 for setting up a GroundTruth project: rules files, state files, hooks, and
 agent configuration, including a file bridge OS-poller setup prompt. Use
-`gt project init --profile <profile>` for automated setup, or copy templates
+`gt project init my-project --profile <profile>` for automated setup, or copy templates
 manually and customize the placeholders.
 
 ## Contributing

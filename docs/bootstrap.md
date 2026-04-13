@@ -11,7 +11,7 @@ process templates, and CI/CD.
 **This guide does NOT cover** cloud infrastructure provisioning or a full
 Agent Red deployment topology. For the fastest client workstation path, use the
 [desktop setup guide](desktop-setup.md).  For profile-based project setup,
-use `gt project init --profile <profile>` (see
+use `gt project init my-project --profile <profile>` (see
 [product architecture](architecture/product-split.md)).
 
 ## Prerequisites
@@ -23,7 +23,7 @@ use `gt project init --profile <profile>` (see
 ## Step 1: Install GroundTruth
 
 ```bash
-pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
+pip install "groundtruth-kb @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
 ```
 
 Verify the installation:
@@ -166,7 +166,7 @@ If the assertion passes (the file and pattern exist), you'll see a passing resul
 The web UI requires the `[web]` extra:
 
 ```bash
-pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.1.2"
+pip install "groundtruth-kb[web] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.3.0"
 gt serve
 ```
 

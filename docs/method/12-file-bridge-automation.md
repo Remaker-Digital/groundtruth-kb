@@ -28,6 +28,19 @@ evidence capture.
 
 The preferred topology is a file-based bridge with symmetric OS-level pollers.
 
+```mermaid
+graph TD
+    SCHED[OS Scheduler] -->|triggers| PP[Prime Poller]
+    SCHED -->|triggers| LP[LO Poller]
+    PP -->|reads/writes| IDX[bridge/INDEX.md]
+    LP -->|reads/writes| IDX
+    IDX -->|references| FILES[bridge/*.md]
+    PP -.->|acquires| LOCK[Lock File]
+    LP -.->|acquires| LOCK
+    PP -->|invokes| PCLI[Prime Builder CLI]
+    LP -->|invokes| LCLI[LO Reviewer CLI]
+```
+
 | Component | Responsibility |
 |-----------|----------------|
 | `bridge/INDEX.md` | Authoritative review queue and status index |
@@ -61,6 +74,18 @@ The index is the source of truth. Each bridge document has a status history.
 Entries are newest-first.
 
 For a Prime Builder plus Loyal Opposition loop, use these status families:
+
+```mermaid
+stateDiagram-v2
+    [*] --> NEW: Prime submits
+    NEW --> GO: LO approves
+    NEW --> NO_GO: LO rejects
+    NO_GO --> REVISED: Prime addresses
+    REVISED --> GO: LO approves
+    REVISED --> NO_GO: LO rejects again
+    GO --> NEW: Prime posts impl report
+    NEW --> VERIFIED: LO verifies
+```
 
 | Status | Written by | Meaning |
 |--------|------------|---------|
