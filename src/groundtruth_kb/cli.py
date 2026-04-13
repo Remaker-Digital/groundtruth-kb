@@ -331,6 +331,7 @@ _IMPORTABLE_TABLES = frozenset(
         "backlog_snapshots",
         "testable_elements",
         "quality_scores",
+        "spec_quality_scores",
     }
 )
 
@@ -407,6 +408,23 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
                             raise click.ClickException(
                                 f"Malformed assertions JSON in {row.get('id', 'unknown')}"
                             ) from exc
+                        rejected += 1
+                        continue
+
+                # F3: Validate flags JSON in spec_quality_scores rows
+                if table_name == "spec_quality_scores" and "flags" in row and row["flags"] is not None:
+                    try:
+                        parsed_flags = json.loads(row["flags"]) if isinstance(row["flags"], str) else row["flags"]
+                        if not isinstance(parsed_flags, list):
+                            raise ValueError("flags must be a JSON list")
+                    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                        spec_ref = f"{row.get('spec_id', '?')}v{row.get('spec_version', '?')}"
+                        if not merge:
+                            raise click.ClickException(f"Invalid flags in quality score {spec_ref}: {exc}") from exc
+                        click.echo(
+                            f"  WARNING: {spec_ref}: invalid flags skipped ({exc})",
+                            err=True,
+                        )
                         rejected += 1
                         continue
 

@@ -285,6 +285,23 @@ CREATE TABLE IF NOT EXISTS quality_scores (
     UNIQUE(session_id)
 );
 
+-- F3: Per-spec quality scores (spec pipeline)
+CREATE TABLE IF NOT EXISTS spec_quality_scores (
+    spec_id TEXT NOT NULL,
+    spec_version INTEGER NOT NULL,
+    session_id TEXT NOT NULL,
+    scored_at TEXT NOT NULL,
+    overall REAL NOT NULL,
+    d1_clarity REAL NOT NULL,
+    d2_testability REAL NOT NULL,
+    d3_completeness REAL NOT NULL,
+    d4_isolation REAL NOT NULL,
+    d5_freshness REAL NOT NULL,
+    tier TEXT NOT NULL,
+    flags TEXT,
+    UNIQUE(spec_id, spec_version, session_id)
+);
+
 -- Pipeline lifecycle events (SPEC-2099) — append-only event log
 CREATE TABLE IF NOT EXISTS pipeline_events (
     id              TEXT    NOT NULL PRIMARY KEY,
@@ -1049,6 +1066,256 @@ class KnowledgeDB:
                 result.append(d)
         result.sort(key=lambda r: spec_sort_key(r["id"]))
         return result
+
+    # --- F3: Spec Quality Gate ---
+
+    def score_spec_quality(self, spec: dict) -> dict:
+        """Compute quality score for a single spec.
+
+        Returns dict with overall, d1-d5 dimension scores, tier, and flags.
+        Gracefully degrades when F1 fields are absent (adjusts denominators).
+        """
+        flags: list[str] = []
+        assertions = spec.get("assertions_parsed") or spec.get("_assertions_parsed") or []
+
+        # Executable assertion types per assertions.py
+        _EXECUTABLE = {"grep", "glob", "grep_absent", "file_exists", "count", "json_path", "all_of", "any_of"}
+
+        has_assertions = bool(assertions)
+        has_executable = (
+            any(isinstance(a, dict) and a.get("type") in _EXECUTABLE for a in assertions) if has_assertions else False
+        )
+
+        if not has_assertions:
+            flags.append("NO_ASSERTIONS")
+        elif not has_executable:
+            flags.append("NO_EXECUTABLE_ASSERTIONS")
+
+        # D1: Clarity
+        d1 = 0.0
+        title = spec.get("title", "")
+        if title and 40 <= len(title) <= 120:
+            d1 += 0.2
+        if title and any(w in title.lower() for w in ("must", "shall", "should", "requires")):
+            d1 += 0.3
+        if spec.get("description") and len(spec.get("description", "")) > 50:
+            d1 += 0.3
+        if spec.get("description") and any(
+            w in spec["description"].lower() for w in ("because", "rationale", "reason", "ensures")
+        ):
+            d1 += 0.2
+
+        # D2: Testability
+        d2 = 0.0
+        if has_assertions:
+            d2 += 0.3
+        if has_executable:
+            d2 += 0.4
+        if has_assertions and any(isinstance(a, dict) and a.get("description") for a in assertions):
+            d2 += 0.15
+        if has_assertions and any(isinstance(a, dict) and a.get("file") for a in assertions):
+            d2 += 0.15
+        # F1 bonus: testability field
+        if spec.get("testability"):
+            d2 = min(1.0, d2 + 0.1)
+
+        # D3: Completeness (dynamic denominator)
+        d3_checks = 0
+        d3_hits = 0
+        for field in ("type", "tags", "section", "scope", "priority", "description"):
+            d3_checks += 1
+            if spec.get(field):
+                d3_hits += 1
+        # F1 fields: only count if present in spec dict (graceful degradation)
+        for f1_field in ("authority", "constraints", "affected_by"):
+            if f1_field in spec:
+                d3_checks += 1
+                val = spec.get(f1_field)
+                if val is not None and val != "" and val != "[]" and val != "{}":
+                    d3_hits += 1
+        d3 = d3_hits / max(d3_checks, 1)
+
+        # D4: Isolation
+        d4 = 0.0
+        if spec.get("section"):
+            d4 += 0.4
+        if spec.get("handle"):
+            d4 += 0.3
+        if spec.get("affected_by_parsed") or spec.get("_affected_by_parsed"):
+            d4 += 0.3
+
+        # D5: Freshness (simplified — based on version existence)
+        d5 = 0.5  # Base freshness
+        if has_assertions:
+            d5 += 0.3
+        if spec.get("version", 0) > 1:
+            d5 += 0.2
+        d5 = min(1.0, d5)
+
+        overall = (d1 + d2 + d3 + d4 + d5) / 5.0
+
+        # Tier classification
+        if overall >= 0.8:
+            tier = "gold"
+        elif overall >= 0.6:
+            tier = "silver"
+        elif overall >= 0.4:
+            tier = "bronze"
+        else:
+            tier = "needs-work"
+
+        return {
+            "overall": round(overall, 4),
+            "d1_clarity": round(d1, 4),
+            "d2_testability": round(d2, 4),
+            "d3_completeness": round(d3, 4),
+            "d4_isolation": round(d4, 4),
+            "d5_freshness": round(d5, 4),
+            "tier": tier,
+            "flags": flags,
+        }
+
+    def persist_quality_scores(self, session_id: str) -> int:
+        """Score all current specs and persist to spec_quality_scores. Returns row count."""
+        specs = self.list_specs()
+        conn = self._get_conn()
+        count = 0
+        for spec in specs:
+            score = self.score_spec_quality(spec)
+            flags_json = json.dumps(score["flags"]) if score["flags"] else None
+            try:
+                conn.execute(
+                    """INSERT OR REPLACE INTO spec_quality_scores
+                       (spec_id, spec_version, session_id, scored_at,
+                        overall, d1_clarity, d2_testability, d3_completeness,
+                        d4_isolation, d5_freshness, tier, flags)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        spec["id"],
+                        spec["version"],
+                        session_id,
+                        _now(),
+                        score["overall"],
+                        score["d1_clarity"],
+                        score["d2_testability"],
+                        score["d3_completeness"],
+                        score["d4_isolation"],
+                        score["d5_freshness"],
+                        score["tier"],
+                        flags_json,
+                    ),
+                )
+                count += 1
+            except Exception:
+                pass  # Skip on constraint violations
+        conn.commit()
+        return count
+
+    def get_quality_history(self, spec_id: str) -> list[dict]:
+        """Historical quality scores for a spec, ordered by scored_at DESC."""
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM spec_quality_scores WHERE spec_id = ? ORDER BY scored_at DESC",
+                (spec_id,),
+            )
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    def get_quality_distribution(self) -> dict:
+        """Aggregate quality distribution across latest scores per spec."""
+        rows = (
+            self._get_conn()
+            .execute(
+                """SELECT tier, COUNT(*) as count, AVG(overall) as avg_score
+                   FROM spec_quality_scores sq
+                   INNER JOIN (
+                       SELECT spec_id, MAX(scored_at) as latest
+                       FROM spec_quality_scores GROUP BY spec_id
+                   ) latest ON sq.spec_id = latest.spec_id AND sq.scored_at = latest.latest
+                   GROUP BY tier"""
+            )
+            .fetchall()
+        )
+        dist: dict[str, Any] = {}
+        total = 0
+        for row in rows:
+            d = dict(row)
+            dist[d["tier"]] = {"count": d["count"], "avg_score": round(d["avg_score"], 4)}
+            total += d["count"]
+        dist["total"] = total
+        return dist
+
+    # --- F4-A: Constraint Propagation (Phase A — Read-Only) ---
+
+    def _find_matching_constraints(
+        self, *, section: str | None = None, scope: str | None = None, tags: list[str] | None = None
+    ) -> list[dict[str, Any]]:
+        """Shared helper: find ADR/DCL specs whose scope overlaps the given criteria."""
+        constraints: list[dict[str, Any]] = []
+        for ctype in ("architecture_decision", "design_constraint"):
+            for spec in self.list_specs(type=ctype):
+                match = False
+                if section and spec.get("section") and section.lower() in spec["section"].lower():
+                    match = True
+                if scope and spec.get("scope") and scope.lower() in spec["scope"].lower():
+                    match = True
+                if tags and spec.get("tags_parsed"):
+                    spec_tags = spec["tags_parsed"] if isinstance(spec["tags_parsed"], list) else []
+                    if set(tags) & set(spec_tags):
+                        match = True
+                if match:
+                    constraints.append(spec)
+        return constraints
+
+    def check_constraints_for_spec(
+        self,
+        spec_id: str | None = None,
+        *,
+        section: str | None = None,
+        scope: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return ADR/DCL specs whose scope overlaps. Read-only advisory lookup.
+
+        If spec_id is provided, uses that spec's section/scope/tags for matching.
+        Otherwise uses the explicit section/scope/tags parameters.
+        """
+        if spec_id is not None:
+            spec = self.get_spec(spec_id)
+            if spec:
+                section = section or spec.get("section")
+                scope = scope or spec.get("scope")
+                if tags is None and spec.get("tags_parsed"):
+                    tags = spec["tags_parsed"] if isinstance(spec["tags_parsed"], list) else None
+        return self._find_matching_constraints(section=section, scope=scope, tags=tags)
+
+    def get_constraint_coverage(self) -> dict[str, Any]:
+        """Report: which sections have ADR/DCL coverage and which don't."""
+        all_specs = self.list_specs()
+        constraint_specs = [s for s in all_specs if s.get("type") in ("architecture_decision", "design_constraint")]
+
+        # Collect sections from all specs
+        all_sections: set[str] = set()
+        for s in all_specs:
+            if s.get("section"):
+                all_sections.add(s["section"])
+
+        # Collect sections covered by constraints
+        covered_sections: set[str] = set()
+        for cs in constraint_specs:
+            if cs.get("section"):
+                covered_sections.add(cs["section"])
+
+        uncovered = all_sections - covered_sections
+        return {
+            "total_sections": len(all_sections),
+            "covered_sections": sorted(covered_sections),
+            "uncovered_sections": sorted(uncovered),
+            "coverage_ratio": len(covered_sections) / max(len(all_sections), 1),
+            "constraint_count": len(constraint_specs),
+        }
 
     def list_children(self, parent_id: str) -> list[dict[str, Any]]:
         """List current specs that are direct or nested children of parent_id.
@@ -2813,6 +3080,7 @@ class KnowledgeDB:
             "deliberation_specs",
             "deliberation_work_items",
             "pipeline_events",
+            "spec_quality_scores",
         ]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
