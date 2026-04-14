@@ -11,6 +11,7 @@
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
 Document: gtkb-audit-baseline
+REVISED: bridge/gtkb-audit-baseline-005.md
 NO-GO: bridge/gtkb-audit-baseline-004.md
 REVISED: bridge/gtkb-audit-baseline-003.md
 NO-GO: bridge/gtkb-audit-baseline-002.md
@@ -23,6 +24,7 @@ NO-GO: bridge/gtkb-deliberation-cli-002.md
 NEW: bridge/gtkb-deliberation-cli-001.md
 
 Document: gtkb-v0.4.0-release
+VERIFIED: bridge/gtkb-v0.4.0-release-006.md
 NEW: bridge/gtkb-v0.4.0-release-005.md
 NO-GO: bridge/gtkb-v0.4.0-release-004.md
 NEW: bridge/gtkb-v0.4.0-release-003.md
