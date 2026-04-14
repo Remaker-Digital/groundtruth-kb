@@ -165,6 +165,37 @@ complete Loyal Opposition review cycle:
 
 This is the quality gate that catches issues before they reach production.
 
+## Step 12A: Archive the review as a deliberation
+
+The REVIEW-EXAMPLE cycle ends with a decision: "Merge after max_length=200
+fix." That reasoning should survive the commit. Capture the review as a
+deliberation linked to WI-001:
+
+```bash
+gt deliberations add \
+  --id DELIB-TT-0001 \
+  --source-type lo_review \
+  --source-ref examples/task-tracker/REVIEW-EXAMPLE.md \
+  --title "P2 unbounded title length → fixed with max_length=200" \
+  --summary "LO review of WI-001 rejected unbounded title; fix accepted on re-review." \
+  --content-file REVIEW-EXAMPLE.md \
+  --outcome go \
+  --work-item-id WI-001
+```
+
+Later, when you (or the next contributor) need to understand *why* titles
+cap at 200 characters, the deliberation is one command away:
+
+```bash
+gt deliberations search "title length"
+gt deliberations get DELIB-TT-0001
+```
+
+This is the institutional memory layer of GroundTruth — the "why" that
+complements the "what" in specs and the "when" in commits. See
+[Method Guide — Deliberation Archive](../../docs/method/13-deliberation-archive.md)
+for the full workflow.
+
 ## Step 13: Understand the CI/CD pipeline
 
 Look at the three workflow files in `.github/workflows/`:

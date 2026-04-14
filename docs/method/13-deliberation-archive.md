@@ -160,6 +160,56 @@ gt deliberations rebuild-index
 This drops and recreates the entire collection. SQLite is always the
 source of truth.
 
+## CLI workflow
+
+The `gt deliberations` command group provides a complete CLI surface over
+the Python API. You can capture, retrieve, list, search, and link
+deliberations without writing Python code.
+
+```bash
+# Capture an owner decision with a caller-supplied identifier
+gt deliberations add \
+  --id DELIB-0123 \
+  --source-type owner_conversation \
+  --source-ref "session S290 chat" \
+  --title "Use text fallback by default" \
+  --summary "Default search must work in base install" \
+  --content-file notes/decision.md \
+  --outcome owner_decision \
+  --session-id S290
+
+# Or let the DB auto-generate the ID (idempotent on content hash)
+gt deliberations upsert \
+  --source-type lo_review \
+  --source-ref bridge/proposal-004.md \
+  --title "GO with conditions" \
+  --summary "Review verdict on proposal-004" \
+  --content-file bridge/proposal-004.md
+
+# Retrieve by ID
+gt deliberations get DELIB-0123
+gt deliberations get DELIB-0123 --history     # all versions
+gt deliberations get DELIB-0123 --json        # machine-readable
+
+# Filter the archive
+gt deliberations list --spec-id SPEC-1234
+gt deliberations list --source-type lo_review --outcome no_go --limit 10
+
+# Search (semantic with text fallback)
+gt deliberations search "rate limiting"
+gt deliberations search "rate limiting" --semantic-only   # strict mode
+
+# Link an existing deliberation to a spec or work item
+gt deliberations link DELIB-0123 --spec SPEC-1234 --role related
+gt deliberations link DELIB-0123 --work-item WI-5678 --role informs
+```
+
+Both `add` and `upsert` redact secrets from content before storing it; the
+stored value carries a `content_hash` that references the pre-redaction text
+for audit but never exposes the secret. See
+[gt deliberations](../reference/cli.md#deliberation-commands) in the CLI
+reference for the full parameter list and exit codes.
+
 ## Python API
 
 ### Insert a deliberation
