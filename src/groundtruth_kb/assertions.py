@@ -70,7 +70,11 @@ class AssertionTarget:
     file_is_glob: bool = False
 
 
-def _extract_assertion_targets(assertion: Any) -> list[AssertionTarget]:
+def _extract_assertion_targets(
+    assertion: Any,
+    *,
+    depth: int = 0,
+) -> list[AssertionTarget]:
     """Extract typed targets from a single assertion dict.
 
     Shared helper that mirrors the runner's normalization logic without
@@ -78,7 +82,12 @@ def _extract_assertion_targets(assertion: Any) -> list[AssertionTarget]:
     share a single extraction path through _normalize_assertion().
 
     Returns an empty list for non-machine assertions (plain text, unknown types).
-    Recurses into all_of/any_of children.
+    Recurses into all_of/any_of children with a depth guard: children past
+    ``_MAX_COMPOSITION_DEPTH`` levels of nesting are silently dropped so
+    pathologically deep compositions cannot cause RecursionError.
+
+    The ``depth`` keyword is for internal recursion bookkeeping; public
+    callers pass a single positional assertion dict as before.
     """
     if not isinstance(assertion, dict):
         return []
@@ -89,11 +98,13 @@ def _extract_assertion_targets(assertion: Any) -> list[AssertionTarget]:
 
     normalized = _normalize_assertion(assertion)
 
-    # --- Composition operators: recurse ---
+    # --- Composition operators: recurse with depth guard ---
     if a_type in ("all_of", "any_of"):
+        if depth >= _MAX_COMPOSITION_DEPTH:
+            return []
         targets: list[AssertionTarget] = []
         for child in normalized.get("assertions", []):
-            targets.extend(_extract_assertion_targets(child))
+            targets.extend(_extract_assertion_targets(child, depth=depth + 1))
         return targets
 
     # --- json_path: file + dotted path ---

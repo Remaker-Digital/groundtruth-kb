@@ -19,11 +19,20 @@ from groundtruth_kb.bootstrap import (
 )
 from groundtruth_kb.project.manifest import ProjectManifest, write_manifest
 from groundtruth_kb.project.profiles import get_profile
+from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
 
 
 @dataclass(frozen=True)
 class ScaffoldOptions:
-    """Options for ``gt project init``."""
+    """Options for ``gt project init``.
+
+    Attributes:
+        spec_scaffold: Optional :class:`SpecScaffoldConfig`. When provided,
+            the newly-initialised KB is populated with generated starter
+            specs at ``authority='inferred'``. When ``None`` (the default),
+            ``gt project init`` behavior is unchanged and no specs are
+            generated — this preserves every pre-F6 caller.
+    """
 
     project_name: str
     profile: str
@@ -36,6 +45,7 @@ class ScaffoldOptions:
     seed_example: bool = True
     brand_mark: str = "GT"
     brand_color: str = "#2563eb"
+    spec_scaffold: SpecScaffoldConfig | None = None
 
 
 def scaffold_project(options: ScaffoldOptions) -> Path:
@@ -95,6 +105,20 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
         cloud_provider=options.cloud_provider,
     )
     write_manifest(target / "groundtruth.toml", manifest)
+
+    # ── F6: Optional spec scaffold into the freshly-created KB ───────
+    # Runs AFTER _seed_database so the governance seed is already in place;
+    # scaffold_specs() skips pre-existing handles, so the seed is preserved.
+    # Only runs when options.spec_scaffold is set — default gt project init
+    # behavior is unchanged.
+    if options.spec_scaffold is not None:
+        from groundtruth_kb.db import KnowledgeDB
+
+        db = KnowledgeDB(target / "groundtruth.db")
+        try:
+            scaffold_specs(db, options.spec_scaffold, dry_run=False)
+        finally:
+            db.close()
 
     # ── Git init ──────────────────────────────────────────────────────
     if options.init_git:

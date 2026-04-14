@@ -11,7 +11,11 @@ from __future__ import annotations
 
 import pytest
 
-from groundtruth_kb.assertions import AssertionTarget, _extract_assertion_targets
+from groundtruth_kb.assertions import (
+    _MAX_COMPOSITION_DEPTH,
+    AssertionTarget,
+    _extract_assertion_targets,
+)
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.impact import ImpactConfig
 
@@ -302,6 +306,39 @@ class TestF2AAssertionTargetExtraction:
             match_target="TODO",
             file_is_glob=True,
         )
+
+    # ------------------------------------------------------------------
+    # 16. Depth guard — pathologically deep composition (Phase 4 / F8 pre-req)
+    # ------------------------------------------------------------------
+    def test_extract_respects_max_composition_depth(self):
+        """Deeply nested all_of chain past _MAX_COMPOSITION_DEPTH returns []
+        without raising RecursionError.
+
+        F8 reconciliation reuses _extract_assertion_targets() to walk
+        assertion lists; a maliciously or accidentally deep composition
+        chain must not crash the reconciliation run. The depth guard
+        stops recursion at _MAX_COMPOSITION_DEPTH and silently drops
+        anything past that.
+        """
+        # Build a chain with _MAX_COMPOSITION_DEPTH + 2 levels of nesting.
+        # Innermost is a real grep target; all wrapping layers are all_of.
+        innermost = {
+            "type": "grep",
+            "file": "src/app.py",
+            "pattern": "TODO",
+        }
+        chain: dict = innermost
+        for _ in range(_MAX_COMPOSITION_DEPTH + 2):
+            chain = {"type": "all_of", "assertions": [chain]}
+
+        # Must not raise RecursionError.
+        targets = _extract_assertion_targets(chain)
+
+        # Past the depth guard, children are silently dropped.
+        # With _MAX_COMPOSITION_DEPTH == 3 and +2 extra layers, the depth
+        # guard fires before we reach the innermost grep, so no targets
+        # are extracted from this pathological tree.
+        assert targets == []
 
 
 class TestF2ARegressions:
