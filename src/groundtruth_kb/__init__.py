@@ -13,7 +13,7 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB, get_depth, get_parent_id, spec_sort_key
 from groundtruth_kb.gates import GateRegistry, GovernanceGate, GovernanceGateError
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 
 def get_templates_dir() -> Path:
