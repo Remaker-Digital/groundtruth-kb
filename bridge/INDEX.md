@@ -4,6 +4,87 @@
 <!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
+<!-- S289 Prime Builder maintenance (2026-04-13): retired 9 stale/subsumed GT-KB spec-pipeline entries from this index -->
+<!--   - gtkb-f1f8-cross-check, gtkb-spec-pipeline-f1..f5, f7 — GO status, implementations committed in S287-S288 -->
+<!--   - gtkb-spec-pipeline-f6, f8 — GO status but subsumed by gtkb-phase4-implementation (active) -->
+<!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
+<!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
+
+Document: gtkb-phase4-implementation
+VERIFIED: bridge/gtkb-phase4-implementation-012.md
+NEW: bridge/gtkb-phase4-implementation-011.md
+GO: bridge/gtkb-phase4-implementation-010.md
+REVISED: bridge/gtkb-phase4-implementation-009.md
+NO-GO: bridge/gtkb-phase4-implementation-008.md
+REVISED: bridge/gtkb-phase4-implementation-007.md
+NO-GO: bridge/gtkb-phase4-implementation-006.md
+REVISED: bridge/gtkb-phase4-implementation-005.md
+NO-GO: bridge/gtkb-phase4-implementation-004.md
+REVISED: bridge/gtkb-phase4-implementation-003.md
+NO-GO: bridge/gtkb-phase4-implementation-002.md
+NEW: bridge/gtkb-phase4-implementation-001.md
+
+Document: gtkb-phase3-implementation
+VERIFIED: bridge/gtkb-phase3-implementation-018.md
+REVISED: bridge/gtkb-phase3-implementation-017.md
+NO-GO: bridge/gtkb-phase3-implementation-016.md
+NEW: bridge/gtkb-phase3-implementation-015.md
+GO: bridge/gtkb-phase3-implementation-014.md
+REVISED: bridge/gtkb-phase3-implementation-013.md
+NO-GO: bridge/gtkb-phase3-implementation-012.md
+REVISED: bridge/gtkb-phase3-implementation-011.md
+NO-GO: bridge/gtkb-phase3-implementation-010.md
+REVISED: bridge/gtkb-phase3-implementation-009.md
+NO-GO: bridge/gtkb-phase3-implementation-008.md
+REVISED: bridge/gtkb-phase3-implementation-007.md
+NO-GO: bridge/gtkb-phase3-implementation-006.md
+REVISED: bridge/gtkb-phase3-implementation-005.md
+NO-GO: bridge/gtkb-phase3-implementation-004.md
+REVISED: bridge/gtkb-phase3-implementation-003.md
+NO-GO: bridge/gtkb-phase3-implementation-002.md
+NEW: bridge/gtkb-phase3-implementation-001.md
+
+Document: gtkb-phase2b-implementation
+VERIFIED: bridge/gtkb-phase2b-implementation-006.md
+NEW: bridge/gtkb-phase2b-implementation-005.md
+GO: bridge/gtkb-phase2b-implementation-004.md
+REVISED: bridge/gtkb-phase2b-implementation-003.md
+NO-GO: bridge/gtkb-phase2b-implementation-002.md
+NEW: bridge/gtkb-phase2b-implementation-001.md
+
+Document: gtkb-phase2-implementation
+VERIFIED: bridge/gtkb-phase2-implementation-012.md
+REVISED: bridge/gtkb-phase2-implementation-011.md
+NO-GO: bridge/gtkb-phase2-implementation-010.md
+REVISED: bridge/gtkb-phase2-implementation-009.md
+NO-GO: bridge/gtkb-phase2-implementation-008.md
+NEW: bridge/gtkb-phase2-implementation-007.md
+GO: bridge/gtkb-phase2-implementation-006.md
+REVISED: bridge/gtkb-phase2-implementation-005.md
+NO-GO: bridge/gtkb-phase2-implementation-004.md
+REVISED: bridge/gtkb-phase2-implementation-003.md
+NO-GO: bridge/gtkb-phase2-implementation-002.md
+NEW: bridge/gtkb-phase2-implementation-001.md
+
+Document: gtkb-f1-implementation
+VERIFIED: bridge/gtkb-f1-implementation-008.md
+NEW: bridge/gtkb-f1-implementation-007.md
+GO: bridge/gtkb-f1-implementation-006.md
+REVISED: bridge/gtkb-f1-implementation-005.md
+NO-GO: bridge/gtkb-f1-implementation-004.md
+REVISED: bridge/gtkb-f1-implementation-003.md
+NO-GO: bridge/gtkb-f1-implementation-002.md
+NEW: bridge/gtkb-f1-implementation-001.md
+
+Document: gtkb-docs-pypi-and-implementation-kickoff
+VERIFIED: bridge/gtkb-docs-pypi-and-implementation-kickoff-008.md
+REVISED: bridge/gtkb-docs-pypi-and-implementation-kickoff-007.md
+NO-GO: bridge/gtkb-docs-pypi-and-implementation-kickoff-006.md
+REVISED: bridge/gtkb-docs-pypi-and-implementation-kickoff-005.md
+NO-GO: bridge/gtkb-docs-pypi-and-implementation-kickoff-004.md
+NEW: bridge/gtkb-docs-pypi-and-implementation-kickoff-003.md
+GO: bridge/gtkb-docs-pypi-and-implementation-kickoff-002.md
+NEW: bridge/gtkb-docs-pypi-and-implementation-kickoff-001.md
 
 Document: groundtruth-db-migration
 VERIFIED: bridge/groundtruth-db-migration-026.md
