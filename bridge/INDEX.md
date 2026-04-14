@@ -21,6 +21,7 @@ NO-GO: bridge/gtkb-audit-baseline-002.md
 NEW: bridge/gtkb-audit-baseline-001.md
 
 Document: gtkb-deliberation-cli
+NEW: bridge/gtkb-deliberation-cli-005.md
 GO: bridge/gtkb-deliberation-cli-004.md
 REVISED: bridge/gtkb-deliberation-cli-003.md
 NO-GO: bridge/gtkb-deliberation-cli-002.md
