@@ -20,12 +20,23 @@ on:
     types: [published]
 
 jobs:
-  # ci-gate (added in v0.4.0 per bridge/gtkb-release-readiness-003.md):
-  # Run the same quality gates that ci.yml runs, but bound to the exact
-  # commit being released, so the publish path is self-gating.
-  # This prevents a broken release commit from reaching PyPI even if
-  # branch CI was green on an older commit.
-  ci-gate:
+  # Release self-gating (Codex gtkb-production-readiness-004.md):
+  #
+  # The old single `ci-gate` installed `.[dev,web,search]`, which let the
+  # failing `test_cli.py::TestConfig::test_config_chroma_path_unset_chromadb_installed`
+  # test pass in the gate (chromadb present) while branch CI was red
+  # because branch `test-base` installs `.[dev,web]` (chromadb absent).
+  # A red branch CI could therefore have published a broken release.
+  #
+  # Fix: run TWO independent gate jobs, one per dependency state, and
+  # require BOTH for `build-verify`. Also verify that branch CI on the
+  # exact release commit SHA has already reported green, as a
+  # belt-and-suspenders check (annotated tags are resolved to commit
+  # SHAs before comparing).
+
+  # ci-gate-base: run ruff + full pytest with BASE extras (no chromadb).
+  # This catches the dependency-state blind spot the old single gate had.
+  ci-gate-base:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,11 +45,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install with test extras
-        # Must include `dev` (httpx for Starlette TestClient), `web`
-        # (FastAPI/Jinja for web tests), and `search` (ChromaDB for
-        # deliberation semantic search tests). Matches ci.yml contract.
-        run: pip install -e ".[dev,web,search]"
+      - name: Install (base state, no search extra)
+        run: pip install -e ".[dev,web]"
 
       - name: Ruff check
         run: python -m ruff check .
@@ -46,14 +54,85 @@ jobs:
       - name: Ruff format check
         run: python -m ruff format --check .
 
-      - name: Pytest
+      - name: Pytest (base state, full suite)
         run: python -m pytest -q --tb=short
 
       - name: Docs CLI coverage
         run: python scripts/check_docs_cli_coverage.py
 
+  # ci-gate-search: run full pytest with SEARCH extra (chromadb present).
+  # Must pass alongside ci-gate-base for any publish to proceed.
+  ci-gate-search:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install with search extra
+        run: pip install -e ".[dev,web,search]"
+
+      - name: Pytest (search state, full suite)
+        run: python -m pytest -q --tb=short
+
+  # branch-ci-gate: verify that the `CI` workflow on the exact release
+  # commit SHA has already reported green. This catches cases where
+  # the release commit was tagged before branch CI had finished, or
+  # where the gate jobs above passed but the broader CI matrix
+  # (including cross-platform smoke on Windows/macOS) didn't.
+  #
+  # Annotated tags are resolved to their referenced commit SHA before
+  # comparison so the `headSha` check compares commit-vs-commit, not
+  # tag-object-vs-commit.
+  branch-ci-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release commit SHA (annotated tag → commit)
+        id: resolve
+        shell: bash
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          # `git rev-list -n 1 <tag>` returns the commit SHA the tag
+          # points to, whether the tag is annotated or lightweight.
+          COMMIT_SHA=$(git rev-list -n 1 "$TAG")
+          echo "Release tag: $TAG"
+          echo "Resolved commit SHA: $COMMIT_SHA"
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Require green branch CI on release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
+        shell: bash
+        run: |
+          # Query the most recent `CI` workflow run whose headSha matches
+          # the release commit. Require conclusion=success.
+          RESULT=$(gh run list --repo "${{ github.repository }}" \
+            --workflow CI --branch main --limit 50 \
+            --json headSha,conclusion,status \
+            --jq "[.[] | select(.headSha==\"$COMMIT_SHA\")][0]")
+          if [ -z "$RESULT" ] || [ "$RESULT" = "null" ]; then
+            echo "ERROR: no CI run found for commit $COMMIT_SHA"
+            exit 1
+          fi
+          CONCLUSION=$(echo "$RESULT" | jq -r .conclusion)
+          STATUS=$(echo "$RESULT" | jq -r .status)
+          echo "Latest CI run on $COMMIT_SHA: status=$STATUS conclusion=$CONCLUSION"
+          if [ "$STATUS" != "completed" ]; then
+            echo "ERROR: CI run on release commit is not yet completed"
+            exit 1
+          fi
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "ERROR: CI run on release commit is not green: $CONCLUSION"
+            exit 1
+          fi
+
   build-verify:
-    needs: ci-gate
+    needs: [ci-gate-base, ci-gate-search, branch-ci-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -104,8 +183,74 @@ jobs:
           name: dist
           path: dist/
 
-  publish-pypi:
+  # smoke-test-cross-platform: install the built wheel on Ubuntu, Windows,
+  # and macOS in the BASE install state (no search extra) and run the
+  # documented CLI contract. This is the production-grade cross-platform
+  # gate required by Codex condition 4 in gtkb-production-readiness-004.md.
+  # Running base/no-search (not search-installed) is intentional: the
+  # whole point of cross-platform smoke is to catch platform-sensitive
+  # bugs that a search-installed environment would mask.
+  smoke-test-cross-platform:
     needs: build-verify
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install built wheel (base state, no search extra)
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          # Install the built wheel directly, no search extra.
+          pip install dist/*.whl
+
+      - name: gt --version
+        shell: bash
+        run: |
+          EXPECTED="${{ github.event.release.tag_name }}"
+          EXPECTED="${EXPECTED#v}"   # strip leading v
+          ACTUAL=$(gt --version 2>&1)
+          echo "gt --version output: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -q "$EXPECTED"; then
+            echo "ERROR: gt --version does not contain expected version $EXPECTED"
+            exit 1
+          fi
+
+      - name: gt project init + gt config + gt summary
+        shell: bash
+        run: |
+          gt project init rd-smoke --profile local-only --no-seed-example --no-include-ci
+          cd rd-smoke
+          gt config
+          gt summary
+
+      - name: gt deliberations rebuild-index contract (base state)
+        shell: bash
+        # Contract test per docs/reference/cli.md:462:
+        # "ChromaDB not installed or rebuild failed" → exit code 1.
+        # The failure IS the expected behavior in the base install state.
+        run: |
+          cd rd-smoke
+          if gt deliberations rebuild-index; then
+            echo "ERROR: rebuild-index should have failed with exit 1 in base state"
+            exit 1
+          fi
+          EC=$?
+          echo "Got expected non-zero exit: $EC"
+
+  publish-pypi:
+    needs: [build-verify, smoke-test-cross-platform]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
