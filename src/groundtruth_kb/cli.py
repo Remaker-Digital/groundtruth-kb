@@ -896,3 +896,165 @@ def intake_list(ctx: click.Context, pending: bool) -> None:
             f"{i['deliberation_id']}  [{status}]  {i.get('proposed_title', '')}"
             f"  ({i.get('classification', '?')}, conf={i.get('confidence', 0)})"
         )
+
+
+# ── F8: Reconciliation (gt kb reconcile) ───────────────────────────────
+
+
+@main.group()
+def kb() -> None:
+    """Knowledge base maintenance commands."""
+
+
+@kb.command("reconcile")
+@click.option("--orphans", "run_orphans", is_flag=True, default=False, help="Run orphaned-assertion detector.")
+@click.option(
+    "--stale",
+    "stale_threshold",
+    type=int,
+    default=None,
+    help="Run stale-spec detector with the given N session threshold.",
+)
+@click.option("--authority", "run_authority", is_flag=True, default=False, help="Run authority-conflict detector.")
+@click.option("--duplicates", "run_duplicates", is_flag=True, default=False, help="Run duplicate-spec detector.")
+@click.option(
+    "--provisionals",
+    "run_provisionals",
+    is_flag=True,
+    default=False,
+    help="Run expired-provisional detector.",
+)
+@click.option("--all", "run_all", is_flag=True, default=False, help="Run every detector.")
+@click.option(
+    "--project-root",
+    "project_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    default=None,
+    help="Project root for orphaned-assertion file resolution. Defaults to cwd.",
+)
+@click.pass_context
+def kb_reconcile(
+    ctx: click.Context,
+    run_orphans: bool,
+    stale_threshold: int | None,
+    run_authority: bool,
+    run_duplicates: bool,
+    run_provisionals: bool,
+    run_all: bool,
+    project_root: str | None,
+) -> None:
+    """Reconcile specs against the current project state.
+
+    Runs one or more provenance/consistency detectors against the KB and
+    prints each report. Pass ``--all`` to run every detector in the
+    standard order: orphans, stale, authority, duplicates, provisionals.
+    """
+    from groundtruth_kb import reconciliation
+
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+
+    # Default-selection semantics:
+    #   --all selects every detector (overriding individual flags).
+    #   No flags at all is treated as --all for convenience.
+    #   Any combination of individual flags runs just those detectors.
+    nothing_selected = not any(
+        [run_orphans, stale_threshold is not None, run_authority, run_duplicates, run_provisionals]
+    )
+    if run_all or nothing_selected:
+        run_orphans = True
+        run_authority = True
+        run_duplicates = True
+        run_provisionals = True
+        if stale_threshold is None:
+            stale_threshold = 5
+
+    root = Path(project_root) if project_root else None
+
+    reports = []
+    if run_orphans:
+        reports.append(reconciliation.find_orphaned_assertions(db, project_root=root))
+    if stale_threshold is not None:
+        reports.append(reconciliation.find_stale_specs(db, staleness_threshold_sessions=stale_threshold))
+    if run_authority:
+        reports.append(reconciliation.find_authority_conflicts(db))
+    if run_duplicates:
+        reports.append(reconciliation.find_duplicate_specs(db))
+    if run_provisionals:
+        reports.append(reconciliation.find_expired_provisionals(db))
+
+    total_findings = 0
+    for report in reports:
+        click.echo(f"\n[{report.category}] {len(report.findings)} finding(s)")
+        total_findings += len(report.findings)
+        for finding in report.findings[:50]:
+            spec_id = finding.get("spec_id") or finding.get("spec_a") or "?"
+            click.echo(f"  - {spec_id}: {finding}")
+        if len(report.findings) > 50:
+            click.echo(f"  ... ({len(report.findings) - 50} more)")
+
+    click.echo(f"\nTotal findings across {len(reports)} detector(s): {total_findings}")
+
+
+# ── F6: Spec scaffold generator ────────────────────────────────────────
+
+
+@main.group()
+def scaffold() -> None:
+    """Specification scaffold commands (F6)."""
+
+
+@scaffold.command("specs")
+@click.option(
+    "--profile",
+    type=click.Choice(["minimal", "full"]),
+    default="minimal",
+    help="Scaffold profile: minimal (governance + infra) or full (all phases).",
+)
+@click.option(
+    "--apply/--dry-run",
+    default=False,
+    help="Apply scaffold changes to the database (default: dry-run).",
+)
+@click.pass_context
+def scaffold_specs_cmd(ctx: click.Context, profile: str, apply: bool) -> None:
+    """Generate a starter set of specs for the current project.
+
+    Default behavior is dry-run: shows what would be generated and the
+    per-spec quality scores, without writing to the database. Pass
+    ``--apply`` to persist generated specs with ``authority='inferred'``
+    so owners can review and promote to ``authority='stated'`` later.
+    """
+    from groundtruth_kb.spec_scaffold import (
+        SpecScaffoldConfig,
+    )
+    from groundtruth_kb.spec_scaffold import (
+        scaffold_specs as run_scaffold_specs,
+    )
+
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    scaffold_config = SpecScaffoldConfig(profile=profile)
+    report = run_scaffold_specs(db, scaffold_config, dry_run=not apply)
+
+    mode = "DRY RUN" if report.dry_run else "APPLIED"
+    click.echo(f"Scaffold specs — profile={profile} — {mode}")
+    click.echo(f"  generated: {len(report.generated)}")
+    click.echo(f"  skipped:   {len(report.skipped)}")
+    click.echo(f"  quality:   {report.quality_summary}")
+
+    if report.skipped:
+        click.echo("\nSkipped (pre-existing handles):")
+        for s in report.skipped:
+            click.echo(f"  - {s['id']} (handle={s.get('handle')!r}): {s['reason']}")
+
+    if report.low_quality_warnings:
+        click.echo("\nLow quality warnings:")
+        for w in report.low_quality_warnings:
+            click.echo(f"  - {w['id']}: tier={w['tier']} score={w.get('score')}")
+
+    if report.generated:
+        click.echo("\nGenerated specs:")
+        for spec in report.generated:
+            tier = spec.get("quality", {}).get("tier", "?")
+            click.echo(f"  - {spec['id']}: {spec['title']}  [{tier}]")

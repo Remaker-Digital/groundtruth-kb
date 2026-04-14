@@ -566,6 +566,117 @@ gt health trends [-n <LIMIT>]
 
 ---
 
+## Knowledge base maintenance (F8)
+
+### gt kb reconcile
+
+Run provenance and consistency detectors against the knowledge database.
+Each detector produces a report with zero or more findings; the command
+prints each report and a total. Exit code is always 0 — this is a
+reporting command, not a gate.
+
+```
+gt kb reconcile [--orphans] [--stale <N>] [--authority] [--duplicates]
+                [--provisionals] [--all] [--project-root <path>]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--orphans` | flag | off | Run the orphaned-assertion detector. Finds machine assertions whose file targets (literal or glob) no longer exist on disk. |
+| `--stale <N>` | integer | off | Run the stale-spec detector with N session snapshots as the staleness threshold. Uses an F7 snapshot window with same-section activity gating; falls back to `changed_at` timestamps + `section_activity_days` when snapshot history is thin. |
+| `--authority` | flag | off | Run the authority-conflict detector. Finds stated-vs-inferred spec pairs in the same `(section, scope)` with overlapping machine assertion targets. |
+| `--duplicates` | flag | off | Run the duplicate-spec detector. Reports spec pairs whose titles overlap by >=90% of tokens. |
+| `--provisionals` | flag | off | Run the expired-provisional detector. Reports provisional specs (`authority='provisional'`) whose replacement spec has lifecycle `status` in `{implemented, verified}`. |
+| `--all` | flag | off | Run every detector (`--stale` uses N=5 by default in this mode). |
+| `--project-root` | path | cwd | Root used to resolve orphaned-assertion file targets. |
+
+**Behavior notes:**
+
+- **No flags is equivalent to `--all`.** Calling `gt kb reconcile` with no
+  flags runs every detector — useful for full-project sweeps.
+- **Non-dict assertions are silently skipped** by the orphan detector (the
+  F8 "plain-text safety" guarantee), so reconciliation can traverse specs
+  that mix machine and human-readable assertion lists without aborting.
+- **Duplicate pairs are canonicalized** (`spec_a < spec_b`) so output is
+  deterministic across runs.
+- **Provisional detector uses `db.get_provisional_specs()`** which filters
+  on `authority='provisional' AND provisional_until IS NOT NULL`. The
+  replacement's lifecycle `status` determines whether the provisional is
+  reported as expired. Replacements still at `specified` or `deprecated`
+  do NOT trigger expiration — the provisional is still load-bearing.
+
+**Examples:**
+
+```
+# Full sweep — run every detector on the current project
+gt kb reconcile
+
+# Orphan detection only, with explicit project root
+gt kb reconcile --orphans --project-root /path/to/project
+
+# Stale spec detection with a 10-session threshold
+gt kb reconcile --stale 10
+
+# Authority conflicts + duplicates combined
+gt kb reconcile --authority --duplicates
+
+# Check for expired provisionals (cleanup pass)
+gt kb reconcile --provisionals
+```
+
+---
+
+## Scaffold commands (F6)
+
+### gt scaffold specs
+
+Generate a starter set of specifications for the current project. The
+scaffold creates governance, infrastructure, AI-component, and compliance
+template specs at `authority='inferred'` so owners can review and promote
+them to `authority='stated'` via `gt` spec-edit flows or the Python API.
+
+```
+gt scaffold specs [--profile <minimal|full>] [--apply | --dry-run]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--profile` | choice | `minimal` | Scaffold profile: `minimal` (governance + infra) or `full` (adds ai_components + compliance). |
+| `--apply` / `--dry-run` | flag | `--dry-run` | Dry-run (default) shows what would be generated without writing. `--apply` persists generated specs with `authority='inferred'`. |
+
+**Behavior:**
+
+- **Pre-existing handles are skipped.** If a spec with the same `handle`
+  already exists in the KB, the scaffold does not overwrite it — the
+  conflict is reported in `skipped`.
+- **Quality scoring is run in both dry-run and apply modes.** Each
+  generated spec is scored via `score_spec_quality()`; the report surfaces
+  any bronze or needs-work tier warnings so the owner can revise or drop
+  them before promotion.
+- **`authority='inferred'` is the default for generated specs.** Owners
+  must explicitly promote to `authority='stated'` via `db.update_spec()`
+  to mark them authoritative.
+
+**Examples:**
+
+```
+# Preview the minimal scaffold without writing
+gt scaffold specs
+
+# Preview the full scaffold (governance + infra + AI + compliance)
+gt scaffold specs --profile full
+
+# Actually insert the full scaffold into the KB
+gt scaffold specs --profile full --apply
+```
+
+**`gt project init` integration:** `gt project init` does NOT run the
+scaffold by default. To include scaffold specs during project creation,
+call `scaffold_project()` with `ScaffoldOptions(spec_scaffold=...)` from
+the Python API. A CLI flag for this is planned for a future release.
+
+---
+
 ## Command Tree
 
 ```
@@ -598,6 +709,11 @@ gt [--config <path>] [--version]
 │   │   [--include-ci/--no-include-ci] [--seed-example/--no-seed-example]
 │   ├── doctor [--auto-install] [--profile] [--dir]
 │   └── upgrade [--dry-run/--apply] [--force] [--dir]
+├── scaffold
+│   └── specs [--profile <minimal|full>] [--apply/--dry-run]
+├── kb
+│   └── reconcile [--orphans] [--stale <N>] [--authority]
+│       [--duplicates] [--provisionals] [--all] [--project-root <path>]
 └── deliberations
     └── rebuild-index
 ```
