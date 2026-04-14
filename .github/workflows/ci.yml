@@ -6,10 +6,26 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Matrix rationale (Codex condition, gtkb-production-readiness-004.md):
+#   Both the base install (`.[dev,web]`) and the search install
+#   (`.[dev,web,search]`) must be exercised by the FULL test suite on every
+#   advertised Python version. The prior `test-search` job only ran
+#   `pytest -k deliberation`, which missed the `test_cli.py` config
+#   dependency-state bug that went undetected for ~12 commits.
+#
+#   Advertised Python versions (pyproject.toml): 3.11, 3.12, 3.13.
+#   Cross-platform smoke (Codex condition): Ubuntu + Windows + macOS
+#   in base/no-search state, plus a targeted CLI subset to catch path
+#   and SQLite edge cases.
+
 jobs:
-  test:
+  # test-base: full pytest in the base install state (no search extra)
+  # across all advertised Python versions.
+  test-base:
+    name: "test-base (${{ matrix.python-version }})"
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
@@ -21,7 +37,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Install dependencies (base, no search extra)
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev,web]"
@@ -31,7 +47,7 @@ jobs:
           ruff check .
           ruff format --check .
 
-      - name: Run tests
+      - name: Run full test suite (base state)
         run: pytest -v --tb=short
 
       - name: Wheel build + install smoke test
@@ -47,9 +63,48 @@ jobs:
           assert tpl.exists(), 'Templates must be packaged in wheel'
           "
 
+  # test-search: full pytest in the search install state across all
+  # advertised Python versions. Previously only ran `-k deliberation`
+  # on 3.12 — that narrow selector is retired in favor of the full suite
+  # (per Codex finding 2 in gtkb-production-readiness-002.md).
   test-search:
+    name: "test-search (${{ matrix.python-version }})"
     runs-on: ubuntu-latest
-    name: "test (search / 3.12)"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies with search extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,web,search]"
+
+      - name: Run full test suite (search state)
+        run: pytest -v --tb=short
+
+  # test-cross-platform: base/no-search state on Ubuntu, Windows, macOS.
+  # Codex condition 4 requires the cross-platform gate to exercise the
+  # BASE install state (not search-installed), because the whole point is
+  # to catch platform-sensitive bugs that a search-installed environment
+  # would mask. Targeted test subset, not full suite, to keep runtime
+  # budget bounded.
+  test-cross-platform:
+    name: "test-cross-platform (${{ matrix.os }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -58,10 +113,34 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies with search extra
+      - name: Install dependencies (base state, no search)
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,web,search]"
+          pip install -e ".[dev,web]"
 
-      - name: Run tests (including semantic search)
-        run: pytest -v --tb=short -k "deliberation"
+      - name: Run platform-sensitive test subset
+        # Targeted subset rationale: CLI, config TOML/path resolution,
+        # SQLite DB path handling, assertion path confinement, and
+        # governance gates. These are the code paths most likely to
+        # differ between Linux/Windows/macOS (path separators,
+        # SQLite/Windows file-lock semantics, TOML decoding, etc.).
+        # Full 600-test suite is NOT run here to keep cross-OS
+        # runtime bounded; it runs on Ubuntu in test-base/test-search.
+        run: pytest -v --tb=short tests/test_cli.py tests/test_config.py tests/test_db.py tests/test_assertions.py tests/test_gates.py
+
+      - name: CLI smoke (base state)
+        shell: bash
+        run: |
+          gt --version
+          gt project init test-project --profile local-only --no-seed-example --no-include-ci
+          cd test-project
+          gt config
+          gt summary
+          # Base install — rebuild-index should exit 1 with ChromaDB
+          # not-installed message per the documented contract
+          # (cli.md:462). This is a CONTRACT test: the non-zero exit is
+          # the expected result.
+          if gt deliberations rebuild-index; then
+            echo "ERROR: rebuild-index should have failed in base state"
+            exit 1
+          fi
