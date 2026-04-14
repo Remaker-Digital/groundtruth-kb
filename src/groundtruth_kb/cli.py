@@ -693,6 +693,408 @@ def deliberations_rebuild_index(ctx: click.Context) -> None:
             click.echo(f"  {err}")
 
 
+# Shared constants for deliberation commands -----------------------------------
+
+_DELIB_SOURCE_TYPES = [
+    "lo_review",
+    "proposal",
+    "owner_conversation",
+    "report",
+    "session_harvest",
+    "bridge_thread",
+]
+
+_DELIB_OUTCOMES = ["go", "no_go", "deferred", "owner_decision", "informational"]
+
+
+def _load_content(content: str | None, content_file: Path | None) -> str:
+    """Resolve --content or --content-file into a single string.
+
+    Raises click.UsageError if both or neither are provided.
+    """
+    if content is not None and content_file is not None:
+        raise click.UsageError("Cannot specify both --content and --content-file.")
+    if content is None and content_file is None:
+        raise click.UsageError("Must provide either --content or --content-file.")
+    if content_file is not None:
+        return content_file.read_text(encoding="utf-8")
+    assert content is not None  # narrow for type checker
+    return content
+
+
+def _parse_participants(raw: str | None) -> list[str] | None:
+    """Parse a comma-separated participants list into a trimmed list."""
+    if not raw:
+        return None
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    return parts or None
+
+
+def _echo_deliberation_row(row: dict) -> None:
+    """Render a deliberation row as a human-readable block."""
+    click.echo(f"{row['id']} (version {row.get('version', '?')})")
+    click.echo(f"  title:       {row.get('title', '')}")
+    click.echo(f"  source:      {row.get('source_type', '')}: {row.get('source_ref', '') or '-'}")
+    click.echo(f"  summary:     {row.get('summary', '')}")
+    if row.get("outcome"):
+        click.echo(f"  outcome:     {row['outcome']}")
+    if row.get("spec_id"):
+        click.echo(f"  spec_id:     {row['spec_id']}")
+    if row.get("work_item_id"):
+        click.echo(f"  work_item:   {row['work_item_id']}")
+    if row.get("session_id"):
+        click.echo(f"  session:     {row['session_id']}")
+    if row.get("participants"):
+        click.echo(f"  participants: {row['participants']}")
+    click.echo(f"  changed_by:  {row.get('changed_by', '')}")
+    click.echo(f"  reason:      {row.get('change_reason', '')}")
+    content = row.get("content", "") or ""
+    if content:
+        click.echo("  content:")
+        for line in content.splitlines():
+            click.echo(f"    {line}")
+
+
+@deliberations.command("add")
+@click.option("--id", "deliberation_id", required=True, help="Deliberation ID (e.g. DELIB-0123)")
+@click.option("--source-type", type=click.Choice(_DELIB_SOURCE_TYPES), required=True)
+@click.option("--source-ref", required=True, help="Source artifact reference (path, URL, bridge file)")
+@click.option("--title", required=True, help="Human-readable title")
+@click.option("--summary", required=True, help="One- or two-sentence summary")
+@click.option("--content", default=None, help="Inline content body")
+@click.option(
+    "--content-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to a file whose contents become the deliberation body",
+)
+@click.option("--outcome", type=click.Choice(_DELIB_OUTCOMES), default=None)
+@click.option("--spec-id", default=None, help="Link to an existing spec at insert time")
+@click.option("--work-item-id", default=None, help="Link to an existing work item at insert time")
+@click.option("--session-id", default=None, help="Session identifier (e.g. S290)")
+@click.option("--participants", default=None, help="Comma-separated participants list")
+@click.option("--changed-by", default="gt-cli", show_default=True)
+@click.option("--change-reason", default="Created via gt deliberations add", show_default=True)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit the inserted row as JSON")
+@click.pass_context
+def deliberations_add(
+    ctx: click.Context,
+    deliberation_id: str,
+    source_type: str,
+    source_ref: str,
+    title: str,
+    summary: str,
+    content: str | None,
+    content_file: Path | None,
+    outcome: str | None,
+    spec_id: str | None,
+    work_item_id: str | None,
+    session_id: str | None,
+    participants: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Add a new deliberation (append-only; requires --id).
+
+    This is a thin wrapper over ``KnowledgeDB.insert_deliberation`` for cases
+    where the caller owns the identifier. For source-content idempotency use
+    ``gt deliberations upsert`` instead.
+    """
+    body = _load_content(content, content_file)
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+    row = db.insert_deliberation(
+        id=deliberation_id,
+        source_type=source_type,
+        title=title,
+        summary=summary,
+        content=body,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        spec_id=spec_id,
+        work_item_id=work_item_id,
+        source_ref=source_ref,
+        participants=_parse_participants(participants),
+        outcome=outcome,
+        session_id=session_id,
+    )
+    if json_output:
+        click.echo(json.dumps(row, indent=2, default=str))
+        return
+    click.echo(f"Added deliberation {row['id']} (version {row.get('version', '?')}).")
+
+
+@deliberations.command("upsert")
+@click.option("--source-type", type=click.Choice(_DELIB_SOURCE_TYPES), required=True)
+@click.option("--source-ref", required=True, help="Source artifact reference used for idempotency")
+@click.option("--title", required=True, help="Human-readable title")
+@click.option("--summary", required=True, help="One- or two-sentence summary")
+@click.option("--content", default=None, help="Inline content body")
+@click.option(
+    "--content-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to a file whose contents become the deliberation body",
+)
+@click.option("--outcome", type=click.Choice(_DELIB_OUTCOMES), default=None)
+@click.option("--spec-id", default=None)
+@click.option("--work-item-id", default=None)
+@click.option("--session-id", default=None)
+@click.option("--participants", default=None, help="Comma-separated participants list")
+@click.option("--changed-by", default="gt-cli", show_default=True)
+@click.option("--change-reason", default="Upserted via gt deliberations upsert", show_default=True)
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def deliberations_upsert(
+    ctx: click.Context,
+    source_type: str,
+    source_ref: str,
+    title: str,
+    summary: str,
+    content: str | None,
+    content_file: Path | None,
+    outcome: str | None,
+    spec_id: str | None,
+    work_item_id: str | None,
+    session_id: str | None,
+    participants: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Upsert a deliberation keyed by (source_type, source_ref, content_hash).
+
+    The database auto-generates a DELIB-NNNN identifier when no matching
+    source/content hash exists. This command has no ``--id`` flag; use
+    ``gt deliberations add`` when the caller owns the identifier.
+    """
+    body = _load_content(content, content_file)
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+    row = db.upsert_deliberation_source(
+        source_type=source_type,
+        source_ref=source_ref,
+        content=body,
+        title=title,
+        summary=summary,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        spec_id=spec_id,
+        work_item_id=work_item_id,
+        participants=_parse_participants(participants),
+        outcome=outcome,
+        session_id=session_id,
+    )
+    if json_output:
+        click.echo(json.dumps(row, indent=2, default=str))
+        return
+    # Per Codex Condition 4: do not infer inserted vs matched from the return
+    # row. Print the ID only and let callers inspect via ``gt deliberations get``.
+    click.echo(row["id"])
+
+
+@deliberations.command("get")
+@click.argument("deliberation_id")
+@click.option("--history", is_flag=True, default=False, help="Show the full version history")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def deliberations_get(
+    ctx: click.Context,
+    deliberation_id: str,
+    history: bool,
+    json_output: bool,
+) -> None:
+    """Show a deliberation by ID (latest version by default)."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+    if history:
+        rows = db.get_deliberation_history(deliberation_id)
+        if not rows:
+            click.echo(f"Deliberation {deliberation_id} not found.")
+            raise SystemExit(1)
+        if json_output:
+            click.echo(json.dumps(rows, indent=2, default=str))
+            return
+        click.echo(f"Version history for {deliberation_id} ({len(rows)} version(s)):")
+        for row in rows:
+            click.echo(f"--- version {row.get('version', '?')} ---")
+            _echo_deliberation_row(row)
+        return
+
+    row = db.get_deliberation(deliberation_id)
+    if row is None:
+        click.echo(f"Deliberation {deliberation_id} not found.")
+        raise SystemExit(1)
+    if json_output:
+        click.echo(json.dumps(row, indent=2, default=str))
+        return
+    _echo_deliberation_row(row)
+
+
+@deliberations.command("list")
+@click.option("--spec-id", default=None, help="Filter by linked spec")
+@click.option("--work-item-id", default=None, help="Filter by linked work item")
+@click.option("--source-type", type=click.Choice(_DELIB_SOURCE_TYPES), default=None)
+@click.option("--session-id", default=None)
+@click.option("--source-ref", default=None)
+@click.option("--outcome", type=click.Choice(_DELIB_OUTCOMES), default=None)
+@click.option("--limit", type=int, default=None, help="CLI-side slice; returns the first N rows")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def deliberations_list(
+    ctx: click.Context,
+    spec_id: str | None,
+    work_item_id: str | None,
+    source_type: str | None,
+    session_id: str | None,
+    source_ref: str | None,
+    outcome: str | None,
+    limit: int | None,
+    json_output: bool,
+) -> None:
+    """List deliberations with optional filters.
+
+    ``--limit`` performs a CLI-side slice; the underlying API returns all
+    matching rows.
+    """
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+    rows = db.list_deliberations(
+        spec_id=spec_id,
+        work_item_id=work_item_id,
+        source_type=source_type,
+        session_id=session_id,
+        source_ref=source_ref,
+        outcome=outcome,
+    )
+    if limit is not None and limit >= 0:
+        rows = rows[:limit]
+    if json_output:
+        click.echo(json.dumps(rows, indent=2, default=str))
+        return
+    if not rows:
+        click.echo("No deliberations match the given filters.")
+        return
+    click.echo(f"{len(rows)} deliberation(s):")
+    for row in rows:
+        outcome_label = f" [{row['outcome']}]" if row.get("outcome") else ""
+        click.echo(f"  {row['id']} v{row.get('version', '?')}{outcome_label}: {row.get('title', '')}")
+        click.echo(
+            f"      source={row.get('source_type', '')}:{row.get('source_ref', '') or '-'}  "
+            f"summary={row.get('summary', '')[:80]}"
+        )
+
+
+@deliberations.command("search")
+@click.argument("query")
+@click.option("--limit", type=int, default=5, show_default=True)
+@click.option(
+    "--semantic-only",
+    is_flag=True,
+    default=False,
+    help=("Require ChromaDB and reject SQLite LIKE fallback rows. Exits with code 1 if ChromaDB is not installed."),
+)
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def deliberations_search(
+    ctx: click.Context,
+    query: str,
+    limit: int,
+    semantic_only: bool,
+    json_output: bool,
+) -> None:
+    """Search deliberations by semantic similarity (with SQLite text fallback).
+
+    The default path preserves ``KnowledgeDB.search_deliberations`` behavior:
+    ChromaDB is used when available, otherwise SQLite LIKE fallback. Use
+    ``--semantic-only`` to opt into a stricter contract that refuses fallback.
+    """
+    # Per Codex Condition 3: enforce --semantic-only as an explicit
+    # no-fallback mode. We check the module-level HAS_CHROMADB flag because the
+    # DB method's own contract is to *always* fall back; we filter the CLI
+    # layer to match the opt-in promise.
+    if semantic_only:
+        from groundtruth_kb import db as _db_mod
+
+        if not getattr(_db_mod, "HAS_CHROMADB", False):
+            click.echo(
+                'Error: --semantic-only requires ChromaDB. Install with:\n  pip install "groundtruth-kb[search]"'
+            )
+            raise SystemExit(1)
+
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+    rows = db.search_deliberations(query, limit=limit)
+
+    if semantic_only:
+        rows = [r for r in rows if r.get("search_method") == "semantic"]
+
+    if json_output:
+        click.echo(json.dumps(rows, indent=2, default=str))
+        return
+
+    if not rows:
+        method_note = " (semantic-only mode)" if semantic_only else ""
+        click.echo(f"No deliberations match '{query}'{method_note}.")
+        return
+
+    click.echo(f"{len(rows)} deliberation(s) for '{query}':")
+    for row in rows:
+        method = row.get("search_method", "?")
+        score = row.get("score")
+        score_note = f" score={score:.3f}" if isinstance(score, (int, float)) else ""
+        click.echo(f"  [{method}{score_note}] {row['id']} v{row.get('version', '?')}: {row.get('title', '')}")
+        click.echo(f"      {row.get('summary', '')[:100]}")
+
+
+@deliberations.command("link")
+@click.argument("deliberation_id")
+@click.option("--spec", "spec_id", default=None, help="Link to this spec ID")
+@click.option("--work-item", "work_item_id", default=None, help="Link to this work item ID")
+@click.option("--role", default="related", show_default=True, help="Relationship role")
+@click.pass_context
+def deliberations_link(
+    ctx: click.Context,
+    deliberation_id: str,
+    spec_id: str | None,
+    work_item_id: str | None,
+    role: str,
+) -> None:
+    """Link an existing deliberation to a spec or work item.
+
+    Exactly one of ``--spec`` or ``--work-item`` must be supplied. The CLI
+    layer validates that both the deliberation and the target artifact exist
+    before writing the link row, because the underlying DB API is permissive.
+    """
+    if bool(spec_id) == bool(work_item_id):
+        raise click.UsageError("Provide exactly one of --spec or --work-item.")
+
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+
+    # Per Codex Condition 5: CLI-layer validation of all three entities.
+    delib = db.get_deliberation(deliberation_id)
+    if delib is None:
+        click.echo(f"Error: deliberation {deliberation_id} not found.")
+        raise SystemExit(1)
+
+    if spec_id is not None:
+        if db.get_spec(spec_id) is None:
+            click.echo(f"Error: spec {spec_id} not found.")
+            raise SystemExit(1)
+        db.link_deliberation_spec(deliberation_id, spec_id, role=role)
+        click.echo(f"Linked {deliberation_id} to spec {spec_id} (role={role}).")
+        return
+
+    assert work_item_id is not None  # mutually exclusive branch
+    if db.get_work_item(work_item_id) is None:
+        click.echo(f"Error: work item {work_item_id} not found.")
+        raise SystemExit(1)
+    db.link_deliberation_work_item(deliberation_id, work_item_id, role=role)
+    click.echo(f"Linked {deliberation_id} to work item {work_item_id} (role={role}).")
+
+
 # ── F7: Health dashboard commands ─────────────────────────────────────
 
 
