@@ -354,6 +354,118 @@ def _check_rules(target: Path, profile_name: str) -> ToolCheck:
     )
 
 
+def _check_settings_classifiers(target: Path) -> ToolCheck:
+    """F5: Check classifier hook configuration in .claude/settings.local.json.
+
+    Bridge-profile-only. Warns when:
+      - settings file is missing
+      - settings JSON is malformed
+      - ``hooks`` key is not a dict
+      - ``UserPromptSubmit`` hooks list is missing, null, or non-list
+      - neither ``intake-classifier.py`` nor ``spec-classifier.py`` is active
+      - both classifiers are active (redundant)
+    """
+    import json
+
+    settings_path = target / ".claude" / "settings.local.json"
+    if not settings_path.exists():
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=False,
+            status="warning",
+            message=".claude/settings.local.json not found; classifiers cannot be activated",
+        )
+
+    try:
+        raw = settings_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Malformed settings JSON: {exc}",
+        )
+
+    if not isinstance(data, dict):
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=True,
+            status="warning",
+            message="settings.local.json root must be a JSON object",
+        )
+
+    hooks = data.get("hooks")
+    if hooks is None:
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=True,
+            status="warning",
+            message="settings.local.json has no 'hooks' section",
+        )
+    if not isinstance(hooks, dict):
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"'hooks' must be a JSON object, got {type(hooks).__name__}",
+        )
+
+    ups = hooks.get("UserPromptSubmit")
+    if ups is None or not isinstance(ups, list):
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=True,
+            status="warning",
+            message="'hooks.UserPromptSubmit' must be a non-null list",
+        )
+
+    active_hook_names: set[str] = set()
+    for entry in ups:
+        if not isinstance(entry, dict):
+            continue
+        cmd = entry.get("command", "") or ""
+        if "intake-classifier.py" in cmd:
+            active_hook_names.add("intake-classifier.py")
+        if "spec-classifier.py" in cmd:
+            active_hook_names.add("spec-classifier.py")
+
+    has_intake = "intake-classifier.py" in active_hook_names
+    has_spec = "spec-classifier.py" in active_hook_names
+
+    if has_intake and has_spec:
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=True,
+            status="warning",
+            message="Both intake-classifier.py and spec-classifier.py are active (redundant)",
+        )
+    if not has_intake and not has_spec:
+        return ToolCheck(
+            name="Classifier settings",
+            required=False,
+            found=True,
+            status="warning",
+            message="Neither intake-classifier.py nor spec-classifier.py is active",
+        )
+
+    active = "intake-classifier.py" if has_intake else "spec-classifier.py"
+    return ToolCheck(
+        name="Classifier settings",
+        required=False,
+        found=True,
+        status="pass",
+        message=f"{active} is active",
+    )
+
+
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
     """Check file bridge configuration capture for dual-agent projects."""
     inventory = target / "BRIDGE-INVENTORY.md"
@@ -496,6 +608,7 @@ def run_doctor(
 
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
+        checks.append(_check_settings_classifiers(target))
 
     # Auto-install pass
     if auto_install:

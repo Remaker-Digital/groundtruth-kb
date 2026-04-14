@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **F1: Spec Schema Enrichment** — `authority`, `provisional_until`, `constraints`,
+  `affected_by`, and `testability` fields on specifications with validation and
+  carry-forward semantics.
+- **F2: Change Impact Analysis** — `KnowledgeDB.compute_impact(operation, spec_data)`
+  returns advisory blast radius, related specs, dependents (via `affected_by`
+  traversal), applicable constraints, potential assertion conflicts, authority
+  distribution, testability summary, and a tier-aware recommendation.
+- **F3: Spec Quality Gate** — `score_spec_quality()`, `persist_quality_scores()`,
+  `get_quality_history()`, `get_quality_distribution()` with 5-dimension scoring
+  and tier classification (gold / silver / bronze / needs-work).
+- **F4: Cross-Cutting Constraint Propagation** — `check_constraints_for_spec()`,
+  `get_constraint_coverage()` (Phase A read-only), plus `propagate_constraint()`
+  and `remove_constraint_link()` (Phase B write) using append-only versioning.
+- **F5: Requirement Intake Pipeline** — `classify_requirement()`,
+  `capture_requirement()`, `confirm_intake()`, `reject_intake()`, `list_intakes()`,
+  `gt intake` CLI group, and `templates/hooks/intake-classifier.py` hook for
+  owner-intent classification (directive / constraint / preference / question /
+  exploration) with numeric confidence. Confirm creates a KB spec and returns
+  F2 impact, F3 quality tier, and F4 constraints in one call.
+- **F7: Session Health Dashboard** — `session_snapshots` table with
+  `INSERT OR REPLACE` write contract, `capture_session_snapshot()`,
+  `compute_session_delta()` (current-vs-last with no-prior graceful
+  degradation), `render_health_text()` with default thresholds,
+  `gt health` CLI group, and `templates/hooks/session-health.py`.
+
+### Migration notes
+
+Projects upgrading from 0.3.0 should run `gt project upgrade` to:
+
+- Install the new `intake-classifier.py` and `session-health.py` hooks into
+  `.claude/hooks/`.
+- Update `.claude/settings.local.json` to activate `intake-classifier.py` as
+  the `UserPromptSubmit` hook (bridge profile only; legacy projects keeping
+  `spec-classifier.py` still pass doctor checks).
+
+Run `gt project doctor` to verify: bridge-profile projects should see a
+`Classifier settings` check pass when exactly one of `intake-classifier.py`
+or `spec-classifier.py` is active.
+
 ## [0.3.0] - 2026-04-12
 
 ### Added

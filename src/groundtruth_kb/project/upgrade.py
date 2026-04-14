@@ -27,6 +27,7 @@ class UpgradeAction:
 _MANAGED_HOOKS = [
     ".claude/hooks/assertion-check.py",
     ".claude/hooks/spec-classifier.py",
+    ".claude/hooks/intake-classifier.py",
     ".claude/hooks/destructive-gate.py",
     ".claude/hooks/credential-scan.py",
     ".claude/hooks/scheduler.py",

@@ -463,6 +463,65 @@ the authoritative source of truth.
 
 ---
 
+## Intake Commands
+
+Requirement intake pipeline — classify owner intent, capture candidates, and
+promote confirmed candidates to KB specs.
+
+### gt intake classify
+
+Classify owner text into `directive`, `constraint`, `preference`, `question`,
+or `exploration` intent categories with numeric confidence.
+
+```
+gt intake classify <TEXT>
+```
+
+### gt intake capture
+
+Capture a requirement candidate as a deliberation with full audit evidence
+(raw text, classification, confidence, proposed spec fields).
+
+```
+gt intake capture <TEXT> --title <TITLE> --section <SECTION> [options]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `TEXT` | argument | *required* | Raw owner text |
+| `--title` | string | *required* | Proposed spec title |
+| `--section` | string | *required* | Proposed section |
+| `--scope` | string | | Proposed scope |
+| `--type` | string | `requirement` | Spec type (requirement, governance, etc.) |
+| `--authority` | string | `stated` | Spec authority (stated, inferred, etc.) |
+
+### gt intake confirm
+
+Confirm a captured candidate. Creates a KB spec using the proposed fields,
+returns F2 impact analysis, F3 quality tier, and F4 applicable constraints.
+
+```
+gt intake confirm <DELIBERATION_ID>
+```
+
+### gt intake reject
+
+Reject a captured candidate with a required reason.
+
+```
+gt intake reject <DELIBERATION_ID> --reason <REASON>
+```
+
+### gt intake list
+
+List intake candidates, filtering non-intake deliberations by discriminator.
+
+```
+gt intake list [--pending]
+```
+
+---
+
 ## Health Commands
 
 Session health dashboard for monitoring project metrics over time.
@@ -524,6 +583,12 @@ gt [--config <path>] [--version]
 ├── export [--output]
 ├── import <FILE> [--merge]
 ├── serve [--port] [--host]
+├── intake
+│   ├── classify <TEXT>
+│   ├── capture <TEXT> --title --section [--scope] [--type] [--authority]
+│   ├── confirm <DELIBERATION_ID>
+│   ├── reject <DELIBERATION_ID> --reason
+│   └── list [--pending]
 ├── health
 │   ├── snapshot <SESSION_ID>
 │   └── trends [-n <LIMIT>]

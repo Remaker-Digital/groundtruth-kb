@@ -60,8 +60,10 @@ Claude Code automation hooks, copied to `.claude/hooks/`:
 | `templates/hooks/assertion-check.py` | `.claude/hooks/assertion-check.py` | Session-start assertion runner |
 | `templates/hooks/credential-scan.py` | `.claude/hooks/credential-scan.py` | Pre-commit credential scanner |
 | `templates/hooks/destructive-gate.py` | `.claude/hooks/destructive-gate.py` | Dangerous command blocker |
+| `templates/hooks/intake-classifier.py` | `.claude/hooks/intake-classifier.py` | Requirement intake classifier (F5) |
 | `templates/hooks/scheduler.py` | `.claude/hooks/scheduler.py` | Bridge poller scheduler |
-| `templates/hooks/spec-classifier.py` | `.claude/hooks/spec-classifier.py` | Spec-first workflow enforcer |
+| `templates/hooks/session-health.py` | `.claude/hooks/session-health.py` | Session health snapshot on Stop (F7) |
+| `templates/hooks/spec-classifier.py` | `.claude/hooks/spec-classifier.py` | Spec-first workflow enforcer (legacy) |
 
 ### Rules
 
