@@ -319,8 +319,11 @@ def reject_intake(
     raw_content = delib.get("content", "{}")
     try:
         content = json.loads(raw_content) if isinstance(raw_content, str) else raw_content
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         content = {}
+
+    if not isinstance(content, dict) or content.get("intake_type") != _INTAKE_TYPE:
+        return {"error": "Not an intake candidate"}
 
     content["intake_status"] = "rejected"
     content["rejection_reason"] = reason

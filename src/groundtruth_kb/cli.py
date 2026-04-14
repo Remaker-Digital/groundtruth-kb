@@ -734,7 +734,7 @@ def health_snapshot(ctx: click.Context, session_id: str) -> None:
 @click.option("-n", "--limit", default=5, help="Number of recent snapshots.")
 @click.pass_context
 def health_trends(ctx: click.Context, limit: int) -> None:
-    """Show recent health snapshots with deltas."""
+    """Show recent health snapshots with per-snapshot metric deltas."""
     config = _resolve_config(ctx)
     db = KnowledgeDB(db_path=config.db_path)
     history = db.get_snapshot_history(limit=limit)
@@ -743,9 +743,23 @@ def health_trends(ctx: click.Context, limit: int) -> None:
         return
     from groundtruth_kb.health import render_health_text
 
+    click.echo(f"Health trends (latest {len(history)} snapshots, newest first):")
     for snap in history:
         click.echo(f"\n--- {snap['session_id']} ({snap['captured_at']}) ---")
         click.echo(render_health_text(snap.get("data_parsed", {})))
+
+        delta = db.compute_session_delta(current_session=snap["session_id"])
+        if delta.get("no_prior"):
+            click.echo("  (no prior snapshot to diff against)")
+            continue
+        deltas = delta.get("deltas") or {}
+        if not deltas:
+            click.echo("  (no metric changes)")
+            continue
+        click.echo("  Deltas vs previous snapshot:")
+        for key, val in deltas.items():
+            sign = "+" if val >= 0 else ""
+            click.echo(f"    {key}: {sign}{val}")
 
 
 # ── F5: Requirement intake commands ────────────────────────────────────
