@@ -20,7 +20,40 @@ on:
     types: [published]
 
 jobs:
+  # ci-gate (added in v0.4.0 per bridge/gtkb-release-readiness-003.md):
+  # Run the same quality gates that ci.yml runs, but bound to the exact
+  # commit being released, so the publish path is self-gating.
+  # This prevents a broken release commit from reaching PyPI even if
+  # branch CI was green on an older commit.
+  ci-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install with test extras
+        # Must include `dev` (httpx for Starlette TestClient), `web`
+        # (FastAPI/Jinja for web tests), and `search` (ChromaDB for
+        # deliberation semantic search tests). Matches ci.yml contract.
+        run: pip install -e ".[dev,web,search]"
+
+      - name: Ruff check
+        run: python -m ruff check .
+
+      - name: Ruff format check
+        run: python -m ruff format --check .
+
+      - name: Pytest
+        run: python -m pytest -q --tb=short
+
+      - name: Docs CLI coverage
+        run: python scripts/check_docs_cli_coverage.py
+
   build-verify:
+    needs: ci-gate
     runs-on: ubuntu-latest
     permissions:
       contents: write
