@@ -10,6 +10,14 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: deploy-scaling-full-coverage
+VERIFIED: bridge/deploy-scaling-full-coverage-006.md
+REVISED: bridge/deploy-scaling-full-coverage-005.md
+NO-GO: bridge/deploy-scaling-full-coverage-004.md
+NEW: bridge/deploy-scaling-full-coverage-003.md
+GO: bridge/deploy-scaling-full-coverage-002.md
+NEW: bridge/deploy-scaling-full-coverage-001.md
+
 Document: gtkb-phase4-implementation
 VERIFIED: bridge/gtkb-phase4-implementation-012.md
 NEW: bridge/gtkb-phase4-implementation-011.md

@@ -70,11 +70,33 @@ FQDNS = {
 HEALTH_TIMEOUT_S = 120
 HEALTH_POLL_S = 10
 
-# Scaling configuration per environment (WI-3156).
-# deploy.py enforces these after every deploy to prevent drift.
+# Scaling configuration per Azure Container App (WI-3171, extends WI-3156).
+# Source of truth for production values: infrastructure/terraform/main.tf
+# container_apps block (Decision #16 Option B+). When Terraform changes,
+# update this dict in the same PR — tests/unit/test_deploy_scaling.py
+# reconciles against main.tf.
+#
+# Staging and production share most Azure Container Apps (ADR-002). Only the
+# gateway has environment-specific app names: agent-red-api-gateway (prod)
+# and agent-red-staging (staging). Shared agent/infra apps use Terraform's
+# production baseline in both environments.
+#
+# NATS is intentionally absent — it is Terraform-managed, not deploy.py-managed.
 SCALING_CONFIG: dict[str, dict[str, int]] = {
-    "staging": {"min_replicas": 1, "max_replicas": 5},
-    "production": {"min_replicas": 2, "max_replicas": 10},
+    # --- Gateways (environment-specific) -----------------------------------
+    "agent-red-api-gateway":          {"min_replicas": 2, "max_replicas": 8},   # TF: api-gateway
+    "agent-red-staging":              {"min_replicas": 1, "max_replicas": 5},   # staging gateway (WI-3156 baseline preserved per Codex GO cond 4)
+    # --- Critical agent containers -----------------------------------------
+    "agent-red-intent-classifier":    {"min_replicas": 2, "max_replicas": 6},   # TF: intent-classifier
+    "agent-red-knowledge-retrieval":  {"min_replicas": 2, "max_replicas": 6},   # TF: knowledge-retrieval
+    "agent-red-response-generator":   {"min_replicas": 2, "max_replicas": 10},  # TF: response-generator
+    "agent-red-critic-supervisor":    {"min_replicas": 2, "max_replicas": 4},   # TF: critic-supervisor
+    # --- Non-critical agent containers -------------------------------------
+    "agent-red-escalation-handler":   {"min_replicas": 1, "max_replicas": 3},   # TF: escalation
+    "agent-red-analytics-collector":  {"min_replicas": 1, "max_replicas": 2},   # TF: analytics
+    # --- Critical infrastructure -------------------------------------------
+    "agent-red-slim":                 {"min_replicas": 2, "max_replicas": 2},   # TF: slim-gateway
+    # NATS (TF: nats, critical=true, min=2 max=2) is Terraform-managed.
 }
 
 # ---------------------------------------------------------------------------
@@ -158,17 +180,12 @@ def verify_acr_tag(repo: str, tag: str) -> bool:
     return tag in output
 
 
-def enforce_scaling(app_name: str, environment: str) -> bool:
-    """Enforce minReplicas/maxReplicas on a container app (WI-3156).
+def _enforce_one(app_name: str, min_r: int, max_r: int) -> bool:
+    """Apply min/max replicas to a single container app via `az` CLI (WI-3171).
 
-    Prevents scaling drift caused by deploys that only update the image.
+    Returns True on success, False on az CLI failure. Failures are logged as
+    WARNING and do not raise — the deploy continues (same semantics as WI-3156).
     """
-    config = SCALING_CONFIG.get(environment)
-    if not config:
-        return True
-
-    min_r = config["min_replicas"]
-    max_r = config["max_replicas"]
     cmd = (
         f"az containerapp update "
         f"--name {app_name} "
@@ -180,10 +197,61 @@ def enforce_scaling(app_name: str, environment: str) -> bool:
     log(f"  Enforcing scaling: min={min_r} max={max_r} on {app_name}...")
     code, output = _run(cmd, timeout=120)
     if code != 0:
-        log(f"  WARNING: Scaling enforcement failed: {output}")
+        log(f"  WARNING: Scaling enforcement failed for {app_name}: {output}")
         return False
-    log(f"  Scaling enforced.")
+    log(f"  Scaling enforced on {app_name}.")
     return True
+
+
+def enforce_all_scaling(environment: str) -> dict[str, bool]:
+    """Enforce scaling on every container app deploy.py manages (WI-3171).
+
+    Iterates the set of container apps relevant to this environment:
+      - The environment-specific gateway (staging or production)
+      - Every shared agent container (ADR-002 — same apps in both envs)
+      - Every shared infra container (currently: SLIM)
+
+    NATS is excluded because it is Terraform-managed. Test host is excluded
+    because it has no Decision #16 scaling baseline.
+
+    Returns a dict mapping app_name -> bool (True on success). Scaling
+    failures are non-fatal and do not abort the loop — matches the
+    WI-3156 contract that scaling drift is a WARNING, not a failure.
+    """
+    gateway_name = CONTAINER_APPS[environment]
+    targets: list[str] = [
+        gateway_name,
+        *AGENT_CONTAINER_APPS.values(),
+        *INFRA_CONTAINER_APPS.values(),
+    ]
+    results: dict[str, bool] = {}
+    for app_name in targets:
+        cfg = SCALING_CONFIG.get(app_name)
+        if cfg is None:
+            log(f"  SKIP scaling: no SCALING_CONFIG entry for {app_name}")
+            results[app_name] = True
+            continue
+        results[app_name] = _enforce_one(
+            app_name,
+            cfg["min_replicas"],
+            cfg["max_replicas"],
+        )
+    return results
+
+
+def enforce_scaling(app_name: str, environment: str) -> bool:
+    """Back-compat shim for the WI-3156 call signature.
+
+    New callers should use enforce_all_scaling(environment). Kept so any
+    out-of-tree caller (and the WI-3156 docstring contract) keeps working.
+    The `environment` parameter is retained for signature compatibility
+    but ignored — the lookup is purely by app_name against the name-keyed
+    SCALING_CONFIG introduced in WI-3171.
+    """
+    cfg = SCALING_CONFIG.get(app_name)
+    if cfg is None:
+        return True  # Unknown app -> no-op (matches WI-3156 missing-env behavior)
+    return _enforce_one(app_name, cfg["min_replicas"], cfg["max_replicas"])
 
 
 def deploy_container(app_name: str, image: str) -> bool:
@@ -554,9 +622,6 @@ def main() -> int:
         _close_log()
         return 1
 
-    # 2b. Enforce scaling (WI-3156: prevent minReplicas drift)
-    enforce_scaling(app_name, args.environment)
-
     # 3. Deploy test host (both environments)
     th_app = TEST_HOST_APPS.get(args.environment)
     if th_app:
@@ -592,6 +657,13 @@ def main() -> int:
                 log(f"  WARNING: {ca_name} deploy failed (non-fatal)")
         else:
             log(f"  SKIP: {repo}:{args.tag} not in ACR")
+
+    # 3d. Enforce scaling on every deploy-managed container (WI-3171).
+    # Runs AFTER all deploys so it lands on the freshly-updated revisions.
+    # Extends WI-3156 (gateway only) to all 8 deploy-managed container apps.
+    log("")
+    log("Enforcing scaling baselines (WI-3171)...")
+    enforce_all_scaling(args.environment)
 
     log("")
 
