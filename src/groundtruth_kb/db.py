@@ -1500,10 +1500,17 @@ class KnowledgeDB:
         return d
 
     def get_snapshot_history(self, limit: int = 10) -> list[dict[str, Any]]:
-        """Retrieve recent snapshots ordered by captured_at DESC."""
+        """Retrieve recent snapshots ordered by latest write.
+
+        Uses ``(captured_at DESC, rowid DESC)`` so same-second captures
+        resolve deterministically to latest-write-wins.
+        """
         rows = (
             self._get_conn()
-            .execute("SELECT * FROM session_snapshots ORDER BY captured_at DESC LIMIT ?", (limit,))
+            .execute(
+                "SELECT * FROM session_snapshots ORDER BY captured_at DESC, rowid DESC LIMIT ?",
+                (limit,),
+            )
             .fetchall()
         )
         result = []

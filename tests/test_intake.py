@@ -574,3 +574,52 @@ class TestF5Roundtrip:
 
         # Verify quality tier is present
         assert result["quality"].get("tier") is not None
+
+
+class TestF5Regressions:
+    """Regression tests from NO-GO bridge/gtkb-phase3-implementation-016.md."""
+
+    # R1. reject_intake must refuse non-intake deliberations
+    def test_reject_intake_refuses_non_intake(self, db):
+        """Ordinary owner_conversation deliberations cannot be rejected as intakes."""
+        db.insert_deliberation(
+            id="D-NON-INTAKE-001",
+            title="Regular chat",
+            summary="General discussion",
+            content=json.dumps({"note": "ordinary conversation, not an intake"}),
+            source_type="owner_conversation",
+            outcome=None,
+            changed_by="test",
+            change_reason="test",
+        )
+
+        result = reject_intake(db, "D-NON-INTAKE-001", "not an intake")
+        assert "error" in result
+        assert "intake" in result["error"].lower()
+
+        # Verify the original deliberation was not mutated
+        delib = db.get_deliberation("D-NON-INTAKE-001")
+        assert delib is not None
+        content = json.loads(delib["content"])
+        assert content.get("intake_status") is None
+        assert content.get("rejection_reason") is None
+        assert content.get("note") == "ordinary conversation, not an intake"
+        # Outcome should remain None (not "no_go")
+        assert delib.get("outcome") in (None, "")
+
+    # R2. reject_intake on malformed content (not a dict) is refused
+    def test_reject_intake_refuses_malformed(self, db):
+        """Deliberations with non-dict content are refused."""
+        db.insert_deliberation(
+            id="D-MALFORMED-001",
+            title="Bad content",
+            summary="Malformed JSON",
+            content='"just a string, not a dict"',
+            source_type="owner_conversation",
+            outcome=None,
+            changed_by="test",
+            change_reason="test",
+        )
+
+        result = reject_intake(db, "D-MALFORMED-001", "malformed")
+        assert "error" in result
