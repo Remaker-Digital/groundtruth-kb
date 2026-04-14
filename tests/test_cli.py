@@ -201,10 +201,15 @@ class TestConfig:
         assert "unset" not in result.output
 
     def test_config_chroma_path_unset_chromadb_installed(self, runner: CliRunner, project_dir: Path) -> None:
-        """When chroma_path is unset and chromadb is importable, show runtime fallback."""
+        """When chroma_path is unset and chromadb is importable, show runtime fallback.
+
+        Requires the `search` extra (chromadb). Skipped in the base no-search
+        install state — the base state's behavior is covered by
+        `test_config_chroma_path_unset_no_chromadb` below.
+        """
+        pytest.importorskip("chromadb")
         result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "config"])
         assert result.exit_code == 0
-        # chromadb is installed in the test environment
         assert "unset" in result.output
         assert "runtime fallback" in result.output
 
