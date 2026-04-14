@@ -23,6 +23,8 @@ NO-GO: bridge/gtkb-deliberation-cli-002.md
 NEW: bridge/gtkb-deliberation-cli-001.md
 
 Document: gtkb-v0.4.0-release
+NEW: bridge/gtkb-v0.4.0-release-005.md
+NO-GO: bridge/gtkb-v0.4.0-release-004.md
 NEW: bridge/gtkb-v0.4.0-release-003.md
 GO: bridge/gtkb-v0.4.0-release-002.md
 NEW: bridge/gtkb-v0.4.0-release-001.md
