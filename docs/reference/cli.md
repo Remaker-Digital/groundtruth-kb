@@ -461,6 +461,134 @@ the authoritative source of truth.
 | `0` | Index rebuilt successfully |
 | `1` | ChromaDB not installed or rebuild failed |
 
+### gt deliberations add
+
+Insert a new deliberation with a caller-supplied identifier (append-only).
+
+```
+gt deliberations add --id <DELIB_ID> --title <TITLE> \
+  --source-type <TYPE> --source-ref <REF> \
+  --summary <SUMMARY> (--content <BODY> | --content-file <PATH>) \
+  [--outcome <OUTCOME>] [--spec-id <SPEC>] [--work-item-id <WI>] \
+  [--session-id <SESSION>] [--participants "a,b,c"] \
+  [--changed-by <USER>] [--change-reason <REASON>] [--json]
+```
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `--id` | yes | Deliberation identifier (e.g. `DELIB-0123`) |
+| `--source-type` | yes | One of `lo_review`, `proposal`, `owner_conversation`, `report`, `session_harvest`, `bridge_thread` |
+| `--source-ref` | yes | Source artifact reference (path, URL, bridge file) |
+| `--title` | yes | Human-readable title |
+| `--summary` | yes | One- or two-sentence summary |
+| `--content` / `--content-file` | yes (one) | Deliberation body (mutually exclusive) |
+| `--outcome` |  | One of `go`, `no_go`, `deferred`, `owner_decision`, `informational` |
+| `--spec-id` |  | Link to existing spec at insert time |
+| `--work-item-id` |  | Link to existing work item at insert time |
+| `--session-id` |  | Session identifier (e.g. `S290`) |
+| `--participants` |  | Comma-separated participants list |
+| `--changed-by` |  | Audit actor (default `gt-cli`) |
+| `--change-reason` |  | Audit reason (default `Created via gt deliberations add`) |
+| `--json` |  | Emit the inserted row as JSON |
+
+Content is redacted at the DB layer before storage. Both inline `--content`
+and file-based `--content-file` paths go through the same redaction pipeline.
+
+Use `add` when the caller owns the identifier. For source-content idempotency,
+use `upsert` instead.
+
+### gt deliberations upsert
+
+Insert or update a deliberation keyed by `(source_type, source_ref, content_hash)`.
+Auto-generates a `DELIB-NNNN` identifier when no match exists.
+
+```
+gt deliberations upsert --source-type <TYPE> --source-ref <REF> \
+  --title <TITLE> --summary <SUMMARY> \
+  (--content <BODY> | --content-file <PATH>) \
+  [--outcome <OUTCOME>] [--spec-id <SPEC>] [--work-item-id <WI>] \
+  [--session-id <SESSION>] [--participants "a,b,c"] \
+  [--changed-by <USER>] [--change-reason <REASON>] [--json]
+```
+
+Same options as `add` **except** no `--id` flag (passing `--id` exits with
+code 2). Prints the deliberation ID on success so shell scripts can capture
+it. Idempotent on identical `(source_type, source_ref, content_hash)`.
+
+### gt deliberations get
+
+Fetch a deliberation by ID (latest version) or its full version history.
+
+```
+gt deliberations get <DELIB_ID> [--history] [--json]
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `DELIB_ID` | Deliberation identifier |
+| `--history` | Return all versions instead of the latest |
+| `--json` | Emit result as JSON |
+
+**Exit codes:** `0` on success, `1` if the deliberation is not found.
+
+### gt deliberations list
+
+List deliberations with optional filters.
+
+```
+gt deliberations list [--spec-id <ID>] [--work-item-id <ID>] \
+  [--source-type <TYPE>] [--session-id <SESSION>] \
+  [--source-ref <REF>] [--outcome <OUTCOME>] [--limit <N>] [--json]
+```
+
+All filters are optional and combine with logical AND. `--limit` performs a
+CLI-side slice on the matching rows.
+
+### gt deliberations search
+
+Search deliberations by semantic similarity with SQLite LIKE text fallback.
+
+```
+gt deliberations search <QUERY> [--limit <N>] [--semantic-only] [--json]
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `QUERY` | Free-text search query |
+| `--limit` | Maximum results (default 5) |
+| `--semantic-only` | Require ChromaDB and reject SQLite LIKE fallback rows |
+| `--json` | Emit results as JSON |
+
+The default path preserves the Python API's behavior: ChromaDB is used when
+available, otherwise SQLite LIKE fallback kicks in. This keeps the base-install
+CLI fully functional without the `[search]` extra.
+
+`--semantic-only` is an opt-in strict mode: it requires ChromaDB to be
+installed and filters out any row tagged `search_method="text_match"`. Exits
+with code `1` if ChromaDB is not installed.
+
+### gt deliberations link
+
+Link an existing deliberation to a spec or work item. Exactly one of
+`--spec` or `--work-item` must be supplied.
+
+```
+gt deliberations link <DELIB_ID> (--spec <SPEC_ID> | --work-item <WI_ID>) \
+  [--role <ROLE>]
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `DELIB_ID` | Deliberation identifier |
+| `--spec` | Spec to link (mutually exclusive with `--work-item`) |
+| `--work-item` | Work item to link (mutually exclusive with `--spec`) |
+| `--role` | Relationship role (default `related`) |
+
+The CLI validates that both the deliberation and the target artifact exist
+before writing the link row. Exits with code `1` and a descriptive error if
+either entity is missing. Exits with code `2` if neither or both of `--spec`
+and `--work-item` are supplied.
+
 ---
 
 ## Intake Commands
@@ -715,7 +843,18 @@ gt [--config <path>] [--version]
 │   └── reconcile [--orphans] [--stale <N>] [--authority]
 │       [--duplicates] [--provisionals] [--all] [--project-root <path>]
 └── deliberations
-    └── rebuild-index
+    ├── rebuild-index
+    ├── add --id <ID> --source-type --source-ref --title --summary
+    │   (--content | --content-file) [--outcome] [--spec-id] [--work-item-id]
+    │   [--session-id] [--participants] [--changed-by] [--change-reason] [--json]
+    ├── upsert --source-type --source-ref --title --summary
+    │   (--content | --content-file) [--outcome] [--spec-id] [--work-item-id]
+    │   [--session-id] [--participants] [--changed-by] [--change-reason] [--json]
+    ├── get <DELIB_ID> [--history] [--json]
+    ├── list [--spec-id] [--work-item-id] [--source-type] [--session-id]
+    │   [--source-ref] [--outcome] [--limit] [--json]
+    ├── search <QUERY> [--limit] [--semantic-only] [--json]
+    └── link <DELIB_ID> (--spec | --work-item) [--role]
 ```
 
 ---

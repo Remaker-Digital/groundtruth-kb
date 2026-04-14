@@ -163,7 +163,48 @@ Shows the seed operation and all recent changes to the knowledge base.
 Every insert, update, and promotion is tracked with timestamps and
 change reasons.
 
-## Step 11: Start the Web UI (optional)
+## Step 11: Capture a Deliberation
+
+Deliberations are the "why" behind your decisions — rejected alternatives,
+owner conversations, review verdicts, and any reasoning that shapes your
+specs. They travel with the project in the same database as your specs.
+
+Capture a deliberation from the command line:
+
+```bash
+gt deliberations add \
+  --id DELIB-0001 \
+  --source-type owner_conversation \
+  --source-ref "walkthrough notes" \
+  --title "Start with 3 layers, add the rest later" \
+  --summary "Chose to seed governance first and defer full layering" \
+  --content "We picked the minimal example because it highlights the spec/test/implementation triangle without overwhelming a first-time reader." \
+  --outcome owner_decision
+```
+
+Retrieve it later:
+
+```bash
+gt deliberations get DELIB-0001
+```
+
+Or find it by free-text search (SQLite LIKE fallback works even in the base
+install; add the `[search]` extra for semantic search):
+
+```bash
+gt deliberations search "minimal example"
+```
+
+Link it to a spec so the reasoning travels with the decision:
+
+```bash
+gt deliberations link DELIB-0001 --spec SPEC-0001 --role related
+```
+
+See the [Method Guide — Deliberation Archive](method/13-deliberation-archive.md)
+for a full workflow and the complete CLI surface.
+
+## Step 12: Start the Web UI (optional)
 
 Install the web extra:
 
@@ -180,7 +221,7 @@ gt serve
 Open [http://localhost:8090](http://localhost:8090) in your browser to
 browse specifications, tests, work items, and assertion results.
 
-## Step 12: Add CI (optional)
+## Step 13: Add CI (optional)
 
 If you skipped CI in Step 3, you can add it manually by copying the
 CI templates into your project:
@@ -213,6 +254,12 @@ directory.
 | Import database | `gt import db.json` |
 | Show config | `gt config` |
 | Start web UI | `gt serve` |
+| Capture a deliberation | `gt deliberations add --id DELIB-... --summary ... --content ...` |
+| Capture (auto-id, idempotent) | `gt deliberations upsert --source-ref ... --content-file ...` |
+| Fetch a deliberation | `gt deliberations get DELIB-0001 [--history]` |
+| List / filter deliberations | `gt deliberations list [--spec-id ...] [--outcome ...]` |
+| Search deliberations | `gt deliberations search "query" [--semantic-only]` |
+| Link deliberation to spec | `gt deliberations link DELIB-... --spec SPEC-... --role related` |
 | Rebuild search index | `gt deliberations rebuild-index` |
 
 ## What's Next?
@@ -221,7 +268,7 @@ directory.
   discipline: specifications, testing, governance, and dual-agent workflows
 - **[Example Project](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/examples/task-tracker/WALKTHROUGH.md)** —
   a guided walkthrough of a task-tracker that exercises all six layers
-- **[CLI Reference](reference/cli.md)** — all 14 commands with options and examples
+- **[CLI Reference](reference/cli.md)** — the full command surface (including the six `gt deliberations` subcommands) with options and examples
 - **[Configuration Reference](reference/configuration.md)** — every
   `groundtruth.toml` field and environment variable
 
