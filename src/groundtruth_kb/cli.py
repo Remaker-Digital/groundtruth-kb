@@ -746,3 +746,139 @@ def health_trends(ctx: click.Context, limit: int) -> None:
     for snap in history:
         click.echo(f"\n--- {snap['session_id']} ({snap['captured_at']}) ---")
         click.echo(render_health_text(snap.get("data_parsed", {})))
+
+
+# ── F5: Requirement intake commands ────────────────────────────────────
+
+
+@main.group()
+def intake():
+    """Requirement intake pipeline commands."""
+
+
+@intake.command("classify")
+@click.argument("text")
+@click.pass_context
+def intake_classify(ctx: click.Context, text: str) -> None:
+    """Classify owner intent and show related specs."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    from groundtruth_kb.intake import classify_requirement
+
+    result = classify_requirement(db, text)
+    click.echo(f"Classification: {result['classification']}")
+    click.echo(f"Confidence:     {result['confidence']}")
+    if result["related_specs"]:
+        click.echo("\nRelated specs:")
+        for s in result["related_specs"]:
+            click.echo(f"  {s['id']}: {s['title']}")
+    else:
+        click.echo("\nNo related specs found.")
+
+
+@intake.command("capture")
+@click.argument("text")
+@click.option("--title", required=True, help="Proposed spec title")
+@click.option("--section", required=True, help="Proposed section")
+@click.option("--scope", default=None, help="Proposed scope")
+@click.option(
+    "--type",
+    "spec_type",
+    default="requirement",
+    help="Spec type (requirement, governance, etc.)",
+)
+@click.option("--authority", default="stated", help="Spec authority")
+@click.pass_context
+def intake_capture(
+    ctx: click.Context,
+    text: str,
+    title: str,
+    section: str,
+    scope: str | None,
+    spec_type: str,
+    authority: str,
+) -> None:
+    """Capture a requirement candidate for later review."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    from groundtruth_kb.intake import capture_requirement
+
+    result = capture_requirement(
+        db,
+        text,
+        proposed_title=title,
+        proposed_section=section,
+        proposed_scope=scope,
+        proposed_type=spec_type,
+        proposed_authority=authority,
+    )
+    click.echo(f"Captured: {result['deliberation_id']}")
+    click.echo(f"  Classification: {result['content']['classification']}")
+    click.echo(f"  Confidence:     {result['content']['confidence']}")
+
+
+@intake.command("confirm")
+@click.argument("deliberation_id")
+@click.pass_context
+def intake_confirm(ctx: click.Context, deliberation_id: str) -> None:
+    """Confirm a captured candidate and create a KB spec."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    from groundtruth_kb.intake import confirm_intake
+
+    result = confirm_intake(db, deliberation_id)
+    if "error" in result:
+        click.echo(f"Error: {result['error']}")
+        raise SystemExit(1)
+    if result.get("already_confirmed"):
+        click.echo(f"Already confirmed: {result['confirmed_spec_id']}")
+        return
+    click.echo(f"Confirmed: {result['confirmed_spec_id']}")
+    quality = result.get("quality", {})
+    if quality:
+        click.echo(f"  Quality tier:  {quality.get('tier', 'n/a')}")
+        click.echo(f"  Quality score: {quality.get('overall', 'n/a')}")
+    impact = result.get("impact", {})
+    if impact:
+        click.echo(f"  Blast radius:  {impact.get('blast_radius', 'n/a')}")
+    constraints = result.get("constraints", [])
+    if constraints:
+        click.echo(f"  Constraints:   {len(constraints)}")
+
+
+@intake.command("reject")
+@click.argument("deliberation_id")
+@click.option("--reason", required=True, help="Rejection reason")
+@click.pass_context
+def intake_reject(ctx: click.Context, deliberation_id: str, reason: str) -> None:
+    """Reject a captured candidate with a reason."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    from groundtruth_kb.intake import reject_intake
+
+    result = reject_intake(db, deliberation_id, reason)
+    if "error" in result:
+        click.echo(f"Error: {result['error']}")
+        raise SystemExit(1)
+    click.echo(f"Rejected: {deliberation_id}")
+
+
+@intake.command("list")
+@click.option("--pending", is_flag=True, help="Show only pending intakes")
+@click.pass_context
+def intake_list(ctx: click.Context, pending: bool) -> None:
+    """List intake candidates."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    from groundtruth_kb.intake import list_intakes
+
+    intakes = list_intakes(db, pending_only=pending)
+    if not intakes:
+        click.echo("No intake candidates found.")
+        return
+    for i in intakes:
+        status = i.get("intake_status", "?")
+        click.echo(
+            f"{i['deliberation_id']}  [{status}]  {i.get('proposed_title', '')}"
+            f"  ({i.get('classification', '?')}, conf={i.get('confidence', 0)})"
+        )
