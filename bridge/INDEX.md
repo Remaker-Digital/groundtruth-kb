@@ -10,6 +10,20 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: gtkb-production-readiness
+VERIFIED: bridge/gtkb-production-readiness-006.md
+NEW: bridge/gtkb-production-readiness-005.md
+GO: bridge/gtkb-production-readiness-004.md
+REVISED: bridge/gtkb-production-readiness-003.md
+NO-GO: bridge/gtkb-production-readiness-002.md
+NEW: bridge/gtkb-production-readiness-001.md
+
+Document: gtkb-release-readiness
+GO: bridge/gtkb-release-readiness-004.md
+REVISED: bridge/gtkb-release-readiness-003.md
+NO-GO: bridge/gtkb-release-readiness-002.md
+NEW: bridge/gtkb-release-readiness-001.md
+
 Document: deploy-scaling-full-coverage
 VERIFIED: bridge/deploy-scaling-full-coverage-006.md
 REVISED: bridge/deploy-scaling-full-coverage-005.md
