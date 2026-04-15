@@ -62,6 +62,5 @@ def test_internal_helpers_mypy_strict_is_clean() -> None:
         timeout=120,
     )
     assert result.returncode == 0, (
-        f"mypy --strict found issues on internal helpers:\n"
-        f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        f"mypy --strict found issues on internal helpers:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
