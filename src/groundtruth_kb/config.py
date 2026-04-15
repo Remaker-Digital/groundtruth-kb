@@ -10,6 +10,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -25,20 +26,19 @@ _DEFAULT_BRAND_MARK = "GT"
 
 
 class GTConfigError(Exception):
-    """Raised when a GroundTruth KB config file cannot be parsed.
+    """Raised when a GroundTruth KB config file cannot be read or parsed.
 
-    Scoped to Phase 4B.1: this exception wraps TOML parser failures
-    (:class:`tomllib.TOMLDecodeError`) with a message that identifies the
-    offending file. The original decoder error is chained via ``__cause__``
-    so debuggers see the underlying location.
+    Wraps the following error surfaces with a message that identifies the
+    offending file:
 
-    Out of scope for Phase 4B.1 (tracked for Phase 4B.2):
+    * :class:`tomllib.TOMLDecodeError` — invalid TOML syntax.
+    * :class:`PermissionError` — unreadable file (ownership or ACL).
 
-    * :class:`FileNotFoundError` — raised directly by :meth:`GTConfig.load`
-      when an explicit ``config_path`` does not exist.
-    * :class:`PermissionError` — continues to propagate unchanged from
-      :func:`open`. A future sub-round will wrap permission failures in
-      ``GTConfigError`` if the owner directs.
+    The original exception is chained via ``__cause__`` so debuggers see
+    the underlying location. :class:`FileNotFoundError` is still raised
+    directly (not wrapped) by :meth:`GTConfig.load` when an explicit
+    ``config_path`` does not exist, because that is Python's idiomatic
+    exception for a missing file.
     """
 
 
@@ -96,6 +96,21 @@ class GTConfig:
         if "governance_gates" in merged and isinstance(merged["governance_gates"], str):
             merged["governance_gates"] = [g.strip() for g in merged["governance_gates"].split(",") if g.strip()]
 
+        # Phase 4B.2, Finding 6: warn on unknown keys so typos in
+        # [groundtruth] (e.g. 'bran_color') are surfaced rather than silently
+        # dropped. Keys from [gates] and [search] sections map to known fields
+        # (governance_gates, gate_config, chroma_path) and never appear here.
+        # stacklevel=2 points at the caller's GTConfig.load() invocation.
+        known_fields = set(cls.__dataclass_fields__.keys())
+        unknown_keys = sorted(k for k in merged if k not in known_fields)
+        if unknown_keys:
+            warnings.warn(
+                f"groundtruth config has unknown keys that will be ignored: "
+                f"{unknown_keys}. Check for typos in your groundtruth.toml.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         return cls(**{k: v for k, v in merged.items() if k in cls.__dataclass_fields__})
 
 
@@ -127,11 +142,33 @@ def _load_toml(config_path: Path | None) -> dict:
 
     # Phase 4B.1, Finding 3: wrap TOML decode errors so the user sees the
     # offending file name instead of a raw parser traceback.
+    # Phase 4B.2, Finding 4: also wrap PermissionError — must be caught
+    # before TOMLDecodeError because open() raises it before any TOML parsing.
     try:
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
+    except PermissionError as exc:
+        raise GTConfigError(
+            f"Cannot read config file {config_path}: permission denied. Check file ownership and permissions."
+        ) from exc
     except tomllib.TOMLDecodeError as exc:
         raise GTConfigError(f"Invalid TOML in {config_path}: {exc}. Check your groundtruth.toml syntax.") from exc
+
+    # Phase 4B.2, Finding 5: warn when [groundtruth] section is absent so
+    # typos like [groundtuh] are caught early. stacklevel=3 surfaces the
+    # warning at the external GTConfig.load() call site (user code), not
+    # inside this helper or in GTConfig.load itself.
+    # Wording clarifies that only core [groundtruth] settings use defaults;
+    # [gates] and [search] sections, if present, remain active.
+    if "groundtruth" not in data:
+        warnings.warn(
+            f"{config_path}: no [groundtruth] section found. "
+            f"Core GroundTruth settings will use env vars and defaults; "
+            f"[gates] and [search] sections, if present, are still applied. "
+            f"Check your section name if this is unexpected.",
+            UserWarning,
+            stacklevel=3,
+        )
 
     section = data.get("groundtruth", {})
     result = dict(section)
