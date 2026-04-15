@@ -38,6 +38,7 @@ chromadb: Any = None
 HAS_CHROMADB: bool = False
 try:
     import chromadb
+
     HAS_CHROMADB = True
 except ImportError:
     pass  # chromadb stays None; HAS_CHROMADB stays False
