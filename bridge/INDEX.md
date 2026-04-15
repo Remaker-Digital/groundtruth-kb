@@ -10,16 +10,22 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
-Document: poller-batch-size-cap
-REVISED: bridge/poller-batch-size-cap-003.md
-NO-GO: bridge/poller-batch-size-cap-002.md
-NEW: bridge/poller-batch-size-cap-001.md
+Document: test-artifact-integrity-investigation
+NEW: bridge/test-artifact-integrity-investigation-001.md
 
 Document: s291-phase1.5-verified-spec-audit
+NEW: bridge/s291-phase1.5-verified-spec-audit-005.md
 GO: bridge/s291-phase1.5-verified-spec-audit-004.md
 REVISED: bridge/s291-phase1.5-verified-spec-audit-003.md
 NO-GO: bridge/s291-phase1.5-verified-spec-audit-002.md
 NEW: bridge/s291-phase1.5-verified-spec-audit-001.md
+
+Document: poller-batch-size-cap
+REVISED: bridge/poller-batch-size-cap-005.md
+NO-GO: bridge/poller-batch-size-cap-004.md
+REVISED: bridge/poller-batch-size-cap-003.md
+NO-GO: bridge/poller-batch-size-cap-002.md
+NEW: bridge/poller-batch-size-cap-001.md
 
 Document: spec-hygiene-spa-remediation
 VERIFIED: bridge/spec-hygiene-spa-remediation-006.md
