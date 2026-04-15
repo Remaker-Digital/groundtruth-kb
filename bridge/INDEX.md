@@ -10,7 +10,21 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: poller-batch-size-cap
+REVISED: bridge/poller-batch-size-cap-003.md
+NO-GO: bridge/poller-batch-size-cap-002.md
+NEW: bridge/poller-batch-size-cap-001.md
+
+Document: s291-phase1.5-verified-spec-audit
+GO: bridge/s291-phase1.5-verified-spec-audit-004.md
+REVISED: bridge/s291-phase1.5-verified-spec-audit-003.md
+NO-GO: bridge/s291-phase1.5-verified-spec-audit-002.md
+NEW: bridge/s291-phase1.5-verified-spec-audit-001.md
+
 Document: spec-hygiene-spa-remediation
+VERIFIED: bridge/spec-hygiene-spa-remediation-006.md
+NEW: bridge/spec-hygiene-spa-remediation-005.md
+GO: bridge/spec-hygiene-spa-remediation-004.md
 REVISED: bridge/spec-hygiene-spa-remediation-003.md
 NO-GO: bridge/spec-hygiene-spa-remediation-002.md
 NEW: bridge/spec-hygiene-spa-remediation-001.md
@@ -36,6 +50,9 @@ GO: bridge/s291-prioritization-request-002.md
 NEW: bridge/s291-prioritization-request-001.md
 
 Document: gtkb-phase4b6-ci-enforcement-gates
+VERIFIED: bridge/gtkb-phase4b6-ci-enforcement-gates-010.md
+NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-009.md
+NO-GO: bridge/gtkb-phase4b6-ci-enforcement-gates-008.md
 NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-007.md
 NO-GO: bridge/gtkb-phase4b6-ci-enforcement-gates-006.md
 NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-005.md
