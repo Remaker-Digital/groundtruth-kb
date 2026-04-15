@@ -177,6 +177,42 @@ config = GTConfig.load(db_path="/custom/path.db", app_title="Custom Title")
 See [Tooling](../method/10-tooling.md#python-api) for the full Python API
 reference.
 
+## Exceptions
+
+`GTConfig.load()` raises typed exceptions when configuration cannot be
+loaded, so library callers can distinguish between "no config supplied"
+(exploration mode, defaults apply) and "caller asked for a specific file
+that could not be used" (hard error).
+
+| Exception | When raised | Recovery |
+|-----------|-------------|----------|
+| `FileNotFoundError` | An explicit `config_path` was supplied but the file does not exist. Auto-discovery (`config_path=None`) does **not** raise — it falls back to defaults when nothing is found. | Check the `--config` flag or create the file. Error message contains the attempted path. |
+| `GTConfigError` | The file exists but contains invalid TOML syntax. The original `tomllib.TOMLDecodeError` is chained via `__cause__`. | Fix the TOML syntax in the file named in the error message. |
+| `PermissionError` | (Pass-through from `open`.) The file exists but cannot be read. | Check file permissions. |
+
+```python
+from groundtruth_kb import GTConfig, GTConfigError
+
+try:
+    config = GTConfig.load(config_path="/path/to/groundtruth.toml")
+except FileNotFoundError as exc:
+    # Explicit path doesn't exist
+    print(f"Missing config: {exc}")
+except GTConfigError as exc:
+    # TOML syntax error
+    print(f"Config parse failure: {exc}")
+    print(f"Original decoder error: {exc.__cause__}")
+```
+
+`GTConfigError` is exported from the package root as
+`groundtruth_kb.GTConfigError` alongside `GTConfig` itself.
+
+!!! note "CLI vs library behavior"
+    The `gt` CLI uses `click.Path(exists=True)` on `--config`, so CLI users
+    see a Click-level error (exit code 2) before `GTConfig.load()` is
+    invoked. The behavior changes described above are observable by
+    Python-level library callers.
+
 ---
 
 *Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

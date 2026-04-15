@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Phase 4B.1: `GTConfigError`** — New public exception class exported
+  from `groundtruth_kb` (grows `__all__` from 15 → 16 symbols). Wraps
+  `tomllib.TOMLDecodeError` raised during `GTConfig.load()` so the caller
+  sees the offending file path in the message; the original decoder error
+  is chained via `__cause__` for debuggers.
+- **Phase 4B.1: `gt deliberations` CLI** — The six deliberation subcommands
+  (`add`, `upsert`, `get`, `list`, `search`, `link`) that shipped in Phase 3
+  now have a documented configuration story via the new Exceptions section
+  in `docs/reference/configuration.md`.
+
+### Changed
+
+- **Phase 4B.1: Explicit missing `config_path` now raises
+  `FileNotFoundError`.** Previously, `GTConfig.load(config_path=<missing>)`
+  silently returned defaults, hiding typos from programmatic callers. The
+  new behavior raises `FileNotFoundError` with a recovery hint. Auto-discovery
+  (`config_path=None` with nothing found up the parent tree) is unchanged —
+  it still falls back to defaults. CLI users are unaffected because
+  `--config` already uses `click.Path(exists=True)`.
+
+### Internal
+
+- **Phase 4B.1: Test-suite growth.** `tests/test_config.py` grew from 9 to
+  15 tests (net +6). Three previously-passing tests that relied on the
+  silent-defaults behavior were rewritten to use real temporary TOML files.
+  Full suite: 624 → 630.
+
+### Tracked for future sub-rounds (Phase 4B.2+)
+
+- Wrap `PermissionError` in `GTConfigError` when `open()` fails (audit
+  finding 4).
+- Log a warning when a TOML file has no `[groundtruth]` section (finding 5).
+- Log a warning when unknown keys are discarded (finding 6).
+
 ## [0.4.0] - 2026-04-14
 
 ### Added
