@@ -5,24 +5,72 @@ propose via bridge → wait for Codex GO → implement → post-impl report → 
 
 Do not wait for owner approval between items. Continue unsupervised.
 
-## Items
+## Active Items
 
-### GT-KB Spec Pipeline (DOC-GTKB-SPEC-PIPELINE)
+### GT-KB Phase 4B.7 — Residual `mypy --strict` errors (39 → 0)
 
-**Phase 1-3 COMPLETE + VERIFIED (S287, S288).**
+**Status (S295):** GO received at `bridge/gtkb-phase4b7-residual-mypy-strict-008.md` after 7-round NO-GO/revision cycle. Headless Claude currently implementing against main (uncommitted modifications to `context.py`, `intake.py`, `runtime.py`, `worker.py`, `poller.py`). Prime Builder is standing down on implementation to avoid race.
 
-Implementation status as of end of S288:
-- [x] F1: Spec Schema Enrichment — committed 1e1e965, VERIFIED (S287)
-- [x] F3 + F4-A: Spec Quality Gate + Constraint Lookup — committed a21fa19 (S287)
-- [x] F2-A: Change Impact Analysis Phase A — committed 35514fe + 85440db + 77c0310, VERIFIED (S288)
-- [x] F4-B + F2-B: Constraint Writes + Dependents Traversal — committed 7d166e4, VERIFIED (S288)
-- [x] F7: Session Health Dashboard — committed 61b278a, VERIFIED (S288)
-- [x] F5: Requirement Intake Pipeline — committed 63ea9c2, VERIFIED (S288)
-- [x] Phase 3 NO-GO fixes (snapshot ordering, trends deltas, reject discriminator) — committed b2d425c, VERIFIED (S288)
+Six fix patterns (all empirically `mypy --strict` verified during proposal rounds):
+- Pattern A: `sys.platform == "win32"` file-lock imports + `BinaryIO | None` narrowing (15 errors, `poller.py` + `worker.py`)
+- Pattern B: `cast(Any, kwargs)` at 3 subprocess sites (3 errors, `worker.py:250, 274` + `poller.py:167`)
+- Pattern C: None-guard error-dicts at 7 `intake.py` sites (7 errors)
+- Pattern D: two `TypedDict` summary shapes + `cast(dict[str, Any], summary)` returns (8 errors, `poller.py`)
+- Pattern E: misc narrowing in `runtime.py`/`context.py` (5 errors)
+- Pattern F: `event_batch: dict[str, Any]` forward declaration at `worker.py:596` (1 error)
 
-### Phase 4 — COMPLETE + VERIFIED (S289) ✓
+Exit criteria: `mypy --strict src/groundtruth_kb/` → 0 errors; 638 tests pass; coverage delta ≤ ±0.5pp; CI workflow gains direct mypy step; `tests/test_public_api_type_checks.py` renamed to `test_full_tree_type_checks.py` with full-tree scope.
 
-All GT-KB Spec Pipeline phases are now implemented, verified, and on main.
+### Phase 4B future sub-rounds (proposed)
+
+Tracked in `groundtruth-kb/docs/reports/phase-4b-plan.md` (created S295):
+- 4B.8 — Line coverage 51% → 70% + branch 55%
+- 4B.9 — Whole-package docstrings 60% → 80%
+- 4C — Structured logging migration (0 `logging` use → bridge/db paths)
+- 4D — Broad-exception review (3 "needs review" sites resolved)
+
+### Agent Red POR Step 16 — Spec hygiene remediation
+
+**Status:** PENDING (post-production, non-blocking). Added S295 per
+`docs/plans/PLAN-OF-RECORD-production-readiness.md` Step 16.
+5 sub-phases: 16.A promote verified remediation statuses; 16.B methodology
+review of Phase 1.5 artifact (deferred S292); 16.C P0b 509-spec phantom-
+evidence audit; 16.D WI-3171 orphan test rationalization (10,440 tests);
+16.E exit verification.
+
+## Completed
+
+### S295 ✓
+
+- [x] **Bridge infrastructure permanent fix** — commit `94392a1b` on develop. Rewrote `.gitignore` blanket excludes to content-level with `!`-negations; tracked `.claude/hooks/poller-freshness.py` (hardened worktree-safe, fail-loud), `.claude/settings.json` (project-level `UserPromptSubmit` hook registration), `.claude/rules/bridge-essential.md` (top-priority mandate), and 9 PowerShell + 2 VBS scheduled-task scripts under `independent-progress-assessments/bridge-automation/`. Closes S290-S292 silent-outage window and S294 worktree-blindness root cause. 15 files, +2048/-2.
+- [x] **Monitor timestamp enhancement** — commit `5eb0421e` on develop. Prepended local-time `[HH:mm:ss]` to each line emitted by `watch-bridge-scan.ps1`, derived from each status file's own `updatedAtUtc` via `.ToLocalTime()`.
+- [x] **Phase 4B plan tracking** — commit `8dafc62` on GT-KB main. Created `docs/reports/phase-4b-plan.md` enumerating sub-rounds 4B.1-4B.6 (Done), 4B.7 (In Flight), 4B.8/4B.9/4C/4D (Proposed) with change protocol.
+- [x] **POR Step 16 added** — commit `bb41a59e` on develop. Added post-production spec hygiene remediation step to `docs/plans/PLAN-OF-RECORD-production-readiness.md` (5 phases, exit criteria).
+- [x] **MEMORY.md refresh** — updated Current Status + added S295 Recent Sessions entry (user auto-memory, not committed to git).
+
+### S292 ✓ (deferred from earlier)
+
+- [x] **Codex autonomous verification batch** — VERIFIED 3 of 4 in-flight items: `poller-emergency-repair` (S291 audit trail), `s291-phase1.5-verified-spec-audit` (98 target specs), `poller-batch-size-cap` (S291 Claude-side cap). `test-artifact-integrity-investigation` NO-GO'd at -004, REVISED -005 autonomously.
+
+### S291 ✓
+
+- [x] **GT-KB Phase 4B.6** — CI enforcement gates (mypy --strict workflow step + per-file coverage gates db.py 68% / cli.py 68% / config.py 80% / gates.py 92% + docstring ratchet 50→51). Commit `31d2c39` on GT-KB main.
+- [x] **Spec hygiene S291 batch** — `spec-hygiene-untested-verified-008` VERIFIED (9 backend/widget/pricing specs), `spec-hygiene-spa-investigation-008` + `spec-hygiene-spa-remediation-006` VERIFIED (10 SPA Control Plane specs), Phase 1.5 categorization VERIFIED (98 phantom-evidence specs identified).
+- [x] **Claude poller emergency repair** — fixed `$MAX_ITEMS_PER_SPAWN:` one-line PowerShell syntax error that caused 6-hour silent outage. Direct foreground edit.
+- [x] **Observability mirror** — `Write-ScanStatus` function + `claude-scan-status.json` at 6 hook points to match `codex-scan-status.json` schema.
+
+### S290 ✓
+
+- [x] **GT-KB v0.4.0 shipped to PyPI** — commit `993f31b` via self-gating `publish.yml` workflow.
+- [x] **GT-KB Phase 4A audit baseline** — 10 files committed, baseline metrics published at `docs/reports/v0.4-baseline/SUMMARY.md`. Target commit `83312a0`.
+- [x] **GT-KB Phase 4B.1** — config defensiveness (`GTConfigError` wrapping `FileNotFoundError` + `TOMLDecodeError`). Commit `2510f1d`.
+- [x] **GT-KB Phase 4B-housekeeping** — Anthropic API-key redaction + `__main__.py` + 4 exit-code tables + `actions/checkout@v4→v6` across 8 workflows. Commit `b41ab8f`.
+- [x] **GT-KB Phase 4B.2** — medium defensiveness (PermissionError wrap + missing-section warning + unknown-keys warning). First autonomous headless Sonnet session. Commit `249cdd4`.
+- [x] **GT-KB Phase 4B.3** — 27 `KnowledgeDB` + `GateRegistry` public API docstrings to 100% + regression guard. Commit `8151ed2`.
+- [x] **GT-KB Phase 4B.4** — mypy --strict public API: 48 errors closed in `db.py` (42), `config.py` (3), `cli.py` (8); insert/update return types widened to `dict[str, Any] | None`; regression guard `tests/test_public_api_type_checks.py`.
+- [x] **Poller repair epic** — OAuth token cascade diagnosed + persistent token fix + 90-min → 15-min spawn timeout + Windows toast notifications + file-lock bug fix.
+
+### S289 ✓
 
 ## Owner Actions Pending
 

@@ -1,12 +1,12 @@
-# Plan-of-Record v3: Agent Red Production Readiness
+# Plan-of-Record v4: Agent Red Production Readiness
 
 **Status:** PLAN-OF-RECORD (default resume target after interrupts)
 **Created:** S270 (2026-04-08)
-**Version:** 6 — Step 11 closed S275 (budget tests already present, 15/15 pass); Step 10 closed S271
-**Owner approval:** Pending
-**Codex review:** v4 CI GO received (2026-04-09, commit 3c5b6359 all shards green).
+**Version:** 7 — Step 16 added S295 (spec hygiene remediation, post-production); production operational at v1.98.92 (Step 15 closed S276)
+**Owner approval:** GOV-16 APPROVED for production deploy (S276)
+**Codex review:** v4 CI GO received (2026-04-09, commit 3c5b6359 all shards green); production deploy validated S276.
 **Spec refs:** SPEC-1879, GOV-16, GOV-17
-**Target:** v1.98.91 production-ready build
+**Target:** v1.98.92 production-ready build (ACHIEVED S276); Step 14 (E2E phone OTP smoke) blocked on toll-free carrier approval; Step 16 (spec hygiene) pending post-production.
 
 ---
 
