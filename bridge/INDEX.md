@@ -11,6 +11,7 @@
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
 Document: spec-hygiene-spa-remediation
+NO-GO: bridge/spec-hygiene-spa-remediation-002.md
 NEW: bridge/spec-hygiene-spa-remediation-001.md
 
 Document: s291-phase1-stream2-categorization
@@ -20,6 +21,8 @@ GO: bridge/s291-phase1-stream2-categorization-002.md
 NEW: bridge/s291-phase1-stream2-categorization-001.md
 
 Document: spec-hygiene-spa-investigation
+NEW: bridge/spec-hygiene-spa-investigation-007.md
+NO-GO: bridge/spec-hygiene-spa-investigation-006.md
 NEW: bridge/spec-hygiene-spa-investigation-005.md
 GO: bridge/spec-hygiene-spa-investigation-004.md
 REVISED: bridge/spec-hygiene-spa-investigation-003.md
@@ -31,6 +34,7 @@ GO: bridge/s291-prioritization-request-002.md
 NEW: bridge/s291-prioritization-request-001.md
 
 Document: gtkb-phase4b6-ci-enforcement-gates
+NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-007.md
 NO-GO: bridge/gtkb-phase4b6-ci-enforcement-gates-006.md
 NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-005.md
 GO: bridge/gtkb-phase4b6-ci-enforcement-gates-004.md
