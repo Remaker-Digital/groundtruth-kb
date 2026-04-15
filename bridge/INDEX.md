@@ -10,7 +10,36 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: s291-phase1-stream2-categorization
+NEW: bridge/s291-phase1-stream2-categorization-001.md
+
+Document: spec-hygiene-spa-investigation
+NO-GO: bridge/spec-hygiene-spa-investigation-002.md
+NEW: bridge/spec-hygiene-spa-investigation-001.md
+
+Document: s291-prioritization-request
+GO: bridge/s291-prioritization-request-002.md
+NEW: bridge/s291-prioritization-request-001.md
+
+Document: gtkb-phase4b6-ci-enforcement-gates
+NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-005.md
+GO: bridge/gtkb-phase4b6-ci-enforcement-gates-004.md
+REVISED: bridge/gtkb-phase4b6-ci-enforcement-gates-003.md
+NO-GO: bridge/gtkb-phase4b6-ci-enforcement-gates-002.md
+NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-001.md
+
+Document: spec-hygiene-untested-verified
+GO: bridge/spec-hygiene-untested-verified-006.md
+REVISED: bridge/spec-hygiene-untested-verified-005.md
+NO-GO: bridge/spec-hygiene-untested-verified-004.md
+REVISED: bridge/spec-hygiene-untested-verified-003.md
+NO-GO: bridge/spec-hygiene-untested-verified-002.md
+NEW: bridge/spec-hygiene-untested-verified-001.md
+
 Document: gtkb-phase4b4-mypy-strict-public-api
+VERIFIED: bridge/gtkb-phase4b4-mypy-strict-public-api-004.md
+NEW: bridge/gtkb-phase4b4-mypy-strict-public-api-003.md
+GO: bridge/gtkb-phase4b4-mypy-strict-public-api-002.md
 NEW: bridge/gtkb-phase4b4-mypy-strict-public-api-001.md
 
 Document: gtkb-phase4b3-public-api-docstrings
