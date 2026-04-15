@@ -17,7 +17,10 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+if TYPE_CHECKING:
+    from mcp.server import FastMCP  # optional dep; import-untyped suppressed by mypy configuration
 
 try:
     from mcp.server import FastMCP
@@ -48,6 +51,7 @@ def get_bridge_db() -> sqlite3.Connection:
     return conn
 
 
+mcp: FastMCP[Any] | None  # forward declaration for mypy --strict (FastMCP is conditionally imported)
 if _HAS_MCP:
     mcp = FastMCP(
         name="prime-bridge",
@@ -94,7 +98,7 @@ def _normalize_json(value: str, expected: type) -> str:
 
 
 def _loads_json(value: str | None, expected: type, default: Any) -> Any:
-    if value in (None, ""):
+    if value is None or value == "":
         return default
     try:
         parsed = json.loads(value)
@@ -405,7 +409,10 @@ def _queue_notification(
         """,
         (agent, event_type, message_id, subject, json.dumps(details), _now()),
     )
-    return int(cur.lastrowid)
+    row_id = cur.lastrowid
+    if row_id is None:
+        raise RuntimeError("INSERT INTO notifications failed to return a row ID")
+    return int(row_id)
 
 
 # ---------------------------------------------------------------------------
@@ -993,7 +1000,7 @@ def send_correction_message(
                 "notification_event_ids": [],
             }
 
-        recipient = str(failed_row["sender"])
+        recipient = cast(Agent, str(failed_row["sender"]))  # narrowed: sender ∈ PEER_AGENTS verified above
         thread_id = _thread_correlation_id(failed_row)
 
         # Dedup: check if correction already sent

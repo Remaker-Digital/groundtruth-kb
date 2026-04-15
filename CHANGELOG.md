@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 4B.7: `mypy --strict` regression guard for full source tree** — A new
+  test `tests/test_full_tree_type_checks.py` runs `mypy --strict` against the
+  entire `src/groundtruth_kb/` tree (31 source files) and asserts exit code 0.
+  Extends the narrower Phase 4B.4 guard which covered only the 4 public API
+  files. Test suite: 638 → 640. CI workflow gains a direct `mypy --strict
+  src/groundtruth_kb/` step.
+
+### Fixed (internal — no runtime behavior change)
+
+- **Phase 4B.7: Closed 39 `mypy --strict` errors across 5 bridge/intake files** —
+  `bridge/poller.py` (17 fixes): platform import stanza changed to
+  `sys.platform == "win32"` discriminant; `_FileLock._fh` annotated as
+  `BinaryIO | None` with local non-optional `fh: BinaryIO` handle in
+  `__enter__`/`__exit__`; `TypedDict` shapes for `_NotificationBatchSummary`
+  and `_InboxSummary` with `cast(dict[str, Any], summary)` at return boundaries;
+  `subprocess.Popen(**cast(Any, popen_kwargs))` for kwargs unpacking.
+  `bridge/worker.py` (10 fixes): same platform import and `_FileLock` pattern;
+  two `subprocess.run(**cast(Any, popen_kwargs))` call sites; `event_batch:
+  dict[str, Any]` forward declaration before the resident-worker loop.
+  `intake.py` (7 fixes): None guard after `insert_deliberation` call (raises
+  `RuntimeError`); None guard after `insert_spec` call (returns error dict).
+  `bridge/runtime.py` (4 fixes): `mcp: FastMCP[Any] | None` annotation via
+  `TYPE_CHECKING` import; `_loads_json` split-check `value is None or value ==
+  ""` for str narrowing; `_queue_notification` None guard on `cur.lastrowid`;
+  `send_correction_message` casts `recipient` to `Agent` after runtime
+  membership check. `bridge/context.py` (1 fix): `artifact_path` variable name
+  in second inner for-loop to avoid `Path | None` conflict with outer `Path`.
+
 - **Phase 4B.4: `mypy --strict` regression guard for public API** — A new
   test `tests/test_public_api_type_checks.py` runs `mypy --strict` against
   the four public-API source files (`db.py`, `config.py`, `cli.py`,

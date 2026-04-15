@@ -220,6 +220,8 @@ def capture_requirement(
         participants=["owner"],
     )
 
+    if delib is None:
+        raise RuntimeError("intake: insert_deliberation returned None (db bug)")
     return {"deliberation_id": delib["id"], "content": content}
 
 
@@ -267,6 +269,9 @@ def confirm_intake(
         authority=authority,
         provisional_until=provisional_until,
     )
+
+    if spec is None:
+        return {"error": "insert_spec returned None", "deliberation_id": deliberation_id}
 
     # Score quality
     created_spec = db.get_spec(spec["id"])

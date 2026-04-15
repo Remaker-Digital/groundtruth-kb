@@ -64,6 +64,9 @@ jobs:
             src/groundtruth_kb/spec_scaffold.py \
             src/groundtruth_kb/project/scaffold.py
 
+      - name: mypy --strict (full tree)
+        run: python -m mypy --strict src/groundtruth_kb/
+
       - name: Run full test suite (base state)
         run: |
           pytest -v --tb=short \
