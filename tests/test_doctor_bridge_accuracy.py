@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from groundtruth_kb.project.doctor import _check_file_bridge_setup, run_doctor
 from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
 
@@ -124,9 +122,7 @@ def test_doctor_does_not_pass_when_index_absent(tmp_path: Path) -> None:
     (target / "bridge" / "INDEX.md").unlink()
 
     report = run_doctor(target, "dual-agent")
-    assert report.overall != "pass", (
-        "Doctor should not return 'pass' when bridge/INDEX.md is absent"
-    )
+    assert report.overall != "pass", "Doctor should not return 'pass' when bridge/INDEX.md is absent"
 
 
 # ---------------------------------------------------------------------------
