@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 4B.2: `PermissionError` wrapped in `GTConfigError`** — An
+  unreadable config file (ownership or ACL problem) now raises
+  `GTConfigError` instead of letting the raw `PermissionError` propagate.
+  The original exception is chained via `__cause__` so debuggers retain
+  full traceback access. The error message includes the file path and a
+  permissions hint.
+- **Phase 4B.2: Warning for missing `[groundtruth]` TOML section** —
+  When a TOML config file is found but has no `[groundtruth]` section,
+  `GTConfig.load()` now emits a `UserWarning` at the call site (not
+  inside the library). The warning clarifies that only core
+  `[groundtruth]` settings fall back to env vars and defaults; any
+  `[gates]` and `[search]` sections present in the file are still
+  applied. This catches the common typo of misspelling `[groundtruth]`.
+- **Phase 4B.2: Warning for unknown keys in `[groundtruth]` section** —
+  When the `[groundtruth]` section contains keys that are not recognized
+  config fields (e.g. `bran_color` instead of `brand_color`),
+  `GTConfig.load()` emits a `UserWarning` naming every unknown key.
+  Known keys are still applied; only the unrecognized ones are ignored.
+  This catches typos that would previously silently have no effect.
 - **Phase 4B.1: `GTConfigError`** — New public exception class exported
   from `groundtruth_kb` (grows `__all__` from 15 → 16 symbols). Wraps
   `tomllib.TOMLDecodeError` raised during `GTConfig.load()` so the caller
@@ -52,6 +71,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- **Phase 4B.2: Test-suite growth.** `tests/test_config.py` grew from 15 to
+  19 tests (+4). Two pre-existing tests were updated to include a
+  `[groundtruth]` section header (previously empty TOML files; TOML content
+  was irrelevant to those tests but the missing section now emits a
+  warning). A latent bug in `tests/test_reconciliation.py` was fixed: the
+  CLI smoke test was writing `[core]` instead of `[groundtruth]`, meaning
+  the `db_path` in that TOML was never being read. Full suite: 632 → 636.
 - **Phase 4B.1: Test-suite growth.** `tests/test_config.py` grew from 9 to
   15 tests (net +6). Three previously-passing tests that relied on the
   silent-defaults behavior were rewritten to use real temporary TOML files.
