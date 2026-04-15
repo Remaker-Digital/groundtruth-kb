@@ -18,7 +18,7 @@ from groundtruth_kb.bootstrap import (
     _write_project_gitignore,
 )
 from groundtruth_kb.project.manifest import ProjectManifest, write_manifest
-from groundtruth_kb.project.profiles import get_profile
+from groundtruth_kb.project.profiles import ProjectProfile, get_profile
 from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
 
 
@@ -276,7 +276,7 @@ def _render_all_templates(
     project_name: str,
     owner: str,
     copyright_notice: str,
-    profile,
+    profile: ProjectProfile,
 ) -> None:
     """Replace all {{PLACEHOLDER}} values in rendered files."""
     replacements = {
