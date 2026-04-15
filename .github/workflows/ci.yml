@@ -47,8 +47,24 @@ jobs:
           ruff check .
           ruff format --check .
 
+      - name: mypy --strict on public API surface
+        run: |
+          python -m mypy --strict \
+            src/groundtruth_kb/db.py \
+            src/groundtruth_kb/config.py \
+            src/groundtruth_kb/cli.py \
+            src/groundtruth_kb/gates.py
+
       - name: Run full test suite (base state)
-        run: pytest -v --tb=short
+        run: |
+          pytest -v --tb=short \
+            --cov=groundtruth_kb \
+            --cov-branch \
+            --cov-report=term-missing
+          python -m coverage report --include="*/src/groundtruth_kb/db.py" --fail-under=70
+          python -m coverage report --include="*/src/groundtruth_kb/cli.py" --fail-under=72
+          python -m coverage report --include="*/src/groundtruth_kb/config.py" --fail-under=92
+          python -m coverage report --include="*/src/groundtruth_kb/gates.py" --fail-under=92
 
       - name: Wheel build + install smoke test
         run: |
