@@ -97,3 +97,12 @@ known-first-party = ["groundtruth_kb"]
 [[tool.mypy.overrides]]
 module = ["chromadb", "chromadb.*"]
 ignore_missing_imports = true
+
+# mypy: in test-base (no chromadb), ignore_missing_imports causes chromadb to be
+# typed as Any, making `chromadb = None` assignment valid (no [assignment] error),
+# so the type: ignore[assignment] on the fallback line becomes "unused". Suppressing
+# warn_unused_ignores for db.py avoids this environment-specific false positive.
+# When chromadb IS installed (test-search/local), the ignore is used correctly.
+[[tool.mypy.overrides]]
+module = ["groundtruth_kb.db"]
+warn_unused_ignores = false
