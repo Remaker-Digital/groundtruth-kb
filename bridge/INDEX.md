@@ -11,6 +11,8 @@
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
 Document: gtkb-phase4b1-config-defensiveness
+NEW: bridge/gtkb-phase4b1-config-defensiveness-005.md
+GO: bridge/gtkb-phase4b1-config-defensiveness-004.md
 REVISED: bridge/gtkb-phase4b1-config-defensiveness-003.md
 NO-GO: bridge/gtkb-phase4b1-config-defensiveness-002.md
 NEW: bridge/gtkb-phase4b1-config-defensiveness-001.md
