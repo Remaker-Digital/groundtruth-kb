@@ -187,8 +187,7 @@ that could not be used" (hard error).
 | Exception | When raised | Recovery |
 |-----------|-------------|----------|
 | `FileNotFoundError` | An explicit `config_path` was supplied but the file does not exist. Auto-discovery (`config_path=None`) does **not** raise — it falls back to defaults when nothing is found. | Check the `--config` flag or create the file. Error message contains the attempted path. |
-| `GTConfigError` | The file exists but contains invalid TOML syntax. The original `tomllib.TOMLDecodeError` is chained via `__cause__`. | Fix the TOML syntax in the file named in the error message. |
-| `PermissionError` | (Pass-through from `open`.) The file exists but cannot be read. | Check file permissions. |
+| `GTConfigError` | The file exists but contains invalid TOML syntax, **or** the file cannot be read due to a permissions problem. The original exception (`TOMLDecodeError` or `PermissionError`) is chained via `__cause__`. | Fix the TOML syntax or check file ownership and permissions. The error message names the offending file. |
 
 ```python
 from groundtruth_kb import GTConfig, GTConfigError
@@ -199,9 +198,9 @@ except FileNotFoundError as exc:
     # Explicit path doesn't exist
     print(f"Missing config: {exc}")
 except GTConfigError as exc:
-    # TOML syntax error
-    print(f"Config parse failure: {exc}")
-    print(f"Original decoder error: {exc.__cause__}")
+    # TOML syntax error or file permission problem
+    print(f"Config load failure: {exc}")
+    print(f"Underlying cause: {exc.__cause__}")
 ```
 
 `GTConfigError` is exported from the package root as
@@ -212,6 +211,40 @@ except GTConfigError as exc:
     see a Click-level error (exit code 2) before `GTConfig.load()` is
     invoked. The behavior changes described above are observable by
     Python-level library callers.
+
+## Warnings
+
+`GTConfig.load()` emits `UserWarning` for config file conditions that are
+not fatal but are likely to indicate a mistake.
+
+| Warning | When emitted | What it means |
+|---------|-------------|----------------|
+| No `[groundtruth]` section | A TOML file was found but contains no `[groundtruth]` section. | The core settings will use env vars and defaults. `[gates]` and `[search]` sections, if present, are still applied. Often indicates a misspelled section name. |
+| Unknown keys | The `[groundtruth]` section contains keys that are not recognized config fields. | The unknown keys are silently ignored. Often indicates a typo (e.g. `bran_color` instead of `brand_color`). The warning names all unknown keys. |
+
+Warnings are issued via Python's standard `warnings` module at the
+`GTConfig.load()` call site, so the warning location points at your code
+rather than inside the library.
+
+To treat configuration warnings as errors (useful in CI):
+
+```python
+import warnings
+from groundtruth_kb import GTConfig
+
+with warnings.catch_warnings():
+    warnings.simplefilter("error", UserWarning)
+    config = GTConfig.load()  # raises if any config warning is emitted
+```
+
+Or globally via the `PYTHONWARNINGS` environment variable or pytest's
+`filterwarnings` option:
+
+```ini
+# pytest.ini / pyproject.toml
+[tool.pytest.ini_options]
+filterwarnings = ["error::UserWarning"]
+```
 
 ---
 
