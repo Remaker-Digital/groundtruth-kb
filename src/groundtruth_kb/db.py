@@ -3892,6 +3892,12 @@ class KnowledgeDB:
         ("ar_spa_plat_key", re.compile(r"\bar_spa_plat_[A-Za-z0-9_-]{10,}")),
         ("pk_live_key", re.compile(r"\bpk_live_[A-Za-z0-9_-]{10,}")),
         ("arsk_key", re.compile(r"\barsk_[A-Za-z0-9_-]{10,}")),
+        # Anthropic API key family: sk-ant-api<digits>-<token>
+        # Covers current form (sk-ant-api03-...) and future API version variants.
+        # Case sensitive because sk-ant-api is always lowercase in Anthropic's
+        # format; case-insensitive would increase false positives against prose.
+        # Word-boundary anchor avoids matching inside longer URL-safe tokens.
+        ("anthropic_api_key", re.compile(r"\bsk-ant-api\d+-[A-Za-z0-9_-]{20,}")),
     ]
 
     @classmethod
