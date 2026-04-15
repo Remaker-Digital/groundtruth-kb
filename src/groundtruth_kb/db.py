@@ -471,7 +471,7 @@ def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def spec_sort_key(spec_id: str) -> tuple:
+def spec_sort_key(spec_id: str) -> tuple[Any, ...]:
     """Convert decimal ID to tuple for correct numeric ordering.
 
     "245" → (1, 245,), "245.2" → (1, 245, 2), "245.10" → (1, 245, 10)
@@ -512,7 +512,7 @@ _VALID_COMPLEXITY_CEILINGS = frozenset({"simple", "moderate", "complex"})
 _VALID_DECISION_AUTHORITIES = frozenset({"owner", "ai", "either"})
 
 
-def _normalize_provisional(authority: Any, provisional_until: Any) -> tuple:
+def _normalize_provisional(authority: Any, provisional_until: Any) -> tuple[Any, Any]:
     """Enforce provisional lifecycle invariants INV-1 through INV-4.
 
     Returns (authority, provisional_until) after normalization.
@@ -705,15 +705,15 @@ class KnowledgeDB:
         section: str | None = None,
         handle: str | None = None,
         tags: list[str] | None = None,
-        assertions: list[dict] | None = None,
+        assertions: list[dict[str, Any]] | None = None,
         type: str = "requirement",
         validate_assertions: bool = True,
         authority: Any = _UNSET,
         provisional_until: str | None = None,
-        constraints: dict | None = None,
+        constraints: dict[str, Any] | None = None,
         affected_by: list[str] | None = None,
         testability: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a specification.
 
         Args:
@@ -761,7 +761,7 @@ class KnowledgeDB:
 
         # Run governance gates on initial insert (for status enforcement)
         if self._gate_registry is not None:
-            spec_data = {
+            spec_data: dict[str, Any] = {
                 "type": type,
                 "assertions": json.dumps(assertions) if assertions else None,
                 "title": title,
@@ -828,7 +828,7 @@ class KnowledgeDB:
         *,
         validate_assertions: bool = True,
         **fields: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a new version of a spec, carrying forward unchanged fields.
 
         F1 enriched fields (authority, provisional_until, constraints, affected_by,
@@ -1086,7 +1086,7 @@ class KnowledgeDB:
 
     # --- F3: Spec Quality Gate ---
 
-    def score_spec_quality(self, spec: dict) -> dict:
+    def score_spec_quality(self, spec: dict[str, Any]) -> dict[str, Any]:
         """Compute quality score for a single spec.
 
         Returns dict with overall, d1-d5 dimension scores, tier, and flags.
@@ -1228,7 +1228,7 @@ class KnowledgeDB:
         conn.commit()
         return count
 
-    def get_quality_history(self, spec_id: str) -> list[dict]:
+    def get_quality_history(self, spec_id: str) -> list[dict[str, Any]]:
         """Historical quality scores for a spec, ordered by scored_at DESC."""
         rows = (
             self._get_conn()
@@ -1240,7 +1240,7 @@ class KnowledgeDB:
         )
         return [_row_to_dict(r) for r in rows]
 
-    def get_quality_distribution(self) -> dict:
+    def get_quality_distribution(self) -> dict[str, Any]:
         """Aggregate quality distribution across latest scores per spec.
 
         Uses rowid as deterministic tie-breaker when multiple scores share
@@ -1631,7 +1631,7 @@ class KnowledgeDB:
         assertion_count: int | None = None,
         last_execution_status: str | None = None,
         last_executed_at: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a test procedure into the knowledge database.
 
         Test procedures are append-only — each call creates a new version row
@@ -1751,12 +1751,12 @@ class KnowledgeDB:
         change_reason: str,
         *,
         type: str | None = None,
-        variables: dict | None = None,
-        steps: list[dict] | None = None,
-        known_failure_modes: list[dict] | None = None,
+        variables: dict[str, Any] | None = None,
+        steps: list[dict[str, Any]] | None = None,
+        known_failure_modes: list[dict[str, Any]] | None = None,
         last_verified_at: str | None = None,
         last_corrected_at: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of an operational procedure into the knowledge database.
 
         Operational procedures are append-only — each call creates a new version
@@ -1887,7 +1887,7 @@ class KnowledgeDB:
         *,
         sensitive: bool = False,
         notes: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of an environment config entry.
 
         Args:
@@ -1917,7 +1917,7 @@ class KnowledgeDB:
         changed_by: str,
         change_reason: str,
         **fields: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a new version of an env config entry, carrying forward unchanged fields."""
         current = self.get_env_config(id)
         if not current:
@@ -1998,7 +1998,7 @@ class KnowledgeDB:
         content: str | None = None,
         tags: list[str] | None = None,
         source_path: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a document."""
         version = self._next_doc_version(id)
         tags_json = json.dumps(tags) if tags else None
@@ -2019,7 +2019,7 @@ class KnowledgeDB:
         changed_by: str,
         change_reason: str,
         **fields: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a new version of a document, carrying forward unchanged fields."""
         current = self.get_document(id)
         if not current:
@@ -2127,9 +2127,10 @@ class KnowledgeDB:
             project_root = Path.cwd()
 
         if dcl_id:
-            specs = [self.get_spec(dcl_id)]
-            if not specs[0]:
+            spec = self.get_spec(dcl_id)
+            if not spec:
                 return [{"dcl_id": dcl_id, "error": f"DCL {dcl_id} not found"}]
+            specs: list[dict[str, Any]] = [spec]
         else:
             specs = self.list_design_constraints(status="implemented")
             specs += self.list_design_constraints(status="verified")
@@ -2200,7 +2201,7 @@ class KnowledgeDB:
 
     def insert_test_coverage_batch(
         self,
-        mappings: list[dict],
+        mappings: list[dict[str, Any]],
         created_by: str,
     ) -> int:
         """Batch-insert test coverage mappings. Returns count inserted."""
@@ -2281,7 +2282,7 @@ class KnowledgeDB:
         description: str | None = None,
         last_result: str | None = None,
         last_executed_at: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a test artifact.
 
         Args:
@@ -2348,7 +2349,7 @@ class KnowledgeDB:
         changed_by: str,
         change_reason: str,
         **fields: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a new version of a test, carrying forward unchanged fields."""
         current = self.get_test(id)
         if not current:
@@ -2506,7 +2507,7 @@ class KnowledgeDB:
         change_reason: str,
         *,
         description: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a test plan.
 
         Args:
@@ -2530,7 +2531,7 @@ class KnowledgeDB:
         changed_by: str,
         change_reason: str,
         **fields: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a new version of a test plan, carrying forward unchanged fields."""
         current = self.get_test_plan(id)
         if not current:
@@ -2628,7 +2629,7 @@ class KnowledgeDB:
         test_ids: list[str] | None = None,
         last_result: str | None = None,
         last_executed_at: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a test plan phase.
 
         Args:
@@ -2671,7 +2672,7 @@ class KnowledgeDB:
         changed_by: str,
         change_reason: str,
         **fields: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a new version of a test plan phase, carrying forward unchanged fields."""
         current = self.get_test_plan_phase(id)
         if not current:
@@ -2834,7 +2835,7 @@ class KnowledgeDB:
         failure_description: str | None = None,
         priority: str | None = None,
         stage: str = "created",
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a work item.
 
         Args:
@@ -2906,7 +2907,7 @@ class KnowledgeDB:
         *,
         owner_approved: bool = False,
         **fields: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a new version of a work item, carrying forward unchanged fields.
 
         Stage transitions are enforced per SPEC-1602:
@@ -3090,9 +3091,9 @@ class KnowledgeDB:
         *,
         description: str | None = None,
         snapshot_at: str | None = None,
-        summary_by_origin: dict | None = None,
-        summary_by_component: dict | None = None,
-    ) -> dict[str, Any]:
+        summary_by_origin: dict[str, Any] | None = None,
+        summary_by_component: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """Insert a new backlog snapshot.
 
         Args:
@@ -3181,7 +3182,7 @@ class KnowledgeDB:
         *,
         title: str | None = None,
         description: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Create a backlog snapshot from the current state of open work items.
 
         Queries all non-verified work items, captures their IDs in priority order,
@@ -3216,7 +3217,7 @@ class KnowledgeDB:
         spec_id: str,
         spec_version: int,
         overall_passed: bool,
-        results: list[dict],
+        results: list[dict[str, Any]],
         triggered_by: str,
     ) -> None:
         """Record the result of an assertion run for a specification.
@@ -3313,7 +3314,7 @@ class KnowledgeDB:
         session_id: str,
         prompt_text: str,
         context: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Store a next-session handoff prompt (append-only).
 
         Args:
@@ -3592,7 +3593,7 @@ class KnowledgeDB:
             "spec_quality_scores",
             "session_snapshots",
         ]
-        export = {"exported_at": _now(), "tables": {}}
+        export: dict[str, Any] = {"exported_at": _now(), "tables": {}}
         for table in tables:
             rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
             export["tables"][table] = [_row_to_dict(r) for r in rows]
@@ -3632,7 +3633,7 @@ class KnowledgeDB:
         *,
         spec_id: str | None = None,
         status: str = "active",
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a testable element.
 
         Args:
@@ -4190,7 +4191,7 @@ class KnowledgeDB:
         sensitivity: str = "normal",
         origin_project: str | None = None,
         origin_repo: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Insert a new version of a deliberation record.
 
         Content is redacted before storage. The SHA-256 hash of the
@@ -4272,7 +4273,7 @@ class KnowledgeDB:
         source_ref: str,
         content: str,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Idempotent insert keyed on (source_ref, content_hash).
 
         If a deliberation with the same source_ref and content_hash already
@@ -4429,7 +4430,7 @@ class KnowledgeDB:
         )
 
     @staticmethod
-    def _deliberation_chroma_metadata(row: dict, *, chunk_index: int, chunk_count: int) -> dict:
+    def _deliberation_chroma_metadata(row: dict[str, Any], *, chunk_index: int, chunk_count: int) -> dict[str, Any]:
         """Build ChromaDB metadata from a deliberation row.
 
         Maps SQLite ``id`` to Chroma ``delib_id``. Required fields are

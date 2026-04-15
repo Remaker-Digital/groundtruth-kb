@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 4B.4: `mypy --strict` regression guard for public API** — A new
+  test `tests/test_public_api_type_checks.py` runs `mypy --strict` against
+  the four public-API source files (`db.py`, `config.py`, `cli.py`,
+  `gates.py`) and asserts exit code 0. The test skips gracefully when mypy
+  is not installed. Test suite: 637 → 638.
+- **Phase 4B.4: `mypy==1.20.1` added to `[dev]` optional dependency extra**
+  — Pinned to the Phase 4A baseline version to prevent spurious regressions
+  from mypy version drift. Install via `pip install ".[dev]"`.
+
+### Fixed (internal — no runtime behavior change)
+
+- **Phase 4B.4: Closed 48 `mypy --strict` errors on the public API surface**
+  — `db.py` (42 fixes): `type-arg` fixes for bare `dict`/`tuple`/`list[dict]`
+  annotations; `return-value` fixes on 22 `insert_*/update_*` methods that
+  annotated `-> dict[str, Any]` but returned `dict[str, Any] | None` (public
+  API contract correction — callers now statically see the possible `None`
+  return). `config.py` (3 fixes): bare `dict` return annotations on two
+  private helpers and one field default. `cli.py` (8 fixes): missing
+  `-> None` on three `@main.group()` callbacks; bare `dict` function
+  parameter; variable name collision (`cols` reused as `set` then `list`);
+  `None` guard added at two `insert_deliberation` / `upsert_deliberation_source`
+  call sites that now correctly reflect the `| None` return contract.
+  `gates.py`: already clean, no changes.
+
 - **Phase 4B.3: Public API docstrings for 27 `KnowledgeDB` and
   `GateRegistry` methods** — Every symbol in `groundtruth_kb.__all__` now
   has a Google-style docstring. Covered methods include `KnowledgeDB.close`,
