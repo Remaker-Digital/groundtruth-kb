@@ -47,7 +47,7 @@ action.
 
 ---
 
-## Remaining Steps (8-15)
+## Remaining Steps (8-16)
 
 ### Step 8: Verify CI test suite passes on develop ✅ (S271)
 
@@ -180,6 +180,34 @@ v1.98.91, we must validate that the production baseline is correct.
 gracefully — customers who provide phone numbers will fall through to
 conversation without verification (same as v1.98.89 behavior). No data loss.
 Rollback to v1.98.89 is available via `python deploy.py --env production --version 1.98.89`.
+
+### Step 16: Spec hygiene remediation (post-production, non-blocking) ⏸️ PENDING
+
+**Scope:** Close the spec traceability gap identified across S275 and S291:
+- **118 untested specs** (Phase 1.5 audit, S291):
+  - 22 verified-but-untested — remediation in flight via `bridge/spec-hygiene-untested-verified-008.md` (VERIFIED, S291). 9 backend/widget/pricing specs remediated; SPA Control Plane specs remediated via `spec-hygiene-spa-investigation-008` + `spec-hygiene-spa-remediation-006`.
+  - 90 implemented-untested — deferred to follow-on hygiene sub-rounds. Scope: add tests that exercise the production interface per GOV-10, or retire the spec if its behavior has been subsumed.
+  - 6 specified-untested — expected (specifications without implementation yet); no action.
+- **10,440 orphan tests of 11,066 total (94.3%)** — tests in the repo that do not link to any spec in the Knowledge DB. Separately tracked as proposed WI-3171 in `bridge/spec-hygiene-untested-verified-*.md`. Scope: for each orphan test, either link to an existing spec, create a new spec for the behavior it covers, or retire the test if it is redundant with an already-covered behavior.
+
+**Preconditions:**
+- [x] Step 15 (production deploy) COMPLETE — v1.98.92 deployed 2026-04 (S276), production operational, bridge infrastructure stable (S295).
+- [ ] Methodology review of Phase 1.5 artifact (deferred at end of S292) — whether the 98-spec remediation pattern from Phase 1.5 generalizes to the remaining 90 implemented-untested specs.
+
+**Action (phased):**
+1. **Phase 16.A** — Close the 22 verified-but-untested track (S291 bridge work already VERIFIED; remains to promote the corresponding KB spec statuses).
+2. **Phase 16.B** — Methodology review of Phase 1.5 artifact; decide whether to batch-remediate the 90 implemented-untested specs or proceed spec-by-spec.
+3. **Phase 16.C** — P0b implementation: 509 implemented-spec phantom-evidence audit (deferred pending 16.B).
+4. **Phase 16.D** — Orphan test rationalization (WI-3171): batch-link, batch-retire, or per-test linkage. Expected to be the largest sub-phase (10,440 tests).
+5. **Phase 16.E** — Re-run `python tools/knowledge-db/db.py assert` + orphan-test count verification. Exit when untested-spec count ≤ 6 (specified only) and orphan-test count ≤ 100 (sampling tolerance).
+
+**Gate:** Spec traceability matrix is credible for external audit / due diligence (spec count matches implemented behavior; test count matches covered behaviors; no silent coverage gaps).
+
+**Why this is a POR step and not a rolling backlog item:** External due diligence and go-to-market credibility require a clean traceability story. Leaving 118 untested specs and 10,440 orphan tests in ambient MEMORY.md backlog risks the gap growing (new untracked tests, new provisional specs) without a forcing function. Step 16 creates the forcing function.
+
+**Ownership:** Prime Builder drives Phase 16.A–16.C; Phase 16.D (orphan tests) may be delegated to a subagent or scripted where the linkage inference is tractable; Phase 16.E requires owner confirmation that the exit metrics are met.
+
+**Rollback plan:** Spec status changes in the KB are append-only (new version rows); all remediation is reversible via `db.update_spec(... version=N-1)`. Test deletions are git-reversible. No production impact.
 
 ---
 
