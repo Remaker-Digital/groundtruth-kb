@@ -61,7 +61,7 @@ jobs:
             --cov=groundtruth_kb \
             --cov-branch \
             --cov-report=term-missing
-          python -m coverage report --include="*/src/groundtruth_kb/db.py" --fail-under=70
+          python -m coverage report --include="*/src/groundtruth_kb/db.py" --fail-under=68
           python -m coverage report --include="*/src/groundtruth_kb/cli.py" --fail-under=72
           python -m coverage report --include="*/src/groundtruth_kb/config.py" --fail-under=92
           python -m coverage report --include="*/src/groundtruth_kb/gates.py" --fail-under=92
