@@ -45,6 +45,7 @@ dev = [
     "ruff>=0.8",
     "httpx>=0.27",
     "interrogate>=1.7",
+    "mypy==1.20.1",
 ]
 docs = [
     "mkdocs-material>=9.5",
