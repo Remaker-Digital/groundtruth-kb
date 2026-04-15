@@ -13,9 +13,10 @@ import os
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Cross-platform file locking
 if os.name == "nt":
@@ -137,7 +138,7 @@ class _FileLock:
         self.path = path
         self._fh = None
 
-    def __enter__(self):
+    def __enter__(self) -> _FileLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists() or self.path.stat().st_size == 0:
             self.path.write_bytes(b"\x00")
@@ -149,7 +150,7 @@ class _FileLock:
             fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, *_args: object) -> None:
         if self._fh:
             try:
                 if os.name == "nt":
@@ -246,7 +247,7 @@ def _invoke_codex(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
     }
     if os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
-    completed = subprocess.run(cmd, **popen_kwargs)
+    completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **popen_kwargs))
     return completed
 
 
@@ -270,7 +271,7 @@ def _invoke_prime(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
     }
     if os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-    completed = subprocess.run(cmd, **popen_kwargs)
+    completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **popen_kwargs))
     _last_stdout_file("prime", project_dir).write_text(completed.stdout or "", encoding="utf-8")
     _last_message_file("prime", project_dir).write_text(completed.stdout or "", encoding="utf-8")
     return completed
@@ -411,7 +412,7 @@ def _maybe_clear_failed_residue(
     bridge: Any,
     state: dict[str, Any],
     *,
-    log_fn,
+    log_fn: Callable[[str], None],
     force: bool = False,
 ) -> int:
     last_cleanup_at = _parse_iso(state.get("last_failed_cleanup_at"))
@@ -452,7 +453,7 @@ def _maybe_retry_stale_pending(
     bridge: Any,
     state: dict[str, Any],
     *,
-    log_fn,
+    log_fn: Callable[[str], None],
 ) -> int:
     """Autonomous persistent retry: re-queue notifications for stale pending outbound messages.
 

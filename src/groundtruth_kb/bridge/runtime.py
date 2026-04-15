@@ -360,10 +360,10 @@ def _recipient_matches(agent: str, recipient: str) -> bool:
 
 
 def _thread_correlation_id(row: sqlite3.Row) -> str:
-    return row["thread_id"] or row["correlation_id"] or row["id"]
+    return str(row["thread_id"] or row["correlation_id"] or row["id"])
 
 
-def _message_is_protocol_ack(item: dict) -> bool:
+def _message_is_protocol_ack(item: dict[str, Any]) -> bool:
     if item.get("message_kind") == "protocol_ack":
         return True
     subject = (item.get("subject") or "").strip().lower()
@@ -396,7 +396,7 @@ def _queue_notification(
     event_type: str,
     message_id: str | None,
     subject: str,
-    details: dict,
+    details: dict[str, Any],
 ) -> int:
     cur = conn.execute(
         """
@@ -419,7 +419,7 @@ def _insert_message(
     recipient: Agent,
     subject: str,
     body: str,
-    payload: dict,
+    payload: dict[str, Any],
     tags: list[str],
     priority: int,
     correlation_id: str | None,
@@ -725,7 +725,7 @@ def _conn() -> sqlite3.Connection:
 # ---------------------------------------------------------------------------
 
 
-def _list_notifications(agent: str, after_event_id: int, limit: int) -> list[dict]:
+def _list_notifications(agent: str, after_event_id: int, limit: int) -> list[dict[str, Any]]:
     if limit < 1 or limit > 200:
         raise ValueError("limit must be between 1 and 200")
     with _conn() as conn:
@@ -768,7 +768,7 @@ def _latest_notification_event_id(agent: str | None = None) -> int:
 def resolve_message_reference(
     message_ref: str,
     recipient: Literal["codex", "prime"] | None = None,
-) -> dict | None:
+) -> dict[str, Any] | None:
     if not message_ref:
         return None
     with _conn() as conn:
@@ -815,7 +815,7 @@ def get_thread_messages(
     message_ref: str,
     recipient: PeerAgent | None = None,
     limit: int = 100,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     resolved = resolve_message_reference(message_ref, recipient=recipient)
     if resolved is None:
         return []
@@ -832,7 +832,7 @@ def describe_thread_context(
     message_ref: str,
     recipient: PeerAgent | None = None,
     limit: int = 100,
-) -> dict | None:
+) -> dict[str, Any] | None:
     resolved = resolve_message_reference(message_ref, recipient=recipient)
     if resolved is None:
         return None
@@ -871,7 +871,7 @@ def build_worker_event_payload(
     message_ref: str,
     recipient: PeerAgent | None = None,
     limit: int = 100,
-) -> dict | None:
+) -> dict[str, Any] | None:
     context = describe_thread_context(message_ref, recipient=recipient, limit=limit)
     if context is None:
         return None
@@ -912,7 +912,7 @@ def send_message(
     tags_json: str = "[]",
     priority: int = 2,
     correlation_id: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Send a message through the bridge."""
     if recipient not in {"codex", "prime", "any"}:
         raise ValueError("recipient must be one of: codex, prime, any")
@@ -953,7 +953,7 @@ def send_correction_message(
     guidance: str,
     artifact_refs_json: str = "[]",
     priority: int = 1,
-) -> dict:
+) -> dict[str, Any]:
     """Send a correction for a failed (formerly invalid) message."""
     if sender not in PEER_AGENTS:
         raise ValueError("sender must be one of: codex, prime")
@@ -1057,7 +1057,7 @@ def list_inbox(
     agent: PeerAgent,
     status: Literal["pending", "completed", "failed", "all"] = "pending",
     limit: int = 20,
-) -> dict:
+) -> dict[str, Any]:
     """List messages for an agent's inbox."""
     if limit < 1 or limit > 200:
         raise ValueError("limit must be between 1 and 200")
@@ -1088,7 +1088,7 @@ def list_stale_outbound(
     sender: PeerAgent,
     older_than_seconds: int = 180,
     limit: int = 500,
-) -> dict:
+) -> dict[str, Any]:
     """List pending messages sent BY this agent that are older than a threshold.
 
     Used by the autonomous retry sweep to find outbound messages that haven't
@@ -1130,7 +1130,7 @@ def resolve_message(
     agent: Literal["codex", "prime", "owner"],
     outcome: Literal["completed", "failed"] = "completed",
     resolution: str = "",
-) -> dict:
+) -> dict[str, Any]:
     """Mark a message as completed or failed."""
     with _conn() as conn:
         row = conn.execute(
@@ -1175,7 +1175,7 @@ def resolve_message(
 def retry_pending_message(
     message_id: str,
     agent: PeerAgent,
-) -> dict:
+) -> dict[str, Any]:
     """Non-blocking persistent retry: re-queue notification for a pending message.
 
     Increments retry metadata in the payload. Caps at MAX_RETRIES to prevent storms.
@@ -1231,7 +1231,7 @@ def clear_failed_messages(
     older_than_minutes: int = 60,
     limit: int = 50,
     resolution: str = "auto-cleared",
-) -> dict:
+) -> dict[str, Any]:
     """Bulk-clear old failed messages."""
     if older_than_minutes < 1 or older_than_minutes > 10080:
         raise ValueError("older_than_minutes must be between 1 and 10080")
@@ -1281,14 +1281,14 @@ def list_notifications(
     agent: PeerAgent,
     after_event_id: int = 0,
     limit: int = 20,
-) -> dict:
+) -> dict[str, Any]:
     """List notifications for an agent."""
     items = _list_notifications(agent, after_event_id, limit)
     last_event_id = items[-1]["event_id"] if items else after_event_id
     return {"count": len(items), "last_event_id": last_event_id, "items": items}
 
 
-def get_latest_notification_event_id(agent: PeerAgent | None = None) -> dict:
+def get_latest_notification_event_id(agent: PeerAgent | None = None) -> dict[str, Any]:
     """Get the latest notification event ID."""
     return {
         "agent": agent,
@@ -1302,7 +1302,7 @@ def wait_for_notifications(
     timeout_seconds: int = 15,
     poll_interval_ms: int = 100,
     limit: int = 20,
-) -> dict:
+) -> dict[str, Any]:
     """Long-poll for new notifications."""
     if timeout_seconds < 1 or timeout_seconds > 60:
         raise ValueError("timeout_seconds must be between 1 and 60")
@@ -1329,13 +1329,13 @@ def wait_for_notifications(
         time.sleep(poll_interval_ms / 1000)
 
 
-def get_thread(thread_ref: str, agent: PeerAgent | None = None) -> dict:
+def get_thread(thread_ref: str, agent: PeerAgent | None = None) -> dict[str, Any]:
     """Get full thread context."""
     context = describe_thread_context(thread_ref, recipient=agent)
     return {"ok": context is not None, "thread": context}
 
 
-def get_worker_event_payload(thread_ref: str, agent: PeerAgent | None = None) -> dict:
+def get_worker_event_payload(thread_ref: str, agent: PeerAgent | None = None) -> dict[str, Any]:
     """Get thread context structured for worker dispatch."""
     context = build_worker_event_payload(thread_ref, recipient=agent)
     return {"ok": context is not None, "context": context}
@@ -1345,7 +1345,7 @@ def list_threads(
     agent: PeerAgent,
     status: Literal["open", "final", "all"] = "open",
     limit: int = 20,
-) -> dict:
+) -> dict[str, Any]:
     """List threads for an agent, derived from messages."""
     if limit < 1 or limit > 200:
         raise ValueError("limit must be between 1 and 200")
