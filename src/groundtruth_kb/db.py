@@ -31,13 +31,13 @@ if TYPE_CHECKING:
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
 
-# ChromaDB optional dependency
+# ChromaDB optional dependency (ignore_missing_imports configured in pyproject.toml)
 try:
     import chromadb
 
     HAS_CHROMADB = True
 except ImportError:
-    chromadb = None  # type: ignore[assignment]
+    chromadb = None
     HAS_CHROMADB = False
 
 # Semantic search constants
