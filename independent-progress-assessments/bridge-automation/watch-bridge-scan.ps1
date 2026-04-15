@@ -36,6 +36,21 @@ function Get-StateColor {
     }
 }
 
+function Format-LocalTime {
+    param([string]$UtcIso)
+    if ([string]::IsNullOrEmpty($UtcIso)) { return "--:--:--" }
+    try {
+        $dt = [DateTime]::Parse(
+            $UtcIso,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::RoundtripKind
+        )
+        return $dt.ToLocalTime().ToString("HH:mm:ss")
+    } catch {
+        return "??:??:??"
+    }
+}
+
 function Write-AgentStatus {
     param(
         [string]$Agent,
@@ -44,7 +59,8 @@ function Write-AgentStatus {
 
     $state = [string]$Status.state
     $message = [string]$Status.message
-    Write-Host ("{0}: {1} | {2}" -f $Agent, $state, $message) -ForegroundColor (Get-StateColor -State $state)
+    $stamp = Format-LocalTime -UtcIso ([string]$Status.updatedAtUtc)
+    Write-Host ("[{0}] {1}: {2} | {3}" -f $stamp, $Agent, $state, $message) -ForegroundColor (Get-StateColor -State $state)
 }
 
 function Write-LivenessStatus {
@@ -54,7 +70,8 @@ function Write-LivenessStatus {
     $claudeVerdict = [string]$Status.claude.verdict
     $codexVerdict = [string]$Status.codex.verdict
     $message = "claude=$claudeVerdict codex=$codexVerdict"
-    Write-Host ("liveness: {0} | {1}" -f $state, $message) -ForegroundColor (Get-StateColor -State $state)
+    $stamp = Format-LocalTime -UtcIso ([string]$Status.updatedAtUtc)
+    Write-Host ("[{0}] liveness: {1} | {2}" -f $stamp, $state, $message) -ForegroundColor (Get-StateColor -State $state)
 }
 
 Clear-Host
@@ -86,7 +103,8 @@ while ($true) {
             $agent = [string]$source.Agent
             $key = "parse-error|$($_.Exception.Message)"
             if (-not $lastSeen.ContainsKey($agent) -or $lastSeen[$agent] -ne $key) {
-                Write-Host ("{0}: error | status file could not be parsed: {1}" -f $agent, $_.Exception.Message) -ForegroundColor Red
+                $nowStamp = (Get-Date).ToString("HH:mm:ss")
+                Write-Host ("[{0}] {1}: error | status file could not be parsed: {2}" -f $nowStamp, $agent, $_.Exception.Message) -ForegroundColor Red
                 $lastSeen[$agent] = $key
             }
         }
@@ -107,7 +125,8 @@ while ($true) {
         } catch {
             $key = "parse-error|$($_.Exception.Message)"
             if (-not $lastSeen.ContainsKey("liveness") -or $lastSeen["liveness"] -ne $key) {
-                Write-Host ("liveness: error | status file could not be parsed: {0}" -f $_.Exception.Message) -ForegroundColor Red
+                $nowStamp = (Get-Date).ToString("HH:mm:ss")
+                Write-Host ("[{0}] liveness: error | status file could not be parsed: {1}" -f $nowStamp, $_.Exception.Message) -ForegroundColor Red
                 $lastSeen["liveness"] = $key
             }
         }
