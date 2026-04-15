@@ -105,9 +105,12 @@ def test_env_governance_gates_string(tmp_path, monkeypatch):
     Phase 4B.1: previously this test passed ``Path("/nonexistent")`` as a
     dummy config_path. Now it creates a real empty TOML file so the test
     doesn't trip over the new explicit-missing-path guard.
+    Phase 4B.2: file now includes a [groundtruth] header to avoid the
+    missing-section UserWarning (the section's content is irrelevant to
+    what this test exercises).
     """
     toml_file = tmp_path / "groundtruth.toml"
-    toml_file.write_text("")  # empty file: valid TOML, no [groundtruth] section
+    toml_file.write_text("[groundtruth]\n")  # empty section; env var overrides everything
     monkeypatch.setenv("GT_GOVERNANCE_GATES", "mod1:Gate1, mod2:Gate2")
     cfg = GTConfig.load(config_path=toml_file)
     assert cfg.governance_gates == ["mod1:Gate1", "mod2:Gate2"]
@@ -118,9 +121,11 @@ def test_db_path_string_converted_to_path(tmp_path):
 
     Phase 4B.1: previously this test passed ``Path("/nonexistent")``. Now
     it creates a real empty TOML file (constructor override wins anyway).
+    Phase 4B.2: file now includes a [groundtruth] header to avoid the
+    missing-section UserWarning (the file's content is irrelevant here).
     """
     toml_file = tmp_path / "groundtruth.toml"
-    toml_file.write_text("")  # empty file; override takes precedence
+    toml_file.write_text("[groundtruth]\n")  # empty section; override takes precedence
     cfg = GTConfig.load(config_path=toml_file, db_path="./test.db")
     assert isinstance(cfg.db_path, Path)
 
@@ -224,3 +229,99 @@ def test_gtconfigerror_is_public_api():
     assert groundtruth_kb.GTConfigError is config_mod.GTConfigError
     # And the count grew from 15 → 16
     assert len(groundtruth_kb.__all__) == 16
+
+
+# ---------------------------------------------------------------------------
+# Phase 4B.2: Finding 4 — PermissionError on open() is wrapped in GTConfigError
+# ---------------------------------------------------------------------------
+
+
+def test_permission_denied_raises_gtconfigerror(tmp_path, monkeypatch):
+    """PermissionError from open() is wrapped in GTConfigError with the
+    file path and a permissions hint in the message (Phase 4B.2, Finding 4).
+
+    Uses monkeypatch on builtins.open to avoid platform-specific ACL
+    manipulation — the mock raises PermissionError only for the target
+    config file, leaving other open() calls intact.
+    """
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text("[groundtruth]\napp_title = 'test'\n")
+
+    original_open = open
+
+    def mock_open(path, *args, **kwargs):
+        if str(path) == str(toml_file):
+            raise PermissionError(13, "Permission denied", str(toml_file))
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", mock_open)
+    with pytest.raises(GTConfigError) as exc_info:
+        GTConfig.load(config_path=toml_file)
+    assert str(toml_file) in str(exc_info.value)
+    assert "permission" in str(exc_info.value).lower()
+
+
+def test_permission_denied_error_chains_original(tmp_path, monkeypatch):
+    """GTConfigError.__cause__ is the original PermissionError so debuggers
+    can trace the underlying OS failure (Phase 4B.2, Finding 4)."""
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text("[groundtruth]\napp_title = 'test'\n")
+
+    original_open = open
+    original_perm_error = PermissionError(13, "Permission denied", str(toml_file))
+
+    def mock_open(path, *args, **kwargs):
+        if str(path) == str(toml_file):
+            raise original_perm_error
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", mock_open)
+    with pytest.raises(GTConfigError) as exc_info:
+        GTConfig.load(config_path=toml_file)
+    assert exc_info.value.__cause__ is not None
+    assert isinstance(exc_info.value.__cause__, PermissionError)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4B.2: Finding 5 — missing [groundtruth] section emits UserWarning
+# ---------------------------------------------------------------------------
+
+
+def test_missing_groundtruth_section_warns(tmp_path):
+    """A TOML file with no [groundtruth] section triggers a UserWarning
+    mentioning the section name (Phase 4B.2, Finding 5).
+
+    Defaults still apply — the warning is advisory, not fatal. The wording
+    must not imply that [gates] or [search] sections are ignored.
+    """
+    toml_file = tmp_path / "groundtruth.toml"
+    # Realistic typo: [groundtuh] instead of [groundtruth]
+    toml_file.write_text("[groundtuh]\napp_title = 'typo-section'\n")
+    with pytest.warns(UserWarning, match=r"\[groundtruth\]"):
+        cfg = GTConfig.load(config_path=toml_file)
+    # Core defaults still apply — the file's content under the wrong section
+    # name is not routed anywhere.
+    assert cfg.app_title == "GroundTruth KB"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4B.2: Finding 6 — unknown keys in [groundtruth] section emit UserWarning
+# ---------------------------------------------------------------------------
+
+
+def test_unknown_toml_key_warns(tmp_path):
+    """A TOML [groundtruth] section with unknown keys triggers a UserWarning
+    that names the offending keys (Phase 4B.2, Finding 6).
+
+    Known keys are still applied. The warning only fires for keys that are
+    not dataclass fields (e.g. typos like 'bran_color' for 'brand_color').
+    """
+    toml_file = tmp_path / "groundtruth.toml"
+    # Typo: 'bran_color' instead of 'brand_color'
+    toml_file.write_text("[groundtruth]\nbran_color = '#ff0000'\napp_title = 'Test'\n")
+    with pytest.warns(UserWarning, match="bran_color"):
+        cfg = GTConfig.load(config_path=toml_file)
+    # Known key was applied correctly
+    assert cfg.app_title == "Test"
+    # Unknown key had no effect — brand_color remains the default
+    assert cfg.brand_color == "#2563eb"
