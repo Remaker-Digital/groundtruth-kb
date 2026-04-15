@@ -678,7 +678,7 @@ class TestReconcileCLI:
         # Create a minimal config file so _resolve_config can find the DB.
         config_path = tmp_path / "groundtruth.toml"
         config_path.write_text(
-            f'[core]\ndb_path = "{db_path.as_posix()}"\n',
+            f'[groundtruth]\ndb_path = "{db_path.as_posix()}"\n',
             encoding="utf-8",
         )
 
