@@ -24,6 +24,24 @@ _DEFAULT_APP_TITLE = "GroundTruth KB"
 _DEFAULT_BRAND_MARK = "GT"
 
 
+class GTConfigError(Exception):
+    """Raised when a GroundTruth KB config file cannot be parsed.
+
+    Scoped to Phase 4B.1: this exception wraps TOML parser failures
+    (:class:`tomllib.TOMLDecodeError`) with a message that identifies the
+    offending file. The original decoder error is chained via ``__cause__``
+    so debuggers see the underlying location.
+
+    Out of scope for Phase 4B.1 (tracked for Phase 4B.2):
+
+    * :class:`FileNotFoundError` — raised directly by :meth:`GTConfig.load`
+      when an explicit ``config_path`` does not exist.
+    * :class:`PermissionError` — continues to propagate unchanged from
+      :func:`open`. A future sub-round will wrap permission failures in
+      ``GTConfigError`` if the owner directs.
+    """
+
+
 @dataclass
 class GTConfig:
     """Configuration for a GroundTruth KB project."""
@@ -82,14 +100,38 @@ class GTConfig:
 
 
 def _load_toml(config_path: Path | None) -> dict:
-    """Load values from groundtruth.toml."""
-    if config_path is None:
-        config_path = _find_config()
-    if config_path is None or not config_path.exists():
-        return {}
+    """Load values from groundtruth.toml.
 
-    with open(config_path, "rb") as f:
-        data = tomllib.load(f)
+    Raises:
+        FileNotFoundError: When ``config_path`` is explicitly supplied but
+            the file does not exist. Auto-discovery (``config_path is None``)
+            still returns ``{}`` when no config is found, per the historical
+            "exploration mode" contract.
+        GTConfigError: When the file exists but contains invalid TOML. The
+            original :class:`tomllib.TOMLDecodeError` is chained via
+            ``__cause__``.
+    """
+    # Phase 4B.1, Finding 2: distinguish auto-discovery (silent defaults)
+    # from an explicit caller-supplied path (hard error). Programmatic
+    # callers get a FileNotFoundError with a recovery hint instead of
+    # silently falling back to defaults.
+    if config_path is None:
+        discovered = _find_config()
+        if discovered is None:
+            return {}
+        config_path = discovered
+    elif not config_path.exists():
+        raise FileNotFoundError(
+            f"GroundTruth config file not found: {config_path}. Check the --config path or create the file."
+        )
+
+    # Phase 4B.1, Finding 3: wrap TOML decode errors so the user sees the
+    # offending file name instead of a raw parser traceback.
+    try:
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+    except tomllib.TOMLDecodeError as exc:
+        raise GTConfigError(f"Invalid TOML in {config_path}: {exc}. Check your groundtruth.toml syntax.") from exc
 
     section = data.get("groundtruth", {})
     result = dict(section)
