@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 4B.3: Public API docstrings for 27 `KnowledgeDB` and
+  `GateRegistry` methods** — Every symbol in `groundtruth_kb.__all__` now
+  has a Google-style docstring. Covered methods include `KnowledgeDB.close`,
+  all `get_*` / `list_*` / `insert_*` methods on `KnowledgeDB` that were
+  previously undocumented, and `GateRegistry.register`,
+  `GateRegistry.run_pre_promote`, and
+  `GateRegistry.run_pre_resolve_work_item`. A new regression guard test
+  (`tests/test_public_api_docstrings.py`) locks public API docstring
+  coverage at 100% and will fail CI if a new method is added without a
+  docstring. Public API coverage: 81.76% → 100.00% (121/148 → 148/148).
+  Test suite: 636 → 637.
 - **Phase 4B.2: `PermissionError` wrapped in `GTConfigError`** — An
   unreadable config file (ownership or ACL problem) now raises
   `GTConfigError` instead of letting the raw `PermissionError` propagate.
