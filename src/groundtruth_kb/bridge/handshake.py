@@ -11,6 +11,7 @@ import argparse
 import json
 import math
 import time
+from typing import Any, cast
 
 from groundtruth_kb.bridge.runtime import (
     get_bridge_db,
@@ -28,7 +29,7 @@ DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_POLL_SECONDS = 15
 
 
-def _extract_prime_reply(thread_payload: dict) -> dict | None:
+def _extract_prime_reply(thread_payload: dict[str, Any]) -> dict[str, Any] | None:
     thread = thread_payload.get("thread") or {}
     messages = thread.get("thread_messages") or []
     for message in reversed(messages):
@@ -45,7 +46,7 @@ def _extract_prime_reply(thread_payload: dict) -> dict | None:
             continue
         if "session-start probe:" in body and "reply sent" in body:
             continue
-        return message
+        return cast(dict[str, Any], message)
     return None
 
 
@@ -70,7 +71,7 @@ def _find_existing_pending_thread() -> str | None:
     return str(row["id"])
 
 
-def _format_success(thread_id: str, reply: dict) -> dict:
+def _format_success(thread_id: str, reply: dict[str, Any]) -> dict[str, Any]:
     body = str(reply.get("body", "") or "").strip()
     first_line = body.splitlines()[0] if body else "(empty reply body)"
     return {
@@ -83,7 +84,7 @@ def _format_success(thread_id: str, reply: dict) -> dict:
     }
 
 
-def _format_timeout(thread_id: str, timeout_seconds: int) -> dict:
+def _format_timeout(thread_id: str, timeout_seconds: int) -> dict[str, Any]:
     return {
         "ok": False,
         "thread_id": thread_id,

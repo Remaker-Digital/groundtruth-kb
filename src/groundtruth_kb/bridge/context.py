@@ -13,7 +13,7 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 WINDOWS_PATH_RE = re.compile(r"[A-Za-z]:\\[^\r\n<>]*")
 ARTIFACT_NAME_RE = re.compile(
@@ -440,7 +440,7 @@ def _worker_context(
             context = payload.get("context")
             return context if isinstance(context, dict) else None
         return payload if isinstance(payload, dict) else None
-    return bridge.describe_thread_context(message_ref, recipient=agent)
+    return cast(dict[str, Any] | None, bridge.describe_thread_context(message_ref, recipient=agent))
 
 
 def build_contexts(

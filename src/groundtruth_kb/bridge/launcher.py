@@ -26,6 +26,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 
 def _consume_stdin_if_present() -> None:
@@ -64,7 +65,7 @@ def _pid_is_running(pid: int) -> bool:
     return True
 
 
-def _discover_running_worker(project_dir: Path, agent: str) -> dict | None:
+def _discover_running_worker(project_dir: Path, agent: str) -> dict[str, Any] | None:
     from groundtruth_kb.bridge.worker import (
         resident_worker_health_snapshot,
         resident_worker_is_healthy,
@@ -84,7 +85,9 @@ def _discover_running_worker(project_dir: Path, agent: str) -> dict | None:
     return None
 
 
-def _wait_for_worker(project_dir: Path, *, agent: str, expected_pid: int, timeout_seconds: float) -> dict | None:
+def _wait_for_worker(
+    project_dir: Path, *, agent: str, expected_pid: int, timeout_seconds: float
+) -> dict[str, Any] | None:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
         running = _discover_running_worker(project_dir, agent)

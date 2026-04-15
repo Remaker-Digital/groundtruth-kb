@@ -15,6 +15,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 # Cross-platform file locking
 if os.name == "nt":
@@ -49,11 +50,11 @@ def _consume_stdin_if_present() -> None:
 class _FileLock:
     """Single-process lock for a given agent poller."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path) -> None:
         self.path = path
         self._fh = None
 
-    def __enter__(self):
+    def __enter__(self) -> _FileLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists() or self.path.stat().st_size == 0:
             self.path.write_bytes(b"\x00")
@@ -70,7 +71,7 @@ class _FileLock:
             raise RuntimeError(f"bridge poller lock busy: {self.path}")
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, *_args: object) -> None:
         if self._fh:
             try:
                 if os.name == "nt":
@@ -84,7 +85,7 @@ class _FileLock:
             self._fh = None
 
 
-def _load_state(path: Path) -> dict:
+def _load_state(path: Path) -> dict[str, Any]:
     try:
         state = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(state, dict):
@@ -97,7 +98,7 @@ def _load_state(path: Path) -> dict:
         return {"last_event_id": 0, "updated_at": _now(), "last_wake_by_message": {}}
 
 
-def _save_state(path: Path, state: dict) -> None:
+def _save_state(path: Path, state: dict[str, Any]) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -105,7 +106,7 @@ def _save_state(path: Path, state: dict) -> None:
         pass
 
 
-def _save_json(path: Path, payload: dict) -> None:
+def _save_json(path: Path, payload: dict[str, Any]) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -174,7 +175,7 @@ def _launch_agent_wake(
         return []
 
 
-def _notification_message_ref(event: dict) -> str | None:
+def _notification_message_ref(event: dict[str, Any]) -> str | None:
     details = event.get("details") or {}
     for candidate in (
         details.get("thread_id"),
@@ -187,7 +188,7 @@ def _notification_message_ref(event: dict) -> str | None:
     return None
 
 
-def _notification_should_wake(agent: str, event: dict) -> bool:
+def _notification_should_wake(agent: str, event: dict[str, Any]) -> bool:
     event_type = str(event.get("event_type") or "")
     details = event.get("details") or {}
     if event_type == "message.failed":
@@ -195,7 +196,7 @@ def _notification_should_wake(agent: str, event: dict) -> bool:
     return False
 
 
-def _last_wake_at(state: dict, message_id: str) -> datetime | None:
+def _last_wake_at(state: dict[str, Any], message_id: str) -> datetime | None:
     wake_state = state.get("last_wake_by_message", {})
     if not isinstance(wake_state, dict):
         return None
@@ -209,8 +210,8 @@ def _last_wake_at(state: dict, message_id: str) -> datetime | None:
 
 
 def _should_wake_substantive_item(
-    item: dict,
-    state: dict,
+    item: dict[str, Any],
+    state: dict[str, Any],
     *,
     cooldown_seconds: int = SUBSTANTIVE_WAKE_COOLDOWN_SECONDS,
 ) -> bool:
@@ -223,7 +224,7 @@ def _should_wake_substantive_item(
     return (datetime.now(UTC) - last_wake).total_seconds() >= cooldown_seconds
 
 
-def _record_wake_launch(state: dict, message_ids: list[str]) -> None:
+def _record_wake_launch(state: dict[str, Any], message_ids: list[str]) -> None:
     if not message_ids:
         return
     wake_state = state.setdefault("last_wake_by_message", {})
@@ -259,11 +260,11 @@ def _resident_worker_should_defer_wake(
 
 
 def _handle_notification_batch(
-    bridge,
+    bridge: Any,
     agent: str,
-    events: list[dict],
+    events: list[dict[str, Any]],
     log_file: Path,
-) -> dict:
+) -> dict[str, Any]:
     summary = {
         "failed_events": 0,
         "wake_refs": [],
@@ -294,16 +295,16 @@ def _handle_notification_batch(
 
 
 def _handle_inbox(
-    bridge,
+    bridge: Any,
     agent: str,
     peer: str,
     log_file: Path,
     *,
-    state: dict,
+    state: dict[str, Any],
     project_dir: Path,
     write_enabled: bool,
     resident_worker_healthy: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """
     Handle new inbox items for `agent`.
 
