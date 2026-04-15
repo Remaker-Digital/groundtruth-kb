@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -446,14 +447,14 @@ def import_cmd(ctx: click.Context, file: str, merge: bool) -> None:
                         rejected += 1
                         continue
 
-                cols = list(row.keys())
-                placeholders = ", ".join(["?"] * len(cols))
-                col_names = ", ".join(cols)
+                row_cols = list(row.keys())
+                placeholders = ", ".join(["?"] * len(row_cols))
+                col_names = ", ".join(row_cols)
 
                 try:
                     conn.execute(
                         f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders})",
-                        [row[c] for c in cols],
+                        [row[c] for c in row_cols],
                     )
                     imported += 1
                 except sqlite3.IntegrityError:
@@ -555,7 +556,7 @@ def serve(ctx: click.Context, port: int, host: str) -> None:
 
 
 @main.group()
-def project():
+def project() -> None:
     """Project scaffold, doctor, and upgrade commands."""
 
 
@@ -665,7 +666,7 @@ def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
 
 
 @main.group()
-def deliberations():
+def deliberations() -> None:
     """Deliberation archive commands."""
 
 
@@ -730,7 +731,7 @@ def _parse_participants(raw: str | None) -> list[str] | None:
     return parts or None
 
 
-def _echo_deliberation_row(row: dict) -> None:
+def _echo_deliberation_row(row: dict[str, Any]) -> None:
     """Render a deliberation row as a human-readable block."""
     click.echo(f"{row['id']} (version {row.get('version', '?')})")
     click.echo(f"  title:       {row.get('title', '')}")
@@ -819,6 +820,8 @@ def deliberations_add(
         outcome=outcome,
         session_id=session_id,
     )
+    if row is None:
+        raise click.ClickException(f"Unexpected error: inserted deliberation {deliberation_id} not found on readback.")
     if json_output:
         click.echo(json.dumps(row, indent=2, default=str))
         return
@@ -886,6 +889,8 @@ def deliberations_upsert(
         outcome=outcome,
         session_id=session_id,
     )
+    if row is None:
+        raise click.ClickException("Unexpected error: upserted deliberation not found on readback.")
     if json_output:
         click.echo(json.dumps(row, indent=2, default=str))
         return
@@ -922,14 +927,14 @@ def deliberations_get(
             _echo_deliberation_row(row)
         return
 
-    row = db.get_deliberation(deliberation_id)
-    if row is None:
+    single_row = db.get_deliberation(deliberation_id)
+    if single_row is None:
         click.echo(f"Deliberation {deliberation_id} not found.")
         raise SystemExit(1)
     if json_output:
-        click.echo(json.dumps(row, indent=2, default=str))
+        click.echo(json.dumps(single_row, indent=2, default=str))
         return
-    _echo_deliberation_row(row)
+    _echo_deliberation_row(single_row)
 
 
 @deliberations.command("list")
@@ -1168,7 +1173,7 @@ def health_trends(ctx: click.Context, limit: int) -> None:
 
 
 @main.group()
-def intake():
+def intake() -> None:
     """Requirement intake pipeline commands."""
 
 
