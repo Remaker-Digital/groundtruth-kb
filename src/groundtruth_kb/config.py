@@ -15,10 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python < 3.11
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib  # stdlib since Python 3.11 (project requires >=3.11)
 
 
 _DEFAULT_BRAND_COLOR = "#2563eb"

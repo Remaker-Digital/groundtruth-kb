@@ -91,3 +91,9 @@ quote-style = "double"
 
 [tool.ruff.lint.isort]
 known-first-party = ["groundtruth_kb"]
+
+# mypy: suppress import-not-found for optional dependencies that are not
+# installed in all CI matrix jobs (chromadb is in the 'search' extra only).
+[[tool.mypy.overrides]]
+module = ["chromadb", "chromadb.*"]
+ignore_missing_imports = true
