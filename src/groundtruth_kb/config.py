@@ -10,13 +10,11 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import os
+import tomllib  # stdlib since Python 3.11 (project requires >=3.11)
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-import tomllib  # stdlib since Python 3.11 (project requires >=3.11)
-
 
 _DEFAULT_BRAND_COLOR = "#2563eb"
 _DEFAULT_APP_TITLE = "GroundTruth KB"
