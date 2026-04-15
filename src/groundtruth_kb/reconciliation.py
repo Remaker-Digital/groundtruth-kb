@@ -64,7 +64,7 @@ class ReconciliationReport:
     """
 
     category: str
-    findings: list[dict] = field(default_factory=list)
+    findings: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ def find_orphaned_assertions(
             directory if no configuration is available.
     """
     root = _resolve_project_root(db, project_root)
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
 
     for spec in db.list_specs():
         spec_id = spec.get("id")
@@ -280,10 +280,12 @@ def find_stale_specs(
 
     snapshots = db.get_snapshot_history(limit=1000)
     # Sorted descending by captured_at already (get_snapshot_history contract).
-    parsed_snapshots = [(_parse_iso(s.get("captured_at")), s) for s in snapshots]
-    parsed_snapshots = [(t, s) for t, s in parsed_snapshots if t is not None]
+    _raw_snapshots: list[tuple[datetime | None, dict[str, Any]]] = [
+        (_parse_iso(s.get("captured_at")), s) for s in snapshots
+    ]
+    parsed_snapshots: list[tuple[datetime, dict[str, Any]]] = [(t, s) for t, s in _raw_snapshots if t is not None]
 
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
     all_specs = db.list_specs()
 
     # Pre-index by section for cheap same-section lookups.
@@ -392,7 +394,7 @@ def find_authority_conflicts(db: KnowledgeDB) -> ReconciliationReport:
     stated = db.list_specs(authority="stated")
     inferred = db.list_specs(authority="inferred")
 
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
     for inf in inferred:
         inf_section = inf.get("section")
         inf_scope = inf.get("scope")
@@ -452,7 +454,7 @@ def find_duplicate_specs(
             continue
         tokens_by_spec.append((spec_id, tokens))
 
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
     n = len(tokens_by_spec)
     for i in range(n):
         id_a, tok_a = tokens_by_spec[i]
@@ -514,7 +516,7 @@ def find_expired_provisionals(db: KnowledgeDB) -> ReconciliationReport:
         - ``specifications.authority='provisional'`` pairing with
           ``specifications.provisional_until``  (groundtruth_kb/db.py:515-527)
     """
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
     for provisional in db.get_provisional_specs():
         replacement_id = provisional.get("provisional_until")
         if not replacement_id:

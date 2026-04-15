@@ -10,7 +10,7 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from groundtruth_kb.db import KnowledgeDB
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # Governance seeds — the GroundTruth method
 # ---------------------------------------------------------------------------
 
-_GOVERNANCE_SPECS = [
+_GOVERNANCE_SPECS: list[dict[str, Any]] = [
     {
         "id": "GOV-01",
         "title": "Specification First",
@@ -94,7 +94,7 @@ _GOVERNANCE_SPECS = [
 # Example domain seeds — a simple "task tracker" project
 # ---------------------------------------------------------------------------
 
-_EXAMPLE_SPECS = [
+_EXAMPLE_SPECS: list[dict[str, Any]] = [
     {
         "id": "SPEC-001",
         "title": "Task creation",
@@ -156,7 +156,7 @@ _EXAMPLE_SPECS = [
     },
 ]
 
-_EXAMPLE_TESTS = [
+_EXAMPLE_TESTS: list[dict[str, Any]] = [
     {
         "id": "TEST-001",
         "spec_id": "SPEC-001",

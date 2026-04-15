@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -86,7 +86,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
     # -----------------------------------------------------------------
 
     @app.get("/", response_class=HTMLResponse)
-    async def dashboard(request: Request):
+    async def dashboard(request: Request) -> Response:
         summary = db.get_summary()
         recent = db.get_history(limit=20)
         return templates.TemplateResponse(
@@ -107,7 +107,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         handle: str = Query(None),
         tag: str = Query(None),
         search: str = Query(None),
-    ):
+    ) -> Response:
         specs = db.list_specs(
             status=status,
             priority=priority,
@@ -143,7 +143,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/specs/{spec_id:path}", response_class=HTMLResponse)
-    async def spec_detail(request: Request, spec_id: str):
+    async def spec_detail(request: Request, spec_id: str) -> Response:
         spec = db.get_spec(spec_id)
         if not spec:
             return HTMLResponse("<h1>Spec not found</h1>", status_code=404)
@@ -165,7 +165,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/tests", response_class=HTMLResponse)
-    async def tests_list(request: Request, type: str = Query(None)):
+    async def tests_list(request: Request, type: str = Query(None)) -> Response:
         procedures = db.list_test_procedures(type=type)
         all_procs = db.list_test_procedures()
         types = sorted(set(p["type"] for p in all_procs if p["type"]))
@@ -180,7 +180,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/tests/{proc_id}", response_class=HTMLResponse)
-    async def test_detail(request: Request, proc_id: str):
+    async def test_detail(request: Request, proc_id: str) -> Response:
         proc = db.get_test_procedure(proc_id)
         if not proc:
             return HTMLResponse("<h1>Test procedure not found</h1>", status_code=404)
@@ -195,7 +195,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/ops", response_class=HTMLResponse)
-    async def ops_list(request: Request, type: str = Query(None)):
+    async def ops_list(request: Request, type: str = Query(None)) -> Response:
         procedures = db.list_op_procedures(type=type)
         all_procs = db.list_op_procedures()
         types = sorted(set(p["type"] for p in all_procs if p["type"]))
@@ -210,7 +210,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/ops/{proc_id}", response_class=HTMLResponse)
-    async def op_detail(request: Request, proc_id: str):
+    async def op_detail(request: Request, proc_id: str) -> Response:
         proc = db.get_op_procedure(proc_id)
         if not proc:
             return HTMLResponse("<h1>Operational procedure not found</h1>", status_code=404)
@@ -229,7 +229,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         request: Request,
         environment: str = Query(None),
         category: str = Query(None),
-    ):
+    ) -> Response:
         configs = db.list_env_config(environment=environment, category=category)
         all_configs = db.list_env_config()
         environments = sorted(set(c["environment"] for c in all_configs))
@@ -246,7 +246,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/env/{config_id:path}", response_class=HTMLResponse)
-    async def env_detail(request: Request, config_id: str):
+    async def env_detail(request: Request, config_id: str) -> Response:
         config_entry = db.get_env_config(config_id)
         if not config_entry:
             return HTMLResponse("<h1>Environment config not found</h1>", status_code=404)
@@ -265,7 +265,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         request: Request,
         changed_by: str = Query(None),
         table: str = Query(None),
-    ):
+    ) -> Response:
         changes = db.get_history(limit=100, changed_by=changed_by, table=table)
         # Build dynamic author list from recent history
         all_changes = db.get_history(limit=500)
@@ -281,7 +281,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/pipeline", response_class=HTMLResponse)
-    async def pipeline_dashboard(request: Request):
+    async def pipeline_dashboard(request: Request) -> Response:
         metrics = db.get_lifecycle_metrics()
         summary = db.get_summary()
         return templates.TemplateResponse(
@@ -291,7 +291,7 @@ def create_app(config: GTConfig, db: KnowledgeDB) -> FastAPI:
         )
 
     @app.get("/assertions", response_class=HTMLResponse)
-    async def assertions(request: Request):
+    async def assertions(request: Request) -> Response:
         runs = db.get_all_latest_assertion_runs()
         for run in runs:
             spec = db.get_spec(run["spec_id"])

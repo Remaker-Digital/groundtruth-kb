@@ -85,10 +85,10 @@ class ScaffoldReport:
             to the database).
     """
 
-    generated: list[dict] = field(default_factory=list)
-    skipped: list[dict] = field(default_factory=list)
+    generated: list[dict[str, Any]] = field(default_factory=list)
+    skipped: list[dict[str, Any]] = field(default_factory=list)
     quality_summary: dict[str, int] = field(default_factory=dict)
-    low_quality_warnings: list[dict] = field(default_factory=list)
+    low_quality_warnings: list[dict[str, Any]] = field(default_factory=list)
     dry_run: bool = True
 
 
@@ -320,6 +320,7 @@ def scaffold_specs(
                 "testability": spec_data.get("testability"),
             }
             created = db.insert_spec(**insert_kwargs)
+            assert created is not None, "insert_spec returned None after successful insert"
             # After insert, the spec dict from get_spec() has real parsed
             # fields — score directly off that.
             stored = db.get_spec(created["id"])
