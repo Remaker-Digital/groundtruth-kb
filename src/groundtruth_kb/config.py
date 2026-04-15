@@ -13,6 +13,7 @@ import os
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 try:
     import tomllib
@@ -55,7 +56,7 @@ class GTConfig:
     logo_url: str | None = None
     legal_footer: str = ""
     governance_gates: list[str] = field(default_factory=list)
-    gate_config: dict[str, dict] = field(default_factory=dict)
+    gate_config: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, config_path: Path | None = None, **overrides: object) -> GTConfig:
@@ -114,7 +115,7 @@ class GTConfig:
         return cls(**{k: v for k, v in merged.items() if k in cls.__dataclass_fields__})
 
 
-def _load_toml(config_path: Path | None) -> dict:
+def _load_toml(config_path: Path | None) -> dict[str, Any]:
     """Load values from groundtruth.toml.
 
     Raises:
@@ -205,7 +206,7 @@ def _find_config() -> Path | None:
     return None
 
 
-def _load_env() -> dict:
+def _load_env() -> dict[str, Any]:
     """Load configuration from GT_* environment variables."""
     mapping = {
         "GT_DB_PATH": "db_path",
