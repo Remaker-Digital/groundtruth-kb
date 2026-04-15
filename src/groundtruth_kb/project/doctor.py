@@ -179,12 +179,23 @@ def _check_terraform() -> ToolCheck:
 
 
 def _check_claude_code() -> ToolCheck:
+    """Check Claude Code CLI availability (not auth validation)."""
     return _check_tool(
-        "Claude Code",
+        "Claude Code (availability)",
         ["claude", "--version"],
         required=False,
         install_hint="npm install -g @anthropic-ai/claude-code",
         auto_installable=True,
+    )
+
+
+def _check_codex() -> ToolCheck:
+    """Check Codex CLI availability."""
+    return _check_tool(
+        "Codex CLI",
+        ["codex", "--version"],
+        required=False,
+        install_hint="See Codex documentation for installation",
     )
 
 
@@ -466,29 +477,56 @@ def _check_settings_classifiers(target: Path) -> ToolCheck:
     )
 
 
+_REQUIRED_BRIDGE_RULES = (
+    "file-bridge-protocol.md",
+    "bridge-essential.md",
+    "deliberation-protocol.md",
+)
+
+
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
-    """Check file bridge configuration capture for dual-agent projects."""
+    """Check file bridge configuration for dual-agent projects.
+
+    Returns WARN when:
+    - BRIDGE-INVENTORY.md or bridge-os-poller-setup-prompt.md are missing
+    - bridge/INDEX.md is absent
+    - Any of the 3 required bridge rule files are absent from .claude/rules/
+
+    Returns pass only when bridge/INDEX.md exists AND all 3 required rule
+    files are present.
+    """
     inventory = target / "BRIDGE-INVENTORY.md"
     setup_prompt = target / "bridge-os-poller-setup-prompt.md"
     index = target / "bridge" / "INDEX.md"
 
-    missing = [path.name for path in (inventory, setup_prompt) if not path.exists()]
-    if missing:
+    missing_setup = [path.name for path in (inventory, setup_prompt) if not path.exists()]
+    if missing_setup:
         return ToolCheck(
             name="File Bridge Config",
             required=True,
             found=False,
             status="warning",
-            message=f"Missing file bridge setup artifact(s): {', '.join(missing)}",
+            message=f"Missing file bridge setup artifact(s): {', '.join(missing_setup)}",
         )
 
-    if index.exists():
+    if not index.exists():
         return ToolCheck(
             name="File Bridge Config",
             required=True,
             found=True,
-            status="pass",
-            message="File bridge inventory, setup prompt, and bridge/INDEX.md present",
+            status="warning",
+            message="bridge/INDEX.md not found — create it to enable the bridge workflow",
+        )
+
+    rules_dir = target / ".claude" / "rules"
+    missing_rules = [r for r in _REQUIRED_BRIDGE_RULES if not (rules_dir / r).exists()]
+    if missing_rules:
+        return ToolCheck(
+            name="File Bridge Config",
+            required=True,
+            found=True,
+            status="warning",
+            message=f"Missing bridge rule file(s) in .claude/rules/: {', '.join(missing_rules)}",
         )
 
     return ToolCheck(
@@ -496,7 +534,7 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
         required=True,
         found=True,
         status="pass",
-        message="File bridge inventory and setup prompt present; create bridge/INDEX.md when enabling pollers",
+        message="File bridge inventory, setup prompt, bridge/INDEX.md, and bridge rules present",
     )
 
 
@@ -591,6 +629,7 @@ def run_doctor(
 
     if p.includes_bridge:
         checks.append(_check_claude_code())
+        checks.append(_check_codex())
 
     if p.includes_docker:
         checks.append(_check_docker())
