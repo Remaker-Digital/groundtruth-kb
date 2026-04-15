@@ -7,20 +7,6 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Active Items
 
-### GT-KB Phase 4B.7 — Residual `mypy --strict` errors (39 → 0)
-
-**Status (S295):** GO received at `bridge/gtkb-phase4b7-residual-mypy-strict-008.md` after 7-round NO-GO/revision cycle. Headless Claude currently implementing against main (uncommitted modifications to `context.py`, `intake.py`, `runtime.py`, `worker.py`, `poller.py`). Prime Builder is standing down on implementation to avoid race.
-
-Six fix patterns (all empirically `mypy --strict` verified during proposal rounds):
-- Pattern A: `sys.platform == "win32"` file-lock imports + `BinaryIO | None` narrowing (15 errors, `poller.py` + `worker.py`)
-- Pattern B: `cast(Any, kwargs)` at 3 subprocess sites (3 errors, `worker.py:250, 274` + `poller.py:167`)
-- Pattern C: None-guard error-dicts at 7 `intake.py` sites (7 errors)
-- Pattern D: two `TypedDict` summary shapes + `cast(dict[str, Any], summary)` returns (8 errors, `poller.py`)
-- Pattern E: misc narrowing in `runtime.py`/`context.py` (5 errors)
-- Pattern F: `event_batch: dict[str, Any]` forward declaration at `worker.py:596` (1 error)
-
-Exit criteria: `mypy --strict src/groundtruth_kb/` → 0 errors; 638 tests pass; coverage delta ≤ ±0.5pp; CI workflow gains direct mypy step; `tests/test_public_api_type_checks.py` renamed to `test_full_tree_type_checks.py` with full-tree scope.
-
 ### Phase 4B future sub-rounds (proposed)
 
 Tracked in `groundtruth-kb/docs/reports/phase-4b-plan.md` (created S295):
@@ -42,10 +28,13 @@ evidence audit; 16.D WI-3171 orphan test rationalization (10,440 tests);
 
 ### S295 ✓
 
+- [x] **GT-KB Phase 4B.7 — Residual `mypy --strict` errors (39 → 0)** — commit `f59dad4` on GT-KB main. Closed 39 errors across 5 files (`bridge/poller.py` 17, `bridge/worker.py` 10, `intake.py` 7, `bridge/runtime.py` 4, `bridge/context.py` 1) via six fix patterns (A: `sys.platform` file-lock imports + `_fh: BinaryIO \| None` narrowing; B: `**cast(Any, popen_kwargs)` at 3 subprocess sites; C: None guard + error-dict at 7 intake sites; D: two TypedDict summary accumulators + `cast(dict[str, Any], summary)` returns; E: misc runtime/context narrowing; F: `event_batch: dict[str, Any]` forward decl at `worker.py:581`). Added `tests/test_full_tree_type_checks.py` (638→640 tests) and direct `mypy --strict` CI workflow step. Bridge thread `gtkb-phase4b7-residual-mypy-strict-001` → `-010 VERIFIED` (7 Prime revisions, 3 NO-GO rounds, 1 autonomous headless Sonnet implementation at 82 turns / 9.3 min, 1 Prime commit). Prime Builder discovered Pattern D misdiagnosis (config dict vs summary accumulators) in `-002` and Pattern A/D mypy non-compliance (`os.name` not narrowed, TypedDict not implicitly widened) in `-004` — every subsequent pattern was empirically `mypy --strict` verified before proposal. Methodology lesson captured: never propose a fix pattern without running it through mypy against a standalone snippet first.
+- [x] **GT-KB phase-4b-plan.md updated** — commit `ff6988b` on GT-KB main. 4B.7 moved from "In flight" to "Done" table with commit SHA `f59dad4`.
 - [x] **Bridge infrastructure permanent fix** — commit `94392a1b` on develop. Rewrote `.gitignore` blanket excludes to content-level with `!`-negations; tracked `.claude/hooks/poller-freshness.py` (hardened worktree-safe, fail-loud), `.claude/settings.json` (project-level `UserPromptSubmit` hook registration), `.claude/rules/bridge-essential.md` (top-priority mandate), and 9 PowerShell + 2 VBS scheduled-task scripts under `independent-progress-assessments/bridge-automation/`. Closes S290-S292 silent-outage window and S294 worktree-blindness root cause. 15 files, +2048/-2.
 - [x] **Monitor timestamp enhancement** — commit `5eb0421e` on develop. Prepended local-time `[HH:mm:ss]` to each line emitted by `watch-bridge-scan.ps1`, derived from each status file's own `updatedAtUtc` via `.ToLocalTime()`.
 - [x] **Phase 4B plan tracking** — commit `8dafc62` on GT-KB main. Created `docs/reports/phase-4b-plan.md` enumerating sub-rounds 4B.1-4B.6 (Done), 4B.7 (In Flight), 4B.8/4B.9/4C/4D (Proposed) with change protocol.
 - [x] **POR Step 16 added** — commit `bb41a59e` on develop. Added post-production spec hygiene remediation step to `docs/plans/PLAN-OF-RECORD-production-readiness.md` (5 phases, exit criteria).
+- [x] **Plan artifacts reconciled** — commit `9b8d57fd` on develop. POR file header bumped v3 → v4, Version 6 → 7, target v1.98.91 → v1.98.92 ACHIEVED; work_list.md brought current from S289 to S295 with all missing sub-round history.
 - [x] **MEMORY.md refresh** — updated Current Status + added S295 Recent Sessions entry (user auto-memory, not committed to git).
 
 ### S292 ✓ (deferred from earlier)
