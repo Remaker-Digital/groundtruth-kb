@@ -180,7 +180,20 @@ stripe
 # =============================================================================
 # AI Assistant
 # =============================================================================
-.claude/
+# NOTE: we deliberately ignore the CONTENTS of .claude/ (with /*), not the
+# directory itself. This is required so that !-negations below can re-include
+# specific files. A blanket ".claude/" ignore would shadow all negations.
+# Do not collapse these patterns without reading .claude/rules/bridge-essential.md.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/poller-freshness.py
+!.claude/hooks/credential-scan.py
+!.claude/rules/
+.claude/rules/*
+!.claude/rules/bridge-essential.md
+
 .kiro/
 cookies.txt
 
@@ -193,7 +206,13 @@ wiki/
 # =============================================================================
 # Independent Progress Assessments (Cursor-generated, consumed)
 # =============================================================================
-independent-progress-assessments/
+# NOTE: same pattern as .claude/ above. Ignore the CONTENTS, not the directory,
+# so bridge-automation scripts can be re-included via negation.
+independent-progress-assessments/*
+!independent-progress-assessments/bridge-automation/
+independent-progress-assessments/bridge-automation/*
+!independent-progress-assessments/bridge-automation/*.ps1
+!independent-progress-assessments/bridge-automation/*.vbs
 
 # =============================================================================
 # Research / Scratch Data

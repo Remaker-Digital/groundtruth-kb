@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Project-level Claude Code settings. This file is TRACKED in git (negated by .gitignore) so every worktree and fresh clone inherits the bridge visibility hook. Workstation-specific permissions live in settings.local.json which remains untracked. Do not remove the poller-freshness UserPromptSubmit hook registration without reading .claude/rules/bridge-essential.md first.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/poller-freshness.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
