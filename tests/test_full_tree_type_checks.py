@@ -49,7 +49,10 @@ def test_full_tree_mypy_strict_is_clean() -> None:
         cwd=repo_root,
         capture_output=True,
         text=True,
-        timeout=180,
+        # 300s accommodates the full coverage-instrumented suite (4B.8): under load,
+        # a bare mypy subprocess takes ~24s but contends with other tests for CPU.
+        # The original 180s was tight under full-suite pressure.
+        timeout=300,
     )
     assert result.returncode == 0, (
         f"mypy --strict found issues on the full src/groundtruth_kb/ tree:\n"

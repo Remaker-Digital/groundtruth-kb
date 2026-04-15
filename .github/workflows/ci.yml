@@ -72,7 +72,8 @@ jobs:
           pytest -v --tb=short \
             --cov=groundtruth_kb \
             --cov-branch \
-            --cov-report=term-missing
+            --cov-report=term-missing \
+            --cov-fail-under=70
           python -m coverage report --include="*/src/groundtruth_kb/db.py" --fail-under=68
           python -m coverage report --include="*/src/groundtruth_kb/cli.py" --fail-under=72
           python -m coverage report --include="*/src/groundtruth_kb/config.py" --fail-under=92
