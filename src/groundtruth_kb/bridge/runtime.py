@@ -17,7 +17,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 try:
     from mcp.server import FastMCP
@@ -360,7 +360,7 @@ def _recipient_matches(agent: str, recipient: str) -> bool:
 
 
 def _thread_correlation_id(row: sqlite3.Row) -> str:
-    return str(row["thread_id"] or row["correlation_id"] or row["id"])
+    return cast(str, row["thread_id"] or row["correlation_id"] or row["id"])
 
 
 def _message_is_protocol_ack(item: dict[str, Any]) -> bool:
