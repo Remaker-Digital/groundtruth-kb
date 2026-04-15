@@ -37,7 +37,7 @@ try:
 
     HAS_CHROMADB = True
 except ImportError:
-    chromadb = None
+    chromadb = None  # type: ignore[assignment]
     HAS_CHROMADB = False
 
 # Semantic search constants
