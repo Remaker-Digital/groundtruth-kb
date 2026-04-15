@@ -25,10 +25,12 @@ SESSION_START_BODY = "Report your current operating state"
 
 
 def _now() -> datetime:
+    """Return the current UTC datetime."""
     return datetime.now(UTC)
 
 
 def _parse_iso(value: str | None) -> datetime | None:
+    """Parse an ISO 8601 string into a timezone-aware datetime, or return None on failure."""
     if not value:
         return None
     try:
@@ -41,14 +43,38 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 
 def agent_peer(agent: str) -> str:
+    """Return the opposing agent identifier for the given agent.
+
+    Args:
+        agent: Either ``"codex"`` or ``"prime"``.
+
+    Returns:
+        ``"prime"`` when ``agent`` is ``"codex"``, and ``"codex"`` otherwise.
+    """
     return "prime" if agent == "codex" else "codex"
 
 
 def agent_display(agent: str) -> str:
+    """Return the human-readable display name for the given agent identifier.
+
+    Args:
+        agent: Either ``"codex"`` or ``"prime"``.
+
+    Returns:
+        ``"Codex"`` or ``"Prime"``.
+    """
     return "Codex" if agent == "codex" else "Prime"
 
 
 def dedupe_preserve_order(values: list[str]) -> list[str]:
+    """Remove duplicates from a list while preserving original insertion order.
+
+    Args:
+        values: Input list of strings, possibly containing duplicates.
+
+    Returns:
+        A new list with duplicates removed, preserving the order of first occurrence.
+    """
     ordered: list[str] = []
     seen: set[str] = set()
     for value in values:
@@ -60,6 +86,7 @@ def dedupe_preserve_order(values: list[str]) -> list[str]:
 
 
 def _message_tags(message: dict[str, Any]) -> set[str]:
+    """Extract a normalised set of lower-cased tag strings from a message dict."""
     raw_tags = message.get("tags")
     if not isinstance(raw_tags, list):
         return set()
@@ -67,12 +94,28 @@ def _message_tags(message: dict[str, Any]) -> set[str]:
 
 
 def message_is_session_start_request(message: dict[str, Any]) -> bool:
+    """Return True if the message matches the canonical session-start probe format.
+
+    Args:
+        message: A bridge message dict.
+
+    Returns:
+        ``True`` when the message subject and body match the session-start template.
+    """
     subject = str(message.get("subject") or "").strip()
     body = str(message.get("body") or "").strip().rstrip(".")
     return subject == SESSION_START_SUBJECT and body == SESSION_START_BODY
 
 
 def message_is_closure_only(message: dict[str, Any]) -> bool:
+    """Return True if the message is purely informational closure traffic requiring no substantive reply.
+
+    Args:
+        message: A bridge message dict.
+
+    Returns:
+        ``True`` when the message content indicates it is closure-only or receipt-only.
+    """
     subject = str(message.get("subject") or "").strip().lower()
     body = str(message.get("body") or "").strip().lower()
     resolution = str(message.get("resolution") or "").strip().lower()
@@ -93,10 +136,22 @@ def message_is_closure_only(message: dict[str, Any]) -> bool:
 
 
 def prioritize_inbox_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort inbox items so session-start probes come first and closure-only traffic comes last.
+
+    Within each bucket, items are ordered by descending priority and then ascending
+    ``created_at`` (oldest first).
+
+    Args:
+        items: A list of bridge message dicts from the inbox.
+
+    Returns:
+        A new list with the same items sorted by priority tier.
+    """
     default_created_at = datetime.max.replace(tzinfo=UTC)
     enumerated = list(enumerate(items))
 
     def _sort_key(entry: tuple[int, dict[str, Any]]) -> tuple[int, int, datetime, int]:
+        """Return a sort tuple for a single enumerated inbox item."""
         original_index, item = entry
         if message_is_session_start_request(item):
             bucket = 0
@@ -115,6 +170,14 @@ def prioritize_inbox_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def iter_text_fragments(value: Any) -> list[str]:
+    """Recursively collect all string leaf values from a nested dict/list/scalar.
+
+    Args:
+        value: Any Python value; strings, dicts, and lists are traversed recursively.
+
+    Returns:
+        A flat list of all string leaves found during traversal.
+    """
     if value is None:
         return []
     if isinstance(value, str):
@@ -133,6 +196,14 @@ def iter_text_fragments(value: Any) -> list[str]:
 
 
 def clean_path_candidate(raw: str) -> str:
+    """Strip surrounding quotes, brackets, and trailing punctuation from a raw path string.
+
+    Args:
+        raw: A raw string that may contain surrounding punctuation from markdown or logs.
+
+    Returns:
+        The cleaned string with leading/trailing noise characters removed.
+    """
     return raw.strip().strip("`'\"()[]{}<>").rstrip(".,:;")
 
 
@@ -190,6 +261,7 @@ def resolve_artifact_name(name: str, *, project_dir: Path) -> Path | None:
 
 
 def _resolve_structured_artifact_ref(raw: Any, *, project_dir: Path) -> Path | None:
+    """Resolve a structured artifact reference (string or dict) to an absolute Path, or None."""
     if isinstance(raw, str):
         cleaned = clean_path_candidate(raw)
         if not cleaned:
@@ -212,6 +284,18 @@ def _resolve_structured_artifact_ref(raw: Any, *, project_dir: Path) -> Path | N
 
 
 def discover_artifacts(context: dict[str, Any], *, project_dir: Path) -> list[dict[str, str]]:
+    """Find all referenced artifact files within a context dict and return resolved path records.
+
+    Searches structured ``artifact_refs``, Windows absolute paths, and artifact name
+    patterns found in the canonical and thread message text fields.
+
+    Args:
+        context: A bridge worker context dict containing message payloads and artifact refs.
+        project_dir: Project root directory used for relative path resolution.
+
+    Returns:
+        A sorted list of ``{"path": ..., "source": ...}`` dicts for each unique artifact found.
+    """
     found: dict[str, dict[str, str]] = {}
 
     for raw in context.get("artifact_refs", []):
@@ -254,6 +338,7 @@ def discover_artifacts(context: dict[str, Any], *, project_dir: Path) -> list[di
 
 
 def _repo_relative_artifact_path(raw: Any, *, project_dir: Path) -> str | None:
+    """Convert a raw artifact reference to a repo-relative POSIX path string, or None if invalid."""
     candidate: str | None = None
     if isinstance(raw, dict):
         for key in ("path", "name"):
@@ -291,10 +376,12 @@ def _repair_payload_artifact_refs(
     *,
     project_dir: Path,
 ) -> list[dict[str, str]]:
+    """Build a deduplicated list of repo-relative artifact ref dicts suitable for a bridge payload."""
     refs: list[dict[str, str]] = []
     seen: set[str] = set()
 
     def _append_ref(raw: Any) -> None:
+        """Append a single repo-relative artifact ref to refs if not already seen."""
         relative_path = _repo_relative_artifact_path(raw, project_dir=project_dir)
         if not relative_path or relative_path in seen:
             return
@@ -312,6 +399,15 @@ def _repair_payload_artifact_refs(
 
 
 def summarize_context(agent: str, context: dict[str, Any]) -> str:
+    """Format a single-context summary string for the dispatch prompt.
+
+    Args:
+        agent: The agent identifier receiving the dispatch.
+        context: A bridge worker context dict.
+
+    Returns:
+        A multi-line summary string suitable for inclusion in the wake prompt.
+    """
     canonical = context["canonical_message"]
     latest_worker = context.get(
         "latest_non_protocol_codex_message" if agent == "codex" else "latest_non_protocol_prime_message"
@@ -340,6 +436,18 @@ def build_prompt(
     *,
     project_dir: Path,
 ) -> str:
+    """Construct the full wake prompt string to pass to the agent CLI subprocess.
+
+    Args:
+        agent: The agent identifier that will receive the prompt.
+        snapshot_path: Path to the JSON context snapshot file written before dispatch.
+        new_items: Pending inbox items included in this dispatch batch.
+        contexts: Worker context dicts for the threads being dispatched.
+        project_dir: Project root directory embedded in the prompt.
+
+    Returns:
+        The complete prompt string for the agent subprocess.
+    """
     if contexts:
         context_lines = "\n".join(summarize_context(agent, context) for context in contexts)
     else:
@@ -379,6 +487,16 @@ def build_context_snapshot(
     contexts: list[dict[str, Any]],
     new_items: list[dict[str, Any]],
 ) -> dict[str, Any]:
+    """Assemble a serialisable context snapshot dict for the dispatch prompt file.
+
+    Args:
+        trigger: Label describing what caused this dispatch (e.g. ``"resident-worker"``).
+        contexts: Enriched worker context dicts for each thread in the batch.
+        new_items: Raw inbox items included in this dispatch.
+
+    Returns:
+        A dict with generation timestamp, trigger, inbox IDs, and context list.
+    """
     return {
         "generated_at": _now().isoformat(),
         "trigger": trigger,
@@ -393,6 +511,22 @@ def select_dispatch_batch(
     *,
     max_targets: int = DEFAULT_MAX_DISPATCH_TARGETS,
 ) -> dict[str, Any]:
+    """Select the highest-priority subset of contexts and items to dispatch, respecting the batch cap.
+
+    Prioritises session-start probes, then regular items, then closure-only traffic.
+    Items that exceed the cap are returned in ``deferred_ids``.
+
+    Args:
+        contexts: Enriched context dicts for candidate threads.
+        new_items: Raw pending inbox items.
+        max_targets: Maximum number of target message IDs to dispatch in one batch.
+
+    Returns:
+        A dict with keys ``"contexts"``, ``"new_items"``, ``"target_ids"``, and ``"deferred_ids"``.
+
+    Raises:
+        ValueError: If ``max_targets`` is less than 1.
+    """
     if max_targets < 1:
         raise ValueError("max_targets must be at least 1")
 
@@ -433,6 +567,7 @@ def _worker_context(
     *,
     agent: str,
 ) -> dict[str, Any] | None:
+    """Fetch the worker event context dict for a single message reference from the bridge."""
     context_builder = getattr(bridge, "get_worker_event_payload", None)
     if callable(context_builder):
         payload = context_builder(message_ref, agent=agent)
@@ -453,6 +588,27 @@ def build_contexts(
     log_fn: Callable[[str], None] | None = None,
     max_contexts: int | None = None,
 ) -> list[dict[str, Any]]:
+    """Build enriched context dicts for all candidate dispatch targets.
+
+    Combines new inbox items and explicit notification references, fetches their
+    thread context from the bridge, and annotates each with wake reasons,
+    discovered artifacts, and a prior-review hint.
+
+    Args:
+        bridge: The bridge runtime module providing ``get_worker_event_payload``.
+        agent: The agent identifier for whom contexts are being built.
+        explicit_refs: Message IDs surfaced directly from notification events.
+        new_items: Raw pending inbox items.
+        project_dir: Project root directory used for artifact resolution.
+        log_fn: Optional callable for writing diagnostic log lines.
+        max_contexts: Maximum number of contexts to build; ``None`` means unlimited.
+
+    Returns:
+        A list of enriched context dicts, one per unique thread.
+
+    Raises:
+        ValueError: If ``max_contexts`` is provided and less than 1.
+    """
     if max_contexts is not None and max_contexts < 1:
         raise ValueError("max_contexts must be at least 1")
 
@@ -501,6 +657,7 @@ def build_contexts(
 
 
 def _peer_sender_for_context(agent: str, context: dict[str, Any]) -> str | None:
+    """Return the peer agent who sent the canonical message, or None if not a peer-to-peer thread."""
     canonical = context.get("canonical_message") or {}
     sender = canonical.get("sender")
     recipient = canonical.get("recipient")
@@ -510,6 +667,7 @@ def _peer_sender_for_context(agent: str, context: dict[str, Any]) -> str | None:
 
 
 def _default_action_items(outcome: str) -> list[str]:
+    """Return a standard list of action items appropriate for the given thread outcome label."""
     if outcome == "blocked":
         return [
             "Send a substantive unblock plan or revised implementation if further review is needed",
@@ -527,6 +685,19 @@ def _default_action_items(outcome: str) -> list[str]:
 
 
 def context_requires_action(agent: str, context: dict[str, Any]) -> bool:
+    """Return True if the agent still needs to take action on this thread.
+
+    A thread requires action when there is no valid outbound substantive reply from
+    this agent after the canonical message was sent, or when the only outbound
+    messages have failed status.
+
+    Args:
+        agent: The agent identifier being evaluated.
+        context: An enriched bridge worker context dict.
+
+    Returns:
+        ``True`` if the agent must send a substantive reply or correction.
+    """
     canonical = context.get("canonical_message") or {}
     canonical_status = str(canonical.get("status") or "").strip().lower()
     request_created_at = _parse_iso(canonical.get("created_at"))
@@ -575,6 +746,7 @@ def _supersede_failed_outbound_messages(
     failed_outbound: list[dict[str, Any]],
     resolution: str,
 ) -> int:
+    """Mark all failed outbound messages as resolved with outcome ``"failed"`` and the given resolution."""
     resolved = 0
     for item in failed_outbound:
         bridge.resolve_message(
@@ -592,6 +764,7 @@ def _load_worker_health_snapshot(
     *,
     project_dir: Path,
 ) -> dict[str, Any]:
+    """Read the health JSON file for the given agent worker, returning an empty dict on error."""
     path = project_dir / ".claude" / "hooks" / f".bridge-worker-{agent}-health.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -606,6 +779,7 @@ def _build_operating_state_message(
     agent: str,
     project_dir: Path,
 ) -> tuple[str, str]:
+    """Compose a session-start operating-state reply subject and body for the given agent."""
     self_health = _load_worker_health_snapshot(agent, project_dir=project_dir)
     peer_health = _load_worker_health_snapshot(agent_peer(agent), project_dir=project_dir)
     inbox = bridge.list_inbox(agent=agent, status="pending", limit=20)
@@ -640,6 +814,22 @@ def fast_path_session_start_requests(
     project_dir: Path,
     log_fn: Callable[[str], None] | None = None,
 ) -> int:
+    """Automatically reply to session-start probes without waking the full agent subprocess.
+
+    For each target ref that is a session-start request, this function generates an
+    operating-state reply and resolves the original request as ``"completed"`` in a
+    single synchronous pass.
+
+    Args:
+        bridge: The bridge runtime module providing ``send_message`` and ``resolve_message``.
+        agent: The agent identifier sending the replies.
+        target_refs: Message IDs to check for session-start requests.
+        project_dir: Project root directory used for health snapshot and artifact resolution.
+        log_fn: Optional callable for writing diagnostic log lines.
+
+    Returns:
+        Number of threads handled by the fast path.
+    """
     handled = 0
     contexts = build_contexts(
         bridge,
@@ -779,6 +969,22 @@ def repair_terminal_thread_outputs(
     project_dir: Path,
     log_fn: Callable[[str], None] | None = None,
 ) -> int:
+    """Repair threads that are stuck due to failed outbound messages or unresolved terminal states.
+
+    Handles several repair cases without invoking the full agent subprocess:
+    closure-only threads, valid substantive replies that were not closed, and
+    failed outbound messages that need superseding.
+
+    Args:
+        bridge: The bridge runtime module providing ``send_message`` and ``resolve_message``.
+        agent: The agent identifier performing the repairs.
+        target_refs: Message IDs of threads to inspect and potentially repair.
+        project_dir: Project root directory used for artifact resolution.
+        log_fn: Optional callable for writing diagnostic log lines.
+
+    Returns:
+        Number of threads repaired.
+    """
     repaired = 0
     contexts = build_contexts(
         bridge,

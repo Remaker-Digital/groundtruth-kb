@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 4B.9: Whole-package docstring coverage 65% → 85%** — Google-style
+  docstrings added to all 119 undocumented nodes across 4 bridge files:
+  `bridge/worker.py` (36), `bridge/context.py` (31), `bridge/runtime.py` (29),
+  `bridge/poller.py` (23). All 4 files reach 100% docstring coverage.
+  Whole-package coverage: 65.1% → 85.3%. CI docstring ratchet in
+  `.github/workflows/docstring-coverage.yml` bumped from `--fail-under 64` to
+  `--fail-under 80`.
+
 - **Phase 4B.8: Line and branch coverage gates** — ~163 new tests across 11
   new test files covering the bridge subpackage (`handshake`, `context`,
   `launcher`, `poller`, `worker`, `runtime`, import hygiene) and `project/`

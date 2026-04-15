@@ -87,10 +87,24 @@ RETRY_BACKOFF_BASE_SECONDS = 60
 
 
 def _now() -> str:
+    """Return the current UTC datetime as an ISO 8601 string."""
     return datetime.now(UTC).isoformat()
 
 
 def _normalize_json(value: str, expected: type) -> str:
+    """Parse ``value`` as JSON, verify it is an instance of ``expected``, and re-serialise it.
+
+    Args:
+        value: A JSON-encoded string.
+        expected: The Python type the decoded value must match (e.g. ``dict`` or ``list``).
+
+    Returns:
+        The canonical JSON string representation of the validated value.
+
+    Raises:
+        ValueError: If the decoded value is not an instance of ``expected``.
+        json.JSONDecodeError: If ``value`` is not valid JSON.
+    """
     parsed = json.loads(value)
     if not isinstance(parsed, expected):
         raise ValueError(f"Expected JSON {expected.__name__}")
@@ -98,6 +112,16 @@ def _normalize_json(value: str, expected: type) -> str:
 
 
 def _loads_json(value: str | None, expected: type, default: Any) -> Any:
+    """Safely parse a JSON string, returning ``default`` on failure or type mismatch.
+
+    Args:
+        value: A JSON-encoded string, or ``None`` / empty string.
+        expected: The Python type the decoded value must match.
+        default: Value returned when ``value`` is absent, invalid, or the wrong type.
+
+    Returns:
+        The decoded value if valid, otherwise ``default``.
+    """
     if value is None or value == "":
         return default
     try:
@@ -108,6 +132,7 @@ def _loads_json(value: str | None, expected: type, default: Any) -> Any:
 
 
 def _parse_iso(value: str | None) -> datetime | None:
+    """Parse an ISO 8601 string into a timezone-aware datetime, or return None on failure."""
     if not value:
         return None
     try:
@@ -120,6 +145,7 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 
 def _peer_collaboration_message(sender: str, recipient: str) -> bool:
+    """Return True if both sender and recipient are peer agents (codex or prime)."""
     return sender in PEER_AGENTS and recipient in PEER_AGENTS
 
 
@@ -129,12 +155,14 @@ def _is_absolute_path(p: str) -> bool:
 
 
 def _normalize_artifact_refs(value: Any) -> list[Any]:
+    """Return a validated list of artifact refs, keeping only str and dict entries."""
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, (str, dict))]
 
 
 def _normalize_action_items(value: Any) -> list[str]:
+    """Return a validated list of non-empty action item strings stripped of whitespace."""
     if not isinstance(value, list):
         return []
     return [item.strip() for item in value if isinstance(item, str) and item.strip()]
@@ -146,6 +174,15 @@ def _normalize_action_items(value: Any) -> list[str]:
 
 
 def _canonical_thread_id(conn: sqlite3.Connection, correlation_id: str | None) -> str | None:
+    """Resolve a correlation ID to its canonical thread ID using the messages table.
+
+    Args:
+        conn: An open SQLite connection with ``row_factory`` set.
+        correlation_id: The correlation ID to resolve, or ``None``.
+
+    Returns:
+        The canonical thread ID string, or ``None`` if unresolvable.
+    """
     if not correlation_id:
         return None
     row = conn.execute(
@@ -168,6 +205,7 @@ def _thread_id_for(
     message_id: str,
     correlation_id: str | None,
 ) -> str:
+    """Return the thread ID for a new message, falling back to the message's own ID."""
     return _canonical_thread_id(conn, correlation_id) or message_id
 
 
@@ -183,6 +221,17 @@ def _infer_message_kind(
     payload: dict[str, Any],
     tags: list[str],
 ) -> str:
+    """Classify a message as ``"protocol_ack"``, ``"status_update"``, ``"system"``, or ``"substantive"``.
+
+    Args:
+        sender: The agent or user sending the message.
+        subject: The message subject line.
+        payload: Parsed payload dict from the message.
+        tags: List of tag strings associated with the message.
+
+    Returns:
+        A message kind string used to drive bridge validation and dispatch logic.
+    """
     response_type = str(payload.get("response_type", "") or "").lower()
     subject_lower = (subject or "").strip().lower()
     tag_set = {str(tag).strip().lower() for tag in tags}
@@ -213,6 +262,17 @@ def _validate_message_contract(
     message_kind: str,
     payload: dict[str, Any],
 ) -> list[str]:
+    """Validate a message against the substantive-reply-only bridge contract.
+
+    Args:
+        sender: The sending agent identifier.
+        recipient: The receiving agent identifier.
+        message_kind: Inferred message kind (e.g. ``"substantive"``).
+        payload: Parsed payload dict from the message.
+
+    Returns:
+        A list of validation error strings; empty means the message is valid.
+    """
     if not _peer_collaboration_message(sender, recipient):
         return []
     if sender == recipient:
@@ -254,6 +314,19 @@ def _validate_thread_correlation(
     message_kind: str,
     payload: dict[str, Any],
 ) -> list[str]:
+    """Validate that the correlation ID links both sender and recipient to an existing thread.
+
+    Args:
+        conn: An open SQLite connection with ``row_factory`` set.
+        sender: The sending agent identifier.
+        recipient: The receiving agent identifier.
+        correlation_id: The correlation / thread ID supplied with the message.
+        message_kind: Inferred message kind.
+        payload: Parsed payload dict from the message.
+
+    Returns:
+        A list of validation error strings; empty means the correlation is valid.
+    """
     if not _peer_collaboration_message(sender, recipient):
         return []
 
@@ -339,6 +412,7 @@ def _derive_thread_state(conn: sqlite3.Connection, thread_id: str) -> dict[str, 
 
 
 def _thread_items(conn: sqlite3.Connection, thread_id: str) -> list[dict[str, Any]]:
+    """Return all messages in a thread ordered chronologically."""
     rows = conn.execute(
         "SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at ASC",
         (thread_id,),
@@ -352,6 +426,7 @@ def _thread_items(conn: sqlite3.Connection, thread_id: str) -> list[dict[str, An
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    """Convert a SQLite Row to a plain dict with JSON fields decoded to Python objects."""
     item = dict(row)
     item["payload"] = _loads_json(item.get("payload"), dict, {})
     item["tags"] = _loads_json(item.get("tags"), list, [])
@@ -360,14 +435,17 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def _recipient_matches(agent: str, recipient: str) -> bool:
+    """Return True if the message recipient matches the given agent (exact or ``"any"``)."""
     return recipient in {agent, "any"}
 
 
 def _thread_correlation_id(row: sqlite3.Row) -> str:
+    """Return the best available thread or correlation ID from a message row."""
     return cast(str, row["thread_id"] or row["correlation_id"] or row["id"])
 
 
 def _message_is_protocol_ack(item: dict[str, Any]) -> bool:
+    """Return True if the message dict represents a legacy protocol acknowledgement."""
     if item.get("message_kind") == "protocol_ack":
         return True
     subject = (item.get("subject") or "").strip().lower()
@@ -384,6 +462,14 @@ def _message_is_protocol_ack(item: dict[str, Any]) -> bool:
 
 
 def _notification_targets(recipient: str) -> list[str]:
+    """Expand the recipient field to a list of agent notification targets.
+
+    Args:
+        recipient: The message recipient (``"codex"``, ``"prime"``, or ``"any"``).
+
+    Returns:
+        A list of agent identifiers that should receive a notification.
+    """
     if recipient == "any":
         return ["codex", "prime"]
     return [recipient]
@@ -402,6 +488,22 @@ def _queue_notification(
     subject: str,
     details: dict[str, Any],
 ) -> int:
+    """Insert a notification row for an agent and return the new event ID.
+
+    Args:
+        conn: An open SQLite connection.
+        agent: The agent that should receive the notification.
+        event_type: The event type string (e.g. ``"message.new"``).
+        message_id: The message ID the notification relates to, if any.
+        subject: The message subject line for display purposes.
+        details: A dict of additional event details serialised as JSON.
+
+    Returns:
+        The ``event_id`` of the newly inserted notification row.
+
+    Raises:
+        RuntimeError: If the INSERT does not return a row ID.
+    """
     cur = conn.execute(
         """
         INSERT INTO notifications (agent, event_type, message_id, subject, details, created_at)
@@ -431,6 +533,22 @@ def _insert_message(
     priority: int,
     correlation_id: str | None,
 ) -> tuple[str, str, list[str], list[int]]:
+    """Insert a new message into the database, validate it, queue notifications, and return metadata.
+
+    Args:
+        conn: An open SQLite connection.
+        sender: The sending agent or ``"owner"``.
+        recipient: The receiving agent or ``"any"``.
+        subject: The message subject line.
+        body: The message body text.
+        payload: Parsed payload dict.
+        tags: List of tag strings.
+        priority: Integer priority 0–3.
+        correlation_id: Thread correlation ID, or ``None`` for a new thread.
+
+    Returns:
+        A tuple of ``(message_id, status, validation_errors, event_ids)``.
+    """
     message_kind = _infer_message_kind(
         sender=sender,
         subject=subject,
@@ -524,6 +642,7 @@ def _insert_message(
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
+    """Create all required tables and indexes and run any pending schema migrations."""
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS messages (
@@ -719,6 +838,7 @@ def _migrate_to_v3(conn: sqlite3.Connection, from_version: int) -> None:
 
 
 def _conn() -> sqlite3.Connection:
+    """Open a WAL-mode SQLite connection with the schema ensured."""
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -733,6 +853,19 @@ def _conn() -> sqlite3.Connection:
 
 
 def _list_notifications(agent: str, after_event_id: int, limit: int) -> list[dict[str, Any]]:
+    """Query notification rows for an agent after a given event ID.
+
+    Args:
+        agent: The agent identifier to filter by.
+        after_event_id: Only return events with ``event_id > after_event_id``.
+        limit: Maximum number of rows to return (1–200).
+
+    Returns:
+        A list of notification row dicts ordered by ascending ``event_id``.
+
+    Raises:
+        ValueError: If ``limit`` is outside the range 1–200.
+    """
     if limit < 1 or limit > 200:
         raise ValueError("limit must be between 1 and 200")
     with _conn() as conn:
@@ -754,6 +887,7 @@ def _list_notifications(agent: str, after_event_id: int, limit: int) -> list[dic
 
 
 def _latest_notification_event_id(agent: str | None = None) -> int:
+    """Return the maximum notification event ID, optionally scoped to a single agent."""
     with _conn() as conn:
         if agent:
             row = conn.execute(
@@ -776,6 +910,18 @@ def resolve_message_reference(
     message_ref: str,
     recipient: Literal["codex", "prime"] | None = None,
 ) -> dict[str, Any] | None:
+    """Resolve a message reference to a single message dict, or None if ambiguous or missing.
+
+    Tries an exact UUID match first, then a prefix (LIKE) match.  Returns None if the
+    prefix matches more than one row.
+
+    Args:
+        message_ref: Full or prefix UUID string.
+        recipient: If given, restricts the lookup to messages for this agent.
+
+    Returns:
+        A deserialized message dict, or ``None``.
+    """
     if not message_ref:
         return None
     with _conn() as conn:
@@ -823,6 +969,16 @@ def get_thread_messages(
     recipient: PeerAgent | None = None,
     limit: int = 100,
 ) -> list[dict[str, Any]]:
+    """Return all messages in the thread containing the referenced message.
+
+    Args:
+        message_ref: Any message ID in the target thread.
+        recipient: Optional agent filter passed to ``resolve_message_reference``.
+        limit: Maximum number of messages to return.
+
+    Returns:
+        A list of deserialized message dicts ordered by creation time.
+    """
     resolved = resolve_message_reference(message_ref, recipient=recipient)
     if resolved is None:
         return []
@@ -840,6 +996,18 @@ def describe_thread_context(
     recipient: PeerAgent | None = None,
     limit: int = 100,
 ) -> dict[str, Any] | None:
+    """Return a rich thread context dict for the referenced message, or None if not found.
+
+    Args:
+        message_ref: Any message ID in the target thread.
+        recipient: Optional agent filter.
+        limit: Maximum number of thread messages to retrieve.
+
+    Returns:
+        A dict with ``canonical_message``, ``thread_messages``, ``thread_state``,
+        ``latest_non_protocol_codex_message``, ``latest_non_protocol_prime_message``,
+        ``terminal_messages``, and ``already_resolved``; or ``None``.
+    """
     resolved = resolve_message_reference(message_ref, recipient=recipient)
     if resolved is None:
         return None
@@ -879,6 +1047,17 @@ def build_worker_event_payload(
     recipient: PeerAgent | None = None,
     limit: int = 100,
 ) -> dict[str, Any] | None:
+    """Build a flattened worker event payload dict from the thread context.
+
+    Args:
+        message_ref: Any message ID in the target thread.
+        recipient: Optional agent filter.
+        limit: Maximum number of thread messages to retrieve.
+
+    Returns:
+        A dict suitable for passing to a bridge worker, or ``None`` if the thread
+        cannot be resolved.
+    """
     context = describe_thread_context(message_ref, recipient=recipient, limit=limit)
     if context is None:
         return None
@@ -1449,6 +1628,7 @@ def _register_mcp_tools() -> None:
 
     @mcp.resource("bridge://health")
     def _health_resource() -> str:
+        """Serve the bridge health JSON as an MCP resource."""
         return health()
 
 
