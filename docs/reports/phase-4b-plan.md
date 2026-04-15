@@ -44,12 +44,11 @@ numbers and drives them to their agreed targets.
 | **4B.5a** | bridge/ runtime annotations | ~52 annotative mypy errors closed in `bridge/` (missing `-> None`, typed parameters, `cast()` at well-defined boundaries) | `e15ceaf` + `efd0282` followup | `gtkb-phase4b5a-bridge-annotations-006` |
 | **4B.5b** | Internal helpers mypy | 40 errors across 5 internal helper modules; CI regression guard via `tests/test_internal_helpers_type_checks.py` | `4870e7d` + `31d2c39` | `gtkb-phase4b5b-internal-helpers-mypy-007` |
 | **4B.6** | CI enforcement gates | `mypy --strict` CI workflow step; per-file coverage gates (db.py 68% / cli.py 68% / config.py 80% / gates.py 92%); docstring-coverage ratchet 50→51 | `31d2c39` | `gtkb-phase4b6-ci-enforcement-gates-010` |
+| **4B.7** | Residual mypy --strict | Closed 39 `mypy --strict` errors across 5 files (`bridge/poller.py` 17, `bridge/worker.py` 10, `intake.py` 7, `bridge/runtime.py` 4, `bridge/context.py` 1). Six fix patterns: (A) `sys.platform == "win32"` file-lock imports + `BinaryIO \| None` narrowing; (B) `**cast(Any, popen_kwargs)` at 3 subprocess sites; (C) None-guard error-dicts at 7 `intake.py` sites; (D) two `TypedDict` summary shapes in `poller.py` + `cast(dict[str, Any], summary)` at returns; (E) misc narrowing in `runtime.py`/`context.py`; (F) `event_batch: dict[str, Any]` forward declaration at `worker.py:581`. Added `tests/test_full_tree_type_checks.py` (640 tests, +2 from 638) and direct `mypy --strict` CI workflow step. Implementation by headless Sonnet session (82 turns / 9.3 min), committed by Prime Opus after Codex verification | `f59dad4` | `gtkb-phase4b7-residual-mypy-strict-010` VERIFIED |
 
 ### In flight
 
-| # | Sub-round | Scope | Bridge entry |
-|---|---|---|---|
-| **4B.7** | Residual mypy --strict | Close remaining 39 `mypy --strict` errors across 5 files (`bridge/poller.py` 17, `bridge/worker.py` 10, `intake.py` 7, `bridge/runtime.py` 4, `bridge/context.py` 1). Six fix patterns: (A) `sys.platform == "win32"` file-lock imports + `BinaryIO \| None` narrowing; (B) `cast(Any, kwargs)` at 3 subprocess sites; (C) None-guard error-dicts at 7 `intake.py` sites; (D) two `TypedDict` summary shapes in `poller.py` + `cast(dict[str, Any], summary)` at returns; (E) misc narrowing in `runtime.py`/`context.py`; (F) `event_batch: dict[str, Any]` forward declaration at `worker.py:596`. Exit: `mypy --strict src/groundtruth_kb/` returns 0; CI gate widened to full tree; test file renamed to `tests/test_full_tree_type_checks.py` | `gtkb-phase4b7-residual-mypy-strict-*` (currently at `-007 REVISED`) |
+*(None — 4B.7 landed; 4B.8 is next but not yet proposed.)*
 
 ### Proposed (post-4B.7)
 
