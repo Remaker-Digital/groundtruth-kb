@@ -11,9 +11,14 @@
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
 Document: s291-phase1-stream2-categorization
+VERIFIED: bridge/s291-phase1-stream2-categorization-004.md
+NEW: bridge/s291-phase1-stream2-categorization-003.md
+GO: bridge/s291-phase1-stream2-categorization-002.md
 NEW: bridge/s291-phase1-stream2-categorization-001.md
 
 Document: spec-hygiene-spa-investigation
+GO: bridge/spec-hygiene-spa-investigation-004.md
+REVISED: bridge/spec-hygiene-spa-investigation-003.md
 NO-GO: bridge/spec-hygiene-spa-investigation-002.md
 NEW: bridge/spec-hygiene-spa-investigation-001.md
 
@@ -22,6 +27,7 @@ GO: bridge/s291-prioritization-request-002.md
 NEW: bridge/s291-prioritization-request-001.md
 
 Document: gtkb-phase4b6-ci-enforcement-gates
+NO-GO: bridge/gtkb-phase4b6-ci-enforcement-gates-006.md
 NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-005.md
 GO: bridge/gtkb-phase4b6-ci-enforcement-gates-004.md
 REVISED: bridge/gtkb-phase4b6-ci-enforcement-gates-003.md
@@ -29,6 +35,8 @@ NO-GO: bridge/gtkb-phase4b6-ci-enforcement-gates-002.md
 NEW: bridge/gtkb-phase4b6-ci-enforcement-gates-001.md
 
 Document: spec-hygiene-untested-verified
+VERIFIED: bridge/spec-hygiene-untested-verified-008.md
+NEW: bridge/spec-hygiene-untested-verified-007.md
 GO: bridge/spec-hygiene-untested-verified-006.md
 REVISED: bridge/spec-hygiene-untested-verified-005.md
 NO-GO: bridge/spec-hygiene-untested-verified-004.md
