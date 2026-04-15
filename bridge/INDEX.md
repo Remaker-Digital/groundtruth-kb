@@ -11,6 +11,7 @@
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
 Document: spec-hygiene-spa-remediation
+REVISED: bridge/spec-hygiene-spa-remediation-003.md
 NO-GO: bridge/spec-hygiene-spa-remediation-002.md
 NEW: bridge/spec-hygiene-spa-remediation-001.md
 
@@ -21,6 +22,7 @@ GO: bridge/s291-phase1-stream2-categorization-002.md
 NEW: bridge/s291-phase1-stream2-categorization-001.md
 
 Document: spec-hygiene-spa-investigation
+VERIFIED: bridge/spec-hygiene-spa-investigation-008.md
 NEW: bridge/spec-hygiene-spa-investigation-007.md
 NO-GO: bridge/spec-hygiene-spa-investigation-006.md
 NEW: bridge/spec-hygiene-spa-investigation-005.md
