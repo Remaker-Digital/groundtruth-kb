@@ -10,8 +10,7 @@ from click.testing import CliRunner
 
 from groundtruth_kb.cli import main as cli
 from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
-from groundtruth_kb.providers.schema import CLAUDE_CODE, CODEX, AgentProvider, get_provider, list_providers
-
+from groundtruth_kb.providers.schema import CLAUDE_CODE, CODEX, get_provider, list_providers
 
 # ---------------------------------------------------------------------------
 # Provider schema unit tests

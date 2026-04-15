@@ -6,8 +6,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 from groundtruth_kb.project.doctor import run_doctor
 from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
 
@@ -78,7 +76,7 @@ def test_smoke_local_only_no_leakage(tmp_path: Path) -> None:
     options = _make_options("local-only", tmp_path)
     scaffold_project(options)
     violations = _scan_for_leakage(tmp_path / "project")
-    assert not violations, f"Leakage found:\n" + "\n".join(violations)
+    assert not violations, "Leakage found:\n" + "\n".join(violations)
 
 
 def test_smoke_local_only_doctor_not_fail(tmp_path: Path) -> None:
@@ -86,9 +84,8 @@ def test_smoke_local_only_doctor_not_fail(tmp_path: Path) -> None:
     options = _make_options("local-only", tmp_path)
     scaffold_project(options)
     report = run_doctor(tmp_path / "project", "local-only")
-    assert report.overall != "fail", (
-        f"Doctor returned fail for local-only. Checks:\n"
-        + "\n".join(f"  {c.status}: {c.message}" for c in report.checks)
+    assert report.overall != "fail", "Doctor returned fail for local-only. Checks:\n" + "\n".join(
+        f"  {c.status}: {c.message}" for c in report.checks
     )
 
 
@@ -115,7 +112,7 @@ def test_smoke_dual_agent_no_leakage(tmp_path: Path) -> None:
     options = _make_options("dual-agent", tmp_path)
     scaffold_project(options)
     violations = _scan_for_leakage(tmp_path / "project")
-    assert not violations, f"Leakage found:\n" + "\n".join(violations)
+    assert not violations, "Leakage found:\n" + "\n".join(violations)
 
 
 def test_smoke_dual_agent_doctor_not_fail(tmp_path: Path) -> None:
@@ -123,9 +120,8 @@ def test_smoke_dual_agent_doctor_not_fail(tmp_path: Path) -> None:
     options = _make_options("dual-agent", tmp_path)
     scaffold_project(options)
     report = run_doctor(tmp_path / "project", "dual-agent")
-    assert report.overall != "fail", (
-        f"Doctor returned fail for dual-agent. Checks:\n"
-        + "\n".join(f"  {c.status}: {c.message}" for c in report.checks)
+    assert report.overall != "fail", "Doctor returned fail for dual-agent. Checks:\n" + "\n".join(
+        f"  {c.status}: {c.message}" for c in report.checks
     )
 
 
@@ -167,7 +163,7 @@ def test_smoke_dual_agent_webapp_no_leakage(tmp_path: Path) -> None:
     options = _make_options("dual-agent-webapp", tmp_path, cloud_provider="azure")
     scaffold_project(options)
     violations = _scan_for_leakage(tmp_path / "project")
-    assert not violations, f"Leakage found:\n" + "\n".join(violations)
+    assert not violations, "Leakage found:\n" + "\n".join(violations)
 
 
 def test_smoke_dual_agent_webapp_doctor_not_fail(tmp_path: Path) -> None:
@@ -175,7 +171,6 @@ def test_smoke_dual_agent_webapp_doctor_not_fail(tmp_path: Path) -> None:
     options = _make_options("dual-agent-webapp", tmp_path, cloud_provider="azure")
     scaffold_project(options)
     report = run_doctor(tmp_path / "project", "dual-agent-webapp")
-    assert report.overall != "fail", (
-        f"Doctor returned fail for dual-agent-webapp. Checks:\n"
-        + "\n".join(f"  {c.status}: {c.message}" for c in report.checks)
+    assert report.overall != "fail", "Doctor returned fail for dual-agent-webapp. Checks:\n" + "\n".join(
+        f"  {c.status}: {c.message}" for c in report.checks
     )

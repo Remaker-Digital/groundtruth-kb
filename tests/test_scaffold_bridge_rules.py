@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
 
 _BRIDGE_RULE_FILES = (
@@ -60,9 +58,7 @@ def test_bridge_essential_contains_gt_project_doctor(tmp_path: Path) -> None:
     """Generated bridge-essential.md contains the 'gt project doctor' command string."""
     options = _make_options("dual-agent", tmp_path)
     scaffold_project(options)
-    content = (tmp_path / "project" / ".claude" / "rules" / "bridge-essential.md").read_text(
-        encoding="utf-8"
-    )
+    content = (tmp_path / "project" / ".claude" / "rules" / "bridge-essential.md").read_text(encoding="utf-8")
     assert "gt project doctor" in content
 
 
@@ -70,9 +66,7 @@ def test_bridge_essential_contains_scheduler_not_implemented_message(tmp_path: P
     """Generated bridge-essential.md contains the scheduler-not-implemented notice."""
     options = _make_options("dual-agent", tmp_path)
     scaffold_project(options)
-    content = (tmp_path / "project" / ".claude" / "rules" / "bridge-essential.md").read_text(
-        encoding="utf-8"
-    )
+    content = (tmp_path / "project" / ".claude" / "rules" / "bridge-essential.md").read_text(encoding="utf-8")
     assert "Bridge scheduler commands are not implemented in this release." in content
 
 
