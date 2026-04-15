@@ -59,7 +59,10 @@ def test_internal_helpers_mypy_strict_is_clean() -> None:
         cwd=repo_root,
         capture_output=True,
         text=True,
-        timeout=120,
+        # 300s accommodates the full coverage-instrumented suite (4B.8): under load,
+        # a bare mypy subprocess takes ~24s but contends with other tests for CPU.
+        # 4B.5b's original 120s was tight even before the full bridge test suite existed.
+        timeout=300,
     )
     assert result.returncode == 0, (
         f"mypy --strict found issues on internal helpers:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"

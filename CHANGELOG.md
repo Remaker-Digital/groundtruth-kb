@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 4B.8: Line and branch coverage gates** — ~163 new tests across 11
+  new test files covering the bridge subpackage (`handshake`, `context`,
+  `launcher`, `poller`, `worker`, `runtime`, import hygiene) and `project/`
+  modules (`upgrade`, `doctor`, `scaffold`, `manifest`). Suite: 640 → ~803
+  tests. Combined coverage ≥70% (statements ≥70%, branches ≥55%). CI gains
+  `--cov-fail-under=70` on the main pytest invocation in the `test-base` job.
+
 - **Phase 4B.7: `mypy --strict` regression guard for full source tree** — A new
   test `tests/test_full_tree_type_checks.py` runs `mypy --strict` against the
   entire `src/groundtruth_kb/` tree (31 source files) and asserts exit code 0.
