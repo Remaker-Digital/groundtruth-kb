@@ -580,6 +580,8 @@ def project() -> None:
 @click.option("--init-git/--no-init-git", default=False, help="Initialize a git repository.")
 @click.option("--include-ci/--no-include-ci", default=True, help="Include CI workflows.")
 @click.option("--seed-example/--no-seed-example", default=True, help="Seed example specs.")
+@click.option("--prime-provider", default="claude-code", help="Prime Builder provider ID.")
+@click.option("--lo-provider", default="codex", help="Loyal Opposition provider ID.")
 def project_init(
     project_name: str,
     profile: str,
@@ -590,9 +592,33 @@ def project_init(
     init_git: bool,
     include_ci: bool,
     seed_example: bool,
+    prime_provider: str,
+    lo_provider: str,
 ) -> None:
     """Scaffold a new GroundTruth project with the selected profile."""
     from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project, scaffold_summary
+    from groundtruth_kb.providers.schema import get_provider
+
+    # Validate provider IDs and bridge roles
+    try:
+        prime_prov = get_provider(prime_provider)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+    if prime_prov.bridge_role != "prime":
+        raise click.UsageError(
+            f"Provider '{prime_provider}' has role '{prime_prov.bridge_role}'"
+            " but --prime-provider requires bridge_role='prime'"
+        )
+
+    try:
+        lo_prov = get_provider(lo_provider)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+    if lo_prov.bridge_role != "loyal-opposition":
+        raise click.UsageError(
+            f"Provider '{lo_provider}' has role '{lo_prov.bridge_role}'"
+            " but --lo-provider requires bridge_role='loyal-opposition'"
+        )
 
     target = Path(target_dir) if target_dir else Path.cwd() / project_name
     options = ScaffoldOptions(
@@ -605,6 +631,8 @@ def project_init(
         init_git=init_git,
         include_ci=include_ci,
         seed_example=seed_example,
+        prime_provider_id=prime_provider,
+        lo_provider_id=lo_provider,
     )
     result = scaffold_project(options)
     click.echo(scaffold_summary(result, profile))

@@ -19,6 +19,7 @@ from groundtruth_kb.bootstrap import (
 )
 from groundtruth_kb.project.manifest import ProjectManifest, write_manifest
 from groundtruth_kb.project.profiles import ProjectProfile, get_profile
+from groundtruth_kb.providers.schema import CLAUDE_CODE, CODEX, AgentProvider, get_provider
 from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
 
 
@@ -32,6 +33,8 @@ class ScaffoldOptions:
             specs at ``authority='inferred'``. When ``None`` (the default),
             ``gt project init`` behavior is unchanged and no specs are
             generated — this preserves every pre-F6 caller.
+        prime_provider_id: Provider ID for the Prime Builder agent (default: ``"claude-code"``).
+        lo_provider_id: Provider ID for the Loyal Opposition agent (default: ``"codex"``).
     """
 
     project_name: str
@@ -46,6 +49,8 @@ class ScaffoldOptions:
     brand_mark: str = "GT"
     brand_color: str = "#2563eb"
     spec_scaffold: SpecScaffoldConfig | None = None
+    prime_provider_id: str = "claude-code"
+    lo_provider_id: str = "codex"
 
 
 def scaffold_project(options: ScaffoldOptions) -> Path:
@@ -56,6 +61,10 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
     target.mkdir(parents=True, exist_ok=True)
 
     copyright_notice = options.copyright_notice or _default_copyright(options.owner)
+
+    # ── Resolve agent providers ───────────────────────────────────────
+    prime_provider = get_provider(options.prime_provider_id)
+    lo_provider = get_provider(options.lo_provider_id)
 
     # ── Layer 1: Core KB (same as bootstrap-desktop) ──────────────────
     _write_groundtruth_toml(
@@ -73,7 +82,7 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
 
     # ── Dual-agent templates ──────────────────────────────────────────
     if profile.includes_bridge:
-        _copy_dual_agent_templates(target)
+        _copy_dual_agent_templates(target, project_name=options.project_name)
 
     # ── Webapp templates ──────────────────────────────────────────────
     if profile.includes_docker:
@@ -91,6 +100,8 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
         owner=options.owner,
         copyright_notice=copyright_notice,
         profile=profile,
+        prime_provider=prime_provider,
+        lo_provider=lo_provider,
     )
 
     # ── Seed governance data ──────────────────────────────────────────
@@ -160,7 +171,49 @@ def _copy_base_templates(target: Path) -> None:
     _write_pyproject_sections(target)
 
 
-def _copy_dual_agent_templates(target: Path) -> None:
+def _generate_bridge_index(project_name: str) -> str:
+    """Generate the initial bridge/INDEX.md content.
+
+    Args:
+        project_name: Human-readable project name used in the header.
+
+    Returns:
+        UTF-8 string content for ``bridge/INDEX.md``.
+    """
+    return """\
+# {{PROJECT_NAME}} — File Bridge Index
+
+<!-- This file is the single coordination artifact for the Prime Builder ↔
+     Loyal Opposition file bridge. Both agents read and write this file.
+     Newest entries are at the top. -->
+
+## Statuses
+
+| Status | Set by | Meaning |
+|--------|--------|---------|
+| NEW | Prime | Fresh proposal awaiting review |
+| REVISED | Prime | Updated proposal after a NO-GO |
+| GO | Codex | Proposal approved for implementation |
+| NO-GO | Codex | Proposal requires changes before approval |
+| VERIFIED | Codex | Post-implementation verification passed |
+
+## Prime Workflow
+
+1. Write proposal as `bridge/{{name}}-001.md`
+2. Insert `NEW: bridge/{{name}}-001.md` at the top of this file
+3. On GO: implement; on NO-GO: revise and insert REVISED entry
+
+## Codex Workflow
+
+1. Scan this file for NEW or REVISED entries
+2. Review the indicated file, write response as next incremented version
+3. Insert GO or NO-GO verdict line at the top of that document entry
+
+<!-- Add new document entries below this line -->
+"""
+
+
+def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
     """Copy dual-agent templates: AGENTS.md, bridge rules, Codex bootstrap."""
     templates = get_templates_dir()
 
@@ -220,6 +273,14 @@ def _copy_dual_agent_templates(target: Path) -> None:
     if "bridge-automation/logs" not in content:
         gi.write_text(content + additions, encoding="utf-8")
 
+    # bridge/INDEX.md — the coordination file for the file bridge workflow
+    bridge_dir = target / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    (bridge_dir / "INDEX.md").write_text(
+        _generate_bridge_index(project_name),
+        encoding="utf-8",
+    )
+
 
 def _copy_webapp_templates(target: Path, *, cloud_provider: str) -> None:
     """Copy webapp templates: Dockerfile, docker-compose, terraform, .env.example."""
@@ -277,8 +338,12 @@ def _render_all_templates(
     owner: str,
     copyright_notice: str,
     profile: ProjectProfile,
+    prime_provider: AgentProvider | None = None,
+    lo_provider: AgentProvider | None = None,
 ) -> None:
     """Replace all {{PLACEHOLDER}} values in rendered files."""
+    _prime = prime_provider or CLAUDE_CODE
+    _lo = lo_provider or CODEX
     replacements = {
         "{{PROJECT_NAME}}": project_name,
         "{{PROJECT_TYPE}}": f"{profile.display_name} project",
@@ -336,6 +401,13 @@ def _render_all_templates(
         "{{DOCUMENT_IDS_OR_NOTES}}": "Add KB IDs or notes here.",
         "{{DATE}}": "TBD",
         "{{FOLLOW_UPS}}": "TBD",
+        # Provider-specific placeholders
+        "{{PRIME_PROVIDER_DISPLAY_NAME}}": _prime.display_name,
+        "{{PRIME_PROVIDER_CLI_COMMAND}}": _prime.cli_command,
+        "{{PRIME_PROVIDER_MODEL_LABEL}}": _prime.model_label,
+        "{{LO_PROVIDER_DISPLAY_NAME}}": _lo.display_name,
+        "{{LO_PROVIDER_CLI_COMMAND}}": _lo.cli_command,
+        "{{LO_PROVIDER_MODEL_LABEL}}": _lo.model_label,
     }
 
     # Find all renderable files
@@ -478,10 +550,10 @@ LOG_LEVEL=INFO
 
 def _write_default_terraform(infra: Path, cloud_provider: str) -> None:
     provider_block = {
-        "azure": 'provider "azurerm" {\n  features {}\n}',
-        "aws": 'provider "aws" {\n  region = var.region\n}',
-        "gcp": 'provider "google" {\n  project = var.project_id\n  region  = var.region\n}',
-    }.get(cloud_provider, "# Configure your cloud provider here")
+        "azure": '# stub\nprovider "azurerm" {\n  features {}\n}',
+        "aws": '# stub\nprovider "aws" {\n  region = var.region\n}',
+        "gcp": '# stub\nprovider "google" {\n  project = var.project_id\n  region  = var.region\n}',
+    }.get(cloud_provider, "# stub\n# Configure your cloud provider here")
 
     (infra / "main.tf").write_text(
         f"# {{{{PROJECT_NAME}}}} — Infrastructure\n\n{provider_block}\n",
