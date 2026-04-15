@@ -31,14 +31,16 @@ if TYPE_CHECKING:
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
 
-# ChromaDB optional dependency (ignore_missing_imports configured in pyproject.toml)
+# chromadb is an optional dependency; declared Any so the try-block import can
+# rebind it without a type-incompatibility error in the except branch.
+# ignore_missing_imports for chromadb is configured in pyproject.toml.
+chromadb: Any = None
+HAS_CHROMADB: bool = False
 try:
     import chromadb
-
     HAS_CHROMADB = True
 except ImportError:
-    chromadb = None  # type: ignore[assignment]
-    HAS_CHROMADB = False
+    pass  # chromadb stays None; HAS_CHROMADB stays False
 
 # Semantic search constants
 SEMANTIC_MAX_DISTANCE = 1.5  # L2 distance threshold for relevance filtering
