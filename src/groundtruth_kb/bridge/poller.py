@@ -15,10 +15,10 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, TypedDict, cast
 
 # Cross-platform file locking
-if os.name == "nt":
+if sys.platform == "win32":
     import msvcrt
 else:
     import fcntl
@@ -32,6 +32,21 @@ from groundtruth_kb.bridge.worker import resident_worker_should_defer
 
 DIRECT_WAKE_EVENT_TYPES = {"message.failed"}
 SUBSTANTIVE_WAKE_COOLDOWN_SECONDS = 5 * 60
+
+
+class _NotificationBatchSummary(TypedDict):
+    failed_events: int
+    wake_refs: list[str]
+
+
+class _InboxSummary(TypedDict):
+    detected: int
+    surfaced: int
+    failed_inbox: int
+    readonly_skips: int
+    resident_deferrals: int
+    errors: int
+    wake_candidates: list[str]
 
 
 def _now() -> str:
@@ -52,37 +67,39 @@ class _FileLock:
 
     def __init__(self, path: Path) -> None:
         self.path = path
-        self._fh = None
+        self._fh: BinaryIO | None = None
 
     def __enter__(self) -> _FileLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists() or self.path.stat().st_size == 0:
             self.path.write_bytes(b"\x00")
-        self._fh = open(self.path, "r+b")
-        self._fh.seek(0)
+        fh: BinaryIO = open(self.path, "r+b")
+        fh.seek(0)
         try:
-            if os.name == "nt":
-                msvcrt.locking(self._fh.fileno(), msvcrt.LK_NBLCK, 1)
+            if sys.platform == "win32":
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
             else:
-                fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except (OSError, PermissionError):
-            self._fh.close()
-            self._fh = None
+            fh.close()
             raise RuntimeError(f"bridge poller lock busy: {self.path}")
+        self._fh = fh
         return self
 
     def __exit__(self, *_args: object) -> None:
-        if self._fh:
-            try:
-                if os.name == "nt":
-                    self._fh.seek(0)
-                    msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
-                    fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
-            except OSError:
-                pass
-            self._fh.close()
-            self._fh = None
+        fh = self._fh
+        if fh is None:
+            return
+        try:
+            if sys.platform == "win32":
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        fh.close()
+        self._fh = None
 
 
 def _load_state(path: Path) -> dict[str, Any]:
@@ -164,7 +181,7 @@ def _launch_agent_wake(
         }
         if os.name == "nt":
             popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-        subprocess.Popen(cmd, **popen_kwargs)
+        subprocess.Popen(cmd, **cast(Any, popen_kwargs))
         _append_log(
             log_file,
             f"wake launched agent={agent} trigger={trigger} message_ids={','.join(launch_ids)}",
@@ -265,7 +282,7 @@ def _handle_notification_batch(
     events: list[dict[str, Any]],
     log_file: Path,
 ) -> dict[str, Any]:
-    summary = {
+    summary: _NotificationBatchSummary = {
         "failed_events": 0,
         "wake_refs": [],
     }
@@ -291,7 +308,7 @@ def _handle_notification_batch(
             summary["wake_refs"].append(message_ref)
 
     summary["wake_refs"] = dedupe_preserve_order(summary["wake_refs"])
-    return summary
+    return cast(dict[str, Any], summary)
 
 
 def _handle_inbox(
@@ -314,7 +331,7 @@ def _handle_inbox(
     - Repeated wake for the same unresolved substantive item is suppressed for
       a short cooldown window.
     """
-    summary = {
+    summary: _InboxSummary = {
         "detected": 0,
         "surfaced": 0,
         "failed_inbox": 0,
@@ -373,7 +390,7 @@ def _handle_inbox(
             _append_log(log_file, f"error handling {message_id}: {exc}")
 
     summary["wake_candidates"] = dedupe_preserve_order(wake_candidates)
-    return summary
+    return cast(dict[str, Any], summary)
 
 
 def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:

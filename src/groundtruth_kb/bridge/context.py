@@ -243,10 +243,10 @@ def discover_artifacts(context: dict[str, Any], *, project_dir: Path) -> list[di
                 }
         for match in ARTIFACT_NAME_RE.findall(raw):
             cleaned = clean_path_candidate(match)
-            path = resolve_artifact_name(cleaned, project_dir=project_dir)
-            if path is not None:
-                found[str(path)] = {
-                    "path": str(path),
+            artifact_path = resolve_artifact_name(cleaned, project_dir=project_dir)
+            if artifact_path is not None:
+                found[str(artifact_path)] = {
+                    "path": str(artifact_path),
                     "source": "artifact-name",
                 }
 

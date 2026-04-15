@@ -12,14 +12,15 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, BinaryIO, cast
 
 # Cross-platform file locking
-if os.name == "nt":
+if sys.platform == "win32":
     import msvcrt
 else:
     import fcntl
@@ -136,32 +137,35 @@ def _save_state(agent: str, state: dict[str, Any], project_dir: Path) -> None:
 class _FileLock:
     def __init__(self, path: Path) -> None:
         self.path = path
-        self._fh = None
+        self._fh: BinaryIO | None = None
 
     def __enter__(self) -> _FileLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists() or self.path.stat().st_size == 0:
             self.path.write_bytes(b"\x00")
-        self._fh = open(self.path, "r+b")
-        self._fh.seek(0)
-        if os.name == "nt":
-            msvcrt.locking(self._fh.fileno(), msvcrt.LK_NBLCK, 1)
+        fh: BinaryIO = open(self.path, "r+b")
+        fh.seek(0)
+        if sys.platform == "win32":
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
         else:
-            fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self._fh = fh
         return self
 
     def __exit__(self, *_args: object) -> None:
-        if self._fh:
-            try:
-                if os.name == "nt":
-                    self._fh.seek(0)
-                    msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
-                    fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
-            except OSError:
-                pass
-            self._fh.close()
-            self._fh = None
+        fh = self._fh
+        if fh is None:
+            return
+        try:
+            if sys.platform == "win32":
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        fh.close()
+        self._fh = None
 
 
 def _find_codex_exe() -> Path:
@@ -247,7 +251,7 @@ def _invoke_codex(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
     }
     if os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
-    completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **popen_kwargs))
+    completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **cast(Any, popen_kwargs)))
     return completed
 
 
@@ -271,7 +275,7 @@ def _invoke_prime(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
     }
     if os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-    completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **popen_kwargs))
+    completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **cast(Any, popen_kwargs)))
     _last_stdout_file("prime", project_dir).write_text(completed.stdout or "", encoding="utf-8")
     _last_message_file("prime", project_dir).write_text(completed.stdout or "", encoding="utf-8")
     return completed
@@ -574,6 +578,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
             startup_scan_pending = True
             consecutive_errors = 0  # Phase C: track repeated failures
 
+            event_batch: dict[str, Any]  # forward declaration for mypy --strict
             while True:
                 try:
                     if startup_scan_pending:
