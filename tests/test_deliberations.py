@@ -232,6 +232,31 @@ class TestRedaction:
         assert "mongodb://admin" not in result["content"]
         assert "[REDACTED:connection_string]" in result["content"]
 
+    def test_anthropic_api_key_redacted(self, db):
+        """Phase 4B-housekeeping Item 1: the anthropic_api_key pattern
+        matches sk-ant-api<version>-<token> and both removes the raw value
+        and records the pattern label in redaction_notes."""
+        raw_key = "sk-ant-api03-ABCDEFG123456789abcdefg123456789XYZ789"
+        content = f"A deliberation body mentioning a leaked key {raw_key} by accident."
+        result = db.insert_deliberation(
+            id="DELIB-0001",
+            source_type="owner_conversation",
+            title="Anthropic key redaction",
+            summary="verify anthropic_api_key pattern",
+            content=content,
+            changed_by="test",
+            change_reason="test",
+        )
+        # Raw key must be removed
+        assert raw_key not in result["content"]
+        # Placeholder marker should be inserted
+        assert "[REDACTED:anthropic_api_key]" in result["content"]
+        # Redaction state and sensitivity should be updated
+        assert result["redaction_state"] == "redacted"
+        assert result["sensitivity"] == "contains_redacted"
+        # Pattern label should appear in the notes
+        assert "anthropic_api_key" in result["redaction_notes"]
+
     def test_clean_content_not_redacted(self, db):
         content = "This review found no issues. The implementation is correct."
         result = db.insert_deliberation(

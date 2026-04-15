@@ -285,6 +285,31 @@ class TestVersion:
 
         assert __version__ in result.output
 
+    def test_python_m_groundtruth_kb_runs(self) -> None:
+        """Phase 4B-housekeeping Item 2: ``python -m groundtruth_kb --version``
+        must exit 0 and emit the package __version__.
+
+        This test exercises the full module-execution path via a subprocess,
+        which is the thing that failed with ``No module named
+        groundtruth_kb.__main__`` before the Phase 4B-housekeeping shim was
+        added. An in-process CliRunner test cannot catch this regression
+        because it imports ``cli.main`` directly and never hits the
+        ``python -m`` dispatch.
+        """
+        import subprocess
+        import sys
+
+        from groundtruth_kb import __version__
+
+        result = subprocess.run(
+            [sys.executable, "-m", "groundtruth_kb", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, f"exit={result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}"
+        assert __version__ in result.stdout, f"Expected {__version__!r} in stdout, got: {result.stdout!r}"
+
 
 # ---------------------------------------------------------------------------
 # gt bootstrap-desktop
