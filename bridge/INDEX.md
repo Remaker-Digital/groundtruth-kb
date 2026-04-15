@@ -10,10 +10,80 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: gtkb-phase4b8-line-coverage
+REVISED: bridge/gtkb-phase4b8-line-coverage-013.md
+NO-GO: bridge/gtkb-phase4b8-line-coverage-012.md
+NEW: bridge/gtkb-phase4b8-line-coverage-011.md
+GO: bridge/gtkb-phase4b8-line-coverage-010.md
+REVISED: bridge/gtkb-phase4b8-line-coverage-009.md
+NO-GO: bridge/gtkb-phase4b8-line-coverage-008.md
+REVISED: bridge/gtkb-phase4b8-line-coverage-007.md
+NO-GO: bridge/gtkb-phase4b8-line-coverage-006.md
+REVISED: bridge/gtkb-phase4b8-line-coverage-005.md
+NO-GO: bridge/gtkb-phase4b8-line-coverage-004.md
+REVISED: bridge/gtkb-phase4b8-line-coverage-003.md
+NO-GO: bridge/gtkb-phase4b8-line-coverage-002.md
+NEW: bridge/gtkb-phase4b8-line-coverage-001.md
+
+Document: gtkb-phase4b7-residual-mypy-strict
+VERIFIED: bridge/gtkb-phase4b7-residual-mypy-strict-010.md
+NEW: bridge/gtkb-phase4b7-residual-mypy-strict-009.md
+GO: bridge/gtkb-phase4b7-residual-mypy-strict-008.md
+REVISED: bridge/gtkb-phase4b7-residual-mypy-strict-007.md
+NO-GO: bridge/gtkb-phase4b7-residual-mypy-strict-006.md
+REVISED: bridge/gtkb-phase4b7-residual-mypy-strict-005.md
+NO-GO: bridge/gtkb-phase4b7-residual-mypy-strict-004.md
+REVISED: bridge/gtkb-phase4b7-residual-mypy-strict-003.md
+NO-GO: bridge/gtkb-phase4b7-residual-mypy-strict-002.md
+NEW: bridge/gtkb-phase4b7-residual-mypy-strict-001.md
+
+Document: gtkb-phase4b5a-bridge-annotations
+VERIFIED: bridge/gtkb-phase4b5a-bridge-annotations-006.md
+REVISED: bridge/gtkb-phase4b5a-bridge-annotations-005.md
+NO-GO: bridge/gtkb-phase4b5a-bridge-annotations-004.md
+NEW: bridge/gtkb-phase4b5a-bridge-annotations-003.md
+GO: bridge/gtkb-phase4b5a-bridge-annotations-002.md
+NEW: bridge/gtkb-phase4b5a-bridge-annotations-001.md
+
+Document: gtkb-phase4b5b-internal-helpers-mypy
+VERIFIED: bridge/gtkb-phase4b5b-internal-helpers-mypy-007.md
+REVISED: bridge/gtkb-phase4b5b-internal-helpers-mypy-006.md
+NO-GO: bridge/gtkb-phase4b5b-internal-helpers-mypy-005.md
+NEW: bridge/gtkb-phase4b5b-internal-helpers-mypy-004.md
+NEW: bridge/gtkb-phase4b5b-internal-helpers-mypy-003.md
+GO: bridge/gtkb-phase4b5b-internal-helpers-mypy-002.md
+NEW: bridge/gtkb-phase4b5b-internal-helpers-mypy-001.md
+
+Document: external-poller-liveness-watcher
+VERIFIED: bridge/external-poller-liveness-watcher-006.md
+NEW: bridge/external-poller-liveness-watcher-005.md
+GO: bridge/external-poller-liveness-watcher-004.md
+REVISED: bridge/external-poller-liveness-watcher-003.md
+NO-GO: bridge/external-poller-liveness-watcher-002.md
+NEW: bridge/external-poller-liveness-watcher-001.md
+
+Document: precommit-ps1-syntax-validation
+VERIFIED: bridge/precommit-ps1-syntax-validation-004.md
+NEW: bridge/precommit-ps1-syntax-validation-003.md
+GO: bridge/precommit-ps1-syntax-validation-002.md
+NEW: bridge/precommit-ps1-syntax-validation-001.md
+
+Document: poller-emergency-repair
+VERIFIED: bridge/poller-emergency-repair-002.md
+NEW: bridge/poller-emergency-repair-001.md
+
 Document: test-artifact-integrity-investigation
+VERIFIED: bridge/test-artifact-integrity-investigation-006.md
+REVISED: bridge/test-artifact-integrity-investigation-005.md
+NO-GO: bridge/test-artifact-integrity-investigation-004.md
+REVISED: bridge/test-artifact-integrity-investigation-003.md
+NO-GO: bridge/test-artifact-integrity-investigation-002.md
 NEW: bridge/test-artifact-integrity-investigation-001.md
 
 Document: s291-phase1.5-verified-spec-audit
+VERIFIED: bridge/s291-phase1.5-verified-spec-audit-008.md
+REVISED: bridge/s291-phase1.5-verified-spec-audit-007.md
+NO-GO: bridge/s291-phase1.5-verified-spec-audit-006.md
 NEW: bridge/s291-phase1.5-verified-spec-audit-005.md
 GO: bridge/s291-phase1.5-verified-spec-audit-004.md
 REVISED: bridge/s291-phase1.5-verified-spec-audit-003.md
@@ -21,6 +91,11 @@ NO-GO: bridge/s291-phase1.5-verified-spec-audit-002.md
 NEW: bridge/s291-phase1.5-verified-spec-audit-001.md
 
 Document: poller-batch-size-cap
+VERIFIED: bridge/poller-batch-size-cap-010.md
+REVISED: bridge/poller-batch-size-cap-009.md
+NO-GO: bridge/poller-batch-size-cap-008.md
+NEW: bridge/poller-batch-size-cap-007.md
+GO: bridge/poller-batch-size-cap-006.md
 REVISED: bridge/poller-batch-size-cap-005.md
 NO-GO: bridge/poller-batch-size-cap-004.md
 REVISED: bridge/poller-batch-size-cap-003.md
@@ -52,6 +127,8 @@ NO-GO: bridge/spec-hygiene-spa-investigation-002.md
 NEW: bridge/spec-hygiene-spa-investigation-001.md
 
 Document: s291-prioritization-request
+VERIFIED: bridge/s291-prioritization-request-004.md
+NEW: bridge/s291-prioritization-request-003.md
 GO: bridge/s291-prioritization-request-002.md
 NEW: bridge/s291-prioritization-request-001.md
 
