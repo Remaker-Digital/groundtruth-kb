@@ -10,6 +10,9 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: gtkb-phase4b2-medium-defensiveness
+NEW: bridge/gtkb-phase4b2-medium-defensiveness-001.md
+
 Document: gtkb-phase4b-housekeeping
 NEW: bridge/gtkb-phase4b-housekeeping-003.md
 GO: bridge/gtkb-phase4b-housekeeping-002.md
