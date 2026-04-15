@@ -497,6 +497,14 @@ and file-based `--content-file` paths go through the same redaction pipeline.
 Use `add` when the caller owns the identifier. For source-content idempotency,
 use `upsert` instead.
 
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Deliberation inserted successfully |
+| `1` | Database write failed (e.g. duplicate `id`, invalid foreign key) |
+| `2` | Click validation error: missing required flag, invalid `--source-type` / `--outcome` choice, or `--content` / `--content-file` mutual-exclusion violation |
+
 ### gt deliberations upsert
 
 Insert or update a deliberation keyed by `(source_type, source_ref, content_hash)`.
@@ -514,6 +522,14 @@ gt deliberations upsert --source-type <TYPE> --source-ref <REF> \
 Same options as `add` **except** no `--id` flag (passing `--id` exits with
 code 2). Prints the deliberation ID on success so shell scripts can capture
 it. Idempotent on identical `(source_type, source_ref, content_hash)`.
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Deliberation row written or matched (idempotent) |
+| `1` | Database write failed |
+| `2` | Click validation error, including passing `--id` (which `upsert` does not accept) |
 
 ### gt deliberations get
 
@@ -544,6 +560,14 @@ gt deliberations list [--spec-id <ID>] [--work-item-id <ID>] \
 All filters are optional and combine with logical AND. `--limit` performs a
 CLI-side slice on the matching rows.
 
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Query completed (empty result is not an error) |
+| `1` | Database access failed |
+| `2` | Click validation error on filter choices (e.g. invalid `--source-type`) |
+
 ### gt deliberations search
 
 Search deliberations by semantic similarity with SQLite LIKE text fallback.
@@ -566,6 +590,14 @@ CLI fully functional without the `[search]` extra.
 `--semantic-only` is an opt-in strict mode: it requires ChromaDB to be
 installed and filters out any row tagged `search_method="text_match"`. Exits
 with code `1` if ChromaDB is not installed.
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Search completed (empty result is not an error) |
+| `1` | `--semantic-only` requested but ChromaDB is not installed |
+| `2` | Click validation error on flag values (e.g. non-integer `--limit`) |
 
 ### gt deliberations link
 

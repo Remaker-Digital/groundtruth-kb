@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`add`, `upsert`, `get`, `list`, `search`, `link`) that shipped in Phase 3
   now have a documented configuration story via the new Exceptions section
   in `docs/reference/configuration.md`.
+- **Phase 4B-housekeeping: `python -m groundtruth_kb` entry point** — New
+  `src/groundtruth_kb/__main__.py` shim delegates to `cli.main`, enabling
+  `python -m groundtruth_kb <command>` in addition to the installed `gt`
+  console script. Useful for CI matrices and for debugging without
+  depending on console-script path resolution. Zero side effects at import.
+- **Phase 4B-housekeeping: Anthropic API key redaction.** New
+  `anthropic_api_key` pattern in `_REDACTION_PATTERNS` matches
+  `sk-ant-api<version>-<token>` so leaked Anthropic keys in deliberation
+  content are redacted at the DB layer alongside the existing AWS,
+  GitHub PAT, Azure SAS, and Agent Red key families.
+- **Phase 4B-housekeeping: Exit-code tables for `gt deliberations`
+  subcommands.** `docs/reference/cli.md` now documents exit codes for
+  `add`, `upsert`, `list`, and `search` (matching the previously-documented
+  `rebuild-index`, `get`, and `link`).
 
 ### Changed
 
@@ -28,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`config_path=None` with nothing found up the parent tree) is unchanged —
   it still falls back to defaults. CLI users are unaffected because
   `--config` already uses `click.Path(exists=True)`.
+- **Phase 4B-housekeeping: `actions/checkout@v4 → @v6`.** All 14
+  occurrences across 8 workflow files upgraded to the current stable
+  major version (GA since 2025-11-20, currently `v6.0.2`). The
+  `v6` release introduces Node 24 runtime support and moves
+  `persist-credentials` storage to a per-job file under `$RUNNER_TEMP`;
+  neither change affects our workflows (no container jobs, no
+  authenticated git operations after checkout).
 
 ### Internal
 
@@ -35,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   15 tests (net +6). Three previously-passing tests that relied on the
   silent-defaults behavior were rewritten to use real temporary TOML files.
   Full suite: 624 → 630.
+- **Phase 4B-housekeeping: Test-suite growth.** Added
+  `test_anthropic_api_key_redacted` to `TestRedaction` and
+  `test_python_m_groundtruth_kb_runs` to `TestVersion`. Full suite:
+  630 → 632.
 
 ### Tracked for future sub-rounds (Phase 4B.2+)
 
