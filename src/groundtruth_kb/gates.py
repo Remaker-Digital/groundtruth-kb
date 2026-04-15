@@ -113,15 +113,58 @@ class GateRegistry:
     _gates: list[GovernanceGate] = field(default_factory=list)
 
     def register(self, gate: GovernanceGate) -> None:
+        """Add a governance gate to the registry.
+
+        Appends the gate to the internal gate list. Gates are run in
+        registration order at each lifecycle transition. Typically called
+        during ``GateRegistry.from_config`` or programmatically before the
+        registry is passed to ``KnowledgeDB``.
+
+        Args:
+            gate: A ``GovernanceGate`` instance to register.
+        """
         self._gates.append(gate)
 
     def run_pre_promote(self, spec_id: str, current_status: str, target_status: str, spec_data: dict[str, Any]) -> None:
+        """Run all registered gates before a spec status promotion.
+
+        Iterates through all registered gates and calls each gate's
+        ``pre_promote`` hook. The first gate that raises
+        ``GovernanceGateError`` stops execution and the error propagates to
+        the caller, blocking the promotion.
+
+        Args:
+            spec_id: The specification ID being promoted (e.g. ``"SPEC-1234"``).
+            current_status: The spec's current status (e.g. ``"specified"``).
+            target_status: The status being transitioned to (e.g. ``"implemented"``).
+            spec_data: A dict of spec fields passed to each gate for evaluation.
+
+        Raises:
+            GovernanceGateError: If any registered gate blocks the transition.
+        """
         for gate in self._gates:
             gate.pre_promote(spec_id, current_status, target_status, spec_data)
 
     def run_pre_resolve_work_item(
         self, wi_id: str, origin: str, resolution: str, owner_approved: bool, wi_data: dict[str, Any]
     ) -> None:
+        """Run all registered gates before a work item resolution.
+
+        Iterates through all registered gates and calls each gate's
+        ``pre_resolve_work_item`` hook. The first gate that raises
+        ``GovernanceGateError`` stops execution and the error propagates to
+        the caller, blocking the resolution.
+
+        Args:
+            wi_id: The work item ID being resolved (e.g. ``"WI-0042"``).
+            origin: The work item origin (``"defect"``, ``"regression"``, etc.).
+            resolution: The target resolution (e.g. ``"resolved"``).
+            owner_approved: Whether the owner has explicitly approved resolution.
+            wi_data: A dict of work item fields passed to each gate for evaluation.
+
+        Raises:
+            GovernanceGateError: If any registered gate blocks the resolution.
+        """
         for gate in self._gates:
             gate.pre_resolve_work_item(wi_id, origin, resolution, owner_approved, wi_data)
 

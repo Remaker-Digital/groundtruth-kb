@@ -669,6 +669,16 @@ class KnowledgeDB:
         return declared_type
 
     def close(self) -> None:
+        """Close the underlying SQLite connection.
+
+        Closes the active SQLite connection and releases it. The connection
+        is lazily re-opened on the next database operation, so calling
+        ``close()`` does not permanently invalidate the instance. Safe to
+        call multiple times — a no-op if no connection is currently open.
+
+        Note: ``close()`` does not touch the ChromaDB client. ChromaDB
+        resources are managed separately and are not released by this call.
+        """
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -1622,6 +1632,27 @@ class KnowledgeDB:
         last_execution_status: str | None = None,
         last_executed_at: str | None = None,
     ) -> dict[str, Any]:
+        """Insert a new version of a test procedure into the knowledge database.
+
+        Test procedures are append-only — each call creates a new version row
+        keyed by ``id``. The latest version is exposed via ``get_test_procedure``.
+
+        Args:
+            id: Unique test procedure identifier (e.g. ``"TP-001"``).
+            title: Short descriptive title.
+            changed_by: Actor responsible for this version.
+            change_reason: Human-readable rationale for the change.
+            type: Optional procedure type classification.
+            content: Full procedure content or script text.
+            assertion_count: Number of assertions in the procedure.
+            last_execution_status: Result of the most recent execution
+                (e.g. ``"pass"``, ``"fail"``).
+            last_executed_at: ISO-8601 timestamp of the most recent execution.
+
+        Returns:
+            The newly inserted version as a dict. Schema mirrors the
+            ``test_procedures`` table row, with JSON fields pre-parsed.
+        """
         version = self._next_test_proc_version(id)
         conn = self._get_conn()
         conn.execute(
@@ -1648,10 +1679,28 @@ class KnowledgeDB:
         return self.get_test_procedure(id)
 
     def get_test_procedure(self, proc_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a test procedure, or None if not found.
+
+        Args:
+            proc_id: Test procedure identifier (e.g. ``"TP-001"``).
+
+        Returns:
+            A dict of the current test procedure row with JSON fields pre-parsed,
+            or ``None`` if no procedure with that ID exists.
+        """
         row = self._get_conn().execute("SELECT * FROM current_test_procedures WHERE id = ?", (proc_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_test_procedure_history(self, proc_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a test procedure, newest-first.
+
+        Args:
+            proc_id: Test procedure identifier (e.g. ``"TP-001"``).
+
+        Returns:
+            A list of version dicts ordered by ``version DESC``. Returns an
+            empty list if no procedure with that ID exists.
+        """
         rows = (
             self._get_conn()
             .execute(
@@ -1663,6 +1712,16 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     def list_test_procedures(self, *, type: str | None = None) -> list[dict[str, Any]]:
+        """List all current test procedures, optionally filtered by type.
+
+        Args:
+            type: Optional type filter. When provided, returns only procedures
+                with a matching ``type`` value.
+
+        Returns:
+            A list of test procedure dicts ordered by ``id``. Returns an
+            empty list if no matching procedures exist.
+        """
         query = "SELECT * FROM current_test_procedures WHERE 1=1"
         params: list[Any] = []
         if type:
@@ -1698,6 +1757,30 @@ class KnowledgeDB:
         last_verified_at: str | None = None,
         last_corrected_at: str | None = None,
     ) -> dict[str, Any]:
+        """Insert a new version of an operational procedure into the knowledge database.
+
+        Operational procedures are append-only — each call creates a new version
+        row keyed by ``id``. The latest version is exposed via ``get_op_procedure``.
+        JSON fields (``variables``, ``steps``, ``known_failure_modes``) are
+        serialized automatically.
+
+        Args:
+            id: Unique operational procedure identifier (e.g. ``"OP-001"``).
+            title: Short descriptive title.
+            changed_by: Actor responsible for this version.
+            change_reason: Human-readable rationale for the change.
+            type: Optional procedure type classification.
+            variables: Optional dict of named variables used by the procedure steps.
+            steps: Optional list of step dicts describing the procedure steps.
+            known_failure_modes: Optional list of dicts documenting known failure
+                modes and their mitigations.
+            last_verified_at: ISO-8601 timestamp of the most recent verification.
+            last_corrected_at: ISO-8601 timestamp of the most recent correction.
+
+        Returns:
+            The newly inserted version as a dict. Schema mirrors the
+            ``operational_procedures`` table row, with JSON fields pre-parsed.
+        """
         version = self._next_op_version(id)
         conn = self._get_conn()
         conn.execute(
@@ -1725,12 +1808,31 @@ class KnowledgeDB:
         return self.get_op_procedure(id)
 
     def get_op_procedure(self, proc_id: str) -> dict[str, Any] | None:
+        """Return the latest version of an operational procedure, or None if not found.
+
+        Args:
+            proc_id: Operational procedure identifier (e.g. ``"OP-001"``).
+
+        Returns:
+            A dict of the current operational procedure row with JSON fields
+            (``variables``, ``steps``, ``known_failure_modes``) pre-parsed,
+            or ``None`` if no procedure with that ID exists.
+        """
         row = (
             self._get_conn().execute("SELECT * FROM current_operational_procedures WHERE id = ?", (proc_id,)).fetchone()
         )
         return _row_to_dict(row) if row else None
 
     def get_op_procedure_history(self, proc_id: str) -> list[dict[str, Any]]:
+        """Return all versions of an operational procedure, newest-first.
+
+        Args:
+            proc_id: Operational procedure identifier (e.g. ``"OP-001"``).
+
+        Returns:
+            A list of version dicts ordered by ``version DESC``. Returns an
+            empty list if no procedure with that ID exists.
+        """
         rows = (
             self._get_conn()
             .execute(
@@ -1742,6 +1844,16 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     def list_op_procedures(self, *, type: str | None = None) -> list[dict[str, Any]]:
+        """List all current operational procedures, optionally filtered by type.
+
+        Args:
+            type: Optional type filter. When provided, returns only procedures
+                with a matching ``type`` value.
+
+        Returns:
+            A list of operational procedure dicts ordered by ``id``. Returns an
+            empty list if no matching procedures exist.
+        """
         query = "SELECT * FROM current_operational_procedures WHERE 1=1"
         params: list[Any] = []
         if type:
@@ -1939,6 +2051,15 @@ class KnowledgeDB:
         return self.get_document(id)
 
     def get_document(self, doc_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a document, or None if not found.
+
+        Args:
+            doc_id: Document identifier (e.g. ``"DOC-001"``).
+
+        Returns:
+            A dict of the current document row with JSON fields pre-parsed,
+            or ``None`` if no document with that ID exists.
+        """
         row = self._get_conn().execute("SELECT * FROM current_documents WHERE id = ?", (doc_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
@@ -1949,6 +2070,18 @@ class KnowledgeDB:
         status: str | None = None,
         tag: str | None = None,
     ) -> list[dict[str, Any]]:
+        """List all current documents, optionally filtered by category, status, or tag.
+
+        Args:
+            category: Optional category filter (e.g. ``"implementation_proposal"``).
+            status: Optional status filter (e.g. ``"published"``).
+            tag: Optional tag filter. Matches documents where the ``tags`` JSON
+                array contains an element equal to ``tag``.
+
+        Returns:
+            A list of document dicts ordered by ``id``. Returns an empty list
+            if no matching documents exist.
+        """
         query = "SELECT * FROM current_documents WHERE 1=1"
         params: list[Any] = []
         if category:
@@ -2288,10 +2421,28 @@ class KnowledgeDB:
         return self.get_test(id)
 
     def get_test(self, test_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a test artifact, or None if not found.
+
+        Args:
+            test_id: Test artifact identifier (e.g. ``"TEST-0001"``).
+
+        Returns:
+            A dict of the current test row with JSON fields pre-parsed,
+            or ``None`` if no test with that ID exists.
+        """
         row = self._get_conn().execute("SELECT * FROM current_tests WHERE id = ?", (test_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_test_history(self, test_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a test artifact, newest-first.
+
+        Args:
+            test_id: Test artifact identifier (e.g. ``"TEST-0001"``).
+
+        Returns:
+            A list of version dicts ordered by ``version DESC``. Returns an
+            empty list if no test with that ID exists.
+        """
         rows = self._get_conn().execute("SELECT * FROM tests WHERE id = ? ORDER BY version DESC", (test_id,)).fetchall()
         return [_row_to_dict(r) for r in rows]
 
@@ -2400,10 +2551,28 @@ class KnowledgeDB:
         return self.get_test_plan(id)
 
     def get_test_plan(self, plan_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a test plan, or None if not found.
+
+        Args:
+            plan_id: Test plan identifier (e.g. ``"PLAN-001"``).
+
+        Returns:
+            A dict of the current test plan row with JSON fields pre-parsed,
+            or ``None`` if no test plan with that ID exists.
+        """
         row = self._get_conn().execute("SELECT * FROM current_test_plans WHERE id = ?", (plan_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_test_plan_history(self, plan_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a test plan, newest-first.
+
+        Args:
+            plan_id: Test plan identifier (e.g. ``"PLAN-001"``).
+
+        Returns:
+            A list of version dicts ordered by ``version DESC``. Returns an
+            empty list if no test plan with that ID exists.
+        """
         rows = (
             self._get_conn()
             .execute("SELECT * FROM test_plans WHERE id = ? ORDER BY version DESC", (plan_id,))
@@ -2412,6 +2581,17 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     def list_test_plans(self, *, status: str | None = None) -> list[dict[str, Any]]:
+        """List all current test plans, optionally filtered by status.
+
+        Args:
+            status: Optional status filter (e.g. ``"active"``, ``"draft"``,
+                ``"retired"``). When provided, returns only plans with a
+                matching ``status`` value.
+
+        Returns:
+            A list of test plan dicts ordered by ``id``. Returns an empty
+            list if no matching test plans exist.
+        """
         query = "SELECT * FROM current_test_plans WHERE 1=1"
         params: list[Any] = []
         if status:
@@ -2537,6 +2717,16 @@ class KnowledgeDB:
         return self.get_test_plan_phase(id)
 
     def get_test_plan_phase(self, phase_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a test plan phase, or None if not found.
+
+        Args:
+            phase_id: Test plan phase identifier (e.g. ``"PLAN-001-P1"``).
+
+        Returns:
+            A dict of the current test plan phase row with JSON fields
+            (e.g. ``test_ids``) pre-parsed, or ``None`` if no phase with
+            that ID exists.
+        """
         row = self._get_conn().execute("SELECT * FROM current_test_plan_phases WHERE id = ?", (phase_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
@@ -2805,10 +2995,28 @@ class KnowledgeDB:
         return self.get_work_item(id)
 
     def get_work_item(self, item_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a work item, or None if not found.
+
+        Args:
+            item_id: Work item identifier (e.g. ``"WI-0042"``).
+
+        Returns:
+            A dict of the current work item row with JSON fields pre-parsed,
+            or ``None`` if no work item with that ID exists.
+        """
         row = self._get_conn().execute("SELECT * FROM current_work_items WHERE id = ?", (item_id,)).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_work_item_history(self, item_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a work item, newest-first.
+
+        Args:
+            item_id: Work item identifier (e.g. ``"WI-0042"``).
+
+        Returns:
+            A list of version dicts ordered by ``version DESC``. Returns an
+            empty list if no work item with that ID exists.
+        """
         rows = (
             self._get_conn()
             .execute("SELECT * FROM work_items WHERE id = ? ORDER BY version DESC", (item_id,))
@@ -2918,12 +3126,31 @@ class KnowledgeDB:
         return self.get_backlog_snapshot(id)
 
     def get_backlog_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        """Return the latest version of a backlog snapshot, or None if not found.
+
+        Args:
+            snapshot_id: Backlog snapshot identifier (e.g. ``"SNAP-001"``).
+
+        Returns:
+            A dict of the current backlog snapshot row with JSON fields
+            (``work_item_ids``, ``summary_by_origin``, ``summary_by_component``)
+            pre-parsed, or ``None`` if no snapshot with that ID exists.
+        """
         row = (
             self._get_conn().execute("SELECT * FROM current_backlog_snapshots WHERE id = ?", (snapshot_id,)).fetchone()
         )
         return _row_to_dict(row) if row else None
 
     def get_backlog_snapshot_history(self, snapshot_id: str) -> list[dict[str, Any]]:
+        """Return all versions of a backlog snapshot, newest-first.
+
+        Args:
+            snapshot_id: Backlog snapshot identifier (e.g. ``"SNAP-001"``).
+
+        Returns:
+            A list of version dicts ordered by ``version DESC``. Returns an
+            empty list if no snapshot with that ID exists.
+        """
         rows = (
             self._get_conn()
             .execute(
@@ -2992,6 +3219,20 @@ class KnowledgeDB:
         results: list[dict],
         triggered_by: str,
     ) -> None:
+        """Record the result of an assertion run for a specification.
+
+        Inserts a row into ``assertion_runs`` capturing which spec version was
+        tested, whether all assertions passed, and the per-assertion details.
+        Also records a ``pipeline_event`` for audit purposes.
+
+        Args:
+            spec_id: The specification ID that was asserted (e.g. ``"SPEC-1234"``).
+            spec_version: The spec version number that was evaluated.
+            overall_passed: ``True`` if every assertion passed; ``False`` if any failed.
+            results: List of per-assertion result dicts from the assertion runner.
+            triggered_by: Actor or process that initiated the assertion run
+                (e.g. ``"session-start-hook"``).
+        """
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO assertion_runs
@@ -3015,6 +3256,16 @@ class KnowledgeDB:
             raise
 
     def get_latest_assertion_run(self, spec_id: str) -> dict[str, Any] | None:
+        """Return the most recent assertion run for a specification, or None if none exist.
+
+        Args:
+            spec_id: The specification ID to look up (e.g. ``"SPEC-1234"``).
+
+        Returns:
+            A dict of the most recent assertion run row (including ``results`` as
+            a pre-parsed list), or ``None`` if no assertion runs have been
+            recorded for this spec.
+        """
         row = (
             self._get_conn()
             .execute(
@@ -4421,6 +4672,35 @@ class KnowledgeDB:
         return {"indexed": indexed, "chunks": total_chunks, "errors": errors}
 
     def get_summary(self) -> dict[str, Any]:
+        """Return a high-level count summary across all artifact types in the database.
+
+        Queries current-view tables for spec counts by status, test artifact
+        counts, procedure counts, assertion pass/fail stats, work item counts
+        by resolution status, backlog snapshot count, deliberation count,
+        and pipeline event count.
+
+        Returns:
+            A dict with keys:
+            - ``spec_counts``: dict of ``{status: count}`` for current specs.
+            - ``spec_total``: total current spec count (sum of spec_counts).
+            - ``spec_total_versions``: total rows in the specs history table.
+            - ``test_procedure_count``: number of current test procedures.
+            - ``op_procedure_count``: number of current operational procedures.
+            - ``assertions_total``: count of specs with at least one assertion run.
+            - ``assertions_passed``: count where the latest assertion run passed.
+            - ``assertions_failed``: count where the latest assertion run failed.
+            - ``env_config_count``: number of current environment config entries.
+            - ``document_count``: number of current documents.
+            - ``test_artifact_count``: number of current test artifacts.
+            - ``test_plan_count``: number of current test plans.
+            - ``test_plan_phase_count``: number of current test plan phases.
+            - ``work_item_counts``: dict of ``{resolution_status: count}``.
+            - ``work_item_total``: total current work item count.
+            - ``backlog_snapshot_count``: number of current backlog snapshots.
+            - ``testable_element_count``: number of current testable elements.
+            - ``deliberation_count``: number of current deliberations.
+            - ``pipeline_event_count``: total pipeline event rows.
+        """
         conn = self._get_conn()
         specs = conn.execute("SELECT status, COUNT(*) as cnt FROM current_specifications GROUP BY status").fetchall()
         spec_counts = {r["status"]: r["cnt"] for r in specs}
