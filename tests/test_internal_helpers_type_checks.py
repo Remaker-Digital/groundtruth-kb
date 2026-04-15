@@ -33,6 +33,7 @@ def _clean_subprocess_env() -> dict[str, str]:
     """
     return {k: v for k, v in os.environ.items() if not (k.startswith("COV_") or k.startswith("COVERAGE_"))}
 
+
 INTERNAL_HELPER_FILES = [
     "src/groundtruth_kb/seed.py",
     "src/groundtruth_kb/web/app.py",
