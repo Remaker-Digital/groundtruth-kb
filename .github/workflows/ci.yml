@@ -55,6 +55,15 @@ jobs:
             src/groundtruth_kb/cli.py \
             src/groundtruth_kb/gates.py
 
+      - name: mypy --strict on internal helpers
+        run: |
+          python -m mypy --strict --follow-imports=silent \
+            src/groundtruth_kb/seed.py \
+            src/groundtruth_kb/web/app.py \
+            src/groundtruth_kb/reconciliation.py \
+            src/groundtruth_kb/spec_scaffold.py \
+            src/groundtruth_kb/project/scaffold.py
+
       - name: Run full test suite (base state)
         run: |
           pytest -v --tb=short \
