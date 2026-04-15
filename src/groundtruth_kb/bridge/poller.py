@@ -35,11 +35,15 @@ SUBSTANTIVE_WAKE_COOLDOWN_SECONDS = 5 * 60
 
 
 class _NotificationBatchSummary(TypedDict):
+    """TypedDict shape for the result of a single notification batch scan."""
+
     failed_events: int
     wake_refs: list[str]
 
 
 class _InboxSummary(TypedDict):
+    """TypedDict shape for the result of a single inbox scan cycle."""
+
     detected: int
     surfaced: int
     failed_inbox: int
@@ -50,6 +54,7 @@ class _InboxSummary(TypedDict):
 
 
 def _now() -> str:
+    """Return the current UTC datetime as an ISO 8601 string."""
     return datetime.now(UTC).isoformat()
 
 
@@ -66,10 +71,12 @@ class _FileLock:
     """Single-process lock for a given agent poller."""
 
     def __init__(self, path: Path) -> None:
+        """Initialise the file lock with the given lock file path."""
         self.path = path
         self._fh: BinaryIO | None = None
 
     def __enter__(self) -> _FileLock:
+        """Acquire the exclusive file lock, raising RuntimeError if already held."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists() or self.path.stat().st_size == 0:
             self.path.write_bytes(b"\x00")
@@ -87,6 +94,7 @@ class _FileLock:
         return self
 
     def __exit__(self, *_args: object) -> None:
+        """Release the exclusive file lock and close the file handle."""
         fh = self._fh
         if fh is None:
             return
@@ -103,6 +111,7 @@ class _FileLock:
 
 
 def _load_state(path: Path) -> dict[str, Any]:
+    """Load poller state from a JSON file, returning a safe default dict on any error."""
     try:
         state = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(state, dict):
@@ -116,6 +125,7 @@ def _load_state(path: Path) -> dict[str, Any]:
 
 
 def _save_state(path: Path, state: dict[str, Any]) -> None:
+    """Persist poller state to a JSON file, silently ignoring OS errors."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -124,6 +134,7 @@ def _save_state(path: Path, state: dict[str, Any]) -> None:
 
 
 def _save_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write an arbitrary dict as pretty-printed JSON to a file, silently ignoring OS errors."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -132,6 +143,7 @@ def _save_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _append_log(path: Path, message: str) -> None:
+    """Append a timestamped log line to a log file, silently ignoring OS errors."""
     line = f"[{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -149,6 +161,19 @@ def _launch_agent_wake(
     *,
     trigger: str,
 ) -> list[str]:
+    """Spawn a detached agent wake subprocess for the given message IDs.
+
+    Args:
+        agent: Target agent identifier.
+        project_dir: Project root containing the wake script.
+        message_ids: IDs of messages to pass to the wake script.
+        log_file: Path to the poller log file for status messages.
+        trigger: Label describing what triggered this wake.
+
+    Returns:
+        The list of message IDs actually passed to the subprocess (capped at the
+        dispatch batch limit); empty list if the launch failed or nothing to do.
+    """
     if not message_ids:
         return []
 
@@ -193,6 +218,7 @@ def _launch_agent_wake(
 
 
 def _notification_message_ref(event: dict[str, Any]) -> str | None:
+    """Extract the best available message reference string from a notification event dict."""
     details = event.get("details") or {}
     for candidate in (
         details.get("thread_id"),
@@ -206,6 +232,7 @@ def _notification_message_ref(event: dict[str, Any]) -> str | None:
 
 
 def _notification_should_wake(agent: str, event: dict[str, Any]) -> bool:
+    """Return True if the notification event should trigger an agent wake."""
     event_type = str(event.get("event_type") or "")
     details = event.get("details") or {}
     if event_type == "message.failed":
@@ -214,6 +241,7 @@ def _notification_should_wake(agent: str, event: dict[str, Any]) -> bool:
 
 
 def _last_wake_at(state: dict[str, Any], message_id: str) -> datetime | None:
+    """Return the datetime of the last recorded wake for a message ID, or None."""
     wake_state = state.get("last_wake_by_message", {})
     if not isinstance(wake_state, dict):
         return None
@@ -232,6 +260,7 @@ def _should_wake_substantive_item(
     *,
     cooldown_seconds: int = SUBSTANTIVE_WAKE_COOLDOWN_SECONDS,
 ) -> bool:
+    """Return True if the inbox item is eligible for a wake based on cooldown state."""
     message_id = str(item.get("id") or "")
     if not message_id or item.get("status") == "failed":
         return False
@@ -242,6 +271,7 @@ def _should_wake_substantive_item(
 
 
 def _record_wake_launch(state: dict[str, Any], message_ids: list[str]) -> None:
+    """Record the current timestamp as the last-wake time for each launched message ID."""
     if not message_ids:
         return
     wake_state = state.setdefault("last_wake_by_message", {})
@@ -258,6 +288,7 @@ def _resident_worker_health(
     *,
     hooks_dir: Path,
 ) -> tuple[bool, str]:
+    """Check whether the resident worker for this agent is healthy and should suppress fallback wakes."""
     return resident_worker_should_defer(agent, [], hooks_dir=hooks_dir)
 
 
@@ -268,6 +299,7 @@ def _resident_worker_should_defer_wake(
     hooks_dir: Path,
     now: datetime | None = None,
 ) -> tuple[bool, str]:
+    """Return (should_defer, state_label) indicating whether the resident worker covers this wake."""
     return resident_worker_should_defer(
         agent,
         wake_candidates,
@@ -282,6 +314,17 @@ def _handle_notification_batch(
     events: list[dict[str, Any]],
     log_file: Path,
 ) -> dict[str, Any]:
+    """Process a batch of notification events and collect direct-wake message refs.
+
+    Args:
+        bridge: Bridge runtime object.
+        agent: The polling agent identifier.
+        events: Notification event dicts from the bridge.
+        log_file: Path to the poller log file.
+
+    Returns:
+        A ``_NotificationBatchSummary`` dict with ``failed_events`` and ``wake_refs``.
+    """
     summary: _NotificationBatchSummary = {
         "failed_events": 0,
         "wake_refs": [],
@@ -394,6 +437,18 @@ def _handle_inbox(
 
 
 def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
+    """Execute the bridge poller for the configured agent.
+
+    In ``--once`` mode, performs a single poll cycle and returns an exit code.
+    Otherwise, enters a continuous long-poll loop until interrupted.
+
+    Args:
+        args: Parsed CLI arguments from :func:`build_parser`.
+        project_dir: Project root override; defaults to ``CLAUDE_PROJECT_DIR`` or cwd.
+
+    Returns:
+        ``0`` on success, ``1`` on error.
+    """
     if project_dir is None:
         project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", Path.cwd()))
 
@@ -419,6 +474,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
         process_started_at = state.get("started_at") or _now()
 
         def _checkpoint() -> None:
+            """Persist current poller state and PID file to disk."""
             state["last_event_id"] = last_event_id
             state["updated_at"] = _now()
             if not args.once:
@@ -605,6 +661,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Return the argument parser for the bridge poller CLI."""
     parser = argparse.ArgumentParser(description="Periodic Prime Bridge notification poller")
     parser.add_argument("--agent", choices=["codex", "prime"], required=True)
     parser.add_argument(
@@ -629,6 +686,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Entry point: parse CLI arguments and run the bridge poller."""
     _consume_stdin_if_present()
     args = build_parser().parse_args()
     project_dir = Path(args.project_dir) if args.project_dir else None

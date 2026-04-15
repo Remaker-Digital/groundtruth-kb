@@ -53,14 +53,17 @@ RETRY_STALE_THRESHOLD_SECONDS = 3 * 60
 
 
 def _now() -> datetime:
+    """Return the current UTC datetime."""
     return datetime.now(UTC)
 
 
 def _now_iso() -> str:
+    """Return the current UTC datetime as an ISO 8601 string."""
     return _now().isoformat()
 
 
 def _parse_iso(value: str | None) -> datetime | None:
+    """Parse an ISO 8601 string into a timezone-aware datetime, or return None on failure."""
     if not value:
         return None
     try:
@@ -73,42 +76,58 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 
 def _agent_model(agent: str) -> str:
+    """Return the model identifier string for the given agent name."""
     return "opus" if agent == "prime" else "codex"
 
 
 def _hooks_dir(project_dir: Path) -> Path:
+    """Return the path to the .claude/hooks directory inside the project."""
     return project_dir / ".claude" / "hooks"
 
 
 def _state_file(agent: str, project_dir: Path) -> Path:
+    """Return the path to the persistent state file for the given agent worker."""
     return _hooks_dir(project_dir) / f".{agent}-bridge-worker-state.json"
 
 
 def _lock_file(agent: str, project_dir: Path) -> Path:
+    """Return the path to the advisory lock file for the given agent worker."""
     return _hooks_dir(project_dir) / f".{agent}-bridge-worker.lock"
 
 
 def _log_file(agent: str, project_dir: Path) -> Path:
+    """Return the path to the append-only log file for the given agent worker."""
     return _hooks_dir(project_dir) / f".{agent}-bridge-worker.log"
 
 
 def _last_message_file(agent: str, project_dir: Path) -> Path:
+    """Return the path to the file used to capture the agent's last raw message output."""
     return _hooks_dir(project_dir) / f".{agent}-bridge-worker-last-message.txt"
 
 
 def _last_stdout_file(agent: str, project_dir: Path) -> Path:
+    """Return the path to the JSONL file capturing the last stdout from the agent process."""
     return _hooks_dir(project_dir) / f".{agent}-bridge-worker-last-stdout.jsonl"
 
 
 def _last_context_file(agent: str, project_dir: Path) -> Path:
+    """Return the path to the file holding the last dispatched context snapshot."""
     return _hooks_dir(project_dir) / f".{agent}-bridge-worker-last-context.json"
 
 
 def _health_file(agent: str, project_dir: Path) -> Path:
+    """Return the path to the health status JSON file for the given agent worker."""
     return _hooks_dir(project_dir) / f".bridge-worker-{agent}-health.json"
 
 
 def _append_log(agent: str, message: str, project_dir: Path) -> None:
+    """Append a timestamped message to the agent worker's log file.
+
+    Args:
+        agent: The agent identifier (e.g. ``"prime"`` or ``"codex"``).
+        message: The log line content to write.
+        project_dir: Root directory of the project.
+    """
     hooks = _hooks_dir(project_dir)
     hooks.mkdir(parents=True, exist_ok=True)
     line = f"[{_now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
@@ -117,6 +136,7 @@ def _append_log(agent: str, message: str, project_dir: Path) -> None:
 
 
 def _load_state(agent: str, project_dir: Path) -> dict[str, Any]:
+    """Load persisted worker state from disk, returning defaults on any read or parse error."""
     try:
         state = json.loads(_state_file(agent, project_dir).read_text(encoding="utf-8"))
         if not isinstance(state, dict):
@@ -129,17 +149,22 @@ def _load_state(agent: str, project_dir: Path) -> dict[str, Any]:
 
 
 def _save_state(agent: str, state: dict[str, Any], project_dir: Path) -> None:
+    """Persist the worker state dict to disk as pretty-printed JSON."""
     hooks = _hooks_dir(project_dir)
     hooks.mkdir(parents=True, exist_ok=True)
     _state_file(agent, project_dir).write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 class _FileLock:
+    """Cross-platform advisory file lock used to prevent concurrent worker runs."""
+
     def __init__(self, path: Path) -> None:
+        """Initialise the lock with the path of the lock file to use."""
         self.path = path
         self._fh: BinaryIO | None = None
 
     def __enter__(self) -> _FileLock:
+        """Acquire the exclusive lock, raising OSError if already held."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists() or self.path.stat().st_size == 0:
             self.path.write_bytes(b"\x00")
@@ -153,6 +178,7 @@ class _FileLock:
         return self
 
     def __exit__(self, *_args: object) -> None:
+        """Release the file lock and close the underlying file handle."""
         fh = self._fh
         if fh is None:
             return
@@ -169,6 +195,14 @@ class _FileLock:
 
 
 def _find_codex_exe() -> Path:
+    """Locate the Codex CLI executable, raising FileNotFoundError if absent.
+
+    Returns:
+        Path to the Codex shim binary.
+
+    Raises:
+        FileNotFoundError: If the Codex shim has not been installed.
+    """
     candidate = (
         Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
         / "OpenAI"
@@ -182,6 +216,14 @@ def _find_codex_exe() -> Path:
 
 
 def _find_claude_exe() -> Path:
+    """Locate the Claude CLI executable, raising FileNotFoundError if absent.
+
+    Returns:
+        Path to the Claude CLI binary.
+
+    Raises:
+        FileNotFoundError: If the Claude Code CLI is not installed on PATH.
+    """
     resolved = shutil.which("claude")
     if resolved:
         return Path(resolved)
@@ -192,6 +234,14 @@ def _find_claude_exe() -> Path:
 
 
 def _notification_message_ref(event: dict[str, Any]) -> str | None:
+    """Extract the most specific message reference from a notification event dict.
+
+    Args:
+        event: A notification event dict from the bridge runtime.
+
+    Returns:
+        The first non-empty reference found, or None if none exist.
+    """
     details = event.get("details") or {}
     for candidate in (
         details.get("thread_id"),
@@ -205,6 +255,15 @@ def _notification_message_ref(event: dict[str, Any]) -> str | None:
 
 
 def _explicit_refs_for(agent: str, event_batch: dict[str, Any]) -> list[str]:
+    """Collect deduplicated message references that directly concern this agent from a notification batch.
+
+    Args:
+        agent: The agent identifier whose references should be collected.
+        event_batch: The notification event batch dict from the bridge.
+
+    Returns:
+        Ordered list of unique message reference strings.
+    """
     refs: list[str] = []
     if not event_batch.get("notified"):
         return refs
@@ -230,6 +289,16 @@ def _explicit_refs_for(agent: str, event_batch: dict[str, Any]) -> list[str]:
 
 
 def _invoke_codex(prompt: str, timeout_seconds: int, project_dir: Path) -> subprocess.CompletedProcess[str]:
+    """Launch the Codex CLI with the given prompt and return the completed process.
+
+    Args:
+        prompt: The prompt text to pass to the Codex CLI.
+        timeout_seconds: Maximum seconds to wait before raising TimeoutExpired.
+        project_dir: Project root directory passed as the working directory.
+
+    Returns:
+        The completed subprocess result.
+    """
     cmd = [
         str(_find_codex_exe()),
         "-a",
@@ -256,6 +325,16 @@ def _invoke_codex(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
 
 
 def _invoke_prime(prompt: str, timeout_seconds: int, project_dir: Path) -> subprocess.CompletedProcess[str]:
+    """Launch the Claude CLI (Prime) with the given prompt and return the completed process.
+
+    Args:
+        prompt: The prompt text to pass to the Claude CLI.
+        timeout_seconds: Maximum seconds to wait before raising TimeoutExpired.
+        project_dir: Project root directory used as the working directory.
+
+    Returns:
+        The completed subprocess result.
+    """
     cmd = [
         str(_find_claude_exe()),
         "-p",
@@ -293,6 +372,19 @@ def _write_health(
     dispatch_timeout_seconds: int | None = None,
     last_error: str | None = None,
 ) -> None:
+    """Write a health status JSON file for the agent worker.
+
+    Args:
+        agent: The agent identifier.
+        project_dir: Project root directory.
+        status: Worker lifecycle status (e.g. ``"idle"``, ``"busy"``, ``"error"``).
+        last_event_id: Most recently processed notification event ID.
+        active_message_ids: Message IDs currently being dispatched, if any.
+        last_thread_id: Thread correlation ID from the most recent dispatch.
+        dispatch_started_at: ISO timestamp when the current dispatch started.
+        dispatch_timeout_seconds: Configured timeout for the current dispatch.
+        last_error: Error string from the most recent failure, if any.
+    """
     doc = {
         "agent": agent,
         "status": status,
@@ -321,6 +413,24 @@ def resident_worker_is_healthy(
     project_dir: Path | None = None,
     now: datetime | None = None,
 ) -> tuple[bool, str]:
+    """Determine whether the resident worker for the given agent is currently healthy.
+
+    Reads the agent's health JSON file and checks whether the reported status and
+    timestamps are within acceptable freshness bounds.
+
+    Args:
+        agent: The agent identifier (``"codex"`` or ``"prime"``).
+        hooks_dir: Explicit hooks directory; derived from ``project_dir`` if omitted.
+        project_dir: Project root directory; required when ``hooks_dir`` is omitted.
+        now: Optional datetime to use as the current time (for testing).
+
+    Returns:
+        A tuple of ``(is_healthy, state_label)`` where ``state_label`` is a
+        short string such as ``"idle"``, ``"busy"``, or ``"idle-stale"``.
+
+    Raises:
+        ValueError: If neither ``hooks_dir`` nor ``project_dir`` is provided.
+    """
     now_value = now or _now()
     if hooks_dir is None:
         if project_dir is None:
@@ -361,6 +471,19 @@ def resident_worker_health_snapshot(
     hooks_dir: Path | None = None,
     project_dir: Path | None = None,
 ) -> dict[str, Any] | None:
+    """Return the raw health JSON dict for the given agent worker, or None if unreadable.
+
+    Args:
+        agent: The agent identifier (``"codex"`` or ``"prime"``).
+        hooks_dir: Explicit hooks directory; derived from ``project_dir`` if omitted.
+        project_dir: Project root directory; required when ``hooks_dir`` is omitted.
+
+    Returns:
+        The health payload dict, or ``None`` if the file is missing or invalid.
+
+    Raises:
+        ValueError: If neither ``hooks_dir`` nor ``project_dir`` is provided.
+    """
     if hooks_dir is None:
         if project_dir is None:
             raise ValueError("Either hooks_dir or project_dir must be provided")
@@ -381,6 +504,21 @@ def resident_worker_should_defer(
     project_dir: Path | None = None,
     now: datetime | None = None,
 ) -> tuple[bool, str]:
+    """Decide whether the poller should defer a wake launch because the resident worker is active.
+
+    When the worker is healthy and either idle or handling the same target messages,
+    the poller should skip launching a separate wake subprocess.
+
+    Args:
+        agent: The agent identifier.
+        target_ids: Message IDs the poller is about to dispatch.
+        hooks_dir: Explicit hooks directory; derived from ``project_dir`` if omitted.
+        project_dir: Project root directory; required when ``hooks_dir`` is omitted.
+        now: Optional current datetime override (for testing).
+
+    Returns:
+        A tuple of ``(should_defer, state_label)``.
+    """
     healthy, state = resident_worker_is_healthy(agent, hooks_dir=hooks_dir, project_dir=project_dir, now=now)
     if not healthy:
         return False, state
@@ -399,6 +537,7 @@ def resident_worker_should_defer(
 
 
 def _record_dispatch(state: dict[str, Any], message_ids: list[str], trigger: str) -> None:
+    """Update the persisted state with timestamps for a new dispatch, recording which messages were handled."""
     timestamp = _now_iso()
     wake_state = state.setdefault("last_wake_by_message", {})
     if not isinstance(wake_state, dict):
@@ -419,6 +558,18 @@ def _maybe_clear_failed_residue(
     log_fn: Callable[[str], None],
     force: bool = False,
 ) -> int:
+    """Periodically purge old failed messages from the bridge to keep the inbox clean.
+
+    Args:
+        agent: The agent whose failed messages should be cleared.
+        bridge: The bridge runtime module providing ``clear_failed_messages``.
+        state: Mutable worker state dict; ``last_failed_cleanup_at`` is updated on run.
+        log_fn: Callable used to write log lines.
+        force: Skip the interval check and clean up immediately.
+
+    Returns:
+        Number of failed messages cleared, or 0 if the interval has not elapsed.
+    """
     last_cleanup_at = _parse_iso(state.get("last_failed_cleanup_at"))
     now = _now()
     if (
@@ -516,6 +667,18 @@ def _capture_target_state(
     agent: str,
     target_ids: list[str],
 ) -> dict[str, dict[str, Any]]:
+    """Snapshot the current bridge state for a set of target message IDs.
+
+    Used before and after a dispatch to detect whether the agent made progress.
+
+    Args:
+        bridge: The bridge runtime module providing ``get_worker_event_payload``.
+        agent: The agent identifier.
+        target_ids: Message IDs whose state should be captured.
+
+    Returns:
+        A dict mapping each target ID to a state summary dict.
+    """
     snapshot: dict[str, dict[str, Any]] = {}
     for target_id in sorted(set(target_ids)):
         payload = bridge.get_worker_event_payload(target_id, agent=agent)
@@ -542,6 +705,17 @@ def _seed_last_event_id(
     state: dict[str, Any],
     project_dir: Path,
 ) -> int:
+    """Initialise the notification cursor from the bridge when no prior state exists.
+
+    Args:
+        agent: The agent identifier.
+        bridge: The bridge runtime module providing ``get_latest_notification_event_id``.
+        state: Mutable worker state dict; ``last_event_id`` is updated when seeded.
+        project_dir: Project root directory used for log file path.
+
+    Returns:
+        The current ``last_event_id`` to use for the first poll.
+    """
     current = int(state.get("last_event_id", 0) or 0)
     if current > 0:
         return current
@@ -563,6 +737,18 @@ def _seed_last_event_id(
 
 
 def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
+    """Start the long-lived resident bridge worker loop for the configured agent.
+
+    Acquires the worker lock, seeds the notification cursor, and processes bridge
+    events in a tight poll loop until interrupted or a fatal error occurs.
+
+    Args:
+        args: Parsed CLI arguments from :func:`build_parser`.
+        project_dir: Project root directory; resolved from environment if ``None``.
+
+    Returns:
+        Exit code: ``0`` on clean exit (including lock-busy), or ``1`` on setup failure.
+    """
     if project_dir is None:
         project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", Path.cwd()))
 
@@ -801,6 +987,11 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and return the CLI argument parser for the resident worker.
+
+    Returns:
+        Configured :class:`argparse.ArgumentParser` instance.
+    """
     parser = argparse.ArgumentParser(description="Long-lived resident bridge worker")
     parser.add_argument("--agent", choices=["codex", "prime"], default="codex")
     parser.add_argument("--cadence-minutes", type=int, default=9)
@@ -817,6 +1008,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Parse arguments and run the resident bridge worker.
+
+    Returns:
+        Exit code forwarded from :func:`run`.
+    """
     args = build_parser().parse_args()
     project_dir = Path(args.project_dir) if args.project_dir else None
     return run(args, project_dir=project_dir)

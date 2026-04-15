@@ -26,4 +26,4 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Check docstring coverage
-        run: interrogate src/groundtruth_kb/ --fail-under 64 -vv
+        run: interrogate src/groundtruth_kb/ --fail-under 80 -vv
