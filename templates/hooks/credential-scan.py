@@ -3,8 +3,8 @@
 PreToolUse hook: credential pattern scanner.
 
 Detects credential patterns in Bash commands to prevent accidental exposure.
-Reads TOOL_INPUT env var (JSON with "command" key) and exits 2 if the
-command contains suspicious credential patterns.
+Reads stdin JSON payload and emits structured deny output (exit 0 +
+permissionDecision:"deny") when a credential pattern is detected.
 
 Hook type: PreToolUse (tool: Bash)
 
@@ -12,47 +12,28 @@ Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
 All rights reserved.
 """
 
+from __future__ import annotations
+
 import json
-import os
 import re
 import sys
 
-# Credential patterns to detect.
-# Each tuple: (compiled regex, human-readable description).
 CREDENTIAL_PATTERNS = [
-    # AWS access keys
     (re.compile(r"AKIA[0-9A-Z]{16}"), "AWS access key ID (AKIA...)"),
-    # Generic secret key prefixes
+    (re.compile(r"\bsk-ant-api[0-9]{2}-[a-zA-Z0-9_-]+"), "Anthropic API key (sk-ant-api...)"),
     (re.compile(r"\bsk-[a-zA-Z0-9]{20,}"), "Secret key (sk-...)"),
     (re.compile(r"\bsk_live_[a-zA-Z0-9]+"), "Stripe live secret key"),
     (re.compile(r"\bsk_test_[a-zA-Z0-9]+"), "Stripe test secret key"),
     (re.compile(r"\brk_live_[a-zA-Z0-9]+"), "Stripe restricted key"),
-    # Private key markers
     (re.compile(r"-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----"), "Private key block"),
     (re.compile(r"-----BEGIN\s+OPENSSH\s+PRIVATE\s+KEY-----"), "OpenSSH private key"),
-    # Connection strings
-    (
-        re.compile(r"[Cc]onnection[Ss]tring\s*=\s*['\"]?[^\s;]+"),
-        "Connection string assignment",
-    ),
-    (
-        re.compile(r"AccountKey=[a-zA-Z0-9+/=]{20,}"),
-        "Azure Storage account key",
-    ),
-    # Azure / cloud tokens
+    (re.compile(r"[Cc]onnection[Ss]tring\s*=\s*['\"]?[^\s;]+"), "Connection string assignment"),
+    (re.compile(r"AccountKey=[a-zA-Z0-9+/=]{20,}"), "Azure Storage account key"),
     (re.compile(r"\beyJ[a-zA-Z0-9_-]{50,}"), "JWT / bearer token"),
-    # Generic password in command
-    (
-        re.compile(r"--password\s*[=\s]\s*\S+"),
-        "Password passed as command argument",
-    ),
-    (
-        re.compile(r"-p\s+['\"]?[^\s]+['\"]?\s"),
-        "Possible password flag (-p)",
-    ),
+    (re.compile(r"--password\s*[=\s]\s*\S+"), "Password passed as command argument"),
+    (re.compile(r"-p\s+['\"]?[^\s]+['\"]?\s"), "Possible password flag (-p)"),
 ]
 
-# Patterns indicating credential output to files or pipes.
 OUTPUT_PATTERNS = [
     (
         re.compile(
@@ -69,44 +50,74 @@ OUTPUT_PATTERNS = [
     ),
 ]
 
+SELF_TEST_PAYLOAD = {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {"command": "echo sk-ant-api03-aaaaaaaaaaaaaaaa"},
+    "session_id": "test",
+    "cwd": "/fake",
+}
 
-def main():
-    tool_input_raw = os.environ.get("TOOL_INPUT", "")
-    if not tool_input_raw:
+
+def _check_command(command: str) -> str | None:
+    """Return description of first credential pattern found, or None."""
+    for pattern, description in CREDENTIAL_PATTERNS:
+        if pattern.search(command):
+            return description
+    for pattern, description in OUTPUT_PATTERNS:
+        if pattern.search(command):
+            return description
+    return None
+
+
+def main() -> None:
+    try:
+        from groundtruth_kb.governance.output import emit_deny, emit_pass
+    except ImportError:
+
+        def emit_deny(event: str, reason: str) -> None:  # type: ignore[misc]
+            out = {
+                "hookSpecificOutput": {
+                    "hookEventName": event,
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+            print(json.dumps(out))
+
+        def emit_pass() -> None:  # type: ignore[misc]
+            print("{}")
+
+    if "--self-test" in sys.argv:
+        description = _check_command(SELF_TEST_PAYLOAD["tool_input"]["command"])  # type: ignore[index]
+        if description is None:
+            print("Self-test error: test payload not detected as credential", file=sys.stderr)
+            sys.exit(1)
+        emit_deny("PreToolUse", f"Credential pattern blocked by governance gate: {description}")
         sys.exit(0)
 
     try:
-        tool_input = json.loads(tool_input_raw)
-    except json.JSONDecodeError:
+        payload = json.loads(sys.stdin.read())
+    except (json.JSONDecodeError, OSError):
+        emit_pass()
         sys.exit(0)
 
+    tool_input = payload.get("tool_input", {})
     command = tool_input.get("command", "")
     if not command:
+        emit_pass()
         sys.exit(0)
 
-    # Check for credential patterns in the command.
-    for pattern, description in CREDENTIAL_PATTERNS:
-        if pattern.search(command):
-            print(
-                f"Hook PreToolUse:Bash denied this tool\n"
-                f"Detected credential pattern: {description}\n"
-                f"Commands containing credentials must not be executed.\n"
-                f"Use environment variables or secure vaults instead."
-            )
-            sys.exit(2)
+    description = _check_command(command)
+    if description is not None:
+        emit_deny(
+            "PreToolUse",
+            f"Credential pattern detected by governance gate: {description}. "
+            "Use environment variables or secure vaults instead.",
+        )
+        sys.exit(0)
 
-    # Check for credential output/redirection patterns.
-    for pattern, description in OUTPUT_PATTERNS:
-        if pattern.search(command):
-            print(
-                f"Hook PreToolUse:Bash denied this tool\n"
-                f"Detected credential exposure risk: {description}\n"
-                f"Do not pipe, redirect, or echo credential values.\n"
-                f"Use environment variables or secure vaults instead."
-            )
-            sys.exit(2)
-
-    # No credential patterns detected.
+    emit_pass()
     sys.exit(0)
 
 

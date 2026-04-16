@@ -900,3 +900,64 @@ class TestSchema:
         assert "current_work_items" in views
         conn.close()
         db.close()
+
+
+# --- source_paths migration tests (Migration 4, governance hardening Phase 1) ---
+
+
+def test_source_paths_migration_fresh_db(tmp_path):
+    """source_paths column is created on a brand-new database."""
+    db = KnowledgeDB(tmp_path / "fresh.db")
+    cols = {row[1] for row in db._conn.execute("PRAGMA table_info(specifications)")}
+    db.close()
+    assert "source_paths" in cols
+
+
+def test_source_paths_migration_idempotent(tmp_path):
+    """Opening an already-migrated database does not raise."""
+    db_path = tmp_path / "existing.db"
+    db1 = KnowledgeDB(db_path)
+    db1.close()
+    db2 = KnowledgeDB(db_path)
+    cols = {row[1] for row in db2._conn.execute("PRAGMA table_info(specifications)")}
+    db2.close()
+    assert "source_paths" in cols
+
+
+def test_insert_spec_without_source_paths_still_works(tmp_path):
+    """Specs can be inserted without supplying source_paths (column defaults to NULL)."""
+    db = KnowledgeDB(tmp_path / "test.db")
+    result = db.insert_spec(
+        id="SPEC-TEST-NOPATHS",
+        title="Test",
+        status="specified",
+        changed_by="test",
+        change_reason="test",
+    )
+    assert result is not None
+    row = db._conn.execute("SELECT source_paths FROM specifications WHERE id = ?", ("SPEC-TEST-NOPATHS",)).fetchone()
+    db.close()
+    assert row is not None
+    assert row[0] is None
+
+
+def test_insert_spec_with_source_paths(tmp_path):
+    """source_paths is stored as JSON and read back correctly."""
+    import json
+
+    db = KnowledgeDB(tmp_path / "test.db")
+    result = db.insert_spec(
+        id="SPEC-TEST-PATHS",
+        title="Test with paths",
+        status="specified",
+        changed_by="test",
+        change_reason="test",
+        source_paths=["src/auth.py", "src/auth_utils.py"],
+    )
+    assert result is not None
+    row = db._conn.execute("SELECT source_paths FROM specifications WHERE id = ?", ("SPEC-TEST-PATHS",)).fetchone()
+    db.close()
+    assert row is not None
+    assert row[0] is not None
+    stored = json.loads(row[0])
+    assert stored == ["src/auth.py", "src/auth_utils.py"]

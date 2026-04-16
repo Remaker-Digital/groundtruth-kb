@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 groundtruth.db
+.groundtruth/
 .hypothesis/
 tmp-review-config/
 .claude/

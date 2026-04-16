@@ -652,6 +652,12 @@ class KnowledgeDB:
                 conn.execute(f"ALTER TABLE specifications ADD COLUMN {col_name} {col_type}")
         conn.commit()
 
+        # Migration 4: Add source_paths column for spec-before-code governance hook
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
+        if "source_paths" not in cols:
+            conn.execute("ALTER TABLE specifications ADD COLUMN source_paths TEXT DEFAULT NULL")
+            conn.commit()
+
     @staticmethod
     def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
         """Auto-detect spec type from ID prefix when declared as default 'requirement'."""
@@ -713,6 +719,7 @@ class KnowledgeDB:
         constraints: dict[str, Any] | None = None,
         affected_by: list[str] | None = None,
         testability: str | None = None,
+        source_paths: list[str] | None = None,
     ) -> dict[str, Any] | None:
         """Insert a new version of a specification.
 
@@ -731,6 +738,9 @@ class KnowledgeDB:
             affected_by: List of spec/ADR/DCL IDs that affect this spec.
             testability: Testability classification — 'automatable', 'observable',
                   'structural', or 'untestable'.
+            source_paths: Optional list of relative file paths or glob patterns this spec
+                  covers. JSON-encoded into the source_paths TEXT column. Used by the
+                  spec-before-code governance hook.
         """
         type = self._auto_detect_spec_type(id, type)
 
@@ -758,6 +768,7 @@ class KnowledgeDB:
         # F1: Serialize JSON fields
         constraints_json = json.dumps(constraints) if constraints is not None else None
         affected_by_json = json.dumps(affected_by) if affected_by is not None else None
+        source_paths_json = json.dumps(source_paths) if source_paths is not None else None
 
         # Run governance gates on initial insert (for status enforcement)
         if self._gate_registry is not None:
@@ -779,8 +790,9 @@ class KnowledgeDB:
                (id, version, title, description, priority, scope, section,
                 handle, tags, status, assertions, type,
                 authority, provisional_until, constraints, affected_by, testability,
+                source_paths,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -799,6 +811,7 @@ class KnowledgeDB:
                 constraints_json,
                 affected_by_json,
                 testability,
+                source_paths_json,
                 changed_by,
                 _now(),
                 change_reason,

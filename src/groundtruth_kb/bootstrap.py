@@ -23,6 +23,8 @@ __pycache__/
 .ruff_cache/
 .venv/
 groundtruth.db
+.groundtruth/
+.claude/settings.local.json
 """
 
 
