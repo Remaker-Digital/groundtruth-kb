@@ -453,7 +453,7 @@ def build_prompt(
     else:
         context_lines = "- none"
     worker_name = agent_display(agent)
-    return f"""Start in Loyal Opposition mode for Agent Red in {project_dir}.
+    return f"""Start in Loyal Opposition mode in {project_dir}.
 
 Load AGENTS.md and the required startup files under independent-progress-assessments/ before doing other work.
 

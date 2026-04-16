@@ -3,8 +3,8 @@ GroundTruth KB — Transport Evidence Governance Gate.
 
 Plugin gate for projects that require executable test evidence before
 transport/container specs can be promoted to 'verified' or their tests
-marked as 'pass'. Originally built for Agent Red's transport recovery
-pipeline (Phase 0 governance).
+marked as 'pass'. Provides Phase 0 governance for transport/container
+deployment pipelines.
 
 Usage in groundtruth.toml::
 

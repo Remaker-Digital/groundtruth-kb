@@ -193,7 +193,7 @@ The bridge protocol is tool-agnostic. The file format is documented in
 `.claude/rules/file-bridge-protocol.md` in any scaffolded project.
 
 We recommend starting with Codex because it's battle-tested (hundreds of
-review cycles on the Agent Red project) and the automation is already built.
+review cycles in production use) and the automation is already built.
 
 ---
 

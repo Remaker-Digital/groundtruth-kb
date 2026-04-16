@@ -248,7 +248,7 @@ def _try_start_scheduled_task(agent: str) -> bool:
     """
     if os.name != "nt":
         return False
-    task_name = f"AgentRedBridgeResidentWorker-{agent}"
+    task_name = f"GroundTruthBridgeWorker-{agent}"
     try:
         result = subprocess.run(
             ["schtasks.exe", "/Run", "/TN", task_name],
@@ -264,7 +264,7 @@ def _scheduled_task_exists(agent: str) -> bool:
     """Check if the Windows Scheduled Task is registered."""
     if os.name != "nt":
         return False
-    task_name = f"AgentRedBridgeResidentWorker-{agent}"
+    task_name = f"GroundTruthBridgeWorker-{agent}"
     try:
         result = subprocess.run(
             ["schtasks.exe", "/Query", "/TN", task_name],
