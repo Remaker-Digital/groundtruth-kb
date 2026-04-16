@@ -304,20 +304,31 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
 
 
 def _write_settings_json(settings_path: Path) -> None:
-    """Write tracked .claude/settings.json with all 8 governance hooks registered.
+    """Write tracked .claude/settings.json with all governance and feature hooks.
 
     Uses the nested hook event → matcher group → handler schema expected by
-    current Claude Code versions. The file is tracked in git so all governance
-    hooks are inherited by every worktree and fresh clone.
+    current Claude Code versions. The file is tracked in git so all hooks
+    are inherited by every worktree and fresh clone.
+
+    Hooks registered (11 total):
+    - SessionStart (2): session-start-governance, assertion-check
+    - UserPromptSubmit (2): delib-search-gate, intake-classifier
+    - PostToolUse (1): delib-search-tracker
+    - PreToolUse (5): spec-before-code, bridge-compliance-gate, kb-not-markdown,
+                       destructive-gate, credential-scan
     """
     hooks_dir = ".claude/hooks"
     content: dict[str, Any] = {
         "hooks": {
             "SessionStart": [
                 {"hooks": [{"type": "command", "command": f"python {hooks_dir}/session-start-governance.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/assertion-check.py"}]},
             ],
             "UserPromptSubmit": [
                 {"hooks": [{"type": "command", "command": f"python {hooks_dir}/delib-search-gate.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/intake-classifier.py"}]},
+            ],
+            "PostToolUse": [
                 {"hooks": [{"type": "command", "command": f"python {hooks_dir}/delib-search-tracker.py"}]},
             ],
             "PreToolUse": [

@@ -939,6 +939,13 @@ class KnowledgeDB:
         else:
             affected_by_raw = current.get("affected_by")  # raw JSON string from _row_to_dict
 
+        # source_paths: carry-forward (same pattern as constraints/affected_by)
+        if "source_paths" in fields:
+            source_paths_val = fields["source_paths"]
+            source_paths_raw = json.dumps(source_paths_val) if source_paths_val is not None else None
+        else:
+            source_paths_raw = current.get("source_paths")  # raw JSON string from _row_to_dict
+
         # Run governance gates before spec promotion
         if self._gate_registry is not None:
             spec_data = {
@@ -958,8 +965,9 @@ class KnowledgeDB:
                (id, version, title, description, priority, scope, section,
                 handle, tags, status, assertions, type,
                 authority, provisional_until, constraints, affected_by, testability,
+                source_paths,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -978,6 +986,7 @@ class KnowledgeDB:
                 constraints_raw,
                 affected_by_raw,
                 testability,
+                source_paths_raw,
                 changed_by,
                 _now(),
                 change_reason,
@@ -4806,6 +4815,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "applicable_dimensions",
         "constraints",
         "affected_by",
+        "source_paths",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:

@@ -33,7 +33,8 @@ PRETOOLUSE_HOOKS = [
 ]
 
 SESSIONSTART_HOOKS = ["session-start-governance.py"]
-USERPROMPTSUBMIT_HOOKS = ["delib-search-gate.py", "delib-search-tracker.py"]
+USERPROMPTSUBMIT_HOOKS = ["delib-search-gate.py"]
+POSTTOOLUSE_HOOKS = ["delib-search-tracker.py"]
 
 
 def _run_hook(
@@ -789,3 +790,589 @@ def test_hook_payload_user_prompt_fallback(tmp_path):
     )
     result = _run_hook("delib-search-gate.py", stdin_data=payload)
     assert result.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# PostToolUse tracker event name
+# ---------------------------------------------------------------------------
+
+
+def test_hook_self_test_hookEventName_posttooluse():
+    """delib-search-tracker emits {} (pass) on self-test — PostToolUse hook."""
+    result = _self_test("delib-search-tracker.py")
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    # Tracker emits silent pass on self-test (no advisory needed)
+    assert output == {}
+
+
+# ---------------------------------------------------------------------------
+# End-to-end: gate → tracker → gate lifecycle
+# ---------------------------------------------------------------------------
+
+
+def test_delib_gate_tracker_e2e_same_context(tmp_path):
+    """Gate warns → tracker records search → gate passes for same bridge context and topic."""
+    # Set up an active bridge document so both hooks compute the same key
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: auth-refactor\nNEW: bridge/auth-refactor-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Step 1: Gate warns (no prior search)
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Let me propose changes to auth refactor middleware",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result1 = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result1.returncode == 0
+    output1 = json.loads(result1.stdout)
+    assert "hookSpecificOutput" in output1, "Gate should warn when no prior search"
+    assert "additionalContext" in output1["hookSpecificOutput"]
+
+    # Step 2: Tracker records a deliberation search (PostToolUse event) with result evidence
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'auth refactor'"},
+            "tool_output": (
+                "Found 3 deliberations\n"
+                "DELIB-0628: auth middleware hook review\n"
+                "DELIB-0629: auth cycle enforcement\n"
+                "DELIB-0630: auth mutation coverage"
+            ),
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result2 = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result2.returncode == 0
+
+    # Verify log file was created with result evidence
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    assert log_path.exists(), "Tracker should create log file"
+    log_entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(log_entries) == 1
+    assert log_entries[0]["doc_topic_hash"]
+    assert log_entries[0]["active_bridge_docs"] == ["auth-refactor"]
+    assert log_entries[0]["search_success"] is True
+    assert log_entries[0]["result_count"] == 3
+    assert "DELIB-0628" in log_entries[0]["delib_ids"]
+    assert log_entries[0]["search_topics"]  # should contain normalized topic words
+    assert log_entries[0]["source_event"] == "PostToolUse"
+
+    # Step 3: Gate passes (matching search found — topic overlap on "auth"/"refactor")
+    result3 = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result3.returncode == 0
+    output3 = json.loads(result3.stdout)
+    assert output3 == {}, f"Gate should pass after tracker recorded topically relevant search, got: {output3}"
+
+
+def test_delib_gate_tracker_e2e_same_doc_different_topic(tmp_path):
+    """Same bridge doc, different topic → gate still warns (topic discrimination)."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: auth-refactor\nNEW: bridge/auth-refactor-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Tracker records a search about "auth refactor" with successful output
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'auth refactor'"},
+            "tool_output": "Found 2 deliberations\nDELIB-0628: auth middleware\nDELIB-0629: auth cycle",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_track = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result_track.returncode == 0
+
+    # Gate with UNRELATED topic under the SAME bridge doc → should still warn
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Now investigate database migration policy for production",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_gate = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result_gate.returncode == 0
+    output = json.loads(result_gate.stdout)
+    assert "hookSpecificOutput" in output, (
+        "Gate should warn when search topic (auth refactor) doesn't overlap "
+        "with prompt topic (database migration policy)"
+    )
+
+
+def test_delib_gate_tracker_e2e_different_context(tmp_path):
+    """Tracker records for topic-a → gate still warns for different topic-b (different bridge doc)."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+
+    # Create bridge with topic-a active
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: topic-a\nNEW: bridge/topic-a-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Tracker records search while topic-a is active
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'topic alpha'"},
+            "tool_output": "Found 1 deliberation\nDELIB-0100: topic alpha review",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_track = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result_track.returncode == 0
+
+    # Now change bridge context to topic-b
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: topic-b\nNEW: bridge/topic-b-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Gate should warn — different active bridge doc means different key
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Working on topic-b now",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_gate = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result_gate.returncode == 0
+    output = json.loads(result_gate.stdout)
+    assert "hookSpecificOutput" in output, "Gate should warn for different bridge context"
+    assert "additionalContext" in output["hookSpecificOutput"]
+
+
+def test_delib_gate_no_active_bridge_docs(tmp_path):
+    """No bridge/INDEX.md → gate and tracker still work with fallback key + topic match."""
+    # No bridge directory — both hooks use _no_active_docs fallback
+
+    # Tracker records with successful output about "deployment config"
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'deployment config'"},
+            "tool_output": "0 results found",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_track = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result_track.returncode == 0
+
+    # Gate should pass (same fallback key + overlapping topic "deployment")
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Check the deployment configuration",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_gate = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result_gate.returncode == 0
+    output = json.loads(result_gate.stdout)
+    assert output == {}, "Gate should pass when tracker used same fallback key with topical overlap"
+
+
+def test_delib_tracker_failed_search_not_recorded(tmp_path):
+    """Failed searches (error output) are not recorded and cannot satisfy the gate."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: widget-fix\nNEW: bridge/widget-fix-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Tracker receives a failed search command
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'widget fix'"},
+            "tool_output": "Error: database connection failed\nTraceback (most recent call last):\n  ...",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_track = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result_track.returncode == 0
+
+    # Log should NOT have been created (failed search not recorded)
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    if log_path.exists():
+        entries = [json.loads(ln) for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        assert len(entries) == 0, "Failed search should not create log entry"
+
+    # Gate should still warn — no successful search recorded
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Let me work on the widget fix",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result_gate = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result_gate.returncode == 0
+    output = json.loads(result_gate.stdout)
+    assert "hookSpecificOutput" in output, "Gate should warn when only failed searches exist"
+
+
+def test_delib_tracker_empty_output_not_recorded(tmp_path):
+    """Tracker with empty tool_output does not record (ambiguous success)."""
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'test'"},
+            "tool_output": "",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    if log_path.exists():
+        entries = [json.loads(ln) for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        assert len(entries) == 0, "Empty output should not create log entry"
+
+
+def test_delib_tracker_result_evidence_fields(tmp_path):
+    """Tracker log entries include auditable result evidence."""
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'auth middleware'"},
+            "tool_output": "Found 2 deliberations\nDELIB-0628: auth hook review\nDELIB-0631: middleware review",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    assert log_path.exists()
+    entry = json.loads(log_path.read_text(encoding="utf-8").strip())
+
+    # All required evidence fields present
+    assert entry["search_success"] is True
+    assert entry["result_count"] == 2
+    assert sorted(entry["delib_ids"]) == ["DELIB-0628", "DELIB-0631"]
+    assert entry["source_event"] == "PostToolUse"
+    assert entry["search_query"] == "auth middleware"
+    assert "auth" in entry["search_topics"]
+    assert "middleware" in entry["search_topics"]
+    assert entry["timestamp"] > 0
+    assert entry["doc_topic_hash"]
+
+
+# ---------------------------------------------------------------------------
+# tool_response runtime-payload tests (documented PostToolUse contract)
+# ---------------------------------------------------------------------------
+
+
+def test_delib_tracker_tool_response_string(tmp_path):
+    """Tracker parses tool_response when it is a plain string (runtime shape)."""
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'scaling policy'"},
+            "tool_response": (
+                "Found 2 deliberations\nDELIB-0700: scaling policy initial review\nDELIB-0701: scaling constraints"
+            ),
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    assert log_path.exists(), "Tracker should record from tool_response string"
+    entry = json.loads(log_path.read_text(encoding="utf-8").strip())
+    assert entry["search_success"] is True
+    assert entry["result_count"] == 2
+    assert sorted(entry["delib_ids"]) == ["DELIB-0700", "DELIB-0701"]
+    assert entry["source_event"] == "PostToolUse"
+
+
+def test_delib_tracker_tool_response_dict_stdout(tmp_path):
+    """Tracker parses tool_response when it is a dict with stdout (Bash shape)."""
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'auth hooks'"},
+            "tool_response": {
+                "stdout": (
+                    "Found 3 deliberations\n"
+                    "DELIB-0628: auth middleware hook review\n"
+                    "DELIB-0631: middleware review\n"
+                    "DELIB-0632: auth remediation"
+                ),
+                "stderr": "",
+                "exitCode": 0,
+                "success": True,
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    assert log_path.exists(), "Tracker should record from tool_response dict with stdout"
+    entry = json.loads(log_path.read_text(encoding="utf-8").strip())
+    assert entry["search_success"] is True
+    assert entry["result_count"] == 3
+    assert sorted(entry["delib_ids"]) == ["DELIB-0628", "DELIB-0631", "DELIB-0632"]
+    assert "auth" in entry["search_topics"]
+    assert "hooks" in entry["search_topics"]
+
+
+def test_delib_tracker_tool_response_failure_not_recorded(tmp_path):
+    """Failed search via tool_response is not recorded (runtime negative test)."""
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'broken query'"},
+            "tool_response": {
+                "stdout": "Error: database connection failed\nTraceback (most recent call last):\n  File ...",
+                "stderr": "connection refused",
+                "exitCode": 1,
+                "success": False,
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    if log_path.exists():
+        entries = [json.loads(ln) for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        assert len(entries) == 0, "Failed tool_response search should not create log entry"
+
+
+def test_delib_tracker_tool_response_overrides_tool_output(tmp_path):
+    """When both tool_response and tool_output are present, tool_response wins."""
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'priority test'"},
+            # tool_response is primary — should be used
+            "tool_response": "Found 1 deliberation\nDELIB-0800: priority check",
+            # tool_output is fallback — should be ignored
+            "tool_output": "Error: this should not be parsed",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    assert log_path.exists(), "tool_response should take priority over tool_output"
+    entry = json.loads(log_path.read_text(encoding="utf-8").strip())
+    assert entry["search_success"] is True
+    assert entry["delib_ids"] == ["DELIB-0800"]
+
+
+def test_delib_tracker_e2e_tool_response_gate_lifecycle(tmp_path):
+    """Full gate lifecycle using documented tool_response payload shape."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: deploy-config\nNEW: bridge/deploy-config-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Step 1: Gate warns (no prior search)
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Let me review the deploy configuration changes",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result1 = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result1.returncode == 0
+    output1 = json.loads(result1.stdout)
+    assert "hookSpecificOutput" in output1, "Gate should warn before any search"
+
+    # Step 2: Tracker records via tool_response (runtime payload shape)
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'deploy configuration'"},
+            "tool_response": {
+                "stdout": "Found 2 deliberations\nDELIB-0628: deploy config review\nDELIB-0629: deploy constraints",
+                "stderr": "",
+                "exitCode": 0,
+            },
+            "tool_use_id": "toolu_01ABC123",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result2 = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result2.returncode == 0
+
+    # Verify log recorded with evidence
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    assert log_path.exists()
+    entry = json.loads(log_path.read_text(encoding="utf-8").strip())
+    assert entry["search_success"] is True
+    assert entry["result_count"] == 2
+    assert "DELIB-0628" in entry["delib_ids"]
+
+    # Step 3: Gate passes (matching topic overlap on "deploy"/"configuration")
+    result3 = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert result3.returncode == 0
+    output3 = json.loads(result3.stdout)
+    assert output3 == {}, f"Gate should pass after tool_response-based search, got: {output3}"
+
+
+def test_delib_tracker_failed_cmd_with_zero_results_stdout_not_recorded(tmp_path):
+    """Failed command (success=false, exitCode=1) with '0 results found' stdout must not satisfy gate.
+
+    Regression test for the case where structured tool_response metadata indicates
+    failure but stdout contains an explicit zero-results marker that would otherwise
+    be treated as a successful empty search.
+    """
+    # Set up an active bridge doc so the gate would warn
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: auth-hooks\nNEW: bridge/auth-hooks-001.md\n",
+        encoding="utf-8",
+    )
+
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'auth hooks'"},
+            "tool_response": {
+                "stdout": "0 results found",
+                "stderr": "fatal: database unavailable",
+                "exitCode": 1,
+                "success": False,
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    if log_path.exists():
+        entries = [json.loads(ln) for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        assert len(entries) == 0, (
+            "Failed command (success=false, exitCode=1) must not create log entry "
+            "even when stdout says '0 results found'"
+        )
+
+    # Verify gate still warns (the failed search did not satisfy it)
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Let me review auth hooks",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    gate_result = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert gate_result.returncode == 0
+    gate_output = json.loads(gate_result.stdout)
+    assert "hookSpecificOutput" in gate_output, (
+        "Gate must still warn after a failed search — the failed command must not satisfy the gate"
+    )
+
+
+def test_delib_tracker_ambiguous_output_not_recorded(tmp_path):
+    """Ambiguous non-empty output without auditable evidence must not satisfy gate.
+
+    Output like 'Search complete' that contains no DELIB IDs, no result count,
+    and no explicit zero-results marker is not evidentiary and must not create
+    a log entry.
+    """
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "INDEX.md").write_text(
+        "Document: auth-hooks\nNEW: bridge/auth-hooks-001.md\n",
+        encoding="utf-8",
+    )
+
+    tracker_payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m groundtruth_kb deliberations search 'auth hooks'"},
+            "tool_response": {
+                "stdout": "Search complete",
+                "stderr": "",
+                "exitCode": 0,
+                "success": True,
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("delib-search-tracker.py", stdin_data=tracker_payload)
+    assert result.returncode == 0
+
+    log_path = tmp_path / ".groundtruth" / "delib-search-log.jsonl"
+    if log_path.exists():
+        entries = [json.loads(ln) for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        assert len(entries) == 0, (
+            "Ambiguous output 'Search complete' without DELIB IDs or result count must not create a log entry"
+        )
+
+    # Verify gate still warns
+    gate_payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Let me review auth hooks",
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    gate_result = _run_hook("delib-search-gate.py", stdin_data=gate_payload)
+    assert gate_result.returncode == 0
+    gate_output = json.loads(gate_result.stdout)
+    assert "hookSpecificOutput" in gate_output, "Gate must still warn after ambiguous non-evidentiary output"
