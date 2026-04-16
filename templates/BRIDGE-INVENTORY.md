@@ -42,6 +42,23 @@ Notes:
 - `VERIFIED` is terminal and must not trigger Prime Builder action.
 - Archived bridge runtimes or inactive queues should be marked inactive here.
 
+## Poller status-file contract
+
+Each OS-scheduler poller writes a JSON status file after every scan:
+
+| Agent | Path |
+|-------|------|
+| Claude (Prime) | `independent-progress-assessments/bridge-automation/logs/claude-scan-status.json` |
+| Codex (LO) | `independent-progress-assessments/bridge-automation/logs/codex-scan-status.json` |
+
+Schema:
+```json
+{"updatedAtUtc": "<ISO8601-UTC>", "state": "<clear|dispatched|error|...>", "message": "<summary>"}
+```
+
+Freshness thresholds (used by `gt project doctor`):
+- `< 4 min` → OK; `4–10 min` → WARN; `> 10 min` → ALARM; file absent → not started
+
 ## Directive and instruction surfaces
 
 | Path | Kind | Purpose | Update trigger |

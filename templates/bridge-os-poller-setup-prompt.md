@@ -52,6 +52,11 @@ Bridge requirements:
     background behavior.
 13. Store scripts, launchers, locks, logs, and prompt text under project-owned
     paths such as independent-progress-assessments/bridge-automation/.
+13a. After every scan (clear or dispatched), write a JSON status file:
+     - Claude:  independent-progress-assessments/bridge-automation/logs/claude-scan-status.json
+     - Codex:   independent-progress-assessments/bridge-automation/logs/codex-scan-status.json
+     Schema: {"updatedAtUtc": "<ISO8601-UTC>", "state": "<clear|dispatched|error|...>", "message": "<summary>"}
+     The state field is free-form; gt project doctor displays it as-is.
 14. Capture the full setup in BRIDGE-INVENTORY.md, including:
     - scheduler task names
     - script and launcher paths

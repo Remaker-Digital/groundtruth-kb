@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import UTC
 from pathlib import Path
 
 from groundtruth_kb.project.doctor import (
     DoctorReport,
     ToolCheck,
+    _check_bridge_poller,
     _check_db_schema,
     _check_git,
     _check_groundtruth_toml,
@@ -284,3 +286,82 @@ def test_run_doctor_returns_fail_for_missing_db(tmp_path: Path) -> None:
     db_check = next((c for c in report.checks if c.name == "Knowledge DB"), None)
     assert db_check is not None
     assert db_check.status == "fail"
+
+
+# ---------------------------------------------------------------------------
+# _check_bridge_poller — bridge liveness checks
+# ---------------------------------------------------------------------------
+
+
+def _make_status_file(tmp_path: Path, agent: str, updated_at: str, state: str = "clear") -> Path:
+    """Write a bridge scan-status JSON file for *agent* under the standard path."""
+    logs_dir = tmp_path / "independent-progress-assessments" / "bridge-automation" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    status_path = logs_dir / f"{agent}-scan-status.json"
+    status_path.write_text(
+        json.dumps({"updatedAtUtc": updated_at, "state": state, "message": "test scan"}),
+        encoding="utf-8",
+    )
+    return status_path
+
+
+def _utc_now_minus_seconds(seconds: int) -> str:
+    """Return an ISO-8601 UTC timestamp for *seconds* ago."""
+    from datetime import datetime, timedelta
+
+    t = datetime.now(tz=UTC) - timedelta(seconds=seconds)
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_bridge_poller_fresh_file_ok(tmp_path: Path) -> None:
+    """Status file updated < 4 min ago → OK."""
+    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(60), state="clear")
+    result = _check_bridge_poller(tmp_path, "claude")
+    assert result.status == "pass", f"Expected pass, got {result.status}: {result.message}"
+    assert "OK" in result.message
+
+
+def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
+    """Status file updated 5 min ago → WARN."""
+    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10), state="clear")
+    result = _check_bridge_poller(tmp_path, "codex")
+    assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
+    assert "WARN" in result.message
+
+
+def test_bridge_poller_15_min_old_alarm(tmp_path: Path) -> None:
+    """Status file updated 15 min ago → ALARM."""
+    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60), state="clear")
+    result = _check_bridge_poller(tmp_path, "claude")
+    assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
+    assert "ALARM" in result.message
+
+
+def test_bridge_poller_missing_file_not_started(tmp_path: Path) -> None:
+    """Missing status file → not started (WARN)."""
+    result = _check_bridge_poller(tmp_path, "codex")
+    assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
+    assert "not started" in result.message.lower()
+
+
+def test_bridge_poller_missing_updated_at_field_alarm(tmp_path: Path) -> None:
+    """Status file with missing updatedAtUtc → ALARM."""
+    logs_dir = tmp_path / "independent-progress-assessments" / "bridge-automation" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    (logs_dir / "claude-scan-status.json").write_text(
+        json.dumps({"state": "clear", "message": "no timestamp"}),
+        encoding="utf-8",
+    )
+    result = _check_bridge_poller(tmp_path, "claude")
+    assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
+    assert "ALARM" in result.message or "updatedAtUtc" in result.message
+
+
+def test_bridge_poller_unknown_state_no_error(tmp_path: Path) -> None:
+    """Unknown state values are displayed as-is without raising an error."""
+    for state in ("running", "completed", "custom-state-42"):
+        _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(30), state=state)
+        result = _check_bridge_poller(tmp_path, "claude")
+        # Should not raise; must return a ToolCheck with the state visible
+        assert isinstance(result, ToolCheck)
+        assert state in result.message

@@ -582,6 +582,17 @@ def project() -> None:
 @click.option("--seed-example/--no-seed-example", default=True, help="Seed example specs.")
 @click.option("--prime-provider", default="claude-code", help="Prime Builder provider ID.")
 @click.option("--lo-provider", default="codex", help="Loyal Opposition provider ID.")
+@click.option(
+    "--integrations/--no-integrations",
+    default=False,
+    help="Generate optional integration config files (Dependabot, CodeRabbit).",
+)
+@click.option(
+    "--python-version",
+    default="3.11",
+    show_default=True,
+    help="Python version for generated CI workflows.",
+)
 def project_init(
     project_name: str,
     profile: str,
@@ -594,6 +605,8 @@ def project_init(
     seed_example: bool,
     prime_provider: str,
     lo_provider: str,
+    integrations: bool,
+    python_version: str,
 ) -> None:
     """Scaffold a new GroundTruth project with the selected profile."""
     from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project, scaffold_summary
@@ -633,6 +646,8 @@ def project_init(
         seed_example=seed_example,
         prime_provider_id=prime_provider,
         lo_provider_id=lo_provider,
+        integrations=integrations,
+        python_version=python_version,
     )
     result = scaffold_project(options)
     click.echo(scaffold_summary(result, profile))

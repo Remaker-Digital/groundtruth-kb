@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -538,6 +540,132 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
     )
 
 
+# ── Bridge poller liveness ────────────────────────────────────────────
+
+_BRIDGE_STATUS_PATHS = {
+    "claude": Path("independent-progress-assessments/bridge-automation/logs/claude-scan-status.json"),
+    "codex": Path("independent-progress-assessments/bridge-automation/logs/codex-scan-status.json"),
+}
+
+_BRIDGE_FRESH_SECS = 4 * 60  # < 4 min → OK
+_BRIDGE_WARN_SECS = 10 * 60  # 4–10 min → WARN; > 10 min → ALARM
+_BRIDGE_SCHEDULER_DOC = "docs/tutorials/bridge-os-scheduler.md"
+_BRIDGE_AUTH_DOC = "docs/troubleshooting/auth.md"
+
+
+def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
+    """Check file bridge poller liveness for *agent* (``'claude'`` or ``'codex'``).
+
+    Reads the JSON status file written by the OS-scheduler poller and
+    computes staleness against the freshness thresholds:
+
+    - ``< 4 min``  → OK
+    - ``4–10 min`` → WARN
+    - ``> 10 min`` → ALARM
+    - File absent  → not started (WARN)
+    - Missing / unparseable ``updatedAtUtc`` → ALARM
+    """
+    status_path = target / _BRIDGE_STATUS_PATHS[agent]
+    check_name = f"{agent.title()} bridge poller"
+
+    if not status_path.exists():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=(
+                f"{agent} bridge poller not started — see {_BRIDGE_SCHEDULER_DOC} to configure OS-scheduler pollers"
+            ),
+        )
+
+    try:
+        raw = status_path.read_text(encoding="utf-8")
+        data: object = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=f"{agent} bridge status file unreadable: {exc}",
+        )
+
+    if not isinstance(data, dict):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=f"{agent} bridge status file is not a JSON object",
+        )
+
+    updated_at_raw = data.get("updatedAtUtc")
+    state_raw = data.get("state", "")
+    state_display = str(state_raw) if state_raw else "unknown"
+
+    if not isinstance(updated_at_raw, str) or not updated_at_raw.strip():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(f"{agent} bridge status file missing updatedAtUtc — ALARM. See {_BRIDGE_AUTH_DOC}"),
+        )
+
+    try:
+        updated_at = datetime.fromisoformat(updated_at_raw.replace("Z", "+00:00"))
+    except ValueError:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"{agent} bridge status file has unparseable updatedAtUtc "
+                f"{updated_at_raw!r} — ALARM. See {_BRIDGE_AUTH_DOC}"
+            ),
+        )
+
+    now = datetime.now(tz=UTC)
+    age_secs = (now - updated_at).total_seconds()
+    age_min = int(age_secs // 60)
+    age_sec_part = int(age_secs % 60)
+    age_display = f"{age_min}m {age_sec_part}s ago"
+
+    if age_secs < _BRIDGE_FRESH_SECS:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"{agent} bridge poller: OK (last scan {age_display}, state: {state_display})",
+        )
+
+    if age_secs < _BRIDGE_WARN_SECS:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"{agent} bridge poller: WARN (last scan {age_display}, state: {state_display}) "
+                f"— investigate poller or see {_BRIDGE_SCHEDULER_DOC}"
+            ),
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="fail",
+        message=(
+            f"{agent} bridge poller: ALARM (last scan {age_display}, state: {state_display}) "
+            f"— check {_BRIDGE_AUTH_DOC} and {_BRIDGE_SCHEDULER_DOC}"
+        ),
+    )
+
+
 # ── Auto-install ──────────────────────────────────────────────────────
 
 
@@ -648,6 +776,8 @@ def run_doctor(
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
         checks.append(_check_settings_classifiers(target))
+        checks.append(_check_bridge_poller(target, "claude"))
+        checks.append(_check_bridge_poller(target, "codex"))
 
     # Auto-install pass
     if auto_install:

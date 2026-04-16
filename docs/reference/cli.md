@@ -335,31 +335,46 @@ gt project init <PROJECT_NAME> [options]
 | `--cloud-provider` | choice | `none` | Cloud provider for infra stubs |
 | `--dir` | path | `./<PROJECT_NAME>` | Target directory |
 | `--init-git / --no-init-git` | flag | `--no-init-git` | Initialize a git repository |
-| `--include-ci / --no-include-ci` | flag | `--include-ci` | Include CI workflow templates |
+| `--include-ci / --no-include-ci` | flag | `--include-ci` | Include CI workflows (all profiles generate CI by default; `--no-include-ci` suppresses all CI regardless of profile) |
 | `--seed-example / --no-seed-example` | flag | `--seed-example` | Seed example domain specs |
+| `--integrations / --no-integrations` | flag | `--no-integrations` | Generate optional integration config files (Dependabot, CodeRabbit) |
+| `--python-version` | string | `3.11` | Python version used in generated CI workflows |
 
 **Profiles:**
 
-| Profile | What it includes |
-|---------|-----------------|
-| `local-only` | Single-agent setup: KB, rules, hooks, Makefile |
-| `dual-agent` | Above + Loyal Opposition bridge, AGENTS.md |
-| `dual-agent-webapp` | Above + Dockerfile, docker-compose, web UI config |
+| Profile | What it includes | CI tier |
+|---------|-----------------|---------|
+| `local-only` | Single-agent setup: KB, rules, hooks, Makefile | minimal (ruff + gt assert only) |
+| `dual-agent` | Above + Loyal Opposition bridge, AGENTS.md | standard (ruff + gt assert; pytest/mypy as advisory comments) |
+| `dual-agent-webapp` | Above + Dockerfile, docker-compose, web UI config | full (pytest + ruff + gt assert + build.yml + deploy.yml) |
+
+!!! note "CI tier is chosen by profile"
+    All profiles generate CI by default. The `--include-ci/--no-include-ci` flag
+    controls whether CI is generated at all — `--no-include-ci` suppresses all CI
+    for any profile. The CI tier (minimal / standard / full) is always determined
+    by the profile, not the flag.
 
 **Cloud providers:** `azure`, `aws`, `gcp`, `none`
 
 **Examples:**
 
 ```bash
-# Minimal project for solo use
+# Minimal project for solo use (no CI, no example specs)
 gt project init my-project --profile local-only --no-seed-example --no-include-ci
 
-# Full dual-agent project with Azure stubs
+# Dual-agent project with full CI suppressed
+gt project init my-project --profile dual-agent --no-include-ci
+
+# Full dual-agent webapp with Azure stubs and integration files
 gt project init enterprise-kb \
   --profile dual-agent-webapp \
   --owner "Acme Corp" \
   --cloud-provider azure \
+  --integrations \
   --init-git
+
+# Use Python 3.12 in generated CI workflows
+gt project init my-project --python-version 3.12
 ```
 
 ---

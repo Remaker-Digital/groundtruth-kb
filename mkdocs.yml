@@ -71,11 +71,17 @@ nav:
       - Operational Config: method/11-operational-configuration.md
       - File Bridge Automation: method/12-file-bridge-automation.md
       - Deliberation Archive: method/13-deliberation-archive.md
+  - Tutorials:
+      - Your First Specification: tutorials/first-spec.md
+      - Dual-Agent Setup: tutorials/dual-agent-setup.md
+      - Bridge OS Scheduler: tutorials/bridge-os-scheduler.md
   - Reference:
       - CLI Reference: reference/cli.md
       - Configuration: reference/configuration.md
       - Assertion Language: reference/assertion-language.md
       - Templates: reference/templates.md
+  - Troubleshooting:
+      - Auth Troubleshooting: troubleshooting/auth.md
   - Examples:
       - Task Tracker: examples/task-tracker.md
   - Architecture:

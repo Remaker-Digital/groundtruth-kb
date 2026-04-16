@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,6 +52,8 @@ class ScaffoldOptions:
     spec_scaffold: SpecScaffoldConfig | None = None
     prime_provider_id: str = "claude-code"
     lo_provider_id: str = "codex"
+    python_version: str = "3.11"
+    integrations: bool = False
 
 
 def scaffold_project(options: ScaffoldOptions) -> Path:
@@ -89,9 +92,22 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
         _copy_webapp_templates(target, cloud_provider=options.cloud_provider)
 
     # ── CI workflows ──────────────────────────────────────────────────
-    include_ci = options.include_ci or profile.includes_ci
+    # User flag always wins; profile selects tier, not whether CI is generated.
+    include_ci = options.include_ci
     if include_ci:
-        _copy_ci_templates(target)
+        _copy_ci_templates(target, profile=profile, options=options)
+
+    # ── dual-agent-webapp stub files ─────────────────────────────────
+    if profile.name == "dual-agent-webapp":
+        _write_webapp_stubs(target, options=options)
+
+    # ── src/tasks.py stub for all profiles when seed_example=True ────
+    if options.seed_example:
+        _write_tasks_stub(target)
+
+    # ── Integration files (--integrations flag) ───────────────────────
+    if options.integrations:
+        _copy_integration_templates(target, options=options)
 
     # ── Render all placeholders ───────────────────────────────────────
     _render_all_templates(
@@ -319,13 +335,54 @@ def _copy_webapp_templates(target: Path, *, cloud_provider: str) -> None:
             _write_default_terraform(infra, cloud_provider)
 
 
-def _copy_ci_templates(target: Path) -> None:
-    """Copy CI/CD workflow templates."""
+def _package_name_slug(project_name: str) -> str:
+    """Convert *project_name* to a slug suitable for use as a Python package/Docker image name.
+
+    Args:
+        project_name: Human-readable project name (may contain spaces, caps, etc.)
+
+    Returns:
+        Lowercase kebab-case slug with only alphanumeric characters and hyphens.
+    """
+    return re.sub(r"[^a-z0-9]+", "-", project_name.lower()).strip("-")
+
+
+def _ci_tier(profile: ProjectProfile) -> str:
+    """Select the CI template tier for *profile*.
+
+    Tier selection:
+    - ``local-only``: ``includes_ci=False``, ``includes_bridge=False`` → ``minimal``
+    - ``dual-agent``: ``includes_ci=False``, ``includes_bridge=True`` → ``standard``
+    - ``dual-agent-webapp``: ``includes_ci=True``, ``includes_bridge=True`` → ``full``
+    """
+    if profile.includes_ci and profile.includes_bridge:
+        return "full"
+    if profile.includes_bridge:
+        return "standard"
+    return "minimal"
+
+
+def _copy_ci_templates(target: Path, *, profile: ProjectProfile, options: ScaffoldOptions) -> None:
+    """Copy CI/CD workflow templates for the profile-selected tier.
+
+    Applies ``{{PACKAGE_NAME}}`` and ``{{PYTHON_VERSION}}`` placeholder
+    substitution in the copied files.
+    """
     templates = get_templates_dir()
+    tier = _ci_tier(profile)
+    tier_dir = templates / "ci" / tier
     workflows = target / ".github" / "workflows"
     workflows.mkdir(parents=True, exist_ok=True)
-    for src in (templates / "ci").glob("*.yml"):
-        shutil.copy2(src, workflows / src.name)
+
+    pkg_slug = _package_name_slug(options.project_name)
+    py_ver = options.python_version
+
+    for src in tier_dir.glob("*.yml"):
+        dest = workflows / src.name
+        content = src.read_text(encoding="utf-8")
+        content = content.replace("{{PACKAGE_NAME}}", pkg_slug)
+        content = content.replace("{{PYTHON_VERSION}}", py_ver)
+        dest.write_text(content, encoding="utf-8")
 
 
 # ── Rendering ─────────────────────────────────────────────────────────
@@ -564,6 +621,147 @@ def _write_default_terraform(infra: Path, cloud_provider: str) -> None:
         encoding="utf-8",
     )
     (infra / "outputs.tf").write_text("# Infrastructure outputs\n", encoding="utf-8")
+
+
+def _write_webapp_stubs(target: Path, *, options: ScaffoldOptions) -> None:  # noqa: F821
+    """Write stub source files for the dual-agent-webapp profile.
+
+    Always generated (not gated on ``seed_example``):
+    - ``src/__init__.py``
+    - ``pyproject.toml``
+    - ``requirements.txt``
+    - ``tests/__init__.py``
+    - ``tests/test_smoke.py``
+    """
+    pkg_slug = _package_name_slug(options.project_name)
+
+    src_dir = target / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
+    (src_dir / "__init__.py").write_text(
+        "# {{PROJECT_NAME}} application package\n",
+        encoding="utf-8",
+    )
+
+    # Only write pyproject.toml if the scaffold_project helper hasn't already
+    # written one via _write_pyproject_sections (that writes pyproject-sections.toml,
+    # not pyproject.toml, so we are safe to write pyproject.toml here).
+    pyproject = target / "pyproject.toml"
+    if not pyproject.exists():
+        pyproject.write_text(
+            f'[project]\nname = "{pkg_slug}"\nversion = "0.1.0"\nrequires-python = ">=3.11"\n',
+            encoding="utf-8",
+        )
+
+    req = target / "requirements.txt"
+    if not req.exists():
+        req.write_text("# Add your runtime dependencies here\n", encoding="utf-8")
+
+    tests_dir = target / "tests"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    tests_init = tests_dir / "__init__.py"
+    if not tests_init.exists():
+        tests_init.write_text("", encoding="utf-8")
+
+    smoke = tests_dir / "test_smoke.py"
+    if not smoke.exists():
+        smoke.write_text(
+            "# tests/test_smoke.py — generated by gt project init\n"
+            "# This smoke test ensures pytest CI passes immediately on a fresh scaffold.\n"
+            "# Replace with your own tests.\n"
+            "\n"
+            "\n"
+            "def test_smoke() -> None:\n"
+            '    """Initial smoke test. Replace with real assertions."""\n'
+            "    assert True\n",
+            encoding="utf-8",
+        )
+
+
+def _write_tasks_stub(target: Path) -> None:
+    """Write ``src/tasks.py`` implementation stub for seeded-example scaffolds.
+
+    The stub satisfies the seeded SPEC-001 and SPEC-002 grep assertions so CI
+    is green from the first push. The assertion patterns are:
+    - ``def create_task`` (function exists)
+    - ``status.*=.*['"]open['"]`` (create_task sets status to open)
+    """
+    src_dir = target / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
+    stub = src_dir / "tasks.py"
+    if stub.exists():
+        return
+    stub.write_text(
+        "# src/tasks.py — seed-example implementation stub\n"
+        "# Generated by: gt project init (default --seed-example)\n"
+        "#\n"
+        "# This stub satisfies the seeded SPEC-001 and SPEC-002 assertions so your CI\n"
+        "# is green from first push. Evolve this file or replace it with your real app.\n"
+        "# To start without example assertions, use: gt project init --no-seed-example\n"
+        "\n"
+        "from __future__ import annotations\n"
+        "\n"
+        "\n"
+        "def create_task(\n"
+        "    title: str,\n"
+        '    description: str = "",\n'
+        '    priority: str = "medium",\n'
+        ") -> dict:\n"
+        '    """Create a task with the given title.\n'
+        "\n"
+        "    Returns a dict with id, title, description, priority, status='open',\n"
+        "    and created_at timestamp.\n"
+        '    """\n'
+        "    return {\n"
+        '        "id": 1,\n'
+        '        "title": title,\n'
+        '        "description": description,\n'
+        '        "priority": priority,\n'
+        '        "status": "open",\n'
+        '        "created_at": "2026-01-01T00:00:00Z",\n'
+        "    }\n"
+        "\n"
+        "\n"
+        "def list_tasks(\n"
+        "    status: str | None = None,\n"
+        "    priority: str | None = None,\n"
+        ") -> list:\n"
+        '    """List tasks, optionally filtered by status and/or priority."""\n'
+        "    return []\n",
+        encoding="utf-8",
+    )
+
+
+def _copy_integration_templates(target: Path, *, options: ScaffoldOptions) -> None:  # noqa: F821
+    """Copy optional integration config files (``--integrations`` flag).
+
+    Generates:
+    - ``.github/dependabot.yml``
+    - ``.coderabbitai.yaml``
+
+    Applies ``{{PROJECT_NAME}}`` substitution in both files.
+    """
+    templates = get_templates_dir()
+    int_dir = templates / "ci" / "integrations"
+
+    pkg_slug = _package_name_slug(options.project_name)
+
+    # dependabot.yml → .github/dependabot.yml
+    dep_src = int_dir / "dependabot.yml"
+    if dep_src.exists():
+        github_dir = target / ".github"
+        github_dir.mkdir(parents=True, exist_ok=True)
+        content = dep_src.read_text(encoding="utf-8")
+        content = content.replace("{{PROJECT_NAME}}", options.project_name)
+        content = content.replace("{{PACKAGE_NAME}}", pkg_slug)
+        (github_dir / "dependabot.yml").write_text(content, encoding="utf-8")
+
+    # .coderabbitai.yaml → repository root
+    cr_src = int_dir / ".coderabbitai.yaml"
+    if cr_src.exists():
+        content = cr_src.read_text(encoding="utf-8")
+        content = content.replace("{{PROJECT_NAME}}", options.project_name)
+        content = content.replace("{{PACKAGE_NAME}}", pkg_slug)
+        (target / ".coderabbitai.yaml").write_text(content, encoding="utf-8")
 
 
 def scaffold_summary(target: Path, profile: str) -> str:
