@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -29,6 +30,8 @@ from groundtruth_kb.bridge.context import (
     prioritize_inbox_items,
 )
 from groundtruth_kb.bridge.worker import resident_worker_should_defer
+
+_log = logging.getLogger(__name__)
 
 DIRECT_WAKE_EVENT_TYPES = {"message.failed"}
 SUBSTANTIVE_WAKE_COOLDOWN_SECONDS = 5 * 60
@@ -142,22 +145,10 @@ def _save_json(path: Path, payload: dict[str, Any]) -> None:
         pass
 
 
-def _append_log(path: Path, message: str) -> None:
-    """Append a timestamped log line to a log file, silently ignoring OS errors."""
-    line = f"[{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(line)
-    except OSError:
-        pass
-
-
 def _launch_agent_wake(
     agent: str,
     project_dir: Path,
     message_ids: list[str],
-    log_file: Path,
     *,
     trigger: str,
 ) -> list[str]:
@@ -167,7 +158,6 @@ def _launch_agent_wake(
         agent: Target agent identifier.
         project_dir: Project root containing the wake script.
         message_ids: IDs of messages to pass to the wake script.
-        log_file: Path to the poller log file for status messages.
         trigger: Label describing what triggered this wake.
 
     Returns:
@@ -182,16 +172,17 @@ def _launch_agent_wake(
     runner = pythonw_exe if pythonw_exe.exists() else python_exe
     wake_script = project_dir / "scripts" / "codex_bridge_wake.py"
     if not wake_script.exists():
-        _append_log(log_file, f"wake skipped: script missing at {wake_script}")
+        _log.warning("wake skipped: script missing at %s", wake_script)
         return []
 
     unique_ids = dedupe_preserve_order(message_ids)
     launch_ids = unique_ids[:DEFAULT_MAX_DISPATCH_TARGETS]
     deferred_ids = unique_ids[DEFAULT_MAX_DISPATCH_TARGETS:]
     if deferred_ids:
-        _append_log(
-            log_file,
-            f"wake launch capped at {DEFAULT_MAX_DISPATCH_TARGETS}; deferred_message_ids={','.join(deferred_ids)}",
+        _log.info(
+            "wake launch capped at %d; deferred_message_ids=%s",
+            DEFAULT_MAX_DISPATCH_TARGETS,
+            ",".join(deferred_ids),
         )
 
     cmd = [str(runner), str(wake_script), "--agent", agent, "--trigger", trigger]
@@ -207,13 +198,15 @@ def _launch_agent_wake(
         if sys.platform == "win32":
             popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
         subprocess.Popen(cmd, **cast(Any, popen_kwargs))
-        _append_log(
-            log_file,
-            f"wake launched agent={agent} trigger={trigger} message_ids={','.join(launch_ids)}",
+        _log.info(
+            "wake launched agent=%s trigger=%s message_ids=%s",
+            agent,
+            trigger,
+            ",".join(launch_ids),
         )
         return launch_ids
     except Exception as exc:
-        _append_log(log_file, f"wake launch failed for {message_ids}: {exc}")
+        _log.error("wake launch failed for %s: %s", message_ids, exc)
         return []
 
 
@@ -312,7 +305,6 @@ def _handle_notification_batch(
     bridge: Any,
     agent: str,
     events: list[dict[str, Any]],
-    log_file: Path,
 ) -> dict[str, Any]:
     """Process a batch of notification events and collect direct-wake message refs.
 
@@ -320,7 +312,6 @@ def _handle_notification_batch(
         bridge: Bridge runtime object.
         agent: The polling agent identifier.
         events: Notification event dicts from the bridge.
-        log_file: Path to the poller log file.
 
     Returns:
         A ``_NotificationBatchSummary`` dict with ``failed_events`` and ``wake_refs``.
@@ -343,9 +334,12 @@ def _handle_notification_batch(
             summary["failed_events"] += 1
 
         details = event.get("details") or {}
-        _append_log(
-            log_file,
-            f"signal event: type={event_type} ref={message_ref} subject={event.get('subject', '')} details={json.dumps(details, sort_keys=True)}",
+        _log.info(
+            "signal event: type=%s ref=%s subject=%s details=%s",
+            event_type,
+            message_ref,
+            event.get("subject", ""),
+            json.dumps(details, sort_keys=True),
         )
         if _notification_should_wake(agent, event):
             summary["wake_refs"].append(message_ref)
@@ -358,7 +352,6 @@ def _handle_inbox(
     bridge: Any,
     agent: str,
     peer: str,
-    log_file: Path,
     *,
     state: dict[str, Any],
     project_dir: Path,
@@ -399,22 +392,25 @@ def _handle_inbox(
 
         if item.get("status") == "failed":
             summary["failed_inbox"] += 1
-            _append_log(
-                log_file,
-                f"invalid substantive item ignored for wake: {message_id} :: {subject}",
+            _log.warning(
+                "invalid substantive item ignored for wake: %s :: %s",
+                message_id,
+                subject,
             )
             continue
 
         if not write_enabled:
             summary["readonly_skips"] += 1
-            _append_log(
-                log_file,
-                f"detected (read-only mode, no auto-response): {message_id} :: {subject}",
+            _log.info(
+                "detected (read-only mode, no auto-response): %s :: %s",
+                message_id,
+                subject,
             )
             if not _should_wake_substantive_item(item, state):
-                _append_log(
-                    log_file,
-                    f"suppressed repeat wake: {message_id} :: {subject}",
+                _log.info(
+                    "suppressed repeat wake: %s :: %s",
+                    message_id,
+                    subject,
                 )
                 continue
             wake_candidates.append(message_id)
@@ -422,15 +418,15 @@ def _handle_inbox(
 
         try:
             if not _should_wake_substantive_item(item, state):
-                _append_log(log_file, f"suppressed repeat wake: {message_id} :: {subject}")
+                _log.info("suppressed repeat wake: %s :: %s", message_id, subject)
                 continue
 
             summary["surfaced"] += 1
-            _append_log(log_file, f"surfaced substantive work (no auto-accept): {message_id} :: {subject}")
+            _log.info("surfaced substantive work (no auto-accept): %s :: %s", message_id, subject)
             wake_candidates.append(message_id)
         except Exception as exc:
             summary["errors"] += 1
-            _append_log(log_file, f"error handling {message_id}: {exc}")
+            _log.error("error handling %s: %s", message_id, exc)
 
     summary["wake_candidates"] = dedupe_preserve_order(wake_candidates)
     return cast(dict[str, Any], summary)
@@ -456,7 +452,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
 
     peer_for = {"codex": "prime", "prime": "codex"}
     if args.agent not in peer_for:
-        print("bridge_poller: agent must be 'codex' or 'prime'", file=sys.stderr)
+        _log.error("bridge_poller: agent must be 'codex' or 'prime'")
         return 1
     peer = peer_for[args.agent]
     bridge_db_path = getattr(bridge, "DB_PATH", None)
@@ -466,8 +462,6 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
     lock_file = hooks_dir / f".bridge-poller-{args.agent}.lock"
     state_file = hooks_dir / f".bridge-poller-state-{args.agent}.json"
     pid_file = hooks_dir / f".bridge-poller-{args.agent}.pid"
-    log_file = hooks_dir / f".bridge-poller-{args.agent}.log"
-
     with _FileLock(lock_file):
         state = _load_state(state_file)
         last_event_id = int(state.get("last_event_id", 0) or 0)
@@ -509,13 +503,11 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                     bridge,
                     args.agent,
                     event_items,
-                    log_file,
                 )
                 handled = _handle_inbox(
                     bridge,
                     args.agent,
                     peer,
-                    log_file,
                     state=state,
                     project_dir=project_dir,
                     write_enabled=write_enabled,
@@ -531,16 +523,16 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                 )
                 if wake_candidates and should_defer:
                     handled["resident_deferrals"] += len(wake_candidates)
-                    _append_log(
-                        log_file,
-                        f"resident worker healthy ({defer_state}); fallback wake suppressed for {','.join(wake_candidates)}",
+                    _log.info(
+                        "resident worker healthy (%s); fallback wake suppressed for %s",
+                        defer_state,
+                        ",".join(wake_candidates),
                     )
                 elif wake_candidates:
                     launched_ids = _launch_agent_wake(
                         args.agent,
                         project_dir,
                         wake_candidates,
-                        log_file,
                         trigger=trigger,
                     )
                     if launched_ids:
@@ -549,7 +541,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                 handled["wake_launched"] = wake_launched
                 handled["signal_failed_events"] = signals["failed_events"]
                 _checkpoint()
-                print(
+                print(  # print-ok: protocol JSON output
                     json.dumps(
                         {
                             "ok": True,
@@ -561,12 +553,12 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                 )
                 return 0
             except Exception as exc:
-                _append_log(log_file, f"once-mode error: {exc}")
+                _log.error("once-mode error: %s", exc)
                 _checkpoint()
                 return 1
 
         _checkpoint()
-        _append_log(log_file, f"poller start: agent={args.agent}, last_event_id={last_event_id}")
+        _log.info("poller start: agent=%s, last_event_id=%d", args.agent, last_event_id)
         while True:
             try:
                 resident_worker_healthy, resident_worker_state = _resident_worker_health(
@@ -590,13 +582,11 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         bridge,
                         args.agent,
                         event_items,
-                        log_file,
                     )
                     handled = _handle_inbox(
                         bridge,
                         args.agent,
                         peer,
-                        log_file,
                         state=state,
                         project_dir=project_dir,
                         write_enabled=write_enabled,
@@ -612,16 +602,16 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                     if wake_candidates and should_defer:
                         handled["wake_launched"] = 0
                         handled["resident_deferrals"] += len(wake_candidates)
-                        _append_log(
-                            log_file,
-                            f"resident worker healthy ({defer_state}); fallback wake suppressed for {','.join(wake_candidates)}",
+                        _log.info(
+                            "resident worker healthy (%s); fallback wake suppressed for %s",
+                            defer_state,
+                            ",".join(wake_candidates),
                         )
                     elif wake_candidates:
                         launched_ids = _launch_agent_wake(
                             args.agent,
                             project_dir,
                             wake_candidates,
-                            log_file,
                             trigger=trigger,
                         )
                         if launched_ids:
@@ -641,21 +631,22 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         or handled["errors"]
                         or handled["wake_launched"]
                     ):
-                        _append_log(
-                            log_file,
-                            "cycle: "
-                            f"detected={handled['detected']} "
-                            f"surfaced={handled['surfaced']} "
-                            f"signal_failed_events={handled['signal_failed_events']} "
-                            f"readonly_skips={handled['readonly_skips']} "
-                            f"resident_deferrals={handled['resident_deferrals']} "
-                            f"wake_launched={handled['wake_launched']} "
-                            f"errors={handled['errors']} "
-                            f"last_event_id={last_event_id}",
+                        _log.info(
+                            "cycle: detected=%d surfaced=%d signal_failed_events=%d"
+                            " readonly_skips=%d resident_deferrals=%d"
+                            " wake_launched=%d errors=%d last_event_id=%d",
+                            handled["detected"],
+                            handled["surfaced"],
+                            handled["signal_failed_events"],
+                            handled["readonly_skips"],
+                            handled["resident_deferrals"],
+                            handled["wake_launched"],
+                            handled["errors"],
+                            last_event_id,
                         )
                 _checkpoint()
             except Exception as exc:
-                _append_log(log_file, f"loop error: {exc}")
+                _log.error("loop error: %s", exc)
                 _checkpoint()
                 time.sleep(args.error_backoff_seconds)
 
@@ -687,9 +678,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     """Entry point: parse CLI arguments and run the bridge poller."""
+    from groundtruth_kb._logging import _setup_bridge_logging
+
     _consume_stdin_if_present()
     args = build_parser().parse_args()
     project_dir = Path(args.project_dir) if args.project_dir else None
+    # Wire logging to existing log path before any work
+    hooks_dir = (project_dir or Path(os.environ.get("CLAUDE_PROJECT_DIR", Path.cwd()))) / ".claude" / "hooks"
+    _setup_bridge_logging(hooks_dir / f".bridge-poller-{args.agent}.log")
     return run(args, project_dir=project_dir)
 
 
