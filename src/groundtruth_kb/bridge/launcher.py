@@ -277,10 +277,15 @@ def _scheduled_task_exists(agent: str) -> bool:
 
 
 def main() -> int:
+    from groundtruth_kb._logging import _setup_bridge_logging
+
     _consume_stdin_if_present()
     args = build_parser().parse_args()
 
     project_dir = Path(args.project_dir) if args.project_dir else Path(os.environ.get("CLAUDE_PROJECT_DIR", Path.cwd()))
+    # Launcher diagnostics go to a dedicated log file
+    hooks_dir = project_dir / ".claude" / "hooks"
+    _setup_bridge_logging(hooks_dir / f".bridge-launcher-{args.agent}.log")
 
     # Step 1: Check if worker is already healthy
     running = _discover_running_worker(project_dir, args.agent)

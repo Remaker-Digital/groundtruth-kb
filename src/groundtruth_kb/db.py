@@ -18,12 +18,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from groundtruth_kb.gates import GateRegistry
@@ -628,6 +631,7 @@ class KnowledgeDB:
             conn.execute("UPDATE specifications SET type = 'governance' WHERE id LIKE 'GOV-%'")
             conn.execute("UPDATE specifications SET type = 'protected_behavior' WHERE id LIKE 'PB-%'")
             conn.commit()
+            _log.info("Applied migration: add type column to specifications")
 
         # Migration 2: Backfill architecture_decision and design_constraint types (GOV-20 Phase 1)
         conn.execute(
@@ -647,16 +651,21 @@ class KnowledgeDB:
             "affected_by": "TEXT",
             "testability": "TEXT",
         }
+        added_f1 = []
         for col_name, col_type in f1_columns.items():
             if col_name not in cols:
                 conn.execute(f"ALTER TABLE specifications ADD COLUMN {col_name} {col_type}")
+                added_f1.append(col_name)
         conn.commit()
+        if added_f1:
+            _log.info("Applied migration: F1 schema enrichment columns %s", added_f1)
 
         # Migration 4: Add source_paths column for spec-before-code governance hook
         cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
         if "source_paths" not in cols:
             conn.execute("ALTER TABLE specifications ADD COLUMN source_paths TEXT DEFAULT NULL")
             conn.commit()
+            _log.info("Applied migration: add source_paths column")
 
     @staticmethod
     def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
@@ -3263,6 +3272,11 @@ class KnowledgeDB:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (spec_id, spec_version, _now(), int(overall_passed), json.dumps(results), triggered_by),
         )
+        if not overall_passed:
+            failed = [r for r in results if not r.get("passed") and not r.get("skipped")]
+            _log.warning(
+                "Assertion %s v%d failed: %d of %d assertions", spec_id, spec_version, len(failed), len(results)
+            )
         try:
             self._record_event(
                 conn,
@@ -4284,8 +4298,8 @@ class KnowledgeDB:
         # the canonical SQLite write appear failed.
         try:
             self._index_deliberation_in_chroma(id)
-        except Exception:
-            pass  # Index can be rebuilt later via rebuild_deliberation_index()
+        except Exception as _idx_err:
+            _log.warning("ChromaDB index failed for %s (rebuildable): %s", id, _idx_err)
 
         return self.get_deliberation(id)
 
@@ -4631,8 +4645,8 @@ class KnowledgeDB:
                                 semantic_results.append(row)
                         if semantic_results:
                             return semantic_results
-            except Exception:
-                pass  # Fall through to SQLite LIKE
+            except Exception as _chroma_err:
+                _log.warning("ChromaDB search failed, falling back to SQLite LIKE: %s", _chroma_err)
 
         # SQLite LIKE fallback
         conn = self._get_conn()

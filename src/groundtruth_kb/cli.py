@@ -17,6 +17,7 @@ from typing import Any
 import click
 
 from groundtruth_kb import __version__
+from groundtruth_kb._logging import configure_cli_logging
 from groundtruth_kb.bootstrap import (
     DesktopBootstrapOptions,
     bootstrap_desktop_project,
@@ -68,6 +69,7 @@ def _open_db(config: GTConfig, *, check_same_thread: bool = True) -> KnowledgeDB
 @click.pass_context
 def main(ctx: click.Context, config_path: str | None) -> None:
     """GroundTruth KB — specification-driven governance toolkit."""
+    configure_cli_logging()
     ctx.ensure_object(dict)
     ctx.obj["config"] = Path(config_path) if config_path else None
 

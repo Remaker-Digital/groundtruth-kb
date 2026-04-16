@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -35,6 +36,8 @@ from groundtruth_kb.bridge.context import (
     repair_terminal_thread_outputs,
     select_dispatch_batch,
 )
+
+_log = logging.getLogger(__name__)
 
 DIRECT_CONTEXT_EVENT_TYPES = {
     "message.failed",
@@ -118,21 +121,6 @@ def _last_context_file(agent: str, project_dir: Path) -> Path:
 def _health_file(agent: str, project_dir: Path) -> Path:
     """Return the path to the health status JSON file for the given agent worker."""
     return _hooks_dir(project_dir) / f".bridge-worker-{agent}-health.json"
-
-
-def _append_log(agent: str, message: str, project_dir: Path) -> None:
-    """Append a timestamped message to the agent worker's log file.
-
-    Args:
-        agent: The agent identifier (e.g. ``"prime"`` or ``"codex"``).
-        message: The log line content to write.
-        project_dir: Root directory of the project.
-    """
-    hooks = _hooks_dir(project_dir)
-    hooks.mkdir(parents=True, exist_ok=True)
-    line = f"[{_now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
-    with _log_file(agent, project_dir).open("a", encoding="utf-8") as fh:
-        fh.write(line)
 
 
 def _load_state(agent: str, project_dir: Path) -> dict[str, Any]:
@@ -703,7 +691,6 @@ def _seed_last_event_id(
     agent: str,
     bridge: Any,
     state: dict[str, Any],
-    project_dir: Path,
 ) -> int:
     """Initialise the notification cursor from the bridge when no prior state exists.
 
@@ -711,7 +698,6 @@ def _seed_last_event_id(
         agent: The agent identifier.
         bridge: The bridge runtime module providing ``get_latest_notification_event_id``.
         state: Mutable worker state dict; ``last_event_id`` is updated when seeded.
-        project_dir: Project root directory used for log file path.
 
     Returns:
         The current ``last_event_id`` to use for the first poll.
@@ -732,7 +718,7 @@ def _seed_last_event_id(
         seeded = int(payload)
     if seeded > 0:
         state["last_event_id"] = seeded
-        _append_log(agent, f"seeded resident worker notification cursor: last_event_id={seeded}", project_dir)
+        _log.info("seeded resident worker notification cursor: last_event_id=%d", seeded)
     return seeded
 
 
@@ -757,8 +743,8 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
     try:
         with _FileLock(_lock_file(args.agent, project_dir)):
             state = _load_state(args.agent, project_dir)
-            last_event_id = _seed_last_event_id(args.agent, bridge, state, project_dir)
-            _append_log(args.agent, f"resident worker start: last_event_id={last_event_id}", project_dir)
+            last_event_id = _seed_last_event_id(args.agent, bridge, state)
+            _log.info("resident worker start: last_event_id=%d", last_event_id)
             _save_state(args.agent, state, project_dir)
             _write_health(args.agent, project_dir, status="idle", last_event_id=last_event_id)
             startup_scan_pending = True
@@ -791,13 +777,13 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         args.agent,
                         bridge,
                         state,
-                        log_fn=lambda message: _append_log(args.agent, message, project_dir),
+                        log_fn=_log.info,
                     )
                     _maybe_retry_stale_pending(
                         args.agent,
                         bridge,
                         state,
-                        log_fn=lambda message: _append_log(args.agent, message, project_dir),
+                        log_fn=_log.info,
                     )
                     explicit_refs = _explicit_refs_for(args.agent, event_batch)
                     new_items = bridge.list_inbox(agent=args.agent, status="pending", limit=100).get("items", [])
@@ -807,7 +793,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         explicit_refs=explicit_refs,
                         new_items=new_items,
                         project_dir=project_dir,
-                        log_fn=lambda message: _append_log(args.agent, message, project_dir),
+                        log_fn=_log.info,
                         max_contexts=args.max_dispatch_targets,
                     )
                     pending_ids = {
@@ -836,10 +822,10 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         continue
 
                     if deferred_targets:
-                        _append_log(
-                            args.agent,
-                            f"dispatch batch capped at {args.max_dispatch_targets}; deferred_targets={','.join(deferred_targets)}",
-                            project_dir,
+                        _log.info(
+                            "dispatch batch capped at %d; deferred_targets=%s",
+                            args.max_dispatch_targets,
+                            ",".join(deferred_targets),
                         )
 
                     pre_repair_count = repair_terminal_thread_outputs(
@@ -847,13 +833,12 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         agent=args.agent,
                         target_refs=targets,
                         project_dir=project_dir,
-                        log_fn=lambda message: _append_log(args.agent, message, project_dir),
+                        log_fn=_log.info,
                     )
                     if pre_repair_count > 0:
-                        _append_log(
-                            args.agent,
-                            f"pre-dispatch terminal repair handled {pre_repair_count} target(s); re-evaluating queue",
-                            project_dir,
+                        _log.info(
+                            "pre-dispatch terminal repair handled %d target(s); re-evaluating queue",
+                            pre_repair_count,
                         )
                         _write_health(args.agent, project_dir, status="running", last_event_id=last_event_id)
                         startup_scan_pending = True  # force immediate inbox re-scan
@@ -864,13 +849,12 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         agent=args.agent,
                         target_refs=targets,
                         project_dir=project_dir,
-                        log_fn=lambda message: _append_log(args.agent, message, project_dir),
+                        log_fn=_log.info,
                     )
                     if fast_path_count > 0:
-                        _append_log(
-                            args.agent,
-                            f"session-start fast path handled {fast_path_count} target(s); re-evaluating queue",
-                            project_dir,
+                        _log.info(
+                            "session-start fast path handled %d target(s); re-evaluating queue",
+                            fast_path_count,
                         )
                         _write_health(args.agent, project_dir, status="running", last_event_id=last_event_id)
                         startup_scan_pending = True
@@ -907,10 +891,11 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         dispatch_started_at=dispatch_started_at,
                         dispatch_timeout_seconds=args.exec_timeout_seconds,
                     )
-                    _append_log(
-                        args.agent,
-                        f"dispatching resident worker run: targets={','.join(targets)} new={len(batch_new_items)} contexts={len(batch_contexts)}",
-                        project_dir,
+                    _log.info(
+                        "dispatching resident worker run: targets=%s new=%d contexts=%d",
+                        ",".join(targets),
+                        len(batch_new_items),
+                        len(batch_contexts),
                     )
                     pre_dispatch_state = _capture_target_state(bridge, args.agent, targets)
 
@@ -924,19 +909,18 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         agent=args.agent,
                         target_refs=targets,
                         project_dir=project_dir,
-                        log_fn=lambda message: _append_log(args.agent, message, project_dir),
+                        log_fn=_log.info,
                     )
                     post_dispatch_state = _capture_target_state(bridge, args.agent, targets)
                     made_progress = pre_dispatch_state != post_dispatch_state or repair_count > 0
 
                     if completed.stderr:
-                        _append_log(args.agent, f"worker stderr: {completed.stderr.strip()}", project_dir)
-                    _append_log(args.agent, f"worker exit={completed.returncode}", project_dir)
+                        _log.warning("worker stderr: %s", completed.stderr.strip())
+                    _log.info("worker exit=%d", completed.returncode)
                     if completed.returncode == 0 and not made_progress:
-                        _append_log(
-                            args.agent,
-                            f"worker made no bridge progress: targets={','.join(targets)}",
-                            project_dir,
+                        _log.warning(
+                            "worker made no bridge progress: targets=%s",
+                            ",".join(targets),
                         )
                     post_status = (
                         "running"
@@ -959,7 +943,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         time.sleep(args.error_backoff_seconds)
                 except Exception as exc:
                     consecutive_errors += 1
-                    _append_log(args.agent, f"loop error ({consecutive_errors}): {exc}", project_dir)
+                    _log.error("loop error (%d): %s", consecutive_errors, exc)
                     # Phase C: Distinguish message-level from worker-level failure.
                     # A single context/dispatch error should not permanently stop the worker.
                     if consecutive_errors >= 5:
@@ -982,7 +966,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                         )
                         time.sleep(args.error_backoff_seconds)
     except OSError:
-        _append_log(args.agent, "resident worker lock busy; another run is active", project_dir)
+        _log.info("resident worker lock busy; another run is active")
         return 0
 
 
@@ -1013,8 +997,13 @@ def main() -> int:
     Returns:
         Exit code forwarded from :func:`run`.
     """
+    from groundtruth_kb._logging import _setup_bridge_logging
+
     args = build_parser().parse_args()
     project_dir = Path(args.project_dir) if args.project_dir else None
+    _setup_bridge_logging(
+        _log_file(args.agent, project_dir or Path(os.environ.get("CLAUDE_PROJECT_DIR", str(Path.cwd()))))
+    )
     return run(args, project_dir=project_dir)
 
 
