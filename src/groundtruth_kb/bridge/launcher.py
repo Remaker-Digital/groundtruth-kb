@@ -40,7 +40,7 @@ def _consume_stdin_if_present() -> None:
 def _pid_is_running(pid: int) -> bool:
     if pid <= 0:
         return False
-    if os.name == "nt":
+    if sys.platform == "win32":
         try:
             import ctypes
             from ctypes import wintypes

@@ -318,7 +318,7 @@ def _invoke_codex(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
         "text": True,
         "timeout": timeout_seconds,
     }
-    if os.name == "nt":
+    if sys.platform == "win32":
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
     completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **cast(Any, popen_kwargs)))
     return completed
@@ -352,7 +352,7 @@ def _invoke_prime(prompt: str, timeout_seconds: int, project_dir: Path) -> subpr
         "text": True,
         "timeout": timeout_seconds,
     }
-    if os.name == "nt":
+    if sys.platform == "win32":
         popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     completed = cast(subprocess.CompletedProcess[str], subprocess.run(cmd, **cast(Any, popen_kwargs)))
     _last_stdout_file("prime", project_dir).write_text(completed.stdout or "", encoding="utf-8")

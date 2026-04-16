@@ -93,9 +93,10 @@ quote-style = "double"
 known-first-party = ["groundtruth_kb"]
 
 # mypy: suppress import-not-found for optional dependencies that are not
-# installed in all CI matrix jobs (chromadb is in the 'search' extra only).
+# installed in all CI matrix jobs (chromadb is in the 'search' extra only;
+# mcp is only installed when the optional mcp extra is present).
 [[tool.mypy.overrides]]
-module = ["chromadb", "chromadb.*"]
+module = ["chromadb", "chromadb.*", "mcp", "mcp.*"]
 ignore_missing_imports = true
 
 # mypy: in test-base (no chromadb), ignore_missing_imports causes chromadb to be
@@ -105,4 +106,12 @@ ignore_missing_imports = true
 # When chromadb IS installed (test-search/local), the ignore is used correctly.
 [[tool.mypy.overrides]]
 module = ["groundtruth_kb.db"]
+warn_unused_ignores = false
+
+# mypy: runtime.py uses the mcp decorator (@mcp.resource) which is untyped when
+# mcp IS installed, but the type: ignore[misc] becomes unused when mcp is absent
+# (ignore_missing_imports above makes the whole mcp namespace Any). Suppress
+# warn_unused_ignores so the same comment works across both CI environments.
+[[tool.mypy.overrides]]
+module = ["groundtruth_kb.bridge.runtime"]
 warn_unused_ignores = false
