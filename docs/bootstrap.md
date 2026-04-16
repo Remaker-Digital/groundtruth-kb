@@ -8,8 +8,8 @@ A step-by-step walkthrough for adding the GroundTruth knowledge database and gov
 install, init, seed, specifications, tests, assertions, web UI,
 process templates, and CI/CD.
 
-**This guide does NOT cover** cloud infrastructure provisioning or a full
-Agent Red deployment topology. For the fastest client workstation path, use the
+**This guide does NOT cover** cloud infrastructure provisioning or
+container deployment. For the fastest client workstation path, use the
 [desktop setup guide](desktop-setup.md).  For profile-based project setup,
 use `gt project init my-project --profile <profile>` (see
 [product architecture](architecture/product-split.md)).
