@@ -117,7 +117,7 @@ GroundTruth-KB is built on current-generation, industry-standard technology:
 | AI Agents | Claude Code (Anthropic), Codex (OpenAI) | Best-of-breed for code generation and code review |
 | Type Safety | Python 3.11+ with `mypy --strict` | Full static type coverage, zero errors |
 | CI/CD | GitHub Actions | Industry standard, matrix testing across platforms |
-| Cloud | Azure (starter scaffolding) | Parameterized Terraform and Docker templates for common Azure resources |
+| Cloud | Azure (starter scaffolding) | Docker templates and minimal Terraform provider stubs; teams add cloud resources for their environment |
 | Web UI | FastAPI + Jinja2 | Built-in `gt serve` dashboard for spec tracking, assertions, and work items |
 | Security | Credential detection built-in; CI placeholders for OWASP scanning tools | Teams configure Semgrep, Bandit, and accessibility tools per project |
 | Search | ChromaDB (optional) | Semantic search over deliberation archive |

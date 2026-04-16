@@ -961,3 +961,21 @@ def test_insert_spec_with_source_paths(tmp_path):
     assert row[0] is not None
     stored = json.loads(row[0])
     assert stored == ["src/auth.py", "src/auth_utils.py"]
+
+
+def test_update_spec_preserves_source_paths(tmp_path):
+    """update_spec carries forward source_paths when not explicitly changed (C1)."""
+    db = KnowledgeDB(tmp_path / "test.db")
+    db.insert_spec(
+        id="SPEC-CARRY",
+        title="Original title",
+        status="specified",
+        changed_by="test",
+        change_reason="initial",
+        source_paths=["src/auth.py"],
+    )
+    db.update_spec("SPEC-CARRY", changed_by="test", change_reason="title update", title="Updated title")
+    spec = db.get_spec("SPEC-CARRY")
+    db.close()
+    assert spec is not None
+    assert spec["source_paths_parsed"] == ["src/auth.py"]

@@ -380,12 +380,30 @@ class TestF5Scaffold:
     """Scaffold adoption tests."""
 
     # 21. Bridge-profile — settings includes intake hook
-    def test_scaffold_bridge_includes_intake_hook(self):
-        template = Path(__file__).parent.parent / "templates" / "project" / "settings.local.json"
-        assert template.exists()
-        data = json.loads(template.read_text(encoding="utf-8"))
-        ups = data["hooks"]["UserPromptSubmit"]
-        commands = [entry.get("command", "") for entry in ups]
+    def test_scaffold_bridge_includes_intake_hook(self, tmp_path):
+        from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
+
+        target = tmp_path / "intake-proj"
+        opts = ScaffoldOptions(
+            project_name="intake-proj",
+            profile="dual-agent",
+            owner="test",
+            target_dir=target,
+            init_git=False,
+            seed_example=False,
+            include_ci=False,
+        )
+        scaffold_project(opts)
+        settings_path = target / ".claude" / "settings.json"
+        assert settings_path.exists()
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        hooks = data["hooks"]
+        # Collect all commands from all events (nested schema)
+        commands = []
+        for event_groups in hooks.values():
+            for group in event_groups:
+                for handler in group.get("hooks", []):
+                    commands.append(handler.get("command", ""))
         assert any("intake-classifier.py" in c for c in commands)
 
     # 22. Local-only — settings omits intake hook

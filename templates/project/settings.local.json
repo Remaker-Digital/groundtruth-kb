@@ -2,30 +2,5 @@
   "permissions": {
     "allow": ["Read", "Glob", "Grep", "Write", "Edit"],
     "deny": []
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "command": "python .claude/hooks/assertion-check.py"
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "command": "python .claude/hooks/intake-classifier.py"
-      },
-      {
-        "command": "python .claude/hooks/scheduler.py"
-      }
-    ],
-    "PreToolUse": [
-      {
-        "command": "python .claude/hooks/destructive-gate.py",
-        "tool": "Bash"
-      },
-      {
-        "command": "python .claude/hooks/credential-scan.py",
-        "tool": "Bash"
-      }
-    ]
   }
 }

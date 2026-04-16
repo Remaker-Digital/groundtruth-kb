@@ -107,7 +107,7 @@ production commercial SaaS project. The current reusable dual-agent pattern is:
 
 | Component | Version | Status |
 |-----------|---------|--------|
-| groundtruth-kb | 0.3.0 | Beta - extracted from production system (2,000+ specs, 11,000+ tests) |
+| groundtruth-kb | 0.5.0 | Alpha / developer-preview — extracted from production system (2,000+ specs, 11,000+ tests) |
 
 ---
 
