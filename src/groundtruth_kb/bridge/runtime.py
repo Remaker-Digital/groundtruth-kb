@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
-    from mcp.server import FastMCP  # optional dep; import-untyped suppressed by mypy configuration
+    from mcp.server import FastMCP  # optional dep; import suppressed by pyproject.toml mypy overrides
 
 try:
     from mcp.server import FastMCP
@@ -1626,7 +1626,7 @@ def _register_mcp_tools() -> None:
     mcp.tool()(get_worker_event_payload)
     mcp.tool()(list_threads)
 
-    @mcp.resource("bridge://health")
+    @mcp.resource("bridge://health")  # type: ignore[misc]
     def _health_resource() -> str:
         """Serve the bridge health JSON as an MCP resource."""
         return health()

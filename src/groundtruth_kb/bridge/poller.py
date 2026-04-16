@@ -204,7 +204,7 @@ def _launch_agent_wake(
             "stdout": subprocess.DEVNULL,
             "stderr": subprocess.DEVNULL,
         }
-        if os.name == "nt":
+        if sys.platform == "win32":
             popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
         subprocess.Popen(cmd, **cast(Any, popen_kwargs))
         _append_log(
