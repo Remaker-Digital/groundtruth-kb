@@ -578,7 +578,7 @@ def _maybe_clear_failed_residue(
             older_than_minutes=FAILED_RESIDUE_MAX_AGE_MINUTES,
             limit=FAILED_RESIDUE_CLEANUP_LIMIT,
         )
-    except Exception as exc:
+    except Exception as exc:  # intentional-catch: cleanup failure, logged and returns 0
         log_fn(f"failed residue cleanup error: {exc}")
         return 0
 
@@ -642,7 +642,7 @@ def _maybe_retry_stale_pending(
                 log_fn(f"autonomous retry: message={message_id} retry_count={result.get('retry_count')}")
             elif "max retries exceeded" in str(result.get("reason", "")):
                 log_fn(f"autonomous retry exhausted: message={message_id}")
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: per-message error, logged and continues
             log_fn(f"autonomous retry error: message={message_id} error={exc}")
 
     if retried > 0:
@@ -941,7 +941,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                     )
                     if completed.returncode != 0:
                         time.sleep(args.error_backoff_seconds)
-                except Exception as exc:
+                except Exception as exc:  # intentional-catch: dispatch error, consecutive counter + backoff
                     consecutive_errors += 1
                     _log.error("loop error (%d): %s", consecutive_errors, exc)
                     # Phase C: Distinguish message-level from worker-level failure.

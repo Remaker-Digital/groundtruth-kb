@@ -252,7 +252,7 @@ def _check_groundtruth_toml(target: Path) -> ToolCheck:
             status="pass",
             message="Valid configuration file",
         )
-    except Exception as e:
+    except Exception as e:  # intentional-catch: validation tool, error -> fail status
         return ToolCheck(
             name="groundtruth.toml",
             required=True,
@@ -295,7 +295,7 @@ def _check_db_schema(target: Path) -> ToolCheck:
             status="fail",
             message=f"Missing tables: {missing}",
         )
-    except Exception as e:
+    except Exception as e:  # intentional-catch: validation tool, error -> fail status
         return ToolCheck(
             name="Knowledge DB",
             required=True,

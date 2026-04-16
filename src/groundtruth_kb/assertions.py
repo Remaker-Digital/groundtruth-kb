@@ -553,7 +553,7 @@ def _run_json_path(a: dict[str, Any], ctx: AssertionContext) -> dict[str, Any]:
                 import tomllib
 
                 data = tomllib.loads(content)
-    except Exception as e:
+    except Exception as e:  # intentional-catch: parse fallback, error message returned
         return _fail("json_path", description, f"Failed to parse {file_rel}: {e}")
 
     actual, err = _walk_path(data, path_expr)

@@ -1,6 +1,6 @@
 # GroundTruth-KB Phase 4B Plan
 
-**Status:** ACTIVE — Phase 4B.7 in flight
+**Status:** ACTIVE — Phase 4D in flight
 **Created:** 2026-04-15 (S295)
 **Baseline:** `docs/reports/v0.4-baseline/SUMMARY.md` (Phase 4A audit, 2026-04-14)
 **Target exit:** Phase 4B complete when all Phase 4A baseline targets are met or explicitly deferred.
@@ -46,18 +46,18 @@ numbers and drives them to their agreed targets.
 | **4B.6** | CI enforcement gates | `mypy --strict` CI workflow step; per-file coverage gates (db.py 68% / cli.py 68% / config.py 80% / gates.py 92%); docstring-coverage ratchet 50→51 | `31d2c39` | `gtkb-phase4b6-ci-enforcement-gates-010` |
 | **4B.7** | Residual mypy --strict | Closed 39 `mypy --strict` errors across 5 files (`bridge/poller.py` 17, `bridge/worker.py` 10, `intake.py` 7, `bridge/runtime.py` 4, `bridge/context.py` 1). Six fix patterns: (A) `sys.platform == "win32"` file-lock imports + `BinaryIO \| None` narrowing; (B) `**cast(Any, popen_kwargs)` at 3 subprocess sites; (C) None-guard error-dicts at 7 `intake.py` sites; (D) two `TypedDict` summary shapes in `poller.py` + `cast(dict[str, Any], summary)` at returns; (E) misc narrowing in `runtime.py`/`context.py`; (F) `event_batch: dict[str, Any]` forward declaration at `worker.py:581`. Added `tests/test_full_tree_type_checks.py` (640 tests, +2 from 638) and direct `mypy --strict` CI workflow step. Implementation by headless Sonnet session (82 turns / 9.3 min), committed by Prime Opus after Codex verification | `f59dad4` | `gtkb-phase4b7-residual-mypy-strict-010` VERIFIED |
 | **4B.8** | Line coverage | Added 174 new tests across 11 new test files: 6 `tests/test_bridge_*.py` files covering the full bridge submodule public API surface (handshake 2, context 18, launcher 2, poller 3 + `_FileLock`, worker 6 + `_FileLock`, runtime 19), `tests/test_bridge_import_hygiene.py` (AST-based top-level import ban with 4 pattern coverage including `importlib.import_module` assignment forms), `tests/test_upgrade.py`, `tests/test_doctor.py`, `tests/test_scaffold_project.py`, `tests/test_manifest_project.py`. Added `--cov-fail-under=70` CI gate. Final metrics: combined **70.04%**, statements **73.28%**, branches **61.16%** — all above Phase 4B plan targets with margins. Suite: 640 → 814. **Also surfaced and fixed a latent mypy-subprocess crash on Windows** where `pytest-cov` instrumentation env vars (`COV_CORE_*` / `COVERAGE_*`) poisoned mypy under full-suite coverage load (STATUS_ACCESS_VIOLATION, exit 3221225477); fix strips those env vars before the subprocess call in both `test_full_tree_type_checks.py` and `test_internal_helpers_type_checks.py`. 14 bridge files, 5 NO-GO rounds (each revealing a different inventory error class), first headless hit the 15-min spawn timeout and required Prime in-session completion | `0e15b90` + `9d68b23` + `bfdd226` | `gtkb-phase4b8-line-coverage-014` VERIFIED |
+| **4B.9** | Whole-package docstrings | Drove whole-package docstring coverage from 60.42% → 85%. Public API already at 100% (from 4B.3). Remaining work in internal helpers, `bridge/`, `intake`/`reconciliation` modules | `2a324c6` | `gtkb-phase4b9-docstrings-006` VERIFIED |
+| **4D** | Broad-exception review | Narrowed 2 broad `except Exception` handlers to specific types (`sqlite3.IntegrityError` in `db.py`, `(OSError, AttributeError, ImportError)` in `launcher.py`). Removed 1 redundant broad handler (Unix `_pid_is_running`). Annotated 21 non-reraising broad handlers with `# intentional-catch:` markers. CI gate: `tests/test_exception_markers.py` AST-based check fails on unannotated broad handlers. 7 re-raise cleanup handlers exempt. Final: 28 broad handlers (7 reraise + 21 marked, 0 violations) | TBD | `gtkb-phase4d-broad-exception-review` |
 
 ### In flight
 
-*(None — 4B.8 landed; 4B.9 is next, not yet proposed.)*
-
-### Proposed (post-4B.8)
-
 | # | Sub-round | Scope | Baseline target |
 |---|---|---|---|
-| **4B.9** | Whole-package docstrings | Drive whole-package docstring coverage from 60.42% → 80%. Public API is already at 100% (from 4B.3). Remaining work is in internal helpers, `bridge/`, and the `intake`/`reconciliation` modules. Docstring-coverage ratchet from 4B.6 increments each PR. | Phase 4A §Docstrings |
 | **4C** | Structured logging | Introduce `logging.getLogger(__name__)` in `bridge/` and `db.py` paths; replace silent failures with `logger.warning`/`logger.error`; preserve `click.echo` for CLI user-facing output (unchanged). CI gate: `grep` guard ensures new code doesn't regress to bare `print()` in `src/`. | Phase 4A §Logging |
-| **4D** | Broad-exception review | Review the 3 "needs review" `except Exception` sites flagged in Phase 4A; for each, either narrow to specific exception classes, or add an explicit `# intentional-catch: <rationale>` comment. CI gate: new `except Exception` sites without the marker comment fail the commit gate. | Phase 4A §Exceptions |
+
+### Proposed
+
+*(None — all Phase 4 sub-rounds are either done or in flight.)*
 
 ## Change protocol
 

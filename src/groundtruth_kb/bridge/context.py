@@ -647,7 +647,7 @@ def build_contexts(
                 latest_worker and latest_worker.get("id") != context["canonical_message"]["id"]
             )
             contexts.append(context)
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: per-message isolation, error logged
             if log_fn is not None:
                 log_fn(
                     f"context-build failed for message {message_id}: {exc!r} — "

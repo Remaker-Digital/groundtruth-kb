@@ -1254,8 +1254,8 @@ class KnowledgeDB:
                     ),
                 )
                 count += 1
-            except Exception:
-                pass  # Skip on constraint violations
+            except sqlite3.IntegrityError:
+                pass  # Skip duplicate/constraint violations
         conn.commit()
         return count
 
@@ -4298,7 +4298,7 @@ class KnowledgeDB:
         # the canonical SQLite write appear failed.
         try:
             self._index_deliberation_in_chroma(id)
-        except Exception as _idx_err:
+        except Exception as _idx_err:  # intentional-catch: ChromaDB optional, SQLite canonical
             _log.warning("ChromaDB index failed for %s (rebuildable): %s", id, _idx_err)
 
         return self.get_deliberation(id)
@@ -4567,7 +4567,7 @@ class KnowledgeDB:
         # Delete stale entries for this deliberation
         try:
             collection.delete(where={"delib_id": delib_id})
-        except Exception:
+        except Exception:  # intentional-catch: ChromaDB optional cleanup
             pass  # Collection may be empty or delib_id not present
 
         # Get current version
@@ -4645,7 +4645,7 @@ class KnowledgeDB:
                                 semantic_results.append(row)
                         if semantic_results:
                             return semantic_results
-            except Exception as _chroma_err:
+            except Exception as _chroma_err:  # intentional-catch: ChromaDB fallback to SQLite LIKE
                 _log.warning("ChromaDB search failed, falling back to SQLite LIKE: %s", _chroma_err)
 
         # SQLite LIKE fallback
@@ -4686,7 +4686,7 @@ class KnowledgeDB:
         # Delete the collection and recreate
         try:
             self._chroma_client.delete_collection(_CHROMA_COLLECTION_NAME)
-        except Exception:
+        except Exception:  # intentional-catch: ChromaDB optional rebuild cleanup
             pass
         # Clear cached collection reference
         if hasattr(self, "_chroma_client"):
@@ -4703,7 +4703,7 @@ class KnowledgeDB:
                 chunks = self._index_deliberation_in_chroma(row["id"])
                 total_chunks += chunks
                 indexed += 1
-            except Exception as e:
+            except Exception as e:  # intentional-catch: per-item error tracking, continues rebuild
                 errors.append(f"{row['id']}: {e}")
 
         return {"indexed": indexed, "chunks": total_chunks, "errors": errors}
