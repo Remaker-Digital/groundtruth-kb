@@ -69,6 +69,13 @@ gt --config my-project/groundtruth.toml serve
 gt bootstrap-desktop my-prototype --owner "Your Organization" --init-git
 ```
 
+## Quick Evaluation Path
+
+1. [Start Here](docs/start-here.md) — install, create a project, and run your first assertion
+2. [Your First Specification](docs/tutorials/first-spec.md) — write a spec, link a test, and verify it
+3. [Dual-Agent Setup](docs/tutorials/dual-agent-setup.md) — add the Loyal Opposition and configure the file bridge
+4. [Day in the Life](docs/day-in-the-life.md) — see what a full development day looks like
+
 > **New to GroundTruth?** Read [The User Journey](docs/user-journey.md) to see
 > what building a product with GroundTruth looks like end-to-end. Then follow
 > the [getting started guide](docs/bootstrap.md) for a 10-step technical walkthrough.
