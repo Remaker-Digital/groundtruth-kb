@@ -33,7 +33,7 @@ def _consume_stdin_if_present() -> None:
     try:
         if not sys.stdin.isatty():
             _ = sys.stdin.read()
-    except Exception:
+    except Exception:  # intentional-catch: best-effort stdin consumption
         pass
 
 
@@ -54,13 +54,11 @@ def _pid_is_running(pid: int) -> bool:
             ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
             ctypes.windll.kernel32.CloseHandle(handle)
             return int(exit_code.value) == STILL_ACTIVE
-        except Exception:
-            return False
+        except (OSError, AttributeError, ImportError):
+            return False  # Process assumed dead on any platform-access error
     try:
         os.kill(pid, 0)
     except OSError:
-        return False
-    except Exception:
         return False
     return True
 
@@ -256,7 +254,7 @@ def _try_start_scheduled_task(agent: str) -> bool:
             text=True,
         )
         return result.returncode == 0
-    except Exception:
+    except Exception:  # intentional-catch: schtasks fallback, returns False
         return False
 
 
@@ -272,7 +270,7 @@ def _scheduled_task_exists(agent: str) -> bool:
             text=True,
         )
         return result.returncode == 0
-    except Exception:
+    except Exception:  # intentional-catch: schtasks query fallback, returns False
         return False
 
 
@@ -341,7 +339,7 @@ def main() -> int:
         else:
             print("{}")
         return 0
-    except Exception as exc:
+    except Exception as exc:  # intentional-catch: detached launch fallback, logged
         ok_once, out_once = _run_once_wake(
             project_dir,
             agent=args.agent,

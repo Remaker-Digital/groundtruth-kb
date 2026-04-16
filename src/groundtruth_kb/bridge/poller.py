@@ -66,7 +66,7 @@ def _consume_stdin_if_present() -> None:
     try:
         if not sys.stdin.isatty():
             _ = sys.stdin.read()
-    except Exception:
+    except Exception:  # intentional-catch: best-effort stdin consumption
         pass
 
 
@@ -205,7 +205,7 @@ def _launch_agent_wake(
             ",".join(launch_ids),
         )
         return launch_ids
-    except Exception as exc:
+    except Exception as exc:  # intentional-catch: wake launch failure, logged and returns empty
         _log.error("wake launch failed for %s: %s", message_ids, exc)
         return []
 
@@ -424,7 +424,7 @@ def _handle_inbox(
             summary["surfaced"] += 1
             _log.info("surfaced substantive work (no auto-accept): %s :: %s", message_id, subject)
             wake_candidates.append(message_id)
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: per-message isolation, error accumulated
             summary["errors"] += 1
             _log.error("error handling %s: %s", message_id, exc)
 
@@ -552,7 +552,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                     )
                 )
                 return 0
-            except Exception as exc:
+            except Exception as exc:  # intentional-catch: once-mode boundary, error logged
                 _log.error("once-mode error: %s", exc)
                 _checkpoint()
                 return 1
@@ -645,7 +645,7 @@ def run(args: argparse.Namespace, project_dir: Path | None = None) -> int:
                             last_event_id,
                         )
                 _checkpoint()
-            except Exception as exc:
+            except Exception as exc:  # intentional-catch: main loop resilience, error logged + backoff
                 _log.error("loop error: %s", exc)
                 _checkpoint()
                 time.sleep(args.error_backoff_seconds)
