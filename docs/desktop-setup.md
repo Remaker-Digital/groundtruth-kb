@@ -6,7 +6,7 @@ local-first setup that supports:
 
 - specification-first project management with GroundTruth
 - AI-assisted implementation on a desktop workstation
-- an upgrade path toward an Agent Red-like architecture
+- an upgrade path toward a dual-agent, cloud-deployed architecture
 
 ## Choose your setup depth
 
@@ -14,7 +14,7 @@ local-first setup that supports:
 |------------|----------|------------------------------|
 | Core local prototype | Solo or small-team proof of concept | Under 1 hour |
 | AI-assisted desktop prototype | Same-day work with repo-local agent instructions | 1-2 hours |
-| Agent Red-like prototype | Local prototype plus cloud/container tooling | Same day for setup, longer for cloud parity |
+| Cloud/container prototype | Local prototype plus cloud/container tooling | Same day for setup, longer for cloud parity |
 
 ## Required downloads and accounts
 
@@ -35,7 +35,7 @@ local-first setup that supports:
 | [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code/overview) | Shortest path if you want to use the included `CLAUDE.md` and `.claude/` control surfaces directly | Recommended |
 | Anthropic account with access to Claude Code | Needed if you choose the Claude-first workflow | Conditional |
 
-### Recommended for an Agent Red-like prototype
+### Recommended for a cloud/container prototype
 
 | Item | Why you need it | Required |
 |------|------------------|----------|
@@ -149,7 +149,7 @@ Use this sequence for a client workshop or kickoff:
 5. Create the first spec and linked test.
 6. Decide whether to stay local-first or add Docker/Azure on day one.
 
-## When to add the Agent Red-like tooling
+## When to add cloud/container tooling
 
 Do not force every client to install Azure CLI, Terraform, and Docker on day
 one unless they are immediately validating cloud/container workflows. For many

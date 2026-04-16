@@ -92,8 +92,8 @@ project, using the package templates and setup prompt.
 
 ## Reference Implementation
 
-Agent Red Customer Engagement is the proving ground for the patterns that
-`groundtruth-kb` packages. The current reusable dual-agent pattern is:
+The patterns packaged by `groundtruth-kb` were developed and validated in a
+production commercial SaaS project. The current reusable dual-agent pattern is:
 
 - File bridge queue and status protocol
 - OS-level scheduled pollers
