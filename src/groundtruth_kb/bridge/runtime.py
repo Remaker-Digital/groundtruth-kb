@@ -1626,7 +1626,7 @@ def _register_mcp_tools() -> None:
     mcp.tool()(get_worker_event_payload)
     mcp.tool()(list_threads)
 
-    @mcp.resource("bridge://health")  # type: ignore[misc]
+    @mcp.resource("bridge://health")  # type: ignore[misc, untyped-decorator]
     def _health_resource() -> str:
         """Serve the bridge health JSON as an MCP resource."""
         return health()
