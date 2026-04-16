@@ -10,7 +10,45 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: gtkb-adoption-gap-closure
+NEW: bridge/gtkb-adoption-gap-closure-013.md
+GO: bridge/gtkb-adoption-gap-closure-012.md
+REVISED: bridge/gtkb-adoption-gap-closure-011.md
+NO-GO: bridge/gtkb-adoption-gap-closure-010.md
+REVISED: bridge/gtkb-adoption-gap-closure-009.md
+NO-GO: bridge/gtkb-adoption-gap-closure-008.md
+REVISED: bridge/gtkb-adoption-gap-closure-007.md
+NO-GO: bridge/gtkb-adoption-gap-closure-006.md
+REVISED: bridge/gtkb-adoption-gap-closure-005.md
+NO-GO: bridge/gtkb-adoption-gap-closure-004.md
+REVISED: bridge/gtkb-adoption-gap-closure-003.md
+NO-GO: bridge/gtkb-adoption-gap-closure-002.md
+NEW: bridge/gtkb-adoption-gap-closure-001.md
+
+Document: gtkb-mass-adoption-readiness
+VERIFIED: bridge/gtkb-mass-adoption-readiness-012.md
+NEW: bridge/gtkb-mass-adoption-readiness-011.md
+NO-GO: bridge/gtkb-mass-adoption-readiness-010.md
+NEW: bridge/gtkb-mass-adoption-readiness-009.md
+GO: bridge/gtkb-mass-adoption-readiness-008.md
+REVISED: bridge/gtkb-mass-adoption-readiness-007.md
+NO-GO: bridge/gtkb-mass-adoption-readiness-006.md
+REVISED: bridge/gtkb-mass-adoption-readiness-005.md
+NO-GO: bridge/gtkb-mass-adoption-readiness-004.md
+REVISED: bridge/gtkb-mass-adoption-readiness-003.md
+NO-GO: bridge/gtkb-mass-adoption-readiness-002.md
+NEW: bridge/gtkb-mass-adoption-readiness-001.md
+
+Document: gtkb-phase4b9-docstring-coverage
+VERIFIED: bridge/gtkb-phase4b9-docstring-coverage-006.md
+NEW: bridge/gtkb-phase4b9-docstring-coverage-005.md
+GO: bridge/gtkb-phase4b9-docstring-coverage-004.md
+REVISED: bridge/gtkb-phase4b9-docstring-coverage-003.md
+NO-GO: bridge/gtkb-phase4b9-docstring-coverage-002.md
+NEW: bridge/gtkb-phase4b9-docstring-coverage-001.md
+
 Document: gtkb-phase4b8-line-coverage
+VERIFIED: bridge/gtkb-phase4b8-line-coverage-014.md
 REVISED: bridge/gtkb-phase4b8-line-coverage-013.md
 NO-GO: bridge/gtkb-phase4b8-line-coverage-012.md
 NEW: bridge/gtkb-phase4b8-line-coverage-011.md
