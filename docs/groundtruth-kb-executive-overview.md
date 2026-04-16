@@ -50,7 +50,7 @@ GroundTruth makes every repeatable procedure deterministic and executable:
 
 - **Governance gates** enforce rules mechanically (no deployment without tests passing, no spec promotion without owner approval)
 - **Assertion checks** run on every session start — failing specifications are surfaced immediately, not discovered later
-- **CI pipelines** are generated from project profiles, with lint, type checking, coverage, docstring, and security scanning built in
+- **CI workflow templates** are generated from project profiles, running ruff and pytest by default; coverage, type-checking, and docstring gates are available in higher-tier templates and enabled when the project is ready
 - **Bridge protocol** automates proposal/review cycles between agents on a 3-minute cadence
 
 The result: AI tokens are concentrated on creative, insightful, and analytical work — the work that actually moves the project forward.
@@ -86,26 +86,24 @@ Staging Deploy → Production Deploy
 
 Each stage has explicit entry and exit criteria. The system tracks which specifications are in which stage and reports progress through a web dashboard and CLI.
 
-**Testing and instrumentation are built into the project scaffolding:**
+**CI templates are included in the project scaffolding:**
 
-- Unit tests, integration tests, end-to-end tests — generated from specifications
-- Type checking (`mypy --strict`) across the entire codebase
-- Code coverage with per-file gates and global thresholds
-- Docstring coverage with ratcheting CI gates
-- CI templates include placeholders for security scanning and visual regression; actual tooling (e.g., Semgrep, Bandit, axe-core, Playwright, Chromatic) is configured per project by the team
-- Architecture compliance assertions checked on every session start
+- Three template tiers (minimal, standard, full) generate GitHub Actions workflows running ruff and pytest by default
+- The full-tier template includes optional configuration for `mypy`, per-file coverage thresholds, and docstring gates (off by default — enabled when the project's codebase is ready)
+- Security scanning, accessibility testing, and visual regression (e.g., Semgrep, Bandit, axe-core, Playwright, Chromatic) are added by the team per their stack and requirements
+- Architecture compliance assertions (`gt assert`) run on every session start via the included session hook
 
 ---
 
 ## Cloud Deployment Patterns
 
-GroundTruth-KB generates starter Terraform and Docker scaffolding for Azure deployments. This gives teams a documented, version-controlled starting point rather than a blank slate.
+When a cloud provider is selected during project initialization, GroundTruth-KB generates Docker and Terraform starter stubs. These provide a version-controlled starting point — not a production-ready deployment configuration.
 
-- **Azure Container Apps** — starter Terraform modules and Dockerfiles for container-based deployments; auto-scaling configuration and production hardening are left to the team's own infrastructure engineers
-- **Multi-tenant and zero-knowledge patterns** — includes architectural patterns and scaffolding for multi-tenant and zero-knowledge designs (implementation depth varies by profile; production-grade isolation requires project-specific implementation)
-- **Infrastructure as Code** — parameterized Terraform scaffolding for common Azure resources; teams extend and adapt these templates to their own environments
+- **Docker** — a starter Dockerfile and Compose file are included; production configuration (secrets, health checks, multi-stage builds) is the team's responsibility
+- **Terraform** — a provider stub with minimal variable and output scaffolding; resource configuration, secrets management, networking, and scaling are implemented by the team for their specific environment
+- **Governance gate** — production deploys require explicit owner approval recorded in the specification system
 
-Deployment is governed by the same specification system: deployment specs must be verified before promotion, and production deploys require explicit governance approval (GOV-16 gate).
+Multi-tenant data isolation and zero-knowledge security are architectural patterns that teams implement for their use case — they are not pre-built features of the current v0.5.0 package.
 
 ---
 
@@ -120,7 +118,7 @@ GroundTruth-KB is built on current-generation, industry-standard technology:
 | Type Safety | Python 3.11+ with `mypy --strict` | Full static type coverage, zero errors |
 | CI/CD | GitHub Actions | Industry standard, matrix testing across platforms |
 | Cloud | Azure (starter scaffolding) | Parameterized Terraform and Docker templates for common Azure resources |
-| Frontend | React + TypeScript (reference architecture) | Project scaffold includes templates; shipped UI components are not part of the package |
+| Web UI | FastAPI + Jinja2 | Built-in `gt serve` dashboard for spec tracking, assertions, and work items |
 | Security | Credential detection built-in; CI placeholders for OWASP scanning tools | Teams configure Semgrep, Bandit, and accessibility tools per project |
 | Search | ChromaDB (optional) | Semantic search over deliberation archive |
 

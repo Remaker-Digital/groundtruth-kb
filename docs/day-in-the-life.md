@@ -210,7 +210,7 @@ This gives you:
 | Component | What it does | CLI command |
 |-----------|-------------|-------------|
 | Knowledge Database | SQLite store for specs, tests, work items, deliberations | `gt init`, `gt assert`, `gt serve` |
-| Project Scaffold | Generates project structure with all config files | `gt project init --profile ...` |
+| Project Scaffold | Generates project structure with all config files | `gt project init PROJECT_NAME --profile ...` |
 | Workstation Doctor | Validates your dev environment | `gt project doctor` |
 | Specification Engine | Create, query, score, impact-analyze specs | `gt scaffold specs` |
 | Deliberation Archive | Decision history with semantic search | `gt deliberations search "..."` |
