@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from groundtruth_kb import get_templates_dir
 from groundtruth_kb.bootstrap import (
@@ -277,6 +279,9 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
     if settings_template.exists():
         shutil.copy2(settings_template, target / ".claude" / "settings.local.json")
 
+    # settings.json (tracked) — governance hook registration for all 8 hooks
+    _write_settings_json(target / ".claude" / "settings.json")
+
     # .gitignore additions for file bridge automation runtime state
     gi = target / ".gitignore"
     content = gi.read_text(encoding="utf-8") if gi.exists() else ""
@@ -296,6 +301,36 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
         _generate_bridge_index(project_name),
         encoding="utf-8",
     )
+
+
+def _write_settings_json(settings_path: Path) -> None:
+    """Write tracked .claude/settings.json with all 8 governance hooks registered.
+
+    Uses the nested hook event → matcher group → handler schema expected by
+    current Claude Code versions. The file is tracked in git so all governance
+    hooks are inherited by every worktree and fresh clone.
+    """
+    hooks_dir = ".claude/hooks"
+    content: dict[str, Any] = {
+        "hooks": {
+            "SessionStart": [
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/session-start-governance.py"}]},
+            ],
+            "UserPromptSubmit": [
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/delib-search-gate.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/delib-search-tracker.py"}]},
+            ],
+            "PreToolUse": [
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/spec-before-code.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/bridge-compliance-gate.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/kb-not-markdown.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/destructive-gate.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/credential-scan.py"}]},
+            ],
+        }
+    }
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
 
 
 def _copy_webapp_templates(target: Path, *, cloud_provider: str) -> None:
