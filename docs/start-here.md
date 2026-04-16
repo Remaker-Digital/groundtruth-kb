@@ -32,7 +32,7 @@ pip install groundtruth-kb
 
 !!! tip "Pinned installs"
     For reproducible installs, pin to an exact version:
-    `pip install groundtruth-kb==0.4.0`
+    `pip install groundtruth-kb==0.5.0`
 
 ## Step 2: Verify Installation
 
@@ -43,7 +43,7 @@ gt --version
 Expected output:
 
 ```
-gt, version 0.4.0
+gt, version 0.5.0
 ```
 
 ## Step 3: Create a New Project
@@ -266,6 +266,8 @@ directory.
 
 ## What's Next?
 
+- **[Your First Specification](tutorials/first-spec.md)** — write your first spec, link a test, and run an assertion
+- **[Dual-Agent Setup](tutorials/dual-agent-setup.md)** — add the Loyal Opposition and configure the file bridge
 - **[Method Guide](method/01-overview.md)** — understand the full GroundTruth
   discipline: specifications, testing, governance, and dual-agent workflows
 - **[Example Project](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/examples/task-tracker/WALKTHROUGH.md)** —

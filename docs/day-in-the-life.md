@@ -134,7 +134,7 @@ gt assert                # All specs passing?
 Review the Knowledge Database through the web UI:
 
 ```bash
-gt web                   # Opens localhost:8090
+gt serve                   # Opens localhost:8090
 ```
 
 The dashboard shows: spec counts by status, recent changes, test coverage,
@@ -209,7 +209,7 @@ This gives you:
 
 | Component | What it does | CLI command |
 |-----------|-------------|-------------|
-| Knowledge Database | SQLite store for specs, tests, work items, deliberations | `gt init`, `gt assert`, `gt web` |
+| Knowledge Database | SQLite store for specs, tests, work items, deliberations | `gt init`, `gt assert`, `gt serve` |
 | Project Scaffold | Generates project structure with all config files | `gt project init --profile ...` |
 | Workstation Doctor | Validates your dev environment | `gt project doctor` |
 | Specification Engine | Create, query, score, impact-analyze specs | `gt scaffold specs` |
