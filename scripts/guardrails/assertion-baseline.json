@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 21830,
-    "total_files": 486
+    "total_assertions": 21878,
+    "total_files": 487
   },
   "baselines": {
     "tests/agents/plugins/test_agent_extensibility_phase0.py": 71,
@@ -36,7 +36,7 @@
     "tests/chat/test_conversation_quality.py": 48,
     "tests/chat/test_escalation_identity_gate.py": 24,
     "tests/chat/test_identity_pipeline_wiring.py": 21,
-    "tests/chat/test_identity_preprocessor.py": 81,
+    "tests/chat/test_identity_preprocessor.py": 83,
     "tests/chat/test_orchestrator_safety.py": 21,
     "tests/chat/test_pipeline_escalation.py": 5,
     "tests/chat/test_quality_config.py": 28,
@@ -402,6 +402,7 @@
     "tests/quality_metrics/test_quality_score.py": 28,
     "tests/regression/test_migration_compat.py": 64,
     "tests/regression/test_upgrade_regression.py": 89,
+    "tests/scripts/test_retroactive_harvest_bridge_threads.py": 43,
     "tests/security/test_adversarial.py": 86,
     "tests/security/test_ci_tooling.py": 18,
     "tests/security/test_config_pipeline_live.py": 32,
@@ -474,7 +475,7 @@
     "tests/unit/test_tenant_secret_service.py": 80,
     "tests/unit/test_tier_upgrade.py": 32,
     "tests/unit/test_trial_scanner.py": 32,
-    "tests/unit/test_widget_otp_verification.py": 37,
+    "tests/unit/test_widget_otp_verification.py": 40,
     "tests/visual/test_widget_css.py": 21,
     "tests/visual/test_widget_structure.py": 17,
     "tests/widget/test_admin_features_batch.py": 216,
