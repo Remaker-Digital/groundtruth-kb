@@ -16,7 +16,7 @@ as a footnote. Numbers without provenance are forbidden on this page.
     not answer "how fast is this moving?" That is what session wrap-up
     reports are for.
 
-## Machine-Verifiable Metrics (reproducible at commit `2790e11`)
+## Machine-Verifiable Metrics (reproducible at commit `f475c8b`)
 
 These metrics are deterministic at a fixed commit. `scripts/collect_evidence_metrics.py --verify`
 compares each row's `metric_name`, `value`, `command`, `source_scope`, and
@@ -28,13 +28,13 @@ and that value is surfaced in the section heading above.
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Tests collected | 1249[^gate1] | deterministic; exact equality enforced on re-run |
+| Tests collected | 1266[^gate1] | deterministic; exact equality enforced on re-run |
 | `mypy --strict` | pass across 40 source files[^gate2] | src/groundtruth_kb/ |
-| Docstring coverage | 87.25%[^gate3] | public API only, per `scripts/audit_docstrings.py` |
+| Docstring coverage | 87.31%[^gate3] | public API only, per `scripts/audit_docstrings.py` |
 
-[^gate1]: `python -m pytest --collect-only -q` — commit `2790e11` — generated 2026-04-17T21:02:03Z. Scope: tests/ directory, all collected test ids.
-[^gate2]: `python -m mypy --strict src/groundtruth_kb/` — commit `2790e11` — generated 2026-04-17T21:02:03Z. Scope: src/groundtruth_kb/ (all modules).
-[^gate3]: `python scripts/audit_docstrings.py` — commit `2790e11` — generated 2026-04-17T21:02:03Z. Scope: src/groundtruth_kb/ public API (audit_docstrings.py scope).
+[^gate1]: `python -m pytest --collect-only -q` — commit `f475c8b` — generated 2026-04-17T21:15:59Z. Scope: tests/ directory, all collected test ids.
+[^gate2]: `python -m mypy --strict src/groundtruth_kb/` — commit `f475c8b` — generated 2026-04-17T21:15:59Z. Scope: src/groundtruth_kb/ (all modules).
+[^gate3]: `python scripts/audit_docstrings.py` — commit `f475c8b` — generated 2026-04-17T21:15:59Z. Scope: src/groundtruth_kb/ public API (audit_docstrings.py scope).
 
 ## Live Reference-Install Snapshot (local dev DB, regenerated on every run)
 
@@ -50,9 +50,9 @@ regenerated on every `scripts/collect_evidence_metrics.py` run, but
 | Specs (verified) | 6[^live2] | count at last `scripts/collect_evidence_metrics.py` run |
 | Deliberations (local archive) | 1[^live3] | count at last `scripts/collect_evidence_metrics.py` run. Reference install only, not Agent Red. |
 
-[^live1]: `sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'` — commit `2790e11` — generated 2026-04-17T21:02:03Z. Scope: local groundtruth-kb/groundtruth.db at repo root. Reproducibility: `local_install_snapshot` — **this value will differ on a fresh `gt project init` and is NOT compared by `--verify`**.
-[^live2]: `sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'` — commit `2790e11` — generated 2026-04-17T21:02:03Z. Scope: local groundtruth-kb/groundtruth.db at repo root. Reproducibility: `local_install_snapshot` — **this value will differ on a fresh `gt project init` and is NOT compared by `--verify`**.
-[^live3]: `sqlite3 groundtruth.db 'SELECT COUNT(DISTINCT id) FROM deliberations'` — commit `2790e11` — generated 2026-04-17T21:02:03Z. Scope: local groundtruth-kb/groundtruth.db at repo root. This is the reference install's local archive, NOT the downstream Agent Red deliberation history which is measured separately. Reproducibility: `local_install_snapshot` — **this value will differ on a fresh `gt project init` and is NOT compared by `--verify`**.
+[^live1]: `sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'` — commit `f475c8b` — generated 2026-04-17T21:15:59Z. Scope: local groundtruth-kb/groundtruth.db at repo root. Reproducibility: `local_install_snapshot` — **this value will differ on a fresh `gt project init` and is NOT compared by `--verify`**.
+[^live2]: `sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'` — commit `f475c8b` — generated 2026-04-17T21:15:59Z. Scope: local groundtruth-kb/groundtruth.db at repo root. Reproducibility: `local_install_snapshot` — **this value will differ on a fresh `gt project init` and is NOT compared by `--verify`**.
+[^live3]: `sqlite3 groundtruth.db 'SELECT COUNT(DISTINCT id) FROM deliberations'` — commit `f475c8b` — generated 2026-04-17T21:15:59Z. Scope: local groundtruth-kb/groundtruth.db at repo root. This is the reference install's local archive, NOT the downstream Agent Red deliberation history which is measured separately. Reproducibility: `local_install_snapshot` — **this value will differ on a fresh `gt project init` and is NOT compared by `--verify`**.
 
 ## Deterministic vs. Non-Deterministic Metrics
 
@@ -132,4 +132,4 @@ or markdown lines are printed.
 
 *Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 
-*Generated from `docs/_generated/evidence_metrics.json` at commit `2790e11` on 2026-04-17T21:02:03Z.*
+*Generated from `docs/_generated/evidence_metrics.json` at commit `f475c8b` on 2026-04-17T21:15:59Z.*
