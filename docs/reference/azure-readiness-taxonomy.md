@@ -217,11 +217,7 @@ buyers expect this to be answered.
 
 **Subtopics:**
 - OIDC federated identity for CI/CD (no static `AZURE_CREDENTIALS`).
-- Managed identity for workload-to-service authentication. **Managed
-  identity is preferred over service principals** wherever Azure
-  supports it; any exception is recorded as an ADR with rationale.
-- Conditional access policies (required sign-in context, MFA, device
-  compliance, risk-based access).
+- Managed identity for workload-to-service authentication.
 - Service-to-service auth model (system-assigned, user-assigned,
   workload identity, service principal — and when each is acceptable).
 - Entra ID (Azure AD) integration: tenant selection, directory roles.
@@ -257,14 +253,11 @@ regardless of how well the deployment pipeline works.
 **Subtopics:**
 - Budgets per subscription / environment / tenant.
 - Tag hygiene (every resource carries required tags — enforced by
-  Azure Policy or an equivalent assertion; required for cost
-  attribution, cross-reference to Section 4.1 tagging standards).
+  Azure Policy or an equivalent assertion).
 - Per-tenant cost attribution: how the team answers "what did tenant X
   cost us last month?"
 - FinOps review cadence: who reviews spend, how often, what happens on
   budget breach.
-- Unit economics: declared cost-per-tenant or cost-per-unit model that
-  converts Azure spend into a per-customer or per-transaction figure.
 - Reservation / savings plan strategy (or documented decision not to).
 
 **Why it is first-class:** enterprise accounts that are large enough to
@@ -273,18 +266,11 @@ have a cloud-finance function expect answers here during procurement.
 ### 4.5 `compliance` / `audit` / `security posture`
 
 **Subtopics:**
-- SOC 2-aligned control baseline (logging, change management, and
-  other administrative controls).
-- Access reviews (explicit cadence for reviewing production access;
-  quarterly or more-frequent at `regulated-enterprise`; exported to
-  the audit log).
-- Audit trail retention and export (retention window meets the named
-  framework's minimum; immutable storage).
-- Data boundaries: residency, cross-border transfer controls,
+- SOC 2-aligned control baseline (access reviews, logging, change
+  management).
+- Audit trail retention and export.
+- Data boundary: residency, cross-border transfer controls,
   subprocessor list.
-- Security posture baseline: Microsoft Cloud Security Benchmark
-  assignment or equivalent (e.g., CIS Azure Foundations Benchmark);
-  explicit waiver ADR for any excluded control.
 - Threat modeling: a recorded threat model per major component.
 - Defender for Cloud enablement (or explicit waiver ADR).
 - Secret rotation schedule and exception process.
@@ -301,16 +287,13 @@ compliance evidence often becomes a go/no-go gate, not a preference.
 - WAF in front of public endpoints.
 - DDoS protection tier (basic vs. standard).
 - Egress controls (firewall, NAT gateway, UDRs).
-- Ingress controllers (Container Apps ingress, Application Gateway,
-  Front Door, or AKS ingress controller — decision recorded per
-  workload).
 - Service-mesh (if applicable) or documented decision not to use one.
 - VNet topology (hub-and-spoke, single VNet with subnets, etc.).
 
 **Why it is first-class:** network posture is one of the first
 questions an enterprise security review will raise.
 
-### 4.7 `CI/CD` (with IaC)
+### 4.7 `CI/CD`
 
 **Subtopics:**
 - OIDC federation to Azure (no `AZURE_CREDENTIALS` JSON secret).
@@ -318,9 +301,6 @@ questions an enterprise security review will raise.
 - Environment approval gates (staging → production requires a human
   approval).
 - Drift detection (periodic plan vs. deployed state).
-- Rollback strategy (documented procedure for reverting a failed deploy:
-  image-tag pin-back, Terraform plan + apply to a prior state, or
-  canary/blue-green cut-over — decision recorded per workload).
 - Deploy evidence artifacts (image digest, IaC plan hash, assertion
   result, owner approval link).
 
@@ -334,9 +314,6 @@ production changes originate; auditors routinely ask for this evidence.
 - Application Insights (instrumentation key vs. connection string;
   sampling policy).
 - OpenTelemetry traces (language SDKs, exporters, context propagation).
-- Distributed tracing with correlation IDs (request-id / trace-id
-  propagated across service boundaries; included in every log record
-  so per-request traces can be reconstructed end-to-end).
 - Per-tenant log view (the security team can answer "show me everything
   tenant X did yesterday").
 - SLO tracking (availability, latency, error budget).
@@ -368,12 +345,6 @@ attribution.
 - Backup strategy and PITR (point-in-time recovery) window.
 - Geo-replication (zone-redundant, geo-redundant, read-access
   geo-redundant).
-- Encryption at rest (Microsoft-managed keys vs. customer-managed keys
-  per data store; cross-reference to Section 4.11 for key-management
-  decisions).
-- Data residency boundaries (approved regions per tenant; enforcement
-  mechanism such as geo-fenced storage, regional SQL failover group
-  allow-lists).
 - Retention policies (how long data is kept per tenant and category).
 - Data classification (PII, PHI, payment data — per regulation).
 
@@ -399,8 +370,6 @@ into a deployment pattern.
 ### 4.12 `DR` / `reliability`
 
 **Subtopics:**
-- SLO targets per workflow (availability and latency targets; paired
-  with error-budget policy from Section 4.8).
 - RPO (recovery point objective) and RTO (recovery time objective) per
   workflow.
 - Backup + restore tested on a recorded cadence (backups that are never
@@ -408,10 +377,8 @@ into a deployment pattern.
 - Chaos testing or failure-injection exercises (optional at
   `enterprise-ready`, expected at `regulated-enterprise`).
 - Incident response runbook with named owners.
-- Availability zones (zone-redundant deployment inside a single region
-  as the first reliability step; documented per workload).
-- Multi-region failover strategy (active-active, active-passive, or
-  single-region with documented rationale); failover drill cadence.
+- Multi-region strategy (active-active, active-passive, or single-region
+  with documented rationale).
 
 **Why it is first-class:** SaaS contracts routinely attach SLAs;
 without tested DR, the SLA cannot be committed to in good faith.
@@ -562,59 +529,9 @@ The Codex INSIGHTS report (Phase 2-6) maps to these child bridges:
 Dependency ordering: 1 and 2 first, then 3 and 4 in parallel, then 5,
 then 6, then 7 as docs wrap-up.
 
-## 8. Review Gates (G1–G4)
+## 8. Source Material and Citations
 
-The parent bridge proposal enumerated four review gates that this
-taxonomy must satisfy. Each gate is a claim about the document itself,
-not about downstream child-bridge work.
-
-### 8.1 G1 — Vocabulary stability
-
-**Claim:** The taxonomy must be stable enough that downstream child
-bridges can cite its categories and tiers without constant
-re-alignment.
-
-**How this document addresses G1:** The 13 first-class categories in
-Section 4 and the four readiness tiers in Section 3 are declared
-explicitly and named in full. Subsequent vocabulary changes require
-their own bridge proposal; this document does not permit side-channel
-amendment of the category list or the tier ladder.
-
-### 8.2 G2 — Scope-boundary clarity
-
-**Claim:** GT-KB's scope must be distinguishable from the customer's
-deployment responsibility, so that downstream child bridges do not
-accidentally commit GT-KB to operating customer infrastructure.
-
-**How this document addresses G2:** Section 2 names exactly what GT-KB
-owns and does not own, including the treatment of reference scaffolds
-(CI/CD workflow templates and IaC skeletons are reference artifacts
-the customer may adopt; they are not GT-KB-operated services).
-
-### 8.3 G3 — `regulated-enterprise` additivity
-
-**Claim:** The `regulated-enterprise` tier must be defined as additive
-to `enterprise-ready`, not as a disconnected fourth track.
-
-**How this document addresses G3:** Section 3.4 states the additivity
-rule directly (`regulated-enterprise = enterprise-ready +
-industry-regulation-specific evidence & audit controls`), lists every
-additional criterion as additive (not substitutive), and preserves all
-`enterprise-ready` criteria as prerequisites for the higher tier.
-
-### 8.4 G4 — Non-authorizing child-bridge preview
-
-**Claim:** The child-bridge list must be a dependency preview only,
-not an implementation authorization.
-
-**How this document addresses G4:** Section 7 opens with an explicit
-disclaimer stating that approval of this taxonomy does NOT authorize
-implementation of any listed child bridge and that each child bridge
-requires its own bridge proposal and GO before implementation begins.
-
-## 9. Source Material and Citations
-
-### 9.1 Authoritative source for this taxonomy
+### 8.1 Authoritative source for this taxonomy
 
 The taxonomy is derived from the Codex Loyal Opposition INSIGHTS report
 at:
@@ -630,7 +547,7 @@ and was the input to the bridge proposal
 deficiency areas across the current GT-KB Azure scaffold and anchors
 recommendations in current Microsoft Learn guidance.
 
-### 9.2 GT-KB method-layer sources
+### 8.2 GT-KB method-layer sources
 
 - `docs/method/00-vision.md` — the pipeline-produces-SaaS vision.
 - `docs/method/01-overview.md` — the "not a CI/CD pipeline"
@@ -640,7 +557,7 @@ recommendations in current Microsoft Learn guidance.
 - `docs/method/02-specifications.md` — the five existing spec types
   (the ADR template reuses `architecture_decision`, no new type).
 
-### 9.3 External Microsoft Learn anchors (from Codex INSIGHTS report)
+### 8.3 External Microsoft Learn anchors (from Codex INSIGHTS report)
 
 Full URLs and line references are preserved in the INSIGHTS report.
 Summary:
@@ -663,7 +580,7 @@ Summary:
 - **Azure cost optimization** — financial targets, cost models, cost
   data review, spending guardrails.
 
-## 10. MemBase Registration Status
+## 9. MemBase Registration Status
 
 The following entries are registered in the local MemBase (the adopting
 project's `groundtruth.db`) when this taxonomy is adopted:
@@ -693,9 +610,9 @@ Child bridges may add tracked seed/migration artifacts if any registration
 needs to be reproducible from git history alone; that is an explicit
 child-bridge scope decision, not something this taxonomy commits to.
 
-## 11. Constraints and Non-Goals
+## 10. Constraints and Non-Goals
 
-### 11.1 Preserved defaults
+### 10.1 Preserved defaults
 
 - The `starter` cloud-provider behavior remains unchanged. Projects
   that do not declare an Azure readiness tier keep their current
@@ -704,7 +621,7 @@ child-bridge scope decision, not something this taxonomy commits to.
   `tests/test_scaffold_smoke.py` around the Azure scaffold smoke
   assertions) continue to hold.
 
-### 11.2 Out of scope
+### 10.2 Out of scope
 
 - **No Azure resource template authoring in this bridge.** Terraform,
   Bicep, and compute-target module skeletons are deferred to the
@@ -721,13 +638,13 @@ child-bridge scope decision, not something this taxonomy commits to.
 - **No Azure API integration or Azure-specific Python dependency.** No
   runtime Azure SDK is added as a result of this taxonomy.
 
-### 11.3 Additive, not disruptive
+### 10.3 Additive, not disruptive
 
 Everything in this taxonomy is additive to the existing GT-KB method
 layer. No existing spec, test, or generated artifact is silently
 re-scoped by the act of committing this taxonomy document.
 
-## 12. Glossary
+## 11. Glossary
 
 - **Readiness envelope** — the collection of specs, ADRs, assertions,
   and doctor checks that make a given tier verifiable.
