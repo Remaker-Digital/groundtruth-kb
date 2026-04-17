@@ -19,11 +19,18 @@ engineering decisions.
 
 ## Architecture
 
-```
-Layer 3: Workstation Doctor    gt project doctor
-Layer 2: Project Scaffold      gt project init / upgrade
-Layer 1: Core Knowledge DB     gt init / seed / assert / serve
-         File Bridge Setup     dual-agent coordination templates [optional]
+```mermaid
+flowchart TB
+    L1["Layer 1<br/>Core Knowledge DB<br/>gt init / seed / assert / serve"]
+    Bridge["Optional<br/>File Bridge Setup<br/>Prime Builder + Loyal Opposition"]
+    L2["Layer 2<br/>Project Scaffold<br/>gt project init / upgrade"]
+    L3["Layer 3<br/>Workstation Doctor<br/>gt project doctor"]
+    Azure["Opt-in<br/>Azure readiness envelope<br/>specs, ADRs, checks, evidence"]
+
+    L1 --> L2 --> L3
+    Bridge --> L2
+    L2 --> Azure
+    L3 --> Azure
 ```
 
 Tier labels in the diagram map to ADR-0001: Three-Tier Memory Architecture — MemBase (Layer 1), MEMORY.md (operational notepad), and the Deliberation Archive (DA).
@@ -51,3 +58,22 @@ See the [Start Here](start-here.md) guide for a complete walkthrough, or the
 - **CI Templates** — test, build, and deploy workflow templates
 - **Process Templates** — CLAUDE.md, MEMORY.md, hooks, and rules
 - **File Bridge Setup** — dual-agent coordination templates (Prime Builder + Loyal Opposition)
+- **Azure Readiness Taxonomy** - opt-in enterprise SaaS readiness vocabulary, categories, and verification model
+
+## Azure Readiness
+
+GroundTruth-KB keeps starter scaffolding lightweight by default. Teams that
+intend to deploy SaaS on Azure can use the
+[Azure Enterprise Readiness Taxonomy](reference/azure-readiness-taxonomy.md)
+to organize landing zone, tenancy, identity, secrets, networking, CI/CD,
+observability, compliance, cost, DR, and doctor verification decisions.
+
+```mermaid
+flowchart LR
+    Starter["starter"]
+    Candidate["production-candidate"]
+    Enterprise["enterprise-ready"]
+    Regulated["regulated-enterprise"]
+
+    Starter --> Candidate --> Enterprise --> Regulated
+```

@@ -80,6 +80,9 @@ nav:
       - Configuration: reference/configuration.md
       - Assertion Language: reference/assertion-language.md
       - Templates: reference/templates.md
+      - Azure Readiness Taxonomy: reference/azure-readiness-taxonomy.md
+  - Wiki:
+      - Azure Enterprise Readiness: wiki/azure-enterprise-readiness.md
   - Troubleshooting:
       - Auth Troubleshooting: troubleshooting/auth.md
   - Examples:

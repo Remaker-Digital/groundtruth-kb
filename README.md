@@ -30,11 +30,18 @@ CI templates, process templates, dual-agent file bridge setup.
 
 ## Architecture
 
-```
-Layer 3: Workstation Doctor    gt project doctor
-Layer 2: Project Scaffold      gt project init / upgrade
-Layer 1: Core Knowledge DB     gt init / seed / assert / serve
-         File Bridge Setup     dual-agent coordination templates [optional]
+```mermaid
+flowchart TB
+    L1["Layer 1<br/>Core Knowledge DB<br/>gt init / seed / assert / serve"]
+    Bridge["Optional<br/>File Bridge Setup<br/>Prime Builder + Loyal Opposition"]
+    L2["Layer 2<br/>Project Scaffold<br/>gt project init / upgrade"]
+    L3["Layer 3<br/>Workstation Doctor<br/>gt project doctor"]
+    Azure["Opt-in<br/>Azure readiness envelope<br/>specs, ADRs, checks, evidence"]
+
+    L1 --> L2 --> L3
+    Bridge --> L2
+    L2 --> Azure
+    L3 --> Azure
 ```
 
 See the [product architecture](docs/architecture/product-split.md) for details.
@@ -119,8 +126,31 @@ discipline behind GroundTruth:
 
 **Reference:**
 [Assertion Language](docs/reference/assertion-language.md) |
+[Azure Readiness Taxonomy](docs/reference/azure-readiness-taxonomy.md) |
 [Desktop Setup](docs/desktop-setup.md) |
 [Example Project](examples/task-tracker/WALKTHROUGH.md)
+
+## Azure Readiness
+
+GroundTruth-KB keeps the default scaffold lightweight, then adds an opt-in
+Azure enterprise readiness path for SaaS teams that need buyer-grade cloud
+evidence.
+
+```mermaid
+flowchart LR
+    Starter["starter<br/>local-first default"]
+    Candidate["production-candidate<br/>Azure decisions recorded"]
+    Enterprise["enterprise-ready<br/>buyer evidence"]
+    Regulated["regulated-enterprise<br/>industry controls"]
+
+    Starter --> Candidate --> Enterprise --> Regulated
+```
+
+The full taxonomy is in
+[docs/reference/azure-readiness-taxonomy.md](docs/reference/azure-readiness-taxonomy.md).
+The wiki-ready summary lives at
+[docs/wiki/azure-enterprise-readiness.md](docs/wiki/azure-enterprise-readiness.md)
+and is mirrored to the GitHub Wiki.
 
 ## Getting Started
 
