@@ -49,6 +49,14 @@ _MANAGED_RULES = [
     ".claude/rules/prime-bridge-collaboration-protocol.md",
     ".claude/rules/report-depth.md",
 ]
+# Managed skill files shipped with the scaffold. Dual-agent profiles receive
+# the full set; base profiles receive none. Subdirectory structure
+# (``decision-capture/helpers/...``) is preserved through
+# :func:`_map_managed_to_template` via ``removeprefix('.claude/skills/')``.
+_MANAGED_SKILLS = [
+    ".claude/skills/decision-capture/SKILL.md",
+    ".claude/skills/decision-capture/helpers/record_decision.py",
+]
 
 
 # Managed PreToolUse hook registrations for ``.claude/settings.json``.
@@ -88,6 +96,12 @@ def _map_managed_to_template(managed: str) -> str | None:
         return "hooks/" + managed.split("/")[-1]
     if managed.startswith(".claude/rules/"):
         return "rules/" + managed.split("/")[-1]
+    if managed.startswith(".claude/skills/"):
+        # Preserve subdirectory structure for the skills/ tree so that
+        # ``.claude/skills/decision-capture/helpers/record_decision.py``
+        # maps to ``skills/decision-capture/helpers/record_decision.py``
+        # under the templates directory.
+        return "skills/" + managed.removeprefix(".claude/skills/")
     return None
 
 
@@ -115,16 +129,33 @@ def _filter_rules_for_profile(profile: ProjectProfile) -> list[str]:
     return managed_rules
 
 
-def _plan_missing_managed_files(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
-    """Plan ``add`` actions for any missing managed hook/rule file.
+def _filter_skills_for_profile(profile: ProjectProfile) -> list[str]:
+    """Return managed skills applicable to the profile.
 
-    Runs unconditionally (not version-gated) so a missing hook at the
-    current scaffold version still produces a repair action. Addresses
-    the same-version inert-hook drift flagged in
-    ``bridge/gtkb-hook-scanner-safe-writer-010.md`` Finding 1.
+    Phase A ships a single dual-agent-only skill
+    (``decision-capture``). Base profiles receive no skills. Parallel
+    in shape to :func:`_filter_hooks_for_profile` and
+    :func:`_filter_rules_for_profile`.
+    """
+    if not profile.includes_bridge:
+        return []
+    return list(_MANAGED_SKILLS)
+
+
+def _plan_missing_managed_files(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
+    """Plan ``add`` actions for any missing managed hook/rule/skill file.
+
+    Runs unconditionally (not version-gated) so a missing managed file
+    at the current scaffold version still produces a repair action.
+    Addresses the same-version inert-hook drift flagged in
+    ``bridge/gtkb-hook-scanner-safe-writer-010.md`` Finding 1 and the
+    same-version missing-skill drift flagged in
+    ``bridge/gtkb-skill-decision-capture-009.md`` Finding 1.
     """
     actions: list[UpgradeAction] = []
-    for mfile in _filter_hooks_for_profile(profile) + _filter_rules_for_profile(profile):
+    for mfile in (
+        _filter_hooks_for_profile(profile) + _filter_rules_for_profile(profile) + _filter_skills_for_profile(profile)
+    ):
         project_path = target / mfile
         if project_path.exists():
             continue
@@ -191,6 +222,44 @@ def _plan_managed_rules(target: Path, profile: ProjectProfile) -> list[UpgradeAc
     """
     actions: list[UpgradeAction] = []
     for mfile in _filter_rules_for_profile(profile):
+        project_path = target / mfile
+        if not project_path.exists():
+            continue  # Missing-file case handled by _plan_missing_managed_files
+
+        template_rel = _map_managed_to_template(mfile)
+        if template_rel is None:
+            continue
+
+        template_h = _template_hash(template_rel)
+        if template_h is None:
+            continue
+
+        project_h = _file_hash(project_path)
+        if project_h == template_h:
+            continue
+
+        actions.append(
+            UpgradeAction(
+                file=mfile,
+                action="skip",
+                reason="File differs from template (customized?) — use --force to overwrite",
+            )
+        )
+
+    return actions
+
+
+def _plan_managed_skills(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
+    """Plan ``skip`` actions for managed ``.claude/skills/`` files that differ
+    from the template. Missing-file case is handled by
+    :func:`_plan_missing_managed_files`.
+
+    Version-gated: only runs when ``scaffold_version != __version__``.
+    Parallel in shape to :func:`_plan_managed_hooks` and
+    :func:`_plan_managed_rules`.
+    """
+    actions: list[UpgradeAction] = []
+    for mfile in _filter_skills_for_profile(profile):
         project_path = target / mfile
         if not project_path.exists():
             continue  # Missing-file case handled by _plan_missing_managed_files
@@ -367,6 +436,7 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
     if manifest.scaffold_version != __version__:
         actions.extend(_plan_managed_hooks(target, profile))
         actions.extend(_plan_managed_rules(target, profile))
+        actions.extend(_plan_managed_skills(target, profile))
 
     return actions
 
