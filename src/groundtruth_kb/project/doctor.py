@@ -486,6 +486,106 @@ _REQUIRED_BRIDGE_RULES = (
 )
 
 
+def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolCheck:
+    """Check scanner-safe-writer hook registration and log-ignore drift.
+
+    Applies only to bridge-enabled profiles. Reports:
+
+    - ``pass`` (``required=False``): base profile — the hook isn't scaffolded
+      there, so there's no drift to surface.
+    - ``fail``: bridge profile and the hook file itself is missing.
+    - ``warning``: the hook file is present but drift exists — the
+      PreToolUse registration in ``.claude/settings.json`` is missing OR the
+      ``.claude/hooks/*.log`` pattern is missing from ``.gitignore``. Both
+      are remediable via ``gt project upgrade --apply``.
+    - ``pass``: the hook file is present, the PreToolUse registration is
+      present, and the gitignore pattern is present.
+
+    Defensive against malformed ``settings.json`` shape: treats non-dict
+    roots, non-dict ``hooks``, non-list ``PreToolUse``, and non-dict entries
+    as "registration missing" rather than crashing the doctor check.
+    """
+    profile = get_profile(profile_name)
+    if not profile.includes_bridge:
+        return ToolCheck(
+            name="scanner-safe-writer",
+            required=False,
+            found=True,
+            status="pass",
+            message="not applicable to base profile",
+        )
+
+    hook_file = target / ".claude" / "hooks" / "scanner-safe-writer.py"
+    if not hook_file.exists():
+        return ToolCheck(
+            name="scanner-safe-writer",
+            required=True,
+            found=False,
+            status="fail",
+            message="scanner-safe-writer.py missing — run `gt project upgrade --apply`",
+        )
+
+    settings_path = target / ".claude" / "settings.json"
+    registered = False
+    if settings_path.exists():
+        try:
+            data: object = json.loads(settings_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            registered = False
+        else:
+            if isinstance(data, dict):
+                raw_hooks = data.get("hooks")
+                hooks_dict = raw_hooks if isinstance(raw_hooks, dict) else {}
+                raw_pretooluse = hooks_dict.get("PreToolUse")
+                pretooluse = raw_pretooluse if isinstance(raw_pretooluse, list) else []
+                for entry in pretooluse:
+                    if not isinstance(entry, dict):
+                        continue
+                    entry_hooks = entry.get("hooks", [])
+                    if not isinstance(entry_hooks, list):
+                        continue
+                    for h in entry_hooks:
+                        if not isinstance(h, dict):
+                            continue
+                        cmd = h.get("command", "")
+                        if isinstance(cmd, str) and "scanner-safe-writer.py" in cmd:
+                            registered = True
+                            break
+                    if registered:
+                        break
+
+    gitignore = target / ".gitignore"
+    log_ignored = False
+    if gitignore.exists():
+        try:
+            gi_text = gitignore.read_text(encoding="utf-8")
+            log_ignored = ".claude/hooks/*.log" in gi_text
+        except OSError:
+            log_ignored = False
+
+    if not registered or not log_ignored:
+        missing: list[str] = []
+        if not registered:
+            missing.append("settings.json PreToolUse registration")
+        if not log_ignored:
+            missing.append(".gitignore exclusion of .claude/hooks/*.log")
+        return ToolCheck(
+            name="scanner-safe-writer",
+            required=True,
+            found=True,
+            status="warning",
+            message=(f"hook present but missing: {', '.join(missing)}. Run `gt project upgrade --apply`."),
+        )
+
+    return ToolCheck(
+        name="scanner-safe-writer",
+        required=True,
+        found=True,
+        status="pass",
+        message="hook registered; log ignored",
+    )
+
+
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
     """Check file bridge configuration for dual-agent projects.
 
@@ -776,6 +876,7 @@ def run_doctor(
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
         checks.append(_check_settings_classifiers(target))
+        checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_bridge_poller(target, "claude"))
         checks.append(_check_bridge_poller(target, "codex"))
 

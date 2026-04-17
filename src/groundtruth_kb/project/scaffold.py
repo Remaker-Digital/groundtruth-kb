@@ -293,6 +293,12 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
     )
     if "bridge-automation/logs" not in content:
         gi.write_text(content + additions, encoding="utf-8")
+        content = gi.read_text(encoding="utf-8")
+
+    # Operational hook logs (scanner-safe-writer.log et al.)
+    hook_log_additions = "\n# Operational hook logs\n.claude/hooks/*.log\n"
+    if ".claude/hooks/*.log" not in content:
+        gi.write_text(content + hook_log_additions, encoding="utf-8")
 
     # bridge/INDEX.md — the coordination file for the file bridge workflow
     bridge_dir = target / "bridge"
@@ -310,12 +316,12 @@ def _write_settings_json(settings_path: Path) -> None:
     current Claude Code versions. The file is tracked in git so all hooks
     are inherited by every worktree and fresh clone.
 
-    Hooks registered (11 total):
+    Hooks registered (12 total):
     - SessionStart (2): session-start-governance, assertion-check
     - UserPromptSubmit (2): delib-search-gate, intake-classifier
     - PostToolUse (1): delib-search-tracker
-    - PreToolUse (5): spec-before-code, bridge-compliance-gate, kb-not-markdown,
-                       destructive-gate, credential-scan
+    - PreToolUse (6): spec-before-code, bridge-compliance-gate, kb-not-markdown,
+                       destructive-gate, credential-scan, scanner-safe-writer
     """
     hooks_dir = ".claude/hooks"
     content: dict[str, Any] = {
@@ -337,6 +343,7 @@ def _write_settings_json(settings_path: Path) -> None:
                 {"hooks": [{"type": "command", "command": f"python {hooks_dir}/kb-not-markdown.py"}]},
                 {"hooks": [{"type": "command", "command": f"python {hooks_dir}/destructive-gate.py"}]},
                 {"hooks": [{"type": "command", "command": f"python {hooks_dir}/credential-scan.py"}]},
+                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/scanner-safe-writer.py"}]},
             ],
         }
     }
