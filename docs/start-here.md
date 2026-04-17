@@ -32,7 +32,7 @@ pip install groundtruth-kb
 
 !!! tip "Pinned installs"
     For reproducible installs, pin to an exact version:
-    `pip install groundtruth-kb==0.5.0`
+    `pip install groundtruth-kb==0.6.0`
 
 ## Step 2: Verify Installation
 
@@ -43,7 +43,7 @@ gt --version
 Expected output:
 
 ```
-gt, version 0.5.0
+gt, version 0.6.0
 ```
 
 ## Step 3: Create a New Project

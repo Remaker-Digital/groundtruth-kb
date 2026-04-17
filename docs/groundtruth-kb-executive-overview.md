@@ -103,7 +103,7 @@ When a cloud provider is selected during project initialization, GroundTruth-KB 
 - **Terraform** — a provider stub with minimal variable and output scaffolding; resource configuration, secrets management, networking, and scaling are implemented by the team for their specific environment
 - **Governance gate** — production deploys require explicit owner approval recorded in the specification system
 
-Multi-tenant data isolation and zero-knowledge security are architectural patterns that teams implement for their use case — they are not pre-built features of the current v0.5.0 package.
+Multi-tenant data isolation and zero-knowledge security are architectural patterns that teams implement for their use case — they are not pre-built features of the current v0.6.0 package.
 
 ---
 
