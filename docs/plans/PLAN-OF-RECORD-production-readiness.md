@@ -181,23 +181,25 @@ gracefully — customers who provide phone numbers will fall through to
 conversation without verification (same as v1.98.89 behavior). No data loss.
 Rollback to v1.98.89 is available via `python deploy.py --env production --version 1.98.89`.
 
-### Step 16: Spec hygiene remediation (post-production, non-blocking) ⏸️ PENDING
+### Step 16: Spec hygiene remediation (post-production, non-blocking) 🔄 IN PROGRESS — 16.A/16.B/16.C complete; 16.D/16.E remain
+
+**Phase 16.A — COMPLETE (S297).** The 22 verified-but-untested track is closed. Invariant: 0 verified requirement-type specs with 0 non-stale test links (excluding governance specs GOV-14/15/16 and owner-approved exception SPEC-GTKB-SCOPE per S297 decision, archived as DELIB-0711). 4 specs have current passing tests (SPEC-0439/0604/1097/1165); 15 specs reverted to implemented with 7 hygiene WIs (WI-3178–WI-3184) open; 3 governance specs verified by assertion runs; 1 scope-boundary spec excepted by owner.
 
 **Scope:** Close the spec traceability gap identified across S275 and S291:
 - **118 untested specs** (Phase 1.5 audit, S291):
-  - 22 verified-but-untested — remediation in flight via `bridge/spec-hygiene-untested-verified-008.md` (VERIFIED, S291). 9 backend/widget/pricing specs remediated; SPA Control Plane specs remediated via `spec-hygiene-spa-investigation-008` + `spec-hygiene-spa-remediation-006`.
-  - 90 implemented-untested — deferred to follow-on hygiene sub-rounds. Scope: add tests that exercise the production interface per GOV-10, or retire the spec if its behavior has been subsumed.
+  - 22 verified-but-untested — **CLOSED (S297).** S291 bridge work VERIFIED; Step 16.A closure verified with invariant query. 4 verified with tests, 15 reverted to implemented (7 hygiene WIs open), 3 governance (out-of-scope), 1 owner-excepted (SPEC-GTKB-SCOPE).
+  - 90 implemented-untested (Phase 1.5 framing) — superseded by Phase 16.B classifier which re-scoped to 193 implemented-untested requirements. **CLOSED (S297).** 16.C four-stream remediation executed; 38 specs remain tracked via hygiene WIs (WI-3185..WI-3218, WI-3221..WI-3224). DELIB-0714 archives results.
   - 6 specified-untested — expected (specifications without implementation yet); no action.
 - **10,440 orphan tests of 11,066 total (94.3%)** — tests in the repo that do not link to any spec in the Knowledge DB. Separately tracked as proposed WI-3171 in `bridge/spec-hygiene-untested-verified-*.md`. Scope: for each orphan test, either link to an existing spec, create a new spec for the behavior it covers, or retire the test if it is redundant with an already-covered behavior.
 
 **Preconditions:**
 - [x] Step 15 (production deploy) COMPLETE — v1.98.92 deployed 2026-04 (S276), production operational, bridge infrastructure stable (S295).
-- [ ] Methodology review of Phase 1.5 artifact (deferred at end of S292) — whether the 98-spec remediation pattern from Phase 1.5 generalizes to the remaining 90 implemented-untested specs.
+- [x] Methodology review of Phase 1.5 artifact (S297) — pattern does not generalize; 193-spec scope partitioned into five classifier categories and remediated via four parallel sub-streams. See Phase 16.B/16.C below.
 
 **Action (phased):**
-1. **Phase 16.A** — Close the 22 verified-but-untested track (S291 bridge work already VERIFIED; remains to promote the corresponding KB spec statuses).
-2. **Phase 16.B** — Methodology review of Phase 1.5 artifact; decide whether to batch-remediate the 90 implemented-untested specs or proceed spec-by-spec.
-3. **Phase 16.C** — P0b implementation: 509 implemented-spec phantom-evidence audit (deferred pending 16.B).
+1. **Phase 16.A** — ✅ COMPLETE (S297). Verified-but-untested track closed. Invariant passes with 0 violations. DELIB-0711 archives owner decision.
+2. **Phase 16.B** — ✅ COMPLETE (S297). Methodology review VERIFIED (bridge `por-step16b-methodology-review-006`). 193 implemented-untested requirements partitioned into 5 categories (α' 151, β' 4, γ' 19, δ' 15, ζ' 4). Option B (multi-stream remediation) chosen via owner decision DELIB-0713. DELIB-0712 archives the methodology finding.
+3. **Phase 16.C** — ✅ COMPLETE (S297). All 4 sub-streams VERIFIED: Stream A (-010, 151 α' refreshed via 122 update_test + 49 insert_test), Stream B (-006, 4 ζ' triaged via 1 WI + 3 relinks/18 fresh TEST IDs), Stream C (-004, 4 β' triaged via 1 relink + 3 WIs), Stream D (-010, 34 γ'+δ' hygiene WIs). Classifier transition: target_count 193 → 38. 38 open hygiene WIs (WI-3185..WI-3218 + WI-3221..WI-3224) track remediation backlog. 0 spec-status mutations. DELIB-0714 archives consolidated results.
 4. **Phase 16.D** — Orphan test rationalization (WI-3171): batch-link, batch-retire, or per-test linkage. Expected to be the largest sub-phase (10,440 tests).
 5. **Phase 16.E** — Re-run `python tools/knowledge-db/db.py assert` + orphan-test count verification. Exit when untested-spec count ≤ 6 (specified only) and orphan-test count ≤ 100 (sampling tolerance).
 

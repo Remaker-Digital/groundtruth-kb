@@ -10,7 +10,178 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+Document: agent-red-cto-prep-phase3-obsolete-purge
+NEW: bridge/agent-red-cto-prep-phase3-obsolete-purge-003.md
+GO: bridge/agent-red-cto-prep-phase3-obsolete-purge-002.md
+NEW: bridge/agent-red-cto-prep-phase3-obsolete-purge-001.md
+
+Document: agent-red-cto-prep-phase2-bridge-automation
+VERIFIED: bridge/agent-red-cto-prep-phase2-bridge-automation-006.md
+NEW: bridge/agent-red-cto-prep-phase2-bridge-automation-005.md
+GO: bridge/agent-red-cto-prep-phase2-bridge-automation-004.md
+REVISED: bridge/agent-red-cto-prep-phase2-bridge-automation-003.md
+NO-GO: bridge/agent-red-cto-prep-phase2-bridge-automation-002.md
+NEW: bridge/agent-red-cto-prep-phase2-bridge-automation-001.md
+
+Document: agent-red-cto-prep-phase1-session-artifacts
+GO: bridge/agent-red-cto-prep-phase1-session-artifacts-014.md
+REVISED: bridge/agent-red-cto-prep-phase1-session-artifacts-013.md
+NO-GO: bridge/agent-red-cto-prep-phase1-session-artifacts-012.md
+REVISED: bridge/agent-red-cto-prep-phase1-session-artifacts-011.md
+NO-GO: bridge/agent-red-cto-prep-phase1-session-artifacts-010.md
+REVISED: bridge/agent-red-cto-prep-phase1-session-artifacts-009.md
+GO: bridge/agent-red-cto-prep-phase1-session-artifacts-008.md
+REVISED: bridge/agent-red-cto-prep-phase1-session-artifacts-007.md
+NO-GO: bridge/agent-red-cto-prep-phase1-session-artifacts-006.md
+REVISED: bridge/agent-red-cto-prep-phase1-session-artifacts-005.md
+NO-GO: bridge/agent-red-cto-prep-phase1-session-artifacts-004.md
+REVISED: bridge/agent-red-cto-prep-phase1-session-artifacts-003.md
+NO-GO: bridge/agent-red-cto-prep-phase1-session-artifacts-002.md
+NEW: bridge/agent-red-cto-prep-phase1-session-artifacts-001.md
+
+Document: agent-red-sms-otp-hardening
+VERIFIED: bridge/agent-red-sms-otp-hardening-008.md
+REVISED: bridge/agent-red-sms-otp-hardening-007.md
+NO-GO: bridge/agent-red-sms-otp-hardening-006.md
+NEW: bridge/agent-red-sms-otp-hardening-005.md
+GO: bridge/agent-red-sms-otp-hardening-004.md
+REVISED: bridge/agent-red-sms-otp-hardening-003.md
+NO-GO: bridge/agent-red-sms-otp-hardening-002.md
+NEW: bridge/agent-red-sms-otp-hardening-001.md
+
+Document: gtkb-4c-ci-regression-fix
+VERIFIED: bridge/gtkb-4c-ci-regression-fix-004.md
+NEW: bridge/gtkb-4c-ci-regression-fix-003.md
+GO: bridge/gtkb-4c-ci-regression-fix-002.md
+NEW: bridge/gtkb-4c-ci-regression-fix-001.md
+
+Document: por-step16c-stream-c-beta-triage
+VERIFIED: bridge/por-step16c-stream-c-beta-triage-004.md
+NEW: bridge/por-step16c-stream-c-beta-triage-003.md
+GO: bridge/por-step16c-stream-c-beta-triage-002.md
+NEW: bridge/por-step16c-stream-c-beta-triage-001.md
+
+Document: por-step16c-stream-b-zeta-triage
+VERIFIED: bridge/por-step16c-stream-b-zeta-triage-006.md
+NEW: bridge/por-step16c-stream-b-zeta-triage-005.md
+GO: bridge/por-step16c-stream-b-zeta-triage-004.md
+REVISED: bridge/por-step16c-stream-b-zeta-triage-003.md
+NO-GO: bridge/por-step16c-stream-b-zeta-triage-002.md
+NEW: bridge/por-step16c-stream-b-zeta-triage-001.md
+
+Document: por-step16c-stream-a-alpha-refresh
+VERIFIED: bridge/por-step16c-stream-a-alpha-refresh-010.md
+NEW: bridge/por-step16c-stream-a-alpha-refresh-009.md
+GO: bridge/por-step16c-stream-a-alpha-refresh-008.md
+REVISED: bridge/por-step16c-stream-a-alpha-refresh-007.md
+NO-GO: bridge/por-step16c-stream-a-alpha-refresh-006.md
+REVISED: bridge/por-step16c-stream-a-alpha-refresh-005.md
+NO-GO: bridge/por-step16c-stream-a-alpha-refresh-004.md
+REVISED: bridge/por-step16c-stream-a-alpha-refresh-003.md
+NO-GO: bridge/por-step16c-stream-a-alpha-refresh-002.md
+NEW: bridge/por-step16c-stream-a-alpha-refresh-001.md
+
+Document: por-step16c-stream-d-phantom-wi-creation
+VERIFIED: bridge/por-step16c-stream-d-phantom-wi-creation-010.md
+REVISED: bridge/por-step16c-stream-d-phantom-wi-creation-009.md
+NO-GO: bridge/por-step16c-stream-d-phantom-wi-creation-008.md
+NEW: bridge/por-step16c-stream-d-phantom-wi-creation-007.md
+GO: bridge/por-step16c-stream-d-phantom-wi-creation-006.md
+REVISED: bridge/por-step16c-stream-d-phantom-wi-creation-005.md
+NO-GO: bridge/por-step16c-stream-d-phantom-wi-creation-004.md
+REVISED: bridge/por-step16c-stream-d-phantom-wi-creation-003.md
+NO-GO: bridge/por-step16c-stream-d-phantom-wi-creation-002.md
+NEW: bridge/por-step16c-stream-d-phantom-wi-creation-001.md
+
+Document: por-step16c-implemented-untested-remediation
+VERIFIED: bridge/por-step16c-implemented-untested-remediation-004.md
+NEW: bridge/por-step16c-implemented-untested-remediation-003.md
+GO: bridge/por-step16c-implemented-untested-remediation-002.md
+NEW: bridge/por-step16c-implemented-untested-remediation-001.md
+
+Document: por-step16b-methodology-review
+VERIFIED: bridge/por-step16b-methodology-review-006.md
+REVISED: bridge/por-step16b-methodology-review-005.md
+NO-GO: bridge/por-step16b-methodology-review-004.md
+NEW: bridge/por-step16b-methodology-review-003.md
+GO: bridge/por-step16b-methodology-review-002.md
+NEW: bridge/por-step16b-methodology-review-001.md
+
+Document: gtkb-phase4d-broad-exception-review
+VERIFIED: bridge/gtkb-phase4d-broad-exception-review-008.md
+REVISED: bridge/gtkb-phase4d-broad-exception-review-007.md
+NO-GO: bridge/gtkb-phase4d-broad-exception-review-006.md
+NEW: bridge/gtkb-phase4d-broad-exception-review-005.md
+GO: bridge/gtkb-phase4d-broad-exception-review-004.md
+REVISED: bridge/gtkb-phase4d-broad-exception-review-003.md
+NO-GO: bridge/gtkb-phase4d-broad-exception-review-002.md
+NEW: bridge/gtkb-phase4d-broad-exception-review-001.md
+
+Document: gtkb-phase4c-structured-logging
+VERIFIED: bridge/gtkb-phase4c-structured-logging-016.md
+REVISED: bridge/gtkb-phase4c-structured-logging-015.md
+NO-GO: bridge/gtkb-phase4c-structured-logging-014.md
+REVISED: bridge/gtkb-phase4c-structured-logging-013.md
+NO-GO: bridge/gtkb-phase4c-structured-logging-012.md
+NEW: bridge/gtkb-phase4c-structured-logging-011.md
+GO: bridge/gtkb-phase4c-structured-logging-010.md
+REVISED: bridge/gtkb-phase4c-structured-logging-009.md
+NO-GO: bridge/gtkb-phase4c-structured-logging-008.md
+REVISED: bridge/gtkb-phase4c-structured-logging-007.md
+NO-GO: bridge/gtkb-phase4c-structured-logging-006.md
+REVISED: bridge/gtkb-phase4c-structured-logging-005.md
+NO-GO: bridge/gtkb-phase4c-structured-logging-004.md
+REVISED: bridge/gtkb-phase4c-structured-logging-003.md
+NO-GO: bridge/gtkb-phase4c-structured-logging-002.md
+NEW: bridge/gtkb-phase4c-structured-logging-001.md
+
+Document: por-step16a-verified-spec-closure
+VERIFIED: bridge/por-step16a-verified-spec-closure-010.md
+REVISED: bridge/por-step16a-verified-spec-closure-009.md
+NO-GO: bridge/por-step16a-verified-spec-closure-008.md
+NEW: bridge/por-step16a-verified-spec-closure-007.md
+GO: bridge/por-step16a-verified-spec-closure-006.md
+REVISED: bridge/por-step16a-verified-spec-closure-005.md
+NO-GO: bridge/por-step16a-verified-spec-closure-004.md
+REVISED: bridge/por-step16a-verified-spec-closure-003.md
+NO-GO: bridge/por-step16a-verified-spec-closure-002.md
+NEW: bridge/por-step16a-verified-spec-closure-001.md
+
+Document: gtkb-operational-governance-hardening
+VERIFIED: bridge/gtkb-operational-governance-hardening-021.md
+REVISED: bridge/gtkb-operational-governance-hardening-020.md
+NO-GO: bridge/gtkb-operational-governance-hardening-019.md
+REVISED: bridge/gtkb-operational-governance-hardening-018.md
+NO-GO: bridge/gtkb-operational-governance-hardening-017.md
+REVISED: bridge/gtkb-operational-governance-hardening-016.md
+NO-GO: bridge/gtkb-operational-governance-hardening-015.md
+REVISED: bridge/gtkb-operational-governance-hardening-014.md
+NO-GO: bridge/gtkb-operational-governance-hardening-013.md
+NEW: bridge/gtkb-operational-governance-hardening-012.md
+NEW: bridge/gtkb-operational-governance-hardening-011.md
+GO: bridge/gtkb-operational-governance-hardening-010.md
+REVISED: bridge/gtkb-operational-governance-hardening-009.md
+NO-GO: bridge/gtkb-operational-governance-hardening-008.md
+REVISED: bridge/gtkb-operational-governance-hardening-007.md
+NO-GO: bridge/gtkb-operational-governance-hardening-006.md
+REVISED: bridge/gtkb-operational-governance-hardening-005.md
+NO-GO: bridge/gtkb-operational-governance-hardening-004.md
+REVISED: bridge/gtkb-operational-governance-hardening-003.md
+NO-GO: bridge/gtkb-operational-governance-hardening-002.md
+NEW: bridge/gtkb-operational-governance-hardening-001.md
+
+Document: gtkb-v050-trial-readiness
+VERIFIED: bridge/gtkb-v050-trial-readiness-008.md
+REVISED: bridge/gtkb-v050-trial-readiness-007.md
+NO-GO: bridge/gtkb-v050-trial-readiness-006.md
+REVISED: bridge/gtkb-v050-trial-readiness-005.md
+NO-GO: bridge/gtkb-v050-trial-readiness-004.md
+REVISED: bridge/gtkb-v050-trial-readiness-003.md
+NO-GO: bridge/gtkb-v050-trial-readiness-002.md
+NEW: bridge/gtkb-v050-trial-readiness-001.md
+
 Document: gtkb-adoption-gap-closure
+VERIFIED: bridge/gtkb-adoption-gap-closure-014.md
 NEW: bridge/gtkb-adoption-gap-closure-013.md
 GO: bridge/gtkb-adoption-gap-closure-012.md
 REVISED: bridge/gtkb-adoption-gap-closure-011.md

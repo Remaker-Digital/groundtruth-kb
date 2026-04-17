@@ -7,23 +7,39 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Active Items
 
-### Phase 4B future sub-rounds (proposed)
+### CTO readiness (Agent Red full cleanup)
+**GT-KB CI fix (4C regression) ✅ VERIFIED + PUSHED.** Bridge `gtkb-4c-ci-regression-fix-004`. Commit `a3fa4d2` on GT-KB main. All 6 GitHub CI workflows green.
 
-Tracked in `groundtruth-kb/docs/reports/phase-4b-plan.md` (created S295):
-- 4B.9 — Whole-package docstrings 60% → 80% — **next up**
-- 4C — Structured logging migration (0 `logging` use → bridge/db paths)
-- 4D — Broad-exception review (3 "needs review" sites resolved)
+**SMS OTP hardening ✅ VERIFIED (not pushed).** Bridge `agent-red-sms-otp-hardening-008`. Commit `468ec1c7` on develop. 4 files: `src/chat/identity_preprocessor.py`, `src/multi_tenant/widget_otp_verification.py`, `tests/chat/test_identity_preprocessor.py`, `tests/unit/test_widget_otp_verification.py`. 77 target tests pass, 3 `assert_awaited_once()` guards. Provisioning display-name rewrite split to future separate bridge (Codex-002 flagged tenant-isolation risk with cross-partition `STARTSWITH` query).
 
-### Agent Red POR Step 16 — Spec hygiene remediation
+**Agent Red remaining CTO-prep work** (not yet scoped into bridge proposals):
+- 16 commits on develop ahead of origin (includes `468ec1c7` SMS hardening)
+- Dirty worktree beyond 4 SMS files (docs, bridge/*, memory, groundtruth.db, ~480 files)
+- CI failing on develop at GitHub (last push was several commits back)
+- Deferred provisioning display-name rewrite (`src/integrations/provisioning.py` + 2 test files, needs tenant-isolation review)
+- Wiki currency review (Codex flagged as stale relative to current April work)
 
-**Status:** PENDING (post-production, non-blocking). Added S295 per
-`docs/plans/PLAN-OF-RECORD-production-readiness.md` Step 16.
-5 sub-phases: 16.A promote verified remediation statuses; 16.B methodology
-review of Phase 1.5 artifact (deferred S292); 16.C P0b 509-spec phantom-
-evidence audit; 16.D WI-3171 orphan test rationalization (10,440 tests);
-16.E exit verification.
+### POR Steps 16.D-16.E — Spec hygiene remediation (16.A/B/C complete)
+**Status:** 16.A/16.B/16.C all COMPLETE + VERIFIED (umbrella at `por-step16c-implemented-untested-remediation-004`, 2026-04-17). Remaining: **16.D** orphan test rationalization (~10,440 tests, largest sub-phase), **16.E** exit verification (untested-spec count ≤ 6 + orphan-test count ≤ 100).
+
+### Zero-Knowledge Architecture (Phase 4, longer-term)
+4 specs (SPEC-1843/1844/1644/1840), 5 implementation phases, ~6-8 sessions. Prerequisites: POR Step 16 substantially complete.
+
+### Minor GT-KB fixes (investigated 2026-04-17 — both resolved/non-issues)
+- ~~delib-search-tracker UserPromptSubmit docstring mismatch~~ — **RESOLVED**: scaffold.py:332 correctly registers under `PostToolUse`, matching the docstring. Stale note.
+- ~~settings.local.json flat hook format~~ — **NON-ISSUE**: template is permissions-only; all hooks go through `_write_settings_json()` with proper nested format. Comment at scaffold.py:277 ("settings.local.json with bridge hooks") is cosmetic misnomer but has no functional impact. Not worth bridge-proposal cycle.
 
 ## Completed
+
+### S297 ✓
+
+- [x] **Agent Red SMS OTP hardening** — VERIFIED at bridge `agent-red-sms-otp-hardening-008`. Commit `468ec1c7` on develop. 4 files (2 src + 2 tests), 77 target tests pass with 3 `assert_awaited_once()` guards. Fixes silent-failure bug where `_send_sms()` returning False was silently treated as success. Bridge iterations: 8 versions (1 NEW + 1 NO-GO proposal, 1 REVISED, 1 GO, 1 NEW post-impl, 1 NO-GO post-impl, 1 REVISED post-impl, VERIFIED).
+- [x] **GT-KB CI regression fix (4C)** — VERIFIED at bridge `gtkb-4c-ci-regression-fix-004`. Commit `a3fa4d2` on GT-KB main, pushed to GitHub. Added empty `tests/__init__.py` for `from tests._print_guard` import resolution on Linux CI. All 6 GT-KB CI workflows green (Docs Check, Docs, Docstring Coverage, CI, SonarCloud, CodeQL, Security).
+- [x] **POR Step 16.C — Implemented-untested remediation (4 streams)** — VERIFIED at bridge `por-step16c-implemented-untested-remediation-004`. All 4 sub-streams VERIFIED: Stream A (151 α') at -010, Stream B (4 ζ') at -006, Stream C (4 β') at -004, Stream D (34 γ'+δ') at -010. 193-spec reconciliation: 151+4+4+34=193 ✓. Classifier transition: 193→38. 38 hygiene WIs (WI-3185..WI-3218, WI-3221..WI-3224). 122 A1 test updates + 68 test inserts (A3 49, B 18, C 1). 0 spec-status mutations. DELIB-0714 archives consolidated results.
+- [x] **POR Step 16.B — Methodology review** — VERIFIED at `por-step16b-methodology-review-006`. 193 implemented-untested requirements partitioned into 5 categories via `classify_16b_candidates.py` (α' 151, β' 4, γ' 19, δ' 15, ζ' 4). Option B (multi-stream remediation) chosen per DELIB-0713.
+- [x] **POR Step 16.A — Verified spec closure** — VERIFIED at bridge `por-step16a-verified-spec-closure-010`. Invariant passes (0 violations with owner-approved SPEC-GTKB-SCOPE exception), 7 hygiene WIs open, DELIB-0711 archived, 1686/1686 assertions pass. 10 bridge versions (3 proposal NO-GO + GO + 2 verification NO-GO + VERIFIED).
+- [x] **GT-KB Phase 4C — Structured logging migration** — Committed `b1c3359` on GT-KB main. 12 files, +582/-123. New `_logging.py` with split-level defaults (CLI=WARNING, bridge=INFO), `_setup_bridge_logging()` with no-raise fallback, shared `tests/_print_guard.py` (single source of truth for CI + pytest). 989 → 988 tests (+19). Bonus: fixed latent COV_CORE_* Windows mypy crash in `test_public_api_type_checks.py`. Bridge `gtkb-phase4c-structured-logging-016` VERIFIED (4 proposal NO-GO + GO + 2 post-impl NO-GO + VERIFIED).
+- [x] **GT-KB Phase 4D — Broad exception governance** — Committed `23cdf09` on GT-KB main. 9 files, +176/-34. Narrowed 2 sites (db.py IntegrityError, launcher.py Windows), removed 1 redundant handler (launcher.py Unix), annotated 21 non-reraising broad catches with `# intentional-catch:` markers. New `tests/test_exception_markers.py` AST-based CI gate (4 tests). Final inventory: 28 handlers (7 exempt re-raise + 21 annotated + 0 unmarked). Bridge `gtkb-phase4d-broad-exception-review-008` VERIFIED.
 
 ### S295 ✓
 
