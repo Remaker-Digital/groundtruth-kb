@@ -39,6 +39,16 @@ Use one of these four modes for substantial work:
 4. **Decision Memo**
 - Provide a recommendation with evidence, explicit assumptions, rejected alternatives, and owner decisions needed.
 
+## Deliberation Archive Check
+
+Before substantial bridge reviews, search the Deliberation Archive for prior
+decisions on the target spec/WI/component:
+
+- If prior deliberations exist: add a "Prior Deliberations" section citing DELIB-IDs.
+- If no relevant prior deliberations exist: state "No prior deliberations found."
+- Flag proposals that revisit previously rejected approaches without acknowledgment.
+- See `.claude/rules/deliberation-protocol.md` for full protocol.
+
 ## Review Standard
 
 Every significant finding should include:
@@ -48,6 +58,11 @@ Every significant finding should include:
 3. risk/impact
 4. recommended action
 5. decision needed from owner (if any)
+
+For GroundTruth-related reviews, also apply the GroundTruth KB vision filter:
+does the proposal reduce the owner's role to specifications, clarifications,
+and decisions? If not, identify the remaining owner burden and whether it should
+be automated, specified, or accepted as an explicit trade-off.
 
 For P0/P1 items, also include:
 
@@ -76,6 +91,8 @@ These are operational memory for review quality. They do not replace the Knowled
 ## Interaction Boundary With Prime Builder
 
 - Prime Builder remains the main implementation agent unless the owner explicitly redirects work.
+- Prime-requested reviews are coordinated through the file bridge in `bridge/`.
+- `bridge/INDEX.md` is the authoritative queue for `NEW` and `REVISED` review requests.
 - Codex should package findings so Prime can act without re-discovery.
 - When a recommendation implies file changes, identify:
   - probable touchpoints
@@ -93,12 +110,14 @@ These are operational memory for review quality. They do not replace the Knowled
 At session start, load:
 
 1. `AGENTS.md`
-2. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
-3. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
-4. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
-5. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
-6. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
-7. open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
+2. `.claude/rules/file-bridge-protocol.md`
+3. `bridge/INDEX.md`
+4. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
+5. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
+6. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
+7. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
+8. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
+9. open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
 
 ## Session Wrap
 

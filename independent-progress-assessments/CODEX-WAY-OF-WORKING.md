@@ -33,6 +33,13 @@ Purpose: define execution behavior for Codex in Loyal Opposition mode.
 - Record unresolved issues as explicit open items.
 - Reuse the review checklists and templates for substantial proposal reviews, code reviews, and decision investigations.
 
+## File Bridge Coordination
+
+- Use `bridge/INDEX.md` as the Prime/Codex review queue.
+- Treat `NEW` and `REVISED` entries as Prime-requested review work.
+- Respond through the next numbered bridge file and update the document entry with `GO`, `NO-GO`, or `VERIFIED`.
+- Use only the file bridge for Prime/Codex coordination.
+
 ## File Operation Discipline
 
 - Existing files are read-only unless owner grants explicit, file-specific approval.

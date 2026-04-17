@@ -23,25 +23,47 @@ YOU MUST NOT delete or modify files which you have not created without explicit 
 - Report risks with severity and concrete evidence.
 - Default to analysis-first behavior; do not implement unless the owner explicitly asks for implementation.
 - Prefer additive outputs (new reports and runbooks) over in-place edits.
+- For GroundTruth-related work, apply the GroundTruth KB vision filter: does this reduce the owner's role to specifications, clarifications, and decisions?
+
+## Codex Standing Priorities
+
+- Load `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md` during session initialization.
+- Priority 1: execute Prime-requested reviews as Codex's standing top-priority task. No separate owner approval is needed to perform those reviews.
+- This priority persists across sessions unless Mike explicitly suspends it during a session. A suspension is temporary and does not persist across session boundaries.
+
+## File Bridge Operating Directives
+
+- The active Prime/Codex bridge is the file bridge defined in `.claude/rules/file-bridge-protocol.md`.
+- `bridge/INDEX.md` is the authoritative review queue.
+- Prime-requested review work is actionable when the latest status for a document entry is `NEW` or `REVISED`.
+- Codex responds by writing the next numbered bridge file and adding `GO`, `NO-GO`, or `VERIFIED` at the top of that document entry.
+- Do not use or create alternate bridge runtimes or queues.
 
 ## Startup Checklist (Every Session)
 
-**Phase A — Bridge sweep and Prime handshake (first priority):**
-1. Query bridge for pending messages addressed to this agent via `list_inbox(agent=..., status="pending")`.
-2. Process or reply to each pending message substantively.
-3. Run `python codex_session_prime_handshake.py`. This sends the required request to Prime: `"Report your current operating state"`.
-4. Wait for the script to receive Prime's reply. Do not proceed with session work until the handshake succeeds.
-5. Report sweep count: "Bridge sweep: N messages processed."
+**Phase A — File bridge review queue (first priority):**
+1. Read `bridge/INDEX.md`.
+2. Identify document entries whose latest status is `NEW` or `REVISED`.
+3. Process actionable entries from oldest to newest using `.claude/rules/file-bridge-protocol.md`.
+4. Report scan count: "File bridge scan: N entries processed."
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
-6. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
-7. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
-8. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
-9. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
-10. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
-11. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
-12. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
-13. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+5. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
+6. Read `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`.
+7. Read `independent-progress-assessments/GROUNDTRUTH-KB-VISION.md`.
+8. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
+9. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
+10. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
+11. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
+12. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+13. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
+14. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+14a. Read `.claude/rules/deliberation-protocol.md` for deliberation archive search/cite obligations.
+15. When verification is needed, prefer repo-native commands already reflected in CI/config:
+    - `python -m pytest <target> -q --tb=short`
+    - `ruff check src/ tests/`
+    - `ruff format --check src/ tests/`
+16. For reviews of another checkout such as GroundTruth KB, verify against that checkout's own workflow scope before accepting or rejecting CI-clean claims; recent GroundTruth KB reviews used `python -m pytest -q --tb=short`, `python -m ruff check .`, and `python -m ruff format --check .`.
 
 ## Report Output Contract
 
