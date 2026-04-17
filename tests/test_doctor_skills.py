@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from groundtruth_kb.project.doctor import _check_skill_present, run_doctor
+from groundtruth_kb.project.doctor import (
+    _check_bridge_propose_skill_present,
+    _check_skill_present,
+    run_doctor,
+)
 from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
 
 
@@ -67,3 +71,32 @@ def test_run_doctor_reports_missing_skill_in_dual_agent_project(tmp_path: Path) 
     assert skill_checks[0].found is False
     assert "SKILL.md" in skill_checks[0].message
     assert "record_decision.py" in skill_checks[0].message
+
+
+def test_doctor_warning_when_bridge_propose_missing(tmp_path: Path) -> None:
+    """Direct helper + integration check: missing bridge-propose → warning.
+
+    Covers both the helper-level check and the ``run_doctor()`` integration
+    path so a regression in either wiring surfaces.
+    """
+    target = _make_dual_agent_project(tmp_path)
+    (target / ".claude" / "skills" / "bridge-propose" / "SKILL.md").unlink()
+    (target / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py").unlink()
+
+    # Direct helper-level check.
+    helper_check = _check_bridge_propose_skill_present(target, profile_name="dual-agent")
+    assert helper_check.name == "skill:bridge-propose"
+    assert helper_check.status == "warning"
+    assert helper_check.found is False
+    assert "SKILL.md" in helper_check.message
+    assert "write_bridge.py" in helper_check.message
+    assert "gt project upgrade --apply" in helper_check.message
+
+    # run_doctor() integration.
+    report = run_doctor(target, "dual-agent")
+    bridge_propose_checks = [c for c in report.checks if c.name == "skill:bridge-propose"]
+    assert len(bridge_propose_checks) == 1, (
+        f"expected exactly one 'skill:bridge-propose' check; got {[c.name for c in report.checks]}"
+    )
+    assert bridge_propose_checks[0].status == "warning"
+    assert bridge_propose_checks[0].found is False

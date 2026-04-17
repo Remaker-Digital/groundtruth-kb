@@ -34,6 +34,8 @@ from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
 _MANAGED_SKILLS_INITIAL: tuple[str, ...] = (
     "decision-capture/SKILL.md",
     "decision-capture/helpers/record_decision.py",
+    "bridge-propose/SKILL.md",
+    "bridge-propose/helpers/write_bridge.py",
 )
 
 
