@@ -1,5 +1,12 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Project upgrade — ``gt project upgrade`` implementation."""
+"""Project upgrade — ``gt project upgrade`` implementation.
+
+All managed artifacts (hooks, rules, skills, settings-hook-registrations,
+and gitignore-patterns) are sourced from
+:mod:`groundtruth_kb.project.managed_registry`, which parses the declarative
+TOML file at ``templates/managed-artifacts.toml``. The registry is the
+single source of truth for scaffold / upgrade / doctor lifecycle behavior.
+"""
 
 from __future__ import annotations
 
@@ -11,8 +18,14 @@ from pathlib import Path
 from typing import Literal
 
 from groundtruth_kb import __version__, get_templates_dir
+from groundtruth_kb.project.managed_registry import (
+    FileArtifact,
+    GitignorePattern,
+    SettingsHookRegistration,
+    artifacts_for_upgrade,
+)
 from groundtruth_kb.project.manifest import read_manifest, write_manifest
-from groundtruth_kb.project.profiles import ProjectProfile, get_profile
+from groundtruth_kb.project.profiles import get_profile
 
 
 @dataclass
@@ -32,54 +45,6 @@ class UpgradeAction:
     payload: str = ""
 
 
-# Files managed by the scaffold (overwritten on upgrade unless customized)
-_MANAGED_HOOKS = [
-    ".claude/hooks/assertion-check.py",
-    ".claude/hooks/spec-classifier.py",
-    ".claude/hooks/intake-classifier.py",
-    ".claude/hooks/destructive-gate.py",
-    ".claude/hooks/credential-scan.py",
-    ".claude/hooks/scheduler.py",
-    ".claude/hooks/scanner-safe-writer.py",
-]
-_MANAGED_RULES = [
-    ".claude/rules/prime-builder.md",
-    ".claude/rules/loyal-opposition.md",
-    ".claude/rules/bridge-poller-canonical.md",
-    ".claude/rules/prime-bridge-collaboration-protocol.md",
-    ".claude/rules/report-depth.md",
-]
-# Managed skill files shipped with the scaffold. Dual-agent profiles receive
-# the full set; base profiles receive none. Subdirectory structure
-# (``decision-capture/helpers/...``) is preserved through
-# :func:`_map_managed_to_template` via ``removeprefix('.claude/skills/')``.
-_MANAGED_SKILLS = [
-    ".claude/skills/decision-capture/SKILL.md",
-    ".claude/skills/decision-capture/helpers/record_decision.py",
-    ".claude/skills/bridge-propose/SKILL.md",
-    ".claude/skills/bridge-propose/helpers/write_bridge.py",
-    ".claude/skills/spec-intake/SKILL.md",
-    ".claude/skills/spec-intake/helpers/spec_intake.py",
-]
-
-
-# Managed PreToolUse hook registrations for ``.claude/settings.json``.
-# Each entry is ``(hook_filename, bridge_profile_only)``. plan_upgrade emits
-# a ``register-hook`` action for any entry whose corresponding command
-# marker is missing from ``hooks.PreToolUse`` in settings.json.
-_MANAGED_SETTINGS_PRETOOLUSE_HOOKS: list[tuple[str, bool]] = [
-    ("scanner-safe-writer.py", True),  # bridge-profile only (Tier A #2)
-]
-
-
-# Managed ``.gitignore`` patterns. Each entry is
-# ``(pattern, comment, bridge_profile_only)``. plan_upgrade emits an
-# ``append-gitignore`` action for any pattern that is not already present.
-_MANAGED_GITIGNORE_PATTERNS: list[tuple[str, str, bool]] = [
-    (".claude/hooks/*.log", "Operational hook logs", True),
-]
-
-
 def _file_hash(path: Path) -> str:
     """SHA-256 of a file's content."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -94,147 +59,74 @@ def _template_hash(template_relative: str) -> str | None:
     return None
 
 
-def _map_managed_to_template(managed: str) -> str | None:
-    """Map a managed project file to its template source."""
-    if managed.startswith(".claude/hooks/"):
-        return "hooks/" + managed.split("/")[-1]
-    if managed.startswith(".claude/rules/"):
-        return "rules/" + managed.split("/")[-1]
-    if managed.startswith(".claude/skills/"):
-        # Preserve subdirectory structure for the skills/ tree so that
-        # ``.claude/skills/decision-capture/helpers/record_decision.py``
-        # maps to ``skills/decision-capture/helpers/record_decision.py``
-        # under the templates directory.
-        return "skills/" + managed.removeprefix(".claude/skills/")
-    return None
+def _managed_file_artifacts(profile_name: str, class_: str) -> list[FileArtifact]:
+    """Return every :class:`FileArtifact` of *class_* managed for *profile_name*.
 
-
-def _filter_hooks_for_profile(profile: ProjectProfile) -> list[str]:
-    """Return managed hooks applicable to the profile."""
-    managed = list(_MANAGED_HOOKS)
-    if not profile.includes_bridge:
-        managed = [
-            h
-            for h in managed
-            if h.split("/")[-1]
-            in {
-                "assertion-check.py",
-                "spec-classifier.py",
-            }
-        ]
-    return managed
-
-
-def _filter_rules_for_profile(profile: ProjectProfile) -> list[str]:
-    """Return managed rules applicable to the profile."""
-    managed_rules = list(_MANAGED_RULES)
-    if not profile.includes_bridge:
-        managed_rules = [r for r in managed_rules if "prime-builder" in r]
-    return managed_rules
-
-
-def _filter_skills_for_profile(profile: ProjectProfile) -> list[str]:
-    """Return managed skills applicable to the profile.
-
-    Phase A ships a single dual-agent-only skill
-    (``decision-capture``). Base profiles receive no skills. Parallel
-    in shape to :func:`_filter_hooks_for_profile` and
-    :func:`_filter_rules_for_profile`.
+    Thin typed adapter over ``artifacts_for_upgrade`` that narrows the
+    union type to :class:`FileArtifact` for mypy.
     """
-    if not profile.includes_bridge:
-        return []
-    return list(_MANAGED_SKILLS)
+    raw = artifacts_for_upgrade(profile_name, class_=class_)  # type: ignore[arg-type]
+    return [a for a in raw if isinstance(a, FileArtifact)]
 
 
-def _plan_missing_managed_files(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
+def _managed_settings_registrations(profile_name: str) -> list[SettingsHookRegistration]:
+    """Return every :class:`SettingsHookRegistration` managed for *profile_name*."""
+    raw = artifacts_for_upgrade(profile_name, class_="settings-hook-registration")
+    return [a for a in raw if isinstance(a, SettingsHookRegistration)]
+
+
+def _managed_gitignore_patterns(profile_name: str) -> list[GitignorePattern]:
+    """Return every :class:`GitignorePattern` managed for *profile_name*."""
+    raw = artifacts_for_upgrade(profile_name, class_="gitignore-pattern")
+    return [a for a in raw if isinstance(a, GitignorePattern)]
+
+
+def _plan_missing_managed_files(target: Path, profile_name: str) -> list[UpgradeAction]:
     """Plan ``add`` actions for any missing managed hook/rule/skill file.
 
     Runs unconditionally (not version-gated) so a missing managed file
     at the current scaffold version still produces a repair action.
     Addresses the same-version inert-hook drift flagged in
-    ``bridge/gtkb-hook-scanner-safe-writer-010.md`` Finding 1 and the
+    ``bridge/gtkb-hook-scanner-safe-writer-010.md`` Finding 1, the
     same-version missing-skill drift flagged in
-    ``bridge/gtkb-skill-decision-capture-009.md`` Finding 1.
+    ``bridge/gtkb-skill-decision-capture-009.md`` Finding 1, and Gap 2.8
+    (bridge rules missing repair) flagged in the non-disruptive upgrade
+    investigation.
     """
     actions: list[UpgradeAction] = []
-    for mfile in (
-        _filter_hooks_for_profile(profile) + _filter_rules_for_profile(profile) + _filter_skills_for_profile(profile)
-    ):
-        project_path = target / mfile
-        if project_path.exists():
-            continue
-        template_rel = _map_managed_to_template(mfile)
-        if template_rel is None:
-            continue
-        if _template_hash(template_rel) is None:
-            continue
-        actions.append(
-            UpgradeAction(
-                file=mfile,
-                action="add",
-                reason="Managed file missing — will copy from template",
+    for class_ in ("hook", "rule", "skill"):
+        for artifact in _managed_file_artifacts(profile_name, class_):
+            project_path = target / artifact.target_path
+            if project_path.exists():
+                continue
+            if _template_hash(artifact.template_path) is None:
+                continue
+            actions.append(
+                UpgradeAction(
+                    file=artifact.target_path,
+                    action="add",
+                    reason="Managed file missing — will copy from template",
+                )
             )
-        )
     return actions
 
 
-def _plan_managed_hooks(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
-    """Plan ``add``/``skip`` actions for managed ``.claude/hooks/`` files.
+def _plan_managed_file_drift(
+    target: Path,
+    profile_name: str,
+    class_: str,
+) -> list[UpgradeAction]:
+    """Plan ``skip`` actions for managed files of *class_* that differ from template.
 
-    Behavior preserved from the original in-line planning loop:
-    - ``local-only`` profile only carries ``assertion-check.py`` and
-      ``spec-classifier.py``.
-    - Missing files produce an ``add`` action.
-    - Files that differ from the template produce a ``skip`` action with a
-      "customized?" reason (requiring ``--force`` to overwrite).
-    - Files that match the template are silently skipped.
+    Missing-file case is handled by :func:`_plan_missing_managed_files`.
     """
     actions: list[UpgradeAction] = []
-    for mfile in _filter_hooks_for_profile(profile):
-        project_path = target / mfile
+    for artifact in _managed_file_artifacts(profile_name, class_):
+        project_path = target / artifact.target_path
         if not project_path.exists():
-            continue  # Missing-file case handled by _plan_missing_managed_files
+            continue  # Missing-file case handled elsewhere.
 
-        template_rel = _map_managed_to_template(mfile)
-        if template_rel is None:
-            continue
-
-        template_h = _template_hash(template_rel)
-        if template_h is None:
-            continue
-
-        project_h = _file_hash(project_path)
-        if project_h == template_h:
-            continue  # Already current
-
-        # User-customized file — require --force to overwrite
-        actions.append(
-            UpgradeAction(
-                file=mfile,
-                action="skip",
-                reason="File differs from template (customized?) — use --force to overwrite",
-            )
-        )
-
-    return actions
-
-
-def _plan_managed_rules(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
-    """Plan ``skip`` actions for managed ``.claude/rules/`` files that differ
-    from the template. Missing-file case is handled by
-    :func:`_plan_missing_managed_files`.
-    """
-    actions: list[UpgradeAction] = []
-    for mfile in _filter_rules_for_profile(profile):
-        project_path = target / mfile
-        if not project_path.exists():
-            continue  # Missing-file case handled by _plan_missing_managed_files
-
-        template_rel = _map_managed_to_template(mfile)
-        if template_rel is None:
-            continue
-
-        template_h = _template_hash(template_rel)
+        template_h = _template_hash(artifact.template_path)
         if template_h is None:
             continue
 
@@ -244,59 +136,34 @@ def _plan_managed_rules(target: Path, profile: ProjectProfile) -> list[UpgradeAc
 
         actions.append(
             UpgradeAction(
-                file=mfile,
+                file=artifact.target_path,
                 action="skip",
                 reason="File differs from template (customized?) — use --force to overwrite",
             )
         )
-
     return actions
 
 
-def _plan_managed_skills(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
-    """Plan ``skip`` actions for managed ``.claude/skills/`` files that differ
-    from the template. Missing-file case is handled by
-    :func:`_plan_missing_managed_files`.
+def _map_target_to_template(target_path: str) -> str | None:
+    """Map a managed target path back to its template-relative source.
 
-    Version-gated: only runs when ``scaffold_version != __version__``.
-    Parallel in shape to :func:`_plan_managed_hooks` and
-    :func:`_plan_managed_rules`.
+    Used by :func:`execute_upgrade` to locate the template bytes to copy.
+    Uses the registry as the lookup table rather than hardcoded path
+    prefix heuristics.
     """
-    actions: list[UpgradeAction] = []
-    for mfile in _filter_skills_for_profile(profile):
-        project_path = target / mfile
-        if not project_path.exists():
-            continue  # Missing-file case handled by _plan_missing_managed_files
+    from groundtruth_kb.project.managed_registry import _load_all_artifacts
 
-        template_rel = _map_managed_to_template(mfile)
-        if template_rel is None:
-            continue
-
-        template_h = _template_hash(template_rel)
-        if template_h is None:
-            continue
-
-        project_h = _file_hash(project_path)
-        if project_h == template_h:
-            continue
-
-        actions.append(
-            UpgradeAction(
-                file=mfile,
-                action="skip",
-                reason="File differs from template (customized?) — use --force to overwrite",
-            )
-        )
-
-    return actions
+    for artifact in _load_all_artifacts():
+        if isinstance(artifact, FileArtifact) and artifact.target_path == target_path:
+            return artifact.template_path
+    return None
 
 
-def _plan_settings_registration(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
+def _plan_settings_registration(target: Path, profile_name: str) -> list[UpgradeAction]:
     """Plan PreToolUse registrations for managed hooks in ``settings.json``.
 
-    Emits ``register-hook`` actions for hooks listed in
-    :data:`_MANAGED_SETTINGS_PRETOOLUSE_HOOKS` that are NOT already
-    registered in ``.claude/settings.json``.
+    Emits ``register-hook`` actions for settings-hook-registration
+    artifacts that are NOT already registered in ``.claude/settings.json``.
 
     Defensive against malformed shapes:
 
@@ -352,24 +219,29 @@ def _plan_settings_registration(target: Path, profile: ProjectProfile) -> list[U
                 registered_commands.add(cmd)
 
     actions: list[UpgradeAction] = []
-    for hook_name, bridge_only in _MANAGED_SETTINGS_PRETOOLUSE_HOOKS:
-        if bridge_only and not profile.includes_bridge:
+    for registration in _managed_settings_registrations(profile_name):
+        # C1 scope: only PreToolUse registrations are upgrade-enforced.
+        # Other event classes (SessionStart, UserPromptSubmit, PostToolUse)
+        # remain scaffold-only per the registry's managed_profiles = [] for
+        # those rows. Upgrade enforcement for those event classes is a
+        # deferred settings-merge child bridge.
+        if registration.event != "PreToolUse":
             continue
-        marker = f"python .claude/hooks/{hook_name}"
+        marker = f"python .claude/hooks/{registration.hook_filename}"
         if any(marker in cmd for cmd in registered_commands):
             continue
         actions.append(
             UpgradeAction(
                 file=".claude/settings.json",
                 action="register-hook",
-                reason=f"Register {hook_name} as PreToolUse hook",
-                payload=hook_name,
+                reason=f"Register {registration.hook_filename} as PreToolUse hook",
+                payload=registration.hook_filename,
             )
         )
     return actions
 
 
-def _plan_gitignore_patterns(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
+def _plan_gitignore_patterns(target: Path, profile_name: str) -> list[UpgradeAction]:
     """Plan ``.gitignore`` pattern additions.
 
     Emits ``append-gitignore`` actions for patterns NOT already present in
@@ -388,17 +260,15 @@ def _plan_gitignore_patterns(target: Path, profile: ProjectProfile) -> list[Upgr
     existing_lines = {line.strip() for line in existing.splitlines()}
 
     actions: list[UpgradeAction] = []
-    for pattern, comment, bridge_only in _MANAGED_GITIGNORE_PATTERNS:
-        if bridge_only and not profile.includes_bridge:
-            continue
-        if pattern in existing_lines:
+    for pattern_record in _managed_gitignore_patterns(profile_name):
+        if pattern_record.pattern in existing_lines:
             continue
         actions.append(
             UpgradeAction(
                 file=".gitignore",
                 action="append-gitignore",
-                reason=f"Append pattern: {pattern} ({comment})",
-                payload=pattern,
+                reason=f"Append pattern: {pattern_record.pattern} ({pattern_record.comment})",
+                payload=pattern_record.pattern,
             )
         )
     return actions
@@ -409,8 +279,9 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
 
     Always runs settings and gitignore drift checks so that config drift is
     repaired even when the scaffold version is already current. Managed
-    hook/rule file updates remain gated on ``scaffold_version != __version__``
-    to avoid unnecessary re-copy of unchanged files.
+    hook/rule/skill file updates remain gated on
+    ``scaffold_version != __version__`` to avoid unnecessary re-copy of
+    unchanged files.
     """
     manifest = read_manifest(target / "groundtruth.toml")
     if manifest is None:
@@ -429,18 +300,17 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
     # so that missing managed files, missing PreToolUse registrations,
     # and missing gitignore patterns are always surfaced by
     # ``gt project upgrade --dry-run``.
-    actions.extend(_plan_missing_managed_files(target, profile))
-    actions.extend(_plan_settings_registration(target, profile))
-    actions.extend(_plan_gitignore_patterns(target, profile))
+    actions.extend(_plan_missing_managed_files(target, profile.name))
+    actions.extend(_plan_settings_registration(target, profile.name))
+    actions.extend(_plan_gitignore_patterns(target, profile.name))
 
     # Managed-file hash/customization checks are gated on version change —
     # at the current version, files present on disk are assumed to match
     # the template (or be intentional customizations). Missing files are
     # already handled above.
     if manifest.scaffold_version != __version__:
-        actions.extend(_plan_managed_hooks(target, profile))
-        actions.extend(_plan_managed_rules(target, profile))
-        actions.extend(_plan_managed_skills(target, profile))
+        for class_ in ("hook", "rule", "skill"):
+            actions.extend(_plan_managed_file_drift(target, profile.name, class_))
 
     return actions
 
@@ -465,7 +335,7 @@ def execute_upgrade(
             continue
 
         project_path = target / action.file
-        template_rel = _map_managed_to_template(action.file)
+        template_rel = _map_target_to_template(action.file)
 
         if action.action == "skip" and not force:
             results.append(f"SKIPPED {action.file} — {action.reason}")

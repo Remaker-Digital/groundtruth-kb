@@ -24,7 +24,21 @@ from groundtruth_kb.intake import (
     reject_intake,
 )
 from groundtruth_kb.project.doctor import _check_settings_classifiers
-from groundtruth_kb.project.upgrade import _MANAGED_HOOKS
+from groundtruth_kb.project.managed_registry import (
+    FileArtifact,
+    artifacts_for_scaffold,
+    artifacts_for_upgrade,
+)
+
+
+def _upgrade_managed_hook_target_paths(profile: str) -> list[str]:
+    """Return the list of managed hook target_paths for *profile* (registry-sourced).
+
+    Replaces the prior ``_MANAGED_HOOKS`` module-level import, now that the
+    five parallel ``_MANAGED_*`` lists have been consolidated into
+    ``templates/managed-artifacts.toml``.
+    """
+    return [a.target_path for a in artifacts_for_upgrade(profile, class_="hook") if isinstance(a, FileArtifact)]
 
 
 @pytest.fixture
@@ -531,28 +545,37 @@ class TestF5Doctor:
 class TestF5Upgrade:
     """Upgrade managed-hook tests."""
 
-    # 31. Upgrade copy — intake hook is in the managed hook list
+    # 31. Upgrade copy — intake hook is in the managed hook list (bridge profile)
     def test_upgrade_managed_hooks_include_intake(self):
-        assert ".claude/hooks/intake-classifier.py" in _MANAGED_HOOKS
+        assert ".claude/hooks/intake-classifier.py" in _upgrade_managed_hook_target_paths("dual-agent")
 
     # 32. Upgrade preserve — existing spec-classifier stays in managed set
     def test_upgrade_preserves_spec_classifier(self):
-        """Legacy spec-classifier.py must remain in _MANAGED_HOOKS so upgrade
-        does not remove it from projects that still rely on it."""
-        assert ".claude/hooks/spec-classifier.py" in _MANAGED_HOOKS
+        """Legacy spec-classifier.py must remain in the managed hook list for
+        every profile so upgrade does not drop it from projects that still
+        rely on it.
+        """
+        for profile in ("local-only", "dual-agent", "dual-agent-webapp"):
+            assert ".claude/hooks/spec-classifier.py" in _upgrade_managed_hook_target_paths(profile), (
+                f"spec-classifier.py missing from upgrade-managed set for {profile!r}"
+            )
 
     # 33. Upgrade local-only — intake hook respects the local-only allowlist
     def test_upgrade_local_only_excludes_intake(self):
         """plan_upgrade() for local-only profile should not include
         intake-classifier.py since intake is a bridge-profile feature.
-        Verified by inspecting the filter logic."""
-        from groundtruth_kb.project.upgrade import _MANAGED_HOOKS as managed
-
-        # Simulate the local-only filter
-        local_allowed = {"assertion-check.py", "spec-classifier.py"}
-        filtered = [h for h in managed if h.split("/")[-1] in local_allowed]
-        assert ".claude/hooks/intake-classifier.py" not in filtered
-        assert ".claude/hooks/spec-classifier.py" in filtered
+        The managed-artifact registry enforces this via the
+        ``managed_profiles`` axis on the intake-classifier record.
+        """
+        local_managed = _upgrade_managed_hook_target_paths("local-only")
+        assert ".claude/hooks/intake-classifier.py" not in local_managed
+        assert ".claude/hooks/spec-classifier.py" in local_managed
+        # And scaffold still copies intake-classifier.py for local-only
+        # (initial_profiles is ALL). Registry keeps the two axes independent.
+        local_initial = [
+            a.target_path for a in artifacts_for_scaffold("local-only", class_="hook") if isinstance(a, FileArtifact)
+        ]
+        assert ".claude/hooks/intake-classifier.py" in local_initial
 
 
 class TestF5Roundtrip:
