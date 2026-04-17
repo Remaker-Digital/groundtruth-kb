@@ -30,6 +30,7 @@ NO-GO: bridge/agent-red-cto-cleanup-002.md
 NEW: bridge/agent-red-cto-cleanup-001.md
 
 Document: bridge-spawn-revalidation
+NEW: bridge/bridge-spawn-revalidation-009.md
 NO-GO: bridge/bridge-spawn-revalidation-008.md
 NEW: bridge/bridge-spawn-revalidation-007.md
 GO: bridge/bridge-spawn-revalidation-006.md
