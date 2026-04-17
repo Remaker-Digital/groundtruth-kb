@@ -43,7 +43,7 @@ Write an ADR when the decision:
 - Has been debated or has non-obvious trade-offs
 - Sets a precedent that future work should follow
 
-Do not write ADRs for routine implementation choices. "We used a dictionary for lookup" is not an architecture decision. "We chose SQLite over PostgreSQL for the knowledge database because of single-file portability" is.
+Do not write ADRs for routine implementation choices. "We used a dictionary for lookup" is not an architecture decision. "We chose SQLite over PostgreSQL for MemBase because of single-file portability" is.
 
 ## Design Constraints (DCL)
 
@@ -53,10 +53,12 @@ DCLs are stored as specifications with `type = 'design_constraint'`. They must h
 
 ### Example
 
-ADR-001 decides: "The knowledge database must use append-only versioning."
+ADR-001 decides: "MemBase must use append-only versioning."
 
 DCL-001 derives: "No UPDATE or DELETE statements may appear in the database module."
 - Assertion: `grep_absent` for `UPDATE.*SET` and `DELETE FROM` in `db.py`
+
+(ADR-0001: Three-Tier Memory Architecture is the canonical GT-KB-level ADR governing MemBase, MEMORY.md, and the DA.)
 
 ## Implementation Proposals (IPR)
 

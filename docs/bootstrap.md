@@ -1,6 +1,8 @@
 # Getting Started with groundtruth-kb
 
-A step-by-step walkthrough for adding the GroundTruth knowledge database and governance toolkit to your project. By the end, you will have a knowledge database with specifications, tests, and governance rules — all verified by assertions.
+A step-by-step walkthrough for adding GroundTruth (MemBase and the governance toolkit) to your project. By the end, you will have a MemBase with specifications, tests, and governance rules — all verified by assertions.
+
+Terminology note: this guide follows ADR-0001: Three-Tier Memory Architecture. Your `groundtruth.db` is MemBase (canonical knowledge and specifications); `MEMORY.md` is the operational notepad.
 
 ## What this guide covers (and does not)
 
@@ -60,7 +62,7 @@ cd my-project
 This creates two files:
 
 - `groundtruth.toml` — project configuration
-- `groundtruth.db` — empty knowledge database
+- `groundtruth.db` — empty MemBase
 
 ## Step 3: Seed governance rules
 
@@ -223,4 +225,4 @@ This gives you a GitHub Actions workflow that runs pytest, ruff, and `gt assert`
 - Read the [Specifications guide](method/02-specifications.md) to learn how to write effective specs
 - Read the [Adoption guide](method/09-adoption.md) to understand the upstream/downstream model
 - Read the [Product Architecture](architecture/product-split.md) to see how groundtruth-kb fits into the broader ecosystem
-- Add more specifications as your project grows — the knowledge database scales with you
+- Add more specifications as your project grows — MemBase scales with you

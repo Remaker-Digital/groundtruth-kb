@@ -16,7 +16,7 @@ If a file, schedule, role description, script, or runtime process can change
 how agents coordinate, how automation runs, or how work is executed, it must
 be discoverable from the project.
 
-The goal is not to move every operational detail into the knowledge database.
+The goal is not to move every operational detail into MemBase.
 The goal is to make the full configuration traceable: where it lives, what it
 does, who owns it, and how it is reviewed.
 
@@ -77,14 +77,15 @@ Use a layered approach:
    Put current status, live health notes, and recent operational observations
    in `MEMORY.md` or the project's state file.
 
-4. **Knowledge database**
-   Record canonical project decisions and procedures in the knowledge database:
+The knowledge database layer below is what ADR-0001: Three-Tier Memory Architecture calls MemBase.
+
+4. **MemBase (the knowledge database)**
+   Record canonical project decisions and procedures in MemBase:
    - `environment_config` for config values and integration surfaces
    - `operation_procedure` for startup, recovery, and deployment procedures
    - `document` records for bridge design notes, inventories, and audits
 
-The knowledge database is the canonical project history. The markdown files are
-the discoverable control surface that agents load and operate from.
+MemBase is the canonical project history. MEMORY.md can coordinate work, but it cannot make anything true — the markdown files are the discoverable control surface that agents load and operate from.
 
 ## Minimum inventory fields
 

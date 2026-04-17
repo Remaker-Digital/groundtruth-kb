@@ -5,8 +5,10 @@ This rule file defines mandatory behavior for the implementing/building agent.
 ## Core Assignment
 
 - Mission: create, manage, maintain, and frequently reference implementation artifacts
-- Output: specifications, tests, code, and knowledge database records
+- Output: specifications, tests, code, and MemBase records
 - Constraint: follows the spec-first workflow — specifications before implementation
+
+This rule set assumes ADR-0001: Three-Tier Memory Architecture — MemBase holds canonical knowledge and specifications, MEMORY.md is the operational notepad, and the Deliberation Archive (DA) captures reasoning.
 
 ## Mandatory Workflow
 
@@ -16,9 +18,9 @@ This rule file defines mandatory behavior for the implementing/building agent.
 4. When implementing → follow backlog priority order
 5. When completing work → run assertions before committing
 
-## Knowledge Database Discipline
+## MemBase Discipline
 
-- All project knowledge lives in the knowledge database
+- All canonical project knowledge lives in MemBase. MEMORY.md can coordinate work, but it cannot make anything true.
 - Use the Python API or CLI — never edit the SQLite file directly
 - Record session documents at wrap-up
 - Run `gt assert` after significant changes
@@ -27,7 +29,7 @@ This rule file defines mandatory behavior for the implementing/building agent.
 
 - State session objective at the start
 - Reference the session ID in all artifacts and commits
-- Update the state file (MEMORY.md) during wrap-up
+- Update the operational notepad (MEMORY.md) during wrap-up
 - If the project uses a bridge or recurring automation, keep the bridge or operations inventory aligned with runtime changes in the same session
 - Every fifth session: run audit hygiene steps
 

@@ -169,7 +169,7 @@ usually `BRIDGE-INVENTORY.md`, with at least:
 - required plugins, skills, MCP servers, and config files
 - health-check commands
 - failure signals and recovery procedure
-- knowledge database records that capture design decisions and procedures
+- MemBase records that capture design decisions and procedures
 
 The package template `templates/BRIDGE-INVENTORY.md` includes these sections.
 
@@ -218,7 +218,9 @@ Common failures to review explicitly:
 | Wrong agent behavior | CLI prompt omits role, verdict rules, or config paths | Version the prompt and include it in inventory |
 | Stale integration config | Archived MCP or bridge config remains active | Remove or mark inactive in config and inventory |
 
-## Knowledge database mapping
+## MemBase mapping
+
+Per ADR-0001: Three-Tier Memory Architecture, MemBase is the auditable history and decision trail below.
 
 Use GroundTruth records to preserve the operating history:
 
@@ -230,8 +232,7 @@ Use GroundTruth records to preserve the operating history:
 | `work_item` | Follow-up tasks for missing automation, docs, or verification |
 | `decision` or ADR/DCL records | Scheduler choice, bridge protocol, role-boundary decisions |
 
-Markdown files are the working control surface. The knowledge database is the
-auditable history and decision trail.
+Markdown files are the working control surface. MemBase is the auditable history and decision trail.
 
 ## Setup prompt
 

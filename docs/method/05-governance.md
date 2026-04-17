@@ -4,9 +4,9 @@ Governance is the self-regulating layer of the GroundTruth method. It defines th
 
 ## Governance specifications
 
-Governance rules are themselves specifications, prefixed with `GOV-`. This is intentional: the method governs itself using the same artifact system it provides to projects. Governance specifications:
+Governance rules are themselves specifications, prefixed with `GOV-`. This is intentional: the method governs itself using the same artifact system it provides to projects. Governance records, like all specification records, live in MemBase per ADR-0001: Three-Tier Memory Architecture. Governance specifications:
 
-- Are stored in the knowledge database like any other spec
+- Are stored in MemBase like any other spec
 - Carry machine-verifiable assertions
 - Move through the same lifecycle (specified → implemented → verified)
 - Can be proposed, reviewed, and refined like any requirement

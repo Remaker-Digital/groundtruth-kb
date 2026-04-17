@@ -10,19 +10,21 @@ All layers ship together and are installed from a single wheel.
 
 ## Architecture Layers
 
-### Layer 1 - Core Knowledge Database
+### Layer 1 - Core Knowledge Database (MemBase)
 
 The foundation: an append-only SQLite database with governance gates and an
 assertion engine.
 
 | Capability | CLI commands |
 |------------|--------------|
-| Knowledge database | `gt init` - create project config and database |
+| MemBase (knowledge database) | `gt init` - create project config and database |
 | Seed data | `gt seed` - populate governance specs and optional examples |
 | Assertions | `gt assert` - run machine-checkable spec assertions |
 | Web dashboard | `gt serve` - optional FastAPI UI (`[web]` extra) |
 | Summary | `gt summary` - quick project overview |
 | Desktop bootstrap | `gt bootstrap-desktop` - same-day prototype scaffold |
+
+Layer 1 is what ADR-0001: Three-Tier Memory Architecture calls MemBase — the canonical knowledge and specifications tier.
 
 ### Layer 2 - Project Scaffold
 
@@ -79,7 +81,7 @@ compatibility code. New projects should not use it as the active bridge.
 
 ## Scope Boundary
 
-`groundtruth-kb` initializes a knowledge database, provides the tools to manage
+`groundtruth-kb` initializes MemBase, provides the tools to manage
 specifications, tests, work items, and assertions, scaffolds project structure
 from profiles, and verifies workstation readiness.
 

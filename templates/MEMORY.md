@@ -3,11 +3,13 @@
 > **Customize this template:** Replace placeholders and remove example entries.
 > Update this file at the end of every session.
 
+This file is the MEMORY.md operational notepad per ADR-0001: Three-Tier Memory Architecture. Canonical knowledge lives in MemBase.
+
 ## Current Status
 
 - **Version:** {{VERSION}}
 - **Environment:** {{ENVIRONMENT_DESCRIPTION}}
-- **Knowledge DB:** Run `gt summary` for current counts
+- **MemBase:** Run `gt summary` for current counts
 - **Tests:** {{TEST_STATUS}}
 
 ## Operational Control Surfaces
@@ -22,12 +24,11 @@
 
 ## Quick Reference
 
-- **Knowledge DB:** `gt --config groundtruth.toml summary`
+- **MemBase:** `gt --config groundtruth.toml summary`
 - **Assertions:** `gt --config groundtruth.toml assert`
 - **Web UI:** `gt --config groundtruth.toml serve`
 - **Operational inventory:** `BRIDGE-INVENTORY.md` or equivalent project-owned file
 
 > **Boundary rule:** If it tells the agent *what to do*, it goes in CLAUDE.md.
 > If it tells the agent *what has been done* or *how to access something*, it goes here.
-> All canonical project knowledge lives in the knowledge database — this file is
-> operational memory, not the source of truth.
+> All canonical project knowledge lives in MemBase — this file is operational memory, not the source of truth. MEMORY.md can coordinate work, but it cannot make anything true.

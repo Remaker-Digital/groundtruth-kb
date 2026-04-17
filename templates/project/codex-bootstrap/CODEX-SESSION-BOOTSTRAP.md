@@ -30,13 +30,14 @@ Load and internalize the following documents in order:
 
 1. `CLAUDE.md` -- Project rules, governance, and procedures.
 2. `MEMORY.md` -- Current project state, versions, recent sessions.
+   - MEMORY.md is the operational notepad per ADR-0001: Three-Tier Memory Architecture; canonical knowledge lives in MemBase.
 3. `AGENTS.md` -- Loyal Opposition operating contract, if present.
 4. `BRIDGE-INVENTORY.md` -- Bridge scripts, prompts, schedules, and recovery.
 5. `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md` -- Open items,
    pending decisions, and completed work from prior sessions, if present.
 
 Note any discrepancies between documents. If MEMORY.md and CLAUDE.md conflict,
-CLAUDE.md takes precedence (rules over state).
+CLAUDE.md takes precedence (rules over state). Remember: MEMORY.md can coordinate work, but it cannot make anything true.
 
 ---
 

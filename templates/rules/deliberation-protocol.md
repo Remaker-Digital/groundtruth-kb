@@ -1,7 +1,9 @@
-# Deliberation Archive Protocol
+# Deliberation Archive (DA) Protocol
 
 This rule file defines mandatory behavior for both Prime Builder and Loyal
-Opposition when interacting with the Deliberation Archive.
+Opposition when interacting with the Deliberation Archive (DA).
+
+The Deliberation Archive (DA) is the design-reasoning tier of ADR-0001: Three-Tier Memory Architecture. MemBase holds specifications and canonical knowledge; MEMORY.md is the operational notepad; the DA holds the why.
 
 ## When To Search Deliberations
 
@@ -9,7 +11,7 @@ Both agents MUST search deliberations before starting substantive work.
 
 ### Prime Builder — Before Proposing
 
-- Before writing any bridge proposal, search the knowledge database for
+- Before writing any bridge proposal, search MemBase (and the DA) for
   prior deliberations on the target spec, work item, or component.
 - If prior reviews exist: cite DELIB-IDs in the proposal's "Prior Deliberations"
   section and explain how this proposal differs from or builds on prior decisions.
@@ -56,7 +58,7 @@ Both agents MUST search deliberations before starting substantive work.
 ## What NOT To Archive
 
 - Bridge liveness/protocol chatter (routine acks, status pings)
-- Duplicate content already in the knowledge database
+- Duplicate content already in MemBase
 - Raw credential values
 - Session start boilerplate
 

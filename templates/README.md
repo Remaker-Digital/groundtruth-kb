@@ -17,12 +17,14 @@ Claude/Codex configuration.
 See the [Adoption guide](../docs/method/09-adoption.md) for the managed vs
 project-owned boundary.
 
+The shipped CLAUDE.md / MEMORY.md / deliberation-protocol templates implement ADR-0001: Three-Tier Memory Architecture (MemBase, MEMORY.md, Deliberation Archive).
+
 ## Contents
 
 | Template | Purpose | Copy to |
 |----------|---------|---------|
 | `CLAUDE.md` | Project rules and procedures for AI assistants | Project root |
-| `MEMORY.md` | Session state and operational memory | Project root |
+| `MEMORY.md` | Session state and operational notepad (per ADR-0001) | Project root |
 | `BRIDGE-INVENTORY.md` | Optional inventory of bridge directives, roles, schedules, prompts, and automations | Project root |
 | `bridge-os-poller-setup-prompt.md` | Prompt for configuring durable file bridge OS pollers and agent setup | Project root or operations docs |
 | `hooks/assertion-check.py` | SessionStart hook — run assertions on session start | `.claude/hooks/` |

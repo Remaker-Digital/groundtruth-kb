@@ -31,7 +31,7 @@ legal_footer = "Copyright 2026 My Company"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `db_path` | path | `./groundtruth.db` | Path to the SQLite knowledge database |
+| `db_path` | path | `./groundtruth.db` | Path to the SQLite MemBase |
 | `project_root` | path | `.` | Root directory of the project (for assertion path resolution) |
 | `app_title` | string | `GroundTruth KB` | Title shown in the web UI header and page title |
 | `brand_mark` | string | `GT` | Short text shown in the web UI navigation |
@@ -71,7 +71,9 @@ configuration subsection at initialization.
 
 ### `[search]` section
 
-Semantic search configuration for the deliberation archive.
+Semantic search backs the Deliberation Archive (DA) tier of ADR-0001: Three-Tier Memory Architecture.
+
+Semantic search configuration for the Deliberation Archive (DA).
 
 ```toml
 [search]

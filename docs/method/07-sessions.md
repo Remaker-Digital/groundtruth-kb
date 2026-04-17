@@ -26,7 +26,7 @@ State the objective clearly. Read the project's state file to understand:
 ### 2. Execute
 
 Work toward the stated objective. Along the way:
-- Record specifications, tests, and work items in the knowledge database
+- Record specifications, tests, and work items in MemBase (canonical knowledge and specifications; see ADR-0001: Three-Tier Memory Architecture).
 - Follow the spec-first workflow when encountering new requirements
 - Run assertions after making changes to catch regressions early
 
@@ -34,7 +34,7 @@ Work toward the stated objective. Along the way:
 
 Before ending the session:
 - **Update the state file** with: what was done, what changed, what's next
-- **Record a session document** in the knowledge database (category: `session_record`)
+- **Record a session document** in MemBase (category: `session_record`)
 - **Run assertions** one final time to confirm no regressions
 - **Commit** with a message that references the session ID
 
@@ -52,7 +52,7 @@ Contains **what has been done**: current status, recent sessions, quick referenc
 
 ### The boundary rule
 
-If it tells the agent *what to do*, it goes in the rules file. If it tells the agent *what has been done* or *how to access something*, it goes in the state file. All canonical project knowledge lives in the knowledge database — state files are operational memory, not the source of truth.
+If it tells the agent *what to do*, it goes in the rules file. If it tells the agent *what has been done* or *how to access something*, it goes in the state file. All canonical project knowledge lives in MemBase — state files are the operational notepad, not the source of truth. MEMORY.md can coordinate work, but it cannot make anything true.
 
 ## Audit sessions
 
@@ -70,15 +70,15 @@ Audit sessions prevent gradual degradation — the slow accumulation of stale ar
 
 Sessions are designed so that a different agent (or a future instance of the same agent) can continue where the last session left off. This requires:
 
-- **Self-contained state**: the state file plus the knowledge database contain everything needed to understand the project's current position
+- **Self-contained state**: the state file (MEMORY.md operational notepad) plus MemBase contain everything needed to understand the project's current position
 - **No implicit context**: decisions, trade-offs, and open questions are recorded, not assumed
 - **Clear "next" section**: every session wrap-up states what should happen next
 
-The test: if you delete the entire conversation history and start fresh with only the rules file, state file, and knowledge database, you should be able to continue productive work within minutes.
+The test: if you delete the entire conversation history and start fresh with only the rules file, MEMORY.md operational notepad, and MemBase, you should be able to continue productive work within minutes.
 
 ## Session documents
 
-Each session produces a document in the knowledge database (category: `session_record`) that captures:
+Each session produces a document in MemBase (category: `session_record`) that captures:
 
 - Session ID and date
 - What was accomplished (summary)
