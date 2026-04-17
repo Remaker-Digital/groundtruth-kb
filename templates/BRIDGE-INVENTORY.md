@@ -100,9 +100,11 @@ Include recurring tasks from:
 - **Health check:** {{STARTUP_OR_LIVENESS_CHECK}}
 - **Restart policy:** {{WHEN_RESTARTS_ARE_ALLOWED_OR_AVOIDED}}
 
-## Knowledge database mapping
+Per ADR-0001: Three-Tier Memory Architecture, canonical project history lives in MemBase; this inventory is an operational control surface that must stay aligned with MemBase records.
 
-Record the canonical history for this control surface in the knowledge database:
+## MemBase mapping
+
+Record the canonical history for this control surface in MemBase:
 
 - `environment_config`: {{ENV_CONFIG_IDS_OR_NOTES}}
 - `operation_procedure`: {{PROCEDURE_IDS_OR_NOTES}}

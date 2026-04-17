@@ -26,7 +26,9 @@ cd examples/task-tracker
 pip install -e ".[dev]"
 ```
 
-## Step 2: Explore the knowledge database
+The database in this example is MemBase per ADR-0001: Three-Tier Memory Architecture.
+
+## Step 2: Explore MemBase
 
 ```bash
 gt --config groundtruth.toml summary

@@ -39,7 +39,7 @@ gt init [PROJECT_NAME] [--dir <path>]
 **What it creates:**
 
 - `groundtruth.toml` — configuration file
-- `groundtruth.db` — empty SQLite knowledge database
+- `groundtruth.db` — empty SQLite MemBase
 
 !!! note
     For a full project scaffold with hooks, rules, CI, and seed data,
@@ -219,7 +219,7 @@ settings and resolution order.
 
 ### gt export
 
-Export the entire knowledge database to JSON.
+Export the entire MemBase to JSON.
 
 ```
 gt export [--output <path>]
@@ -447,9 +447,11 @@ gt project upgrade --apply --force
 
 ---
 
-## Deliberation Commands
+## Deliberation Archive (DA) Commands
 
-Commands for managing the deliberation archive and semantic search index.
+Commands for managing the Deliberation Archive (DA) and semantic search index.
+
+See ADR-0001: Three-Tier Memory Architecture for how these commands interact with MemBase.
 
 ### gt deliberations rebuild-index
 
@@ -745,7 +747,7 @@ gt health trends [-n <LIMIT>]
 
 ### gt kb reconcile
 
-Run provenance and consistency detectors against the knowledge database.
+Run provenance and consistency detectors against MemBase.
 Each detector produces a report with zero or more findings; the command
 prints each report and a total. Exit code is always 0 — this is a
 reporting command, not a gate.

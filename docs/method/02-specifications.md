@@ -79,7 +79,7 @@ Use protected behaviors for safety-critical constraints: "API keys must never ap
 
 Architecture Decision Records capture cross-cutting technical choices: why a particular database was chosen, why a specific communication pattern was adopted, what alternatives were considered and rejected. They include a `consequences` section documenting known trade-offs.
 
-Design Constraints are machine-checkable rules derived from ADRs. Where an ADR says "we chose SQLite for the knowledge database because of single-file portability", the corresponding DCL says "the knowledge database must use SQLite" and carries assertions to verify it.
+Design Constraints are machine-checkable rules derived from ADRs. Where an ADR says "we chose SQLite for MemBase because of single-file portability", the corresponding DCL says "MemBase must use SQLite" and carries assertions to verify it. (This pattern is itself codified in ADR-0001: Three-Tier Memory Architecture.)
 
 For details, see the [Architecture Decisions guide](08-architecture.md).
 
@@ -90,7 +90,7 @@ The most important discipline in GroundTruth is **spec-first**: when the owner d
 This applies whenever you encounter specification language — words like "must", "should", "must include", numbered criteria, or acceptance conditions. The workflow:
 
 1. **Recognize** the input as specification language
-2. **Record** the specification in the knowledge database (or verify an existing spec covers it)
+2. **Record** the specification in MemBase (or verify an existing spec covers it)
 3. **Identify** any implementation gaps → create work items
 4. **Add** work items to the backlog for prioritization
 5. **Wait** for prioritization approval before implementing

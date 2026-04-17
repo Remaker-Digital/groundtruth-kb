@@ -29,7 +29,7 @@ groundtruth-kb (upstream)
     └── src/                      ← your application code
 ```
 
-**GroundTruth** provides the method documentation, the knowledge database engine, the governance gate framework, and reference [process templates](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/templates) for project setup, including templates for capturing bridge and automation configuration. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation. The boundary between them is explicit.
+**GroundTruth** provides the method documentation, the MemBase engine, the governance gate framework, and reference [process templates](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/templates) for project setup, including templates for capturing bridge and automation configuration. **Your project** provides the domain knowledge, specifications, tests, implementation, and any project-specific automation. The boundary between them is explicit.
 
 ## Managed vs project-owned files
 
@@ -46,12 +46,12 @@ These files originate from GroundTruth and are updated when you pull a new upstr
 
 ### Project-owned files (you control)
 
-These files are created by `gt init` or by you. GroundTruth never overwrites them after initial creation.
+These files are created by `gt init` or by you. GroundTruth never overwrites them after initial creation. `groundtruth.db` (your project's MemBase) is created once and owned by your project per ADR-0001: Three-Tier Memory Architecture.
 
 | File | Purpose |
 |------|---------|
 | `groundtruth.toml` | Project configuration (DB path, branding, gate plugins) — created by `gt init` |
-| `groundtruth.db` | Your project's knowledge database — created by `gt init` |
+| `groundtruth.db` | Your project's MemBase — created by `gt init` |
 | Rules and state files | Your project's rules file and operational state (you create these as needed for your workflow) |
 | Gate plugins | Custom governance gates for your domain |
 | `src/`, `tests/`, etc. | Your application code |

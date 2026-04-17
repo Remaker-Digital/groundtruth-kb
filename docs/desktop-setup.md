@@ -96,7 +96,9 @@ This creates:
 - `.claude/rules/`
 - `.github/workflows/` from the reference CI templates
 
-It also seeds the knowledge database with the standard governance specs plus
+The resulting layout follows ADR-0001: Three-Tier Memory Architecture — `groundtruth.db` is MemBase; `MEMORY.md` is the operational notepad.
+
+It also seeds MemBase with the standard governance specs plus
 the example domain records.
 
 ### 3. Verify the environment
@@ -124,7 +126,7 @@ Before the first real session:
 ### Automated by `gt bootstrap-desktop`
 
 - GroundTruth project initialization
-- knowledge database creation
+- MemBase creation
 - template copy for rules, memory, hooks, and bridge inventory
 - CI workflow copy
 - governance/example seed data

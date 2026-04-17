@@ -22,11 +22,11 @@ This is not new in principle. What is new is that GroundTruth-KB makes it **prac
 
 ### 1. MemBase: Persistent Project Memory
 
-AI agents forget everything between sessions. GroundTruth-KB solves this with MemBase — a structured memory system that gives every session full context about what has been decided, what has been built, and what needs to happen next.
+AI agents forget everything between sessions. GroundTruth-KB solves this with MemBase — a structured memory system that gives every session full context about what has been decided, what has been built, and what needs to happen next. This structure is codified in ADR-0001: Three-Tier Memory Architecture.
 
-- **Knowledge Database** — SQLite-backed store of specifications, tests, work items, and deliberations. Every entry is append-only and versioned: you can see who changed what, when, and why.
+- **MemBase (knowledge database)** — SQLite-backed store of specifications, tests, work items, and deliberations, per ADR-0001: Three-Tier Memory Architecture. Every entry is append-only and versioned: you can see who changed what, when, and why.
 - **Session Memory** — structured handoff files that tell the AI agent exactly where the project stands, what the current priorities are, and what lessons have been learned from previous sessions.
-- **Deliberation Archive** — a searchable record of every significant design discussion, rejected alternative, and owner decision. When someone asks "why did we build it this way?", the answer is in the archive — not in someone's head.
+- **Deliberation Archive (DA)** — a searchable record of every significant design discussion, rejected alternative, and owner decision. When someone asks "why did we build it this way?", the answer is in the archive — not in someone's head.
 
 ### 2. Spec-First Development
 
@@ -66,7 +66,7 @@ They communicate through an asynchronous file-based bridge protocol. Prime propo
 
 This is not a rubber stamp. In practice, proposals go through 2-5 revision cycles before approval. Each NO-GO includes specific evidence: what was wrong, which file, which line, what needs to change. The result is code that has been adversarially reviewed before any human sees it.
 
-### 6. Deliberation Archive: Organizational Memory
+### 6. Deliberation Archive (DA): Organizational Memory
 
 Every significant decision — accepted proposals, rejected alternatives, owner directives, design trade-offs — is automatically harvested into a searchable archive with semantic search capability. Before any agent proposes a change, it searches the archive for prior decisions on the same topic.
 
@@ -113,14 +113,14 @@ GroundTruth-KB is built on current-generation, industry-standard technology:
 
 | Layer | Technology | Why |
 |-------|-----------|-----|
-| Knowledge Database | SQLite | Zero-infrastructure, portable, append-only versioning |
+| MemBase (knowledge database) | SQLite | Zero-infrastructure, portable, append-only versioning |
 | AI Agents | Claude Code (Anthropic), Codex (OpenAI) | Best-of-breed for code generation and code review |
 | Type Safety | Python 3.11+ with `mypy --strict` | Full static type coverage, zero errors |
 | CI/CD | GitHub Actions | Industry standard, matrix testing across platforms |
 | Cloud | Azure (starter scaffolding) | Docker templates and minimal Terraform provider stubs; teams add cloud resources for their environment |
 | Web UI | FastAPI + Jinja2 | Built-in `gt serve` dashboard for spec tracking, assertions, and work items |
 | Security | Credential detection built-in; CI placeholders for OWASP scanning tools | Teams configure Semgrep, Bandit, and accessibility tools per project |
-| Search | ChromaDB (optional) | Semantic search over deliberation archive |
+| Search | ChromaDB (optional) | Semantic search over Deliberation Archive (DA) |
 
 The entire system is open-source (AGPL-3.0), installable from PyPI (`pip install groundtruth-kb`), and designed for inspection by lead developers familiar with modern AI-assisted development practices.
 

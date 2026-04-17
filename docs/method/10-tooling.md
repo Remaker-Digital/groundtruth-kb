@@ -21,6 +21,8 @@ For development (tests, linting):
 pip install "groundtruth-kb[dev]"
 ```
 
+Tooling terminology follows ADR-0001: Three-Tier Memory Architecture — MemBase, MEMORY.md, and the Deliberation Archive (DA).
+
 ## Initializing a project
 
 ```bash
@@ -30,7 +32,7 @@ gt init my-project
 This creates a project directory with:
 
 - `groundtruth.toml` — configuration file
-- `groundtruth.db` — empty knowledge database
+- `groundtruth.db` — empty MemBase
 
 To seed with starter governance specs and example data:
 
@@ -159,7 +161,7 @@ gt serve --host 0.0.0.0     # listen on all interfaces
 
 ## Web UI
 
-The web UI provides a read-only dashboard for browsing the knowledge database. It is served by a FastAPI application with Jinja2 templates.
+The web UI provides a read-only dashboard for browsing MemBase. It is served by a FastAPI application with Jinja2 templates.
 
 Pages:
 

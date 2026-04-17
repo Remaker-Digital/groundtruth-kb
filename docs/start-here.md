@@ -165,6 +165,8 @@ Shows the seed operation and all recent changes to the knowledge base.
 Every insert, update, and promotion is tracked with timestamps and
 change reasons.
 
+Deliberations live in the Deliberation Archive (DA), one of three tiers defined by ADR-0001: Three-Tier Memory Architecture (MemBase, MEMORY.md, DA).
+
 ## Step 11: Capture a Deliberation
 
 Deliberations are the "why" behind your decisions — rejected alternatives,

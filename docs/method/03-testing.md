@@ -18,7 +18,7 @@ All three forms are valid. The key requirement is **unambiguous outcome** — so
 
 Tests are versioned alongside the specifications they verify. When a specification changes, the linked tests should be reviewed and updated to match.
 
-Test results are recorded in the knowledge database:
+Test results are recorded in MemBase:
 
 - `last_result`: the most recent outcome (`pass`, `fail`, `not_proven`, `skipped`)
 - `last_executed_at`: when the test was last run

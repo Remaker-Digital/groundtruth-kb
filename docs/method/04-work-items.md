@@ -62,7 +62,7 @@ Not all transitions are valid:
 - `implementing` can advance to `resolved`
 - You cannot skip stages (e.g., `created` → `implementing` is blocked)
 
-These rules are enforced by the knowledge database. Attempting an invalid transition raises an error.
+These rules are enforced by MemBase. Attempting an invalid transition raises an error.
 
 ## Backlog snapshots
 

@@ -6,6 +6,8 @@ It is loaded at the start of every session.
 > **Customize this template:** Replace `{{PROJECT_NAME}}`, `{{COPYRIGHT}}`, and
 > other placeholders with your project's values. Remove sections that don't apply.
 
+This project follows ADR-0001: Three-Tier Memory Architecture (MemBase = canonical knowledge and specifications; MEMORY.md = operational notepad; Deliberation Archive (DA) = design-reasoning record).
+
 ---
 
 ## Project Identity
@@ -55,7 +57,7 @@ directives, and role exceptions.
 
 ## Workflow: Specification → Work Item → Test → Implementation
 
-1. Owner requests change → record as specification(s) in knowledge database
+1. Owner requests change → record as specification(s) in MemBase (canonical knowledge and specifications)
 2. Identify implementation gaps → create work items
 3. Work item creation triggers test creation
 4. Add work items to backlog → prioritize
@@ -66,18 +68,18 @@ directives, and role exceptions.
 ### Spec-First Rule
 
 When the owner describes what the system **must do**, **should do**, or states numbered criteria:
-1. Record or verify specifications in the knowledge database
+1. Record or verify specifications in MemBase
 2. Create work items for any gaps
 3. Present the backlog for prioritization
 4. Only proceed to implementation after approval
 
 ---
 
-## Knowledge Database
+## MemBase (Canonical Knowledge and Specifications)
 
 Access via Python API (`groundtruth_kb`) or CLI (`gt`). Web UI available via `gt serve`.
 
-**Key principle:** All project knowledge lives in the knowledge database. Use `gt summary`
+**Key principle:** All canonical project knowledge lives in MemBase. MEMORY.md can coordinate work, but it cannot make anything true. Use `gt summary`
 to check current status. Use `gt assert` to verify specifications against the codebase.
 
 ---

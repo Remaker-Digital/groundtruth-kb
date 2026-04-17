@@ -3,6 +3,8 @@ name: gtkb-decision-capture
 description: Capture an owner decision as a governed Deliberation Archive record. Use when the owner makes a yes/no/tradeoff decision worth preserving for future sessions — policy choices, scope calls, design selections, rejected alternatives.
 ---
 
+This skill implements the Deliberation Archive (DA) tier of ADR-0001: Three-Tier Memory Architecture.
+
 # /gtkb-decision-capture
 
 ## What this skill does

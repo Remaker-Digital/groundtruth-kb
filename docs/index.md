@@ -26,6 +26,8 @@ Layer 1: Core Knowledge DB     gt init / seed / assert / serve
          File Bridge Setup     dual-agent coordination templates [optional]
 ```
 
+Tier labels in the diagram map to ADR-0001: Three-Tier Memory Architecture — MemBase (Layer 1), MEMORY.md (operational notepad), and the Deliberation Archive (DA).
+
 **New here?** Read [The User Journey](user-journey.md) to see what building
 a product with GroundTruth looks like — from first install to production.
 

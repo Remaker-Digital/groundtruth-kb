@@ -59,7 +59,7 @@ flowchart TD
     H -->|code wrong| E
 ```
 
-1. **Specify** — The owner describes what the system must do. Record as specifications in the knowledge database.
+1. **Specify** — The owner describes what the system must do. Record as specifications in MemBase (canonical knowledge and specifications). See ADR-0001: Three-Tier Memory Architecture.
 2. **Identify gaps** — Compare specs against the current implementation. Create work items for each gap.
 3. **Create tests** — For each work item, create tests that will prove the gap is closed. Link each test to its specification.
 4. **Prioritize** — Add work items to a backlog. The backlog ordering determines implementation sequence.
@@ -69,7 +69,7 @@ flowchart TD
 
 This is not a waterfall process. Steps overlap and repeat. The key discipline is that specifications come *before* implementation, not after — and that every change flows through this cycle.
 
-## The knowledge database
+## MemBase (Canonical Knowledge and Specifications)
 
 All artifacts live in an append-only SQLite database. The term "append-only" means:
 
@@ -128,7 +128,7 @@ The separation ensures that the agent building the system is not the same agent 
 Work is organized into numbered sessions (`S1`, `S2`, ..., `S240`). Each session:
 
 - Has a clear objective stated at the start
-- Produces artifacts recorded in the knowledge database
+- Produces artifacts recorded in MemBase
 - Ends with a structured wrap-up: what was done, what changed, what's next
 
 Every fifth session is an **audit session** with additional hygiene steps — checking for stale work items, verifying spec coverage, and pruning operational records.

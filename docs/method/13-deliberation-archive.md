@@ -1,8 +1,10 @@
-# 13. Deliberation Archive
+# 13. Deliberation Archive (DA)
 
-The deliberation archive captures the reasoning behind decisions: why a
+The Deliberation Archive (DA) captures the reasoning behind decisions: why a
 proposal was accepted or rejected, what alternatives were considered, and
 what the owner decided. It is the institutional memory of the project.
+
+The Deliberation Archive (DA) is one tier of ADR-0001: Three-Tier Memory Architecture, alongside MemBase (canonical knowledge and specifications) and MEMORY.md (operational notepad). Remember: MEMORY.md can coordinate work, but it cannot make anything true.
 
 ## Why deliberations matter
 
