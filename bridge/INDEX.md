@@ -10,7 +10,166 @@
 <!--   - Bridge files remain on disk for reference; retirement only affects index visibility -->
 <!--   - Rationale: claude-file-bridge-scan.ps1 has no "actioned" marker and was re-firing headless claude.exe every 3 min on these dead entries -->
 
+<!-- S299 Prime Builder maintenance (2026-04-17): retired gtkb-docs-memory-architecture-alignment (Step-2-only GO actioned) -->
+<!--   - gtkb-docs-memory-architecture-alignment -004 was a "Step 2 edit-preview generation only" GO, not an implementation GO -->
+<!--   - Step 2 deliverable filed as separate thread gtkb-docs-memory-architecture-alignment-editplan (retained in index) -->
+<!--   - All four -004 findings addressed in editplan-003 REVISED (baseline re-anchor d9325c9, per-hit tables, phase-4b-plan reclassification, version-bump separation) -->
+<!--   - Bridge files 001-004 remain on disk as audit trail; editplan thread tracks continuing work -->
+<!--   - Rationale (same as S289): automated cap=1 scan spawn was re-firing on a consumed GO; downstream thread already visible to index -->
+
+Document: gtkb-managed-artifact-registry
+NO-GO: bridge/gtkb-managed-artifact-registry-002.md
+NEW: bridge/gtkb-managed-artifact-registry-001.md
+
+Document: agent-red-cto-cleanup
+GO: bridge/agent-red-cto-cleanup-004.md
+REVISED: bridge/agent-red-cto-cleanup-003.md
+NO-GO: bridge/agent-red-cto-cleanup-002.md
+NEW: bridge/agent-red-cto-cleanup-001.md
+
+Document: bridge-spawn-revalidation
+NEW: bridge/bridge-spawn-revalidation-007.md
+GO: bridge/bridge-spawn-revalidation-006.md
+REVISED: bridge/bridge-spawn-revalidation-005.md
+NO-GO: bridge/bridge-spawn-revalidation-004.md
+REVISED: bridge/bridge-spawn-revalidation-003.md
+NO-GO: bridge/bridge-spawn-revalidation-002.md
+NEW: bridge/bridge-spawn-revalidation-001.md
+
+Document: post-phase-a-prioritization
+VERIFIED: bridge/post-phase-a-prioritization-006.md
+NEW: bridge/post-phase-a-prioritization-005.md
+GO: bridge/post-phase-a-prioritization-004.md
+REVISED: bridge/post-phase-a-prioritization-003.md
+NO-GO: bridge/post-phase-a-prioritization-002.md
+NEW: bridge/post-phase-a-prioritization-001.md
+
+Document: gtkb-azure-enterprise-readiness-taxonomy
+VERIFIED: bridge/gtkb-azure-enterprise-readiness-taxonomy-008.md
+NEW: bridge/gtkb-azure-enterprise-readiness-taxonomy-007.md
+NO-GO: bridge/gtkb-azure-enterprise-readiness-taxonomy-006.md
+NEW: bridge/gtkb-azure-enterprise-readiness-taxonomy-005.md
+VERIFIED: bridge/gtkb-azure-enterprise-readiness-taxonomy-004.md
+NEW: bridge/gtkb-azure-enterprise-readiness-taxonomy-003.md
+GO: bridge/gtkb-azure-enterprise-readiness-taxonomy-002.md
+NEW: bridge/gtkb-azure-enterprise-readiness-taxonomy-001.md
+
+Document: gtkb-non-disruptive-upgrade-investigation
+VERIFIED: bridge/gtkb-non-disruptive-upgrade-investigation-006.md
+NEW: bridge/gtkb-non-disruptive-upgrade-investigation-005.md
+GO: bridge/gtkb-non-disruptive-upgrade-investigation-004.md
+REVISED: bridge/gtkb-non-disruptive-upgrade-investigation-003.md
+NO-GO: bridge/gtkb-non-disruptive-upgrade-investigation-002.md
+NEW: bridge/gtkb-non-disruptive-upgrade-investigation-001.md
+
+Document: gtkb-v060-release
+VERIFIED: bridge/gtkb-v060-release-006.md
+NEW: bridge/gtkb-v060-release-005.md
+GO: bridge/gtkb-v060-release-004.md
+REVISED: bridge/gtkb-v060-release-003.md
+GO: bridge/gtkb-v060-release-002.md
+NEW: bridge/gtkb-v060-release-001.md
+
+Document: gtkb-phase-a-metrics-collector
+VERIFIED: bridge/gtkb-phase-a-metrics-collector-004.md
+NEW: bridge/gtkb-phase-a-metrics-collector-003.md
+GO: bridge/gtkb-phase-a-metrics-collector-002.md
+NEW: bridge/gtkb-phase-a-metrics-collector-001.md
+
+Document: gtkb-skill-spec-intake
+VERIFIED: bridge/gtkb-skill-spec-intake-006.md
+NEW: bridge/gtkb-skill-spec-intake-005.md
+GO: bridge/gtkb-skill-spec-intake-004.md
+REVISED: bridge/gtkb-skill-spec-intake-003.md
+NO-GO: bridge/gtkb-skill-spec-intake-002.md
+NEW: bridge/gtkb-skill-spec-intake-001.md
+
+Document: gtkb-docs-memory-architecture-alignment-editplan
+VERIFIED: bridge/gtkb-docs-memory-architecture-alignment-editplan-008.md
+NEW: bridge/gtkb-docs-memory-architecture-alignment-editplan-007.md
+GO: bridge/gtkb-docs-memory-architecture-alignment-editplan-006.md
+REVISED: bridge/gtkb-docs-memory-architecture-alignment-editplan-005.md
+NO-GO: bridge/gtkb-docs-memory-architecture-alignment-editplan-004.md
+REVISED: bridge/gtkb-docs-memory-architecture-alignment-editplan-003.md
+NO-GO: bridge/gtkb-docs-memory-architecture-alignment-editplan-002.md
+NEW: bridge/gtkb-docs-memory-architecture-alignment-editplan-001.md
+
+Document: gtkb-skill-bridge-propose
+VERIFIED: bridge/gtkb-skill-bridge-propose-008.md
+NEW: bridge/gtkb-skill-bridge-propose-007.md
+GO: bridge/gtkb-skill-bridge-propose-006.md
+REVISED: bridge/gtkb-skill-bridge-propose-005.md
+NO-GO: bridge/gtkb-skill-bridge-propose-004.md
+REVISED: bridge/gtkb-skill-bridge-propose-003.md
+NO-GO: bridge/gtkb-skill-bridge-propose-002.md
+NEW: bridge/gtkb-skill-bridge-propose-001.md
+
+Document: gtkb-skill-decision-capture
+VERIFIED: bridge/gtkb-skill-decision-capture-012.md
+NEW: bridge/gtkb-skill-decision-capture-011.md
+GO: bridge/gtkb-skill-decision-capture-010.md
+REVISED: bridge/gtkb-skill-decision-capture-009.md
+NO-GO: bridge/gtkb-skill-decision-capture-008.md
+REVISED: bridge/gtkb-skill-decision-capture-007.md
+NO-GO: bridge/gtkb-skill-decision-capture-006.md
+REVISED: bridge/gtkb-skill-decision-capture-005.md
+NO-GO: bridge/gtkb-skill-decision-capture-004.md
+REVISED: bridge/gtkb-skill-decision-capture-003.md
+NO-GO: bridge/gtkb-skill-decision-capture-002.md
+NEW: bridge/gtkb-skill-decision-capture-001.md
+
+Document: gtkb-hook-scanner-safe-writer
+VERIFIED: bridge/gtkb-hook-scanner-safe-writer-012.md
+NEW: bridge/gtkb-hook-scanner-safe-writer-011.md
+NO-GO: bridge/gtkb-hook-scanner-safe-writer-010.md
+NEW: bridge/gtkb-hook-scanner-safe-writer-009.md
+GO: bridge/gtkb-hook-scanner-safe-writer-008.md
+REVISED: bridge/gtkb-hook-scanner-safe-writer-007.md
+NO-GO: bridge/gtkb-hook-scanner-safe-writer-006.md
+REVISED: bridge/gtkb-hook-scanner-safe-writer-005.md
+NO-GO: bridge/gtkb-hook-scanner-safe-writer-004.md
+REVISED: bridge/gtkb-hook-scanner-safe-writer-003.md
+NO-GO: bridge/gtkb-hook-scanner-safe-writer-002.md
+NEW: bridge/gtkb-hook-scanner-safe-writer-001.md
+
+Document: gtkb-adr-memory-architecture
+VERIFIED: bridge/gtkb-adr-memory-architecture-006.md
+NEW: bridge/gtkb-adr-memory-architecture-005.md
+GO: bridge/gtkb-adr-memory-architecture-004.md
+REVISED: bridge/gtkb-adr-memory-architecture-003.md
+NO-GO: bridge/gtkb-adr-memory-architecture-002.md
+NEW: bridge/gtkb-adr-memory-architecture-001.md
+
+Document: gtkb-credential-patterns-canonical
+VERIFIED: bridge/gtkb-credential-patterns-canonical-010.md
+NEW: bridge/gtkb-credential-patterns-canonical-009.md
+GO: bridge/gtkb-credential-patterns-canonical-008.md
+REVISED: bridge/gtkb-credential-patterns-canonical-007.md
+NO-GO: bridge/gtkb-credential-patterns-canonical-006.md
+REVISED: bridge/gtkb-credential-patterns-canonical-005.md
+NO-GO: bridge/gtkb-credential-patterns-canonical-004.md
+REVISED: bridge/gtkb-credential-patterns-canonical-003.md
+NO-GO: bridge/gtkb-credential-patterns-canonical-002.md
+NEW: bridge/gtkb-credential-patterns-canonical-001.md
+
+Document: gtkb-operational-skills-tier-a
+VERIFIED: bridge/gtkb-operational-skills-tier-a-008.md
+REVISED: bridge/gtkb-operational-skills-tier-a-007.md
+NO-GO: bridge/gtkb-operational-skills-tier-a-006.md
+NEW: bridge/gtkb-operational-skills-tier-a-005.md
+GO: bridge/gtkb-operational-skills-tier-a-004.md
+REVISED: bridge/gtkb-operational-skills-tier-a-003.md
+NO-GO: bridge/gtkb-operational-skills-tier-a-002.md
+NEW: bridge/gtkb-operational-skills-tier-a-001.md
+
+Document: agent-red-cto-prep-phase1b-scanner-exclusion
+VERIFIED: bridge/agent-red-cto-prep-phase1b-scanner-exclusion-004.md
+NEW: bridge/agent-red-cto-prep-phase1b-scanner-exclusion-003.md
+GO: bridge/agent-red-cto-prep-phase1b-scanner-exclusion-002.md
+NEW: bridge/agent-red-cto-prep-phase1b-scanner-exclusion-001.md
+
 Document: agent-red-cto-prep-phase3-obsolete-purge
+VERIFIED: bridge/agent-red-cto-prep-phase3-obsolete-purge-004.md
 NEW: bridge/agent-red-cto-prep-phase3-obsolete-purge-003.md
 GO: bridge/agent-red-cto-prep-phase3-obsolete-purge-002.md
 NEW: bridge/agent-red-cto-prep-phase3-obsolete-purge-001.md
@@ -24,6 +183,8 @@ NO-GO: bridge/agent-red-cto-prep-phase2-bridge-automation-002.md
 NEW: bridge/agent-red-cto-prep-phase2-bridge-automation-001.md
 
 Document: agent-red-cto-prep-phase1-session-artifacts
+VERIFIED: bridge/agent-red-cto-prep-phase1-session-artifacts-016.md
+NEW: bridge/agent-red-cto-prep-phase1-session-artifacts-015.md
 GO: bridge/agent-red-cto-prep-phase1-session-artifacts-014.md
 REVISED: bridge/agent-red-cto-prep-phase1-session-artifacts-013.md
 NO-GO: bridge/agent-red-cto-prep-phase1-session-artifacts-012.md
