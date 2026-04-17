@@ -209,7 +209,7 @@ gt deliberations link DELIB-0123 --work-item WI-5678 --role informs
 Both `add` and `upsert` redact secrets from content before storing it; the
 stored value carries a `content_hash` that references the pre-redaction text
 for audit but never exposes the secret. See
-[gt deliberations](../reference/cli.md#deliberation-commands) in the CLI
+[gt deliberations](../reference/cli.md#deliberation-archive-da-commands) in the CLI
 reference for the full parameter list and exit codes.
 
 ## Python API

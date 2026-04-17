@@ -54,8 +54,12 @@ nav:
   - Getting Started:
       - User Journey: user-journey.md
       - Start Here: start-here.md
+      - A Day in the Life: day-in-the-life.md
+      - Evidence: evidence.md
+      - Known Limitations: known-limitations.md
       - Bootstrap Guide: bootstrap.md
       - Desktop Setup: desktop-setup.md
+  - Executive Overview: groundtruth-kb-executive-overview.md
   - Method:
       - Vision: method/00-vision.md
       - Overview: method/01-overview.md
