@@ -16,6 +16,52 @@ It is a **scope document**, not an implementation plan. Its job is to make
 the downstream decisions nameable and reviewable before any Azure resource
 template, CI gate, or doctor check is written.
 
+### 1.1 Readiness Envelope At A Glance
+
+```mermaid
+flowchart LR
+    Owner["Owner<br/>specifications, clarifications, decisions"]
+    GTKB["GroundTruth-KB<br/>specs, ADR prompts, assertions, doctor checks"]
+    Prime["Prime Builder<br/>implements app and scaffold changes"]
+    LO["Loyal Opposition<br/>reviews evidence and risks"]
+    App["Application repo<br/>code, tests, IaC, CI/CD"]
+    Azure["Azure environment<br/>runtime resources and live state"]
+
+    Owner --> GTKB
+    GTKB --> Prime
+    Prime --> App
+    App --> Azure
+    LO --> GTKB
+    LO --> App
+    Azure -. "live doctor evidence" .-> GTKB
+```
+
+The readiness envelope keeps Azure production readiness visible without
+making GT-KB the owner of the deployed Azure estate. GT-KB owns the
+governance artifacts and checks; the adopting team owns runtime resources.
+
+### 1.2 Starter To Enterprise Path
+
+```mermaid
+flowchart TD
+    Starter["starter<br/>local-first default<br/>Docker + provider stubs"]
+    Candidate["production-candidate<br/>Azure deployment decisions recorded"]
+    Enterprise["enterprise-ready<br/>buyer-grade governance evidence"]
+    Regulated["regulated-enterprise<br/>industry control evidence"]
+
+    Starter --> Candidate --> Enterprise --> Regulated
+
+    StarterCheck["Workstation doctor<br/>local assertions<br/>credential scan"]
+    CandidateCheck["Compute ADR<br/>OIDC deploy pattern<br/>Key Vault reference pattern"]
+    EnterpriseCheck["Landing zone ADR<br/>tenancy tests<br/>observability, cost, DR"]
+    RegulatedCheck["Control mapping<br/>audit retention<br/>BCP/DR drill evidence"]
+
+    Starter -. verifies .-> StarterCheck
+    Candidate -. verifies .-> CandidateCheck
+    Enterprise -. verifies .-> EnterpriseCheck
+    Regulated -. verifies .-> RegulatedCheck
+```
+
 ## 2. GT-KB Product Boundary
 
 > **What GT-KB owns:** governed specifications, decision prompts, ADR
@@ -54,6 +100,36 @@ actually deploys is owned and operated by the adopting team.
 **Rule:** every time GT-KB adds a reference scaffold, the scaffold must
 either be a `starter` default or be gated behind an explicit profile
 selection.
+
+### 2.1 Ownership Boundary
+
+```mermaid
+flowchart TB
+    subgraph GTKB["GT-KB owned"]
+        Specs["Readiness specs"]
+        ADRTemplates["ADR templates"]
+        Assertions["Assertions"]
+        Doctor["Doctor checks"]
+        Runbooks["Runbook templates"]
+    end
+
+    subgraph Team["Application team owned"]
+        ADRAnswers["Instance ADR answers"]
+        IaC["Production IaC modules"]
+        Pipeline["CI/CD pipeline"]
+        Runtime["Azure runtime state"]
+        Ops["Incident response and audits"]
+    end
+
+    Specs --> ADRAnswers
+    ADRTemplates --> ADRAnswers
+    Assertions --> Pipeline
+    Doctor --> Pipeline
+    Runbooks --> Ops
+    ADRAnswers --> IaC
+    Pipeline --> Runtime
+    Runtime --> Doctor
+```
 
 ## 3. Readiness Tiers
 
@@ -183,6 +259,24 @@ requirements.
 healthcare, government, or critical infrastructure — where
 regulatory-level evidence is a go/no-go for procurement.
 
+### 3.5 Tier Capability Matrix
+
+| Capability | `starter` | `production-candidate` | `enterprise-ready` | `regulated-enterprise` |
+|------------|:---------:|:----------------------:|:------------------:|:----------------------:|
+| Local MemBase, specs, assertions | yes | yes | yes | yes |
+| Docker and provider stubs | yes | yes | yes | yes |
+| Compute target ADR | no | yes | yes | yes |
+| OIDC deploy pattern | no | yes | yes | yes |
+| Key Vault reference pattern | no | yes | yes | yes |
+| Landing zone/resource organization ADR | no | optional | yes | yes |
+| Tenancy isolation specs/tests | no | basic | required | required |
+| Cost budgets and FinOps cadence | no | optional | required | required |
+| Observability and SLO evidence | no | basic | required | required |
+| DR RPO/RTO and restore evidence | no | optional | required | required |
+| Compliance control mapping | no | no | baseline | regulation-specific |
+| Offline Azure readiness doctor | no | yes | yes | yes |
+| Live Azure readiness doctor | no | optional | recommended | expected |
+
 ## 4. Category Catalog
 
 The readiness envelope is organized into 13 first-class categories. Each
@@ -193,6 +287,57 @@ posture are explicit — not implicit narrative.
 Each category maps to one or more ADR templates (Section 5) and one or
 more doctor checks (Section 6). Child bridges (Section 7) populate the
 concrete specs, assertions, and scaffolds per category.
+
+### 4.0 Category Map
+
+```mermaid
+flowchart TB
+    Readiness["Azure readiness envelope"]
+
+    Readiness --> Org["Landing zone<br/>resource organization"]
+    Readiness --> Identity["Identity<br/>RBAC"]
+    Readiness --> Tenancy["Tenancy<br/>isolation"]
+    Readiness --> Cost["Cost<br/>FinOps"]
+    Readiness --> Compliance["Compliance<br/>audit<br/>security posture"]
+    Readiness --> Network["Networking"]
+    Readiness --> CICD["CI/CD"]
+    Readiness --> Obs["Observability"]
+    Readiness --> Compute["Compute"]
+    Readiness --> Data["Data<br/>storage"]
+    Readiness --> Secrets["Secrets<br/>Key Vault"]
+    Readiness --> DR["DR<br/>reliability"]
+    Readiness --> Verify["Doctor<br/>verification"]
+
+    Org --> Cost
+    Org --> Compliance
+    Identity --> Secrets
+    Identity --> CICD
+    Tenancy --> Data
+    Tenancy --> Obs
+    Network --> Secrets
+    Compute --> CICD
+    Compute --> Obs
+    Data --> DR
+    Verify --> Readiness
+```
+
+### 4.0.1 Category To Evidence Matrix
+
+| Category | Required evidence shape | Typical verification |
+|----------|-------------------------|----------------------|
+| Landing zone/resource organization | ADR plus naming/tagging standard | File/assertion scan; optional Azure API tag/policy check |
+| Identity/RBAC | ADR plus OIDC and managed identity pattern | Workflow scan; optional Azure role assignment check |
+| Tenancy | Tenant model ADR plus isolation tests | Test/spec linkage and cross-tenant assertion results |
+| Cost | Budget/tagging spec plus FinOps cadence | Tag assertion; optional Azure budget check |
+| Compliance/audit/security posture | Control baseline and waivers | Spec coverage; audit artifact presence |
+| Networking | Ingress/egress and private endpoint ADR | IaC scan; optional live resource check |
+| CI/CD | OIDC, plan/apply, approval, evidence artifacts | Workflow parse and forbidden-secret scan |
+| Observability | Logs, metrics, traces, SLOs | Config scan; optional App Insights/Log Analytics check |
+| Compute | Compute target ADR and scaling rules | IaC/workflow scan; optional deployment health check |
+| Data/storage | Partitioning, retention, backup decisions | Spec/assertion scan; optional backup setting check |
+| Secrets/Key Vault | Key Vault references and rotation policy | IaC scan; optional Key Vault RBAC check |
+| DR/reliability | RPO/RTO, restore, incident runbook | Artifact scan; optional restore evidence check |
+| Doctor/verification | Offline/live checks and result schema | Unit tests plus doctor output validation |
 
 ### 4.1 `landing-zone` / `resource-organization`
 
@@ -442,6 +587,23 @@ instance ADR is registered as a separate `architecture_decision` spec
 with its own ID (e.g., `ADR-AZURE-LANDING-ZONE-001`), not by mutating
 the template.
 
+### 5.3 ADR Decision Flow
+
+```mermaid
+sequenceDiagram
+    participant Owner
+    participant Prime as Prime Builder
+    participant GTKB as GT-KB MemBase
+    participant LO as Loyal Opposition
+
+    Prime->>GTKB: Generate ADR template for category
+    Prime->>Owner: Ask scoped decision questions
+    Owner-->>Prime: Select option and tradeoffs
+    Prime->>GTKB: Register instance ADR and linked specs
+    LO->>GTKB: Review ADR, rejected alternatives, assertions
+    LO-->>Prime: GO / NO-GO with evidence
+```
+
 ## 6. Verification Plan Skeleton
 
 The doctor / verification surface is split into two modes. Live mode
@@ -488,12 +650,67 @@ Live mode additionally checks:
 Live mode requires explicit opt-in. It is designed for pre-deploy
 gates and periodic drift checks, not for routine session-start runs.
 
+### 6.2.1 Offline And Live Verification Split
+
+```mermaid
+flowchart LR
+    subgraph Offline["Offline doctor<br/>safe default"]
+        Files["Docs, specs, ADRs"]
+        Workflows["Workflow YAML"]
+        IaCText["IaC text"]
+        Assertions["Local assertions"]
+    end
+
+    subgraph Live["Live doctor<br/>explicit --live"]
+        AzLogin["Azure login context"]
+        RG["Resource groups"]
+        KV["Key Vault/RBAC"]
+        Diag["Diagnostics"]
+        Budget["Budgets"]
+        Deploy["Deployment health"]
+    end
+
+    Files --> Result["Readiness result JSON"]
+    Workflows --> Result
+    IaCText --> Result
+    Assertions --> Result
+    AzLogin --> Result
+    RG --> Result
+    KV --> Result
+    Diag --> Result
+    Budget --> Result
+    Deploy --> Result
+```
+
 ### 6.3 Verification Evidence Artifact
 
 Both modes produce a machine-readable result artifact (JSON) that can
 be attached to a deployment's evidence bundle. The artifact names each
 category, severity, and either the passing assertion or the failure
 detail. The exact schema is defined in a later child bridge.
+
+### 6.4 Deployment Evidence Bundle
+
+```mermaid
+flowchart TD
+    Commit["Git commit SHA"]
+    Image["Container image digest"]
+    Plan["IaC plan hash"]
+    Approval["Environment approval"]
+    Assert["gt assert result"]
+    Doctor["Azure readiness doctor JSON"]
+    Bundle["Deploy evidence bundle"]
+
+    Commit --> Bundle
+    Image --> Bundle
+    Plan --> Bundle
+    Approval --> Bundle
+    Assert --> Bundle
+    Doctor --> Bundle
+
+    Bundle --> Audit["Audit/procurement evidence"]
+    Bundle --> Release["Release record"]
+```
 
 ## 7. Child-Bridge Preview (NOT authorized by this taxonomy)
 
