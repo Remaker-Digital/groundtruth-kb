@@ -1,22 +1,39 @@
 # test-spawn-revalidation.ps1
 #
 # Integration test for the spawn revalidation guard defined in
-# bridge-scan-common.ps1. Exercises the seven-case mutate-between-snapshot-
-# and-guard matrix from bridge/bridge-spawn-revalidation-005.md (approved
-# at -006).
+# bridge-scan-common.ps1. Exercises the approved seven-case SEMANTIC
+# matrix from bridge/bridge-spawn-revalidation-003.md:111-119 (retained
+# in -005 and accepted at -006), using the five-step deterministic flow:
+#
+#   1. Create a temp INDEX.md with a known initial state.
+#   2. Capture a snapshot from the temp INDEX via Get-IndexEntryTopVersion.
+#   3. Mutate the temp INDEX to a new state (or leave it alone for fresh
+#      cases).
+#   4. Invoke Invoke-GuardedLaunch with a no-op launch scriptblock.
+#   5. Assert on Launched / Reason / Result and the stale-log presence.
+#
+# The seven approved semantic cases map to real Codex/Prime scanner
+# outcomes:
+#
+#   1. Codex NEW -> NEW fresh          (unchanged NEW; review proceeds)
+#   2. Codex NEW -> VERIFIED stale     (review already completed elsewhere)
+#   3. Codex REVISED -> later NEW stale (Prime filed post-impl after
+#                                        Codex captured REVISED for review)
+#   4. Prime GO -> GO fresh            (unchanged GO; impl proceeds)
+#   5. Prime NO-GO -> NO-GO fresh      (unchanged NO-GO; revise proceeds)
+#   6. Prime GO -> NO-GO stale         (owner/Codex objection arrived)
+#   7. Prime GO -> VERIFIED stale      (S299 Azure replay: VERIFIED
+#                                        landed while spawn queued)
+#
+# Additional cases 8-10 are supplementary coverage (entry removed,
+# unrelated-document fresh) and may be dropped without losing approved-
+# matrix coverage.
 #
 # Usage:
 #   powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass `
 #     -File independent-progress-assessments/bridge-automation/tests/test-spawn-revalidation.ps1
 #
 # Exits 0 on all-pass, 1 on any failure. Prints one line per case.
-#
-# Every case follows the five-step deterministic flow from the proposal:
-#   1. Create a temp INDEX.md with a known initial state.
-#   2. Capture a snapshot from the temp INDEX via Get-IndexEntryTopVersion.
-#   3. Mutate the temp INDEX to a new state (or leave it alone for fresh cases).
-#   4. Invoke Invoke-GuardedLaunch with a no-op launch scriptblock.
-#   5. Assert on Launched / Reason / Result and the stale-log presence.
 #
 # No live bridge/INDEX.md is read or mutated. All fixtures live under
 # a per-run temp directory that is removed when the test exits.
@@ -140,13 +157,14 @@ function Invoke-TestCase {
     }
 }
 
-Write-Host "Spawn revalidation matrix"
-Write-Host "-------------------------"
+Write-Host "Spawn revalidation semantic matrix (bridge-spawn-revalidation-003:111-119)"
+Write-Host "-----------------------------------------------------------------------"
 
 # ---------------------------------------------------------------------------
-# Case 1: no mutation — snapshot stays the top version, launch proceeds.
+# CASE 1 — Codex NEW -> NEW fresh.
+# Scenario: scanner captured NEW, nothing changes, review proceeds.
 Invoke-TestCase `
-    -Name "1 no-mutation (fresh)" `
+    -Name "1 Codex NEW -> NEW (fresh)" `
     -InitialIndex @"
 Document: widget-refactor
 NEW: bridge/widget-refactor-001.md
@@ -157,9 +175,11 @@ NEW: bridge/widget-refactor-001.md
     -ExpectReason "fresh"
 
 # ---------------------------------------------------------------------------
-# Case 2: status promotion NEW->GO above the captured line.
+# CASE 2 — Codex NEW -> VERIFIED stale.
+# Scenario: scanner captured NEW, but another reviewer or post-impl cycle
+# landed VERIFIED on top before this scanner reached launch. Abort.
 Invoke-TestCase `
-    -Name "2 status promotion (NEW->GO, stale)" `
+    -Name "2 Codex NEW -> VERIFIED (stale)" `
     -InitialIndex @"
 Document: widget-refactor
 NEW: bridge/widget-refactor-001.md
@@ -169,6 +189,87 @@ NEW: bridge/widget-refactor-001.md
         param($indexPath)
         Write-TempIndex -IndexPath $indexPath -Body @"
 Document: widget-refactor
+VERIFIED: bridge/widget-refactor-002.md
+NEW: bridge/widget-refactor-001.md
+"@
+    } `
+    -ExpectLaunched $false `
+    -ExpectReason "stale"
+
+# ---------------------------------------------------------------------------
+# CASE 3 — Codex captured REVISED -> later NEW stale.
+# Scenario: scanner captured REVISED for review, then Prime filed a post-
+# implementation NEW before the review spawn ran. Abort; Prime's NEW
+# supersedes Codex's pending REVISED work.
+Invoke-TestCase `
+    -Name "3 Codex captured REVISED -> later NEW (stale)" `
+    -InitialIndex @"
+Document: widget-refactor
+REVISED: bridge/widget-refactor-003.md
+NO-GO: bridge/widget-refactor-002.md
+NEW: bridge/widget-refactor-001.md
+"@ `
+    -DocumentName "widget-refactor" `
+    -Mutate {
+        param($indexPath)
+        Write-TempIndex -IndexPath $indexPath -Body @"
+Document: widget-refactor
+NEW: bridge/widget-refactor-004.md
+REVISED: bridge/widget-refactor-003.md
+NO-GO: bridge/widget-refactor-002.md
+NEW: bridge/widget-refactor-001.md
+"@
+    } `
+    -ExpectLaunched $false `
+    -ExpectReason "stale"
+
+# ---------------------------------------------------------------------------
+# CASE 4 — Prime GO -> GO fresh.
+# Scenario: scanner captured GO, nothing changes, implementation proceeds.
+Invoke-TestCase `
+    -Name "4 Prime GO -> GO (fresh)" `
+    -InitialIndex @"
+Document: widget-refactor
+GO: bridge/widget-refactor-002.md
+NEW: bridge/widget-refactor-001.md
+"@ `
+    -DocumentName "widget-refactor" `
+    -Mutate { param($indexPath) } `
+    -ExpectLaunched $true `
+    -ExpectReason "fresh"
+
+# ---------------------------------------------------------------------------
+# CASE 5 — Prime NO-GO -> NO-GO fresh.
+# Scenario: scanner captured NO-GO, nothing changes, revise spawn proceeds.
+Invoke-TestCase `
+    -Name "5 Prime NO-GO -> NO-GO (fresh)" `
+    -InitialIndex @"
+Document: widget-refactor
+NO-GO: bridge/widget-refactor-002.md
+NEW: bridge/widget-refactor-001.md
+"@ `
+    -DocumentName "widget-refactor" `
+    -Mutate { param($indexPath) } `
+    -ExpectLaunched $true `
+    -ExpectReason "fresh"
+
+# ---------------------------------------------------------------------------
+# CASE 6 — Prime GO -> NO-GO stale.
+# Scenario: scanner captured GO for implementation, but owner/Codex
+# objection landed NO-GO on top before launch. Abort.
+Invoke-TestCase `
+    -Name "6 Prime GO -> NO-GO (stale)" `
+    -InitialIndex @"
+Document: widget-refactor
+GO: bridge/widget-refactor-002.md
+NEW: bridge/widget-refactor-001.md
+"@ `
+    -DocumentName "widget-refactor" `
+    -Mutate {
+        param($indexPath)
+        Write-TempIndex -IndexPath $indexPath -Body @"
+Document: widget-refactor
+NO-GO: bridge/widget-refactor-003.md
 GO: bridge/widget-refactor-002.md
 NEW: bridge/widget-refactor-001.md
 "@
@@ -177,11 +278,17 @@ NEW: bridge/widget-refactor-001.md
     -ExpectReason "stale"
 
 # ---------------------------------------------------------------------------
-# Case 3: file revision (REVISED line replaces the top version file path).
+# CASE 7 — Prime GO -> VERIFIED stale (S299 Azure replay).
+# Scenario: scanner captured GO, but VERIFIED landed before launch.
+# This is the specific incident that motivated the A1 work: Azure
+# taxonomy GO at -002 was dispatched to a headless spawn after Codex
+# had already landed VERIFIED at -004, producing duplicate work
+# (commit 98563fc). Abort.
 Invoke-TestCase `
-    -Name "3 file revision (same document, new file, stale)" `
+    -Name "7 Prime GO -> VERIFIED (stale, S299 Azure replay)" `
     -InitialIndex @"
 Document: widget-refactor
+GO: bridge/widget-refactor-002.md
 NEW: bridge/widget-refactor-001.md
 "@ `
     -DocumentName "widget-refactor" `
@@ -189,7 +296,9 @@ NEW: bridge/widget-refactor-001.md
         param($indexPath)
         Write-TempIndex -IndexPath $indexPath -Body @"
 Document: widget-refactor
-REVISED: bridge/widget-refactor-003.md
+VERIFIED: bridge/widget-refactor-004.md
+NEW: bridge/widget-refactor-003.md
+GO: bridge/widget-refactor-002.md
 NEW: bridge/widget-refactor-001.md
 "@
     } `
@@ -197,28 +306,14 @@ NEW: bridge/widget-refactor-001.md
     -ExpectReason "stale"
 
 # ---------------------------------------------------------------------------
-# Case 4: same status, different path (e.g., renumbered NEW).
-Invoke-TestCase `
-    -Name "4 same-status different-path (stale)" `
-    -InitialIndex @"
-Document: widget-refactor
-NEW: bridge/widget-refactor-001.md
-"@ `
-    -DocumentName "widget-refactor" `
-    -Mutate {
-        param($indexPath)
-        Write-TempIndex -IndexPath $indexPath -Body @"
-Document: widget-refactor
-NEW: bridge/widget-refactor-999.md
-"@
-    } `
-    -ExpectLaunched $false `
-    -ExpectReason "stale"
-
+# Supplementary coverage (not required by approved matrix).
 # ---------------------------------------------------------------------------
-# Case 5: entry removed entirely.
+
+# CASE 8 — Entry removed entirely.
+# Scenario: INDEX maintenance removed the captured entry between
+# snapshot and launch. Abort.
 Invoke-TestCase `
-    -Name "5 entry removed (stale)" `
+    -Name "8 entry removed (stale)" `
     -InitialIndex @"
 Document: widget-refactor
 NEW: bridge/widget-refactor-001.md
@@ -234,11 +329,11 @@ NEW: bridge/some-other-001.md
     -ExpectLaunched $false `
     -ExpectReason "stale"
 
-# ---------------------------------------------------------------------------
-# Case 6: unrelated document prepended above — target document's top line
-# unchanged, so snapshot is still fresh.
+# CASE 9 — Unrelated document added above; target top unchanged.
+# Scenario: other work filed a new entry at the top while this scanner
+# was running. Target doc's top line is unchanged -> still fresh.
 Invoke-TestCase `
-    -Name "6 unrelated document added (fresh)" `
+    -Name "9 unrelated document above (fresh)" `
     -InitialIndex @"
 Document: widget-refactor
 NEW: bridge/widget-refactor-001.md
@@ -256,11 +351,9 @@ NEW: bridge/widget-refactor-001.md
     -ExpectLaunched $true `
     -ExpectReason "fresh"
 
-# ---------------------------------------------------------------------------
-# Case 7: unrelated document below mutated (REVISED added) — target entry's
-# top version is unchanged, so fresh.
+# CASE 10 — Unrelated document below mutated; target top unchanged.
 Invoke-TestCase `
-    -Name "7 unrelated document below mutated (fresh)" `
+    -Name "10 unrelated document below mutated (fresh)" `
     -InitialIndex @"
 Document: widget-refactor
 NEW: bridge/widget-refactor-001.md
