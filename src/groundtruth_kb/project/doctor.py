@@ -767,6 +767,193 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
     )
 
 
+def _load_canonical_terminology_config(target: Path) -> dict[str, object] | None:
+    """Load ``.claude/rules/canonical-terminology.toml`` or return ``None`` if absent/malformed.
+
+    Returns the parsed TOML as a dict. ``None`` indicates the config is
+    missing — the caller should treat this as an ERROR (config is required
+    by the scaffold for every profile per SPEC-TERMINOLOGY-CONFIG-TOML).
+
+    The canonical-terminology config is a managed ``rule`` artifact in the
+    registry (``rule.canonical-terminology-config``), but its presence and
+    validity are enforced by this composite check, not by generic
+    ``_check_rules()`` Markdown enumeration.
+    """
+    import tomllib
+
+    toml_path = target / ".claude" / "rules" / "canonical-terminology.toml"
+    if not toml_path.exists():
+        return None
+
+    try:
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+    return data
+
+
+def _resolve_profile_config(
+    config: dict[str, object],
+    profile_name: str,
+) -> dict[str, object] | None:
+    """Resolve a profile's terminology config, handling ``extends`` inheritance.
+
+    Returns the effective config dict with ``required_startup_terms``,
+    ``required_files``, ``missing_severity``, and (optionally)
+    ``memory_md_location`` keys. Returns ``None`` when the profile is not
+    configured in the TOML.
+    """
+    profiles = config.get("config")
+    if not isinstance(profiles, dict):
+        return None
+    profiles_map = profiles.get("profiles")
+    if not isinstance(profiles_map, dict):
+        return None
+    profile_cfg = profiles_map.get(profile_name)
+    if not isinstance(profile_cfg, dict):
+        return None
+
+    # Handle ``extends = "other-profile"``
+    extends = profile_cfg.get("extends")
+    base: dict[str, object] = {}
+    if isinstance(extends, str):
+        parent = _resolve_profile_config(config, extends)
+        if parent is not None:
+            base = dict(parent)
+
+    # Merge: profile overrides inherit.
+    effective = dict(base)
+    for key, value in profile_cfg.items():
+        if key == "extends":
+            continue
+        effective[key] = value
+    return effective
+
+
+def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
+    """Check canonical-terminology surface per SPEC-TERMINOLOGY-DOCTOR-CHECK.
+
+    Reads the profile-aware matrix from ``.claude/rules/canonical-terminology.toml``.
+    ERROR when required startup terms are missing from the profile's required
+    files; WARN when minor drift is detected. Runs for every profile, with the
+    required-term set selected by profile per SPEC-TERMINOLOGY-PROFILE-MATRIX.
+
+    The two canonical-terminology files are managed ``rule`` artifacts in
+    ``templates/managed-artifacts.toml`` (``rule.canonical-terminology`` and
+    ``rule.canonical-terminology-config``). Lifecycle (scaffold/upgrade) is
+    registry-driven; presence/validity is enforced by this composite check
+    rather than by generic ``_check_rules()`` Markdown enumeration.
+
+    Skipped (pass with 'not applicable') if the harness-memory override is in
+    effect and the requested file is MEMORY.md — projects whose harness holds
+    MEMORY.md outside the project repo opt in by setting
+    ``memory_md_location = "harness"`` in their profile block.
+    """
+    config = _load_canonical_terminology_config(target)
+    if config is None:
+        return ToolCheck(
+            name="canonical terminology",
+            required=True,
+            found=False,
+            status="fail",
+            message=(
+                ".claude/rules/canonical-terminology.toml missing or malformed — "
+                "run `gt project upgrade --apply` to restore."
+            ),
+        )
+
+    profile_cfg = _resolve_profile_config(config, profile_name)
+    if profile_cfg is None:
+        # Unknown profile in config — don't fail; warn.
+        return ToolCheck(
+            name="canonical terminology",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"profile {profile_name!r} not configured in canonical-terminology.toml",
+        )
+
+    raw_terms = profile_cfg.get("required_startup_terms", [])
+    required_terms: list[str] = (
+        [t for t in raw_terms if isinstance(t, str)] if isinstance(raw_terms, list) else []
+    )
+    raw_files = profile_cfg.get("required_files", [])
+    required_files: list[str] = (
+        [f for f in raw_files if isinstance(f, str)] if isinstance(raw_files, list) else []
+    )
+    missing_severity_raw = profile_cfg.get("missing_severity", "ERROR")
+    missing_severity = str(missing_severity_raw).upper() if missing_severity_raw else "ERROR"
+    memory_md_location = profile_cfg.get("memory_md_location", "project")
+
+    # Verify the canonical-terminology glossary file exists.
+    glossary_md = target / ".claude" / "rules" / "canonical-terminology.md"
+    if not glossary_md.exists():
+        return ToolCheck(
+            name="canonical terminology",
+            required=True,
+            found=False,
+            status="fail",
+            message=(
+                ".claude/rules/canonical-terminology.md missing — "
+                "run `gt project upgrade --apply` to restore."
+            ),
+        )
+
+    # For each required file, verify each required term is present in it.
+    missing_report: list[str] = []
+    for rel in required_files:
+        # harness-memory profile: MEMORY.md is out-of-repo; skip content check for it.
+        if rel == "MEMORY.md" and memory_md_location == "harness":
+            continue
+
+        abs_path = target / rel
+        if not abs_path.exists():
+            missing_report.append(f"{rel}: file missing")
+            continue
+        try:
+            text = abs_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            missing_report.append(f"{rel}: unreadable ({exc})")
+            continue
+
+        for term in required_terms:
+            if term not in text:
+                missing_report.append(f"{rel}: missing term {term!r}")
+
+    if missing_report:
+        status: Literal["pass", "fail", "warning"]
+        if missing_severity == "ERROR":
+            status = "fail"
+        elif missing_severity == "WARN":
+            status = "warning"
+        else:
+            status = "warning"
+        return ToolCheck(
+            name="canonical terminology",
+            required=True,
+            found=True,
+            status=status,
+            message=(
+                f"Missing canonical terms in profile {profile_name!r} "
+                f"required files: {'; '.join(missing_report[:6])}"
+                + ("; ..." if len(missing_report) > 6 else "")
+            ),
+        )
+
+    return ToolCheck(
+        name="canonical terminology",
+        required=True,
+        found=True,
+        status="pass",
+        message=(
+            f"Canonical-terminology surface OK — {len(required_terms)} required terms "
+            f"present in {len(required_files)} required files (profile: {profile_name})"
+        ),
+    )
+
+
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
     """Check file bridge configuration for dual-agent projects.
 
@@ -1057,6 +1244,7 @@ def run_doctor(
     checks.append(_check_db_schema(target))
     checks.append(_check_hooks(target, profile))
     checks.append(_check_rules(target, profile))
+    checks.append(_check_canonical_terminology(target, profile))
 
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))

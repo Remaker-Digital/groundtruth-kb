@@ -32,8 +32,9 @@ Load and internalize the following documents in order:
 2. `MEMORY.md` -- Current project state, versions, recent sessions.
    - MEMORY.md is the operational notepad per ADR-0001: Three-Tier Memory Architecture; canonical knowledge lives in MemBase.
 3. `AGENTS.md` -- Loyal Opposition operating contract, if present.
-4. `BRIDGE-INVENTORY.md` -- Bridge scripts, prompts, schedules, and recovery.
-5. `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md` -- Open items,
+4. `.claude/rules/canonical-terminology.md` -- ADR-0001 canonical vocabulary (MemBase, DA, Prime Builder, Loyal Opposition, etc.).
+5. `BRIDGE-INVENTORY.md` -- Bridge scripts, prompts, schedules, and recovery.
+6. `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md` -- Open items,
    pending decisions, and completed work from prior sessions, if present.
 
 Note any discrepancies between documents. If MEMORY.md and CLAUDE.md conflict,

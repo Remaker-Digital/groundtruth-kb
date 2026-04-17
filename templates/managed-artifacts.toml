@@ -2,7 +2,7 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 40 records = 14 hooks + 8 rules + 6 skills + 11 settings-hook-registrations + 1 gitignore-pattern.
+# 42 records = 14 hooks + 10 rules + 6 skills + 11 settings-hook-registrations + 1 gitignore-pattern.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -150,7 +150,7 @@ managed_profiles = []
 doctor_required_profiles = []
 
 # =========================================================================
-# RULES (8 records)
+# RULES (10 records)
 # =========================================================================
 
 [[artifacts]]
@@ -224,6 +224,28 @@ target_path = ".claude/rules/deliberation-protocol.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+
+# Canonical terminology surface (SPEC-TERMINOLOGY-TEMPLATE-INHERITANCE,
+# SPEC-TERMINOLOGY-CONFIG-TOML). Presence/validity is enforced by the
+# composite ``_check_canonical_terminology()`` (not generic ``_check_rules()``
+# Markdown enumeration). ``doctor_required_profiles`` is intentionally empty.
+[[artifacts]]
+class = "rule"
+id = "rule.canonical-terminology"
+template_path = "rules/canonical-terminology.md"
+target_path = ".claude/rules/canonical-terminology.md"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "rule"
+id = "rule.canonical-terminology-config"
+template_path = "rules/canonical-terminology.toml"
+target_path = ".claude/rules/canonical-terminology.toml"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
 
 # =========================================================================
 # SKILLS (6 records)

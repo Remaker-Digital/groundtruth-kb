@@ -1,0 +1,50 @@
+# Canonical terminology config for gt project doctor.
+# Profile-aware: the doctor selects the matching [config.profiles.<profile>]
+# block based on the project's scaffold profile (groundtruth.toml :: [project].profile).
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+[meta]
+version = "1.0.0"
+# Source: SPEC-TERMINOLOGY-PROFILE-MATRIX (in GT-KB MemBase).
+# Per DELIB-0719: missing terms = ERROR, minor drift = WARN.
+
+[config.profiles.local-only]
+# Solo-Prime scaffold; intentionally no AGENTS.md (per test_scaffold_project.py:63-77).
+required_files = ["CLAUDE.md", "MEMORY.md"]
+optional_files = [".claude/rules/deliberation-protocol.md"]
+required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md"]
+missing_severity = "ERROR"
+
+[config.profiles.dual-agent]
+required_files = ["CLAUDE.md", "AGENTS.md", "MEMORY.md", ".claude/rules/deliberation-protocol.md"]
+required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition"]
+missing_severity = "ERROR"
+
+[config.profiles.dual-agent-webapp]
+# Extends dual-agent; no webapp-specific additional terminology files.
+extends = "dual-agent"
+required_files = ["CLAUDE.md", "AGENTS.md", "MEMORY.md", ".claude/rules/deliberation-protocol.md"]
+required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition"]
+missing_severity = "ERROR"
+
+[config.profiles.harness-memory]
+# Opt-in profile for projects where MEMORY.md is held outside the project
+# repo (e.g., managed by an external harness or orchestration layer).
+# Used until the project is ready to adopt the default repo-tracked MEMORY.md layout.
+# Harness-driven MEMORY.md lives outside the project repo; don't require MEMORY.md content check.
+extends = "dual-agent"
+memory_md_location = "harness"
+required_files = ["CLAUDE.md", "AGENTS.md", ".claude/rules/deliberation-protocol.md"]
+required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition"]
+missing_severity = "ERROR"
+
+[config.defaults]
+drift_severity = "WARN"
+checked_trees = ["docs/", "templates/"]
+ignore_paths = [
+    "CLAUDE_ARCHIVE.md",
+    "docs/archive/**",
+    "archive/**",
+    "bridge/**",
+    "CHANGELOG.md",
+]
