@@ -398,26 +398,17 @@ def test_scanner_safe_writer_fallback_exact_canonical_mirror() -> None:
     extra = set(inline_by_name) - set(canonical_by_name) - pii_names
     assert not extra, f"Inline fallback has unknown names: {sorted(extra)}"
 
-    # Names exempt from description parity: canonical descriptions for these
-    # entries contain product-specific strings (e.g., "Agent Red") that must
-    # not appear in adopter-facing template files per test_scaffold_smoke's
-    # no-leakage contract. Pattern + flag parity still enforced — divergence
-    # is in human-readable description only.
-    _DESCRIPTION_PARITY_EXEMPT = {
-        "ar_live_key",
-        "ar_user_key",
-        "ar_spa_plat_key",
-        "pk_live_key",
-        "arsk_key",
-    }
-
-    for name, (c_pat, c_flg, c_desc) in canonical_by_name.items():
-        i_pat, i_flg, i_desc = inline_by_name[name]
+    # pattern_description is human-readable context, not part of the stable
+    # deny-record interface. Collectors index on pattern_name (+ optionally
+    # pattern+flags) — descriptions may diverge between canonical and
+    # fallback catalogs without breaking the interface contract. See schema
+    # v1 docstring in templates/hooks/scanner-safe-writer.py.
+    #
+    # Strict parity: name + pattern + flags.
+    for name, (c_pat, c_flg, _c_desc) in canonical_by_name.items():
+        i_pat, i_flg, _i_desc = inline_by_name[name]
         assert i_pat == c_pat, f"Pattern regex mismatch for {name}"
         assert i_flg == c_flg, f"Flags mismatch for {name}: inline={i_flg!r} canonical={c_flg!r}"
-        if name in _DESCRIPTION_PARITY_EXEMPT:
-            continue
-        assert i_desc == c_desc, f"Description mismatch for {name}: inline={i_desc!r} canonical={c_desc!r}"
 
 
 # ---------------------------------------------------------------------------

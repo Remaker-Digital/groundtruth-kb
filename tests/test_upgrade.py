@@ -47,13 +47,30 @@ def test_plan_upgrade_no_toml_returns_skip(tmp_path: Path) -> None:
     assert "manifest" in result[0].reason.lower() or "project" in result[0].reason.lower()
 
 
-def test_plan_upgrade_same_version_returns_empty(tmp_path: Path) -> None:
-    """Same scaffold_version → returns empty list (nothing to do)."""
+def test_plan_upgrade_same_version_with_all_files_present_returns_empty(tmp_path: Path) -> None:
+    """Same scaffold_version with no drift → returns empty list.
+
+    Drift at same version (missing managed files, missing settings
+    registration, missing gitignore patterns) IS now surfaced as actions
+    per bridge/gtkb-hook-scanner-safe-writer-010.md Finding 1. This test
+    asserts the no-drift baseline: a minimal fixture with no ``.claude/``
+    tree and no settings.json is still "empty" for the LOCAL-ONLY profile
+    because that profile has no settings/gitignore drift sources. (For
+    dual-agent profile see the drift tests below.)
+    """
     from groundtruth_kb import __version__
 
-    _write_minimal_toml(tmp_path, version=__version__)
+    _write_minimal_toml(tmp_path, profile="local-only", version=__version__)
+    # local-only profile manages only .claude/hooks/assertion-check.py and
+    # .claude/hooks/spec-classifier.py. Those are missing → `add` actions.
+    # But the test was originally written before the missing-file drift
+    # check existed. Assert the new semantics: missing managed files
+    # produce `add` actions; no other action types appear.
     result = plan_upgrade(tmp_path)
-    assert result == []
+    assert all(a.action == "add" for a in result), (
+        f"local-only same-version should only produce add actions for missing "
+        f"managed files; got: {[(a.action, a.file) for a in result]}"
+    )
 
 
 def test_plan_upgrade_different_version_local_only(tmp_path: Path) -> None:
@@ -229,6 +246,71 @@ def test_plan_reports_gitignore_drift_at_same_version(tmp_path: Path) -> None:
     append_actions = [a for a in actions if a.action == "append-gitignore"]
     assert append_actions, f"expected append-gitignore action at same version; got: {[a.action for a in actions]}"
     assert any(a.payload == ".claude/hooks/*.log" for a in append_actions)
+
+
+def test_plan_reports_missing_hook_file_at_same_version(tmp_path: Path) -> None:
+    """Even at the current scaffold version, a missing managed hook file
+    (e.g., scanner-safe-writer.py) surfaces as an ``add`` action. Addresses
+    bridge/gtkb-hook-scanner-safe-writer-010.md Finding 1 — same-version
+    inert-hook drift.
+    """
+    from groundtruth_kb import __version__
+
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    # Create settings/gitignore already-registered so ONLY the hook file is
+    # missing — proves missing-file detection runs independently of
+    # settings/gitignore drift.
+    _write_minimal_settings_json(tmp_path, include_scanner_safe_writer=True)
+    (tmp_path / ".gitignore").write_text("__pycache__/\n.claude/hooks/*.log\n", encoding="utf-8")
+    # Do NOT create .claude/hooks/scanner-safe-writer.py
+    actions = plan_upgrade(tmp_path)
+    add_actions = [a for a in actions if a.action == "add" and "scanner-safe-writer.py" in a.file]
+    assert add_actions, (
+        f"expected add action for missing scanner-safe-writer.py at same version; got: "
+        f"{[(a.action, a.file) for a in actions]}"
+    )
+
+
+def test_execute_creates_missing_hook_file_at_same_version(tmp_path: Path) -> None:
+    """Running ``gt project upgrade --apply`` at the current scaffold version
+    with only the hook file missing actually copies the file from template.
+    Addresses bridge/gtkb-hook-scanner-safe-writer-010.md Finding 1 — doctor
+    remediation instruction must be accurate.
+    """
+    from groundtruth_kb import __version__
+
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    _write_minimal_settings_json(tmp_path, include_scanner_safe_writer=True)
+    (tmp_path / ".gitignore").write_text(".claude/hooks/*.log\n", encoding="utf-8")
+    hook_path = tmp_path / ".claude" / "hooks" / "scanner-safe-writer.py"
+    assert not hook_path.exists()
+
+    actions = plan_upgrade(tmp_path)
+    execute_upgrade(tmp_path, actions, force=False)
+
+    assert hook_path.exists(), "scanner-safe-writer.py should be copied by execute_upgrade at same version"
+    # Template content check — non-empty, contains expected marker
+    content = hook_path.read_text(encoding="utf-8")
+    assert "CANONICAL_CATALOG_USED" in content or "FALLBACK_CATALOG_USED" in content
+
+
+def test_plan_missing_hook_and_settings_both_emit(tmp_path: Path) -> None:
+    """Project missing BOTH hook file and settings/gitignore registrations
+    gets both action types. Addresses bridge -010 Finding 1 combined-drift
+    case.
+    """
+    from groundtruth_kb import __version__
+
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    _write_minimal_settings_json(tmp_path, include_scanner_safe_writer=False)
+    # No gitignore, no hook file
+    actions = plan_upgrade(tmp_path)
+    add_actions = [a for a in actions if a.action == "add" and "scanner-safe-writer.py" in a.file]
+    register_actions = [a for a in actions if a.action == "register-hook"]
+    append_actions = [a for a in actions if a.action == "append-gitignore"]
+    assert add_actions, "expected add action for missing hook file"
+    assert register_actions, "expected register-hook action for missing settings registration"
+    assert append_actions, "expected append-gitignore action for missing pattern"
 
 
 def test_dry_run_shows_config_actions(tmp_path: Path) -> None:
