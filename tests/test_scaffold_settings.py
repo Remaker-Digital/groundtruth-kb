@@ -100,6 +100,7 @@ def test_settings_json_exact_event_placement(tmp_project):
             "credential-scan.py",
             "destructive-gate.py",
             "kb-not-markdown.py",
+            "scanner-safe-writer.py",
             "spec-before-code.py",
         ]
     )
