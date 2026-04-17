@@ -320,7 +320,10 @@ async def _send_sms_otp_for_conversation(phone: str, tenant_id: str) -> bool:
         )
 
         # Send the SMS
-        await _send_sms(phone, otp_code)
+        sent = await _send_sms(phone, otp_code)
+        if not sent:
+            logger.error("Failed to send in-conversation SMS OTP (transport returned False): tenant=%s", tenant_id[:8])
+            return False
 
         logger.info("In-conversation SMS OTP sent: tenant=%s phone=%s***", tenant_id[:8], phone[:6])
         return True
@@ -716,7 +719,8 @@ async def preprocess_identity(
 
             if not await check_tier_gate(tenant_id):
                 logger.info(
-                    "SMS OTP blocked by tier gate: tenant=%s", tenant_id,
+                    "SMS OTP blocked by tier gate: tenant=%s",
+                    tenant_id,
                 )
                 return IdentityAction(action="none")
 
