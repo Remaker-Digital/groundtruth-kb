@@ -18,6 +18,7 @@
 <!--   - Rationale (same as S289): automated cap=1 scan spawn was re-firing on a consumed GO; downstream thread already visible to index -->
 
 Document: gtkb-managed-artifact-registry
+REVISED: bridge/gtkb-managed-artifact-registry-003.md
 NO-GO: bridge/gtkb-managed-artifact-registry-002.md
 NEW: bridge/gtkb-managed-artifact-registry-001.md
 
