@@ -182,10 +182,18 @@ def capture_requirement(
     proposed_scope: str | None = None,
     proposed_type: str = "requirement",
     proposed_authority: str = "stated",
+    changed_by: str = "intake-pipeline",
+    change_reason: str = "Requirement captured via intake pipeline",
 ) -> dict[str, Any]:
     """Capture a requirement candidate as a deliberation.
 
     Classifies intent and stores the full candidate payload.
+
+    The ``changed_by`` and ``change_reason`` keyword-only parameters
+    default to the generic intake-pipeline attribution so existing
+    callers (CLI, tests) preserve their behavior. Skill callers
+    pass a skill-specific ``changed_by`` value to differentiate the
+    audit trail (see ``templates/skills/spec-intake``).
     """
     classification, confidence = _classify_intent(text)
     related = _find_related_specs(db, text)
@@ -215,8 +223,8 @@ def capture_requirement(
         content=json.dumps(content),
         source_type="owner_conversation",
         outcome="deferred",
-        changed_by="intake-pipeline",
-        change_reason="Requirement captured via intake pipeline",
+        changed_by=changed_by,
+        change_reason=change_reason,
         participants=["owner"],
     )
 
@@ -228,10 +236,18 @@ def capture_requirement(
 def confirm_intake(
     db: KnowledgeDB,
     deliberation_id: str,
+    *,
+    changed_by: str = "intake-pipeline",
 ) -> dict[str, Any]:
     """Confirm an intake candidate — creates a KB spec and records confirmation.
 
     Returns the created spec, quality score, impact analysis, and constraints.
+
+    The ``changed_by`` keyword-only parameter defaults to the generic
+    intake-pipeline attribution so existing callers (CLI, tests)
+    preserve their behavior. It is propagated to both the created
+    spec and the confirmation deliberation so the skill actor is
+    recorded on every governance row this function writes.
     """
     delib = db.get_deliberation(deliberation_id)
     if delib is None:
@@ -261,7 +277,7 @@ def confirm_intake(
         id=spec_id,
         title=content.get("proposed_title", "Untitled"),
         status="specified",
-        changed_by="intake-pipeline",
+        changed_by=changed_by,
         change_reason=f"Confirmed from intake {deliberation_id}",
         section=content.get("proposed_section"),
         scope=content.get("proposed_scope"),
@@ -295,7 +311,7 @@ def confirm_intake(
         content=json.dumps(content),
         source_type="owner_conversation",
         outcome="owner_decision",
-        changed_by="intake-pipeline",
+        changed_by=changed_by,
         change_reason=f"Intake confirmed, created spec {spec['id']}",
     )
 
@@ -312,8 +328,16 @@ def reject_intake(
     db: KnowledgeDB,
     deliberation_id: str,
     reason: str,
+    *,
+    changed_by: str = "intake-pipeline",
 ) -> dict[str, Any]:
-    """Reject an intake candidate with a reason."""
+    """Reject an intake candidate with a reason.
+
+    The ``changed_by`` keyword-only parameter defaults to the generic
+    intake-pipeline attribution so existing callers (CLI, tests)
+    preserve their behavior. Skill callers pass a skill-specific
+    value to differentiate the audit trail.
+    """
     if not reason:
         raise ValueError("Rejection reason is required")
 
@@ -339,7 +363,7 @@ def reject_intake(
         content=json.dumps(content),
         source_type="owner_conversation",
         outcome="no_go",
-        changed_by="intake-pipeline",
+        changed_by=changed_by,
         change_reason=f"Intake rejected: {reason}",
     )
 

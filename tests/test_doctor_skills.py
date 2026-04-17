@@ -12,6 +12,7 @@ from pathlib import Path
 from groundtruth_kb.project.doctor import (
     _check_bridge_propose_skill_present,
     _check_skill_present,
+    _check_spec_intake_skill_present,
     run_doctor,
 )
 from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
@@ -100,3 +101,46 @@ def test_doctor_warning_when_bridge_propose_missing(tmp_path: Path) -> None:
     )
     assert bridge_propose_checks[0].status == "warning"
     assert bridge_propose_checks[0].found is False
+
+
+def test_doctor_warning_when_spec_intake_missing(tmp_path: Path) -> None:
+    """Direct helper check: missing spec-intake SKILL.md + helper → status=warning."""
+    target = _make_dual_agent_project(tmp_path)
+    (target / ".claude" / "skills" / "spec-intake" / "SKILL.md").unlink()
+    (target / ".claude" / "skills" / "spec-intake" / "helpers" / "spec_intake.py").unlink()
+
+    check = _check_spec_intake_skill_present(target, profile_name="dual-agent")
+    assert check.status == "warning"
+    assert check.name == "skill:spec-intake"
+    assert check.found is False
+    assert "SKILL.md" in check.message
+    assert "spec_intake.py" in check.message
+    assert "gt project upgrade --apply" in check.message
+
+
+def test_doctor_pass_when_spec_intake_present(tmp_path: Path) -> None:
+    """Direct helper check: fresh scaffold has spec-intake → status=pass."""
+    target = _make_dual_agent_project(tmp_path)
+    check = _check_spec_intake_skill_present(target, profile_name="dual-agent")
+    assert check.status == "pass"
+    assert check.found is True
+    assert "present" in check.message.lower()
+
+
+def test_run_doctor_reports_missing_spec_intake_in_dual_agent_project(tmp_path: Path) -> None:
+    """Integration: run_doctor() on dual-agent project with missing spec-intake →
+    DoctorReport contains a 'skill:spec-intake' check with status=warning.
+    """
+    target = _make_dual_agent_project(tmp_path)
+    (target / ".claude" / "skills" / "spec-intake" / "SKILL.md").unlink()
+    (target / ".claude" / "skills" / "spec-intake" / "helpers" / "spec_intake.py").unlink()
+
+    report = run_doctor(target, "dual-agent")
+    spec_intake_checks = [c for c in report.checks if c.name == "skill:spec-intake"]
+    assert len(spec_intake_checks) == 1, (
+        f"expected exactly one 'skill:spec-intake' check; got {[c.name for c in report.checks]}"
+    )
+    assert spec_intake_checks[0].status == "warning"
+    assert spec_intake_checks[0].found is False
+    assert "SKILL.md" in spec_intake_checks[0].message
+    assert "spec_intake.py" in spec_intake_checks[0].message

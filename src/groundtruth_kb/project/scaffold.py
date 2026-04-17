@@ -36,6 +36,8 @@ _MANAGED_SKILLS_INITIAL: tuple[str, ...] = (
     "decision-capture/helpers/record_decision.py",
     "bridge-propose/SKILL.md",
     "bridge-propose/helpers/write_bridge.py",
+    "spec-intake/SKILL.md",
+    "spec-intake/helpers/spec_intake.py",
 )
 
 
