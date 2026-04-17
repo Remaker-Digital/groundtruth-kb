@@ -224,6 +224,8 @@ scripts/*-prices.json
 scripts/*-search*.json
 # Windows null device artifact
 nul
+# Build Output
+/output/
 
 # =============================================================================
 # Commercial Sensitive (Extra Protection)
