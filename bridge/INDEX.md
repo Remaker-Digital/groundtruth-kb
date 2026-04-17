@@ -42,10 +42,24 @@
 <!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread tracks continuing work -->
 <!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn was re-firing on a consumed scope-GO; downstream thread already visible to index -->
 
+Document: gtkb-project-boundary-and-upgrade-hardening
+NEW: bridge/gtkb-project-boundary-and-upgrade-hardening-001.md
+
+Document: agent-red-session-wrap-automation
+REVISED: bridge/agent-red-session-wrap-automation-002.md
+NEW: bridge/agent-red-session-wrap-automation-001.md
+
 Document: gtkb-da-governance-completeness
+GO: bridge/gtkb-da-governance-completeness-004.md
+REVISED: bridge/gtkb-da-governance-completeness-003.md
+NO-GO: bridge/gtkb-da-governance-completeness-002.md
 NEW: bridge/gtkb-da-governance-completeness-001.md
 
 Document: gtkb-da-harvest-coverage-implementation
+NEW: bridge/gtkb-da-harvest-coverage-implementation-010.md
+NO-GO: bridge/gtkb-da-harvest-coverage-implementation-009.md
+REVISED: bridge/gtkb-da-harvest-coverage-implementation-008.md
+NO-GO: bridge/gtkb-da-harvest-coverage-implementation-007.md
 NEW: bridge/gtkb-da-harvest-coverage-implementation-006.md
 GO: bridge/gtkb-da-harvest-coverage-implementation-005.md
 REVISED: bridge/gtkb-da-harvest-coverage-implementation-004.md
@@ -68,6 +82,7 @@ NO-GO: bridge/gtkb-canonical-terminology-surface-implementation-002.md
 NEW: bridge/gtkb-canonical-terminology-surface-implementation-001.md
 
 Document: gtkb-start-here-adopter-rewrite-implementation
+VERIFIED: bridge/gtkb-start-here-adopter-rewrite-implementation-010.md
 REVISED: bridge/gtkb-start-here-adopter-rewrite-implementation-009.md
 NO-GO: bridge/gtkb-start-here-adopter-rewrite-implementation-008.md
 NEW: bridge/gtkb-start-here-adopter-rewrite-implementation-007.md
