@@ -12,6 +12,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from groundtruth_kb.project.managed_registry import (
+    FileArtifact,
+    GitignorePattern,
+    SettingsHookRegistration,
+    artifacts_for_doctor,
+    find_artifact_by_id,
+)
 from groundtruth_kb.project.profiles import get_profile
 
 
@@ -315,10 +322,14 @@ def _check_hooks(target: Path, profile_name: str) -> ToolCheck:
             status="fail",
             message=".claude/hooks/ directory not found",
         )
-    required_hooks = {"assertion-check.py", "spec-classifier.py"}
-    profile = get_profile(profile_name)
-    if profile.includes_bridge:
-        required_hooks.update({"destructive-gate.py", "credential-scan.py"})
+    # Required-hook set is sourced from the managed-artifact registry
+    # (``doctor_required_profiles`` axis). Empty set for unknown profiles
+    # falls back to no required hooks rather than crashing.
+    required_hooks = {
+        Path(artifact.target_path).name
+        for artifact in artifacts_for_doctor(profile_name, class_="hook")
+        if isinstance(artifact, FileArtifact)
+    }
 
     present = {f.name for f in hooks_dir.glob("*.py")}
     missing = required_hooks - present
@@ -479,11 +490,21 @@ def _check_settings_classifiers(target: Path) -> ToolCheck:
     )
 
 
-_REQUIRED_BRIDGE_RULES = (
-    "file-bridge-protocol.md",
-    "bridge-essential.md",
-    "deliberation-protocol.md",
-)
+def _required_bridge_rule_filenames(profile_name: str) -> tuple[str, ...]:
+    """Return the basename set of rules whose doctor_required_profiles
+    includes *profile_name*.
+
+    Sourced from the managed-artifact registry rather than a hardcoded
+    tuple. Preserves the current bridge-profile set
+    (``file-bridge-protocol.md``, ``bridge-essential.md``,
+    ``deliberation-protocol.md``) while letting the registry add or remove
+    rules without code changes.
+    """
+    return tuple(
+        Path(artifact.target_path).name
+        for artifact in artifacts_for_doctor(profile_name, class_="rule")
+        if isinstance(artifact, FileArtifact)
+    )
 
 
 def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolCheck:
@@ -515,17 +536,27 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
             message="not applicable to base profile",
         )
 
-    hook_file = target / ".claude" / "hooks" / "scanner-safe-writer.py"
+    # Composite-check inputs are resolved from the managed-artifact
+    # registry by canonical IDs. This is the C1 Condition 2 contract —
+    # three stable IDs that must exist and be unique.
+    hook_record = find_artifact_by_id("hook.scanner-safe-writer")
+    settings_record = find_artifact_by_id("settings.hook.scanner-safe-writer.pretooluse")
+    gitignore_record = find_artifact_by_id("gitignore.hook-logs")
+    assert isinstance(hook_record, FileArtifact)
+    assert isinstance(settings_record, SettingsHookRegistration)
+    assert isinstance(gitignore_record, GitignorePattern)
+
+    hook_file = target / hook_record.target_path
     if not hook_file.exists():
         return ToolCheck(
             name="scanner-safe-writer",
             required=True,
             found=False,
             status="fail",
-            message="scanner-safe-writer.py missing — run `gt project upgrade --apply`",
+            message=f"{hook_record.target_path.split('/')[-1]} missing — run `gt project upgrade --apply`",
         )
 
-    settings_path = target / ".claude" / "settings.json"
+    settings_path = target / settings_record.target_settings_path
     registered = False
     if settings_path.exists():
         try:
@@ -536,7 +567,7 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
             if isinstance(data, dict):
                 raw_hooks = data.get("hooks")
                 hooks_dict = raw_hooks if isinstance(raw_hooks, dict) else {}
-                raw_pretooluse = hooks_dict.get("PreToolUse")
+                raw_pretooluse = hooks_dict.get(settings_record.event)
                 pretooluse = raw_pretooluse if isinstance(raw_pretooluse, list) else []
                 for entry in pretooluse:
                     if not isinstance(entry, dict):
@@ -548,7 +579,7 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
                         if not isinstance(h, dict):
                             continue
                         cmd = h.get("command", "")
-                        if isinstance(cmd, str) and "scanner-safe-writer.py" in cmd:
+                        if isinstance(cmd, str) and settings_record.hook_filename in cmd:
                             registered = True
                             break
                     if registered:
@@ -559,7 +590,7 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
     if gitignore.exists():
         try:
             gi_text = gitignore.read_text(encoding="utf-8")
-            log_ignored = ".claude/hooks/*.log" in gi_text
+            log_ignored = gitignore_record.pattern in gi_text
         except OSError:
             log_ignored = False
 
@@ -771,7 +802,11 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
         )
 
     rules_dir = target / ".claude" / "rules"
-    missing_rules = [r for r in _REQUIRED_BRIDGE_RULES if not (rules_dir / r).exists()]
+    # ``_check_file_bridge_setup`` is gated on ``p.includes_bridge`` at its
+    # sole call site in :func:`run_doctor`, so sourcing the required-rule
+    # set from the bridge-profile registry entries preserves prior behavior.
+    required_rules = _required_bridge_rule_filenames("dual-agent")
+    missing_rules = [r for r in required_rules if not (rules_dir / r).exists()]
     if missing_rules:
         return ToolCheck(
             name="File Bridge Config",

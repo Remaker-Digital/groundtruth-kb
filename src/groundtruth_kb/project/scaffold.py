@@ -20,25 +20,16 @@ from groundtruth_kb.bootstrap import (
     _write_groundtruth_toml,
     _write_project_gitignore,
 )
+from groundtruth_kb.project.managed_registry import (
+    FileArtifact,
+    GitignorePattern,
+    SettingsHookRegistration,
+    artifacts_for_scaffold,
+)
 from groundtruth_kb.project.manifest import ProjectManifest, write_manifest
 from groundtruth_kb.project.profiles import ProjectProfile, get_profile
 from groundtruth_kb.providers.schema import CLAUDE_CODE, CODEX, AgentProvider, get_provider
 from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
-
-# Skill files copied into every dual-agent scaffold. Paths are relative
-# to ``templates/skills/`` on the source side and
-# ``.claude/skills/`` on the target side. Subdirectory structure is
-# preserved. Kept in lockstep with ``upgrade._MANAGED_SKILLS`` so that a
-# scaffold at the current version never immediately triggers upgrade
-# drift.
-_MANAGED_SKILLS_INITIAL: tuple[str, ...] = (
-    "decision-capture/SKILL.md",
-    "decision-capture/helpers/record_decision.py",
-    "bridge-propose/SKILL.md",
-    "bridge-propose/helpers/write_bridge.py",
-    "spec-intake/SKILL.md",
-    "spec-intake/helpers/spec_intake.py",
-)
 
 
 @dataclass(frozen=True)
@@ -175,23 +166,41 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
 
 
 def _copy_base_templates(target: Path) -> None:
-    """Copy base templates for all profiles: CLAUDE.md, MEMORY.md, hooks, rules."""
+    """Copy base templates for all profiles: CLAUDE.md, MEMORY.md, hooks, rules.
+
+    Hook and rule copies are driven by the managed-artifact registry
+    (:func:`artifacts_for_scaffold` with ``"local-only"``) so that the single
+    source of truth controls what the base profile receives.
+    """
     templates = get_templates_dir()
 
     for name in ("CLAUDE.md", "MEMORY.md"):
         shutil.copy2(templates / name, target / name)
 
+    # Hooks — registry-driven (initial_profiles contains "local-only" for all 14 hooks).
     hooks_target = target / ".claude" / "hooks"
     hooks_target.mkdir(parents=True, exist_ok=True)
-    for src in (templates / "hooks").glob("*.py"):
-        shutil.copy2(src, hooks_target / src.name)
+    for artifact in artifacts_for_scaffold("local-only", class_="hook"):
+        assert isinstance(artifact, FileArtifact)
+        src = templates / artifact.template_path
+        if not src.exists():
+            continue
+        dst = target / artifact.target_path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
+    # Rules — registry-driven. Base profile only gets rules whose
+    # initial_profiles contains "local-only" (currently only prime-builder).
     rules_target = target / ".claude" / "rules"
     rules_target.mkdir(parents=True, exist_ok=True)
-    for src in (templates / "rules").glob("*.md"):
-        # Base profile only gets prime-builder rule
-        if src.name == "prime-builder.md":
-            shutil.copy2(src, rules_target / src.name)
+    for artifact in artifacts_for_scaffold("local-only", class_="rule"):
+        assert isinstance(artifact, FileArtifact)
+        src = templates / artifact.template_path
+        if not src.exists():
+            continue
+        dst = target / artifact.target_path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
     # Developer config files (from templates/project/)
     project_templates = templates / "project"
@@ -267,17 +276,32 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
     else:
         _write_default_agents_md(target)
 
-    # All rules (bridge-specific)
+    # All rules (bridge-specific) — registry-driven.
     rules_target = target / ".claude" / "rules"
     rules_target.mkdir(parents=True, exist_ok=True)
-    for src in (templates / "rules").glob("*.md"):
-        shutil.copy2(src, rules_target / src.name)
+    for artifact in artifacts_for_scaffold("dual-agent", class_="rule"):
+        assert isinstance(artifact, FileArtifact)
+        src = templates / artifact.template_path
+        if not src.exists():
+            continue
+        dst = target / artifact.target_path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
-    # Additional hooks (destructive-gate, credential-scan, scheduler)
-    hooks_target = target / ".claude" / "hooks"
-    for src in (templates / "hooks").glob("*.py"):
-        if not (hooks_target / src.name).exists():
-            shutil.copy2(src, hooks_target / src.name)
+    # Additional hooks — registry-driven. Already copied by
+    # :func:`_copy_base_templates` (initial_profiles is ALL), so this is a
+    # no-op for every hook; retained as a defensive guard against a base
+    # scaffold failing to populate ``.claude/hooks/`` before this point.
+    for artifact in artifacts_for_scaffold("dual-agent", class_="hook"):
+        assert isinstance(artifact, FileArtifact)
+        dst = target / artifact.target_path
+        if dst.exists():
+            continue
+        src = templates / artifact.template_path
+        if not src.exists():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
     # Codex bootstrap documents
     codex_dir = target / "independent-progress-assessments"
@@ -310,10 +334,14 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
         gi.write_text(content + additions, encoding="utf-8")
         content = gi.read_text(encoding="utf-8")
 
-    # Operational hook logs (scanner-safe-writer.log et al.)
-    hook_log_additions = "\n# Operational hook logs\n.claude/hooks/*.log\n"
-    if ".claude/hooks/*.log" not in content:
-        gi.write_text(content + hook_log_additions, encoding="utf-8")
+    # Registry-driven gitignore-pattern additions (currently: ``.claude/hooks/*.log``).
+    for artifact in artifacts_for_scaffold("dual-agent", class_="gitignore-pattern"):
+        assert isinstance(artifact, GitignorePattern)
+        if artifact.pattern in content:
+            continue
+        addition = f"\n# {artifact.comment}\n{artifact.pattern}\n"
+        gi.write_text(content + addition, encoding="utf-8")
+        content = gi.read_text(encoding="utf-8")
 
     # bridge/INDEX.md — the coordination file for the file bridge workflow
     bridge_dir = target / "bridge"
@@ -330,22 +358,20 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
 def _copy_skill_templates(target: Path) -> None:
     """Copy dual-agent skill templates into ``.claude/skills/``.
 
-    Creates subdirectories as needed to preserve the template tree
-    (e.g., ``decision-capture/helpers/record_decision.py``). Missing
-    template files are silently skipped so a partially-populated
-    template tree does not break scaffold. The set of files copied is
-    ``_MANAGED_SKILLS_INITIAL`` — keep in lockstep with
-    ``upgrade._MANAGED_SKILLS``.
+    Driven by the managed-artifact registry: every ``skill``-class record whose
+    ``initial_profiles`` contains ``dual-agent`` is copied, preserving subdirectory
+    structure (e.g., ``decision-capture/helpers/record_decision.py``). Missing
+    template files are silently skipped so a partially-populated template tree
+    does not break scaffold.
     """
     templates = get_templates_dir()
-    skills_src_root = templates / "skills"
-    skills_dst_root = target / ".claude" / "skills"
 
-    for relative in _MANAGED_SKILLS_INITIAL:
-        src = skills_src_root / relative
+    for artifact in artifacts_for_scaffold("dual-agent", class_="skill"):
+        assert isinstance(artifact, FileArtifact)
+        src = templates / artifact.template_path
         if not src.exists():
             continue
-        dst = skills_dst_root / relative
+        dst = target / artifact.target_path
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
@@ -353,41 +379,29 @@ def _copy_skill_templates(target: Path) -> None:
 def _write_settings_json(settings_path: Path) -> None:
     """Write tracked .claude/settings.json with all governance and feature hooks.
 
-    Uses the nested hook event → matcher group → handler schema expected by
-    current Claude Code versions. The file is tracked in git so all hooks
-    are inherited by every worktree and fresh clone.
-
-    Hooks registered (12 total):
-    - SessionStart (2): session-start-governance, assertion-check
-    - UserPromptSubmit (2): delib-search-gate, intake-classifier
-    - PostToolUse (1): delib-search-tracker
-    - PreToolUse (6): spec-before-code, bridge-compliance-gate, kb-not-markdown,
-                       destructive-gate, credential-scan, scanner-safe-writer
+    Registration matrix is driven by the managed-artifact registry — every
+    ``settings-hook-registration`` record whose ``initial_profiles`` contains
+    ``dual-agent`` is emitted, preserving the per-event ordering given by the
+    registry's record sequence. Uses the nested hook event → matcher group →
+    handler schema expected by current Claude Code versions. The file is tracked
+    in git so all hooks are inherited by every worktree and fresh clone.
     """
     hooks_dir = ".claude/hooks"
-    content: dict[str, Any] = {
-        "hooks": {
-            "SessionStart": [
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/session-start-governance.py"}]},
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/assertion-check.py"}]},
-            ],
-            "UserPromptSubmit": [
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/delib-search-gate.py"}]},
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/intake-classifier.py"}]},
-            ],
-            "PostToolUse": [
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/delib-search-tracker.py"}]},
-            ],
-            "PreToolUse": [
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/spec-before-code.py"}]},
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/bridge-compliance-gate.py"}]},
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/kb-not-markdown.py"}]},
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/destructive-gate.py"}]},
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/credential-scan.py"}]},
-                {"hooks": [{"type": "command", "command": f"python {hooks_dir}/scanner-safe-writer.py"}]},
-            ],
-        }
-    }
+    # Preserve registry order; build per-event groups in record order so the
+    # output matches the event-to-hook matrix asserted by tests.
+    event_order: list[str] = []
+    per_event: dict[str, list[dict[str, Any]]] = {}
+    for artifact in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration"):
+        assert isinstance(artifact, SettingsHookRegistration)
+        event = artifact.event
+        if event not in per_event:
+            per_event[event] = []
+            event_order.append(event)
+        per_event[event].append(
+            {"hooks": [{"type": "command", "command": f"python {hooks_dir}/{artifact.hook_filename}"}]}
+        )
+
+    content: dict[str, Any] = {"hooks": {event: per_event[event] for event in event_order}}
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
 

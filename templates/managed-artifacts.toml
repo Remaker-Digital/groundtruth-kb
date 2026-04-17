@@ -1,0 +1,411 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
+#
+# 40 records = 14 hooks + 8 rules + 6 skills + 11 settings-hook-registrations + 1 gitignore-pattern.
+#
+# Three independent lifecycle axes per record:
+#   - initial_profiles:          scaffold copies this artifact for these profiles
+#   - managed_profiles:          upgrade enforces drift/missing-file repair for these profiles
+#   - doctor_required_profiles:  doctor enforces presence as a simple required check for these profiles
+#                                (empty = not required, or enforced via composite check)
+#
+# Loader invariants (InvalidArtifactRecord on violation):
+#   - managed_profiles ⊆ initial_profiles
+#   - doctor_required_profiles ⊆ initial_profiles
+#
+# Profile groups:
+#   ALL     = ["local-only", "dual-agent", "dual-agent-webapp"]
+#   bridge  = ["dual-agent", "dual-agent-webapp"]
+#   none    = []
+
+# =========================================================================
+# HOOKS (14 records)
+# =========================================================================
+
+[[artifacts]]
+class = "hook"
+id = "hook.assertion-check"
+template_path = "hooks/assertion-check.py"
+target_path = ".claude/hooks/assertion-check.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+
+[[artifacts]]
+class = "hook"
+id = "hook.spec-classifier"
+template_path = "hooks/spec-classifier.py"
+target_path = ".claude/hooks/spec-classifier.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+
+[[artifacts]]
+class = "hook"
+id = "hook.intake-classifier"
+template_path = "hooks/intake-classifier.py"
+target_path = ".claude/hooks/intake-classifier.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.destructive-gate"
+template_path = "hooks/destructive-gate.py"
+target_path = ".claude/hooks/destructive-gate.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+
+[[artifacts]]
+class = "hook"
+id = "hook.credential-scan"
+template_path = "hooks/credential-scan.py"
+target_path = ".claude/hooks/credential-scan.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+
+[[artifacts]]
+class = "hook"
+id = "hook.scheduler"
+template_path = "hooks/scheduler.py"
+target_path = ".claude/hooks/scheduler.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.scanner-safe-writer"
+template_path = "hooks/scanner-safe-writer.py"
+target_path = ".claude/hooks/scanner-safe-writer.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.bridge-compliance-gate"
+template_path = "hooks/bridge-compliance-gate.py"
+target_path = ".claude/hooks/bridge-compliance-gate.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.delib-search-gate"
+template_path = "hooks/delib-search-gate.py"
+target_path = ".claude/hooks/delib-search-gate.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.delib-search-tracker"
+template_path = "hooks/delib-search-tracker.py"
+target_path = ".claude/hooks/delib-search-tracker.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.kb-not-markdown"
+template_path = "hooks/kb-not-markdown.py"
+target_path = ".claude/hooks/kb-not-markdown.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.session-health"
+template_path = "hooks/session-health.py"
+target_path = ".claude/hooks/session-health.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.session-start-governance"
+template_path = "hooks/session-start-governance.py"
+target_path = ".claude/hooks/session-start-governance.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "hook"
+id = "hook.spec-before-code"
+template_path = "hooks/spec-before-code.py"
+target_path = ".claude/hooks/spec-before-code.py"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+# =========================================================================
+# RULES (8 records)
+# =========================================================================
+
+[[artifacts]]
+class = "rule"
+id = "rule.prime-builder"
+template_path = "rules/prime-builder.md"
+target_path = ".claude/rules/prime-builder.md"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "rule"
+id = "rule.loyal-opposition"
+template_path = "rules/loyal-opposition.md"
+target_path = ".claude/rules/loyal-opposition.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "rule"
+id = "rule.bridge-poller-canonical"
+template_path = "rules/bridge-poller-canonical.md"
+target_path = ".claude/rules/bridge-poller-canonical.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "rule"
+id = "rule.prime-bridge-collaboration-protocol"
+template_path = "rules/prime-bridge-collaboration-protocol.md"
+target_path = ".claude/rules/prime-bridge-collaboration-protocol.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "rule"
+id = "rule.report-depth"
+template_path = "rules/report-depth.md"
+target_path = ".claude/rules/report-depth.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "rule"
+id = "rule.file-bridge-protocol"
+template_path = "rules/file-bridge-protocol.md"
+target_path = ".claude/rules/file-bridge-protocol.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+
+[[artifacts]]
+class = "rule"
+id = "rule.bridge-essential"
+template_path = "rules/bridge-essential.md"
+target_path = ".claude/rules/bridge-essential.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+
+[[artifacts]]
+class = "rule"
+id = "rule.deliberation-protocol"
+template_path = "rules/deliberation-protocol.md"
+target_path = ".claude/rules/deliberation-protocol.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+
+# =========================================================================
+# SKILLS (6 records)
+# =========================================================================
+
+[[artifacts]]
+class = "skill"
+id = "skill.decision-capture.skill-md"
+template_path = "skills/decision-capture/SKILL.md"
+target_path = ".claude/skills/decision-capture/SKILL.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "skill"
+id = "skill.decision-capture.helper"
+template_path = "skills/decision-capture/helpers/record_decision.py"
+target_path = ".claude/skills/decision-capture/helpers/record_decision.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "skill"
+id = "skill.bridge-propose.skill-md"
+template_path = "skills/bridge-propose/SKILL.md"
+target_path = ".claude/skills/bridge-propose/SKILL.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "skill"
+id = "skill.bridge-propose.helper"
+template_path = "skills/bridge-propose/helpers/write_bridge.py"
+target_path = ".claude/skills/bridge-propose/helpers/write_bridge.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "skill"
+id = "skill.spec-intake.skill-md"
+template_path = "skills/spec-intake/SKILL.md"
+target_path = ".claude/skills/spec-intake/SKILL.md"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "skill"
+id = "skill.spec-intake.helper"
+template_path = "skills/spec-intake/helpers/spec_intake.py"
+target_path = ".claude/skills/spec-intake/helpers/spec_intake.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+# =========================================================================
+# SETTINGS-HOOK-REGISTRATION (11 records)
+# =========================================================================
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.session-start-governance.sessionstart"
+event = "SessionStart"
+hook_filename = "session-start-governance.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.assertion-check.sessionstart"
+event = "SessionStart"
+hook_filename = "assertion-check.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.delib-search-gate.userpromptsubmit"
+event = "UserPromptSubmit"
+hook_filename = "delib-search-gate.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.intake-classifier.userpromptsubmit"
+event = "UserPromptSubmit"
+hook_filename = "intake-classifier.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.delib-search-tracker.posttooluse"
+event = "PostToolUse"
+hook_filename = "delib-search-tracker.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.spec-before-code.pretooluse"
+event = "PreToolUse"
+hook_filename = "spec-before-code.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.bridge-compliance-gate.pretooluse"
+event = "PreToolUse"
+hook_filename = "bridge-compliance-gate.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.kb-not-markdown.pretooluse"
+event = "PreToolUse"
+hook_filename = "kb-not-markdown.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.destructive-gate.pretooluse"
+event = "PreToolUse"
+hook_filename = "destructive-gate.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.credential-scan.pretooluse"
+event = "PreToolUse"
+hook_filename = "credential-scan.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.scanner-safe-writer.pretooluse"
+event = "PreToolUse"
+hook_filename = "scanner-safe-writer.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+
+# =========================================================================
+# GITIGNORE-PATTERN (1 record)
+# =========================================================================
+
+[[artifacts]]
+class = "gitignore-pattern"
+id = "gitignore.hook-logs"
+pattern = ".claude/hooks/*.log"
+comment = "Operational hook logs"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
