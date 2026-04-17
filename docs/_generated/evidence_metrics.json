@@ -1,0 +1,63 @@
+{
+  "generated_at_commit": "e12aab3",
+  "generated_at_utc": "2026-04-17T19:51:24Z",
+  "metrics": [
+    {
+      "command": "python -m pytest --collect-only -q",
+      "commit_sha": "e12aab3",
+      "metric_name": "test_count",
+      "nondeterminism": "deterministic",
+      "source_scope": "tests/ directory, all collected test ids",
+      "timestamp_utc": "2026-04-17T19:51:24Z",
+      "value": 1249
+    },
+    {
+      "command": "sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'",
+      "commit_sha": "e12aab3",
+      "metric_name": "specs_specified",
+      "nondeterminism": "deterministic (at a fixed commit)",
+      "source_scope": "local groundtruth-kb/groundtruth.db at repo root",
+      "timestamp_utc": "2026-04-17T19:51:24Z",
+      "value": 17
+    },
+    {
+      "command": "sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'",
+      "commit_sha": "e12aab3",
+      "metric_name": "specs_verified",
+      "nondeterminism": "deterministic (at a fixed commit)",
+      "source_scope": "local groundtruth-kb/groundtruth.db at repo root",
+      "timestamp_utc": "2026-04-17T19:51:24Z",
+      "value": 6
+    },
+    {
+      "command": "sqlite3 groundtruth.db 'SELECT COUNT(DISTINCT id) FROM deliberations'",
+      "commit_sha": "e12aab3",
+      "metric_name": "deliberations_total",
+      "nondeterminism": "deterministic (at a fixed commit)",
+      "source_scope": "local groundtruth-kb/groundtruth.db at repo root. This is the reference install's local archive, NOT the downstream Agent Red deliberation history which is measured separately.",
+      "timestamp_utc": "2026-04-17T19:51:24Z",
+      "value": 1
+    },
+    {
+      "command": "python -m mypy --strict src/groundtruth_kb/",
+      "commit_sha": "e12aab3",
+      "metric_name": "mypy_strict",
+      "nondeterminism": "deterministic",
+      "source_scope": "src/groundtruth_kb/ (all modules)",
+      "timestamp_utc": "2026-04-17T19:51:24Z",
+      "value": {
+        "source_files": 40,
+        "status": "pass"
+      }
+    },
+    {
+      "command": "python scripts/audit_docstrings.py",
+      "commit_sha": "e12aab3",
+      "metric_name": "docstring_coverage_percent",
+      "nondeterminism": "deterministic",
+      "source_scope": "src/groundtruth_kb/ public API (audit_docstrings.py scope)",
+      "timestamp_utc": "2026-04-17T19:51:24Z",
+      "value": 87.25
+    }
+  ]
+}
