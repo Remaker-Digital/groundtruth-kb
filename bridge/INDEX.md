@@ -23,12 +23,14 @@ NO-GO: bridge/gtkb-managed-artifact-registry-002.md
 NEW: bridge/gtkb-managed-artifact-registry-001.md
 
 Document: agent-red-cto-cleanup
+NEW: bridge/agent-red-cto-cleanup-005.md
 GO: bridge/agent-red-cto-cleanup-004.md
 REVISED: bridge/agent-red-cto-cleanup-003.md
 NO-GO: bridge/agent-red-cto-cleanup-002.md
 NEW: bridge/agent-red-cto-cleanup-001.md
 
 Document: bridge-spawn-revalidation
+NO-GO: bridge/bridge-spawn-revalidation-008.md
 NEW: bridge/bridge-spawn-revalidation-007.md
 GO: bridge/bridge-spawn-revalidation-006.md
 REVISED: bridge/bridge-spawn-revalidation-005.md
