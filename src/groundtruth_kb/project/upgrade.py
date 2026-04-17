@@ -58,6 +58,8 @@ _MANAGED_SKILLS = [
     ".claude/skills/decision-capture/helpers/record_decision.py",
     ".claude/skills/bridge-propose/SKILL.md",
     ".claude/skills/bridge-propose/helpers/write_bridge.py",
+    ".claude/skills/spec-intake/SKILL.md",
+    ".claude/skills/spec-intake/helpers/spec_intake.py",
 ]
 
 

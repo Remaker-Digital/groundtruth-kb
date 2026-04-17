@@ -181,3 +181,49 @@ def test_plan_upgrade_adds_missing_bridge_propose_skill_at_same_version(tmp_path
     assert _BRIDGE_PROPOSE_HELPER in action_files, (
         f"expected add action for missing {_BRIDGE_PROPOSE_HELPER}; got: {[(a.action, a.file) for a in actions]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Spec-intake skill — unconditional missing-file repair at current version.
+# ---------------------------------------------------------------------------
+
+_SPEC_INTAKE_SKILL_MD = ".claude/skills/spec-intake/SKILL.md"
+_SPEC_INTAKE_HELPER = ".claude/skills/spec-intake/helpers/spec_intake.py"
+
+
+def test_plan_upgrade_adds_missing_spec_intake_skill_at_same_version(tmp_path: Path) -> None:
+    """dual-agent project at current version with spec-intake SKILL.md missing → add action."""
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    actions = plan_upgrade(tmp_path)
+    skill_adds = [a for a in actions if a.action == "add" and a.file == _SPEC_INTAKE_SKILL_MD]
+    assert skill_adds, (
+        f"expected add action for missing {_SPEC_INTAKE_SKILL_MD} at same version; "
+        f"got: {[(a.action, a.file) for a in actions]}"
+    )
+
+
+def test_plan_upgrade_adds_missing_spec_intake_helper_at_same_version(tmp_path: Path) -> None:
+    """dual-agent project at current version with spec-intake helper missing → add action."""
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    actions = plan_upgrade(tmp_path)
+    helper_adds = [a for a in actions if a.action == "add" and a.file == _SPEC_INTAKE_HELPER]
+    assert helper_adds, (
+        f"expected add action for missing {_SPEC_INTAKE_HELPER} at same version; "
+        f"got: {[(a.action, a.file) for a in actions]}"
+    )
+
+
+def test_execute_creates_missing_spec_intake_files_at_same_version(tmp_path: Path) -> None:
+    """End-to-end: plan at same version → execute → spec-intake files landed on disk."""
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    actions = plan_upgrade(tmp_path)
+    execute_upgrade(tmp_path, actions, force=False)
+    skill_md = tmp_path / _SPEC_INTAKE_SKILL_MD
+    helper_py = tmp_path / _SPEC_INTAKE_HELPER
+    assert skill_md.exists(), "spec-intake SKILL.md should be copied by execute_upgrade"
+    assert helper_py.exists(), "spec_intake.py should be copied by execute_upgrade"
+    assert skill_md.read_text(encoding="utf-8").strip(), "spec-intake SKILL.md is empty"
+    helper_content = helper_py.read_text(encoding="utf-8")
+    assert "def capture_candidate" in helper_content
+    assert "def confirm_candidate" in helper_content
+    assert "def reject_candidate" in helper_content

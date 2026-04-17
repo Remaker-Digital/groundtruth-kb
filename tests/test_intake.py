@@ -641,3 +641,26 @@ class TestF5Regressions:
 
         result = reject_intake(db, "D-MALFORMED-001", "malformed")
         assert "error" in result
+
+
+class TestF5BackwardCompat:
+    """Backward-compatibility guards for keyword-only ``changed_by`` extension.
+
+    The three intake pipeline functions accept an optional
+    ``changed_by`` keyword-only parameter (default
+    ``"intake-pipeline"``). Callers who never pass the kwarg must
+    still produce the legacy attribution so the F1 skill-level
+    differentiation does not regress existing CLI/test behavior.
+    """
+
+    def test_capture_requirement_default_changed_by_preserved(self, db):
+        """Default (unpassed) ``changed_by`` persists as ``"intake-pipeline"``."""
+        cap = capture_requirement(
+            db,
+            "The system must emit audit logs",
+            proposed_title="Audit logs",
+            proposed_section="observability",
+        )
+        delib = db.get_deliberation(cap["deliberation_id"])
+        assert delib is not None
+        assert delib["changed_by"] == "intake-pipeline"
