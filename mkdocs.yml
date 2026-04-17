@@ -83,6 +83,7 @@ nav:
       - CLI Reference: reference/cli.md
       - Configuration: reference/configuration.md
       - Assertion Language: reference/assertion-language.md
+      - Canonical Terminology: reference/canonical-terminology.md
       - Templates: reference/templates.md
       - Azure Readiness Taxonomy: reference/azure-readiness-taxonomy.md
   - Wiki:

@@ -40,21 +40,27 @@ from groundtruth_kb.project.managed_registry import (
 # ---------------------------------------------------------------------------
 
 
-def test_registry_total_is_forty_records() -> None:
-    """40 total = 14 hooks + 8 rules + 6 skills + 11 settings + 1 gitignore."""
+def test_registry_total_is_forty_two_records() -> None:
+    """42 total = 14 hooks + 10 rules + 6 skills + 11 settings + 1 gitignore.
+
+    Post-canonical-terminology-surface: rule count rose from 8 to 10 with the
+    addition of ``rule.canonical-terminology`` and
+    ``rule.canonical-terminology-config`` (see
+    ``bridge/gtkb-canonical-terminology-surface-implementation-007.md`` Option B).
+    """
     records = _load_all_artifacts()
-    assert len(records) == 40, f"expected 40 total records; got {len(records)}"
+    assert len(records) == 42, f"expected 42 total records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
-    """Class counts match the approved proposal at ``-007`` §Registry record totals."""
+    """Class counts match the approved proposal (post-canonical-terminology)."""
     records = _load_all_artifacts()
     counts: dict[str, int] = {}
     for r in records:
         counts[r.class_] = counts.get(r.class_, 0) + 1
     assert counts == {
         "hook": 14,
-        "rule": 8,
+        "rule": 10,
         "skill": 6,
         "settings-hook-registration": 11,
         "gitignore-pattern": 1,
@@ -174,17 +180,25 @@ def _file_target_paths(records: list[ManagedArtifact]) -> set[str]:
     return {r.target_path for r in records if isinstance(r, FileArtifact)}
 
 
-def test_scaffold_local_only_copies_all_hooks_and_prime_rule() -> None:
-    """local-only scaffold copies all 14 hooks plus prime-builder rule only."""
+def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
+    """local-only scaffold copies all 14 hooks plus the 3 initial local-only rules.
+
+    Post-canonical-terminology-surface: local-only initial rules grew from 1
+    (prime-builder) to 3 with the addition of ``canonical-terminology.md`` and
+    ``canonical-terminology.toml``.
+    """
     scaffolded = artifacts_for_scaffold("local-only")
     # 14 hooks
     hooks = [r for r in scaffolded if r.class_ == "hook"]
     assert len(hooks) == 14
-    # 1 rule (prime-builder)
+    # 3 rules (prime-builder + canonical-terminology surface)
     rules = [r for r in scaffolded if r.class_ == "rule"]
-    assert len(rules) == 1
-    assert isinstance(rules[0], FileArtifact)
-    assert rules[0].target_path == ".claude/rules/prime-builder.md"
+    rule_paths = {r.target_path for r in rules if isinstance(r, FileArtifact)}
+    assert rule_paths == {
+        ".claude/rules/prime-builder.md",
+        ".claude/rules/canonical-terminology.md",
+        ".claude/rules/canonical-terminology.toml",
+    }
     # 0 skills, 0 settings, 0 gitignore-patterns
     assert [r for r in scaffolded if r.class_ == "skill"] == []
     assert [r for r in scaffolded if r.class_ == "settings-hook-registration"] == []
@@ -192,14 +206,17 @@ def test_scaffold_local_only_copies_all_hooks_and_prime_rule() -> None:
 
 
 def test_scaffold_dual_agent_copies_everything() -> None:
-    """dual-agent scaffold copies 14 hooks + 8 rules + 6 skills + 11 settings + 1 gitignore."""
+    """dual-agent scaffold copies 14 hooks + 10 rules + 6 skills + 11 settings + 1 gitignore.
+
+    Rule count rose from 8 to 10 post-canonical-terminology-surface.
+    """
     scaffolded = artifacts_for_scaffold("dual-agent")
     by_class: dict[str, int] = {}
     for r in scaffolded:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
         "hook": 14,
-        "rule": 8,
+        "rule": 10,
         "skill": 6,
         "settings-hook-registration": 11,
         "gitignore-pattern": 1,
@@ -214,7 +231,12 @@ def test_scaffold_dual_agent_webapp_matches_dual_agent() -> None:
 
 
 def test_upgrade_local_only_manages_two_hooks() -> None:
-    """local-only upgrade manages only assertion-check.py, spec-classifier.py, prime-builder.md."""
+    """local-only upgrade manages 2 hooks plus 3 rules (prime-builder + canonical-terminology.{md,toml}).
+
+    Post-canonical-terminology-surface: local-only upgrade-managed rules grew
+    from 1 to 3 because both new canonical-terminology records have
+    ``managed_profiles`` covering all three profiles.
+    """
     managed = artifacts_for_upgrade("local-only")
     hooks = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "hook"}
     assert hooks == {
@@ -222,7 +244,11 @@ def test_upgrade_local_only_manages_two_hooks() -> None:
         ".claude/hooks/spec-classifier.py",
     }
     rules = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "rule"}
-    assert rules == {".claude/rules/prime-builder.md"}
+    assert rules == {
+        ".claude/rules/prime-builder.md",
+        ".claude/rules/canonical-terminology.md",
+        ".claude/rules/canonical-terminology.toml",
+    }
     # No skills or settings or gitignore for local-only
     assert [r for r in managed if r.class_ == "skill"] == []
     assert [r for r in managed if r.class_ == "settings-hook-registration"] == []
@@ -230,7 +256,11 @@ def test_upgrade_local_only_manages_two_hooks() -> None:
 
 
 def test_upgrade_dual_agent_manages_full_set_including_gap_28_rules() -> None:
-    """dual-agent upgrade includes the 3 Gap 2.8 bridge rules in managed set."""
+    """dual-agent upgrade includes the 3 Gap 2.8 bridge rules + canonical-terminology pair.
+
+    Post-canonical-terminology-surface: dual-agent upgrade-managed rules grew
+    from 8 to 10 with the addition of ``canonical-terminology.{md,toml}``.
+    """
     managed_rule_paths = {
         r.target_path for r in artifacts_for_upgrade("dual-agent", class_="rule") if isinstance(r, FileArtifact)
     }
@@ -240,11 +270,14 @@ def test_upgrade_dual_agent_manages_full_set_including_gap_28_rules() -> None:
     assert ".claude/rules/bridge-poller-canonical.md" in managed_rule_paths
     assert ".claude/rules/prime-bridge-collaboration-protocol.md" in managed_rule_paths
     assert ".claude/rules/report-depth.md" in managed_rule_paths
-    # The 3 Gap 2.8 rules newly added to managed upgrade repair by C1
+    # The 3 Gap 2.8 rules added by C1
     assert ".claude/rules/file-bridge-protocol.md" in managed_rule_paths
     assert ".claude/rules/bridge-essential.md" in managed_rule_paths
     assert ".claude/rules/deliberation-protocol.md" in managed_rule_paths
-    assert len(managed_rule_paths) == 8
+    # The 2 canonical-terminology rules added post-C1
+    assert ".claude/rules/canonical-terminology.md" in managed_rule_paths
+    assert ".claude/rules/canonical-terminology.toml" in managed_rule_paths
+    assert len(managed_rule_paths) == 10
 
 
 # ---------------------------------------------------------------------------
@@ -397,14 +430,14 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent should see all 40 records (ALL hooks in initial, 8 rules, 6 skills,
+    # dual-agent should see all 42 records (ALL hooks in initial, 10 rules, 6 skills,
     # 11 settings, 1 gitignore — all touch dual-agent in at least one axis).
-    assert len(dual_agent) == 40
+    assert len(dual_agent) == 42
 
     local_only = load_managed_artifacts("local-only")
-    # local-only sees all 14 hooks (initial=ALL) + rule.prime-builder only
-    # = 15 records.
-    assert len(local_only) == 15
+    # local-only sees all 14 hooks (initial=ALL) + rule.prime-builder +
+    # the 2 canonical-terminology rules = 17 records.
+    assert len(local_only) == 17
 
 
 def test_find_artifact_by_id_raises_on_unknown() -> None:

@@ -96,3 +96,34 @@ def test_scaffold_project_dual_agent_creates_bridge_files(tmp_path: Path) -> Non
     scaffold_project(options)
     # At minimum, AGENTS.md should be created for dual-agent
     assert (target / "AGENTS.md").exists()
+
+
+def test_scaffold_agents_md_uses_root_memory_path(tmp_path: Path) -> None:
+    """Generated AGENTS.md names root ``MEMORY.md``, not ``memory/MEMORY.md``.
+
+    Codex GO condition (``bridge/gtkb-canonical-terminology-surface-implementation-006.md``
+    P1 carried forward to ``-008``): GT-KB scaffolds ``MEMORY.md`` at repo root
+    per ADR-0001, so the AGENTS.md startup checklist must reference the root
+    path — not the ``memory/`` subdirectory variant.
+    """
+    target = tmp_path / "agents-md-path"
+    options = ScaffoldOptions(
+        project_name="AGENTS.md Path Check",
+        profile="dual-agent",
+        owner="Owner",
+        target_dir=target,
+        seed_example=False,
+        include_ci=False,
+    )
+    scaffold_project(options)
+    agents_md = target / "AGENTS.md"
+    assert agents_md.exists(), "dual-agent profile must create AGENTS.md"
+    content = agents_md.read_text(encoding="utf-8")
+    assert "memory/MEMORY.md" not in content, (
+        "Generated AGENTS.md must NOT reference 'memory/MEMORY.md'; "
+        "GT-KB places MEMORY.md at repo root per ADR-0001. "
+        "See bridge/gtkb-canonical-terminology-surface-implementation-008.md."
+    )
+    assert "MEMORY.md" in content, (
+        "Generated AGENTS.md must reference root 'MEMORY.md' in the startup checklist."
+    )
