@@ -5,12 +5,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Shared guard helpers: Get-IndexEntryTopVersion, Test-SnapshotStillFresh,
+# Invoke-GuardedLaunch. See bridge/bridge-spawn-revalidation-005.md (approved
+# at -006) for the TOCTOU revalidation contract.
+. (Join-Path $PSScriptRoot "bridge-scan-common.ps1")
+
 $Workspace = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
 $IndexPath = Join-Path $Workspace "bridge\INDEX.md"
 $ProtocolPath = Join-Path $Workspace ".claude\rules\file-bridge-protocol.md"
 $LogDir = Join-Path $Workspace "independent-progress-assessments\bridge-automation\logs"
 $LockPath = Join-Path $LogDir "codex-file-bridge-scan.lock"
 $StatusPath = Join-Path $LogDir "codex-scan-status.json"
+$StaleLogPath = Join-Path $LogDir "bridge-snapshot-stale.log"
 $CodexExe = "C:\Users\micha\AppData\Local\OpenAI\Codex\bin\codex.exe"
 $MAX_ITEMS_PER_SPAWN = 1   # Keep automated Codex scans bounded to avoid INDEX.md races.
 
@@ -348,7 +354,36 @@ try {
         exit 2
     }
 
-    Invoke-CodexBridgeScan -AttentionCount $attention.Count -SelectedEntries $selected -SelectedNames $selectedNames
+    # TOCTOU revalidation (bridge-spawn-revalidation-006 GO):
+    # Between the INDEX read above ($attention / $selected) and the child-agent
+    # spawn below, the other scanner or a manual edit could append a newer
+    # verdict to the same entry. Capture the selected entry's top status+file
+    # as a snapshot and let Invoke-GuardedLaunch re-read the INDEX immediately
+    # before launch; launch only if the snapshot is still the top version.
+    $firstSelected = $selected[0]
+    $snapshot = [pscustomobject]@{
+        DocumentName = $firstSelected.Name
+        Status       = $firstSelected.Versions[0].Status
+        File         = $firstSelected.Versions[0].Path
+    }
+
+    $launchAction = {
+        Invoke-CodexBridgeScan -AttentionCount $attention.Count -SelectedEntries $selected -SelectedNames $selectedNames
+    }
+
+    $guardResult = Invoke-GuardedLaunch `
+        -SelectedSnapshot $snapshot `
+        -IndexPath        $IndexPath `
+        -LaunchAction     $launchAction `
+        -StaleLogPath     $StaleLogPath
+
+    if (-not $guardResult.Launched) {
+        $staleMsg = "SNAPSHOT-STALE: aborted launch (document=$($snapshot.DocumentName) expected=$($snapshot.Status):$($snapshot.File))"
+        Write-ScanLog $staleMsg
+        Write-ScanStatus -State "stale" -Message $staleMsg -AttentionNames $attentionNames
+        Show-PollerToast -Title "Codex bridge scan" -Message "snapshot stale - aborted"
+        exit 0
+    }
 } catch {
     Write-ScanLog "ERROR: $($_.Exception.Message)"
     Write-ScanStatus -State "error" -Message "ERROR: $($_.Exception.Message)"

@@ -5,12 +5,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Shared guard helpers: Get-IndexEntryTopVersion, Test-SnapshotStillFresh,
+# Invoke-GuardedLaunch. See bridge/bridge-spawn-revalidation-005.md (approved
+# at -006) for the TOCTOU revalidation contract.
+. (Join-Path $PSScriptRoot "bridge-scan-common.ps1")
+
 $Workspace = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
 $IndexPath = Join-Path $Workspace "bridge\INDEX.md"
 $ProtocolPath = Join-Path $Workspace ".claude\rules\file-bridge-protocol.md"
 $LogDir = Join-Path $Workspace "independent-progress-assessments\bridge-automation\logs"
 $LockPath = Join-Path $LogDir "claude-file-bridge-scan.lock"
 $StatusPath = Join-Path $LogDir "claude-scan-status.json"
+$StaleLogPath = Join-Path $LogDir "bridge-snapshot-stale.log"
 $MAX_ITEMS_PER_SPAWN = 1   # Conservative initial cap; raise after stable 48h at cap=1.
 
 # S290 (WI-3171 poller investigation) — ROOT CAUSE OF 744 SILENT SPAWN FAILURES:
@@ -276,7 +282,23 @@ try {
         exit 2
     }
 
-    if (-not (Test-Path -LiteralPath $ClaudeExe)) {
+    # TOCTOU revalidation (bridge-spawn-revalidation-006 GO):
+    # Between the INDEX read above ($attention / $selected) and the child-agent
+    # spawn below, Codex or a manual edit could append a newer verdict to the
+    # same entry. Capture the selected entry's top status+file as a snapshot
+    # and let Invoke-GuardedLaunch re-read the INDEX immediately before launch.
+    # The launch scriptblock below owns the full child lifecycle (ClaudeExe
+    # test, Process.Start, WaitForExit, JSON validation, logging) so the
+    # guard abstraction does not leak process state across its boundary.
+    $firstSelected = $selected[0]
+    $snapshot = [pscustomobject]@{
+        DocumentName = $firstSelected.Name
+        Status       = $firstSelected.Versions[0].Status
+        File         = $firstSelected.Versions[0].Path
+    }
+
+    $launchAction = {
+        if (-not (Test-Path -LiteralPath $ClaudeExe)) {
         throw "Claude CLI not found: $ClaudeExe"
     }
     Write-ScanLog "using ClaudeExe=$ClaudeExe (version $($latestClaudeVersion.Name))"
@@ -468,6 +490,21 @@ Key files: CLAUDE.md, memory/MEMORY.md, memory/work_list.md
         -RunStamp $runStamp `
         -StdoutPath $stdoutPath `
         -StderrPath $stderrPath
+    }
+
+    $guardResult = Invoke-GuardedLaunch `
+        -SelectedSnapshot $snapshot `
+        -IndexPath        $IndexPath `
+        -LaunchAction     $launchAction `
+        -StaleLogPath     $StaleLogPath
+
+    if (-not $guardResult.Launched) {
+        $staleMsg = "SNAPSHOT-STALE: aborted launch (document=$($snapshot.DocumentName) expected=$($snapshot.Status):$($snapshot.File))"
+        Write-ScanLog $staleMsg
+        Write-ScanStatus -State "stale" -Message $staleMsg -AttentionNames $attentionNameArray
+        Show-PollerToast -Title "Bridge scan" -Message "snapshot stale - aborted"
+        exit 0
+    }
 } catch {
     Write-ScanLog "ERROR: $($_.Exception.Message)"
     Write-ScanStatus -State "error" -Message "ERROR: $($_.Exception.Message)"
