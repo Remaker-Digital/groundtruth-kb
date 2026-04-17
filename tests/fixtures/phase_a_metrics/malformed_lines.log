@@ -1,0 +1,4 @@
+{"schema_version": 1, "timestamp_utc": "2026-04-16T13:00:00Z", "hook": "scanner-safe-writer", "event": "deny", "file_path": "bridge/mal-001.md", "catalog_source": "canonical", "hits": [{"pattern_name": "aws_access_key_id", "pattern_description": "AWS access key ID", "span": [0, 20]}], "session_id": "S298"}
+this is not json at all
+{"schema_version": 1, "timestamp_utc": "2026-04-16T13:05:00Z", "hook": "scanner-safe-writer", "event": "deny", "file_path": "bridge/mal-002.md", "catalog_source": "canonical", "hits": [{"pattern_name": "anthropic_api_key", "pattern_description": "Anthropic API key", "span": [5, 41]}], "session_id": "S298"}
+
