@@ -25,6 +25,17 @@ from groundtruth_kb.project.profiles import ProjectProfile, get_profile
 from groundtruth_kb.providers.schema import CLAUDE_CODE, CODEX, AgentProvider, get_provider
 from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
 
+# Skill files copied into every dual-agent scaffold. Paths are relative
+# to ``templates/skills/`` on the source side and
+# ``.claude/skills/`` on the target side. Subdirectory structure is
+# preserved. Kept in lockstep with ``upgrade._MANAGED_SKILLS`` so that a
+# scaffold at the current version never immediately triggers upgrade
+# drift.
+_MANAGED_SKILLS_INITIAL: tuple[str, ...] = (
+    "decision-capture/SKILL.md",
+    "decision-capture/helpers/record_decision.py",
+)
+
 
 @dataclass(frozen=True)
 class ScaffoldOptions:
@@ -307,6 +318,32 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
         _generate_bridge_index(project_name),
         encoding="utf-8",
     )
+
+    # .claude/skills/ — dual-agent-only Phase A skills (decision-capture).
+    _copy_skill_templates(target)
+
+
+def _copy_skill_templates(target: Path) -> None:
+    """Copy dual-agent skill templates into ``.claude/skills/``.
+
+    Creates subdirectories as needed to preserve the template tree
+    (e.g., ``decision-capture/helpers/record_decision.py``). Missing
+    template files are silently skipped so a partially-populated
+    template tree does not break scaffold. The set of files copied is
+    ``_MANAGED_SKILLS_INITIAL`` — keep in lockstep with
+    ``upgrade._MANAGED_SKILLS``.
+    """
+    templates = get_templates_dir()
+    skills_src_root = templates / "skills"
+    skills_dst_root = target / ".claude" / "skills"
+
+    for relative in _MANAGED_SKILLS_INITIAL:
+        src = skills_src_root / relative
+        if not src.exists():
+            continue
+        dst = skills_dst_root / relative
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
 
 def _write_settings_json(settings_path: Path) -> None:

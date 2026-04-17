@@ -586,6 +586,55 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
     )
 
 
+def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
+    """Check that the ``decision-capture`` skill files are present.
+
+    Bridge-profile-only check. Warning-level (not fail) because a missing
+    skill degrades workflow quality but does not render the project
+    non-functional. Remediation: ``gt project upgrade --apply`` (the
+    missing-file repair path is unconditional — works at any scaffold
+    version).
+    """
+    profile = get_profile(profile_name)
+    if not profile.includes_bridge:
+        return ToolCheck(
+            name="skill:decision-capture",
+            required=False,
+            found=True,
+            status="pass",
+            message="not applicable to base profile",
+        )
+
+    skill_md = target / ".claude" / "skills" / "decision-capture" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "decision-capture" / "helpers" / "record_decision.py"
+
+    missing: list[str] = []
+    if not skill_md.exists():
+        missing.append("SKILL.md")
+    if not helper_py.exists():
+        missing.append("helpers/record_decision.py")
+
+    if missing:
+        return ToolCheck(
+            name="skill:decision-capture",
+            required=False,
+            found=False,
+            status="warning",
+            message=(
+                f".claude/skills/decision-capture/ missing: {', '.join(missing)}. "
+                f"Run `gt project upgrade --apply` to restore."
+            ),
+        )
+
+    return ToolCheck(
+        name="skill:decision-capture",
+        required=False,
+        found=True,
+        status="pass",
+        message="decision-capture skill present",
+    )
+
+
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
     """Check file bridge configuration for dual-agent projects.
 
@@ -877,6 +926,7 @@ def run_doctor(
         checks.append(_check_file_bridge_setup(target))
         checks.append(_check_settings_classifiers(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
+        checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_poller(target, "claude"))
         checks.append(_check_bridge_poller(target, "codex"))
 
