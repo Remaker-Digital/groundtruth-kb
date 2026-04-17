@@ -189,6 +189,155 @@ def test_credential_scan_stdin_blocks():
 
 
 # ---------------------------------------------------------------------------
+# Credential scan: canonical vs. fallback catalog sourcing
+# ---------------------------------------------------------------------------
+#
+# GO ``bridge/gtkb-credential-patterns-canonical-008.md`` Condition 5 requires
+# that the hook test asserts which catalog path was used when the hook denied
+# a credential sample. The hook writes one of two markers to stderr:
+#
+#   CANONICAL_CATALOG_USED   — imported groundtruth_kb.governance.credential_patterns
+#   FALLBACK_CATALOG_USED    — fell back to the inline catalog
+#
+# Both modes MUST deny an equivalent credential payload.
+
+
+def _fallback_isolated_copy(tmp_path: Path) -> Path:
+    """Copy credential-scan.py to an isolated directory for fallback-mode runs.
+
+    No sidecar file is copied (per GO-008 Condition 1: fallback is inline).
+    """
+    import shutil
+
+    isolated = tmp_path / "isolated"
+    isolated.mkdir()
+    shutil.copy(HOOKS_DIR / "credential-scan.py", isolated / "credential-scan.py")
+    return isolated
+
+
+_CRED_SAMPLE_PAYLOAD = {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    # Split literal to keep source file scanner-safe; the runtime value is the
+    # full sk-ant-api03-<payload> credential string.
+    "tool_input": {"command": "echo " + "sk-" + "ant-api" + "03-" + "a" * 16},
+    "session_id": "test",
+    "cwd": "/fake",
+}
+
+
+def _canonical_env() -> dict[str, str]:
+    """Subprocess env that makes the local ``src/`` directory importable.
+
+    pytest injects ``src/`` into ``sys.path`` via
+    ``[tool.pytest.ini_options] pythonpath = ["src"]``, but subprocesses
+    spawned via ``subprocess.run`` inherit only ``PYTHONPATH``. Without this
+    helper the subprocess would import the installed GT-KB wheel (if any)
+    instead of the local source, potentially landing on the inline fallback.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    src_dir = repo_root / "src"
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(src_dir) + (os.pathsep + existing if existing else "")
+    return env
+
+
+def test_credential_scan_canonical_mode_self_test_uses_canonical_catalog():
+    """Running the hook with ``groundtruth_kb`` importable must use the canonical
+    catalog and must still deny the credential sample.
+    """
+    result = _run_hook("credential-scan.py", args=["--self-test"], env=_canonical_env())
+    assert result.returncode == 0, f"self-test exited {result.returncode}: {result.stderr}"
+    output = json.loads(result.stdout)
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny", (
+        "Canonical-mode self-test must deny the credential sample"
+    )
+    assert "CANONICAL_CATALOG_USED" in result.stderr, (
+        "Canonical mode must emit CANONICAL_CATALOG_USED marker on stderr. "
+        "Got stderr: " + repr(result.stderr)
+    )
+    assert "FALLBACK_CATALOG_USED" not in result.stderr, (
+        "Canonical mode must NOT emit fallback marker"
+    )
+
+
+def test_credential_scan_fallback_mode_uses_inline_catalog(tmp_path):
+    """Running the hook with ``python -S -I`` in an isolated directory must
+    force the inline fallback path (groundtruth_kb unimportable) and still
+    deny an equivalent credential sample.
+    """
+    isolated = _fallback_isolated_copy(tmp_path)
+    payload = json.dumps(_CRED_SAMPLE_PAYLOAD)
+
+    # -S: skip site.py (site-packages); -I: isolated mode (also clears
+    # PYTHONPATH, PYTHONHOME, user site). Net effect: groundtruth_kb cannot
+    # be imported from anywhere.
+    result = subprocess.run(
+        [sys.executable, "-S", "-I", str(isolated / "credential-scan.py")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        cwd=str(isolated),
+    )
+    assert result.returncode == 0, (
+        f"Fallback-mode run exited {result.returncode}: stderr={result.stderr!r}"
+    )
+    assert "FALLBACK_CATALOG_USED" in result.stderr, (
+        "Fallback mode must emit FALLBACK_CATALOG_USED marker on stderr. "
+        "Got stderr: " + repr(result.stderr)
+    )
+    assert "CANONICAL_CATALOG_USED" not in result.stderr, (
+        "Fallback mode must NOT emit canonical marker — isolation broke"
+    )
+    output = json.loads(result.stdout)
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert output["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+@pytest.mark.parametrize("mode", ["canonical", "fallback"])
+def test_credential_scan_both_modes_deny_same_sample(tmp_path, mode):
+    """Parameterized equivalence test: canonical and fallback catalogs must
+    deny the same credential sample with the same first-match description.
+    """
+    payload = json.dumps(_CRED_SAMPLE_PAYLOAD)
+
+    if mode == "canonical":
+        result = _run_hook("credential-scan.py", stdin_data=payload, env=_canonical_env())
+        expected_marker = "CANONICAL_CATALOG_USED"
+    else:
+        isolated = _fallback_isolated_copy(tmp_path)
+        result = subprocess.run(
+            [sys.executable, "-S", "-I", str(isolated / "credential-scan.py")],
+            input=payload,
+            capture_output=True,
+            text=True,
+            cwd=str(isolated),
+        )
+        expected_marker = "FALLBACK_CATALOG_USED"
+
+    assert result.returncode == 0, (
+        f"[{mode}] exited {result.returncode}: stderr={result.stderr!r}"
+    )
+    assert expected_marker in result.stderr, (
+        f"[{mode}] missing expected marker {expected_marker!r} on stderr. "
+        f"Got: {result.stderr!r}"
+    )
+    output = json.loads(result.stdout)
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny", (
+        f"[{mode}] expected deny decision, got {output!r}"
+    )
+    reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+    # First-match description must mention Anthropic API key family — both
+    # catalogs list it as the second Bash credential entry so the stripe sk-
+    # family match earlier in the catalog does not apply to this payload.
+    assert "Anthropic" in reason or "sk-ant-api" in reason, (
+        f"[{mode}] expected first-match to identify Anthropic API key family. "
+        f"Reason: {reason!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Deliberation search gate
 # ---------------------------------------------------------------------------
 
