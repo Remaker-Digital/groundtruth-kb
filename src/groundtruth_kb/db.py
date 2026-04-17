@@ -26,6 +26,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from groundtruth_kb.governance.credential_patterns import db_pattern_list
+
 _log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -4154,39 +4156,15 @@ class KnowledgeDB:
     # Deliberations
     # ------------------------------------------------------------------
 
-    # Redaction patterns for credential/PII scanning
-    _REDACTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-        ("api_key", re.compile(r"(?:api[_-]?key|apikey)\s*[:=]\s*['\"]?[\w\-]{16,}['\"]?", re.IGNORECASE)),
-        # Authorization header: "Authorization: Bearer <token>" or "Bearer <token>"
-        ("bearer_header", re.compile(r"(?:Authorization\s*:\s*)?Bearer\s+[\w\-\.~+/]+=*", re.IGNORECASE)),
-        # token=/token:/bearer=/bearer: explicit separator forms
-        ("token", re.compile(r"(?:token|bearer)\s*[:=]\s*['\"]?[\w\-\.]{20,}['\"]?", re.IGNORECASE)),
-        ("secret", re.compile(r"(?:secret|password|passwd)\s*[:=]\s*['\"]?[^\s'\"]{8,}['\"]?", re.IGNORECASE)),
-        ("connection_string", re.compile(r"(?:mongodb|postgres|mysql|redis|amqp)://[^\s\"']+", re.IGNORECASE)),
-        # Azure SharedAccessKey connection strings (captures full key up to ; or end)
-        ("azure_sas_key", re.compile(r"SharedAccessKey=[A-Za-z0-9+/=]{20,}(?:;|$)", re.IGNORECASE)),
-        # GitHub PAT prefixes: ghp_, gho_, ghs_, ghr_, github_pat_
-        ("github_pat", re.compile(r"(?:ghp|gho|ghs|ghr)_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}", re.IGNORECASE)),
-        # OpenAI / Stripe / generic service key prefixes
-        ("service_key", re.compile(r"(?:sk|pk)[-_](?:live|test|prod)[-_][A-Za-z0-9]{20,}", re.IGNORECASE)),
-        ("phone", re.compile(r"\+\d{10,15}")),
-        ("email", re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")),
-        ("ip_address", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")),
-        ("aws_key", re.compile(r"AKIA[0-9A-Z]{16}")),
-        # Common API key prefix families for credential redaction
-        # Character class includes hyphen for secrets.token_urlsafe() output
-        ("ar_live_key", re.compile(r"\bar_live_[A-Za-z0-9_-]{10,}")),
-        ("ar_user_key", re.compile(r"\bar_user_[A-Za-z0-9_-]{10,}")),
-        ("ar_spa_plat_key", re.compile(r"\bar_spa_plat_[A-Za-z0-9_-]{10,}")),
-        ("pk_live_key", re.compile(r"\bpk_live_[A-Za-z0-9_-]{10,}")),
-        ("arsk_key", re.compile(r"\barsk_[A-Za-z0-9_-]{10,}")),
-        # Anthropic API key family: sk-ant-api<digits>-<token>
-        # Covers current form (sk-ant-api03-...) and future API version variants.
-        # Case sensitive because sk-ant-api is always lowercase in Anthropic's
-        # format; case-insensitive would increase false positives against prose.
-        # Word-boundary anchor avoids matching inside longer URL-safe tokens.
-        ("anthropic_api_key", re.compile(r"\bsk-ant-api\d+-[A-Za-z0-9_-]{20,}")),
-    ]
+    # Redaction patterns for credential/PII scanning.
+    #
+    # Sourced from ``groundtruth_kb.governance.credential_patterns`` — the
+    # canonical cross-consumer catalog. The list shape ``(name, pattern)``
+    # is preserved so ``redact_content()`` and any downstream code that
+    # iterates ``_REDACTION_PATTERNS`` remain unchanged. See
+    # ``bridge/gtkb-credential-patterns-canonical-007.md`` (proposal)
+    # and ``-008.md`` (GO) for the consolidation rationale.
+    _REDACTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = db_pattern_list()
 
     @classmethod
     def redact_content(cls, text: str) -> tuple[str, str | None]:
