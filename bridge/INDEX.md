@@ -17,7 +17,71 @@
 <!--   - Bridge files 001-004 remain on disk as audit trail; editplan thread tracks continuing work -->
 <!--   - Rationale (same as S289): automated cap=1 scan spawn was re-firing on a consumed GO; downstream thread already visible to index -->
 
+<!-- Prime Builder maintenance (2026-04-17, S299-continuation): retired gtkb-start-here-adopter-rewrite (scope-bridge GO actioned) -->
+<!--   - gtkb-start-here-adopter-rewrite -002 was a scope-bridge GO with 7 conditions, NOT an implementation GO -->
+<!--   - The only action the scope GO authorized (per -001 §"Next Steps After Codex GO") was filing an implementation bridge -->
+<!--   - Implementation bridge gtkb-start-here-adopter-rewrite-implementation-001.md already filed NEW (see entry below) and discharges all 7 conditions + pins both owner decisions (Mermaid-only, synthetic protagonist "Allison") -->
+<!--   - Per .claude/rules/codex-review-gate.md, no code/doc/KB changes can begin until Codex GOs on the implementation bridge -->
+<!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread tracks continuing work -->
+<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn was re-firing on a consumed scope-GO; downstream thread already visible to index -->
+
+<!-- Prime Builder maintenance (2026-04-17, S299-continuation): retired gtkb-canonical-terminology-surface (scope-bridge GO actioned) -->
+<!--   - gtkb-canonical-terminology-surface -002 was a scope-bridge GO with 6 conditions + 2 owner-decision asks, NOT an implementation GO -->
+<!--   - The only action the scope GO authorized (per -001 §"Next Steps After Codex GO") was filing an implementation bridge -->
+<!--   - Implementation bridge gtkb-canonical-terminology-surface-implementation-001.md filed NEW (see entry below) — discharges all 6 Codex conditions, pins 5 owner decisions with defaults (MEMORY.md target = harness, doctor severity = ERROR/WARN/INFO, minimum term set, release coupling, rule file choice), and proposes the concrete doctor-check algorithm + TOML registry schema -->
+<!--   - Per .claude/rules/codex-review-gate.md, no Agent Red or GT-KB code/doc/template/KB mutation can begin until Codex GOs the implementation bridge -->
+<!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread tracks continuing work -->
+<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn was re-firing on a consumed scope-GO; downstream thread already visible to index -->
+
+<!-- Prime Builder maintenance (2026-04-17, S299-continuation): retired gtkb-da-harvest-coverage (scope-bridge GO actioned) -->
+<!--   - gtkb-da-harvest-coverage -002 was a scope-bridge GO with 7 implementation conditions + 5 findings, NOT an implementation GO -->
+<!--   - Codex -002 §"Rationale" states explicitly: "This is a GO for the scope bridge only. It authorizes filing the implementation bridge. It does not approve immediate code, doc, hook, database, or template mutation without the implementation bridge." -->
+<!--   - The only action the scope GO authorized (per -001 §"Next Steps After Codex GO" and -002 §"Required Next Step") was filing bridge/gtkb-da-harvest-coverage-implementation-001.md -->
+<!--   - Implementation bridge gtkb-da-harvest-coverage-implementation-001.md filed NEW (see entry above) — discharges all 5 Codex findings (F1 thread-level compression algorithm with 4 collision cases, F2 INDEX as authoritative grouping, F3 methodology_review→report source-type decision, F4 two-phase warning baseline contract with machine-readable JSON output, F5 Agent-Red-vs-GT-KB ownership split) and all 7 implementation conditions (algorithm, dry-run schema, source_ref convention, doctor denominator, idempotence tests, loud-failure tests, raw-transcript exclusion) -->
+<!--   - Per .claude/rules/codex-review-gate.md, no Agent Red or GT-KB code, script, doctor, or DA mutation can begin until Codex GOs the implementation bridge -->
+<!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread tracks continuing work -->
+<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn was re-firing on a consumed scope-GO; downstream thread already visible to index -->
+
+Document: gtkb-da-governance-completeness
+NEW: bridge/gtkb-da-governance-completeness-001.md
+
+Document: gtkb-da-harvest-coverage-implementation
+NEW: bridge/gtkb-da-harvest-coverage-implementation-006.md
+GO: bridge/gtkb-da-harvest-coverage-implementation-005.md
+REVISED: bridge/gtkb-da-harvest-coverage-implementation-004.md
+NO-GO: bridge/gtkb-da-harvest-coverage-implementation-003.md
+NO-GO: bridge/gtkb-da-harvest-coverage-implementation-002.md
+NEW: bridge/gtkb-da-harvest-coverage-implementation-001.md
+
+Document: gtkb-canonical-terminology-surface-implementation
+VERIFIED: bridge/gtkb-canonical-terminology-surface-implementation-012.md
+REVISED: bridge/gtkb-canonical-terminology-surface-implementation-011.md
+NO-GO: bridge/gtkb-canonical-terminology-surface-implementation-010.md
+NEW: bridge/gtkb-canonical-terminology-surface-implementation-009.md
+GO: bridge/gtkb-canonical-terminology-surface-implementation-008.md
+REVISED: bridge/gtkb-canonical-terminology-surface-implementation-007.md
+GO: bridge/gtkb-canonical-terminology-surface-implementation-006.md
+REVISED: bridge/gtkb-canonical-terminology-surface-implementation-005.md
+NO-GO: bridge/gtkb-canonical-terminology-surface-implementation-004.md
+REVISED: bridge/gtkb-canonical-terminology-surface-implementation-003.md
+NO-GO: bridge/gtkb-canonical-terminology-surface-implementation-002.md
+NEW: bridge/gtkb-canonical-terminology-surface-implementation-001.md
+
+Document: gtkb-start-here-adopter-rewrite-implementation
+REVISED: bridge/gtkb-start-here-adopter-rewrite-implementation-009.md
+NO-GO: bridge/gtkb-start-here-adopter-rewrite-implementation-008.md
+NEW: bridge/gtkb-start-here-adopter-rewrite-implementation-007.md
+GO: bridge/gtkb-start-here-adopter-rewrite-implementation-006.md
+REVISED: bridge/gtkb-start-here-adopter-rewrite-implementation-005.md
+NO-GO: bridge/gtkb-start-here-adopter-rewrite-implementation-004.md
+NEW: bridge/gtkb-start-here-adopter-rewrite-implementation-003.md
+GO: bridge/gtkb-start-here-adopter-rewrite-implementation-002.md
+NEW: bridge/gtkb-start-here-adopter-rewrite-implementation-001.md
+
 Document: gtkb-managed-artifact-registry
+VERIFIED: bridge/gtkb-managed-artifact-registry-010.md
+NEW: bridge/gtkb-managed-artifact-registry-009.md
+GO: bridge/gtkb-managed-artifact-registry-008.md
 REVISED: bridge/gtkb-managed-artifact-registry-007.md
 NO-GO: bridge/gtkb-managed-artifact-registry-006.md
 REVISED: bridge/gtkb-managed-artifact-registry-005.md
@@ -27,6 +91,7 @@ NO-GO: bridge/gtkb-managed-artifact-registry-002.md
 NEW: bridge/gtkb-managed-artifact-registry-001.md
 
 Document: agent-red-cto-cleanup
+VERIFIED: bridge/agent-red-cto-cleanup-010.md
 NEW: bridge/agent-red-cto-cleanup-009.md
 GO: bridge/agent-red-cto-cleanup-008.md
 REVISED: bridge/agent-red-cto-cleanup-007.md
