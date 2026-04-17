@@ -33,3 +33,16 @@ For Prime Builder and Loyal Opposition work, use this decision filter:
 If the answer is no, the report or proposal should identify what owner burden
 remains, why it remains, and whether it should be automated, specified, or
 accepted as an explicit owner decision.
+
+## Scope of the "production-deployable SaaS" claim
+
+"Produces a production-deployable SaaS application" names the outcome the
+method is designed to support, not an end-to-end deployment service owned by
+GroundTruth-KB. Concretely, GT-KB produces **governed readiness
+specifications, decision prompts, ADR templates, and verification checks**
+— the artifacts that force every cloud-readiness question into a traceable
+workflow. The CI/CD pipeline that builds and deploys the application, and
+the Azure (or other cloud) resource definitions themselves, remain owned
+and operated by the adopting team. See
+[Azure Enterprise Readiness Taxonomy](../reference/azure-readiness-taxonomy.md)
+for the full readiness-envelope boundary, tiers, and category catalog.

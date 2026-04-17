@@ -142,3 +142,15 @@ Session discipline prevents context loss across conversations and ensures that a
 - **Not a test runner.** It does not execute pytest or jest. It *records* test results and *enforces* that tests exist and pass before specifications can be promoted.
 - **Not a replacement for code review.** The Loyal Opposition pattern complements human review; it does not replace the judgment of experienced engineers.
 - **Not prescriptive about architecture.** It governs the *process* of making and verifying decisions, not the technical choices themselves. You can use GroundTruth with any language, framework, or cloud provider.
+
+### Reconciling the "Azure-ready SaaS" goal with the non-pipeline boundary
+
+The vision statement ("production-deployable SaaS application ready for
+Azure") and the non-goal above ("Not a CI/CD pipeline") are both true.
+GroundTruth-KB produces the **readiness envelope** — the specs, ADRs,
+decision prompts, and automated checks that make cloud readiness a
+traceable, verifiable workflow. The CI/CD pipeline that actually builds
+and deploys the application, and the Azure (or other cloud) resource
+definitions themselves, remain owned and operated by the adopting team.
+For the full tier model, category catalog, and child-bridge sequencing,
+see [Azure Enterprise Readiness Taxonomy](../reference/azure-readiness-taxonomy.md).
