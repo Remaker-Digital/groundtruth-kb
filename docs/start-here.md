@@ -1,42 +1,193 @@
 # Start Here
 
-A complete walkthrough from zero to a working GroundTruth project. Every command
-on this page has been verified against the current release.
+A guided walkthrough for adopters evaluating GroundTruth-KB for the first time.
+
+## Reader Profile
+
+This page assumes **zero prior context**. You have not used GroundTruth-KB
+before, you have not read the method documentation, and you may have never
+run a file-bridge protocol in your life. The only assumption is that you are
+sitting at a Windows workstation with internet access and can copy-paste
+commands into a PowerShell terminal.
+
+If that describes you, keep reading. Everything a senior technologist needs
+to decide whether GroundTruth-KB is worth an evaluation sits on this page or
+behind the links at the bottom.
 
 ## Prerequisites
+
+Before anything else, make sure these are present on your workstation:
 
 - **Python 3.11+** — check with `python --version`
 - **Git** — check with `git --version`
 - **pip** — included with Python
+- **Claude Code** — Anthropic's terminal-based coding assistant. Install
+  from the [Anthropic Claude Code install page](https://docs.anthropic.com/claude/docs/claude-code)
+  (retrieved 2026-04-17). Claude Code is a **separate prerequisite**. Install
+  and authenticate Claude Code before installing GroundTruth-KB.
+  GroundTruth-KB does not bundle Claude Code and does not manage its updates.
+- **(Optional) Codex** — available through OpenAI. Only needed if you intend
+  to run the dual-agent file bridge with a Loyal Opposition reviewer.
+
+The PowerShell primer at the bottom of this page shows exactly what commands
+to run if any of the above are missing.
+
+## 1. What Is GroundTruth-KB?
+
+GroundTruth-KB is a **specification-first governance toolkit for AI
+engineering teams**. It gives you three things that are hard to keep in sync
+without discipline:
+
+- A **canonical record** of what the system is supposed to do
+  (specifications).
+- A **machine-checkable proof** that the code still does it (assertions).
+- An **audit trail** of every decision and its rejected alternatives
+  (the Deliberation Archive).
+
+The toolkit is a single Python package (`pip install groundtruth-kb`). It
+ships with a CLI (`gt`), an optional Web UI, project scaffolding, CI
+templates, and a dual-agent file-bridge pattern for AI code review.
+
+See [Architecture — Product Split](architecture/product-split.md) for the
+three-layer split (Core Knowledge Database, Project Scaffold, Workstation
+Doctor).
+
+## 2. Features, One Problem at a Time
+
+Each capability exists because a specific thing is hard to get right without
+tooling. Read the problem first; the feature follows.
+
+### Specifications
+
+**Problem:** "What is this thing supposed to do?" is the single most common
+source of argument in AI-assisted development. Without a canonical record,
+every team member, every agent, and every reviewer carries their own
+unverifiable mental model.
+
+**Solution:** GroundTruth-KB stores specifications in an append-only SQLite
+database. Each spec has an ID, a status (`specified` → `implemented` →
+`verified`), and a history of every change. Specs are the project's
+decision log — not a build specification for an implementer.
+
+### Assertions
+
+**Problem:** Documentation rots. A spec that says "users can create tasks
+with a priority" does not prove the code still does it.
+
+**Solution:** Every spec can carry one or more machine-checkable
+**assertions**. A grep pattern, a file-exists check, a JSON path, a counted
+occurrence. Run `gt assert` and GroundTruth-KB tells you which specs still
+hold and which have drifted.
+
+### Tests
+
+**Problem:** Tests written without specifications drift in a different
+direction than the code they were meant to pin down.
+
+**Solution:** Every test is linked to a spec. When a test fails, you see
+which specification is at risk. When a spec changes, you see which tests
+need review.
+
+### Work Items
+
+**Problem:** "Known gap between spec and implementation" is a real
+engineering state, but most trackers (Jira, Linear) don't distinguish it
+from ordinary bugs or feature requests.
+
+**Solution:** A work item (WI) is always tied to a source spec. It has an
+origin (`new`, `regression`, `defect`, `hygiene`) and a stage. When the WI
+resolves, the linked spec can advance its status.
+
+### Deliberation Archive
+
+**Problem:** Six months from now, nobody will remember why you picked
+approach A over approach B, or whether a rejected alternative has already
+been tried.
+
+**Solution:** Every decision — owner conversation, Loyal Opposition review,
+bridge thread — is archived as a deliberation with semantic search. Cite
+deliberation IDs in proposals. Search before re-opening a settled decision.
+
+### Governance Gates
+
+**Problem:** "We will review every change" is aspirational. It does not
+survive contact with a fast-moving codebase.
+
+**Solution:** GroundTruth-KB enforces GOV specs (spec-first, test clarity,
+owner consent, no-fixes-during-testing, KB-is-truth) as runnable assertions.
+If a governance rule is violated, `gt assert` says so.
+
+### File-Bridge Dual-Agent Pattern
+
+**Problem:** A single AI agent reviewing its own work is weaker than two
+agents with opposing incentives. But coordinating two agents over chat is
+lossy.
+
+**Solution:** A file-bridge protocol in `bridge/` with a versioned INDEX.
+Prime Builder writes proposals; Loyal Opposition writes GO / NO-GO reviews;
+both agents poll the index independently. The filesystem is the audit trail.
+
+## 3. Block Diagram: Where Things Live
 
 ```mermaid
-flowchart TD
-    A[Install] --> B[Verify]
-    B --> C[Create Project]
-    C --> D[Check Workstation]
-    D --> E[Inspect Config]
-    E --> F[View Database]
-    F --> G[Seed Examples]
-    G --> H[Run Assertions]
-    H --> I[View History]
-    I --> J{Optional}
-    J -->|Web UI| K[Start Server]
-    J -->|CI| L[Add Workflows]
+flowchart TB
+    subgraph Local["Your Workstation"]
+        CLI["gt CLI<br/>(init / assert / serve)"]
+        DB["MemBase<br/>groundtruth.db<br/>(append-only SQLite)"]
+        MEM["MEMORY.md<br/>(operational notepad)"]
+        DA["Deliberation Archive<br/>(deliberations table)"]
+        CHROMA["ChromaDB index<br/>(semantic search, optional)"]
+        BRIDGE["bridge/<br/>(file-bridge proposals, INDEX.md)"]
+    end
+    subgraph Agents["AI Agents"]
+        CC["Claude Code<br/>(Prime Builder)"]
+        CX["Codex<br/>(Loyal Opposition)"]
+    end
+    subgraph Infra["Infrastructure"]
+        SCHED["OS Scheduler<br/>(Task Scheduler / cron)"]
+        WEB["Web UI<br/>(gt serve, optional)"]
+        CI["CI templates<br/>(GitHub Actions)"]
+    end
+
+    CLI --> DB
+    CLI --> MEM
+    CLI --> DA
+    DA --> CHROMA
+    CC --> BRIDGE
+    CX --> BRIDGE
+    SCHED --> CC
+    SCHED --> CX
+    DB --> WEB
+    CI --> CLI
 ```
 
-## Step 1: Install GroundTruth
+The diagram names the 14 directive entities an adopter touches in the first
+week: the CLI, the canonical database (MemBase), the operational memory
+file, the Deliberation Archive, the ChromaDB index, the bridge directory,
+the two AI agents, the OS scheduler, the Web UI, the CI templates, plus
+three roles (Prime Builder, Loyal Opposition, OS Scheduler).
 
-```bash
+The **three-tier memory architecture** is defined in
+[ADR-0001](method/08-architecture.md): **MemBase** is the canonical
+knowledge tier (specs, tests, work items, procedures, documents);
+**MEMORY.md** is the operational notepad (session state, what you were
+working on yesterday); the **Deliberation Archive** is the decision log
+(why you picked approach A over approach B). ChromaDB is a derived search
+index, not a fourth tier. See
+[product-split.md](architecture/product-split.md) for the authoritative
+definition of each layer.
+
+## 4. Install
+
+Once the prerequisites are satisfied, installation is a single command:
+
+```powershell
 pip install groundtruth-kb
 ```
 
-!!! tip "Pinned installs"
-    For reproducible installs, pin to an exact version:
-    `pip install groundtruth-kb==0.6.0`
+Verify the install:
 
-## Step 2: Verify Installation
-
-```bash
+```powershell
 gt --version
 ```
 
@@ -46,237 +197,157 @@ Expected output:
 gt, version 0.6.0
 ```
 
-## Step 3: Create a New Project
+Create your first project:
 
-```bash
+```powershell
 gt project init my-first-project --profile local-only --no-seed-example --no-include-ci
 ```
 
-This creates a `my-first-project/` directory with the core GroundTruth scaffold:
-configuration, database, rules, hooks, and project files.
+Switch into the project and verify its health:
 
-Now switch into the project directory — all remaining commands run from here:
-
-```bash
+```powershell
 cd my-first-project
-```
-
-??? info "Available profiles"
-    | Profile | What it includes | CI tier |
-    |---------|-----------------|---------|
-    | `local-only` | Single-agent setup: KB, rules, hooks | minimal |
-    | `dual-agent` | Above + Loyal Opposition bridge, AGENTS.md | standard |
-    | `dual-agent-webapp` | Above + Dockerfile, docker-compose, web UI config | full |
-
-    CI workflows are generated by default for all profiles. The profile
-    determines the tier (minimal / standard / full). Use `--no-include-ci`
-    to suppress all CI for any profile.
-
-## Step 4: Check Workstation Readiness
-
-```bash
 gt project doctor
 ```
 
-This reports which tools are installed and which are optional. All core
-checks should pass after Step 1.
+The doctor reports which tools are present and which are optional. All core
+checks should pass at this point.
 
-## Step 5: Inspect Configuration
+See the [Bootstrap Guide](bootstrap.md) for the full 10-step technical
+walkthrough (seed data, first spec, first test, first assertion, Web UI,
+CI). See [Desktop Setup](desktop-setup.md) for the same-day prototype
+path (`gt bootstrap-desktop`).
 
-```bash
-gt config
+## 5. PowerShell Primer
+
+If you have never opened a terminal, this five-command primer covers
+everything the walkthrough above requires. Open PowerShell (Start menu →
+type `PowerShell` → press Enter).
+
+| Task | Command | What it does |
+|------|---------|--------------|
+| Change directory | `cd C:\Users\you\projects` | Move into a folder |
+| List files | `ls` | Show what is in the current folder |
+| Run a program | `python --version` | Run a `.exe` that is on your `PATH` |
+| Install a Python package | `pip install groundtruth-kb` | Download + install a package from PyPI |
+| Check a command exists | `where.exe python` | Show the path to a `.exe` |
+
+If a command fails with "not recognized," it usually means the `.exe` is
+not on your `PATH`. The installers for Python and Git both offer to add
+themselves to `PATH` during setup — accept that option. If you already
+installed them without that option, re-run the installer and choose
+"Modify."
+
+## 6. Third-Party Integrations
+
+GroundTruth-KB deliberately stays thin. The heavy lifting is delegated to
+tools you probably already have. Here is the named inventory:
+
+| Tool | Why it is needed |
+|------|------------------|
+| **Claude Code** | Prime Builder — reads the bridge, writes proposals, edits code. |
+| **Codex** (OpenAI) | Loyal Opposition — reads the bridge, writes GO/NO-GO reviews. |
+| **OS Scheduler** (Windows Task Scheduler / Linux cron / macOS launchd) | Runs the bridge pollers every 3 minutes, independent of open chat sessions. |
+| **GitHub** | Hosts the repo and runs the CI templates. Not required for local-only mode. |
+| **PyPI** | Distributes the `groundtruth-kb` wheel. Required for install. |
+| **MkDocs + Material theme** | Renders the docs site (this page). Optional but recommended for team-scale adoption. |
+| **ChromaDB** | Semantic search backend for the Deliberation Archive. Optional; a SQLite LIKE fallback ships in the base install. |
+
+Nothing on this list is installed automatically by GroundTruth-KB. That is
+intentional — each is a separate decision that an adopter (or their IT
+department) should make explicitly. See [Desktop Setup](desktop-setup.md)
+for the install order that has been battle-tested on Windows.
+
+## 7. The Web UI Dashboard
+
+With the web extra installed (`pip install "groundtruth-kb[web]"`) and
+`gt serve` running at `http://localhost:8090`, the **dashboard** is the
+adopter's daily status screen. Each metric has an action attached to it:
+
+| Metric | What it tells you | If it is off-normal |
+|--------|-------------------|---------------------|
+| Specs by status | How many specs are `specified`, `implemented`, `verified` | A growing `specified` pile means WIs are not being created. A shrinking `verified` pile means drift. |
+| Tests total | How many tests are linked to specs | Test count dropping without a deletion reason → regression. |
+| Assertion pass / fail | How many machine-checkable assertions currently pass | Any failing `verified` spec is a regression. Failing `specified` is expected. |
+| Work item counts | Open vs. resolved WIs | An open WI with no recent change → investigate stalling. |
+| Recent activity | Last 20 spec / WI / test changes | A quiet day when you know you worked → the CLI is not writing to the expected DB. |
+| Deliberation archive size | Rows in the `deliberations` table | Zero rows after a session with reviews → the harvest script did not run. |
+
+The dashboard is text-first. No charting, no animated widgets. Every row
+can be exported via `gt export` for external tooling.
+
+## 8. Core Operational Loops
+
+Adoption means internalizing two loops. Both are short.
+
+### The Deploy Loop
+
+```
+develop → staging → prod
 ```
 
-Shows the resolved database path, project root, branding settings, and
-governance gates. These values come from `groundtruth.toml` in your
-project directory.
+- **develop** is the branch where every change lands. CI runs on every
+  push. Nobody commits directly to `main`.
+- **staging** is where the branch is tested against a production-shaped
+  environment before release.
+- **prod** is what the user sees. A merge to `main` is a deployment
+  operation; `main` is always deployable.
 
-## Step 6: View the Database
+GroundTruth-KB itself does not provision the staging and prod
+environments. The CI templates in `templates/ci/` show the wiring; the
+rest is your cloud decision.
 
-```bash
-gt summary
-```
-
-Expected output:
-
-```
-Specifications: 5 total
-Tests: 0
-Work items: 0
-```
-
-The 5 specifications are **governance rules** — they define the GroundTruth
-method itself and are always included. Your project starts with structure,
-not an empty void.
-
-## Step 7: Add Example Content
-
-```bash
-gt seed --example
-```
-
-This loads example specifications and tests that demonstrate the method
-using a sample task-tracker application.
-
-## Step 8: Verify the Seeded Content
-
-```bash
-gt summary
-```
-
-Expected output:
+### The Bridge Loop
 
 ```
-Specifications: 8 total
-Tests: 5
-Work items: 0
+propose → review → implement → verify
 ```
 
-The database now contains governance rules plus example specifications
-with linked tests.
+- **Propose:** Prime Builder writes `bridge/{topic}-001.md` and inserts a
+  `NEW` entry at the top of `bridge/INDEX.md`.
+- **Review:** Loyal Opposition reads the proposal and writes
+  `bridge/{topic}-002.md` with verdict `GO` or `NO-GO`.
+- **Implement:** On `GO`, Prime writes the code. On `NO-GO`, Prime writes
+  a `REVISED` proposal as `-003.md`.
+- **Verify:** Prime files a post-implementation report; Loyal Opposition
+  reads it and writes `VERIFIED` or another `NO-GO`.
 
-## Step 9: Run Assertions
+Both agents poll `bridge/INDEX.md` on a 3-minute cadence via the OS
+scheduler. No human has to babysit the queue. See
+[Method — File Bridge Automation](method/12-file-bridge-automation.md)
+for the full protocol.
 
-```bash
-gt assert
-```
+## 9. Next Steps
 
-Expected output:
+Once this page makes sense, walk through these in order:
 
-```
-PASSED: 2
-FAILED: 0
-```
-
-!!! tip "Why do assertions pass on a fresh scaffold?"
-    On a fresh scaffold, `gt assert` exits 0 because `src/tasks.py` is
-    pre-generated as a stub that satisfies the seeded SPEC-001 and SPEC-002
-    assertions. The tutorial teaches you to evolve it — as you replace the
-    stub with real application code, assertions confirm that your
-    implementation still meets the specifications.
-
-## Step 10: View History
-
-```bash
-gt history
-```
-
-Shows the seed operation and all recent changes to the knowledge base.
-Every insert, update, and promotion is tracked with timestamps and
-change reasons.
-
-Deliberations live in the Deliberation Archive (DA), one of three tiers defined by ADR-0001: Three-Tier Memory Architecture (MemBase, MEMORY.md, DA).
-
-## Step 11: Capture a Deliberation
-
-Deliberations are the "why" behind your decisions — rejected alternatives,
-owner conversations, review verdicts, and any reasoning that shapes your
-specs. They travel with the project in the same database as your specs.
-
-Capture a deliberation from the command line:
-
-```bash
-gt deliberations add \
-  --id DELIB-0001 \
-  --source-type owner_conversation \
-  --source-ref "walkthrough notes" \
-  --title "Start with 3 layers, add the rest later" \
-  --summary "Chose to seed governance first and defer full layering" \
-  --content "We picked the minimal example because it highlights the spec/test/implementation triangle without overwhelming a first-time reader." \
-  --outcome owner_decision
-```
-
-Retrieve it later:
-
-```bash
-gt deliberations get DELIB-0001
-```
-
-Or find it by free-text search (SQLite LIKE fallback works even in the base
-install; add the `[search]` extra for semantic search):
-
-```bash
-gt deliberations search "minimal example"
-```
-
-Link it to a spec so the reasoning travels with the decision:
-
-```bash
-gt deliberations link DELIB-0001 --spec SPEC-0001 --role related
-```
-
-See the [Method Guide — Deliberation Archive](method/13-deliberation-archive.md)
-for a full workflow and the complete CLI surface.
-
-## Step 12: Start the Web UI (optional)
-
-Install the web extra:
-
-```bash
-pip install "groundtruth-kb[web]"
-```
-
-Then start the server:
-
-```bash
-gt serve
-```
-
-Open [http://localhost:8090](http://localhost:8090) in your browser to
-browse specifications, tests, work items, and assertion results.
-
-## Step 13: Add CI (optional)
-
-If you skipped CI in Step 3, you can add it manually by copying the
-CI templates into your project:
-
-```bash
-# From your project directory:
-gt project upgrade
-```
-
-Or copy individual workflow files from the
-[templates/ci/](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/templates/ci)
-directory.
-
-!!! note "Default behavior"
-    If you run `gt project init my-project --profile local-only` without
-    the `--no-include-ci` flag, CI workflows are included automatically.
+- **[Your First Specification](tutorials/first-spec.md)** — write a spec,
+  link a test, run an assertion. 15 minutes.
+- **[Dual-Agent Setup](tutorials/dual-agent-setup.md)** — add the Loyal
+  Opposition and wire the file-bridge poller. 30 minutes.
+- **[A Day in the Life](day-in-the-life.md)** — a synthetic first week
+  with a solo developer using Claude Code + GroundTruth-KB together.
+- **[Evidence](evidence.md)** — live metrics from the reference
+  implementation, each with generating command + commit SHA + date.
+- **[Known Limitations](known-limitations.md)** — open gaps you should
+  know about before committing. Honesty beats marketing.
+- **[Executive Overview](groundtruth-kb-executive-overview.md)** — the
+  business case for an engineering manager reviewing this tool.
 
 ## Command Quick Reference
 
 | Task | Command |
 |------|---------|
-| Scaffold new project | `gt project init my-project --profile <profile>` |
+| Install | `pip install groundtruth-kb` |
+| Scaffold a project | `gt project init my-project --profile <profile>` |
 | Same-day prototype | `gt bootstrap-desktop my-project` |
 | Check workstation | `gt project doctor` |
-| Update scaffold | `gt project upgrade` |
 | View summary | `gt summary` |
 | Run assertions | `gt assert` |
 | View history | `gt history` |
-| Export database | `gt export` |
-| Import database | `gt import db.json` |
-| Show config | `gt config` |
-| Start web UI | `gt serve` |
 | Capture a deliberation | `gt deliberations add --id DELIB-... --summary ... --content ...` |
-| Capture (auto-id, idempotent) | `gt deliberations upsert --source-ref ... --content-file ...` |
-| Fetch a deliberation | `gt deliberations get DELIB-0001 [--history]` |
-| List / filter deliberations | `gt deliberations list [--spec-id ...] [--outcome ...]` |
-| Search deliberations | `gt deliberations search "query" [--semantic-only]` |
-| Link deliberation to spec | `gt deliberations link DELIB-... --spec SPEC-... --role related` |
-| Rebuild search index | `gt deliberations rebuild-index` |
-
-## What's Next?
-
-- **[Your First Specification](tutorials/first-spec.md)** — write your first spec, link a test, and run an assertion
-- **[Dual-Agent Setup](tutorials/dual-agent-setup.md)** — add the Loyal Opposition and configure the file bridge
-- **[Method Guide](method/01-overview.md)** — understand the full GroundTruth
-  discipline: specifications, testing, governance, and dual-agent workflows
-- **[Example Project](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/examples/task-tracker/WALKTHROUGH.md)** —
-  a guided walkthrough of a task-tracker that exercises all six layers
-- **[CLI Reference](reference/cli.md)** — the full command surface (including the six `gt deliberations` subcommands) with options and examples
-- **[Configuration Reference](reference/configuration.md)** — every
-  `groundtruth.toml` field and environment variable
+| Search deliberations | `gt deliberations search "query"` |
+| Start the Web UI | `gt serve` |
 
 ---
 
