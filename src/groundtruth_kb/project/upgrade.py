@@ -91,6 +91,58 @@ def _map_managed_to_template(managed: str) -> str | None:
     return None
 
 
+def _filter_hooks_for_profile(profile: ProjectProfile) -> list[str]:
+    """Return managed hooks applicable to the profile."""
+    managed = list(_MANAGED_HOOKS)
+    if not profile.includes_bridge:
+        managed = [
+            h
+            for h in managed
+            if h.split("/")[-1]
+            in {
+                "assertion-check.py",
+                "spec-classifier.py",
+            }
+        ]
+    return managed
+
+
+def _filter_rules_for_profile(profile: ProjectProfile) -> list[str]:
+    """Return managed rules applicable to the profile."""
+    managed_rules = list(_MANAGED_RULES)
+    if not profile.includes_bridge:
+        managed_rules = [r for r in managed_rules if "prime-builder" in r]
+    return managed_rules
+
+
+def _plan_missing_managed_files(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
+    """Plan ``add`` actions for any missing managed hook/rule file.
+
+    Runs unconditionally (not version-gated) so a missing hook at the
+    current scaffold version still produces a repair action. Addresses
+    the same-version inert-hook drift flagged in
+    ``bridge/gtkb-hook-scanner-safe-writer-010.md`` Finding 1.
+    """
+    actions: list[UpgradeAction] = []
+    for mfile in _filter_hooks_for_profile(profile) + _filter_rules_for_profile(profile):
+        project_path = target / mfile
+        if project_path.exists():
+            continue
+        template_rel = _map_managed_to_template(mfile)
+        if template_rel is None:
+            continue
+        if _template_hash(template_rel) is None:
+            continue
+        actions.append(
+            UpgradeAction(
+                file=mfile,
+                action="add",
+                reason="Managed file missing — will copy from template",
+            )
+        )
+    return actions
+
+
 def _plan_managed_hooks(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
     """Plan ``add``/``skip`` actions for managed ``.claude/hooks/`` files.
 
@@ -103,30 +155,17 @@ def _plan_managed_hooks(target: Path, profile: ProjectProfile) -> list[UpgradeAc
     - Files that match the template are silently skipped.
     """
     actions: list[UpgradeAction] = []
-    managed = list(_MANAGED_HOOKS)
-    if not profile.includes_bridge:
-        managed = [
-            h
-            for h in managed
-            if h.split("/")[-1]
-            in {
-                "assertion-check.py",
-                "spec-classifier.py",
-            }
-        ]
-
-    for mfile in managed:
+    for mfile in _filter_hooks_for_profile(profile):
         project_path = target / mfile
+        if not project_path.exists():
+            continue  # Missing-file case handled by _plan_missing_managed_files
+
         template_rel = _map_managed_to_template(mfile)
         if template_rel is None:
             continue
 
         template_h = _template_hash(template_rel)
         if template_h is None:
-            continue
-
-        if not project_path.exists():
-            actions.append(UpgradeAction(file=mfile, action="add", reason="New managed file"))
             continue
 
         project_h = _file_hash(project_path)
@@ -146,27 +185,22 @@ def _plan_managed_hooks(target: Path, profile: ProjectProfile) -> list[UpgradeAc
 
 
 def _plan_managed_rules(target: Path, profile: ProjectProfile) -> list[UpgradeAction]:
-    """Plan ``add``/``skip`` actions for managed ``.claude/rules/`` files.
-
-    Behavior preserved from the original in-line planning loop.
+    """Plan ``skip`` actions for managed ``.claude/rules/`` files that differ
+    from the template. Missing-file case is handled by
+    :func:`_plan_missing_managed_files`.
     """
     actions: list[UpgradeAction] = []
-    managed_rules = list(_MANAGED_RULES)
-    if not profile.includes_bridge:
-        managed_rules = [r for r in managed_rules if "prime-builder" in r]
-
-    for mfile in managed_rules:
+    for mfile in _filter_rules_for_profile(profile):
         project_path = target / mfile
+        if not project_path.exists():
+            continue  # Missing-file case handled by _plan_missing_managed_files
+
         template_rel = _map_managed_to_template(mfile)
         if template_rel is None:
             continue
 
         template_h = _template_hash(template_rel)
         if template_h is None:
-            continue
-
-        if not project_path.exists():
-            actions.append(UpgradeAction(file=mfile, action="add", reason="New managed file"))
             continue
 
         project_h = _file_hash(project_path)
@@ -318,14 +352,18 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
     profile = get_profile(manifest.profile)
     actions: list[UpgradeAction] = []
 
-    # Config drift checks run unconditionally (even at current scaffold
-    # version) so that a missing PreToolUse registration or gitignore
-    # pattern is always surfaced by ``gt project upgrade --dry-run``.
+    # Drift checks run unconditionally (even at current scaffold version)
+    # so that missing managed files, missing PreToolUse registrations,
+    # and missing gitignore patterns are always surfaced by
+    # ``gt project upgrade --dry-run``.
+    actions.extend(_plan_missing_managed_files(target, profile))
     actions.extend(_plan_settings_registration(target, profile))
     actions.extend(_plan_gitignore_patterns(target, profile))
 
-    # Managed-file hash checks are gated on version change — at the current
-    # version the existing files are assumed to be at-template.
+    # Managed-file hash/customization checks are gated on version change —
+    # at the current version, files present on disk are assumed to match
+    # the template (or be intentional customizations). Missing files are
+    # already handled above.
     if manifest.scaffold_version != __version__:
         actions.extend(_plan_managed_hooks(target, profile))
         actions.extend(_plan_managed_rules(target, profile))

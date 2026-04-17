@@ -57,6 +57,18 @@ When a write is denied the hook appends a single-line JSON record to
 - ``hits`` (list of ``{"pattern_name": str, "pattern_description": str, "span": [int,int]}``)
 - ``session_id`` (string or ``null``)
 
+Stable interface contract
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Within ``schema_version: 1``, the stable fields collectors may index on
+are ``pattern_name`` (the canonical PatternSpec name, e.g.,
+``"ar_live_key"``) and the regex/flags identity. **``pattern_description``
+is human-readable context only and may diverge between canonical and
+fallback catalogs** (for example, fallback descriptions omit
+product-specific phrasing so adopter template files don't trip
+no-leakage scans). Collectors should NOT treat ``pattern_description``
+as schema-stable. Parity test enforces ``(name, pattern, flags)``
+equality strictly; description equality is intentionally NOT enforced.
+
 Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
 All rights reserved.
 """

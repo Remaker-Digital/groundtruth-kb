@@ -196,8 +196,7 @@ def test_pattern_matches_positive_sample(spec: PatternSpec) -> None:
     """Every canonical spec's positive sample must match its regex."""
     positive, _ = _SAMPLES[spec.name]
     assert spec.pattern.search(positive) is not None, (
-        f"Positive sample for {spec.name!r} did not match pattern {spec.pattern.pattern!r}. "
-        f"Sample: {positive!r}"
+        f"Positive sample for {spec.name!r} did not match pattern {spec.pattern.pattern!r}. Sample: {positive!r}"
     )
 
 
@@ -210,8 +209,7 @@ def test_pattern_rejects_negative_sample(spec: PatternSpec) -> None:
     """Every canonical spec's negative sample must NOT match its regex."""
     _, negative = _SAMPLES[spec.name]
     assert spec.pattern.search(negative) is None, (
-        f"Negative sample for {spec.name!r} unexpectedly matched pattern {spec.pattern.pattern!r}. "
-        f"Sample: {negative!r}"
+        f"Negative sample for {spec.name!r} unexpectedly matched pattern {spec.pattern.pattern!r}. Sample: {negative!r}"
     )
 
 
@@ -228,8 +226,13 @@ def test_scan_default_scope_includes_all_specs() -> None:
         "+15551234567 "  # DB PII (phone)
         "user@example.com "  # DB PII (email)
         "192.168.1.1 "  # DB PII (ip_address)
-        + _AWS_PREFIX + "ABCDEFGHIJKLMNOP "  # DB + Bash-credential dual via AWS key
-        + "echo " + _SK_ANT_PREFIX + "03-" + "a" * 10 + " > /tmp/out"
+        + _AWS_PREFIX
+        + "ABCDEFGHIJKLMNOP "  # DB + Bash-credential dual via AWS key
+        + "echo "
+        + _SK_ANT_PREFIX
+        + "03-"
+        + "a" * 10
+        + " > /tmp/out"
     )
     matches = scan(text)
     names = {m.name for m in matches}
@@ -246,10 +249,7 @@ def test_scan_default_scope_includes_all_specs() -> None:
 
 def test_scan_scope_db_returns_only_db_specs() -> None:
     """``scan(scope=Scope.DB)`` returns only DB-scoped matches."""
-    text = (
-        "api_key=abc123def456ghi789jkl echo "
-        + _SK_ANT_PREFIX + "03-" + "a" * 10 + " > /tmp/out"
-    )
+    text = "api_key=abc123def456ghi789jkl echo " + _SK_ANT_PREFIX + "03-" + "a" * 10 + " > /tmp/out"
     matches = scan(text, scope=Scope.DB)
     # Every match must come from a DB-scoped spec
     db_spec_names = {s.name for s in _all_specs() if s.scope is Scope.DB}
@@ -261,7 +261,8 @@ def test_scan_scope_bash_credential_returns_only_bash_credential_specs() -> None
     """``scan(scope=Scope.BASH_CREDENTIAL)`` returns only Bash credential specs."""
     text = (
         "api_key=abc123def456ghi789jkl "  # DB credential — should NOT appear
-        + _AWS_PREFIX + "ABCDEFGHIJKLMNOP "  # Bash credential (dual-registered AWS key)
+        + _AWS_PREFIX
+        + "ABCDEFGHIJKLMNOP "  # Bash credential (dual-registered AWS key)
         + "echo sk-abcdefghij > /tmp/leak.txt"  # Bash output — should NOT appear
     )
     matches = scan(text, scope=Scope.BASH_CREDENTIAL)
@@ -294,8 +295,7 @@ def test_public_match_has_no_matched_text_attribute() -> None:
     assert isinstance(m, Match)
     # The dataclass must not have ``matched_text`` as a public attribute
     assert not hasattr(m, "matched_text"), (
-        "Public Match class must not surface raw matched text; move sensitive "
-        "matched-text access to _InternalMatch."
+        "Public Match class must not surface raw matched text; move sensitive matched-text access to _InternalMatch."
     )
 
 
@@ -346,8 +346,7 @@ def test_mapping_all_source_entries_have_canonical_target() -> None:
         bash_cred_hits = [s for s in hits if s.scope is Scope.BASH_CREDENTIAL]
         if not bash_cred_hits:
             unresolved.append(
-                f"bash_credential:{entry['description']!r} "
-                f"(pattern={entry['pattern']!r}, flags={entry['flags']!r})"
+                f"bash_credential:{entry['description']!r} (pattern={entry['pattern']!r}, flags={entry['flags']!r})"
             )
 
     # Bash output entries (2)
@@ -357,15 +356,13 @@ def test_mapping_all_source_entries_have_canonical_target() -> None:
         bash_out_hits = [s for s in hits if s.scope is Scope.BASH_OUTPUT]
         if not bash_out_hits:
             unresolved.append(
-                f"bash_output:{entry['description']!r} "
-                f"(pattern={entry['pattern']!r}, flags={entry['flags']!r})"
+                f"bash_output:{entry['description']!r} (pattern={entry['pattern']!r}, flags={entry['flags']!r})"
             )
 
     assert not unresolved, (
         "Pre-migration source entries are missing canonical targets; migration "
         "has silently dropped patterns. Either migrate the missing entries or "
-        "document fixture-proven equivalence with explicit dedup tests:\n  "
-        + "\n  ".join(unresolved)
+        "document fixture-proven equivalence with explicit dedup tests:\n  " + "\n  ".join(unresolved)
     )
 
 
@@ -494,26 +491,18 @@ def test_inline_fallback_catalog_matches_canonical() -> None:
     # lines, and so does the inline fallback. Both compile to the same
     # pattern object, so ``re.compile(...).pattern`` is what we compare.
     assert len(inline_creds) == len(canonical_creds), (
-        f"CREDENTIAL_PATTERNS count mismatch: inline has {len(inline_creds)}, "
-        f"canonical has {len(canonical_creds)}"
+        f"CREDENTIAL_PATTERNS count mismatch: inline has {len(inline_creds)}, canonical has {len(canonical_creds)}"
     )
     for i, (inline, canonical) in enumerate(zip(inline_creds, canonical_creds, strict=True)):
         assert inline == canonical, (
-            f"CREDENTIAL_PATTERNS entry {i} drift:\n"
-            f"  inline   = {inline}\n"
-            f"  canonical= {canonical}"
+            f"CREDENTIAL_PATTERNS entry {i} drift:\n  inline   = {inline}\n  canonical= {canonical}"
         )
 
     assert len(inline_outs) == len(canonical_outs), (
-        f"OUTPUT_PATTERNS count mismatch: inline has {len(inline_outs)}, "
-        f"canonical has {len(canonical_outs)}"
+        f"OUTPUT_PATTERNS count mismatch: inline has {len(inline_outs)}, canonical has {len(canonical_outs)}"
     )
     for i, (inline, canonical) in enumerate(zip(inline_outs, canonical_outs, strict=True)):
-        assert inline == canonical, (
-            f"OUTPUT_PATTERNS entry {i} drift:\n"
-            f"  inline   = {inline}\n"
-            f"  canonical= {canonical}"
-        )
+        assert inline == canonical, f"OUTPUT_PATTERNS entry {i} drift:\n  inline   = {inline}\n  canonical= {canonical}"
 
 
 # ---------------------------------------------------------------------------

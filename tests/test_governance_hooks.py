@@ -254,12 +254,9 @@ def test_credential_scan_canonical_mode_self_test_uses_canonical_catalog():
         "Canonical-mode self-test must deny the credential sample"
     )
     assert "CANONICAL_CATALOG_USED" in result.stderr, (
-        "Canonical mode must emit CANONICAL_CATALOG_USED marker on stderr. "
-        "Got stderr: " + repr(result.stderr)
+        "Canonical mode must emit CANONICAL_CATALOG_USED marker on stderr. Got stderr: " + repr(result.stderr)
     )
-    assert "FALLBACK_CATALOG_USED" not in result.stderr, (
-        "Canonical mode must NOT emit fallback marker"
-    )
+    assert "FALLBACK_CATALOG_USED" not in result.stderr, "Canonical mode must NOT emit fallback marker"
 
 
 def test_credential_scan_fallback_mode_uses_inline_catalog(tmp_path):
@@ -280,12 +277,9 @@ def test_credential_scan_fallback_mode_uses_inline_catalog(tmp_path):
         text=True,
         cwd=str(isolated),
     )
-    assert result.returncode == 0, (
-        f"Fallback-mode run exited {result.returncode}: stderr={result.stderr!r}"
-    )
+    assert result.returncode == 0, f"Fallback-mode run exited {result.returncode}: stderr={result.stderr!r}"
     assert "FALLBACK_CATALOG_USED" in result.stderr, (
-        "Fallback mode must emit FALLBACK_CATALOG_USED marker on stderr. "
-        "Got stderr: " + repr(result.stderr)
+        "Fallback mode must emit FALLBACK_CATALOG_USED marker on stderr. Got stderr: " + repr(result.stderr)
     )
     assert "CANONICAL_CATALOG_USED" not in result.stderr, (
         "Fallback mode must NOT emit canonical marker — isolation broke"
@@ -316,12 +310,9 @@ def test_credential_scan_both_modes_deny_same_sample(tmp_path, mode):
         )
         expected_marker = "FALLBACK_CATALOG_USED"
 
-    assert result.returncode == 0, (
-        f"[{mode}] exited {result.returncode}: stderr={result.stderr!r}"
-    )
+    assert result.returncode == 0, f"[{mode}] exited {result.returncode}: stderr={result.stderr!r}"
     assert expected_marker in result.stderr, (
-        f"[{mode}] missing expected marker {expected_marker!r} on stderr. "
-        f"Got: {result.stderr!r}"
+        f"[{mode}] missing expected marker {expected_marker!r} on stderr. Got: {result.stderr!r}"
     )
     output = json.loads(result.stdout)
     assert output["hookSpecificOutput"]["permissionDecision"] == "deny", (
@@ -332,8 +323,7 @@ def test_credential_scan_both_modes_deny_same_sample(tmp_path, mode):
     # catalogs list it as the second Bash credential entry so the stripe sk-
     # family match earlier in the catalog does not apply to this payload.
     assert "Anthropic" in reason or "sk-ant-api" in reason, (
-        f"[{mode}] expected first-match to identify Anthropic API key family. "
-        f"Reason: {reason!r}"
+        f"[{mode}] expected first-match to identify Anthropic API key family. Reason: {reason!r}"
     )
 
 
