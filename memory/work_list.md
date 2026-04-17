@@ -7,6 +7,51 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Active Items
 
+### Forward-work ordering reference (GO'd 2026-04-17)
+
+**Authoritative ordering:** `bridge/post-phase-a-prioritization-003.md` (plan) + `-004.md` (Codex GO).
+The plan is the ordering reference for all post-Phase-A work. Each numbered item still requires
+its own bridge proposal and review cycle per `.claude/rules/codex-review-gate.md`.
+
+**Tier 1 (immediate, visible to CTO, blocks downstream):**
+1. **A1 — `gtkb-bridge-spawn-revalidation`** (small; spawn pre-execution INDEX revalidation guard).
+2. **B1 — Agent Red CTO cleanup** (20 commits ahead, CI red on SonarCloud, 19 dirty files to classify).
+3. **C1 — `gtkb-managed-artifact-registry`** (closes live Gap 2.8; blocks C2-C8 only; NOT a dependency of D1/D2).
+
+**Tier 2 (parallelizable after Tier 1):**
+4. **C2 — `gtkb-upgrade-pre-flight-checks`** (requires C1).
+5. **D1 + D2 — Azure spec scaffold + ADR template activation** (independent of C1; can run parallel with C1 — owner priority choice).
+6. **E1 — `gtkb-skills-tier-a-adoption-001`** (Agent Red adoption of Tier A deliverables).
+
+**Tier 3 (dependency-gated):** C3+C4, D3+D4, F2 (POR 16.D orphan test), F4 (SPEC-1831/1832/1833 verify), B4 (`wiki/Scaling-Analysis.md` hygiene).
+
+**Tier 4 (planned/deferred):** F1 (POR 14, blocked on carrier), C5-C8, D5→D6→D7, F3 (POR 16.E), B2, B3.
+
+**Tier 5 (long-term):** F6 (Zero-Knowledge Phase 4).
+
+**Codex conditions to carry forward (from `-004.md`):**
+- **A1 child bridge must:** (a) make revalidation rule role-specific (Codex = NEW/REVISED match; Prime = GO/NO-GO match); (b) NOT treat `NO-GO` as terminal for Prime (Prime on NO-GO writes REVISED — see `.claude/rules/file-bridge-protocol.md:60-63`); (c) identify live wrapper set explicitly (including whether `*-noconsole.generated.ps1` files are source-of-truth, deployment artifacts, or both); (d) include an integration test that mutates `bridge/INDEX.md` between snapshot selection and spawn execution and proves the stale spawn aborts without modifying any bridge file.
+- **B4 child bridge must:** stay scoped as documentation-hygiene around `wiki/Scaling-Analysis.md`; must NOT reopen WI-3171 implementation scope unless new evidence shows a live scaling mismatch.
+- **If Prime ever proposes C2 before C1** despite the matrix, that is an explicit owner override of the registry-first recommendation, not a default technical plan.
+
+**Owner override still open:** whether D1+D2 should be pulled into Tier 1 alongside A1+B1+C1 for an Azure-focused CTO demonstration. Default plan recommends Tier 2 placement; owner may elevate.
+
+### Owner-directed backlog addition (2026-04-17): Claude Design GUI exploration
+
+**Priority placement:** Deferred until the current active priorities above are complete or explicitly paused by owner. Once the current priority stack is clear, focus on taking best advantage of Claude Design for Agent Red GUI work.
+
+**Proposed bridge/workstream name:** `agent-red-claude-design-gui-refresh-intake`
+
+**Initial scope (exploration and process design, not implementation):**
+- Define how Agent Red's current GUI can be captured for Claude Design using screenshots, route inventory, component inventory, state inventory, design-token notes, and selected source-context directories.
+- Define the Claude Design project brief and context package for improving Agent Red GUIs.
+- Define the design handoff packet format: exported prototype/HTML/PDF/PPTX/screenshots, component inventory, state matrix, responsive behavior, accessibility notes, open owner decisions, and Claude Code handoff boundaries.
+- Define how GT-KB should register design artifacts, visual specs, ADRs, acceptance criteria, and review evidence.
+- Define automated GUI verification requirements for Claude Design-derived work: Playwright screenshots, visual baselines, review gallery, axe/accessibility checks, keyboard navigation, semantic DOM assertions, and state-matrix coverage.
+- Define Loyal Opposition review gates so Claude Design output becomes binding only after export, GT-KB registration, bridge review, and visual/a11y verification.
+
+**Explicit non-scope until later GO:** no GUI redesign implementation, no production UI changes, no direct Claude Design to production handoff, and no bypass of Prime/Codex bridge review.
+
 ### CTO readiness (Agent Red full cleanup)
 **GT-KB CI fix (4C regression) ✅ VERIFIED + PUSHED.** Bridge `gtkb-4c-ci-regression-fix-004`. Commit `a3fa4d2` on GT-KB main. All 6 GitHub CI workflows green.
 
@@ -18,6 +63,26 @@ Do not wait for owner approval between items. Continue unsupervised.
 - CI failing on develop at GitHub (last push was several commits back)
 - Deferred provisioning display-name rewrite (`src/integrations/provisioning.py` + 2 test files, needs tenant-isolation review)
 - Wiki currency review (Codex flagged as stale relative to current April work)
+
+### GT-KB Operational Skills Tier A (Phase A scope GO'd 2026-04-17)
+**Status:** Scope GO at bridge `gtkb-operational-skills-tier-a-004`. Scope-level post-implementation tracking report filed at `-005` (NEW, S299) — all six authorized bridges filed in dependency order, G1-G5 review gates propagated, verdict requested. 6 implementation bridges tracked separately. Phase A targets `groundtruth-kb` v0.6.0 — 1 canonical module + 1 PreToolUse hook + 3 skills + 1 metrics collector.
+
+Six implementation bridges (strict dependency order per GO Condition 3):
+1. **`gtkb-credential-patterns-canonical`** — **✅ VERIFIED S298** at `-010`. Commit `862045d` on GT-KB main (local, not pushed): 6 files, +1442/-63, tests 969→1074 (+105), ruff/mypy --strict/full-suite all pass. Non-blocking audit caveat from Codex: fixture has set-equality with pre-migration source but not order-equality (subagent reordered PII entries to end). Recommended non-blocking follow-up: either restore order or document content-set comparison basis. #1 is done; #2, #4 in revision; #3, #5 blocked.
+2. **`gtkb-hook-scanner-safe-writer`** — **✅ VERIFIED S298** at `-012`. Two commits on GT-KB main: `b5e5c6c` (original delivery, 7 files +1619/-25) + `37a88cc` (post-impl fix per `-010` NO-GO: same-version missing-file repair via `_plan_missing_managed_files`, pattern_description formally non-contractual in schema v1, full-repo ruff format). 1114 tests pass total (+40 from Tier A #2), mypy --strict clean, ruff check + format clean on full repo. 3 proposal NO-GO cycles (002/004/006) → REVISED-1/-2/-3 → GO at -008. Post-impl VERIFY took 2 rounds (-010 NO-GO + -012 VERIFIED). Unblocks #3, #5. Non-disruptive-upgrade primitive `_plan_missing_managed_files` now available for skills (#4) and future managed-file classes.
+3. **`gtkb-skill-bridge-propose`** — **✅ VERIFIED S298** at `-008`. Commit `0a60054` on GT-KB main: 9 files, +1274/-1, tests 1134→1161 (+27), mypy --strict/ruff/full-suite all pass. 2 NO-GO cycles (002/004) → REVISED-1/-2 → GO at -006 → committed → VERIFIED at -008. Autonomous -001 draft; Prime took over on -003 REVISED after #4 VERIFIED. Pattern: skill helper does credential-only scan + overlap-safe redact (outermost-label merging via `_normalize_hit_intervals`) + atomic INDEX update with 2-attempt retry; no Force bypass path (helper-based writes are outside scanner-safe-writer's Write-tool scope, documented). Unblocks #5 mutation-gate pattern.
+4. **`gtkb-skill-decision-capture`** — **✅ VERIFIED S298** at `-012` (no findings). Commit `d9325c9` on GT-KB main: 9 files, +821/-7, tests 1114→1134 (+20), ruff/mypy --strict/full-suite all pass. Wheel contents verified: both skill files ship. 4 proposal NO-GO cycles (002/004/006/008) + 4 REVISED (003/005/007/009) → GO at -010 → committed → VERIFIED. `_MANAGED_SKILLS` pattern established; skills + doctor integration + non-disruptive upgrade path now operational. Unblocks #3 skill-bridge-propose.
+5. **`gtkb-skill-spec-intake`** — `/gtkb-spec-intake` skill with confirm-before-mutate contract. Blocked on #3 (mutation-gate pattern).
+6. **`gtkb-phase-a-metrics-collector`** — `scripts/collect_phase_a_metrics.py` + fixtures. Consumes `.claude/hooks/scanner-safe-writer.log` JSONL schema v1 from #2. Can parallel #3-5; deferred to last so collector sees real bridge data.
+
+GO review gates from `-004` that each implementation bridge must satisfy:
+- **G1** (High, #1): derive credential-pattern inventory from source, not from proposal counts.
+- **G2** (High, first skill bridge): make skill scaffold and adopter installation explicit (skills packaged + copied like hooks).
+- **G3** (Medium, all): treat GO as authorizing **six** (not five) implementation bridges; normalize counts in reports.
+- **G4** (Medium, #5): use valid deliberation outcome (`deferred` exists today; `pending_confirmation` requires schema/API migration).
+- **G5** (Medium, #2+#6): scanner-deny record schema must be a stable interface agreed between hook and collector.
+
+Follow-up bridge after v0.6.0 ships: `gtkb-skills-tier-a-adoption-001` (Agent Red adoption of the five deliverables).
 
 ### POR Steps 16.D-16.E — Spec hygiene remediation (16.A/B/C complete)
 **Status:** 16.A/16.B/16.C all COMPLETE + VERIFIED (umbrella at `por-step16c-implemented-untested-remediation-004`, 2026-04-17). Remaining: **16.D** orphan test rationalization (~10,440 tests, largest sub-phase), **16.E** exit verification (untested-spec count ≤ 6 + orphan-test count ≤ 100).
