@@ -5,7 +5,121 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-04-17
+
+### Added — Phase A Tier A operational skills bundle
+
+- **Canonical credential patterns module** (Tier A #1, commit `862045d`) —
+  New `src/groundtruth_kb/governance/credential_patterns.py` consolidating
+  the credential-class regex catalog into one authoritative module.
+  `CREDENTIAL_PATTERNS` + `BASH_EXTRAS` + `PII_PATTERNS` are the three
+  named exports; `scan()` runs all three. DB `_REDACTION_PATTERNS` and
+  the `credential-scan.py` hook both re-use this module. Immutable
+  pre-migration fixture test locks the pattern set against unintended
+  drift.
+
+- **`scanner-safe-writer` PreToolUse hook** (Tier A #2, commits `b5e5c6c`
+  + `37a88cc`) — New `templates/hooks/scanner-safe-writer.py` intercepts
+  Write tool events targeting direct `bridge/*.md` paths and scans the
+  proposed content against the canonical credential catalog. Schema v1
+  deny-record log at `.claude/hooks/scanner-safe-writer.log` with stable
+  `pattern_name`/`catalog_source` contract (`pattern_description` is
+  explicitly non-contractual). Scaffold + upgrade + doctor integration
+  via `_MANAGED_SETTINGS_PRETOOLUSE_HOOKS` and
+  `_plan_missing_managed_files` unconditional repair. PII is passed
+  through (email/phone/IPv4 are legitimate in prose).
+
+- **`/gtkb-decision-capture` skill** (Tier A #4, commit `d9325c9`) —
+  New `templates/skills/decision-capture/` with `SKILL.md` and
+  `helpers/record_decision.py`. Wraps
+  `KnowledgeDB.insert_deliberation()` with fixed governance metadata
+  (`source_type="owner_conversation"`, `outcome="owner_decision"`,
+  `changed_by="prime-builder/decision-capture-skill"`). First skill
+  in GT-KB's skills inventory. Scaffold + upgrade + doctor integration
+  via `_MANAGED_SKILLS_INITIAL` / `_MANAGED_SKILLS` / new
+  `_check_skill_present()` doctor check.
+
+- **`/gtkb-bridge-propose` skill** (Tier A #3, commit `0a60054`) —
+  New `templates/skills/bridge-propose/` with `SKILL.md` and
+  `helpers/write_bridge.py`. Writes bridge proposal files with a
+  credential-only pre-flight scan (iterates `CREDENTIAL_PATTERNS +
+  BASH_EXTRAS` directly; excludes PII), overlap-safe redaction via
+  `_normalize_hit_intervals` (outermost-label merging), post-redaction
+  re-scan as correctness gate, atomic INDEX update with `os.replace()`,
+  and 2-attempt retry at INDEX layer only.
+
+- **`/gtkb-spec-intake` skill** (Tier A #5, commit `9629091`) — New
+  `templates/skills/spec-intake/` with `SKILL.md` and
+  `helpers/spec_intake.py`. Wraps
+  `intake.capture_requirement()` / `intake.confirm_intake()` /
+  `intake.reject_intake()` with fixed governance metadata
+  (`changed_by="prime-builder/spec-intake-skill"`) and
+  confirm-before-mutate contract: capture writes a deliberation at
+  `outcome="deferred"`; separate confirm or reject step is the only
+  path that writes specs or records rejection.
+
+- **Phase A scanner-safe-writer metrics collector** (Tier A #6, commit
+  `41ac869`) — New `scripts/collect_phase_a_metrics.py` consumes
+  `.claude/hooks/scanner-safe-writer.log` (schema v1 JSONL) and emits
+  aggregated deny metrics (per pattern, catalog source, session, date,
+  file path) in JSON (stable automation contract) or Markdown (human
+  presentation). G5 stability contract: indexes only on `pattern_name`,
+  never on `pattern_description`; guarded by
+  `test_pattern_names_indexed_not_descriptions`. Forward-compat:
+  warn-and-skip on unknown `schema_version` with stderr warning.
+
+### Added — Quality
+
+- **Phase 4C: Structured logging migration** (commit `b1c3359`) —
+  New `_logging.py` with split-level defaults (CLI=WARNING,
+  bridge=INFO), `_setup_bridge_logging()` with no-raise fallback,
+  shared `tests/_print_guard.py` (single source of truth for CI +
+  pytest). 12 files migrated from `print()` to structured logging.
+
+- **Phase 4D: Broad exception governance** (commit `23cdf09`) —
+  Narrowed 2 sites (db.py IntegrityError, launcher.py Windows),
+  removed 1 redundant handler (launcher.py Unix), annotated 21
+  non-reraising broad catches with `# intentional-catch:` markers.
+  New `tests/test_exception_markers.py` AST-based CI gate enforces
+  marker hygiene. Final inventory: 28 handlers (7 exempt re-raise +
+  21 annotated + 0 unmarked).
+
+- **Phase 1 operational governance hooks + `source_paths` migration**
+  (commit `b9a2071`) — Additional governance hook suite for adopter
+  projects plus schema migration adding `source_paths` field to
+  specification records for traceability of where implementation
+  lives.
+
+### Added — Docs
+
+- **Memory architecture alignment to ADR-0001 three-tier vocabulary**
+  (commit `71ef2b0`) — 30 documentation files aligned to use the
+  canonical ADR-0001 memory architecture terminology
+  (MemBase / Deliberation Archive / Local Memory tiers) across docs,
+  templates, and skill content.
+
+### Fixed
+
+- **`intake.py` governance metadata extension** (part of commit
+  `9629091`) — Three `intake` functions
+  (`capture_requirement`, `confirm_intake`, `reject_intake`) now
+  accept optional keyword-only `changed_by: str = "intake-pipeline"`
+  parameter; `capture_requirement` also accepts
+  `change_reason: str = "..."`. Defaults preserve existing behavior
+  for all pre-existing callers (CLI, hook classifier, tests).
+  Skill helpers pass skill-specific actor metadata for audit-trail
+  differentiation.
+
+- **`source_paths` carry-forward in `update_spec`** (commit
+  `8efcbb1`) — `update_spec` previously dropped `source_paths` on
+  version update (column missing from INSERT). Now preserved
+  through the version chain. Added regression guards.
+
+- **4C CI test-package import resolution** (commit `a3fa4d2`) —
+  Added empty `tests/__init__.py` so `from tests._print_guard`
+  imports resolve on Linux CI alongside Windows local dev.
+
+## [0.5.0] - 2026-04-15
 
 ### Added
 
