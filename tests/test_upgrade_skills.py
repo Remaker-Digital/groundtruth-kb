@@ -159,3 +159,25 @@ def test_base_profile_no_skill_actions(tmp_path: Path) -> None:
     actions = plan_upgrade(tmp_path)
     skill_actions = [a for a in actions if a.file.startswith(".claude/skills/")]
     assert not skill_actions, f"local-only profile should emit no skill actions; got {skill_actions}"
+
+
+# ---------------------------------------------------------------------------
+# Bridge-propose skill — unconditional missing-file repair at current version.
+# ---------------------------------------------------------------------------
+
+_BRIDGE_PROPOSE_SKILL_MD = ".claude/skills/bridge-propose/SKILL.md"
+_BRIDGE_PROPOSE_HELPER = ".claude/skills/bridge-propose/helpers/write_bridge.py"
+
+
+def test_plan_upgrade_adds_missing_bridge_propose_skill_at_same_version(tmp_path: Path) -> None:
+    """dual-agent project at current version with bridge-propose missing → add actions."""
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    actions = plan_upgrade(tmp_path)
+    adds = [a for a in actions if a.action == "add" and a.file in {_BRIDGE_PROPOSE_SKILL_MD, _BRIDGE_PROPOSE_HELPER}]
+    action_files = {a.file for a in adds}
+    assert _BRIDGE_PROPOSE_SKILL_MD in action_files, (
+        f"expected add action for missing {_BRIDGE_PROPOSE_SKILL_MD}; got: {[(a.action, a.file) for a in actions]}"
+    )
+    assert _BRIDGE_PROPOSE_HELPER in action_files, (
+        f"expected add action for missing {_BRIDGE_PROPOSE_HELPER}; got: {[(a.action, a.file) for a in actions]}"
+    )

@@ -635,6 +635,56 @@ def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
     )
 
 
+def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> ToolCheck:
+    """Check that the ``bridge-propose`` skill files are present.
+
+    Bridge-profile-only check. Warning-level (not fail) because a
+    missing skill degrades workflow quality but does not render the
+    project non-functional. Remediation: ``gt project upgrade
+    --apply`` (the missing-file repair path is unconditional — works
+    at any scaffold version). Parallel in shape to
+    :func:`_check_skill_present`.
+    """
+    profile = get_profile(profile_name)
+    if not profile.includes_bridge:
+        return ToolCheck(
+            name="skill:bridge-propose",
+            required=False,
+            found=True,
+            status="pass",
+            message="not applicable to base profile",
+        )
+
+    skill_md = target / ".claude" / "skills" / "bridge-propose" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+
+    missing: list[str] = []
+    if not skill_md.exists():
+        missing.append("SKILL.md")
+    if not helper_py.exists():
+        missing.append("helpers/write_bridge.py")
+
+    if missing:
+        return ToolCheck(
+            name="skill:bridge-propose",
+            required=False,
+            found=False,
+            status="warning",
+            message=(
+                f".claude/skills/bridge-propose/ missing: {', '.join(missing)}. "
+                f"Run `gt project upgrade --apply` to restore."
+            ),
+        )
+
+    return ToolCheck(
+        name="skill:bridge-propose",
+        required=False,
+        found=True,
+        status="pass",
+        message="bridge-propose skill present",
+    )
+
+
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
     """Check file bridge configuration for dual-agent projects.
 
@@ -927,6 +977,7 @@ def run_doctor(
         checks.append(_check_settings_classifiers(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_skill_present(target, profile))
+        checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_bridge_poller(target, "claude"))
         checks.append(_check_bridge_poller(target, "codex"))
 

@@ -49,3 +49,18 @@ def test_skill_files_copied_recursively(tmp_path: Path) -> None:
     assert helper_py.exists(), f"record_decision.py missing at {helper_py}"
     content = helper_py.read_text(encoding="utf-8")
     assert "def record_decision" in content
+
+
+def test_dual_agent_project_has_bridge_propose_skill(tmp_path: Path) -> None:
+    """dual-agent scaffold copies bridge-propose SKILL.md + helper with non-empty content."""
+    scaffold_project(_make_options("dual-agent", tmp_path))
+    target = tmp_path / "project"
+    skill_md = target / ".claude" / "skills" / "bridge-propose" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+    assert skill_md.exists(), f"bridge-propose SKILL.md missing at {skill_md}"
+    assert helper_py.exists(), f"write_bridge.py missing at {helper_py}"
+    assert skill_md.read_text(encoding="utf-8").strip(), "bridge-propose SKILL.md is empty"
+    helper_content = helper_py.read_text(encoding="utf-8")
+    assert helper_content.strip(), "write_bridge.py is empty"
+    # Sanity check that the shipped helper exposes the documented entry point.
+    assert "def propose_bridge" in helper_content
