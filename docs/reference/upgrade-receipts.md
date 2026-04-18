@@ -122,6 +122,76 @@ See the `ReceiptJSON` TypedDict in
 design trail in `bridge/gtkb-rollback-receipts-001.md` through `-014.md`
 (7 versions total).
 
+## Rolling Back an Upgrade (C3)
+
+Once a receipt exists, roll the upgrade back with:
+
+```bash
+gt project rollback [--dry-run | --apply] [--commit] [--receipt-id <id>]
+```
+
+Default behavior is dry-run, which prints the rollback plan without
+executing. Pass `--apply` to run `git revert -m 1 <merge_commit>` against
+the current working tree. By default the revert stays staged
+(`--no-commit`); pass `--commit` together with `--apply` to auto-commit
+the revert with message `gt: rollback upgrade payload {receipt_id}`.
+
+`--receipt-id` is optional; when omitted the newest receipt (by
+`created_at` descending, tie-break on `receipt_id` descending) is used.
+File mtime is not used, so receipts restored from backups or copied
+between machines still resolve correctly.
+
+### Example: apply + rollback cycle
+
+```bash
+# Apply an upgrade (writes the receipt).
+gt project upgrade --apply
+
+# Later: preview the rollback plan.
+gt project rollback
+
+# Execute the rollback; revert stays staged for review.
+gt project rollback --apply
+
+# Or execute + auto-commit in one step.
+gt project rollback --apply --commit
+```
+
+### Preconditions enforced
+
+- **Clean working tree** — `gt project rollback --apply` refuses if
+  `git status --porcelain` is non-empty (exit 6 /
+  `DirtyWorkingTreeError`). Stash or commit first.
+- **Merge commit is reachable** — receipt's `merge_commit` must be
+  reachable from HEAD. Otherwise exit 5 /
+  `MergeCommitNotInHistoryError` (e.g., already reverted, rebased away,
+  on a different branch).
+- **Receipt points at a two-parent merge** — otherwise exit 4 /
+  `NotAMergeCommitError`. Rules out receipts whose recorded commit has
+  been amended or fast-forwarded.
+
+### Library API
+
+For tooling that wants the plan object without shelling out:
+
+```python
+from pathlib import Path
+from groundtruth_kb.project.rollback import (
+    find_latest_receipt, plan_rollback, execute_rollback,
+)
+
+adopter_root = Path(".")
+plan = plan_rollback(adopter_root, receipt_id=None)  # None → latest receipt
+# plan.files_to_revert is list[FileEntry] with status letters A/M/D.
+result = execute_rollback(adopter_root, plan, commit=False)
+```
+
+### C3 authorizing bridge
+
+`bridge/gtkb-upgrade-rollback-006.md` (Codex GO, 2026-04-18). Design
+trail in `bridge/gtkb-upgrade-rollback-001.md` through `-006.md`
+(2 NO-GO cycles; F1/F2/F3 resolved at `-003`, F4/F5 resolved at `-005`).
+
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
