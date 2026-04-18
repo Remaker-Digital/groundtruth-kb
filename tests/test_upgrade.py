@@ -221,16 +221,16 @@ def _write_minimal_settings_json(
 
 def test_plan_reports_settings_drift_at_same_version(tmp_path: Path) -> None:
     """Even at the current scaffold version, a missing scanner-safe-writer
-    PreToolUse registration surfaces as a ``register-hook`` action.
+    PreToolUse registration surfaces as a ``merge-event-hooks`` action.
     """
     from groundtruth_kb import __version__
 
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     _write_minimal_settings_json(tmp_path, include_scanner_safe_writer=False)
     actions = plan_upgrade(tmp_path)
-    register_actions = [a for a in actions if a.action == "register-hook"]
-    assert register_actions, f"expected register-hook action at same version; got: {[a.action for a in actions]}"
-    assert any(a.payload == "scanner-safe-writer.py" for a in register_actions)
+    merge_actions = [a for a in actions if a.action == "merge-event-hooks"]
+    assert merge_actions, f"expected merge-event-hooks action at same version; got: {[a.action for a in actions]}"
+    assert any(a.event == "PreToolUse" for a in merge_actions)
 
 
 def test_plan_reports_gitignore_drift_at_same_version(tmp_path: Path) -> None:
@@ -306,15 +306,15 @@ def test_plan_missing_hook_and_settings_both_emit(tmp_path: Path) -> None:
     # No gitignore, no hook file
     actions = plan_upgrade(tmp_path)
     add_actions = [a for a in actions if a.action == "add" and "scanner-safe-writer.py" in a.file]
-    register_actions = [a for a in actions if a.action == "register-hook"]
+    merge_actions = [a for a in actions if a.action == "merge-event-hooks"]
     append_actions = [a for a in actions if a.action == "append-gitignore"]
     assert add_actions, "expected add action for missing hook file"
-    assert register_actions, "expected register-hook action for missing settings registration"
+    assert merge_actions, "expected merge-event-hooks action for missing settings registration"
     assert append_actions, "expected append-gitignore action for missing pattern"
 
 
 def test_dry_run_shows_config_actions(tmp_path: Path) -> None:
-    """CLI ``gt project upgrade --dry-run`` surfaces REGISTER-HOOK and
+    """CLI ``gt project upgrade --dry-run`` surfaces MERGE-EVENT-HOOKS and
     APPEND-GITIGNORE actions in its output.
     """
     from click.testing import CliRunner
@@ -328,13 +328,13 @@ def test_dry_run_shows_config_actions(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(main, ["project", "upgrade", "--dry-run", "--dir", str(tmp_path)])
     assert result.exit_code == 0, f"CLI failed: {result.output}"
-    assert "[REGISTER-HOOK]" in result.output, f"dry-run missing [REGISTER-HOOK]:\n{result.output}"
+    assert "[MERGE-EVENT-HOOKS]" in result.output, f"dry-run missing [MERGE-EVENT-HOOKS]:\n{result.output}"
     assert "[APPEND-GITIGNORE]" in result.output, f"dry-run missing [APPEND-GITIGNORE]:\n{result.output}"
 
 
-def test_execute_register_hook_preserves_existing_entries(tmp_path: Path) -> None:
-    """Registering scanner-safe-writer must add exactly one entry while
-    leaving the existing 5 untouched.
+def test_execute_merge_event_hooks_preserves_unmanaged_entries(tmp_path: Path) -> None:
+    """merge-event-hooks rebuilds PreToolUse to registry order while preserving
+    any adopter-authored entries not matching a managed scaffold marker.
     """
     import json
 
@@ -342,58 +342,52 @@ def test_execute_register_hook_preserves_existing_entries(tmp_path: Path) -> Non
 
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     _write_minimal_settings_json(tmp_path, include_scanner_safe_writer=False)
+    # Inject an adopter-authored entry that is NOT in the managed scaffold set.
+    settings_path = tmp_path / ".claude" / "settings.json"
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    data["hooks"]["PreToolUse"].append(
+        {"hooks": [{"type": "command", "command": "python .claude/hooks/custom-adopter-hook.py"}]}
+    )
+    settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
     action = UpgradeAction(
         file=".claude/settings.json",
-        action="register-hook",
-        reason="Register scanner-safe-writer.py as PreToolUse hook",
-        payload="scanner-safe-writer.py",
+        action="merge-event-hooks",
+        reason="Merge PreToolUse hooks to registry order",
+        payload="PreToolUse",
+        event="PreToolUse",
     )
     results = execute_upgrade(tmp_path, [action], force=False)
-    assert any("REGISTERED scanner-safe-writer.py" in r for r in results), results
-    data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    pretooluse = data["hooks"]["PreToolUse"]
-    assert len(pretooluse) == 6, f"expected 6 entries, got {len(pretooluse)}"
-    commands = [h["command"] for entry in pretooluse for h in entry["hooks"]]
-    # Original 5 still present
-    for expected in (
-        "python .claude/hooks/spec-before-code.py",
-        "python .claude/hooks/bridge-compliance-gate.py",
-        "python .claude/hooks/kb-not-markdown.py",
-        "python .claude/hooks/destructive-gate.py",
-        "python .claude/hooks/credential-scan.py",
-    ):
-        assert expected in commands, f"original entry {expected!r} missing"
-    # New entry present
-    assert "python .claude/hooks/scanner-safe-writer.py" in commands
+    assert any("MERGED" in r and "PreToolUse rebuilt" in r for r in results), results
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    commands = [h["command"] for entry in data["hooks"]["PreToolUse"] for h in entry["hooks"]]
+    # Unmanaged entry preserved (must appear after all managed entries).
+    assert "python .claude/hooks/custom-adopter-hook.py" in commands
+    assert commands[-1] == "python .claude/hooks/custom-adopter-hook.py", (
+        f"unmanaged entry should be last (after managed block); got commands order: {commands}"
+    )
 
 
-def test_execute_register_hook_is_idempotent(tmp_path: Path) -> None:
-    """Running register-hook twice: first REGISTERED, second SKIPPED; final
-    state has exactly one registration.
-    """
-    import json
-
+def test_execute_merge_event_hooks_is_idempotent(tmp_path: Path) -> None:
+    """Running merge-event-hooks twice: first MERGED, second SKIPPED
+    (target list equals existing list)."""
     from groundtruth_kb import __version__
 
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     _write_minimal_settings_json(tmp_path, include_scanner_safe_writer=False)
     action = UpgradeAction(
         file=".claude/settings.json",
-        action="register-hook",
-        reason="Register scanner-safe-writer.py as PreToolUse hook",
-        payload="scanner-safe-writer.py",
+        action="merge-event-hooks",
+        reason="Merge PreToolUse hooks to registry order",
+        payload="PreToolUse",
+        event="PreToolUse",
     )
     first = execute_upgrade(tmp_path, [action], force=False)
-    assert any("REGISTERED scanner-safe-writer.py" in r for r in first), first
+    assert any("MERGED" in r and "PreToolUse rebuilt" in r for r in first), first
     # Reset version so the noop execute doesn't cascade into other file work
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     second = execute_upgrade(tmp_path, [action], force=False)
-    assert any("already registered" in r for r in second), second
-    data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    ssw_count = sum(
-        1 for entry in data["hooks"]["PreToolUse"] for h in entry["hooks"] if "scanner-safe-writer.py" in h["command"]
-    )
-    assert ssw_count == 1, f"expected exactly one registration, got {ssw_count}"
+    assert any("already at registry order" in r for r in second), second
 
 
 def test_execute_append_gitignore_preserves_existing_content(tmp_path: Path) -> None:
@@ -475,14 +469,14 @@ def test_plan_malformed_settings_structure_does_not_crash(tmp_path: Path) -> Non
     (settings_dir / "settings.json").write_text(json.dumps([1, 2, 3]), encoding="utf-8")
     actions = plan_upgrade(tmp_path)
     # Treated as "no existing registrations" — emits register-hook
-    assert any(a.action == "register-hook" for a in actions), (
+    assert any(a.action == "merge-event-hooks" for a in actions), (
         f"non-dict root should surface register-hook action; got {actions}"
     )
 
     # 2. hooks is a string (not a dict)
     (settings_dir / "settings.json").write_text(json.dumps({"hooks": "oops"}), encoding="utf-8")
     actions = plan_upgrade(tmp_path)
-    assert any(a.action == "register-hook" for a in actions)
+    assert any(a.action == "merge-event-hooks" for a in actions)
 
     # 3. PreToolUse is a string (not a list)
     (settings_dir / "settings.json").write_text(
@@ -490,7 +484,7 @@ def test_plan_malformed_settings_structure_does_not_crash(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     actions = plan_upgrade(tmp_path)
-    assert any(a.action == "register-hook" for a in actions)
+    assert any(a.action == "merge-event-hooks" for a in actions)
 
     # 4. Entries contain non-dicts
     (settings_dir / "settings.json").write_text(
@@ -498,7 +492,7 @@ def test_plan_malformed_settings_structure_does_not_crash(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     actions = plan_upgrade(tmp_path)
-    assert any(a.action == "register-hook" for a in actions)
+    assert any(a.action == "merge-event-hooks" for a in actions)
 
     # 5. entry["hooks"] is not a list
     (settings_dir / "settings.json").write_text(
@@ -506,7 +500,7 @@ def test_plan_malformed_settings_structure_does_not_crash(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     actions = plan_upgrade(tmp_path)
-    assert any(a.action == "register-hook" for a in actions)
+    assert any(a.action == "merge-event-hooks" for a in actions)
 
 
 def test_upgrade_creates_gitignore_if_missing(tmp_path: Path) -> None:

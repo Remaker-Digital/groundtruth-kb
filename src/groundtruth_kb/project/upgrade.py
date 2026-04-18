@@ -40,17 +40,24 @@ _NO_UPGRADE_ACTION_POLICIES: frozenset[str] = frozenset({"preserve", "transient"
 class UpgradeAction:
     """A single file or config action in the upgrade plan.
 
-    ``payload`` is used by non-file-copy action types (``register-hook`` and
-    ``append-gitignore``) to carry the hook filename or gitignore pattern to
-    write. File-copy actions (``update``, ``add``, ``skip``) ignore it and
-    the default empty-string preserves every existing three-argument call
-    site and test.
+    ``payload`` is used by non-file-copy action types (``merge-event-hooks``
+    and ``append-gitignore``) to carry event or pattern metadata. File-copy
+    actions (``update``, ``add``, ``skip``) ignore it and the default
+    empty-string preserves every existing three-argument call site and test.
+
+    ``event`` identifies the settings hook event (``PreToolUse``,
+    ``UserPromptSubmit``, ``PostToolUse``, ``SessionStart``, ``Stop``, etc.)
+    for ``merge-event-hooks`` actions. Defaults to ``"PreToolUse"`` for
+    back-compat with any call site or test that constructs an
+    ``UpgradeAction`` without explicitly naming the field; canonical
+    planner emissions always set it explicitly.
     """
 
     file: str
-    action: Literal["update", "add", "skip", "register-hook", "append-gitignore"]
+    action: Literal["update", "add", "skip", "merge-event-hooks", "append-gitignore"]
     reason: str
     payload: str = ""
+    event: str = "PreToolUse"
 
 
 def _file_hash(path: Path) -> str:
@@ -188,11 +195,84 @@ def _map_target_to_template(target_path: str) -> str | None:
     return None
 
 
-def _plan_settings_registration(target: Path, profile_name: str) -> list[UpgradeAction]:
-    """Plan PreToolUse registrations for managed hooks in ``settings.json``.
+def _entry_commands(entry: object) -> list[str]:
+    """Extract every ``command`` string reachable from a hooks event entry."""
+    if not isinstance(entry, dict):
+        return []
+    entry_hooks = entry.get("hooks", [])
+    if not isinstance(entry_hooks, list):
+        return []
+    out: list[str] = []
+    for h in entry_hooks:
+        if isinstance(h, dict):
+            cmd = h.get("command", "")
+            if isinstance(cmd, str):
+                out.append(cmd)
+    return out
 
-    Emits ``register-hook`` actions for settings-hook-registration
-    artifacts that are NOT already registered in ``.claude/settings.json``.
+
+def _compute_target_event_list(
+    existing_entries: list[object],
+    scaffold_registrations: list[SettingsHookRegistration],
+) -> tuple[list[object], int, int]:
+    """Return ``(target_list, n_managed, n_preserved)``.
+
+    The target list is the registry-ordered managed block followed by the
+    unmanaged block in original relative order. Existing managed entries
+    are reused by identity when their command marker matches; missing
+    managed entries are synthesized in the canonical shape. Duplicate
+    managed entries collapse to the first occurrence. Non-dict entries and
+    entries whose commands do not match any scaffold-superset marker fall
+    into the unmanaged block.
+
+    This helper is the SINGLE definition of "target list" shared by
+    :func:`_plan_settings_registration` and
+    :func:`_execute_merge_event_hooks`; both route through it so planner
+    and apply agree by construction.
+    """
+    scaffold_filenames: list[str] = [r.hook_filename for r in scaffold_registrations]
+    scaffold_markers: set[str] = {f"python .claude/hooks/{fn}" for fn in scaffold_filenames}
+
+    managed_existing_by_marker: dict[str, object] = {}
+    unmanaged: list[object] = []
+    for entry in existing_entries:
+        matched_marker: str | None = None
+        for cmd in _entry_commands(entry):
+            for marker in scaffold_markers:
+                if marker in cmd:
+                    matched_marker = marker
+                    break
+            if matched_marker is not None:
+                break
+        if matched_marker is None:
+            unmanaged.append(entry)
+        else:
+            managed_existing_by_marker.setdefault(matched_marker, entry)
+
+    new_managed_block: list[object] = []
+    for filename in scaffold_filenames:
+        marker = f"python .claude/hooks/{filename}"
+        reused = managed_existing_by_marker.get(marker)
+        if isinstance(reused, dict):
+            new_managed_block.append(reused)
+        else:
+            new_managed_block.append({"hooks": [{"type": "command", "command": marker}]})
+
+    target_list: list[object] = [*new_managed_block, *unmanaged]
+    return target_list, len(new_managed_block), len(unmanaged)
+
+
+def _plan_settings_registration(target: Path, profile_name: str) -> list[UpgradeAction]:
+    """Plan structured-merge actions for settings hook events.
+
+    For each event that contains any upgrade-enforced
+    ``settings-hook-registration`` record, computes the target event list
+    (registry-ordered managed block ++ unmanaged block in original relative
+    order) via :func:`_compute_target_event_list`. Emits a
+    ``merge-event-hooks`` action iff the target list differs from the
+    existing list. Planner and :func:`_execute_merge_event_hooks` share
+    this helper, so planner emits an action iff apply would change the
+    file.
 
     Defensive against malformed shapes:
 
@@ -200,11 +280,8 @@ def _plan_settings_registration(target: Path, profile_name: str) -> list[Upgrade
     - If the file is unreadable: return ``[]`` (can't plan without reading).
     - If the JSON parse fails: emit a single ``skip`` action with a
       manual-repair reason.
-    - If the root is not a dict, ``hooks`` is not a dict, or ``PreToolUse``
-      is not a list: treat as empty (no registrations exist, so every
-      managed hook must be registered).
-    - Entries that are not dicts, or whose ``hooks`` is not a list, are
-      ignored while scanning for existing registrations.
+    - If the root is not a dict, ``hooks`` is not a dict, or
+      ``hooks[event]`` is not a list: treat as empty existing entries.
     """
     settings_path = target / ".claude" / "settings.json"
     if not settings_path.exists():
@@ -223,50 +300,52 @@ def _plan_settings_registration(target: Path, profile_name: str) -> list[Upgrade
     except OSError:
         return []
 
-    # Defensive unwrap: accept malformed shapes without crashing.
     if not isinstance(data, dict):
         hooks_dict: dict[str, object] = {}
     else:
         raw_hooks = data.get("hooks", {})
         hooks_dict = raw_hooks if isinstance(raw_hooks, dict) else {}
 
-    raw_pretooluse = hooks_dict.get("PreToolUse", [])
-    pretooluse: list[object] = raw_pretooluse if isinstance(raw_pretooluse, list) else []
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
 
-    registered_commands: set[str] = set()
-    for entry in pretooluse:
-        if not isinstance(entry, dict):
-            continue
-        entry_hooks = entry.get("hooks", [])
-        if not isinstance(entry_hooks, list):
-            continue
-        for h in entry_hooks:
-            if not isinstance(h, dict):
-                continue
-            cmd = h.get("command", "")
-            if isinstance(cmd, str):
-                registered_commands.add(cmd)
+    # Partition scaffold-superset registrations by event in registry order.
+    scaffold_by_event: dict[str, list[SettingsHookRegistration]] = {}
+    scaffold_raw = artifacts_for_scaffold(profile_name, class_="settings-hook-registration")
+    for artifact in scaffold_raw:
+        if isinstance(artifact, SettingsHookRegistration):
+            scaffold_by_event.setdefault(artifact.event, []).append(artifact)
+
+    # Outer-loop key set: every event that contains at least one
+    # upgrade-enforced record for the active profile. A merge only fires
+    # against events the registry claims ownership of.
+    upgrade_enforced_by_event: dict[str, list[SettingsHookRegistration]] = {}
+    for registration in _managed_settings_registrations(profile_name):
+        upgrade_enforced_by_event.setdefault(registration.event, []).append(registration)
 
     actions: list[UpgradeAction] = []
-    for registration in _managed_settings_registrations(profile_name):
-        # C1 scope: only PreToolUse registrations are upgrade-enforced.
-        # Other event classes (SessionStart, UserPromptSubmit, PostToolUse)
-        # remain scaffold-only per the registry's managed_profiles = [] for
-        # those rows. Upgrade enforcement for those event classes is a
-        # deferred settings-merge child bridge.
-        if registration.event != "PreToolUse":
-            continue
-        marker = f"python .claude/hooks/{registration.hook_filename}"
-        if any(marker in cmd for cmd in registered_commands):
-            continue
-        actions.append(
-            UpgradeAction(
-                file=".claude/settings.json",
-                action="register-hook",
-                reason=f"Register {registration.hook_filename} as PreToolUse hook",
-                payload=registration.hook_filename,
+    for event in upgrade_enforced_by_event:
+        raw_event_entries = hooks_dict.get(event)
+        event_entries: list[object] = raw_event_entries if isinstance(raw_event_entries, list) else []
+
+        scaffold_registrations = scaffold_by_event.get(event, [])
+        target_event_list, _n_managed, _n_preserved = _compute_target_event_list(event_entries, scaffold_registrations)
+
+        # Trigger: merge is required iff the target list apply would produce
+        # differs from the existing list. This captures every mismatch shape
+        # — missing managed entries, wrong managed order, interleaved
+        # unmanaged entries, non-list existing value, and duplicate
+        # collapses — without a per-shape check.
+        if target_event_list != event_entries:
+            actions.append(
+                UpgradeAction(
+                    file=".claude/settings.json",
+                    action="merge-event-hooks",
+                    reason=f"Merge {event} hooks to registry order",
+                    payload=event,
+                    event=event,
+                )
             )
-        )
+
     return actions
 
 
@@ -356,8 +435,8 @@ def execute_upgrade(
 
     for action in actions:
         # Config actions dispatch first — they don't follow the template-copy path.
-        if action.action == "register-hook":
-            results.append(_execute_register_hook(target, action))
+        if action.action == "merge-event-hooks":
+            results.append(_execute_merge_event_hooks(target, action))
             continue
         if action.action == "append-gitignore":
             results.append(_execute_append_gitignore(target, action))
@@ -400,14 +479,20 @@ def execute_upgrade(
     return results
 
 
-def _execute_register_hook(target: Path, action: UpgradeAction) -> str:
-    """Non-destructively register ``action.payload`` as a PreToolUse entry.
+def _execute_merge_event_hooks(target: Path, action: UpgradeAction) -> str:
+    """Rebuild ``hooks[action.event]`` as managed-block ++ unmanaged-block.
 
-    Idempotent: if the hook is already registered (command marker present),
-    returns a ``SKIPPED`` status. Preserves every existing entry. Defensive
-    against malformed settings shape — in that case returns a ``SKIPPED``
-    status rather than crashing.
+    The managed block is registry-ordered scaffold-superset entries; the
+    unmanaged block is every pre-existing entry whose command does not match
+    any scaffold-superset marker, preserved in original relative order.
+    Shares the :func:`_compute_target_event_list` helper with the planner,
+    so apply writes the same list the planner's trigger compared against.
+    Idempotent: re-running after a successful merge returns ``SKIPPED``
+    because the target list equals the existing list.
     """
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
+    from groundtruth_kb.project.manifest import read_manifest
+
     settings_path = target / ".claude" / "settings.json"
     if not settings_path.exists():
         return f"SKIPPED {action.file} — settings.json not found"
@@ -422,37 +507,35 @@ def _execute_register_hook(target: Path, action: UpgradeAction) -> str:
     if not isinstance(data, dict):
         return f"SKIPPED {action.file} — settings root is not a JSON object"
 
-    # Defensive: replace any non-dict hooks value with a fresh dict rather
-    # than mutating through an unknown type.
     raw_hooks = data.get("hooks")
     if not isinstance(raw_hooks, dict):
         data["hooks"] = {}
     hooks_dict = data["hooks"]
 
-    raw_pretooluse = hooks_dict.get("PreToolUse")
-    if not isinstance(raw_pretooluse, list):
-        hooks_dict["PreToolUse"] = []
-    pretooluse = hooks_dict["PreToolUse"]
+    event = action.event
+    manifest = read_manifest(target / "groundtruth.toml")
+    profile_name = manifest.profile if manifest else "dual-agent"
 
-    marker = f"python .claude/hooks/{action.payload}"
-    for entry in pretooluse:
-        if not isinstance(entry, dict):
-            continue
-        entry_hooks = entry.get("hooks", [])
-        if not isinstance(entry_hooks, list):
-            continue
-        for h in entry_hooks:
-            if isinstance(h, dict):
-                cmd = h.get("command", "")
-                if isinstance(cmd, str) and marker in cmd:
-                    return f"SKIPPED {action.file} — {action.payload} already registered"
+    scaffold_raw = artifacts_for_scaffold(profile_name, class_="settings-hook-registration")
+    scaffold_registrations: list[SettingsHookRegistration] = [
+        a for a in scaffold_raw if isinstance(a, SettingsHookRegistration) and a.event == event
+    ]
 
-    pretooluse.append({"hooks": [{"type": "command", "command": marker}]})
+    raw_existing = hooks_dict.get(event)
+    existing_entries: list[object] = raw_existing if isinstance(raw_existing, list) else []
+
+    new_event_list, n_managed, n_preserved = _compute_target_event_list(existing_entries, scaffold_registrations)
+
+    if new_event_list == existing_entries:
+        return f"SKIPPED {action.file} — {event} already at registry order"
+
+    hooks_dict[event] = new_event_list
+    data["hooks"] = hooks_dict
     try:
         settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
         return f"SKIPPED {action.file} — write failed ({exc})"
-    return f"REGISTERED {action.payload} in {action.file}"
+    return f"MERGED {action.file} — {event} rebuilt ({n_managed} managed, {n_preserved} preserved)"
 
 
 def _execute_append_gitignore(target: Path, action: UpgradeAction) -> str:
