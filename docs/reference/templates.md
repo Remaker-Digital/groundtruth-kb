@@ -12,6 +12,8 @@ by category and copied selectively based on the chosen profile and options.
 |----------|-----------|-------------|
 | `templates/CLAUDE.md` | `CLAUDE.md` | Claude Code project instructions |
 | `templates/MEMORY.md` | `MEMORY.md` | Session state and operational memory |
+| `templates/rules/canonical-terminology.md` | `.claude/rules/canonical-terminology.md` | Canonical ADR-0001 glossary (MemBase, DA, Prime Builder, Loyal Opposition, etc.) |
+| `templates/rules/canonical-terminology.toml` | `.claude/rules/canonical-terminology.toml` | Profile-aware doctor config (required terms + required files + severity) |
 | `templates/BRIDGE-INVENTORY.md` | `BRIDGE-INVENTORY.md` | Bridge automation component registry |
 | `templates/README.md` | `README.md` | Project README with setup instructions |
 | `templates/project/Makefile` | `Makefile` | Common tasks: test, lint, serve, assert |

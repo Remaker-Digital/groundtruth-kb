@@ -5,6 +5,8 @@
 
 This file is the MEMORY.md operational notepad per ADR-0001: Three-Tier Memory Architecture. Canonical knowledge lives in MemBase.
 
+**Glossary:** canonical ADR-0001 vocabulary (MemBase, Deliberation Archive, Prime Builder, Loyal Opposition, etc.) is defined at `.claude/rules/canonical-terminology.md`.
+
 ## Current Status
 
 - **Version:** {{VERSION}}

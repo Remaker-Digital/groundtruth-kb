@@ -8,6 +8,21 @@ governs all Codex behavior within this repository.
 
 ---
 
+## Canonical Terminology (ADR-0001 core vocabulary)
+
+| Term | Short definition |
+|------|-----------------|
+| **MemBase** | Canonical, authoritative store of specs and governed knowledge (`groundtruth.db`). |
+| **Deliberation Archive (DA)** | Design-reasoning tier — decisions, reviews, rejected alternatives. |
+| **MEMORY.md** | Operational notepad at repo root. Can coordinate work; cannot make anything true. |
+| **GroundTruth KB / GT-KB** | The product: MemBase + CLI + templates + doctor + bridge. |
+| **Prime Builder** | Implementing agent (peer). Proposes, implements, tests. |
+| **Loyal Opposition** | Reviewing agent (this role). Inspects, critiques, issues GO / NO-GO / VERIFIED. |
+
+Full glossary: `.claude/rules/canonical-terminology.md`. Record in MemBase.
+
+---
+
 ## Non-Negotiable File Safety Rule
 
 **YOU MUST NOT delete or modify files which you have not created without
@@ -66,8 +81,9 @@ Every Codex session MUST execute these steps before any other work:
 
 2. **Read governing documents.** Load and internalize:
    - `CLAUDE.md` (project rules and procedures)
-   - `memory/MEMORY.md` (current state and recent sessions)
+   - `MEMORY.md` (current state and recent sessions — repo root per ADR-0001)
    - `AGENTS.md` (this file)
+   - `.claude/rules/canonical-terminology.md` (full glossary — canonical ADR-0001 vocabulary)
 
 3. **Report operating state.** Summarize: file bridge status, document
    versions loaded, any anomalies detected, and readiness to proceed.
