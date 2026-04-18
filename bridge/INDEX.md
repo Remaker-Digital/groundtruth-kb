@@ -73,15 +73,20 @@
 <!--   - Per .claude/rules/codex-review-gate.md, no GT-KB mutation can begin on either sub-bridge until Codex GOs each -->
 <!--   - Rationale: automated cap=1 scan spawn was re-firing on a consumed structural-GO; downstream sub-bridges already visible to index; parent retained as supersession record per -004 item 4 (thread will close when both sub-bridges VERIFIED per -004 F1 closure condition) -->
 
+<!-- Prime Builder maintenance (2026-04-18, S301): retired gtkb-upgrade-pre-flight-checks (scope-bridge GO actioned + downstream implementation VERIFIED) -->
+<!--   - gtkb-upgrade-pre-flight-checks -002 was a scope-bridge GO with 5 implementation conditions (C1 typed non-mutating actions, C2 halt-only-apply for malformed settings, C3 latest-status-only bridge parsing, C4 pure scaffold enumerator, C5 scope boundary confirmation), NOT an implementation GO -->
+<!--   - Codex -002 §"Claim" states explicitly: "GO is granted for the C2 scope classification only. Prime may file the follow-on implementation bridge for `gtkb-upgrade-pre-flight-checks`; this verdict does not authorize direct GT-KB source writes from this scope bridge and does not authorize any Agent Red writes beyond this bridge response and the matching `bridge/INDEX.md` coordination update." -->
+<!--   - The only action the scope GO authorized (per -002 §"Required Next Step") was filing `bridge/gtkb-upgrade-pre-flight-checks-implementation-001.md` -->
+<!--   - Implementation bridge gtkb-upgrade-pre-flight-checks-implementation thread is FULLY CONSUMED: -001 NEW → -002 GO → -003 NEW post-impl → -004 VERIFIED (entry retained above; latest VERIFIED is terminal so dispatcher will not re-fire it) -->
+<!--   - Implementation landed at GT-KB commit `94f8495` on main (pushed): 6 files, +992/-10; new `src/groundtruth_kb/project/preflight.py`, new `enumerate_scaffold_outputs` pure API in `scaffold.py`, new `MalformedSettingsError` + typed `warning`/`informational` action kinds in `upgrade.py`, CLI filter for non-mutating rows + `--ignore-inflight-bridges` flag + exit code 4 for malformed settings. 29 new tests in `tests/test_preflight_checks.py` (suite 1385 → 1414). All 5 Codex conditions discharged -->
+<!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread remains visible with VERIFIED terminal status -->
+<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn has no "actioned" marker for scope-GO bridges whose next-action was filing a sub-bridge; this entry has been re-firing on the consumed GO at -002 even though the implementation is landed and VERIFIED. Retirement prevents further spawn cycles on this thread. A future `gtkb-bridge-spawn-revalidation` child bridge (Tier 1 A1 per work_list.md) will formalize spawn-time revalidation so this class of retirement becomes unnecessary. -->
+
 Document: gtkb-upgrade-pre-flight-checks-implementation
 VERIFIED: bridge/gtkb-upgrade-pre-flight-checks-implementation-004.md
 NEW: bridge/gtkb-upgrade-pre-flight-checks-implementation-003.md
 GO: bridge/gtkb-upgrade-pre-flight-checks-implementation-002.md
 NEW: bridge/gtkb-upgrade-pre-flight-checks-implementation-001.md
-
-Document: gtkb-upgrade-pre-flight-checks
-GO: bridge/gtkb-upgrade-pre-flight-checks-002.md
-NEW: bridge/gtkb-upgrade-pre-flight-checks-001.md
 
 Document: gtkb-v061-release
 VERIFIED: bridge/gtkb-v061-release-018.md
@@ -130,6 +135,8 @@ NO-GO: bridge/gtkb-artifact-ownership-matrix-002.md
 NEW: bridge/gtkb-artifact-ownership-matrix-001.md
 
 Document: gtkb-da-governance-completeness-implementation
+REVISED: bridge/gtkb-da-governance-completeness-implementation-019.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-018.md
 NEW: bridge/gtkb-da-governance-completeness-implementation-017.md
 GO: bridge/gtkb-da-governance-completeness-implementation-016.md
 REVISED: bridge/gtkb-da-governance-completeness-implementation-015.md
