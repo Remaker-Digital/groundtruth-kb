@@ -234,20 +234,21 @@ def test_resolver_path_classification_excludes_settings_and_gitignore() -> None:
 def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     """With scaffold-ownership.toml present, artifacts_for_scaffold excludes ownership-glob rows.
 
-    Post-canonical-terminology (v0.6.1):
-    - local-only scaffolds 17 = 14 hooks + 3 rules (adds rule.canonical-terminology
-      + rule.canonical-terminology-config).
-    - dual-agent scaffolds 42 = 14 hooks + 10 rules + 6 skills + 11 settings + 1 gitignore.
+    Post-governance-completeness:
+    - local-only scaffolds 17 = 14 hooks + 3 rules (unchanged; 5 new
+      governance hooks are dual-agent-only).
+    - dual-agent scaffolds 51 = 19 hooks + 10 rules + 6 skills + 15 settings
+      + 1 gitignore.
 
     The sibling file contains only ownership-glob records which are filtered
     out by the helper — the ownership-glob exclusion invariant is preserved.
     """
-    # Post-canonical-terminology: local-only = 17 (14 hooks + 3 rules)
+    # local-only unchanged: 17 (14 original hooks + 3 rules)
     ids = {a.id for a in artifacts_for_scaffold("local-only")}
     assert len(ids) == 17
-    # dual-agent scaffold pulls all 42 registry rows (post-canonical-terminology).
+    # dual-agent scaffold: 51 rows post-governance-completeness.
     ids_da = {a.id for a in artifacts_for_scaffold("dual-agent")}
-    assert len(ids_da) == 42
+    assert len(ids_da) == 51
     # None are ownership-glob.
     assert all("adopter-" not in i for i in ids_da), "ownership-glob leaked into scaffold"
 
