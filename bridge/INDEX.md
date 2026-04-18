@@ -82,12 +82,19 @@
 <!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread remains visible with VERIFIED terminal status -->
 
 Document: gtkb-skills-tier-a-adoption-prepare
+NO-GO: bridge/gtkb-skills-tier-a-adoption-prepare-002.md
 NEW: bridge/gtkb-skills-tier-a-adoption-prepare-001.md
 
-Document: gtkb-skills-tier-a-adoption
-GO: bridge/gtkb-skills-tier-a-adoption-002.md
-NEW: bridge/gtkb-skills-tier-a-adoption-001.md
-<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn has no "actioned" marker for scope-GO bridges whose next-action was filing a sub-bridge; this entry has been re-firing on the consumed GO at -002 even though the implementation is landed and VERIFIED. Retirement prevents further spawn cycles on this thread. A future `gtkb-bridge-spawn-revalidation` child bridge (Tier 1 A1 per work_list.md) will formalize spawn-time revalidation so this class of retirement becomes unnecessary. -->
+<!-- Prime Builder maintenance (2026-04-18, S301-continuation): retired gtkb-skills-tier-a-adoption (scope-bridge GO actioned by downstream Prepare thread) -->
+<!--   - gtkb-skills-tier-a-adoption -002 was a scope-bridge GO with 6 open-question resolutions + 9 next-bridge conditions + 4 findings, NOT an implementation GO -->
+<!--   - Codex -002 §"Verdict" states explicitly: "GO on the broadened retroactive-adopter scope... The GO is for scope only. It does not authorize Agent Red or GT-KB source writes outside a future implementation bridge." -->
+<!--   - Codex -002 §"Required Open-Question Resolutions" item 5 ("Phase split") required splitting into at least two implementation bridges (Prepare + Apply). -->
+<!--   - The only action the scope GO authorized (per -002 §"Conditions for the Next Bridge") was filing an implementation bridge that discharges all 9 conditions -->
+<!--   - Downstream Prepare implementation bridge `gtkb-skills-tier-a-adoption-prepare-001.md` was filed NEW by a prior capped-spawn (commit 4cf2f9e4 + INDEX NEW entry at e970b857) — discharges all 6 resolutions (1 profile dual-agent, 2 version 0.6.1 runtime-proven via `python -m groundtruth_kb --version`, 3 clean-tree-gate deferred to Apply, 4 full A1/A2/A3 column schema, 5 Prepare-only scope, 6 Phase ζ deferred) + all 4 findings (F1 live `artifacts_for_upgrade("dual-agent")` enumeration replacing stale counts, F2 hand-written manifest not `gt project init`, F3 `python -m groundtruth_kb` explicit command form throughout, F4 clean-tree gate scoped OUT of Prepare) -->
+<!--   - Prepare thread has its own active entry above and continues independently (NO-GO at -002 will be addressed in a REVISED -003 by a future spawn) -->
+<!--   - Per .claude/rules/codex-review-gate.md, no Agent Red or GT-KB mutation can begin on the Apply sub-bridge until Prepare VERIFIED and Apply filed + GO'd separately -->
+<!--   - Bridge files 001-002 remain on disk as audit trail -->
+<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn has no "actioned" marker for scope-GO bridges whose next-action was filing a sub-bridge; this scope entry has been re-firing on the consumed GO at -002 even though the downstream Prepare thread is filed and visible. Retirement prevents further spawn cycles on this thread. A future `gtkb-bridge-spawn-revalidation` child bridge (Tier 1 A1 per work_list.md) will formalize spawn-time revalidation so this class of retirement becomes unnecessary. -->
 
 Document: gtkb-upgrade-pre-flight-checks-implementation
 VERIFIED: bridge/gtkb-upgrade-pre-flight-checks-implementation-004.md
