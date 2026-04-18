@@ -27,6 +27,14 @@ from groundtruth_kb.project.managed_registry import (
 from groundtruth_kb.project.manifest import read_manifest, write_manifest
 from groundtruth_kb.project.profiles import get_profile
 
+# Upgrade policies that produce no upgrade-time action at all. Rows whose
+# ``ownership.upgrade_policy`` is in this set are filtered out of the plan
+# before each phase runs. Policy metadata is attached to every parsed
+# artifact by the managed-registry loader (GO C2 — no parallel raw-TOML
+# parser). All 40 current-HEAD registry rows have ``upgrade_policy`` in
+# ``{overwrite, structured-merge}`` and are unaffected by this filter.
+_NO_UPGRADE_ACTION_POLICIES: frozenset[str] = frozenset({"preserve", "transient", "adopter-opt-in"})
+
 
 @dataclass
 class UpgradeAction:
@@ -59,26 +67,47 @@ def _template_hash(template_relative: str) -> str | None:
     return None
 
 
+def _ownership_permits_upgrade_action(artifact: FileArtifact | SettingsHookRegistration | GitignorePattern) -> bool:
+    """Return True iff *artifact*'s ownership policy allows an upgrade action.
+
+    Per the artifact-ownership matrix (``OwnershipResolver``), rows whose
+    ``upgrade_policy`` is one of ``preserve`` / ``transient`` /
+    ``adopter-opt-in`` do not produce any upgrade-time action. All 40
+    current-HEAD registry rows have ``overwrite`` or ``structured-merge``
+    policies, so this filter is a no-op on the existing registry and
+    preserves bit-identical upgrade behavior.
+    """
+    meta = artifact.ownership
+    if meta is None:
+        # Loader guarantees ownership metadata is always populated for
+        # non-ownership-glob rows; bail defensively to original behavior.
+        return True
+    return meta.upgrade_policy not in _NO_UPGRADE_ACTION_POLICIES
+
+
 def _managed_file_artifacts(profile_name: str, class_: str) -> list[FileArtifact]:
     """Return every :class:`FileArtifact` of *class_* managed for *profile_name*.
 
     Thin typed adapter over ``artifacts_for_upgrade`` that narrows the
-    union type to :class:`FileArtifact` for mypy.
+    union type to :class:`FileArtifact` for mypy. Filters out rows whose
+    ownership policy forbids an upgrade-time action (preserve / transient /
+    adopter-opt-in); preserves current behavior for all 40 existing rows
+    because they all use ``overwrite`` or ``structured-merge``.
     """
     raw = artifacts_for_upgrade(profile_name, class_=class_)  # type: ignore[arg-type]
-    return [a for a in raw if isinstance(a, FileArtifact)]
+    return [a for a in raw if isinstance(a, FileArtifact) and _ownership_permits_upgrade_action(a)]
 
 
 def _managed_settings_registrations(profile_name: str) -> list[SettingsHookRegistration]:
     """Return every :class:`SettingsHookRegistration` managed for *profile_name*."""
     raw = artifacts_for_upgrade(profile_name, class_="settings-hook-registration")
-    return [a for a in raw if isinstance(a, SettingsHookRegistration)]
+    return [a for a in raw if isinstance(a, SettingsHookRegistration) and _ownership_permits_upgrade_action(a)]
 
 
 def _managed_gitignore_patterns(profile_name: str) -> list[GitignorePattern]:
     """Return every :class:`GitignorePattern` managed for *profile_name*."""
     raw = artifacts_for_upgrade(profile_name, class_="gitignore-pattern")
-    return [a for a in raw if isinstance(a, GitignorePattern)]
+    return [a for a in raw if isinstance(a, GitignorePattern) and _ownership_permits_upgrade_action(a)]
 
 
 def _plan_missing_managed_files(target: Path, profile_name: str) -> list[UpgradeAction]:

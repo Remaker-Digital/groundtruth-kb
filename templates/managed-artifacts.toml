@@ -31,6 +31,9 @@ target_path = ".claude/hooks/assertion-check.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -40,6 +43,9 @@ target_path = ".claude/hooks/spec-classifier.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -49,6 +55,9 @@ target_path = ".claude/hooks/intake-classifier.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -58,6 +67,9 @@ target_path = ".claude/hooks/destructive-gate.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -67,6 +79,9 @@ target_path = ".claude/hooks/credential-scan.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -76,6 +91,9 @@ target_path = ".claude/hooks/scheduler.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -85,6 +103,9 @@ target_path = ".claude/hooks/scanner-safe-writer.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -94,6 +115,9 @@ target_path = ".claude/hooks/bridge-compliance-gate.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -103,6 +127,9 @@ target_path = ".claude/hooks/delib-search-gate.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -112,6 +139,9 @@ target_path = ".claude/hooks/delib-search-tracker.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -121,6 +151,9 @@ target_path = ".claude/hooks/kb-not-markdown.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -130,6 +163,9 @@ target_path = ".claude/hooks/session-health.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -139,6 +175,9 @@ target_path = ".claude/hooks/session-start-governance.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "hook"
@@ -148,6 +187,9 @@ target_path = ".claude/hooks/spec-before-code.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 # =========================================================================
 # RULES (8 records)
@@ -161,6 +203,9 @@ target_path = ".claude/rules/prime-builder.md"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "rule"
@@ -170,6 +215,9 @@ target_path = ".claude/rules/loyal-opposition.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "rule"
@@ -179,6 +227,9 @@ target_path = ".claude/rules/bridge-poller-canonical.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "rule"
@@ -188,6 +239,9 @@ target_path = ".claude/rules/prime-bridge-collaboration-protocol.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "rule"
@@ -197,6 +251,9 @@ target_path = ".claude/rules/report-depth.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "rule"
@@ -206,6 +263,9 @@ target_path = ".claude/rules/file-bridge-protocol.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "rule"
@@ -215,6 +275,9 @@ target_path = ".claude/rules/bridge-essential.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "rule"
@@ -224,6 +287,9 @@ target_path = ".claude/rules/deliberation-protocol.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 # =========================================================================
 # SKILLS (6 records)
@@ -237,6 +303,9 @@ target_path = ".claude/skills/decision-capture/SKILL.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "skill"
@@ -246,6 +315,9 @@ target_path = ".claude/skills/decision-capture/helpers/record_decision.py"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "skill"
@@ -255,6 +327,9 @@ target_path = ".claude/skills/bridge-propose/SKILL.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "skill"
@@ -264,6 +339,9 @@ target_path = ".claude/skills/bridge-propose/helpers/write_bridge.py"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "skill"
@@ -273,6 +351,9 @@ target_path = ".claude/skills/spec-intake/SKILL.md"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "skill"
@@ -282,6 +363,9 @@ target_path = ".claude/skills/spec-intake/helpers/spec_intake.py"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
 
 # =========================================================================
 # SETTINGS-HOOK-REGISTRATION (11 records)
@@ -296,6 +380,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -306,6 +393,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -316,6 +406,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -326,6 +419,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -336,6 +432,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -346,6 +445,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -356,6 +458,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -366,6 +471,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -376,6 +484,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -386,6 +497,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -396,6 +510,9 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
 
 # =========================================================================
 # GITIGNORE-PATTERN (1 record)
@@ -409,3 +526,7 @@ comment = "Operational hook logs"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+

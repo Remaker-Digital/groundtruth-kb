@@ -25,6 +25,7 @@ from groundtruth_kb.project.managed_registry import (
     GitignorePattern,
     InvalidArtifactRecord,
     ManagedArtifact,
+    OwnershipGlobArtifact,
     SettingsHookRegistration,
     UnknownArtifactClass,
     _load_all_artifacts,
@@ -35,20 +36,36 @@ from groundtruth_kb.project.managed_registry import (
     load_managed_artifacts,
 )
 
+
+def _registry_records() -> list[ManagedArtifact]:
+    """Return only the original 40 managed-registry records (excludes ownership-glob).
+
+    ``_load_all_artifacts()`` merges records from ``managed-artifacts.toml``
+    and ``templates/scaffold-ownership.toml`` (``ownership-glob`` class). These
+    tests were written before the sibling file was introduced and assert on
+    registry-only counts.
+    """
+    return [r for r in _load_all_artifacts() if not isinstance(r, OwnershipGlobArtifact)]
+
+
 # ---------------------------------------------------------------------------
 # Parse / totals
 # ---------------------------------------------------------------------------
 
 
 def test_registry_total_is_forty_records() -> None:
-    """40 total = 14 hooks + 8 rules + 6 skills + 11 settings + 1 gitignore."""
-    records = _load_all_artifacts()
-    assert len(records) == 40, f"expected 40 total records; got {len(records)}"
+    """40 total = 14 hooks + 8 rules + 6 skills + 11 settings + 1 gitignore.
+
+    ``ownership-glob`` rows from ``templates/scaffold-ownership.toml`` are
+    excluded — this test scope is registry-only.
+    """
+    records = _registry_records()
+    assert len(records) == 40, f"expected 40 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
     """Class counts match the approved proposal at ``-007`` §Registry record totals."""
-    records = _load_all_artifacts()
+    records = _registry_records()
     counts: dict[str, int] = {}
     for r in records:
         counts[r.class_] = counts.get(r.class_, 0) + 1
@@ -62,17 +79,17 @@ def test_registry_class_counts_match_proposal() -> None:
 
 
 def test_registry_ids_are_unique() -> None:
-    """Every registry record must have a unique id."""
+    """Every record must have a unique id (registry + sibling ownership-glob combined)."""
     records = _load_all_artifacts()
     ids = [r.id for r in records]
-    assert len(ids) == len(set(ids)), f"duplicate registry ids found: {[x for x in ids if ids.count(x) > 1]}"
+    assert len(ids) == len(set(ids)), f"duplicate ids found: {[x for x in ids if ids.count(x) > 1]}"
 
 
 def test_registry_parses_into_correct_dataclass_types() -> None:
-    """Each record parses to exactly one of the three dataclass types."""
+    """Every record parses to one of the four dataclass types."""
     records = _load_all_artifacts()
     for r in records:
-        assert isinstance(r, (FileArtifact, SettingsHookRegistration, GitignorePattern))
+        assert isinstance(r, (FileArtifact, SettingsHookRegistration, GitignorePattern, OwnershipGlobArtifact))
 
 
 # ---------------------------------------------------------------------------

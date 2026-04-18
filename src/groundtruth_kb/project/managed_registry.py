@@ -39,6 +39,7 @@ ArtifactClass = Literal[
     "skill",
     "settings-hook-registration",
     "gitignore-pattern",
+    "ownership-glob",
 ]
 
 SettingsEvent = Literal[
@@ -48,6 +49,29 @@ SettingsEvent = Literal[
     "PreToolUse",
 ]
 
+# Ownership-matrix enum literals (bridge/gtkb-artifact-ownership-matrix-003.md §1.3).
+OwnershipEnum = Literal[
+    "gt-kb-managed",
+    "gt-kb-scaffolded",
+    "shared-structured",
+    "adopter-owned",
+    "legacy-exception",
+]
+
+UpgradePolicyEnum = Literal[
+    "overwrite",
+    "structured-merge",
+    "adopter-opt-in",
+    "preserve",
+    "transient",
+]
+
+DivergencePolicyEnum = Literal[
+    "warn",
+    "error",
+    "force-merge-on-upgrade",
+]
+
 _VALID_ARTIFACT_CLASSES: frozenset[str] = frozenset(
     {
         "hook",
@@ -55,12 +79,57 @@ _VALID_ARTIFACT_CLASSES: frozenset[str] = frozenset(
         "skill",
         "settings-hook-registration",
         "gitignore-pattern",
+        "ownership-glob",
     }
 )
 
 _VALID_SETTINGS_EVENTS: frozenset[str] = frozenset({"SessionStart", "UserPromptSubmit", "PostToolUse", "PreToolUse"})
 
 _FILE_CLASSES: frozenset[str] = frozenset({"hook", "rule", "skill"})
+
+_VALID_OWNERSHIP_VALUES: frozenset[str] = frozenset(
+    {"gt-kb-managed", "gt-kb-scaffolded", "shared-structured", "adopter-owned", "legacy-exception"}
+)
+
+_VALID_UPGRADE_POLICIES: frozenset[str] = frozenset(
+    {"overwrite", "structured-merge", "adopter-opt-in", "preserve", "transient"}
+)
+
+_VALID_DIVERGENCE_POLICIES: frozenset[str] = frozenset({"warn", "error", "force-merge-on-upgrade"})
+
+# Upgrade policies that require adopter_divergence_policy to be explicitly set.
+# Rows with ``upgrade_policy`` in {preserve, transient} MUST omit divergence policy.
+_UPGRADE_POLICIES_REQUIRING_DIVERGENCE: frozenset[str] = frozenset({"overwrite", "structured-merge", "adopter-opt-in"})
+
+# The 3 ownership keys that define an ownership block. C1: defaults apply iff
+# ALL three are absent. If any of the three are present, the block is treated
+# as explicitly declared and fully validated.
+_OWNERSHIP_BLOCK_KEYS: frozenset[str] = frozenset({"ownership", "upgrade_policy", "adopter_divergence_policy"})
+
+
+# Per-class defaults applied when the entire ownership block is absent from a
+# legacy row (GO Condition C1). All-or-none: partial blocks raise.
+_CLASS_OWNERSHIP_DEFAULTS: dict[str, tuple[str, str, str]] = {
+    "hook": ("gt-kb-managed", "overwrite", "warn"),
+    "rule": ("gt-kb-managed", "overwrite", "warn"),
+    "skill": ("gt-kb-managed", "overwrite", "warn"),
+    "settings-hook-registration": ("gt-kb-managed", "structured-merge", "warn"),
+    "gitignore-pattern": ("gt-kb-managed", "structured-merge", "warn"),
+}
+
+
+@dataclass(frozen=True)
+class OwnershipMeta:
+    """Typed ownership metadata attached to every parsed artifact (GO C2).
+
+    ``adopter_divergence_policy`` is ``None`` iff ``upgrade_policy`` is one of
+    ``preserve`` / ``transient``. Enforced by :func:`_extract_ownership_block`.
+    """
+
+    ownership: OwnershipEnum
+    upgrade_policy: UpgradePolicyEnum
+    adopter_divergence_policy: DivergencePolicyEnum | None
+    workflow_targets: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -77,6 +146,7 @@ class FileArtifact:
     initial_profiles: tuple[str, ...]
     managed_profiles: tuple[str, ...]
     doctor_required_profiles: tuple[str, ...]
+    ownership: OwnershipMeta | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +161,7 @@ class SettingsHookRegistration:
     initial_profiles: tuple[str, ...]
     managed_profiles: tuple[str, ...]
     doctor_required_profiles: tuple[str, ...]
+    ownership: OwnershipMeta | None = None
 
 
 @dataclass(frozen=True)
@@ -104,9 +175,31 @@ class GitignorePattern:
     initial_profiles: tuple[str, ...]
     managed_profiles: tuple[str, ...]
     doctor_required_profiles: tuple[str, ...]
+    ownership: OwnershipMeta | None = None
 
 
-ManagedArtifact = FileArtifact | SettingsHookRegistration | GitignorePattern
+@dataclass(frozen=True)
+class OwnershipGlobArtifact:
+    """Sibling ownership-map record keyed by ``path_glob`` rather than ``target_path``.
+
+    Loaded from ``templates/scaffold-ownership.toml``. The ``ownership`` block
+    is REQUIRED (never default-derived) — ownership-glob rows exist solely to
+    carry ownership metadata. The ``priority`` integer (higher wins) drives
+    glob-conflict resolution in :class:`OwnershipResolver`.
+    """
+
+    class_: Literal["ownership-glob"]
+    id: str
+    path_glob: str
+    priority: int
+    initial_profiles: tuple[str, ...]
+    managed_profiles: tuple[str, ...]
+    doctor_required_profiles: tuple[str, ...]
+    ownership: OwnershipMeta
+    notes: str = ""
+
+
+ManagedArtifact = FileArtifact | SettingsHookRegistration | GitignorePattern | OwnershipGlobArtifact
 
 
 # ---------------------------------------------------------------------------
@@ -143,15 +236,46 @@ _CLASS_REQUIRED_KEYS: dict[str, frozenset[str]] = {
     "skill": frozenset(_REQUIRED_COMMON_KEYS | {"template_path", "target_path"}),
     "settings-hook-registration": frozenset(_REQUIRED_COMMON_KEYS | {"event", "hook_filename", "target_settings_path"}),
     "gitignore-pattern": frozenset(_REQUIRED_COMMON_KEYS | {"pattern", "comment"}),
+    # ownership-glob rows must carry the full ownership triple inline (no defaults).
+    "ownership-glob": frozenset(_REQUIRED_COMMON_KEYS | {"path_glob", "priority", "ownership", "upgrade_policy"}),
 }
 
 _CLASS_FORBIDDEN_KEYS: dict[str, frozenset[str]] = {
-    "hook": frozenset({"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment"}),
-    "rule": frozenset({"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment"}),
-    "skill": frozenset({"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment"}),
-    "settings-hook-registration": frozenset({"profiles", "template_path", "target_path", "pattern", "comment"}),
+    "hook": frozenset(
+        {"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment", "path_glob", "priority"}
+    ),
+    "rule": frozenset(
+        {"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment", "path_glob", "priority"}
+    ),
+    "skill": frozenset(
+        {"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment", "path_glob", "priority"}
+    ),
+    "settings-hook-registration": frozenset(
+        {"profiles", "template_path", "target_path", "pattern", "comment", "path_glob", "priority"}
+    ),
     "gitignore-pattern": frozenset(
-        {"profiles", "template_path", "target_path", "event", "hook_filename", "target_settings_path"}
+        {
+            "profiles",
+            "template_path",
+            "target_path",
+            "event",
+            "hook_filename",
+            "target_settings_path",
+            "path_glob",
+            "priority",
+        }
+    ),
+    "ownership-glob": frozenset(
+        {
+            "profiles",
+            "template_path",
+            "target_path",
+            "event",
+            "hook_filename",
+            "target_settings_path",
+            "pattern",
+            "comment",
+        }
     ),
 }
 
@@ -159,6 +283,15 @@ _CLASS_FORBIDDEN_KEYS: dict[str, frozenset[str]] = {
 def _registry_path() -> Path:
     """Return the filesystem path to the registry TOML."""
     return get_templates_dir() / "managed-artifacts.toml"
+
+
+def _ownership_glob_path() -> Path:
+    """Return the filesystem path to the sibling ownership-glob TOML.
+
+    File may be absent (older GT-KB installs); loader handles absence
+    gracefully by returning an empty record list.
+    """
+    return get_templates_dir() / "scaffold-ownership.toml"
 
 
 def _coerce_profile_tuple(value: Any, record_id: str, field_name: str) -> tuple[str, ...]:
@@ -219,6 +352,117 @@ def _validate_lifecycle_invariants(
         )
 
 
+def _extract_ownership_block(record: dict[str, Any], class_: str) -> OwnershipMeta:
+    """Validate + extract ownership metadata for any artifact record (GO C2).
+
+    Called from all four build helpers. Enforces:
+
+    - **C1 all-or-none defaults**: if NONE of the 3 ownership keys
+      (``ownership``, ``upgrade_policy``, ``adopter_divergence_policy``) are
+      present, class defaults apply. If ANY are present, the block is treated
+      as explicitly declared and fully validated.
+    - **Enum membership**: all three values must be in the canonical sets.
+    - **Divergence invariant**: ``adopter_divergence_policy`` present iff
+      ``upgrade_policy ∈ {overwrite, structured-merge, adopter-opt-in}``.
+
+    ``ownership-glob`` rows always require an explicit block (no defaults);
+    this is enforced by required-key validation before this function is
+    called.
+    """
+    record_id = record["id"]
+    present_keys = _OWNERSHIP_BLOCK_KEYS & record.keys()
+
+    if not present_keys:
+        # C1: entire block absent → class defaults apply. ownership-glob
+        # never reaches this branch because "ownership" is in its required
+        # key set and _validate_schema_keys will have already raised.
+        if class_ not in _CLASS_OWNERSHIP_DEFAULTS:
+            raise InvalidArtifactRecord(
+                f"record {record_id!r} (class={class_!r}): no class default ownership block defined"
+            )
+        default_ownership, default_upgrade, default_divergence = _CLASS_OWNERSHIP_DEFAULTS[class_]
+        return OwnershipMeta(
+            ownership=cast(OwnershipEnum, default_ownership),
+            upgrade_policy=cast(UpgradePolicyEnum, default_upgrade),
+            adopter_divergence_policy=cast(DivergencePolicyEnum, default_divergence),
+            workflow_targets=_coerce_workflow_targets(record.get("workflow_targets"), record_id),
+        )
+
+    # C1: at least one ownership key is present → validate the whole block.
+    ownership_val = record.get("ownership")
+    upgrade_policy_val = record.get("upgrade_policy")
+    divergence_val = record.get("adopter_divergence_policy")
+
+    if not isinstance(ownership_val, str):
+        raise InvalidArtifactRecord(
+            f"record {record_id!r}: ownership must be a string (one of "
+            f"{sorted(_VALID_OWNERSHIP_VALUES)}); got {type(ownership_val).__name__}"
+        )
+    if ownership_val not in _VALID_OWNERSHIP_VALUES:
+        raise InvalidArtifactRecord(
+            f"record {record_id!r}: ownership {ownership_val!r} is not in {sorted(_VALID_OWNERSHIP_VALUES)}"
+        )
+
+    if not isinstance(upgrade_policy_val, str):
+        raise InvalidArtifactRecord(
+            f"record {record_id!r}: upgrade_policy must be a string (one of "
+            f"{sorted(_VALID_UPGRADE_POLICIES)}); got {type(upgrade_policy_val).__name__}"
+        )
+    if upgrade_policy_val not in _VALID_UPGRADE_POLICIES:
+        raise InvalidArtifactRecord(
+            f"record {record_id!r}: upgrade_policy {upgrade_policy_val!r} is not in {sorted(_VALID_UPGRADE_POLICIES)}"
+        )
+
+    divergence_required = upgrade_policy_val in _UPGRADE_POLICIES_REQUIRING_DIVERGENCE
+    if divergence_required:
+        if divergence_val is None:
+            raise InvalidArtifactRecord(
+                f"record {record_id!r}: upgrade_policy={upgrade_policy_val!r} requires "
+                f"adopter_divergence_policy (one of {sorted(_VALID_DIVERGENCE_POLICIES)})"
+            )
+        if not isinstance(divergence_val, str):
+            raise InvalidArtifactRecord(
+                f"record {record_id!r}: adopter_divergence_policy must be a string; got {type(divergence_val).__name__}"
+            )
+        if divergence_val not in _VALID_DIVERGENCE_POLICIES:
+            raise InvalidArtifactRecord(
+                f"record {record_id!r}: adopter_divergence_policy {divergence_val!r} "
+                f"is not in {sorted(_VALID_DIVERGENCE_POLICIES)}"
+            )
+    else:
+        # preserve / transient — divergence policy must be absent.
+        if divergence_val is not None:
+            raise InvalidArtifactRecord(
+                f"record {record_id!r}: upgrade_policy={upgrade_policy_val!r} forbids "
+                f"adopter_divergence_policy (present: {divergence_val!r})"
+            )
+
+    return OwnershipMeta(
+        ownership=cast(OwnershipEnum, ownership_val),
+        upgrade_policy=cast(UpgradePolicyEnum, upgrade_policy_val),
+        adopter_divergence_policy=(cast(DivergencePolicyEnum, divergence_val) if divergence_val is not None else None),
+        workflow_targets=_coerce_workflow_targets(record.get("workflow_targets"), record_id),
+    )
+
+
+def _coerce_workflow_targets(raw: Any, record_id: str) -> tuple[str, ...]:
+    """Coerce optional ``workflow_targets`` list into a tuple of str."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise InvalidArtifactRecord(
+            f"record {record_id!r}: workflow_targets must be a list of strings; got {type(raw).__name__}"
+        )
+    result: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            raise InvalidArtifactRecord(
+                f"record {record_id!r}: workflow_targets item must be str; got {type(item).__name__}"
+            )
+        result.append(item)
+    return tuple(result)
+
+
 def _build_file_artifact(record: dict[str, Any]) -> FileArtifact:
     """Construct a :class:`FileArtifact` from a validated record dict."""
     class_raw = record["class"]
@@ -237,6 +481,7 @@ def _build_file_artifact(record: dict[str, Any]) -> FileArtifact:
     managed = _coerce_profile_tuple(record["managed_profiles"], record_id, "managed_profiles")
     doctor_required = _coerce_profile_tuple(record["doctor_required_profiles"], record_id, "doctor_required_profiles")
     _validate_lifecycle_invariants(record_id, initial, managed, doctor_required)
+    ownership_meta = _extract_ownership_block(record, class_raw)
     # Narrow class_raw for mypy via cast — schema validation above guarantees the value.
     class_literal = cast(Literal["hook", "rule", "skill"], class_raw)
     return FileArtifact(
@@ -247,6 +492,7 @@ def _build_file_artifact(record: dict[str, Any]) -> FileArtifact:
         initial_profiles=initial,
         managed_profiles=managed,
         doctor_required_profiles=doctor_required,
+        ownership=ownership_meta,
     )
 
 
@@ -272,6 +518,7 @@ def _build_settings_registration(record: dict[str, Any]) -> SettingsHookRegistra
     managed = _coerce_profile_tuple(record["managed_profiles"], record_id, "managed_profiles")
     doctor_required = _coerce_profile_tuple(record["doctor_required_profiles"], record_id, "doctor_required_profiles")
     _validate_lifecycle_invariants(record_id, initial, managed, doctor_required)
+    ownership_meta = _extract_ownership_block(record, "settings-hook-registration")
     event_literal = cast(SettingsEvent, event_raw)
     return SettingsHookRegistration(
         class_="settings-hook-registration",
@@ -282,6 +529,7 @@ def _build_settings_registration(record: dict[str, Any]) -> SettingsHookRegistra
         initial_profiles=initial,
         managed_profiles=managed,
         doctor_required_profiles=doctor_required,
+        ownership=ownership_meta,
     )
 
 
@@ -298,6 +546,7 @@ def _build_gitignore_pattern(record: dict[str, Any]) -> GitignorePattern:
     managed = _coerce_profile_tuple(record["managed_profiles"], record_id, "managed_profiles")
     doctor_required = _coerce_profile_tuple(record["doctor_required_profiles"], record_id, "doctor_required_profiles")
     _validate_lifecycle_invariants(record_id, initial, managed, doctor_required)
+    ownership_meta = _extract_ownership_block(record, "gitignore-pattern")
     return GitignorePattern(
         class_="gitignore-pattern",
         id=record_id,
@@ -306,6 +555,46 @@ def _build_gitignore_pattern(record: dict[str, Any]) -> GitignorePattern:
         initial_profiles=initial,
         managed_profiles=managed,
         doctor_required_profiles=doctor_required,
+        ownership=ownership_meta,
+    )
+
+
+def _build_ownership_glob(record: dict[str, Any]) -> OwnershipGlobArtifact:
+    """Construct an :class:`OwnershipGlobArtifact` from a validated record dict.
+
+    ``ownership-glob`` rows carry their ownership block inline (no defaults);
+    :func:`_extract_ownership_block` will validate it as explicitly-declared.
+    """
+    record_id = record["id"]
+    path_glob = record["path_glob"]
+    priority_raw = record["priority"]
+    notes_raw = record.get("notes", "")
+
+    if not isinstance(path_glob, str):
+        raise InvalidArtifactRecord(f"record {record_id!r}: path_glob must be str; got {type(path_glob).__name__}")
+    if not isinstance(priority_raw, int) or isinstance(priority_raw, bool):
+        # bool is a subclass of int; reject True/False as accidental values.
+        raise InvalidArtifactRecord(f"record {record_id!r}: priority must be int; got {type(priority_raw).__name__}")
+    if not isinstance(notes_raw, str):
+        raise InvalidArtifactRecord(f"record {record_id!r}: notes must be str; got {type(notes_raw).__name__}")
+
+    initial = _coerce_profile_tuple(record["initial_profiles"], record_id, "initial_profiles")
+    managed = _coerce_profile_tuple(record["managed_profiles"], record_id, "managed_profiles")
+    doctor_required = _coerce_profile_tuple(record["doctor_required_profiles"], record_id, "doctor_required_profiles")
+    _validate_lifecycle_invariants(record_id, initial, managed, doctor_required)
+
+    ownership_meta = _extract_ownership_block(record, "ownership-glob")
+
+    return OwnershipGlobArtifact(
+        class_="ownership-glob",
+        id=record_id,
+        path_glob=path_glob,
+        priority=priority_raw,
+        initial_profiles=initial,
+        managed_profiles=managed,
+        doctor_required_profiles=doctor_required,
+        ownership=ownership_meta,
+        notes=notes_raw,
     )
 
 
@@ -327,8 +616,10 @@ def _parse_record(record: dict[str, Any]) -> ManagedArtifact:
         return _build_file_artifact(record)
     if class_raw == "settings-hook-registration":
         return _build_settings_registration(record)
+    if class_raw == "gitignore-pattern":
+        return _build_gitignore_pattern(record)
     # Only remaining branch.
-    return _build_gitignore_pattern(record)
+    return _build_ownership_glob(record)
 
 
 # ---------------------------------------------------------------------------
@@ -336,28 +627,62 @@ def _parse_record(record: dict[str, Any]) -> ManagedArtifact:
 # ---------------------------------------------------------------------------
 
 
-def _load_all_artifacts() -> list[ManagedArtifact]:
-    """Parse the TOML registry and return every record.
+def _load_raw_artifacts_from(path: Path, source_label: str) -> list[ManagedArtifact]:
+    """Parse a single artifact-table TOML file and return its records.
 
-    No profile filter; no ID uniqueness check at this layer — that is enforced by
-    dedicated tests (see ``tests/test_managed_registry.py``). Validation of
-    per-record schemas and lifecycle invariants IS performed here so that the
-    loader itself is the point at which ``InvalidArtifactRecord`` is raised.
+    Returns an empty list if the file is absent. Raises on malformed root.
     """
-    path = _registry_path()
+    if not path.exists():
+        return []
     with open(path, "rb") as f:
         data = tomllib.load(f)
-
     raw_records = data.get("artifacts", [])
     if not isinstance(raw_records, list):
-        raise InvalidArtifactRecord(f"registry root 'artifacts' must be a list, got {type(raw_records).__name__}")
-
+        raise InvalidArtifactRecord(
+            f"registry root 'artifacts' in {source_label} must be a list, got {type(raw_records).__name__}"
+        )
     results: list[ManagedArtifact] = []
     for raw in raw_records:
         if not isinstance(raw, dict):
-            raise InvalidArtifactRecord(f"artifacts[] entries must be tables, got {type(raw).__name__}")
+            raise InvalidArtifactRecord(
+                f"artifacts[] entries in {source_label} must be tables, got {type(raw).__name__}"
+            )
         results.append(_parse_record(raw))
     return results
+
+
+def _load_all_artifacts() -> list[ManagedArtifact]:
+    """Parse BOTH artifact TOML files and return every record.
+
+    Sources in order:
+
+    1. ``templates/managed-artifacts.toml`` (the registry, ~40 records)
+    2. ``templates/scaffold-ownership.toml`` (sibling ownership map; optional)
+
+    Records are merged into a single list. Cross-file ``id`` uniqueness IS
+    enforced here: a collision raises :class:`InvalidArtifactRecord` naming
+    the two offending files. Validation of per-record schemas and lifecycle
+    invariants is performed inside :func:`_parse_record`.
+    """
+    registry_path = _registry_path()
+    ownership_path = _ownership_glob_path()
+
+    registry_records = _load_raw_artifacts_from(registry_path, source_label="managed-artifacts.toml")
+    ownership_records = _load_raw_artifacts_from(ownership_path, source_label="scaffold-ownership.toml")
+
+    # Cross-file ``id`` uniqueness (records within a single file are allowed
+    # to collide — the test suite enforces that separately — but a collision
+    # across files is surfaced here because the offending file pair is
+    # known).
+    registry_ids = {r.id for r in registry_records}
+    for r in ownership_records:
+        if r.id in registry_ids:
+            raise InvalidArtifactRecord(
+                f"artifact id {r.id!r} is defined in both "
+                f"'templates/managed-artifacts.toml' and 'templates/scaffold-ownership.toml'"
+            )
+
+    return [*registry_records, *ownership_records]
 
 
 def load_managed_artifacts(profile: str) -> list[ManagedArtifact]:
@@ -366,6 +691,12 @@ def load_managed_artifacts(profile: str) -> list[ManagedArtifact]:
     A record appears in the result if *profile* is a member of at least one of
     ``initial_profiles``, ``managed_profiles``, or ``doctor_required_profiles``.
 
+    ``ownership-glob`` rows are excluded because they are not lifecycle
+    participants for scaffold/upgrade/doctor — they carry ownership metadata
+    only. Callers needing every record (including ownership-glob) should use
+    :func:`_load_all_artifacts` directly (private) or the
+    :class:`~groundtruth_kb.project.ownership.OwnershipResolver` query API.
+
     This is a broad query helper; filters for a specific lifecycle step should
     use :func:`artifacts_for_scaffold`, :func:`artifacts_for_upgrade`, or
     :func:`artifacts_for_doctor`.
@@ -373,7 +704,8 @@ def load_managed_artifacts(profile: str) -> list[ManagedArtifact]:
     return [
         a
         for a in _load_all_artifacts()
-        if profile in a.initial_profiles or profile in a.managed_profiles or profile in a.doctor_required_profiles
+        if a.class_ != "ownership-glob"
+        and (profile in a.initial_profiles or profile in a.managed_profiles or profile in a.doctor_required_profiles)
     ]
 
 
@@ -384,10 +716,14 @@ def artifacts_for_scaffold(
     """Return artifacts to be copied by ``scaffold_project`` for *profile*.
 
     Filters by ``initial_profiles`` membership. Optional ``class_`` argument
-    narrows the result to one class.
+    narrows the result to one class. ``ownership-glob`` records are always
+    excluded — they carry ownership metadata only and never trigger a file
+    copy at scaffold time (sub-bridge ``gtkb-artifact-ownership-matrix-003``).
     """
     return [
-        a for a in _load_all_artifacts() if profile in a.initial_profiles and (class_ is None or a.class_ == class_)
+        a
+        for a in _load_all_artifacts()
+        if a.class_ != "ownership-glob" and profile in a.initial_profiles and (class_ is None or a.class_ == class_)
     ]
 
 
@@ -397,10 +733,15 @@ def artifacts_for_upgrade(
 ) -> list[ManagedArtifact]:
     """Return artifacts for which ``plan_upgrade`` enforces drift/missing-file repair.
 
-    Filters by ``managed_profiles`` membership.
+    Filters by ``managed_profiles`` membership. ``ownership-glob`` records
+    are always excluded — upgrade policy is derived from the resolved
+    :class:`~groundtruth_kb.project.ownership.OwnershipMeta` on registry
+    rows, not directly from glob entries.
     """
     return [
-        a for a in _load_all_artifacts() if profile in a.managed_profiles and (class_ is None or a.class_ == class_)
+        a
+        for a in _load_all_artifacts()
+        if a.class_ != "ownership-glob" and profile in a.managed_profiles and (class_ is None or a.class_ == class_)
     ]
 
 
@@ -410,21 +751,29 @@ def artifacts_for_doctor(
 ) -> list[ManagedArtifact]:
     """Return artifacts enforced by ``run_doctor`` as simple required checks.
 
-    Filters by ``doctor_required_profiles`` membership.
+    Filters by ``doctor_required_profiles`` membership. ``ownership-glob``
+    records are always excluded.
     """
     return [
         a
         for a in _load_all_artifacts()
-        if profile in a.doctor_required_profiles and (class_ is None or a.class_ == class_)
+        if a.class_ != "ownership-glob"
+        and profile in a.doctor_required_profiles
+        and (class_ is None or a.class_ == class_)
     ]
 
 
 def find_artifact_by_id(artifact_id: str) -> ManagedArtifact:
     """Return the registry record whose ``id`` matches *artifact_id*.
 
+    Searches across both the registry and the sibling ownership-glob file;
+    ``id`` uniqueness is enforced globally at load time.
+
     Used by ``doctor.py``'s composite checks (scanner-safe-writer) to
     resolve the canonical hook / settings-registration / gitignore-pattern
-    triple by ID rather than by hardcoded string.
+    triple by ID rather than by hardcoded string, and by
+    :class:`~groundtruth_kb.project.ownership.OwnershipResolver` to look up
+    ownership-glob records.
 
     Raises:
         KeyError: if no record has the given id.

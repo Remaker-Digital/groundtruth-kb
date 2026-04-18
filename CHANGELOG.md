@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — Artifact Ownership Matrix (sub-bridge `gtkb-artifact-ownership-matrix`)
+
+- **OwnershipResolver query API** (`src/groundtruth_kb/project/ownership.py`)
+  — new public module exposing `OwnershipResolver`, `OwnershipRecord`,
+  `ClassificationRow`, and report renderers. Resolver joins
+  registry-class rows (keyed by `target_path`) with sibling
+  `ownership-glob` rows (keyed by `path_glob`) into a single query
+  surface. Precedence: exact FILE-class match → glob match (priority
+  desc, then longest-literal-prefix tiebreak) → synthetic `adopter-owned
+  + preserve` fallback. Loads typed output from `managed_registry`
+  (never re-parses TOML — GO Condition C2).
+
+- **Ownership metadata on every managed artifact** — `FileArtifact`,
+  `SettingsHookRegistration`, `GitignorePattern`, and the new
+  `OwnershipGlobArtifact` dataclasses each carry an `OwnershipMeta`
+  block with `ownership` / `upgrade_policy` / `adopter_divergence_policy`
+  / `workflow_targets`. Extracted by shared `_extract_ownership_block`
+  validator called from all four build helpers (GO C2).
+
+- **Sibling ownership map** (`templates/scaffold-ownership.toml`) — new
+  TOML file carrying 8 `ownership-glob` rows for adopter-tree paths
+  outside the registry (`groundtruth.toml`, `groundtruth.db`,
+  `bridge/**/*.md`, `memory/**/*.md`, `webapp/**`,
+  `.gt-upgrade-staging/**`, plus the two requirement files mandated by
+  GO Condition C3).
+
+- **`gt project classify-tree` CLI subcommand** — manifest-independent
+  classifier (`gt project classify-tree --dir <path> --output <report>`).
+  Does NOT require `groundtruth.toml` in the target tree and does NOT
+  call `gt project doctor`. Read-only tree walker writes a Markdown or
+  JSON report with a deterministic header block and ordering (ownership
+  enum, then alphabetical by path). Flags rows whose ownership equals
+  `legacy-exception` as `owner_decision_pending = "YES"`.
+
+### Changed
+
+- **Managed registry loader** (`managed_registry.py`) — now merges
+  records from `templates/managed-artifacts.toml` and
+  `templates/scaffold-ownership.toml` into a single list with enforced
+  cross-file `id` uniqueness. New `ownership-glob` class; new enum
+  literals `OwnershipEnum` / `UpgradePolicyEnum` / `DivergencePolicyEnum`.
+  `artifacts_for_scaffold` / `artifacts_for_upgrade` /
+  `artifacts_for_doctor` filter out `ownership-glob` rows so current
+  scaffold/upgrade/doctor behavior is bit-identical (zero regression on
+  40 existing rows; verified by per-profile id-set delta).
+
+- **`templates/managed-artifacts.toml`** — all 40 rows now carry an
+  explicit ownership block (`ownership` / `upgrade_policy` /
+  `adopter_divergence_policy`). File-class rows default to `gt-kb-managed
+  + overwrite + warn`; settings-hook-registration and gitignore-pattern
+  rows use `gt-kb-managed + structured-merge + warn`. Defaults still
+  apply if the entire block is absent from a row; partial ownership
+  blocks raise `InvalidArtifactRecord` (GO Condition C1).
+
+- **`plan_upgrade`** — consults each artifact's `OwnershipMeta` and
+  skips rows whose `upgrade_policy` is `preserve` / `transient` /
+  `adopter-opt-in`. No effect on current-HEAD behavior (all 40 rows use
+  `overwrite` or `structured-merge`) but unlocks preserve/transient
+  semantics for future registry / ownership-glob rows.
+
+### Reports
+
+- **Agent Red classification report** (`docs/reports/agent-red-classification.md`)
+  — generated via `gt project classify-tree` against the Agent Red
+  checkout. 7,355 paths classified; 3 owner-decision-pending rows
+  (`groundtruth.db`, `requirements-local.txt`, `requirements-test.txt`).
+  Zero-write proof: Agent Red `git status --short` is byte-identical
+  before and after the classify run.
+
 ## [0.6.0] - 2026-04-17
 
 ### Added — Phase A Tier A operational skills bundle
