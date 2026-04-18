@@ -73,7 +73,11 @@
 <!--   - Per .claude/rules/codex-review-gate.md, no GT-KB mutation can begin on either sub-bridge until Codex GOs each -->
 <!--   - Rationale: automated cap=1 scan spawn was re-firing on a consumed structural-GO; downstream sub-bridges already visible to index; parent retained as supersession record per -004 item 4 (thread will close when both sub-bridges VERIFIED per -004 F1 closure condition) -->
 
+Document: gtkb-upgrade-pre-flight-checks-implementation
+NEW: bridge/gtkb-upgrade-pre-flight-checks-implementation-001.md
+
 Document: gtkb-upgrade-pre-flight-checks
+GO: bridge/gtkb-upgrade-pre-flight-checks-002.md
 NEW: bridge/gtkb-upgrade-pre-flight-checks-001.md
 
 Document: gtkb-v061-release
