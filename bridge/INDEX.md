@@ -74,6 +74,7 @@
 <!--   - Rationale: automated cap=1 scan spawn was re-firing on a consumed structural-GO; downstream sub-bridges already visible to index; parent retained as supersession record per -004 item 4 (thread will close when both sub-bridges VERIFIED per -004 F1 closure condition) -->
 
 Document: gtkb-upgrade-pre-flight-checks-implementation
+VERIFIED: bridge/gtkb-upgrade-pre-flight-checks-implementation-004.md
 NEW: bridge/gtkb-upgrade-pre-flight-checks-implementation-003.md
 GO: bridge/gtkb-upgrade-pre-flight-checks-implementation-002.md
 NEW: bridge/gtkb-upgrade-pre-flight-checks-implementation-001.md
@@ -129,6 +130,7 @@ NO-GO: bridge/gtkb-artifact-ownership-matrix-002.md
 NEW: bridge/gtkb-artifact-ownership-matrix-001.md
 
 Document: gtkb-da-governance-completeness-implementation
+NEW: bridge/gtkb-da-governance-completeness-implementation-017.md
 GO: bridge/gtkb-da-governance-completeness-implementation-016.md
 REVISED: bridge/gtkb-da-governance-completeness-implementation-015.md
 NO-GO: bridge/gtkb-da-governance-completeness-implementation-014.md
