@@ -19,7 +19,13 @@ from groundtruth_kb.project.doctor import (
     _check_python,
     _check_rules,
     _check_settings_classifiers,
+    _check_settings_hook_registration_drift,
+    _derive_paired_hook_id,
     run_doctor,
+)
+from groundtruth_kb.project.managed_registry import (
+    SettingsHookRegistration,
+    find_artifact_by_id,
 )
 
 # ---------------------------------------------------------------------------
@@ -365,3 +371,126 @@ def test_bridge_poller_unknown_state_no_error(tmp_path: Path) -> None:
         # Should not raise; must return a ToolCheck with the state visible
         assert isinstance(result, ToolCheck)
         assert state in result.message
+
+
+# ---------------------------------------------------------------------------
+# _check_settings_hook_registration_drift — §B.3 generalized composite check
+# Covers gtkb-da-governance-completeness-implementation-015 §B.4 cases 1-5
+# plus a back-compat assertion preserving the legacy scanner-safe-writer name.
+# ---------------------------------------------------------------------------
+
+
+def _write_settings_hooks(target: Path, hooks: dict[str, list[dict[str, object]]]) -> None:
+    """Write ``.claude/settings.json`` with the given hooks map."""
+    settings_dir = target / ".claude"
+    settings_dir.mkdir(parents=True, exist_ok=True)
+    (settings_dir / "settings.json").write_text(json.dumps({"hooks": hooks}, indent=2) + "\n", encoding="utf-8")
+
+
+def _touch_hook_file(target: Path, filename: str) -> None:
+    """Create an empty ``.claude/hooks/<filename>`` so the liveness probe passes."""
+    hooks_dir = target / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    (hooks_dir / filename).write_text("# stub\n", encoding="utf-8")
+
+
+def _hook_entry(filename: str) -> dict[str, object]:
+    """Return a canonical hook entry shape referencing the given hook file."""
+    return {"hooks": [{"type": "command", "command": f"python .claude/hooks/{filename}"}]}
+
+
+def _get_registration(reg_id: str) -> SettingsHookRegistration:
+    """Resolve a registry record as a SettingsHookRegistration (or fail)."""
+    record = find_artifact_by_id(reg_id)
+    assert isinstance(record, SettingsHookRegistration)
+    return record
+
+
+def test_derive_paired_hook_id_strips_prefix_and_event_suffix() -> None:
+    """``_derive_paired_hook_id`` yields the paired ``hook.<short>`` id."""
+    assert (
+        _derive_paired_hook_id("settings.hook.turn-marker.userpromptsubmit", "userpromptsubmit") == "hook.turn-marker"
+    )
+    assert (
+        _derive_paired_hook_id("settings.hook.owner-decision-capture.posttooluse", "posttooluse")
+        == "hook.owner-decision-capture"
+    )
+
+
+def test_settings_hook_registration_turn_marker_file_missing_is_fail(tmp_path: Path) -> None:
+    """§B.4 case 1: bridge profile, hook file missing → ``fail``."""
+    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
+    assert result.name == f"settings:{reg.id}"
+    assert result.status == "fail"
+    assert result.required is True
+    assert "turn-marker.py" in result.message
+
+
+def test_settings_hook_registration_turn_marker_file_present_empty_event_is_warning(
+    tmp_path: Path,
+) -> None:
+    """§B.4 case 2: hook file present, ``hooks['UserPromptSubmit']`` empty → ``warning``."""
+    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    _touch_hook_file(tmp_path, reg.hook_filename)
+    _write_settings_hooks(tmp_path, {"UserPromptSubmit": []})
+    result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
+    assert result.status == "warning"
+    assert "UserPromptSubmit" in result.message
+    assert "settings.json" in result.message
+
+
+def test_settings_hook_registration_owner_decision_present_and_registered_is_pass(
+    tmp_path: Path,
+) -> None:
+    """§B.4 case 3: PostToolUse record: file present, registered in correct event → ``pass``."""
+    reg = _get_registration("settings.hook.owner-decision-capture.posttooluse")
+    _touch_hook_file(tmp_path, reg.hook_filename)
+    _write_settings_hooks(tmp_path, {"PostToolUse": [_hook_entry(reg.hook_filename)]})
+    result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
+    assert result.status == "pass"
+    assert "PostToolUse" in result.message
+
+
+def test_settings_hook_registration_wrong_event_location_is_warning(tmp_path: Path) -> None:
+    """§B.4 case 4: turn-marker entry appears in ``PreToolUse`` instead of ``UserPromptSubmit``
+    → ``warning`` (the event-correct location is what's checked)."""
+    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    _touch_hook_file(tmp_path, reg.hook_filename)
+    _write_settings_hooks(tmp_path, {"PreToolUse": [_hook_entry(reg.hook_filename)]})
+    result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
+    assert result.status == "warning"
+
+
+def test_settings_hook_registration_base_profile_is_pass_and_not_required(tmp_path: Path) -> None:
+    """§B.4 case 5 (partial): on a non-bridge profile the check degrades to
+    ``pass`` with ``required=False`` without inspecting the filesystem."""
+    reg = _get_registration("settings.hook.turn-marker.userpromptsubmit")
+    # No hook file, no settings.json — base profile should still pass.
+    result = _check_settings_hook_registration_drift(tmp_path, "local-only", reg)
+    assert result.status == "pass"
+    assert result.required is False
+    assert "base profile" in result.message
+
+
+def test_run_doctor_local_only_omits_new_settings_checks(tmp_path: Path) -> None:
+    """§B.4 case 5 (integration): on ``local-only`` profile the 4 new
+    ``settings:`` checks do NOT appear in the report (gated by
+    ``p.includes_bridge`` AND by ``doctor_required_profiles`` filter)."""
+    toml_path = tmp_path / "groundtruth.toml"
+    toml_path.write_text("[groundtruth]\ndb_path = 'groundtruth.db'\n", encoding="utf-8")
+    report = run_doctor(tmp_path, "local-only")
+    settings_check_names = [c.name for c in report.checks if c.name.startswith("settings:")]
+    assert settings_check_names == [], (
+        f"local-only profile must not emit any settings:* checks; got {settings_check_names}"
+    )
+
+
+def test_run_doctor_dual_agent_retains_scanner_safe_writer_check(tmp_path: Path) -> None:
+    """§B.4 back-compat assertion: the existing ``scanner-safe-writer`` doctor
+    check name is still present in the report for bridge profiles."""
+    toml_path = tmp_path / "groundtruth.toml"
+    toml_path.write_text("[groundtruth]\ndb_path = 'groundtruth.db'\n", encoding="utf-8")
+    report = run_doctor(tmp_path, "dual-agent")
+    names = [c.name for c in report.checks]
+    assert "scanner-safe-writer" in names, f"scanner-safe-writer must remain as a distinct check name; got {names}"
