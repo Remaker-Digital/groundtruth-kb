@@ -490,3 +490,25 @@ class TestCLIFlagValidation:
         runner = CliRunner()
         result = runner.invoke(cli_main, ["project", "rollback", "--receipt-id", "UNKNOWN"])
         assert result.exit_code != 0
+
+    def test_cli_apply_commit_uses_approved_message(self, repo):
+        """F10: ``gt project rollback --apply --commit`` must exit 0 and produce
+        the approved ``gt: rollback upgrade payload {receipt_id}`` commit subject
+        via the CLI surface (not just the library call)."""
+        merge_sha = _make_noff_merge(repo, {"payload.txt": "hi"})
+        _write_receipt(
+            repo,
+            {"receipt_id": "a1b2c3d4e5f60000", "merge_commit": merge_sha},
+            filename="r.json",
+            commit=True,
+        )
+        runner = CliRunner()
+        result = runner.invoke(
+            cli_main,
+            ["project", "rollback", "--apply", "--commit", "--target-dir", str(repo)],
+        )
+        assert result.exit_code == 0, result.output
+        subject = _git(repo, "log", "-1", "--format=%s").stdout.strip()
+        assert subject == "gt: rollback upgrade payload a1b2c3d4e5f60000", (
+            f"F10 violation: expected approved CLI commit subject, got {subject!r}"
+        )
