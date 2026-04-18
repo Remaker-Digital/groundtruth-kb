@@ -82,6 +82,7 @@
 <!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread remains visible with VERIFIED terminal status -->
 
 Document: gtkb-skills-tier-a-adoption
+GO: bridge/gtkb-skills-tier-a-adoption-002.md
 NEW: bridge/gtkb-skills-tier-a-adoption-001.md
 <!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn has no "actioned" marker for scope-GO bridges whose next-action was filing a sub-bridge; this entry has been re-firing on the consumed GO at -002 even though the implementation is landed and VERIFIED. Retirement prevents further spawn cycles on this thread. A future `gtkb-bridge-spawn-revalidation` child bridge (Tier 1 A1 per work_list.md) will formalize spawn-time revalidation so this class of retirement becomes unnecessary. -->
 
