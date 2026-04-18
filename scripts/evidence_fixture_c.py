@@ -19,7 +19,6 @@ post-implementation bridge report (-017).
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -101,9 +100,7 @@ def _write_settings_with_interleaved_fixture_c(target: Path) -> None:
 
     settings_dir = target / ".claude"
     settings_dir.mkdir(parents=True, exist_ok=True)
-    (settings_dir / "settings.json").write_text(
-        json.dumps({"hooks": hooks}, indent=2) + "\n", encoding="utf-8"
-    )
+    (settings_dir / "settings.json").write_text(json.dumps({"hooks": hooks}, indent=2) + "\n", encoding="utf-8")
 
 
 def _write_minimal_toml(target: Path) -> None:
@@ -117,9 +114,7 @@ def _setup_git(target: Path) -> None:
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.name", "test"], cwd=target, check=True)
     subprocess.run(["git", "add", "-A"], cwd=target, check=True)
-    subprocess.run(
-        ["git", "commit", "-q", "-m", "initial fixture C state"], cwd=target, check=True
-    )
+    subprocess.run(["git", "commit", "-q", "-m", "initial fixture C state"], cwd=target, check=True)
 
 
 def _format_action(action: object) -> str:

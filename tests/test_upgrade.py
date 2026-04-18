@@ -746,9 +746,9 @@ def test_plan_malformed_settings_structure_does_not_crash(tmp_path: Path) -> Non
     # 1. Non-dict root (a JSON array)
     (settings_dir / "settings.json").write_text(json.dumps([1, 2, 3]), encoding="utf-8")
     actions = plan_upgrade(tmp_path)
-    # Treated as "no existing registrations" — emits register-hook
+    # Treated as "no existing registrations" — emits merge-event-hooks
     assert any(a.action == "merge-event-hooks" for a in actions), (
-        f"non-dict root should surface register-hook action; got {actions}"
+        f"non-dict root should surface merge-event-hooks action; got {actions}"
     )
 
     # 2. hooks is a string (not a dict)
@@ -805,16 +805,21 @@ def test_upgrade_creates_gitignore_if_missing(tmp_path: Path) -> None:
 
 
 def test_upgrade_no_settings_file_is_noop(tmp_path: Path) -> None:
-    """If ``settings.json`` is absent, plan_upgrade emits no register-hook
-    actions — this is a non-Claude-Code project and we don't create one.
+    """If ``settings.json`` is absent, plan_upgrade emits no
+    merge-event-hooks actions — this is a non-Claude-Code project and
+    we don't create one. Also asserts the retired ``register-hook``
+    action never surfaces (negative backward-compatibility guard).
     """
     from groundtruth_kb import __version__
 
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     assert not (tmp_path / ".claude" / "settings.json").exists()
     actions = plan_upgrade(tmp_path)
+    merge_actions = [a for a in actions if a.action == "merge-event-hooks"]
+    assert not merge_actions, f"no settings.json → expected no merge-event-hooks actions; got {merge_actions}"
+    # Retired action must never appear (backward-compat guard).
     register_actions = [a for a in actions if a.action == "register-hook"]
-    assert not register_actions, f"no settings.json → expected no register-hook actions; got {register_actions}"
+    assert not register_actions, f"retired action 'register-hook' must not surface; got {register_actions}"
 
 
 def test_plan_upgrade_still_plans_managed_hooks_on_version_mismatch(tmp_path: Path) -> None:
