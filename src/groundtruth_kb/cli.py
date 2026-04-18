@@ -707,6 +707,111 @@ def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
         click.echo(f"  {msg}")
 
 
+@project.command("classify-tree")
+@click.option(
+    "--dir",
+    "target_dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    help="Target tree root to classify (does NOT require groundtruth.toml).",
+)
+@click.option(
+    "--output",
+    "output_path",
+    required=True,
+    type=click.Path(dir_okay=False),
+    help="Output report path (written relative to CWD).",
+)
+@click.option("--max-depth", "max_depth", type=int, default=10, show_default=True, help="Maximum walk depth.")
+@click.option(
+    "--ignore-glob",
+    "ignore_globs",
+    multiple=True,
+    help="Additive ignore glob (may be repeated).",
+)
+@click.option(
+    "--format",
+    "report_format",
+    type=click.Choice(["markdown", "json"]),
+    default="markdown",
+    show_default=True,
+    help="Report format.",
+)
+def project_classify_tree(
+    target_dir: str,
+    output_path: str,
+    max_depth: int,
+    ignore_globs: tuple[str, ...],
+    report_format: str,
+) -> None:
+    """Classify every file under --dir against the ownership matrix.
+
+    Manifest-independent: does NOT require ``groundtruth.toml`` in the target
+    tree, and does NOT call ``gt project doctor`` or any manifest / DB
+    checks. READ-ONLY: no writes are made to the target tree. The
+    classification report is written to ``--output``.
+    """
+    import subprocess
+
+    from groundtruth_kb import __version__
+    from groundtruth_kb.project.ownership import (
+        _DEFAULT_IGNORE_GLOBS,
+        OwnershipResolver,
+        render_classification_report_json,
+        render_classification_report_markdown,
+    )
+
+    target = Path(target_dir).resolve()
+
+    resolver = OwnershipResolver()
+    combined_ignores = tuple(_DEFAULT_IGNORE_GLOBS) + tuple(ignore_globs)
+    rows = resolver.classify_tree(target, max_depth=max_depth, ignore_globs=combined_ignores)
+
+    # Best-effort HEAD-SHA resolution. Failures (no git, detached HEAD, etc.)
+    # fall back to the literal string "unknown".
+    def _git_head(path: Path) -> str:
+        try:
+            r = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=str(path),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if r.returncode == 0:
+                return r.stdout.strip() or "unknown"
+            return "unknown"
+        except (OSError, subprocess.TimeoutExpired):
+            return "unknown"
+
+    gt_kb_root = Path(__file__).parent.parent.parent
+    gt_kb_head = _git_head(gt_kb_root)
+    target_head = _git_head(target)
+
+    if report_format == "json":
+        content = render_classification_report_json(
+            rows,
+            gt_kb_version=__version__,
+            gt_kb_head=gt_kb_head,
+            target_tree=str(target),
+            target_head=target_head,
+        )
+    else:
+        content = render_classification_report_markdown(
+            rows,
+            gt_kb_version=__version__,
+            gt_kb_head=gt_kb_head,
+            target_tree=str(target),
+            target_head=target_head,
+        )
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(content, encoding="utf-8")
+
+    click.echo(f"Wrote {len(rows)} classification row(s) to {output}")
+
+
 # ── gt deliberations ──────────────────────────────────────────────
 
 
