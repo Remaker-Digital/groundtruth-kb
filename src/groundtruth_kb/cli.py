@@ -1630,9 +1630,13 @@ def scaffold() -> None:
 @scaffold.command("specs")
 @click.option(
     "--profile",
-    type=click.Choice(["minimal", "full"]),
+    type=click.Choice(["minimal", "full", "azure-enterprise"]),
     default="minimal",
-    help="Scaffold profile: minimal (governance + infra) or full (all phases).",
+    help=(
+        "Scaffold profile: minimal (governance + infra), full (all phases), "
+        "or azure-enterprise (13 Azure category specs + ADR template + "
+        "verification plan + taxonomy document)."
+    ),
 )
 @click.option(
     "--apply/--dry-run",
@@ -1647,6 +1651,10 @@ def scaffold_specs_cmd(ctx: click.Context, profile: str, apply: bool) -> None:
     per-spec quality scores, without writing to the database. Pass
     ``--apply`` to persist generated specs with ``authority='inferred'``
     so owners can review and promote to ``authority='stated'`` later.
+
+    The ``azure-enterprise`` profile generates a MIXED artifact set: 15
+    specs + 1 taxonomy document. Spec counts and document counts are
+    reported separately so callers cannot conflate them.
     """
     from groundtruth_kb.spec_scaffold import (
         SpecScaffoldConfig,
@@ -1662,14 +1670,21 @@ def scaffold_specs_cmd(ctx: click.Context, profile: str, apply: bool) -> None:
 
     mode = "DRY RUN" if report.dry_run else "APPLIED"
     click.echo(f"Scaffold specs — profile={profile} — {mode}")
-    click.echo(f"  generated: {len(report.generated)}")
-    click.echo(f"  skipped:   {len(report.skipped)}")
-    click.echo(f"  quality:   {report.quality_summary}")
+    click.echo(f"  generated specs:     {len(report.generated)}")
+    click.echo(f"  skipped specs:       {len(report.skipped)}")
+    click.echo(f"  generated documents: {len(report.generated_documents)}")
+    click.echo(f"  skipped documents:   {len(report.skipped_documents)}")
+    click.echo(f"  quality:             {report.quality_summary}")
 
     if report.skipped:
-        click.echo("\nSkipped (pre-existing handles):")
+        click.echo("\nSkipped specs (pre-existing handles):")
         for s in report.skipped:
             click.echo(f"  - {s['id']} (handle={s.get('handle')!r}): {s['reason']}")
+
+    if report.skipped_documents:
+        click.echo("\nSkipped documents (already exist):")
+        for d in report.skipped_documents:
+            click.echo(f"  - {d['id']}: {d['reason']}")
 
     if report.low_quality_warnings:
         click.echo("\nLow quality warnings:")
@@ -1681,3 +1696,9 @@ def scaffold_specs_cmd(ctx: click.Context, profile: str, apply: bool) -> None:
         for spec in report.generated:
             tier = spec.get("quality", {}).get("tier", "?")
             click.echo(f"  - {spec['id']}: {spec['title']}  [{tier}]")
+
+    if report.generated_documents:
+        click.echo("\nGenerated documents:")
+        for doc in report.generated_documents:
+            cat = doc.get("category", "?")
+            click.echo(f"  - {doc['id']}: {doc.get('title', '?')}  [category={cat}]")

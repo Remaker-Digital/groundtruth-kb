@@ -827,6 +827,54 @@ Child bridges may add tracked seed/migration artifacts if any registration
 needs to be reproducible from git history alone; that is an explicit
 child-bridge scope decision, not something this taxonomy commits to.
 
+### 9.1 Populated by D1 (`gtkb-azure-spec-scaffold`)
+
+When an adopter runs `gt scaffold specs --profile azure-enterprise --apply`
+against their own MemBase, the D1 scaffold populates the following 16 artifacts:
+
+**13 category specs** (one per §4 category, all `type='requirement'`,
+`authority='inferred'`, `status='specified'`):
+
+- `SPEC-AZURE-LANDING-ZONE-001`
+- `SPEC-AZURE-IDENTITY-001`
+- `SPEC-AZURE-TENANCY-001`
+- `SPEC-AZURE-COST-001`
+- `SPEC-AZURE-COMPLIANCE-001`
+- `SPEC-AZURE-NETWORKING-001`
+- `SPEC-AZURE-CICD-001`
+- `SPEC-AZURE-OBSERVABILITY-001`
+- `SPEC-AZURE-COMPUTE-001`
+- `SPEC-AZURE-DATA-001`
+- `SPEC-AZURE-SECRETS-001`
+- `SPEC-AZURE-DR-001`
+- `SPEC-AZURE-DOCTOR-001`
+
+**1 ADR template spec** (`type='architecture_decision'`):
+- `ADR-TEMPLATE-AZURE-CATEGORY-DECISION`
+
+**1 verification plan spec** (`type='requirement'`):
+- `SPEC-AZURE-READINESS-VERIFICATION`
+
+**1 taxonomy document** (`category='taxonomy'`, via `db.insert_document()`):
+- `DOC-AZURE-READINESS-TAXONOMY`
+
+Each category spec persists its taxonomy-aligned outline (subtopics +
+owner decision placeholders + automatable assertion pointers) in the
+`description` field. Each has at least one automatable assertion or an
+explicit `owner_decision_placeholder` assertion per INSIGHTS Phase 2
+verification clause.
+
+Idempotence: re-running `--apply` skips pre-existing artifacts (matched by
+handle for specs; by id for the taxonomy document). No artifact is
+promoted to version 2 on re-run.
+
+Downstream child bridges:
+- **D2 (`gtkb-azure-adr-template-activation`)** activates instance-ADR
+  creation per category + the assertion harness that verifies adopter
+  ADR answers.
+- **D3-D6** add IaC skeletons, CI/CD gates, and offline/live doctor
+  implementation.
+
 ## 10. Constraints and Non-Goals
 
 ### 10.1 Preserved defaults

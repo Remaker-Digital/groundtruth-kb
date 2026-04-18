@@ -90,6 +90,12 @@ class ScaffoldReport:
     quality_summary: dict[str, int] = field(default_factory=dict)
     low_quality_warnings: list[dict[str, Any]] = field(default_factory=list)
     dry_run: bool = True
+    # D1 (azure-enterprise profile) — mixed-artifact reporting.
+    # These fields are empty for `minimal` and `full` profiles; populated only
+    # for `azure-enterprise` which generates 1 taxonomy document alongside its
+    # 15 specs. See bridge/gtkb-azure-spec-scaffold-004.md GO for contract.
+    generated_documents: list[dict[str, Any]] = field(default_factory=list)
+    skipped_documents: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +232,14 @@ _PHASE_TEMPLATE_BUILDERS = {
 
 def _generate_spec_data(config: SpecScaffoldConfig) -> list[dict[str, Any]]:
     """Materialize the list of spec data dicts to generate, per config."""
+    if config.profile == "azure-enterprise":
+        # D1 Azure-enterprise profile: 13 category specs + 1 ADR template + 1
+        # verification plan spec (15 total). The taxonomy document is a
+        # separate artifact handled by ``_generate_document_data()``.
+        from groundtruth_kb._azure_spec_templates import azure_spec_templates
+
+        return azure_spec_templates()
+
     phases = config.resolve_phases()
     specs: list[dict[str, Any]] = []
     for phase, enabled in phases.items():
@@ -236,6 +250,24 @@ def _generate_spec_data(config: SpecScaffoldConfig) -> list[dict[str, Any]]:
             continue
         specs.extend(builder())
     return specs
+
+
+def _generate_document_data(config: SpecScaffoldConfig) -> list[dict[str, Any]]:
+    """Materialize the list of document data dicts to generate, per config.
+
+    Returns an empty list for all profiles EXCEPT ``azure-enterprise``. Azure
+    returns one entry: the taxonomy document (``DOC-AZURE-READINESS-TAXONOMY``).
+
+    Each returned dict is shaped for ``db.insert_document()``: has keys
+    ``id``, ``title``, ``category``, ``status``, optional ``tags``, and
+    optional ``source_path``. Callers MUST NOT pass these dicts to
+    ``db.insert_spec()``; documents persist via a separate table.
+    """
+    if config.profile == "azure-enterprise":
+        from groundtruth_kb._azure_spec_templates import azure_taxonomy_document
+
+        return [azure_taxonomy_document()]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -339,10 +371,49 @@ def scaffold_specs(
             )
         generated.append(entry)
 
+    # D1 (azure-enterprise profile) — mixed-artifact document handling.
+    # Iterate documents separately. Idempotence via ``db.get_document(id)``
+    # rather than the spec-handle pattern used above. Pre-existing documents
+    # append to ``skipped_documents`` with ``reason='already exists'``. Apply
+    # mode dispatches to ``db.insert_document()``. Non-azure profiles emit an
+    # empty document list here, leaving both document buckets empty.
+    generated_documents: list[dict[str, Any]] = []
+    skipped_documents: list[dict[str, Any]] = []
+
+    for doc_data in _generate_document_data(config):
+        doc_id = doc_data["id"]
+        existing_doc = db.get_document(doc_id)
+        if existing_doc is not None:
+            skipped_documents.append(
+                {
+                    "id": doc_id,
+                    "reason": "already exists",
+                }
+            )
+            continue
+
+        if dry_run:
+            generated_documents.append({**doc_data})
+        else:
+            created_doc = db.insert_document(
+                id=doc_id,
+                title=doc_data["title"],
+                category=doc_data["category"],
+                status=doc_data.get("status", "current"),
+                changed_by=config.changed_by,
+                change_reason=config.change_reason,
+                tags=doc_data.get("tags"),
+                source_path=doc_data.get("source_path"),
+            )
+            assert created_doc is not None, "insert_document returned None after successful insert"
+            generated_documents.append(dict(created_doc))
+
     return ScaffoldReport(
         generated=generated,
         skipped=skipped,
         quality_summary=quality_summary,
         low_quality_warnings=low_quality_warnings,
         dry_run=dry_run,
+        generated_documents=generated_documents,
+        skipped_documents=skipped_documents,
     )
