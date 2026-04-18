@@ -996,7 +996,8 @@ gt [--config <path>] [--version]
 │   │   [--cloud-provider] [--dir] [--init-git/--no-init-git]
 │   │   [--include-ci/--no-include-ci] [--seed-example/--no-seed-example]
 │   ├── doctor [--auto-install] [--profile] [--dir]
-│   └── upgrade [--dry-run/--apply] [--force] [--dir]
+│   ├── upgrade [--dry-run/--apply] [--force] [--dir]
+│   └── rollback [--dry-run] [--apply] [--commit] [--receipt-id] [--target-dir]
 ├── scaffold
 │   └── specs [--profile <minimal|full>] [--apply/--dry-run]
 ├── kb
