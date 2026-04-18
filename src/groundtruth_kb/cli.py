@@ -684,8 +684,20 @@ def project_doctor(auto_install: bool, profile: str | None, target_dir: str) -> 
 @click.option("--force", is_flag=True, default=False, help="Overwrite customized files.")
 @click.option("--dir", "target_dir", default=".", help="Project directory (default: cwd).")
 def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
-    """Update scaffold files to match the current GroundTruth version."""
-    from groundtruth_kb.project.upgrade import execute_upgrade, plan_upgrade
+    """Update scaffold files to match the current GroundTruth version.
+
+    ``--apply`` runs the upgrade inside a short-lived payload branch that
+    merges back into the current branch to produce a rollback receipt
+    anchored on a real merge commit. Requires a git work tree with a clean
+    index; see ``docs/reference/upgrade-receipts.md``.
+    """
+    from groundtruth_kb.project.upgrade import (
+        DirtyWorkingTreeError,
+        MergeFailedError,
+        NotAGitRepositoryError,
+        execute_upgrade,
+        plan_upgrade,
+    )
 
     target = Path(target_dir).resolve()
     actions = plan_upgrade(target)
@@ -702,7 +714,18 @@ def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
         click.echo(f"\n{len(actions)} action(s). Run with --apply to execute.")
         return
 
-    results = execute_upgrade(target, actions, force=force)
+    try:
+        results = execute_upgrade(target, actions, force=force)
+    except NotAGitRepositoryError as exc:
+        click.echo(f"\nError: {exc}", err=True)
+        raise SystemExit(2) from exc
+    except DirtyWorkingTreeError as exc:
+        click.echo(f"\nError: {exc}", err=True)
+        raise SystemExit(2) from exc
+    except MergeFailedError as exc:
+        click.echo(f"\nError: {exc}", err=True)
+        raise SystemExit(3) from exc
+
     for msg in results:
         click.echo(f"  {msg}")
 

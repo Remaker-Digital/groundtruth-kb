@@ -46,6 +46,9 @@ def _init_git_repo(root: Path) -> None:
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
     subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=root, check=True)
+    # Disable Windows CRLF auto-conversion so byte-level assertions
+    # (receipt JSON contents, payload bytes) are stable across checkouts.
+    subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=root, check=True)
 
 
 def _commit_all(root: Path, message: str) -> str:
@@ -364,3 +367,321 @@ def test_filesystem_mode_write_creates_file_without_commit(tmp_path: Path) -> No
         text=True,
     )
     assert ls_files.stdout.strip() == "", "filesystem-mode receipt should NOT be in git index; got:\n" + ls_files.stdout
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: execute_upgrade end-to-end — payload-branch-and-merge + receipt
+# ---------------------------------------------------------------------------
+#
+# Phase 3 per bridge/gtkb-rollback-receipts-014 integrates the receipt
+# lifecycle into ``gt project upgrade --apply``. These tests exercise the
+# end-to-end flow (preconditions → payload branch → merge commit → receipt)
+# through the public ``execute_upgrade`` API, using hand-built actions to
+# avoid needing a full GT-KB template scaffold.
+
+
+def _write_minimal_toml(target: Path, version: str = "0.5.0") -> None:
+    """Minimal groundtruth.toml so read_manifest returns a valid manifest."""
+    (target / "groundtruth.toml").write_text(
+        f"""[groundtruth]
+db_path = "groundtruth.db"
+
+[project]
+project_name = "Test"
+owner = "Test Owner"
+profile = "local-only"
+copyright_notice = ""
+cloud_provider = "none"
+scaffold_version = "{version}"
+created_at = "2026-01-01T00:00:00Z"
+""",
+        encoding="utf-8",
+    )
+
+
+def _gitignore_append_action() -> object:
+    """Hand-built append-gitignore action for integration tests.
+
+    Uses a stable payload that appears in none of the registry's default
+    patterns; the action is only a vehicle to force a non-empty payload
+    commit without needing a full template scaffold. Return type is
+    :class:`object` so the import lives in one place and the helper stays
+    decoupled from any specific ``UpgradeAction`` signature change.
+    """
+    from groundtruth_kb.project.upgrade import UpgradeAction
+
+    return UpgradeAction(
+        file=".gitignore",
+        action="append-gitignore",
+        reason="test payload pattern (integration fixture)",
+        payload="test-integration-pattern/",
+    )
+
+
+def test_execute_upgrade_not_git_repo_raises(tmp_path: Path) -> None:
+    """Pre-flight: execute_upgrade outside a git work tree raises."""
+    from groundtruth_kb.project.upgrade import NotAGitRepositoryError, execute_upgrade
+
+    _write_minimal_toml(tmp_path)
+    # tmp_path intentionally NOT initialized as a git repo.
+
+    with pytest.raises(NotAGitRepositoryError) as excinfo:
+        execute_upgrade(tmp_path, [_gitignore_append_action()], force=False)  # type: ignore[list-item]
+
+    assert excinfo.value.target == tmp_path
+    assert "git init" in str(excinfo.value)
+
+
+def test_execute_upgrade_dirty_tree_raises(tmp_path: Path) -> None:
+    """Pre-flight: execute_upgrade on a dirty tree raises with status output."""
+    from groundtruth_kb.project.upgrade import DirtyWorkingTreeError, execute_upgrade
+
+    _init_git_repo(tmp_path)
+    _write_minimal_toml(tmp_path)
+    _commit_all(tmp_path, "initial")
+    # Introduce an uncommitted change to make the tree dirty.
+    (tmp_path / "dirty.txt").write_text("uncommitted\n", encoding="utf-8")
+
+    with pytest.raises(DirtyWorkingTreeError) as excinfo:
+        execute_upgrade(tmp_path, [_gitignore_append_action()], force=False)  # type: ignore[list-item]
+
+    assert excinfo.value.target == tmp_path
+    assert "dirty.txt" in excinfo.value.status
+
+
+def test_execute_upgrade_tracked_mode_end_to_end(tmp_path: Path) -> None:
+    """Full happy-path integration test in tracked mode.
+
+    Fresh scaffold .gitignore leaves the receipt path trackable, so the
+    receipt lands as a SEPARATE commit on HEAD, the merge commit is at
+    HEAD~1 with two parents, and the receipt JSON records the real
+    merge_commit SHA.
+    """
+    from groundtruth_kb import __version__
+    from groundtruth_kb.project.upgrade import execute_upgrade
+
+    _init_git_repo(tmp_path)
+    _write_gitignore(tmp_path, ".claude/settings.local.json\n")
+    _write_minimal_toml(tmp_path, version="0.0.1")
+    _commit_all(tmp_path, "initial")
+
+    results = execute_upgrade(tmp_path, [_gitignore_append_action()], force=False)  # type: ignore[list-item]
+
+    # Results include MERGED + RECEIPT lines.
+    assert any("MERGED payload into main" in r for r in results), results
+    assert any("RECEIPT tracked" in r for r in results), results
+
+    # Topology: HEAD is receipt commit; HEAD~1 is the merge commit and has
+    # two parents (a real merge, not a fast-forward).
+    head_tilde_1 = subprocess.run(
+        ["git", "rev-parse", "HEAD~1"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    parents_of_head_tilde_1 = (
+        subprocess.run(
+            ["git", "rev-list", "--parents", "-n", "1", head_tilde_1],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        .stdout.strip()
+        .split()
+    )
+    # rev-list --parents returns "sha parent1 parent2..."; a real merge has 3 tokens.
+    assert len(parents_of_head_tilde_1) == 3, (
+        f"HEAD~1 must be a real merge commit with two parents; got {parents_of_head_tilde_1}"
+    )
+
+    # Receipt JSON exists, is in the git index, and contains the merge_commit SHA.
+    receipt_files = list((tmp_path / ".claude" / "upgrade-receipts" / "active").glob("*.json"))
+    assert len(receipt_files) == 1, f"expected exactly one receipt; got {receipt_files}"
+    receipt = json.loads(receipt_files[0].read_text(encoding="utf-8"))
+    assert receipt["schema_version"] == "v1"
+    assert receipt["merge_commit"] == head_tilde_1
+    assert receipt["target_branch"] == "main"
+    assert receipt["from_version"] == "0.0.1"
+    assert receipt["to_version"] == __version__
+    assert receipt["mode"] == "tracked"
+    assert "gitignore-pattern" in receipt["artifact_classes_touched"]
+
+    # Receipt IS in the git index (tracked).
+    ls = subprocess.run(
+        ["git", "ls-files", "--", ".claude/upgrade-receipts/"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert receipt_files[0].name in ls.stdout, f"receipt must be tracked; ls-files:\n{ls.stdout}"
+
+    # Receipt is NOT in the merge commit's tree.
+    show_merge = subprocess.run(
+        ["git", "show", "--stat", "--format=", head_tilde_1],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "upgrade-receipts" not in show_merge.stdout, (
+        f"receipt must not appear in merge commit tree; got:\n{show_merge.stdout}"
+    )
+
+    # Payload branch is deleted after success.
+    branches = subprocess.run(
+        ["git", "branch", "--list"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout
+    assert "gt-upgrade-payload-" not in branches, f"payload branch must be cleaned up; got branches:\n{branches}"
+
+
+def test_execute_upgrade_tracked_mode_revert_m1_reverts_only_payload(tmp_path: Path) -> None:
+    """Verifies the rollback primitive: ``git revert -m 1 <merge_commit>``
+    reverts the payload without touching the receipt.
+
+    This is the contract the whole Phase 3 design exists to enable.
+    """
+    from groundtruth_kb.project.upgrade import execute_upgrade
+
+    _init_git_repo(tmp_path)
+    _write_gitignore(tmp_path, ".claude/settings.local.json\n")
+    _write_minimal_toml(tmp_path, version="0.0.1")
+    _commit_all(tmp_path, "initial")
+
+    execute_upgrade(tmp_path, [_gitignore_append_action()], force=False)  # type: ignore[list-item]
+
+    head_tilde_1 = subprocess.run(
+        ["git", "rev-parse", "HEAD~1"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    # Pre-revert: the payload pattern is in .gitignore.
+    before = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    assert "test-integration-pattern/" in before
+
+    # Dry-run revert of the merge commit on the mainline parent side (-m 1)
+    # must NOT touch the receipt file.
+    subprocess.run(
+        ["git", "revert", "-m", "1", "--no-commit", head_tilde_1],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    status = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout
+    assert "upgrade-receipts" not in status, f"revert -m 1 must not touch the receipt; status:\n{status}"
+    # The pattern removal IS in the revert staging.
+    assert ".gitignore" in status, f"revert should restage .gitignore; status:\n{status}"
+
+
+def test_execute_upgrade_filesystem_mode_end_to_end(tmp_path: Path) -> None:
+    """Full happy-path integration test in filesystem mode.
+
+    Legacy-style .gitignore broadly ignores .claude/, so the receipt is
+    written to disk but NOT committed. HEAD in this mode is the merge
+    commit itself (no separate receipt commit).
+    """
+    from groundtruth_kb.project.upgrade import execute_upgrade
+
+    _init_git_repo(tmp_path)
+    _write_gitignore(tmp_path, ".claude/\n")
+    _write_minimal_toml(tmp_path, version="0.0.1")
+    _commit_all(tmp_path, "initial")
+
+    results = execute_upgrade(tmp_path, [_gitignore_append_action()], force=False)  # type: ignore[list-item]
+
+    assert any("MERGED payload into main" in r for r in results), results
+    assert any("RECEIPT filesystem" in r for r in results), results
+
+    # HEAD is the merge commit directly (two parents, because --no-ff).
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    parents_of_head = (
+        subprocess.run(
+            ["git", "rev-list", "--parents", "-n", "1", head],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        .stdout.strip()
+        .split()
+    )
+    assert len(parents_of_head) == 3, f"HEAD must be a merge commit; got {parents_of_head}"
+
+    # Receipt JSON exists on disk but is NOT in git index.
+    receipt_files = list((tmp_path / ".claude" / "upgrade-receipts" / "active").glob("*.json"))
+    assert len(receipt_files) == 1, f"expected exactly one receipt on disk; got {receipt_files}"
+    receipt = json.loads(receipt_files[0].read_text(encoding="utf-8"))
+    assert receipt["mode"] == "filesystem"
+    assert receipt["merge_commit"] == head
+
+    ls = subprocess.run(
+        ["git", "ls-files", "--", ".claude/upgrade-receipts/"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert ls.stdout.strip() == "", f"filesystem receipt must NOT be in git; got:\n{ls.stdout}"
+
+
+def test_execute_upgrade_no_bak_files_ever_created(tmp_path: Path) -> None:
+    """Cross-mode invariant: execute_upgrade never writes .bak files.
+
+    Per bridge gtkb-rollback-receipts-014 Condition 5. Check in both modes.
+    """
+    from groundtruth_kb.project.upgrade import execute_upgrade
+
+    # Tracked-mode run.
+    _init_git_repo(tmp_path)
+    _write_gitignore(tmp_path, ".claude/settings.local.json\n")
+    _write_minimal_toml(tmp_path, version="0.0.1")
+    _commit_all(tmp_path, "initial")
+    execute_upgrade(tmp_path, [_gitignore_append_action()], force=False)  # type: ignore[list-item]
+
+    bak_files = list(tmp_path.rglob("*.bak"))
+    assert bak_files == [], f"tracked-mode run must not create .bak; found: {bak_files}"
+
+
+def test_execute_upgrade_noop_payload_skips_receipt(tmp_path: Path) -> None:
+    """When actions produce no disk changes AND manifest is already current,
+    execute_upgrade aborts cleanly without creating a merge or receipt.
+    """
+    from groundtruth_kb import __version__
+    from groundtruth_kb.project.upgrade import execute_upgrade
+
+    _init_git_repo(tmp_path)
+    _write_gitignore(tmp_path, ".claude/settings.local.json\n")
+    _write_minimal_toml(tmp_path, version=__version__)
+    # Pre-seed the pattern so append-gitignore is already idempotent.
+    (tmp_path / ".gitignore").write_text(".claude/settings.local.json\ntest-integration-pattern/\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial")
+
+    commits_before = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    results = execute_upgrade(tmp_path, [_gitignore_append_action()], force=False)  # type: ignore[list-item]
+
+    # "no changes to apply" signal present; no RECEIPT message.
+    assert any("no changes to apply" in r for r in results), results
+    assert not any("RECEIPT" in r for r in results), results
+
+    # No receipt file landed on disk.
+    receipt_dir = tmp_path / ".claude" / "upgrade-receipts" / "active"
+    if receipt_dir.exists():
+        assert list(receipt_dir.glob("*.json")) == [], "no-op run must not write a receipt"
+
+    # Commit count unchanged — no merge, no receipt commit.
+    commits_after = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    assert commits_before == commits_after, (
+        f"no-op run must not add commits; before={commits_before}, after={commits_after}"
+    )
+
+    # Payload branch cleaned up.
+    branches = subprocess.run(
+        ["git", "branch", "--list"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout
+    assert "gt-upgrade-payload-" not in branches, f"payload branch must be cleaned up even on no-op; got:\n{branches}"

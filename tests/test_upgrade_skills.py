@@ -8,6 +8,7 @@ version-gated hash-drift path (handled by ``_plan_managed_skills``).
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from groundtruth_kb import __version__
@@ -33,6 +34,29 @@ scaffold_version = "{version}"
 created_at = "2026-01-01T00:00:00Z"
 """,
         encoding="utf-8",
+    )
+
+
+def _setup_git_for_upgrade(target: Path) -> None:
+    """Initialize git + commit current tree so execute_upgrade preconditions pass.
+
+    Per bridge ``gtkb-rollback-receipts-014`` GO, execute_upgrade now runs a
+    payload-branch-and-merge flow to anchor the rollback receipt. Tests
+    must run inside a git work tree with a clean index.
+    """
+    subprocess.run(["git", "init", "--initial-branch=main"], cwd=target, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=target, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=target, check=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=target, check=True)
+    # Disable Windows CRLF auto-conversion so byte-level file assertions
+    # don't trip on line endings that git would rewrite during checkouts.
+    subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=target, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=target, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "pre-upgrade snapshot", "--allow-empty"],
+        cwd=target,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -65,6 +89,7 @@ def test_execute_creates_missing_skill_files_at_same_version(tmp_path: Path) -> 
     """End-to-end: plan at same version → execute → skill files landed on disk."""
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     actions = plan_upgrade(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
     execute_upgrade(tmp_path, actions, force=False)
     skill_md = tmp_path / _SKILL_MD
     helper_py = tmp_path / _SKILL_HELPER
@@ -128,6 +153,7 @@ def test_execute_upgrade_applies_customized_skill_with_force(tmp_path: Path) -> 
     assert b"customized sentinel" in skill_path.read_bytes()
 
     actions = plan_upgrade(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
     execute_upgrade(tmp_path, actions, force=True)
 
     # Hash comparison avoids newline-translation false negatives on
@@ -217,6 +243,7 @@ def test_execute_creates_missing_spec_intake_files_at_same_version(tmp_path: Pat
     """End-to-end: plan at same version → execute → spec-intake files landed on disk."""
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     actions = plan_upgrade(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
     execute_upgrade(tmp_path, actions, force=False)
     skill_md = tmp_path / _SPEC_INTAKE_SKILL_MD
     helper_py = tmp_path / _SPEC_INTAKE_HELPER
