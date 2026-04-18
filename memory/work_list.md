@@ -7,6 +7,39 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Active Items
 
+### ℹ️ DA-gov dispatch loop — escalation OBSOLETE (resolved by owner action 2026-04-18)
+
+**Spawn-5 escalation (A/B/C) is obsolete.** The owner has effectively chosen
+Option B implicitly: GT-KB is now on `main` and `gtkb-da-governance-completeness-implementation-016`
+is in active iterative implementation per the fast-iterate posture
+(`memory/feedback_iterate_fast_on_main.md`, S300). Two commits have already
+landed:
+
+- **`4e54c0b`** — §B.1 refactor (event-aware structured-merge planner/apply via
+  shared `_compute_target_event_list` helper).
+- **`f5b0051`** — Phase 2: 5 governance hook stubs + 9 registry records
+  (registry expanded 42→51, including the 4 new `settings-hook-registration`
+  rows that opt into BOTH upgrade enforcement AND doctor enforcement per §A
+  of `-015`).
+
+**Remaining work** (per the f5b0051 commit message + `-015` §-numbering):
+real hook logic, doctor integration (§B.3/§B.4), §B.2 13+1 test cases
+(especially cases 12/13 interleaved-unmanaged), and Phases 1-10 specs/tests
+(redaction routing, source-ref validation, LO-report backfill, transcript
+extractor, owner-decision capture full impl, GOV-09 capture, backfill
+framework, session wrap gate, dogfooding). Approximately 100+ new tests
+across ~10 test files; ~8-12 follow-up commits expected.
+
+**Capped-spawn behavior:** the auto-poller will continue to dispatch the
+GO until `-017 NEW` (post-impl report) lands. Future capped spawns should
+append abbreviated entries to `groundtruth-kb/.implementation-log-gtkb-da-governance-completeness.md`
+(spawn-54 entry has the corrected state baseline) and not attempt next-slice
+implementation work — the owner's iterative landings on main handle the
+cohesive multi-file slices naturally.
+
+Full corrected status chain: see spawn-54 entry in
+`groundtruth-kb/.implementation-log-gtkb-da-governance-completeness.md`.
+
 ### Forward-work ordering reference (GO'd 2026-04-17)
 
 **Authoritative ordering:** `bridge/post-phase-a-prioritization-003.md` (plan) + `-004.md` (Codex GO).
@@ -95,6 +128,11 @@ Follow-up bridge after v0.6.0 ships: `gtkb-skills-tier-a-adoption-001` (Agent Re
 - ~~settings.local.json flat hook format~~ — **NON-ISSUE**: template is permissions-only; all hooks go through `_write_settings_json()` with proper nested format. Comment at scaffold.py:277 ("settings.local.json with bridge hooks") is cosmetic misnomer but has no functional impact. Not worth bridge-proposal cycle.
 
 ## Completed
+
+### S301 ✓
+
+- [x] **GT-KB C2 upgrade pre-flight checks (Area 5)** — VERIFIED at `gtkb-upgrade-pre-flight-checks-implementation-004` with zero blocking findings. Commit `94f8495` on GT-KB main (pushed). 6 files, +992/-10: new `src/groundtruth_kb/project/preflight.py` module, new `enumerate_scaffold_outputs` pure API in `scaffold.py`, new `MalformedSettingsError` exception + `_has_malformed_settings_skip` helper + `_NON_MUTATING_ACTION_KINDS` frozenset in `upgrade.py`, typed `warning` + `informational` action Literal extension, CLI filter for non-mutating rows + `--ignore-inflight-bridges` flag + exit code 4 for malformed settings. Implements Area 5.2 (bridge in-flight awareness) + 5.3 (halt-before-write on malformed settings.json) + 5.6 (scaffold coverage delta report). 29 new tests (`tests/test_preflight_checks.py`) covering all 5 Codex conditions (C1 structural filter at CLI layer, C2 halt-before-git ordering, C3 latest-status-only parsing with older-under-terminal regression, C4 pure read-only enumerator with byte-snapshot proof, C5 CLI labels + flag wiring). Explicitly deferred: Area 5.1 branch/unpushed policy checks + 5.5 profile change detection. Excluded: Area 6 settings-merge (separate future bridge). Bridge thread: 4 versions total (scope -001 NEW → -002 GO; impl -001 NEW → -002 GO → post-impl -003 NEW → -004 VERIFIED). Full suite: 1385 → 1414 tests. Non-blocking Codex note: direct `execute_upgrade([warning])` library calls still run git preconditions before `_apply_file_actions` (structural fix is CLI-layer per approved design; not a documented library API contract).
+- [x] **GT-KB rollback-receipts Phase 3 — `execute_upgrade` payload-branch-and-merge + receipt** — VERIFIED at bridge `gtkb-rollback-receipts-016` (zero blocking findings). Commit `4bc4bb5` on GT-KB main, pushed. 5 files, +693/-13. Adds `_require_git_repo` + `_require_clean_tree` preflight, short-lived `gt-upgrade-payload-<id>` branch, `git merge --no-ff` producing real merge commit, post-merge receipt write (tracked mode creates separate receipt commit at HEAD; HEAD~1 is merge commit). Removes `.bak` backup writes per `-014` condition 5. Adds 3 new exception types (`NotAGitRepositoryError`, `DirtyWorkingTreeError`, `MergeFailedError`) with CLI error wrapping in `project_upgrade`. 7 new Phase 3 integration tests: not-git-repo, dirty-tree, tracked-end-to-end (topology + all 9 receipt fields), revert-m1-reverts-only-payload (proves the rollback primitive), filesystem-end-to-end, no-bak-invariant, noop-payload-skips-receipt. Wrapped 15 existing `execute_upgrade` call sites in 4 test files with `_setup_git_for_upgrade` helper (11 via concurrent gov-completeness commit `d630b20` which adopted my helper). Full suite: 1356 passed (was 1209 at S300 wrap); mypy --strict clean; ruff clean. Phase 4 post-impl report filed at `-015`; VERIFIED at `-016`. Thread fully closed: 16 versions, 7 NO-GOs, 1 GO, 1 VERIFIED. Breaking change: `gt project upgrade --apply` now requires a clean git work tree.
 
 ### S297 ✓
 
