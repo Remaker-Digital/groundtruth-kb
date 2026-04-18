@@ -1702,3 +1702,144 @@ def scaffold_specs_cmd(ctx: click.Context, profile: str, apply: bool) -> None:
         for doc in report.generated_documents:
             cat = doc.get("category", "?")
             click.echo(f"  - {doc['id']}: {doc.get('title', '?')}  [category={cat}]")
+
+
+# ---------------------------------------------------------------------------
+# D2: gt scaffold adrs --profile azure-enterprise
+# ---------------------------------------------------------------------------
+
+
+@scaffold.command("adrs")
+@click.option(
+    "--profile",
+    type=click.Choice(["azure-enterprise"]),
+    default="azure-enterprise",
+    help=(
+        "ADR scaffold profile. Currently only 'azure-enterprise' is supported "
+        "(13 instance-ADR skeletons per Azure readiness category)."
+    ),
+)
+@click.option(
+    "--apply/--dry-run",
+    default=False,
+    help="Apply scaffold changes to the database (default: dry-run).",
+)
+@click.pass_context
+def scaffold_adrs_cmd(ctx: click.Context, profile: str, apply: bool) -> None:
+    """Generate instance-ADR skeletons for the given profile (D2).
+
+    For ``azure-enterprise``, generates 13 ADR skeletons (one per taxonomy
+    category) with the 9-section template body and
+    ``<<ADOPTER-ANSWER-REQUIRED>>`` placeholders in the sections that require
+    owner input (Decision, Rationale, Rejected alternatives).
+
+    After scaffolding, the adopter-owner edits each ADR's description to
+    replace the placeholders with their actual answers, then optionally
+    promotes status via ``db.update_spec()``. Use ``gt check adrs
+    --profile azure-enterprise`` to verify all 13 are answered.
+    """
+    from groundtruth_kb.adr_scaffold import (
+        AdrScaffoldConfig,
+    )
+    from groundtruth_kb.adr_scaffold import (
+        scaffold_adrs as run_scaffold_adrs,
+    )
+
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    adr_config = AdrScaffoldConfig(profile=profile)
+    report = run_scaffold_adrs(db, adr_config, dry_run=not apply)
+
+    mode = "DRY RUN" if report.dry_run else "APPLIED"
+    click.echo(f"Scaffold adrs — profile={profile} — {mode}")
+    click.echo(f"  generated ADRs: {len(report.generated)}")
+    click.echo(f"  skipped ADRs:   {len(report.skipped)}")
+
+    if report.skipped:
+        click.echo("\nSkipped (pre-existing handles):")
+        for s in report.skipped:
+            click.echo(f"  - {s['id']} (handle={s.get('handle')!r}): {s['reason']}")
+
+    if report.generated:
+        click.echo("\nGenerated ADRs:")
+        for adr in report.generated:
+            click.echo(f"  - {adr['id']}: {adr['title']}")
+
+
+# ---------------------------------------------------------------------------
+# D2: gt check adrs --profile azure-enterprise
+# ---------------------------------------------------------------------------
+
+
+@main.group()
+def check() -> None:
+    """Verification commands (D2+)."""
+
+
+@check.command("adrs")
+@click.option(
+    "--profile",
+    type=click.Choice(["azure-enterprise"]),
+    default="azure-enterprise",
+    help="ADR verification profile.",
+)
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    default=False,
+    help="Emit machine-readable JSON output suitable for CI consumption.",
+)
+@click.pass_context
+def check_adrs_cmd(ctx: click.Context, profile: str, json_output: bool) -> None:
+    """Verify all 13 instance ADRs have been answered by the adopter-owner.
+
+    Exit code 0 only when all 13 ADRs are answered (non-empty, non-placeholder
+    Decision + Rationale + Rejected alternatives sections, plus all 9
+    template headings present). Exit non-zero if any are missing or
+    unanswered.
+    """
+    import json as _json
+
+    from groundtruth_kb.adr_harness import verify_azure_adrs
+
+    if profile != "azure-enterprise":  # pragma: no cover — only one profile today
+        raise click.UsageError(f"Unsupported profile: {profile!r}")
+
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    report = verify_azure_adrs(db)
+
+    if json_output:
+        payload = {
+            "total": report.total,
+            "answered_count": report.answered_count,
+            "unanswered_count": report.unanswered_count,
+            "missing_count": report.missing_count,
+            "entries": [
+                {
+                    "adr_id": e.adr_id,
+                    "status": e.status,
+                    "missing_headings": list(e.missing_headings),
+                    "unanswered_sections": list(e.unanswered_sections),
+                    "spec_status": e.spec_status,
+                }
+                for e in report.entries
+            ],
+        }
+        click.echo(_json.dumps(payload, indent=2))
+    else:
+        click.echo(f"Azure ADR verification — profile={profile}")
+        click.echo(f"  total:              {report.total}")
+        click.echo(f"  answered:           {report.answered_count}")
+        click.echo(f"  unanswered:         {report.unanswered_count}")
+        click.echo(f"  missing:            {report.missing_count}")
+        click.echo("")
+        for entry in report.entries:
+            click.echo(f"  [{entry.status:<10}] {entry.adr_id}")
+            if entry.missing_headings:
+                click.echo(f"    missing headings: {', '.join(entry.missing_headings)}")
+            if entry.unanswered_sections:
+                click.echo(f"    unanswered sections: {', '.join(entry.unanswered_sections)}")
+
+    ctx.exit(0 if report.all_answered() else 1)

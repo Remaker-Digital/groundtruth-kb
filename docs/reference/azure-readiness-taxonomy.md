@@ -875,6 +875,41 @@ Downstream child bridges:
 - **D3-D6** add IaC skeletons, CI/CD gates, and offline/live doctor
   implementation.
 
+### 9.2 Populated by D2 (`gtkb-azure-adr-template-activation`)
+
+When an adopter runs `gt scaffold adrs --profile azure-enterprise --apply`
+against their own MemBase, the D2 scaffold populates 13 instance-ADR
+skeletons (one per §4 category):
+
+- `ADR-AZURE-LANDING-ZONE-001`
+- `ADR-AZURE-IDENTITY-001`
+- `ADR-AZURE-TENANCY-001`
+- `ADR-AZURE-COST-001`
+- `ADR-AZURE-COMPLIANCE-001`
+- `ADR-AZURE-NETWORKING-001`
+- `ADR-AZURE-CICD-001`
+- `ADR-AZURE-OBSERVABILITY-001`
+- `ADR-AZURE-COMPUTE-001`
+- `ADR-AZURE-DATA-001`
+- `ADR-AZURE-SECRETS-001`
+- `ADR-AZURE-DR-001`
+- `ADR-AZURE-DOCTOR-001`
+
+Each skeleton (`type='architecture_decision'`, `authority='inferred'`)
+carries the 9-question template from §5.1 with `<<ADOPTER-ANSWER-REQUIRED>>`
+placeholders in the Decision, Rationale, and Rejected alternatives sections.
+
+To verify that an adopter has answered all 13 ADRs, run:
+
+```
+gt check adrs --profile azure-enterprise
+```
+
+Exit code 0 only when all 13 have: (a) all 9 required headings present,
+AND (b) non-empty, non-placeholder content in Decision, Rationale, and
+Rejected alternatives. Add `--json` to emit machine-readable output
+suitable for CI consumption.
+
 ## 10. Constraints and Non-Goals
 
 ### 10.1 Preserved defaults
