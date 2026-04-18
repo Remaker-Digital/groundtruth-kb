@@ -47,6 +47,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   list re-introduction; AST gate `tests/test_no_parallel_manifests.py`
   remains green).
 
+### Added — Artifact Ownership Matrix (sub-bridge `gtkb-artifact-ownership-matrix`)
+
+- **OwnershipResolver query API** (`src/groundtruth_kb/project/ownership.py`)
+  — new public module exposing `OwnershipResolver`, `OwnershipRecord`,
+  `ClassificationRow`, and report renderers. Resolver joins
+  registry-class rows (keyed by `target_path`) with sibling
+  `ownership-glob` rows (keyed by `path_glob`) into a single query
+  surface. Precedence: exact FILE-class match → glob match (priority
+  desc, then longest-literal-prefix tiebreak) → synthetic `adopter-owned
+  + preserve` fallback. Loads typed output from `managed_registry`
+  (never re-parses TOML — GO Condition C2).
+
+- **Ownership metadata on every managed artifact** — `FileArtifact`,
+  `SettingsHookRegistration`, `GitignorePattern`, and the new
+  `OwnershipGlobArtifact` dataclasses each carry an `OwnershipMeta`
+  block with `ownership` / `upgrade_policy` / `adopter_divergence_policy`
+  / `workflow_targets`. Extracted by shared `_extract_ownership_block`
+  validator called from all four build helpers (GO C2).
+
+- **Sibling ownership map** (`templates/scaffold-ownership.toml`) — new
+  TOML file carrying 8 `ownership-glob` rows for adopter-tree paths
+  outside the registry (`groundtruth.toml`, `groundtruth.db`,
+  `bridge/**/*.md`, `memory/**/*.md`, `webapp/**`,
+  `.gt-upgrade-staging/**`, plus the two requirement files mandated by
+  GO Condition C3).
+
+- **`gt project classify-tree` CLI subcommand** — manifest-independent
+  classifier (`gt project classify-tree --dir <path> --output <report>`).
+  Does NOT require `groundtruth.toml` in the target tree and does NOT
+  call `gt project doctor`. Read-only tree walker writes a Markdown or
+  JSON report with a deterministic header block and ordering (ownership
+  enum, then alphabetical by path). Flags rows whose ownership equals
+  `legacy-exception` as `owner_decision_pending = "YES"`.
+
+### Added — DA harvest coverage
+
+- **Thread-level DA harvest coverage helper + doctor check** — New
+  `src/groundtruth_kb/reporting/harvest_coverage.py` computes DA
+  coverage against the bridge INDEX + `bridge/*.md` thread roll-up.
+  New doctor check reports uncovered bridge threads so the harvest gap
+  surfaces in routine `gt project doctor` runs, not only on a wrap.
+  See `gtkb-da-harvest-coverage-implementation-011` VERIFIED.
+
+### Changed
+
+- **Managed registry loader** (`managed_registry.py`) — now merges
+  records from `templates/managed-artifacts.toml` and
+  `templates/scaffold-ownership.toml` into a single list with enforced
+  cross-file `id` uniqueness. New `ownership-glob` class; new enum
+  literals `OwnershipEnum` / `UpgradePolicyEnum` / `DivergencePolicyEnum`.
+  `artifacts_for_scaffold` / `artifacts_for_upgrade` /
+  `artifacts_for_doctor` filter out `ownership-glob` rows so current
+  scaffold/upgrade/doctor behavior is bit-identical (zero regression on
+  40 existing rows; verified by per-profile id-set delta).
+
+- **`templates/managed-artifacts.toml`** — all 42 rows (40 pre-existing
+  + 2 new canonical-terminology) carry an explicit ownership block
+  (`ownership` / `upgrade_policy` / `adopter_divergence_policy`).
+  File-class rows default to `gt-kb-managed + overwrite + warn`;
+  settings-hook-registration and gitignore-pattern rows use
+  `gt-kb-managed + structured-merge + warn`. Defaults still apply if
+  the entire block is absent from a row; partial ownership blocks raise
+  `InvalidArtifactRecord` (GO Condition C1).
+
+- **`plan_upgrade`** — consults each artifact's `OwnershipMeta` and
+  skips rows whose `upgrade_policy` is `preserve` / `transient` /
+  `adopter-opt-in`. No effect on current-HEAD behavior (all 42 rows use
+  `overwrite` or `structured-merge`) but unlocks preserve/transient
+  semantics for future registry / ownership-glob rows.
+
 ### Fixed
 
 - `templates/project/AGENTS.md` startup checklist now names root
@@ -70,7 +140,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Registry
 
 - `templates/managed-artifacts.toml` grew from 40 to 42 records (rule
-  count 8 → 10). Header comment updated.
+  count 8 → 10). Both new canonical-terminology rows carry the
+  `gt-kb-managed + overwrite + warn` ownership block matching all other
+  rule-class rows.
+
+### Reports
+
+- **Agent Red classification report** (`docs/reports/agent-red-classification.md`)
+  — generated via `gt project classify-tree` against the Agent Red
+  checkout. 7,355 paths classified; 3 owner-decision-pending rows
+  (`groundtruth.db`, `requirements-local.txt`, `requirements-test.txt`).
+  Zero-write proof: Agent Red `git status --short` is byte-identical
+  before and after the classify run.
 
 ### Tests
 
@@ -79,11 +160,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   + extends inheritance + missing-config ERROR + full-scaffold
   zero-ERROR + Codex P1 AGENTS.md path assertion.
 - `tests/test_managed_registry.py` — updated counts (42 total, 10
-  rules, local-only scaffold/upgrade includes the two new
+  rules; `_registry_records()` helper filters `OwnershipGlobArtifact`
+  rows; local-only scaffold/upgrade includes the two new
   canonical-terminology rule records).
 - `tests/test_scaffold_project.py` — added
   `test_scaffold_agents_md_uses_root_memory_path` asserting generated
   `AGENTS.md` names `MEMORY.md` (not `memory/MEMORY.md`).
+- `tests/test_harvest_coverage_helper.py` +
+  `tests/test_harvest_coverage_doctor.py` — full coverage of the DA
+  harvest coverage helper and doctor integration.
+- `tests/test_ownership_loader_agreement.py`,
+  `tests/test_ownership_resolver.py`,
+  `tests/test_scaffold_consumes_resolver.py`,
+  `tests/test_upgrade_dispatches_by_policy.py`,
+  `tests/test_doctor_unchanged_without_classify_flag.py`,
+  `tests/test_classify_tree_cli.py`,
+  `tests/test_classify_tree_read_only.py` — full coverage of
+  ownership matrix loader, resolver, scaffold consumption, upgrade
+  dispatch, doctor isolation, and classify-tree CLI.
 
 ## [0.6.0] - 2026-04-17
 
