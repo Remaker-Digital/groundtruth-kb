@@ -447,6 +447,77 @@ gt project upgrade --apply --force
 
 ---
 
+### gt project rollback
+
+Roll back a previously-applied `gt project upgrade --apply` by
+consuming its rollback receipt and running
+`git revert -m 1 <merge_commit>` against the working tree.
+
+```
+gt project rollback [--dry-run | --apply] [--commit] [--receipt-id <id>] [--target-dir <path>]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--dry-run` | flag | on (default) | Plan the rollback without executing. Mutually exclusive with `--apply`. |
+| `--apply` | flag | off | Execute the revert. Leaves revert staged unless `--commit` is also passed. |
+| `--commit` | flag | off | Auto-commit the revert with message `gt: rollback upgrade payload {receipt_id}`. Requires `--apply`. |
+| `--receipt-id` | string | latest | Specific receipt to roll back. Default picks newest by `created_at` (tie-break on `receipt_id`). |
+| `--target-dir` | path | `.` | Directory containing `.claude/upgrade-receipts/` |
+
+**Default behavior is dry-run.** Bare `gt project rollback` and
+`gt project rollback --dry-run` both plan without executing. Exactly one
+of `--dry-run` and `--apply` may be passed; both together raise a
+`UsageError`. `--commit` without `--apply` also raises a `UsageError`.
+
+**Receipt resolution.** When `--receipt-id` is omitted, the latest
+receipt under `.claude/upgrade-receipts/active/` is selected, ordered by
+JSON `created_at` descending, with a deterministic tie-break on
+`receipt_id` descending. File mtime is not used, so receipts restored
+from backups or copied between machines still resolve correctly.
+
+**Preconditions.** Planning is read-only. Apply requires:
+
+- Working tree clean (`git status --porcelain` empty) — otherwise
+  exits non-zero with `DirtyWorkingTreeError`.
+- Receipt `merge_commit` is a two-parent merge commit — otherwise
+  `NotAMergeCommitError`.
+- `merge_commit` is reachable from current HEAD — otherwise
+  `MergeCommitNotInHistoryError` (e.g., already reverted, rebased
+  away, or on a different branch).
+
+**Error cases and exit codes.**
+
+| Exit code | Cause |
+|-----------|-------|
+| 2 | `ReceiptNotFoundError` (no receipts or unknown `--receipt-id`) |
+| 3 | `ReceiptMalformedError` / `ReceiptSchemaVersionMismatchError` |
+| 4 | `NotAMergeCommitError` (receipt SHA is not a 2-parent merge) |
+| 5 | `MergeCommitNotInHistoryError` (merge SHA not reachable) |
+| 6 | `DirtyWorkingTreeError` (working tree has uncommitted changes) |
+| 7 | `RollbackFailedError` (underlying `git revert` failed) |
+
+**Example:**
+
+```bash
+# Preview the latest rollback plan
+gt project rollback
+
+# Execute rollback; revert is staged for review
+gt project rollback --apply
+
+# Execute rollback and auto-commit it
+gt project rollback --apply --commit
+
+# Roll back a specific receipt
+gt project rollback --apply --receipt-id a1b2c3d4e5f60000
+```
+
+See also: `docs/reference/upgrade-receipts.md` for receipt format + full
+workflow.
+
+---
+
 ### gt project classify-tree
 
 Classify every path in a target tree against the artifact-ownership matrix.
