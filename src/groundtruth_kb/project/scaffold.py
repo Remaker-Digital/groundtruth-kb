@@ -64,6 +64,110 @@ class ScaffoldOptions:
     integrations: bool = False
 
 
+def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none") -> list[str]:
+    """Return the sorted list of target paths a ``gt project init`` would write.
+
+    Pure function — performs **no** filesystem writes, takes **no** target
+    directory argument, and never invokes :func:`scaffold_project`. Used by
+    the upgrade pre-flight coverage check (bridge
+    ``gtkb-upgrade-pre-flight-checks-implementation-002.md`` C4) to compute
+    the delta between scaffold-created paths and registry-managed paths.
+
+    Enumerates only outputs that are **guaranteed** by persisted project
+    state: ``profile``, ``cloud_provider``, registry rows, and unconditional
+    base outputs. Option-dependent outputs that the manifest does NOT
+    persist are intentionally excluded:
+
+    - CI workflows (``options.include_ci``)
+    - ``src/tasks.py`` stub (``options.seed_example``)
+    - Integration templates (``options.integrations``)
+    - Spec scaffold (``options.spec_scaffold``)
+    - Webapp stub files (``options.*`` for ``dual-agent-webapp``)
+
+    Excluding these keeps the coverage check from false-positively reporting
+    "created by scaffold; not tracked by upgrade" for projects that were
+    initialized with ``--no-include-ci`` / ``--no-seed-example`` /
+    ``--no-integrations``.
+
+    Args:
+        profile_name: One of the registered project profile names
+            (``"local-only"``, ``"dual-agent"``, ``"dual-agent-webapp"``).
+        cloud_provider: The adopter's recorded cloud provider. Used only to
+            gate terraform stub paths under the webapp profile; the default
+            ``"none"`` excludes them.
+
+    Returns:
+        Sorted, de-duplicated list of project-relative target paths.
+
+    Raises:
+        ValueError: when ``profile_name`` is not a registered profile.
+    """
+    profile = get_profile(profile_name)
+
+    paths: set[str] = set()
+
+    # Unconditional core outputs (every profile)
+    paths.update(
+        {
+            "groundtruth.toml",
+            "groundtruth.db",
+            ".gitignore",
+            "CLAUDE.md",
+            "MEMORY.md",
+            ".editorconfig",
+            "Makefile",
+            ".pre-commit-config.yaml",
+            "pyproject.toml",
+        }
+    )
+
+    # Registry-backed outputs for this profile (hooks, rules, skills).
+    # Settings-hook-registrations and gitignore-patterns fold into their
+    # implicit target paths so the coverage check doesn't flag
+    # ``.claude/settings.json`` or ``.gitignore`` as uncovered.
+    for artifact in artifacts_for_scaffold(profile_name):
+        if isinstance(artifact, FileArtifact):
+            paths.add(artifact.target_path)
+        elif isinstance(artifact, SettingsHookRegistration):
+            paths.add(".claude/settings.json")
+        elif isinstance(artifact, GitignorePattern):
+            paths.add(".gitignore")
+
+    # Dual-agent-profile outputs (all profiles with ``includes_bridge``)
+    if profile.includes_bridge:
+        paths.update(
+            {
+                "BRIDGE-INVENTORY.md",
+                "bridge-os-poller-setup-prompt.md",
+                "AGENTS.md",
+                ".claude/settings.local.json",
+                ".claude/settings.json",
+                "bridge/INDEX.md",
+            }
+        )
+        # Codex bootstrap files copied from the GT-KB templates dir. These
+        # live under templates/project/codex-bootstrap/*.md and are
+        # version-deterministic but enumerated from the templates tree so
+        # adding a new bootstrap doc does not silently drift the check.
+        templates_dir = get_templates_dir()
+        codex_src = templates_dir / "project" / "codex-bootstrap"
+        if codex_src.exists():
+            for src in codex_src.glob("*.md"):
+                paths.add(f"independent-progress-assessments/{src.name}")
+
+    # Webapp-profile outputs (all profiles with ``includes_docker``)
+    if profile.includes_docker:
+        paths.update({"Dockerfile", "docker-compose.yml", ".env.example"})
+        if cloud_provider != "none":
+            templates_dir = get_templates_dir()
+            tf_src = templates_dir / "infrastructure" / "terraform"
+            if tf_src.exists():
+                for src in tf_src.glob("*.tf"):
+                    paths.add(f"infrastructure/terraform/{src.name}")
+
+    return sorted(paths)
+
+
 def scaffold_project(options: ScaffoldOptions) -> Path:
     """Create a complete project scaffold based on the selected profile."""
     profile = get_profile(options.profile)

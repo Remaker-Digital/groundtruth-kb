@@ -92,11 +92,14 @@ def test_plan_upgrade_same_version_with_all_files_present_returns_empty(tmp_path
     # .claude/hooks/spec-classifier.py. Those are missing → `add` actions.
     # But the test was originally written before the missing-file drift
     # check existed. Assert the new semantics: missing managed files
-    # produce `add` actions; no other action types appear.
+    # produce `add` actions; no other action types appear (apart from
+    # non-mutating pre-flight diagnostics, which are filtered here because
+    # they are covered by tests/test_preflight_checks.py).
     result = plan_upgrade(tmp_path)
-    assert all(a.action == "add" for a in result), (
+    drift_actions = [a for a in result if a.action not in ("warning", "informational")]
+    assert all(a.action == "add" for a in drift_actions), (
         f"local-only same-version should only produce add actions for missing "
-        f"managed files; got: {[(a.action, a.file) for a in result]}"
+        f"managed files; got: {[(a.action, a.file) for a in drift_actions]}"
     )
 
 
@@ -108,7 +111,17 @@ def test_plan_upgrade_different_version_local_only(tmp_path: Path) -> None:
     assert isinstance(result, list)
     for action in result:
         assert isinstance(action, UpgradeAction)
-        assert action.action in ("add", "skip", "update")
+        # Pre-flight action kinds (warning, informational) are covered
+        # by the preflight test file; this test asserts drift-check shapes.
+        assert action.action in (
+            "add",
+            "skip",
+            "update",
+            "warning",
+            "informational",
+            "merge-event-hooks",
+            "append-gitignore",
+        )
 
 
 def test_plan_upgrade_missing_file_gets_add_action(tmp_path: Path) -> None:

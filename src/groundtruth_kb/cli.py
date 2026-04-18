@@ -683,24 +683,43 @@ def project_doctor(auto_install: bool, profile: str | None, target_dir: str) -> 
 @click.option("--dry-run/--apply", default=True, help="Preview changes without writing (default: dry-run).")
 @click.option("--force", is_flag=True, default=False, help="Overwrite customized files.")
 @click.option("--dir", "target_dir", default=".", help="Project directory (default: cwd).")
-def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
+@click.option(
+    "--ignore-inflight-bridges",
+    is_flag=True,
+    default=False,
+    help="Suppress the 'bridge in-flight' pre-flight warning (automation).",
+)
+def project_upgrade(
+    dry_run: bool,
+    force: bool,
+    target_dir: str,
+    ignore_inflight_bridges: bool,
+) -> None:
     """Update scaffold files to match the current GroundTruth version.
 
     ``--apply`` runs the upgrade inside a short-lived payload branch that
     merges back into the current branch to produce a rollback receipt
     anchored on a real merge commit. Requires a git work tree with a clean
     index; see ``docs/reference/upgrade-receipts.md``.
+
+    Dry-run surfaces non-mutating pre-flight diagnostics (``[WARNING]``
+    for in-flight bridges; ``[INFORMATIONAL]`` for scaffold-coverage
+    delta). Those rows are filtered out before apply so pre-flight
+    reporting never triggers git or file writes, even with ``--force``.
     """
     from groundtruth_kb.project.upgrade import (
+        _NON_MUTATING_ACTION_KINDS,
         DirtyWorkingTreeError,
+        MalformedSettingsError,
         MergeFailedError,
         NotAGitRepositoryError,
+        _has_malformed_settings_skip,
         execute_upgrade,
         plan_upgrade,
     )
 
     target = Path(target_dir).resolve()
-    actions = plan_upgrade(target)
+    actions = plan_upgrade(target, ignore_inflight_bridges=ignore_inflight_bridges)
 
     if not actions:
         click.echo("Already at current version. Nothing to upgrade.")
@@ -714,8 +733,32 @@ def project_upgrade(dry_run: bool, force: bool, target_dir: str) -> None:
         click.echo(f"\n{len(actions)} action(s). Run with --apply to execute.")
         return
 
+    # Halt before execute_upgrade if ``.claude/settings.json`` is malformed.
+    # This is the CLI-side arm of the C2 contract — ``execute_upgrade`` also
+    # raises :class:`MalformedSettingsError` as defense in depth for library
+    # callers, but catching it here keeps the adopter-facing error local.
+    malformed = _has_malformed_settings_skip(actions)
+    if malformed is not None:
+        click.echo(
+            f"\nError: Malformed .claude/settings.json — repair and re-run.\nPlanner reason: {malformed.reason}",
+            err=True,
+        )
+        raise SystemExit(4)
+
+    # Filter pre-flight ``warning`` and ``informational`` rows out of the
+    # action list before handing it to ``execute_upgrade``. Per C1, these
+    # must never reach the git/manifest write path — even with ``--force``.
+    mutating_actions = [a for a in actions if a.action not in _NON_MUTATING_ACTION_KINDS]
+
+    if not mutating_actions:
+        click.echo("\nPre-flight only — no mutating actions to apply.")
+        return
+
     try:
-        results = execute_upgrade(target, actions, force=force)
+        results = execute_upgrade(target, mutating_actions, force=force)
+    except MalformedSettingsError as exc:
+        click.echo(f"\nError: {exc}", err=True)
+        raise SystemExit(4) from exc
     except NotAGitRepositoryError as exc:
         click.echo(f"\nError: {exc}", err=True)
         raise SystemExit(2) from exc
