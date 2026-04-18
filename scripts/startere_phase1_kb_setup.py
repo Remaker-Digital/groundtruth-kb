@@ -366,18 +366,14 @@ WORK_ITEMS: list[dict[str, object]] = [
         "id": "WI-ADOPT-03",
         "title": "Mermaid block diagram and narrated tour",
         "description": (
-            "Add Mermaid block diagram plus narrated tour to docs/start-here.md "
-            "section 4. Covers BLOCKDIAGRAM."
+            "Add Mermaid block diagram plus narrated tour to docs/start-here.md section 4. Covers BLOCKDIAGRAM."
         ),
         "source_spec_id": "SPEC-STARTHERE-BLOCKDIAGRAM",
     },
     {
         "id": "WI-ADOPT-04",
         "title": "evidence.md plus metrics collector script",
-        "description": (
-            "Create docs/evidence.md plus scripts/collect_evidence_metrics.py. "
-            "Covers EVIDENCE."
-        ),
+        "description": ("Create docs/evidence.md plus scripts/collect_evidence_metrics.py. Covers EVIDENCE."),
         "source_spec_id": "SPEC-STARTHERE-EVIDENCE",
     },
     {

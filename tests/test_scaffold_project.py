@@ -124,6 +124,4 @@ def test_scaffold_agents_md_uses_root_memory_path(tmp_path: Path) -> None:
         "GT-KB places MEMORY.md at repo root per ADR-0001. "
         "See bridge/gtkb-canonical-terminology-surface-implementation-008.md."
     )
-    assert "MEMORY.md" in content, (
-        "Generated AGENTS.md must reference root 'MEMORY.md' in the startup checklist."
-    )
+    assert "MEMORY.md" in content, "Generated AGENTS.md must reference root 'MEMORY.md' in the startup checklist."

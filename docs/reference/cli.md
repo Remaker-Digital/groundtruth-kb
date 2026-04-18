@@ -447,6 +447,46 @@ gt project upgrade --apply --force
 
 ---
 
+### gt project classify-tree
+
+Classify every path in a target tree against the artifact-ownership matrix.
+Manifest-independent: does NOT require `groundtruth.toml` in the target
+tree and does NOT call `gt project doctor`. Read-only.
+
+```
+gt project classify-tree --dir <path> --output <report> [options]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--dir` | path | **required** | Target tree root to classify (does NOT require `groundtruth.toml`) |
+| `--output` | path | **required** | Output report path (written relative to CWD) |
+| `--max-depth` | integer | `10` | Maximum walk depth |
+| `--ignore-glob` | repeatable glob | built-in ignores only | Additive ignore glob; may be repeated |
+| `--format` | choice | `markdown` | Report format: `markdown` or `json` |
+
+**Output format:** Deterministic header block + rows ordered by ownership
+enum then alphabetical by path. Rows with ownership `legacy-exception`
+are flagged `owner_decision_pending = "YES"`.
+
+**Read-only:** Does not modify any file in the target tree. Suitable for
+legacy projects that have no GT-KB manifests.
+
+**Example:**
+
+```bash
+# Classify the current tree, write a Markdown report
+gt project classify-tree --dir . --output classification.md
+
+# Classify another project tree as JSON
+gt project classify-tree --dir ../other-project --output other-report.json --format json
+
+# Add custom ignore patterns on top of built-in ignores
+gt project classify-tree --dir . --output report.md --ignore-glob "vendor/**" --ignore-glob "*.bak"
+```
+
+---
+
 ## Deliberation Archive (DA) Commands
 
 Commands for managing the Deliberation Archive (DA) and semantic search index.
