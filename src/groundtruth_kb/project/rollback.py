@@ -434,14 +434,28 @@ def _assert_merge_commit_reachable(root: Path, merge_commit: str) -> None:
 
 
 def _assert_is_two_parent_merge(root: Path, merge_commit: str) -> None:
-    """Raise ``NotAMergeCommitError`` if ``merge_commit`` is not a 2-parent merge."""
-    result = subprocess.run(
-        ["git", "rev-list", "--parents", "-n", "1", merge_commit],
-        cwd=str(root),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    """Raise ``NotAMergeCommitError`` if ``merge_commit`` is not a 2-parent merge.
+
+    If the SHA does not correspond to any object in the repo (valid hex but
+    absent), ``git rev-list`` fails with ``CalledProcessError``; we catch and
+    re-raise as ``MergeCommitNotInHistoryError`` to keep F8-documented rollback
+    exceptions as the only adopter-facing surface.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--parents", "-n", "1", merge_commit],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        # Missing/unreachable SHA: map to MergeCommitNotInHistoryError per F8.
+        raise MergeCommitNotInHistoryError(
+            f"Receipt references merge_commit {merge_commit!r}, but that commit "
+            f"is not present in the repository at {root}. Receipt may point at "
+            f"a SHA from a different clone, or the commit was garbage-collected."
+        ) from exc
     tokens = result.stdout.strip().split()
     # Output format: '<merge_sha> <parent1_sha> <parent2_sha>' → 3 tokens.
     if len(tokens) != 3:
@@ -540,22 +554,36 @@ def execute_rollback(
     _assert_is_two_parent_merge(root, plan.merge_commit)
     _assert_merge_commit_reachable(root, plan.merge_commit)
 
-    revert_cmd = ["git", "revert", "-m", "1", plan.merge_commit]
-    if not commit:
-        revert_cmd.append("--no-commit")
-
-    result = subprocess.run(
-        revert_cmd,
+    # Always run revert with --no-commit first so we control the commit
+    # message on the commit=True path (per Codex F7: approved message is
+    # exactly "gt: rollback upgrade payload {receipt_id}", not git's
+    # default "Revert \"...\"" subject).
+    revert_result = subprocess.run(
+        ["git", "revert", "-m", "1", "--no-commit", plan.merge_commit],
         cwd=str(root),
         capture_output=True,
         text=True,
         check=False,
     )
-    if result.returncode != 0:
-        raise RollbackFailedError(f"git revert failed (exit {result.returncode}): {result.stderr.strip()}")
+    if revert_result.returncode != 0:
+        raise RollbackFailedError(
+            f"git revert failed (exit {revert_result.returncode}): {revert_result.stderr.strip()}"
+        )
 
     commit_sha: str | None = None
     if commit:
+        message = f"gt: rollback upgrade payload {plan.receipt['receipt_id']}"
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", message],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if commit_result.returncode != 0:
+            raise RollbackFailedError(
+                f"git commit after revert failed (exit {commit_result.returncode}): {commit_result.stderr.strip()}"
+            )
         sha_result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=str(root),

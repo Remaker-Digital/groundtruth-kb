@@ -405,6 +405,49 @@ class TestExecuteRollback:
         with pytest.raises(DirtyWorkingTreeError):
             execute_rollback(repo, plan, commit=False)
 
+    def test_commit_mode_uses_approved_message(self, repo):
+        """F7: --apply --commit must use 'gt: rollback upgrade payload {receipt_id}'
+        commit message, NOT git's default 'Revert \"...\"' subject."""
+        merge_sha = _make_noff_merge(repo, {"payload.txt": "hi"})
+        _write_receipt(
+            repo,
+            {"receipt_id": "a1b2c3d4e5f60000", "merge_commit": merge_sha},
+            filename="r.json",
+            commit=True,
+        )
+        plan = plan_rollback(repo)
+        result = execute_rollback(repo, plan, commit=True)
+        assert result.mode == "revert-commit"
+        # Verify exact commit subject.
+        subject = _git(repo, "log", "-1", "--format=%s").stdout.strip()
+        assert subject == "gt: rollback upgrade payload a1b2c3d4e5f60000", (
+            f"F7 violation: expected approved message, got {subject!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# F8 — Missing/nonexistent merge commits leak CalledProcessError → map to MergeCommitNotInHistoryError
+# ---------------------------------------------------------------------------
+
+
+class TestMissingMergeCommitSHA:
+    """F8: valid 40-char hex SHA that is absent from the repo must raise
+    MergeCommitNotInHistoryError, not leak CalledProcessError."""
+
+    def test_valid_hex_absent_sha_raises_documented_exception(self, repo):
+        # "a" * 40 is syntactically a valid SHA but does not exist in the repo.
+        _write_receipt(repo, {"merge_commit": "a" * 40}, filename="r.json")
+        with pytest.raises(MergeCommitNotInHistoryError):
+            plan_rollback(repo)
+
+    def test_absent_sha_cli_exit_code(self, repo, monkeypatch):
+        _write_receipt(repo, {"merge_commit": "a" * 40}, filename="r.json")
+        monkeypatch.chdir(repo)
+        runner = CliRunner()
+        result = runner.invoke(cli_main, ["project", "rollback"])
+        # Exit 5 per docs/reference/cli.md (MergeCommitNotInHistoryError).
+        assert result.exit_code == 5, f"F8 violation: expected exit 5 for absent SHA, got {result.exit_code}"
+
 
 # ---------------------------------------------------------------------------
 # F4 — CLI flag validation
