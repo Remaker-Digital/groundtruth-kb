@@ -42,20 +42,109 @@
 <!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread tracks continuing work -->
 <!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn was re-firing on a consumed scope-GO; downstream thread already visible to index -->
 
-Document: gtkb-project-boundary-and-upgrade-hardening
-NEW: bridge/gtkb-project-boundary-and-upgrade-hardening-001.md
+<!-- Prime Builder maintenance (2026-04-17, S299-continuation): retired gtkb-da-governance-completeness (scope-bridge GO actioned) -->
+<!--   - gtkb-da-governance-completeness -004 was a conditional scope-bridge GO with 7 required implementation conditions, NOT an implementation GO -->
+<!--   - Codex -004 §"Claim" states explicitly: "The revised scope resolves the five blockers from -002 well enough for Prime to proceed to an implementation bridge. The remaining risks are implementation-shaping conditions, not reasons to force another scope revision." -->
+<!--   - The only action the scope GO authorized (per -003 §"Required Next Steps After Codex GO") was filing bridge/gtkb-da-governance-completeness-implementation-001.md -->
+<!--   - Implementation bridge gtkb-da-governance-completeness-implementation-001.md filed NEW (see entry below) — discharges all 7 Codex required conditions (owner-decision gate Q1/Q2/Q3 as Phase 0, harvest-coverage sequencing gate preserved via Phase 9a/9b split, source-ref warn-only v1 non-breaking, managed-artifact/scaffold/test updates per-surface for turn-marker + delib-preflight-gate + _delib_common + owner-decision-capture + gov09-capture, DB-routing invariant test, dry-run artifacts + owner approval gates for LO backfill and transcript extraction, post-impl report contract with focused test output + DA count evidence) -->
+<!--   - Per .claude/rules/codex-review-gate.md, no GT-KB source/doc/hook/template/script/DB/managed-artifact mutation can begin until Codex GOs the implementation bridge -->
+<!--   - Bridge files 001-004 remain on disk as audit trail; implementation thread tracks continuing work -->
+<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn was re-firing on a consumed scope-GO; downstream thread already visible to index -->
+
+<!-- Prime Builder maintenance (2026-04-17, S299-continuation): retired gtkb-project-boundary-and-upgrade-hardening (scope-bridge GO actioned) -->
+<!--   - gtkb-project-boundary-and-upgrade-hardening -002 was a scope-bridge GO with 5 implementation conditions, NOT an implementation GO -->
+<!--   - Codex -002 §"Claim" states: "GO is granted for the scope, with implementation conditions below. This GO does not authorize direct Agent Red cleanup beyond read-only dogfood commands and a generated classification report." -->
+<!--   - Scope -001 §"Implementation Approach" states explicitly: "On Codex GO: implementation. Large scope; likely needs to split into sub-bridges per phase or sub-phase at implementation-bridge time." -->
+<!--   - Implementation bridge gtkb-project-boundary-and-upgrade-hardening-implementation-001.md filed NEW (see entry below) — discharges all 5 Codex conditions (C1 rollback receipts restore-capable via per-artifact-class payloads + 7 mandatory rollback tests; C2 two-source ownership via extended managed-artifacts.toml + new templates/scaffold-ownership.toml + unified OwnershipResolver + generated matrix doc; C3 bootstrap-desktop consolidation under registry with tests; C4 Agent Red dogfood is classification-only, report written to GT-KB repo only, groundtruth.db as legacy-exception pending owner decision; C5 docs parity via generator scripts + CI gate + regex scan for hard-coded counts) -->
+<!--   - Also sequences all 10 scope phases into 9 review-gated implementation phases (P1 specs → P2 ownership → P3 rollback → P4 bootstrap-desktop → P5 preflight+retrofit → P6 workflow surface → P7 docs parity → P8 Agent Red dogfood → P9 post-impl report), estimates ~12-18 commits and ~80-120 new tests, and opens 5 Codex review questions (subsume Tier 2 C2? bootstrap-desktop decision? receipt inline-bytes cap? phase-gate bridge splitting? structured-merge vs cooperative-preserve enum split?) -->
+<!--   - Per .claude/rules/codex-review-gate.md, no GT-KB source/doc/registry/script/CI/KB mutation can begin until Codex GOs the implementation bridge -->
+<!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread tracks continuing work -->
+<!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn was re-firing on a consumed scope-GO; downstream thread already visible to index -->
+
+<!-- Prime Builder maintenance (2026-04-17, S299-continuation): retired gtkb-project-boundary-and-upgrade-hardening-implementation (structural GO actioned) -->
+<!--   - gtkb-project-boundary-and-upgrade-hardening-implementation -004 was a STRUCTURAL GO with explicit no-implementation mandate. Codex -004 §"Claim": "Codex GO is granted only to close this oversized implementation thread and require the work to move into protocol-visible sub-bridges. This GO does not approve any GT-KB source, doc, registry, script, CI, KB, or Agent Red mutation from this parent thread." -->
+<!--   - Codex -004 §"Required Action Items" item 1: "File `gtkb-artifact-ownership-matrix-001` and `gtkb-rollback-receipts-001` as separate bridge entries before any implementation." -->
+<!--   - Codex -004 §"Required Action Items" item 4: "Keep this parent thread as a coordination/supersession record only." -->
+<!--   - Both prerequisite sub-bridges filed NEW (see entries below): -->
+<!--     - gtkb-rollback-receipts-001.md — discharges F2 (restore-capability conditions): presents git-based rollback as a candidate design subject to review (not pre-approved); defines two modes (`revert` default history-preserving + `reset` opt-in destructive with clean-tree proof); proves restore coverage via per-artifact-class matrix (10 classes A-J, git-sufficient for A-C + G, git+receipt-aid for D-F, receipt-owned payload required for H-I gitignored/untracked); defines object-retention and failure semantics with loud diagnostics; 16 mandatory tests (T1-T16) covering all classes + large files + dirty-tree refusal + GC'd objects + deleted receipts; receipt JSON schema v1; Agent Red dogfood READ-ONLY only -->
+<!--     - gtkb-artifact-ownership-matrix-001.md — discharges F3 (registry extension conditions) + F4 (classification report ownership): extends existing `[[artifacts]]` records in managed-artifacts.toml (NOT a parallel root); new sibling file templates/scaffold-ownership.toml using the same `[[artifacts]]` root for non-registry artifacts (path_glob-based); single extended loader (not parallel parser) guarantees loader-resolver agreement by construction; OwnershipResolver module with classify_path()/classify_tree() APIs; 5-value ownership enum + 5-value upgrade_policy enum + 4-value divergence_policy enum; owns the Agent Red classification report deliverable written to GT-KB `docs/reports/agent-red-classification.md` only (no Agent Red writes); ~18-22 tests including explicit loader-resolver agreement tests per Codex F3 -->
+<!--   - Both sub-bridges explicitly state zero Agent Red writes + state Agent Red dogfood boundary per F4 condition of -004 -->
+<!--   - Parent thread files 001-004 remain on disk as audit trail; sub-bridges track continuing work independently per -004 §Conditions ("Each sub-bridge must include its own proposed files, tests, dogfood evidence plan, and post-implementation verification criteria") -->
+<!--   - Per .claude/rules/codex-review-gate.md, no GT-KB mutation can begin on either sub-bridge until Codex GOs each -->
+<!--   - Rationale: automated cap=1 scan spawn was re-firing on a consumed structural-GO; downstream sub-bridges already visible to index; parent retained as supersession record per -004 item 4 (thread will close when both sub-bridges VERIFIED per -004 F1 closure condition) -->
+
+Document: gtkb-v061-release
+VERIFIED: bridge/gtkb-v061-release-018.md
+NEW: bridge/gtkb-v061-release-017.md
+GO: bridge/gtkb-v061-release-016.md
+REVISED: bridge/gtkb-v061-release-015.md
+NO-GO: bridge/gtkb-v061-release-014.md
+NEW: bridge/gtkb-v061-release-013.md
+GO: bridge/gtkb-v061-release-012.md
+NEW: bridge/gtkb-v061-release-011.md
+GO: bridge/gtkb-v061-release-010.md
+REVISED: bridge/gtkb-v061-release-009.md
+NO-GO: bridge/gtkb-v061-release-008.md
+NEW: bridge/gtkb-v061-release-007.md
+GO: bridge/gtkb-v061-release-006.md
+REVISED: bridge/gtkb-v061-release-005.md
+NO-GO: bridge/gtkb-v061-release-004.md
+REVISED: bridge/gtkb-v061-release-003.md
+NO-GO: bridge/gtkb-v061-release-002.md
+NEW: bridge/gtkb-v061-release-001.md
+
+Document: gtkb-rollback-receipts
+NEW: bridge/gtkb-rollback-receipts-015.md
+GO: bridge/gtkb-rollback-receipts-014.md
+REVISED: bridge/gtkb-rollback-receipts-013.md
+NO-GO: bridge/gtkb-rollback-receipts-012.md
+REVISED: bridge/gtkb-rollback-receipts-011.md
+NO-GO: bridge/gtkb-rollback-receipts-010.md
+REVISED: bridge/gtkb-rollback-receipts-009.md
+NO-GO: bridge/gtkb-rollback-receipts-008.md
+REVISED: bridge/gtkb-rollback-receipts-007.md
+NO-GO: bridge/gtkb-rollback-receipts-006.md
+REVISED: bridge/gtkb-rollback-receipts-005.md
+NO-GO: bridge/gtkb-rollback-receipts-004.md
+REVISED: bridge/gtkb-rollback-receipts-003.md
+NO-GO: bridge/gtkb-rollback-receipts-002.md
+NEW: bridge/gtkb-rollback-receipts-001.md
+
+Document: gtkb-artifact-ownership-matrix
+VERIFIED: bridge/gtkb-artifact-ownership-matrix-006.md
+NEW: bridge/gtkb-artifact-ownership-matrix-005.md
+GO: bridge/gtkb-artifact-ownership-matrix-004.md
+REVISED: bridge/gtkb-artifact-ownership-matrix-003.md
+NO-GO: bridge/gtkb-artifact-ownership-matrix-002.md
+NEW: bridge/gtkb-artifact-ownership-matrix-001.md
+
+Document: gtkb-da-governance-completeness-implementation
+GO: bridge/gtkb-da-governance-completeness-implementation-016.md
+REVISED: bridge/gtkb-da-governance-completeness-implementation-015.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-014.md
+REVISED: bridge/gtkb-da-governance-completeness-implementation-013.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-012.md
+REVISED: bridge/gtkb-da-governance-completeness-implementation-011.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-010.md
+REVISED: bridge/gtkb-da-governance-completeness-implementation-009.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-008.md
+REVISED: bridge/gtkb-da-governance-completeness-implementation-007.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-006.md
+REVISED: bridge/gtkb-da-governance-completeness-implementation-005.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-004.md
+REVISED: bridge/gtkb-da-governance-completeness-implementation-003.md
+NO-GO: bridge/gtkb-da-governance-completeness-implementation-002.md
+NEW: bridge/gtkb-da-governance-completeness-implementation-001.md
 
 Document: agent-red-session-wrap-automation
+VERIFIED: bridge/agent-red-session-wrap-automation-005.md
+REVISED: bridge/agent-red-session-wrap-automation-004.md
+NO-GO: bridge/agent-red-session-wrap-automation-003.md
 REVISED: bridge/agent-red-session-wrap-automation-002.md
 NEW: bridge/agent-red-session-wrap-automation-001.md
 
-Document: gtkb-da-governance-completeness
-GO: bridge/gtkb-da-governance-completeness-004.md
-REVISED: bridge/gtkb-da-governance-completeness-003.md
-NO-GO: bridge/gtkb-da-governance-completeness-002.md
-NEW: bridge/gtkb-da-governance-completeness-001.md
-
 Document: gtkb-da-harvest-coverage-implementation
+VERIFIED: bridge/gtkb-da-harvest-coverage-implementation-011.md
 NEW: bridge/gtkb-da-harvest-coverage-implementation-010.md
 NO-GO: bridge/gtkb-da-harvest-coverage-implementation-009.md
 REVISED: bridge/gtkb-da-harvest-coverage-implementation-008.md
