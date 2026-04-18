@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,32 @@ scaffold_version = "{version}"
 created_at = "2026-01-01T00:00:00Z"
 """,
         encoding="utf-8",
+    )
+
+
+def _setup_git_for_upgrade(target: Path) -> None:
+    """Initialize git and commit current state so execute_upgrade preconditions pass.
+
+    Per bridge ``gtkb-rollback-receipts-014`` GO, execute_upgrade now creates
+    a payload branch and merges it back to produce a real merge commit that
+    anchors the rollback receipt. Tests that call execute_upgrade must
+    therefore run inside a git work tree with a clean tree — this helper
+    does the init + initial-commit work.
+    """
+    subprocess.run(["git", "init", "--initial-branch=main"], cwd=target, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=target, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=target, check=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=target, check=True)
+    # Disable Windows CRLF auto-conversion so byte-level file assertions
+    # (e.g. comparing a copied template to its source) don't trip on line
+    # endings that git would rewrite during checkouts across branches.
+    subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=target, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=target, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "pre-upgrade snapshot", "--allow-empty"],
+        cwd=target,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -130,6 +157,7 @@ def test_execute_upgrade_skip_without_force(tmp_path: Path) -> None:
     """Skip action without --force → 'SKIPPED' in results."""
     _write_minimal_toml(tmp_path, version="0.0.1")
     action = UpgradeAction(file="some-file.py", action="skip", reason="customized")
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=False)
     assert any("SKIPPED" in r for r in results)
 
@@ -145,6 +173,7 @@ def test_execute_upgrade_add_action_copies_template(tmp_path: Path) -> None:
         pytest.skip("assertion-check.py template not available")
 
     action = UpgradeAction(file=".claude/hooks/assertion-check.py", action="add", reason="New managed file")
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=False)
     assert any("UPDATED" in r for r in results)
     assert (tmp_path / ".claude" / "hooks" / "assertion-check.py").exists()
@@ -154,12 +183,16 @@ def test_execute_upgrade_template_not_found_skips(tmp_path: Path) -> None:
     """Template not found → 'SKIPPED' in results."""
     _write_minimal_toml(tmp_path, version="0.0.1")
     action = UpgradeAction(file=".claude/hooks/nonexistent-hook.py", action="add", reason="New managed file")
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=False)
     assert any("SKIPPED" in r for r in results)
 
 
-def test_execute_upgrade_existing_file_backed_up(tmp_path: Path) -> None:
-    """Existing managed file gets a .bak backup before overwrite."""
+def test_execute_upgrade_no_bak_files_created(tmp_path: Path) -> None:
+    """Per bridge gtkb-rollback-receipts-014 Condition 5, execute_upgrade
+    must NOT create ``.bak`` backup files. The payload-branch commit is the
+    pre-merge snapshot; git history is the audit trail for the old content.
+    """
     from groundtruth_kb import get_templates_dir
 
     _write_minimal_toml(tmp_path, version="0.0.1")
@@ -171,11 +204,20 @@ def test_execute_upgrade_existing_file_backed_up(tmp_path: Path) -> None:
     hooks_dir = tmp_path / ".claude" / "hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
     original_content = "# original content\n"
-    (hooks_dir / "assertion-check.py").write_text(original_content, encoding="utf-8")
+    hook_path = hooks_dir / "assertion-check.py"
+    hook_path.write_text(original_content, encoding="utf-8")
 
     action = UpgradeAction(file=".claude/hooks/assertion-check.py", action="skip", reason="customized")
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=True)
-    assert any("BACKUP" in r for r in results)
+
+    # Forcing the skip should update the file in-place (UPDATED in results).
+    assert any("UPDATED" in r for r in results), results
+    # No .bak file anywhere under the project tree.
+    bak_files = list(tmp_path.rglob("*.bak"))
+    assert bak_files == [], f"execute_upgrade must not create .bak files; found: {bak_files}"
+    # No BACKUP messages in results, either.
+    assert not any("BACKUP" in r for r in results), f"BACKUP message leaked through: {results}"
 
 
 def test_execute_upgrade_updates_manifest_version(tmp_path: Path) -> None:
@@ -184,6 +226,7 @@ def test_execute_upgrade_updates_manifest_version(tmp_path: Path) -> None:
     from groundtruth_kb.project.manifest import read_manifest
 
     _write_minimal_toml(tmp_path, version="0.0.1")
+    _setup_git_for_upgrade(tmp_path)
     execute_upgrade(tmp_path, [], force=False)
     manifest = read_manifest(tmp_path / "groundtruth.toml")
     assert manifest is not None
@@ -286,6 +329,7 @@ def test_execute_creates_missing_hook_file_at_same_version(tmp_path: Path) -> No
     assert not hook_path.exists()
 
     actions = plan_upgrade(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
     execute_upgrade(tmp_path, actions, force=False)
 
     assert hook_path.exists(), "scanner-safe-writer.py should be copied by execute_upgrade at same version"
@@ -357,6 +401,7 @@ def test_execute_merge_event_hooks_preserves_unmanaged_entries(tmp_path: Path) -
         payload="PreToolUse",
         event="PreToolUse",
     )
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=False)
     assert any("MERGED" in r and "PreToolUse rebuilt" in r for r in results), results
     data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -382,12 +427,230 @@ def test_execute_merge_event_hooks_is_idempotent(tmp_path: Path) -> None:
         payload="PreToolUse",
         event="PreToolUse",
     )
+    _setup_git_for_upgrade(tmp_path)
     first = execute_upgrade(tmp_path, [action], force=False)
     assert any("MERGED" in r and "PreToolUse rebuilt" in r for r in first), first
-    # Reset version so the noop execute doesn't cascade into other file work
+    # Reset version so the noop execute doesn't cascade into other file work.
+    # The rewrite is idempotent at value level, so git sees no diff and the
+    # second execute still runs against a clean tree.
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
     second = execute_upgrade(tmp_path, [action], force=False)
     assert any("already at registry order" in r for r in second), second
+
+
+# ---------------------------------------------------------------------------
+# §B.2 cases 12 + 13: interleaved-unmanaged with all managed hooks already in
+# correct registry relative order. These tests exercise the planner-apply
+# parity guarantee introduced in `-015`: the planner must emit a merge action
+# whenever apply would change the file, including the case where the only
+# difference is an unmanaged entry interleaved inside the managed block.
+# ---------------------------------------------------------------------------
+
+
+def _build_event_entry(filename: str) -> dict[str, object]:
+    """Render a single hooks-event entry for the given hook filename."""
+    return {"hooks": [{"type": "command", "command": f"python .claude/hooks/{filename}"}]}
+
+
+def _write_settings_with_full_registry(target: Path) -> None:
+    """Write .claude/settings.json with every event populated in registry order.
+
+    All four upgrade-enforced events (PreToolUse, UserPromptSubmit, PostToolUse,
+    SessionStart) get the exact registry-ordered managed block. This baseline
+    yields zero merge-event-hooks actions on plan_upgrade so that mutations
+    introduced by individual tests can be attributed to the targeted event.
+    """
+    import json
+
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
+
+    by_event: dict[str, list[str]] = {}
+    for art in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration"):
+        # mypy can't narrow without isinstance; the registry returns the union type.
+        event = getattr(art, "event", None)
+        filename = getattr(art, "hook_filename", None)
+        if isinstance(event, str) and isinstance(filename, str):
+            by_event.setdefault(event, []).append(filename)
+
+    hooks = {event: [_build_event_entry(fn) for fn in files] for event, files in by_event.items()}
+    settings_dir = target / ".claude"
+    settings_dir.mkdir(parents=True, exist_ok=True)
+    (settings_dir / "settings.json").write_text(json.dumps({"hooks": hooks}, indent=2) + "\n", encoding="utf-8")
+
+
+def _materialize_managed_hook_files(target: Path) -> None:
+    """Copy managed hook templates to .claude/hooks/ so plan_upgrade does not
+    emit add-actions for missing files (which would muddy assertion counts on
+    the merge-event-hooks tests)."""
+    from groundtruth_kb import get_templates_dir
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
+
+    hooks_dir = target / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    templates = get_templates_dir()
+    for art in artifacts_for_scaffold("dual-agent", class_="hook"):
+        template_path = getattr(art, "template_path", None)
+        target_path = getattr(art, "target_path", None)
+        if not isinstance(template_path, str) or not isinstance(target_path, str):
+            continue
+        src = templates / template_path
+        dest = target / target_path
+        if src.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def _interleaved_userpromptsubmit_baseline(target: Path) -> None:
+    """Mutate settings.json to interleave one adopter-owned entry inside the
+    UserPromptSubmit managed block, leaving every managed hook in correct
+    registry relative order."""
+    import json
+
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
+
+    settings_path = target / ".claude" / "settings.json"
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    registry_order = [
+        getattr(art, "hook_filename", None)
+        for art in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
+        if getattr(art, "event", None) == "UserPromptSubmit"
+    ]
+    managed_filenames = [fn for fn in registry_order if isinstance(fn, str)]
+    assert len(managed_filenames) >= 2, (
+        f"UserPromptSubmit registry must have >=2 hooks for interleave test; got {managed_filenames}"
+    )
+    # Build managed block in registry order, then inject one custom entry
+    # between index 0 and index 1 (still inside the managed block).
+    entries: list[object] = [_build_event_entry(managed_filenames[0])]
+    entries.append(_build_event_entry("custom-ups.py"))
+    entries.extend(_build_event_entry(fn) for fn in managed_filenames[1:])
+    data["hooks"]["UserPromptSubmit"] = entries
+    settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _interleaved_posttooluse_baseline(target: Path) -> None:
+    """Mutate settings.json to interleave one adopter-owned entry inside the
+    PostToolUse managed block."""
+    import json
+
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
+
+    settings_path = target / ".claude" / "settings.json"
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    registry_order = [
+        getattr(art, "hook_filename", None)
+        for art in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
+        if getattr(art, "event", None) == "PostToolUse"
+    ]
+    managed_filenames = [fn for fn in registry_order if isinstance(fn, str)]
+    assert len(managed_filenames) >= 2, (
+        f"PostToolUse registry must have >=2 hooks for interleave test; got {managed_filenames}"
+    )
+    entries: list[object] = [_build_event_entry(managed_filenames[0])]
+    entries.append(_build_event_entry("custom-post.py"))
+    entries.extend(_build_event_entry(fn) for fn in managed_filenames[1:])
+    data["hooks"]["PostToolUse"] = entries
+    settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def test_plan_apply_userpromptsubmit_interleaved_unmanaged(tmp_path: Path) -> None:
+    """§B.2 case 12: existing UserPromptSubmit has all managed hooks in correct
+    registry relative order plus one adopter-owned entry interleaved inside
+    the managed block. Planner must emit exactly one UserPromptSubmit merge
+    action; apply must rebuild as managed-block + unmanaged-block; second plan
+    must emit zero UserPromptSubmit merge actions."""
+    import json
+
+    from groundtruth_kb import __version__
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
+
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    _write_settings_with_full_registry(tmp_path)
+    _materialize_managed_hook_files(tmp_path)
+    (tmp_path / ".gitignore").write_text(".claude/hooks/*.log\n", encoding="utf-8")
+    _interleaved_userpromptsubmit_baseline(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
+
+    actions = plan_upgrade(tmp_path)
+    ups_actions = [a for a in actions if a.action == "merge-event-hooks" and a.event == "UserPromptSubmit"]
+    assert len(ups_actions) == 1, (
+        f"interleaved UserPromptSubmit must produce exactly one merge action; got {ups_actions}"
+    )
+
+    results = execute_upgrade(tmp_path, ups_actions, force=False)
+    registry_filenames = [
+        getattr(art, "hook_filename", None)
+        for art in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
+        if getattr(art, "event", None) == "UserPromptSubmit"
+    ]
+    n_managed = len([fn for fn in registry_filenames if isinstance(fn, str)])
+    assert any(
+        "MERGED" in r and f"UserPromptSubmit rebuilt ({n_managed} managed, 1 preserved)" in r for r in results
+    ), results
+
+    data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    commands = [h["command"] for entry in data["hooks"]["UserPromptSubmit"] for h in entry["hooks"]]
+    expected_managed = [f"python .claude/hooks/{fn}" for fn in registry_filenames if isinstance(fn, str)]
+    assert commands[: len(expected_managed)] == expected_managed, (
+        f"managed block must be registry-ordered; got {commands}"
+    )
+    assert commands[-1] == "python .claude/hooks/custom-ups.py", (
+        f"unmanaged entry must follow managed block; got {commands}"
+    )
+
+    # Idempotence: a second plan must emit zero UserPromptSubmit merge actions.
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    second_plan = plan_upgrade(tmp_path)
+    second_ups = [a for a in second_plan if a.action == "merge-event-hooks" and a.event == "UserPromptSubmit"]
+    assert second_ups == [], f"second plan must emit zero UserPromptSubmit merge actions; got {second_ups}"
+
+
+def test_plan_apply_posttooluse_interleaved_unmanaged(tmp_path: Path) -> None:
+    """§B.2 case 13: same shape as case 12 but for PostToolUse — proves the
+    planner/apply pair is event-agnostic and the parity guarantee holds for
+    every event registered in `upgrade_enforced_by_event`."""
+    import json
+
+    from groundtruth_kb import __version__
+    from groundtruth_kb.project.managed_registry import artifacts_for_scaffold
+
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    _write_settings_with_full_registry(tmp_path)
+    _materialize_managed_hook_files(tmp_path)
+    (tmp_path / ".gitignore").write_text(".claude/hooks/*.log\n", encoding="utf-8")
+    _interleaved_posttooluse_baseline(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
+
+    actions = plan_upgrade(tmp_path)
+    pto_actions = [a for a in actions if a.action == "merge-event-hooks" and a.event == "PostToolUse"]
+    assert len(pto_actions) == 1, f"interleaved PostToolUse must produce exactly one merge action; got {pto_actions}"
+
+    results = execute_upgrade(tmp_path, pto_actions, force=False)
+    registry_filenames = [
+        getattr(art, "hook_filename", None)
+        for art in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
+        if getattr(art, "event", None) == "PostToolUse"
+    ]
+    n_managed = len([fn for fn in registry_filenames if isinstance(fn, str)])
+    assert any("MERGED" in r and f"PostToolUse rebuilt ({n_managed} managed, 1 preserved)" in r for r in results), (
+        results
+    )
+
+    data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    commands = [h["command"] for entry in data["hooks"]["PostToolUse"] for h in entry["hooks"]]
+    expected_managed = [f"python .claude/hooks/{fn}" for fn in registry_filenames if isinstance(fn, str)]
+    assert commands[: len(expected_managed)] == expected_managed, (
+        f"managed block must be registry-ordered; got {commands}"
+    )
+    assert commands[-1] == "python .claude/hooks/custom-post.py", (
+        f"unmanaged entry must follow managed block; got {commands}"
+    )
+
+    # Idempotence: a second plan must emit zero PostToolUse merge actions.
+    _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
+    second_plan = plan_upgrade(tmp_path)
+    second_pto = [a for a in second_plan if a.action == "merge-event-hooks" and a.event == "PostToolUse"]
+    assert second_pto == [], f"second plan must emit zero PostToolUse merge actions; got {second_pto}"
 
 
 def test_execute_append_gitignore_preserves_existing_content(tmp_path: Path) -> None:
@@ -409,6 +672,7 @@ def test_execute_append_gitignore_preserves_existing_content(tmp_path: Path) -> 
         reason="Append pattern: .claude/hooks/*.log (Operational hook logs)",
         payload=".claude/hooks/*.log",
     )
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=False)
     assert any("APPENDED .claude/hooks/*.log" in r for r in results), results
     content = (tmp_path / ".gitignore").read_text(encoding="utf-8")
@@ -430,6 +694,7 @@ def test_execute_append_gitignore_is_idempotent(tmp_path: Path) -> None:
         payload=".claude/hooks/*.log",
     )
     before = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=False)
     after = (tmp_path / ".gitignore").read_text(encoding="utf-8")
     assert any("already present" in r for r in results), results
@@ -518,6 +783,7 @@ def test_upgrade_creates_gitignore_if_missing(tmp_path: Path) -> None:
         reason="Append pattern: .claude/hooks/*.log (Operational hook logs)",
         payload=".claude/hooks/*.log",
     )
+    _setup_git_for_upgrade(tmp_path)
     results = execute_upgrade(tmp_path, [action], force=False)
     assert any("APPENDED .claude/hooks/*.log" in r for r in results), results
     assert gi.exists(), "execute_upgrade must create .gitignore"
