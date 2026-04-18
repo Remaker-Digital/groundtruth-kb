@@ -53,33 +53,36 @@ def _registry_records() -> list[ManagedArtifact]:
 # ---------------------------------------------------------------------------
 
 
-def test_registry_total_is_forty_two_records() -> None:
-    """42 total = 14 hooks + 10 rules + 6 skills + 11 settings + 1 gitignore.
+def test_registry_total_is_fifty_one_records() -> None:
+    """51 total = 19 hooks + 10 rules + 6 skills + 15 settings + 1 gitignore.
 
-    Post-canonical-terminology-surface: rule count rose from 8 to 10 with the
-    addition of ``rule.canonical-terminology`` and
-    ``rule.canonical-terminology-config`` (see
-    ``bridge/gtkb-canonical-terminology-surface-implementation-007.md`` Option B).
+    Post-governance-completeness (v0.6.x): hook count rose from 14 to 19 with
+    the addition of 5 new governance hooks (_delib_common, turn-marker,
+    delib-preflight-gate, owner-decision-capture, gov09-capture) per
+    gtkb-da-governance-completeness-implementation-016. Settings count rose
+    from 11 to 15 with 4 new settings-hook-registrations for the new event
+    hooks (turn-marker + delib-preflight-gate + gov09-capture on
+    UserPromptSubmit, owner-decision-capture on PostToolUse).
 
     ``ownership-glob`` rows from ``templates/scaffold-ownership.toml`` are
     excluded via ``_registry_records()`` helper — this test scope is
     registry-only.
     """
     records = _registry_records()
-    assert len(records) == 42, f"expected 42 total registry records; got {len(records)}"
+    assert len(records) == 51, f"expected 51 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
-    """Class counts match the approved proposal (post-canonical-terminology)."""
+    """Class counts match the approved proposal (post-governance-completeness)."""
     records = _registry_records()
     counts: dict[str, int] = {}
     for r in records:
         counts[r.class_] = counts.get(r.class_, 0) + 1
     assert counts == {
-        "hook": 14,
+        "hook": 19,
         "rule": 10,
         "skill": 6,
-        "settings-hook-registration": 11,
+        "settings-hook-registration": 15,
         "gitignore-pattern": 1,
     }
 
@@ -223,19 +226,20 @@ def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
 
 
 def test_scaffold_dual_agent_copies_everything() -> None:
-    """dual-agent scaffold copies 14 hooks + 10 rules + 6 skills + 11 settings + 1 gitignore.
+    """dual-agent scaffold copies 19 hooks + 10 rules + 6 skills + 15 settings + 1 gitignore.
 
-    Rule count rose from 8 to 10 post-canonical-terminology-surface.
+    Post-governance-completeness: hook count 14→19 (5 new governance hooks),
+    settings-hook-registration count 11→15 (4 new event registrations).
     """
     scaffolded = artifacts_for_scaffold("dual-agent")
     by_class: dict[str, int] = {}
     for r in scaffolded:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
-        "hook": 14,
+        "hook": 19,
         "rule": 10,
         "skill": 6,
-        "settings-hook-registration": 11,
+        "settings-hook-registration": 15,
         "gitignore-pattern": 1,
     }
 
@@ -313,7 +317,13 @@ def test_doctor_hooks_local_only_matches_prior_hardcoded() -> None:
 
 
 def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
-    """For bridge profiles, doctor requires the 4-hook set (includes destructive-gate, credential-scan)."""
+    """For bridge profiles, doctor requires the 4 pre-governance hooks +
+    5 governance-completeness hooks (9 total).
+
+    Post-governance-completeness (gtkb-da-governance-completeness-implementation-015 §A):
+    all 5 new governance hooks carry ``doctor_required_profiles = ["dual-agent",
+    "dual-agent-webapp"]``, matching their managed status.
+    """
     for profile in ("dual-agent", "dual-agent-webapp"):
         hook_names = {
             r.target_path.split("/")[-1]
@@ -325,6 +335,11 @@ def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
             "spec-classifier.py",
             "destructive-gate.py",
             "credential-scan.py",
+            "_delib_common.py",
+            "turn-marker.py",
+            "delib-preflight-gate.py",
+            "owner-decision-capture.py",
+            "gov09-capture.py",
         }, f"doctor hook set mismatch for {profile!r}: {hook_names}"
 
 
@@ -354,11 +369,16 @@ def test_doctor_rules_local_only_is_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_settings_parity_exact_eleven_row_matrix() -> None:
-    """Registry produces the exact 11-row event-to-hook matrix enforced by scaffold."""
+def test_settings_parity_exact_fifteen_row_matrix() -> None:
+    """Registry produces the exact 15-row event-to-hook matrix enforced by scaffold.
+
+    Post-governance-completeness: 15 = 11 original + 4 governance hook
+    registrations (turn-marker, delib-preflight-gate, gov09-capture on
+    UserPromptSubmit + owner-decision-capture on PostToolUse).
+    """
     registrations = artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
-    assert len(registrations) == 11, (
-        f"expected 11 settings-hook-registration records for dual-agent; got {len(registrations)}"
+    assert len(registrations) == 15, (
+        f"expected 15 settings-hook-registration records for dual-agent; got {len(registrations)}"
     )
     # Collect per-event sorted hook filenames
     by_event: dict[str, list[str]] = {}
@@ -370,8 +390,16 @@ def test_settings_parity_exact_eleven_row_matrix() -> None:
 
     expected = {
         "SessionStart": sorted(["session-start-governance.py", "assertion-check.py"]),
-        "UserPromptSubmit": sorted(["delib-search-gate.py", "intake-classifier.py"]),
-        "PostToolUse": sorted(["delib-search-tracker.py"]),
+        "UserPromptSubmit": sorted(
+            [
+                "delib-search-gate.py",
+                "intake-classifier.py",
+                "turn-marker.py",
+                "delib-preflight-gate.py",
+                "gov09-capture.py",
+            ]
+        ),
+        "PostToolUse": sorted(["delib-search-tracker.py", "owner-decision-capture.py"]),
         "PreToolUse": sorted(
             [
                 "spec-before-code.py",
@@ -386,14 +414,24 @@ def test_settings_parity_exact_eleven_row_matrix() -> None:
     assert by_event == expected
 
 
-def test_settings_scanner_safe_writer_is_only_managed_pretooluse() -> None:
-    """Only scanner-safe-writer PreToolUse registration is upgrade-managed at C1."""
+def test_settings_upgrade_managed_set_post_governance_completeness() -> None:
+    """Upgrade-managed settings registrations: scanner-safe-writer + 4 governance.
+
+    Post-governance-completeness (gtkb-da-governance-completeness-implementation-015 §A):
+    the 4 new governance hook registrations are the first rows to opt in to
+    BOTH upgrade enforcement AND doctor enforcement. scanner-safe-writer
+    remains the only upgrade-managed PreToolUse registration.
+    """
     managed = artifacts_for_upgrade("dual-agent", class_="settings-hook-registration")
-    assert len(managed) == 1
-    only = managed[0]
-    assert isinstance(only, SettingsHookRegistration)
-    assert only.hook_filename == "scanner-safe-writer.py"
-    assert only.event == "PreToolUse"
+    assert len(managed) == 5, f"expected 5 upgrade-managed settings-hook-registrations; got {len(managed)}"
+    by_filename = {r.hook_filename: r.event for r in managed if isinstance(r, SettingsHookRegistration)}
+    assert by_filename == {
+        "scanner-safe-writer.py": "PreToolUse",
+        "turn-marker.py": "UserPromptSubmit",
+        "delib-preflight-gate.py": "UserPromptSubmit",
+        "gov09-capture.py": "UserPromptSubmit",
+        "owner-decision-capture.py": "PostToolUse",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -447,13 +485,16 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent should see all 42 records (ALL hooks in initial, 10 rules, 6 skills,
-    # 11 settings, 1 gitignore — all touch dual-agent in at least one axis).
-    assert len(dual_agent) == 42
+    # dual-agent sees all 51 records post-governance-completeness:
+    # 19 hooks (14 original + 5 new governance) + 10 rules + 6 skills +
+    # 15 settings (11 original + 4 new governance registrations) + 1 gitignore.
+    assert len(dual_agent) == 51
 
     local_only = load_managed_artifacts("local-only")
-    # local-only sees all 14 hooks (initial=ALL) + rule.prime-builder +
-    # the 2 canonical-terminology rules = 17 records.
+    # local-only sees all 14 ORIGINAL hooks (initial=ALL for those) +
+    # rule.prime-builder + the 2 canonical-terminology rules = 17 records.
+    # The 5 new governance hooks are dual-agent-only, so local-only count
+    # is unchanged from pre-governance-completeness.
     assert len(local_only) == 17
 
 

@@ -2,7 +2,7 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 42 records = 14 hooks + 10 rules + 6 skills + 11 settings-hook-registrations + 1 gitignore-pattern.
+# 51 records = 19 hooks + 10 rules + 6 skills + 15 settings-hook-registrations + 1 gitignore-pattern.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -20,7 +20,8 @@
 #   none    = []
 
 # =========================================================================
-# HOOKS (14 records)
+# HOOKS (19 records — 14 original + 5 governance hooks per
+# gtkb-da-governance-completeness-implementation-016)
 # =========================================================================
 
 [[artifacts]]
@@ -187,6 +188,71 @@ target_path = ".claude/hooks/spec-before-code.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+
+# Governance hooks (5 records — per gtkb-da-governance-completeness-implementation-015
+# §5.5-§5.9). Dual-agent-only. _delib_common is a shared helper module (no
+# settings-hook-registration). The other four are event hooks with matching
+# settings-hook-registration entries below.
+
+[[artifacts]]
+class = "hook"
+id = "hook._delib_common"
+template_path = "hooks/_delib_common.py"
+target_path = ".claude/hooks/_delib_common.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "hook"
+id = "hook.turn-marker"
+template_path = "hooks/turn-marker.py"
+target_path = ".claude/hooks/turn-marker.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "hook"
+id = "hook.delib-preflight-gate"
+template_path = "hooks/delib-preflight-gate.py"
+target_path = ".claude/hooks/delib-preflight-gate.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "hook"
+id = "hook.owner-decision-capture"
+template_path = "hooks/owner-decision-capture.py"
+target_path = ".claude/hooks/owner-decision-capture.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "hook"
+id = "hook.gov09-capture"
+template_path = "hooks/gov09-capture.py"
+target_path = ".claude/hooks/gov09-capture.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
@@ -396,7 +462,8 @@ upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 
 # =========================================================================
-# SETTINGS-HOOK-REGISTRATION (11 records)
+# SETTINGS-HOOK-REGISTRATION (15 records — 11 original + 4 governance hook
+# registrations per gtkb-da-governance-completeness-implementation-016)
 # =========================================================================
 
 [[artifacts]]
@@ -538,6 +605,63 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+# Governance hook settings registrations (4 records — per
+# gtkb-da-governance-completeness-implementation-015 §A). First rows to opt
+# in to BOTH upgrade enforcement AND doctor enforcement. Registry order
+# below is the authoritative target order for the structured-merge.
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.turn-marker.userpromptsubmit"
+event = "UserPromptSubmit"
+hook_filename = "turn-marker.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.delib-preflight-gate.userpromptsubmit"
+event = "UserPromptSubmit"
+hook_filename = "delib-preflight-gate.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.gov09-capture.userpromptsubmit"
+event = "UserPromptSubmit"
+hook_filename = "gov09-capture.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "settings-hook-registration"
+id = "settings.hook.owner-decision-capture.posttooluse"
+event = "PostToolUse"
+hook_filename = "owner-decision-capture.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"

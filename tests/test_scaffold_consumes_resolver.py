@@ -50,13 +50,14 @@ def test_scaffold_local_only_id_set_matches_baseline() -> None:
 
 
 def test_scaffold_dual_agent_id_set_matches_baseline() -> None:
-    """dual-agent scaffold returns the full 42-record registry set.
+    """dual-agent scaffold returns the full 51-record registry set.
 
-    Post-canonical-terminology (v0.6.1): 40 pre-existing rows + 2 new
-    canonical-terminology rule rows = 42.
+    Post-governance-completeness: 42 v0.6.1 rows + 9 new governance records
+    (5 hook-class + 4 settings-hook-registration) = 51. See
+    gtkb-da-governance-completeness-implementation-016.
     """
     ids = sorted(a.id for a in artifacts_for_scaffold("dual-agent"))
-    assert len(ids) == 42
+    assert len(ids) == 51
     # None are ownership-glob.
     for a in artifacts_for_scaffold("dual-agent"):
         assert isinstance(a, (FileArtifact, SettingsHookRegistration, GitignorePattern))
