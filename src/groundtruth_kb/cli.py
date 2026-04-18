@@ -773,6 +773,155 @@ def project_upgrade(
         click.echo(f"  {msg}")
 
 
+# ---------------------------------------------------------------------------
+# C3: gt project rollback — consume a receipt to revert an upgrade
+# ---------------------------------------------------------------------------
+
+
+@project.command("rollback")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help=(
+        "Plan the rollback without executing. Default behavior if neither "
+        "--dry-run nor --apply is supplied. Mutually exclusive with --apply."
+    ),
+)
+@click.option(
+    "--apply",
+    is_flag=True,
+    default=False,
+    help=(
+        "Execute the rollback: git revert -m 1 <merge_commit> --no-commit. "
+        "Leaves the revert staged for review. Mutually exclusive with --dry-run."
+    ),
+)
+@click.option(
+    "--commit",
+    is_flag=True,
+    default=False,
+    help=(
+        "When combined with --apply, commits the revert automatically with "
+        "message 'gt: rollback upgrade payload {receipt_id}'. Requires --apply."
+    ),
+)
+@click.option(
+    "--receipt-id",
+    default=None,
+    help=(
+        "Specific receipt ID to roll back. If omitted, the latest receipt "
+        "(by created_at desc, tie-break on receipt_id desc) is used."
+    ),
+)
+@click.option(
+    "--target-dir",
+    default=".",
+    help="Directory containing .claude/upgrade-receipts/ to consume. Defaults to current directory.",
+)
+@click.pass_context
+def project_rollback(
+    ctx: click.Context,
+    dry_run: bool,
+    apply: bool,
+    commit: bool,
+    receipt_id: str | None,
+    target_dir: str,
+) -> None:
+    """Roll back a previously-applied ``gt project upgrade --apply``.
+
+    Consumes a rollback receipt (written by ``gt project upgrade --apply``)
+    and runs ``git revert -m 1 <merge_commit>`` against the adopter's
+    working tree. By default leaves the revert staged for review; pass
+    ``--commit`` with ``--apply`` to auto-commit.
+
+    See docs/reference/cli.md and docs/reference/upgrade-receipts.md for
+    full workflow + receipt schema.
+    """
+    from pathlib import Path as _Path
+
+    from groundtruth_kb.project.rollback import (
+        DirtyWorkingTreeError,
+        MergeCommitNotInHistoryError,
+        NotAMergeCommitError,
+        ReceiptMalformedError,
+        ReceiptNotFoundError,
+        ReceiptSchemaVersionMismatchError,
+        RollbackFailedError,
+        execute_rollback,
+        plan_rollback,
+    )
+
+    # Flag validation (C3 -005 F4 required: explicit mutual exclusion).
+    if dry_run and apply:
+        raise click.UsageError("--dry-run and --apply are mutually exclusive. Pick one.")
+    if commit and not apply:
+        raise click.UsageError("--commit requires --apply.")
+    # Default to dry-run if neither flag supplied.
+    if not dry_run and not apply:
+        dry_run = True
+
+    root = _Path(target_dir).resolve()
+
+    try:
+        plan = plan_rollback(root, receipt_id=receipt_id)
+    except ReceiptNotFoundError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        ctx.exit(2)
+        return
+    except ReceiptSchemaVersionMismatchError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        ctx.exit(3)
+        return
+    except ReceiptMalformedError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        ctx.exit(3)
+        return
+    except NotAMergeCommitError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        ctx.exit(4)
+        return
+    except MergeCommitNotInHistoryError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        ctx.exit(5)
+        return
+
+    receipt = plan.receipt
+    click.echo(f"Rollback plan — receipt {receipt['receipt_id']} ({receipt['mode']} mode)")
+    click.echo(f"  target merge commit: {plan.merge_commit}")
+    click.echo(f"  target branch:       {receipt['target_branch']}")
+    click.echo(f"  from_version:        {receipt['from_version']}")
+    click.echo(f"  to_version:          {receipt['to_version']}")
+    click.echo(f"  created_at:          {receipt['created_at']}")
+    click.echo(f"  files to revert:     {len(plan.files_to_revert)}")
+    for entry in plan.files_to_revert:
+        click.echo(f"    [{entry.status}] {entry.path}")
+
+    if dry_run:
+        click.echo("")
+        click.echo("Dry run — no changes applied. Pass --apply to execute.")
+        return
+
+    # Apply path.
+    try:
+        result = execute_rollback(root, plan, commit=commit)
+    except DirtyWorkingTreeError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        ctx.exit(6)
+        return
+    except RollbackFailedError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        ctx.exit(7)
+        return
+
+    click.echo("")
+    click.echo(f"Rollback executed — mode={result.mode}")
+    if result.commit_sha is not None:
+        click.echo(f"  new commit: {result.commit_sha}")
+    else:
+        click.echo("  revert is staged; run `git commit` (or reset) to finalize.")
+
+
 @project.command("classify-tree")
 @click.option(
     "--dir",
