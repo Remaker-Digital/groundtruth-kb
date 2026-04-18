@@ -617,6 +617,123 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
     )
 
 
+def _derive_paired_hook_id(registration_id: str, event_lowercase: str) -> str:
+    """Derive the paired ``hook.<short>`` FileArtifact id from a registration id.
+
+    Registration ids follow the convention
+    ``settings.hook.<short>.<event-lowercase>``; the paired hook record is
+    ``hook.<short>``. Stripping the ``settings.`` prefix and the
+    ``.<event-lowercase>`` suffix yields the paired id.
+    """
+    stripped = registration_id.removeprefix("settings.")
+    suffix = "." + event_lowercase
+    if stripped.endswith(suffix):
+        stripped = stripped[: -len(suffix)]
+    return stripped
+
+
+def _is_command_registered_in_event(settings_path: Path, event: str, hook_filename: str) -> bool:
+    """Return ``True`` iff ``settings.json`` has an entry under
+    ``hooks[event]`` whose command references ``hook_filename``.
+
+    Defensive against malformed shapes (non-dict root, non-dict ``hooks``,
+    non-list event list, non-dict entries) — all treated as "not
+    registered" rather than crashing the doctor check.
+    """
+    if not settings_path.exists():
+        return False
+    try:
+        data: object = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    raw_hooks = data.get("hooks")
+    hooks_dict = raw_hooks if isinstance(raw_hooks, dict) else {}
+    raw_event_list = hooks_dict.get(event)
+    event_list = raw_event_list if isinstance(raw_event_list, list) else []
+    for entry in event_list:
+        if not isinstance(entry, dict):
+            continue
+        entry_hooks = entry.get("hooks", [])
+        if not isinstance(entry_hooks, list):
+            continue
+        for h in entry_hooks:
+            if not isinstance(h, dict):
+                continue
+            cmd = h.get("command", "")
+            if isinstance(cmd, str) and hook_filename in cmd:
+                return True
+    return False
+
+
+def _check_settings_hook_registration_drift(
+    target: Path, profile_name: str, registration: SettingsHookRegistration
+) -> ToolCheck:
+    """Check drift for a single settings-hook-registration record.
+
+    Generalization of the scanner-safe-writer composite check pattern to any
+    ``SettingsHookRegistration`` returned from
+    ``artifacts_for_doctor(profile, class_="settings-hook-registration")``.
+    Reports:
+
+    - ``pass`` (``required=False``): non-bridge profile.
+    - ``fail``: paired hook file (``hook.<short>`` FileArtifact) missing.
+    - ``warning``: hook file present but
+      ``.claude/settings.json`` registration for ``registration.event`` is
+      missing.
+    - ``pass``: hook file present and registered under the expected event.
+    """
+    check_name = f"settings:{registration.id}"
+    profile = get_profile(profile_name)
+    if not profile.includes_bridge:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="not applicable to base profile",
+        )
+
+    paired_id = _derive_paired_hook_id(registration.id, registration.event.lower())
+    hook_record = find_artifact_by_id(paired_id)
+    assert isinstance(hook_record, FileArtifact)
+
+    hook_file = target / hook_record.target_path
+    if not hook_file.exists():
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"{hook_record.target_path.split('/')[-1]} missing — run `gt project upgrade --apply`",
+        )
+
+    if _is_command_registered_in_event(
+        target / registration.target_settings_path,
+        registration.event,
+        registration.hook_filename,
+    ):
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="pass",
+            message=f"{registration.hook_filename} registered in {registration.event}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status="warning",
+        message=(
+            f"{registration.hook_filename} present but {registration.event} "
+            f"registration missing in settings.json. Run `gt project upgrade --apply`."
+        ),
+    )
+
+
 def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
     """Check that the ``decision-capture`` skill files are present.
 
@@ -1338,6 +1455,9 @@ def run_doctor(
         checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_spec_intake_skill_present(target, profile))
+        for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
+            if isinstance(registration, SettingsHookRegistration):
+                checks.append(_check_settings_hook_registration_drift(target, profile, registration))
         checks.append(_check_bridge_poller(target, "claude"))
         checks.append(_check_bridge_poller(target, "codex"))
         checks.append(_check_da_harvest_coverage(target))
