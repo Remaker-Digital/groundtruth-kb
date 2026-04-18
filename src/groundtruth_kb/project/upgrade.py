@@ -59,13 +59,36 @@ class UpgradeAction:
     back-compat with any call site or test that constructs an
     ``UpgradeAction`` without explicitly naming the field; canonical
     planner emissions always set it explicitly.
+
+    ``warning`` and ``informational`` are **non-mutating pre-flight rows**
+    produced by :mod:`groundtruth_kb.project.preflight` (bridge C2). The
+    CLI filters them out of the list passed to :func:`execute_upgrade` so
+    git/manifest work never runs on a warning-only plan, regardless of
+    ``--force``. Per bridge ``gtkb-upgrade-pre-flight-checks-implementation-002.md``
+    condition C1.
     """
 
     file: str
-    action: Literal["update", "add", "skip", "merge-event-hooks", "append-gitignore"]
+    action: Literal[
+        "update",
+        "add",
+        "skip",
+        "merge-event-hooks",
+        "append-gitignore",
+        "warning",
+        "informational",
+    ]
     reason: str
     payload: str = ""
     event: str = "PreToolUse"
+
+
+# Action kinds that represent non-mutating pre-flight diagnostics. The CLI
+# filters these out of the action list passed to :func:`execute_upgrade` so
+# pre-flight reporting never triggers git, manifest, or file mutation —
+# even with ``--force``. Per C1 of
+# ``bridge/gtkb-upgrade-pre-flight-checks-implementation-002.md``.
+_NON_MUTATING_ACTION_KINDS: frozenset[str] = frozenset({"warning", "informational"})
 
 
 def _file_hash(path: Path) -> str:
@@ -405,6 +428,43 @@ def _plan_gitignore_patterns(target: Path, profile_name: str) -> list[UpgradeAct
 # Authorizing bridge: ``bridge/gtkb-rollback-receipts-014.md`` (Codex GO).
 
 
+class MalformedSettingsError(RuntimeError):
+    """Raised when ``execute_upgrade`` sees a malformed-settings skip in the action list.
+
+    ``plan_upgrade`` still emits a ``skip`` action with reason starting
+    ``"Malformed JSON"`` so ``--dry-run`` surfaces the problem; ``--apply``
+    must refuse before any git checkout or file write. The adopter repairs
+    ``.claude/settings.json`` manually and re-runs.
+
+    Per bridge ``gtkb-upgrade-pre-flight-checks-implementation-002.md`` C2.
+    """
+
+    def __init__(self, action: UpgradeAction) -> None:
+        super().__init__(
+            f"Cannot upgrade: {action.file} has malformed JSON. "
+            f"Repair manually and re-run. Planner reason: {action.reason}"
+        )
+        self.action = action
+
+
+def _has_malformed_settings_skip(actions: list[UpgradeAction]) -> UpgradeAction | None:
+    """Return the first malformed-settings ``skip`` action in *actions*, or ``None``.
+
+    Used by :func:`execute_upgrade` to halt before any git or file work
+    when the planner signaled that ``.claude/settings.json`` is malformed,
+    and by the CLI for the same halt at the process boundary (defense in
+    depth).
+    """
+    for action in actions:
+        if (
+            action.action == "skip"
+            and action.file == ".claude/settings.json"
+            and action.reason.startswith("Malformed JSON")
+        ):
+            return action
+    return None
+
+
 class NotAGitRepositoryError(RuntimeError):
     """Raised when ``execute_upgrade`` is invoked outside a git work tree.
 
@@ -574,14 +634,27 @@ def _artifact_classes_touched(actions: list[UpgradeAction]) -> list[str]:
     return sorted(seen)
 
 
-def plan_upgrade(target: Path) -> list[UpgradeAction]:
-    """Plan the upgrade: managed-file updates + config drift repairs.
+def plan_upgrade(target: Path, *, ignore_inflight_bridges: bool = False) -> list[UpgradeAction]:
+    """Plan the upgrade: pre-flight diagnostics + managed-file updates + config drift repairs.
 
     Always runs settings and gitignore drift checks so that config drift is
     repaired even when the scaffold version is already current. Managed
     hook/rule/skill file updates remain gated on
     ``scaffold_version != __version__`` to avoid unnecessary re-copy of
     unchanged files.
+
+    Pre-flight diagnostics (bridge
+    ``gtkb-upgrade-pre-flight-checks-implementation-002.md``) run before
+    the drift checks and emit non-mutating ``warning`` / ``informational``
+    actions. The CLI filters those out of the list passed to
+    :func:`execute_upgrade` so pre-flight reporting never triggers git or
+    file writes.
+
+    Args:
+        target: Adopter project root.
+        ignore_inflight_bridges: When True, suppresses the 5.2 bridge
+            in-flight warnings. Used by automation / CI that can't be
+            paused by active bridge review.
     """
     manifest = read_manifest(target / "groundtruth.toml")
     if manifest is None:
@@ -595,6 +668,19 @@ def plan_upgrade(target: Path) -> list[UpgradeAction]:
 
     profile = get_profile(manifest.profile)
     actions: list[UpgradeAction] = []
+
+    # Pre-flight checks (Area 5.2 + 5.6) — emit non-mutating diagnostic
+    # rows that the CLI displays but never passes to ``execute_upgrade``.
+    # 5.3 halt (malformed settings) is inherited from the existing
+    # ``_plan_settings_registration`` skip-action emission below + the
+    # ``execute_upgrade`` pre-pre-flight scan for ``MalformedSettingsError``.
+    from groundtruth_kb.project.preflight import (
+        _check_bridge_inflight,
+        _check_scaffold_coverage,
+    )
+
+    actions.extend(_check_bridge_inflight(target, ignore=ignore_inflight_bridges))
+    actions.extend(_check_scaffold_coverage(target, profile.name))
 
     # Drift checks run unconditionally (even at current scaffold version)
     # so that missing managed files, missing PreToolUse registrations,
@@ -640,10 +726,20 @@ def execute_upgrade(
        ``git revert -m 1 <merge_commit>`` rolls back only the payload.
 
     Raises:
+        MalformedSettingsError: the plan contains a malformed-settings skip
+            action (``.claude/settings.json`` is not valid JSON); refused
+            before any git or file work runs.
         NotAGitRepositoryError: ``target`` is not inside a git work tree.
         DirtyWorkingTreeError: uncommitted changes present before upgrade.
         MergeFailedError: ``git merge --no-ff`` of the payload failed.
     """
+    # Pre-pre-flight: malformed-settings halt (C2). Must run BEFORE any git
+    # precondition or branch creation so ``--apply`` refuses cleanly and the
+    # adopter repairs settings.json without mixed state.
+    malformed = _has_malformed_settings_skip(actions)
+    if malformed is not None:
+        raise MalformedSettingsError(malformed)
+
     _require_git_repo(target)
     _require_clean_tree(target)
 
@@ -726,6 +822,17 @@ def _apply_file_actions(
     results: list[str] = []
 
     for action in actions:
+        # Non-mutating pre-flight rows are safe to re-emit as display text
+        # regardless of ``--force``. Per C1 of the pre-flight-checks
+        # implementation bridge, these must never map to a template, stage
+        # a file, or run a git operation. The CLI filters these out before
+        # ``execute_upgrade`` is called; this branch is defense in depth
+        # for programmatic callers.
+        if action.action in _NON_MUTATING_ACTION_KINDS:
+            prefix = "WARNING" if action.action == "warning" else "INFORMATIONAL"
+            results.append(f"{prefix} {action.file} — {action.reason}")
+            continue
+
         if action.action == "merge-event-hooks":
             results.append(_execute_merge_event_hooks(target, action))
             continue
