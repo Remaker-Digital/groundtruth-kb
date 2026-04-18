@@ -13,7 +13,10 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
+import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -26,6 +29,11 @@ from groundtruth_kb.project.managed_registry import (
 )
 from groundtruth_kb.project.manifest import read_manifest, write_manifest
 from groundtruth_kb.project.profiles import get_profile
+from groundtruth_kb.project.rollback import (
+    ReceiptJSON,
+    resolve_receipt_mode,
+    write_receipt,
+)
 
 # Upgrade policies that produce no upgrade-time action at all. Rows whose
 # ``ownership.upgrade_policy`` is in this set are filtered out of the plan
@@ -382,6 +390,190 @@ def _plan_gitignore_patterns(target: Path, profile_name: str) -> list[UpgradeAct
     return actions
 
 
+# ---------------------------------------------------------------------------
+# Rollback-receipts integration (Phase 3 of bridge gtkb-rollback-receipts-014)
+# ---------------------------------------------------------------------------
+#
+# ``execute_upgrade`` runs the adopter's planned actions inside a short-lived
+# payload branch that merges back into the target branch with ``--no-ff``.
+# The resulting merge commit is what a future ``gt project rollback`` can
+# target with ``git revert -m 1 <merge_commit>``. The rollback receipt is
+# written AFTER the merge commit exists so its ``merge_commit`` field records
+# the real SHA, and — in tracked mode — the receipt lands in a SEPARATE
+# post-merge commit that is not part of the payload merge tree.
+#
+# Authorizing bridge: ``bridge/gtkb-rollback-receipts-014.md`` (Codex GO).
+
+
+class NotAGitRepositoryError(RuntimeError):
+    """Raised when ``execute_upgrade`` is invoked outside a git work tree.
+
+    The payload-branch-and-merge flow requires git. Adopters who were
+    previously running ``gt project upgrade`` without a git repo must
+    initialize one and commit their current state before upgrading.
+    """
+
+    def __init__(self, target: Path) -> None:
+        super().__init__(
+            f"{target} is not inside a git work tree. "
+            "`gt project upgrade --apply` now requires git so it can record "
+            "a rollback receipt. Run `git init && git add -A && git commit -m 'pre-upgrade snapshot'` first."
+        )
+        self.target = target
+
+
+class DirtyWorkingTreeError(RuntimeError):
+    """Raised when the target has uncommitted changes at upgrade time.
+
+    A dirty tree would cause unrelated adopter work to be rolled into the
+    payload commit, which defeats the rollback contract. The adopter must
+    commit or stash first.
+    """
+
+    def __init__(self, target: Path, status: str) -> None:
+        super().__init__(
+            f"Working tree at {target} has uncommitted changes; commit or stash "
+            f"before running `gt project upgrade --apply`.\ngit status --porcelain:\n{status}"
+        )
+        self.target = target
+        self.status = status
+
+
+class MergeFailedError(RuntimeError):
+    """Raised when ``git merge --no-ff`` of the payload branch fails.
+
+    Typical causes: conflicts between the payload and newer commits on the
+    target branch (rare at upgrade time since we required a clean tree),
+    or an environmental git failure. The caller is responsible for leaving
+    the repository in a usable state.
+    """
+
+    def __init__(self, stdout: str, stderr: str) -> None:
+        super().__init__(f"git merge --no-ff of upgrade payload failed.\nstdout:\n{stdout}\nstderr:\n{stderr}")
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+# Path prefix → managed artifact class. Used by ``_artifact_classes_touched``
+# to derive the ``artifact_classes_touched`` field of the rollback receipt
+# from the applied actions without re-reading the registry.
+_FILE_CLASS_PREFIXES: tuple[tuple[str, str], ...] = (
+    (".claude/hooks/", "hook"),
+    (".claude/rules/", "rule"),
+    (".claude/skills/", "skill"),
+)
+
+
+def _run_git(
+    target: Path,
+    *args: str,
+    check: bool = True,
+    capture: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    """Run ``git *args`` in ``target``. Text mode, optional capture."""
+    return subprocess.run(
+        ["git", *args],
+        cwd=str(target),
+        check=check,
+        capture_output=capture,
+        text=True,
+    )
+
+
+def _require_git_repo(target: Path) -> None:
+    """Raise :class:`NotAGitRepositoryError` unless ``target`` is a git work tree."""
+    result = _run_git(target, "rev-parse", "--is-inside-work-tree", check=False)
+    if result.returncode != 0 or result.stdout.strip() != "true":
+        raise NotAGitRepositoryError(target)
+
+
+def _require_clean_tree(target: Path) -> None:
+    """Raise :class:`DirtyWorkingTreeError` if ``target`` has uncommitted changes."""
+    result = _run_git(target, "status", "--porcelain")
+    if result.stdout.strip():
+        raise DirtyWorkingTreeError(target, result.stdout)
+
+
+def _current_branch(target: Path) -> str:
+    """Return the short name of ``HEAD``'s current branch (e.g. ``"main"``)."""
+    return _run_git(target, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+
+
+def _commit_payload(target: Path, message: str) -> str | None:
+    """Stage and commit everything on the current branch.
+
+    Returns the new commit SHA, or ``None`` if there was nothing to commit.
+    The latter signals a no-op upgrade (all actions were ``skip`` and the
+    manifest was already at ``__version__``), in which case the caller
+    should abort the merge and receipt flow cleanly.
+    """
+    _run_git(target, "add", "-A")
+    status = _run_git(target, "status", "--porcelain").stdout.strip()
+    if not status:
+        return None
+    _run_git(target, "commit", "-m", message)
+    return _run_git(target, "rev-parse", "HEAD").stdout.strip()
+
+
+def _merge_payload(
+    target: Path,
+    target_branch: str,
+    payload_branch: str,
+    message: str,
+) -> str:
+    """Switch to ``target_branch`` and ``git merge --no-ff`` the payload branch.
+
+    Returns the resulting merge commit SHA. Raises :class:`MergeFailedError`
+    if the merge itself fails (conflicts or git error); the caller's
+    ``finally`` block is responsible for payload-branch cleanup.
+    """
+    _run_git(target, "checkout", target_branch)
+    result = _run_git(
+        target,
+        "merge",
+        "--no-ff",
+        payload_branch,
+        "-m",
+        message,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise MergeFailedError(result.stdout, result.stderr)
+    return _run_git(target, "rev-parse", "HEAD").stdout.strip()
+
+
+def _cleanup_payload_branch(target: Path, payload_branch: str) -> None:
+    """Best-effort ``git branch -D <payload_branch>``.
+
+    Runs with ``check=False`` so cleanup failures do not mask the original
+    error in the caller's ``finally`` block. After a successful merge the
+    payload branch is reachable from the merge commit, so ``-D`` is safe.
+    """
+    _run_git(target, "branch", "-D", payload_branch, check=False)
+
+
+def _artifact_classes_touched(actions: list[UpgradeAction]) -> list[str]:
+    """Return the sorted set of artifact classes actually modified by *actions*.
+
+    Recorded in the rollback receipt as ``artifact_classes_touched`` so a
+    future rollback tool can report which subsystems the upgrade had
+    touched without re-parsing the payload commit. ``skip`` actions are
+    excluded (they don't mutate anything).
+    """
+    seen: set[str] = set()
+    for action in actions:
+        if action.action == "merge-event-hooks":
+            seen.add("settings-hook-registration")
+        elif action.action == "append-gitignore":
+            seen.add("gitignore-pattern")
+        elif action.action in ("update", "add"):
+            for prefix, class_ in _FILE_CLASS_PREFIXES:
+                if action.file.startswith(prefix):
+                    seen.add(class_)
+                    break
+    return sorted(seen)
+
+
 def plan_upgrade(target: Path) -> list[UpgradeAction]:
     """Plan the upgrade: managed-file updates + config drift repairs.
 
@@ -429,12 +621,111 @@ def execute_upgrade(
     *,
     force: bool = False,
 ) -> list[str]:
-    """Execute planned upgrade actions. Returns status messages."""
+    """Execute planned upgrade actions via a payload-branch-and-merge flow.
+
+    The flow (per ``bridge/gtkb-rollback-receipts-014.md`` GO):
+
+    1. Pre-flight: verify git work tree + clean tree; resolve receipt mode
+       from the adopter's current ``.gitignore`` state.
+    2. Create and switch to a short-lived ``gt-upgrade-payload-<id>`` branch.
+    3. Apply file actions on the payload branch (NO ``.bak`` backups — git
+       history is the audit trail).
+    4. Commit the payload. If nothing changed, abort cleanly without a
+       merge or receipt.
+    5. Switch back to the target branch and ``git merge --no-ff`` the
+       payload branch, producing a real merge commit.
+    6. Write the rollback receipt post-merge. In tracked mode the receipt
+       lands in a SEPARATE post-merge commit at HEAD; the merge commit is
+       at HEAD~1 and its tree does not contain the receipt, so
+       ``git revert -m 1 <merge_commit>`` rolls back only the payload.
+
+    Raises:
+        NotAGitRepositoryError: ``target`` is not inside a git work tree.
+        DirtyWorkingTreeError: uncommitted changes present before upgrade.
+        MergeFailedError: ``git merge --no-ff`` of the payload failed.
+    """
+    _require_git_repo(target)
+    _require_clean_tree(target)
+
+    manifest = read_manifest(target / "groundtruth.toml")
+    if manifest is None:
+        return ["SKIPPED — no groundtruth.toml manifest (run `gt project init` first)"]
+
+    from_version = manifest.scaffold_version
+    target_branch = _current_branch(target)
+
+    receipt_id = uuid.uuid4().hex[:16]
+    receipt_path = target / ".claude" / "upgrade-receipts" / "active" / f"{receipt_id}.json"
+
+    # Pre-flight: resolver reads the adopter's starting .gitignore state,
+    # before any upgrade write. ``gt project upgrade --apply`` never mutates
+    # .gitignore for receipt-tracking purposes (per -013 condition 3).
+    resolved = resolve_receipt_mode(target, receipt_path)
+
+    payload_branch = f"gt-upgrade-payload-{receipt_id}"
+    _run_git(target, "checkout", "-b", payload_branch)
+    on_payload_branch = True
+
+    try:
+        results = _apply_file_actions(target, actions, force=force)
+
+        payload_commit = _commit_payload(target, f"gt: upgrade payload to {__version__}")
+        if payload_commit is None:
+            results.append("SKIPPED — no changes to apply")
+            _run_git(target, "checkout", target_branch)
+            on_payload_branch = False
+            return results
+
+        _run_git(target, "checkout", target_branch)
+        on_payload_branch = False
+
+        merge_commit = _merge_payload(
+            target,
+            target_branch,
+            payload_branch,
+            f"gt: merge upgrade payload to {__version__}",
+        )
+        results.append(f"MERGED payload into {target_branch} @ {merge_commit[:10]}")
+
+        receipt: ReceiptJSON = {
+            "schema_version": "v1",
+            "receipt_id": receipt_id,
+            "merge_commit": merge_commit,
+            "target_branch": target_branch,
+            "from_version": from_version,
+            "to_version": __version__,
+            "mode": resolved.mode,
+            "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "artifact_classes_touched": _artifact_classes_touched(actions),
+        }
+        receipt_outcome = write_receipt(resolved, receipt)
+        if resolved.mode == "tracked":
+            results.append(f"RECEIPT tracked @ {receipt_outcome[:10]} ({resolved.receipt_path.name})")
+        else:
+            results.append(f"RECEIPT filesystem at {resolved.receipt_path}")
+        return results
+    finally:
+        if on_payload_branch:
+            _run_git(target, "checkout", target_branch, check=False)
+        _cleanup_payload_branch(target, payload_branch)
+
+
+def _apply_file_actions(
+    target: Path,
+    actions: list[UpgradeAction],
+    *,
+    force: bool = False,
+) -> list[str]:
+    """Apply every action in *actions* on the current branch.
+
+    Inner file-writing half of :func:`execute_upgrade`. Runs on the
+    short-lived payload branch only. No ``.bak`` backups are created — the
+    payload branch commit is the authoritative pre-merge snapshot.
+    """
     templates = get_templates_dir()
     results: list[str] = []
 
     for action in actions:
-        # Config actions dispatch first — they don't follow the template-copy path.
         if action.action == "merge-event-hooks":
             results.append(_execute_merge_event_hooks(target, action))
             continue
@@ -458,18 +749,10 @@ def execute_upgrade(
             results.append(f"SKIPPED {action.file} — template not found")
             continue
 
-        # Backup existing file
-        if project_path.exists():
-            backup = project_path.with_suffix(project_path.suffix + ".bak")
-            shutil.copy2(project_path, backup)
-            results.append(f"BACKUP  {action.file} → {backup.name}")
-
-        # Copy template
         project_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(template_path, project_path)
         results.append(f"UPDATED {action.file}")
 
-    # Update scaffold_version in manifest
     manifest = read_manifest(target / "groundtruth.toml")
     if manifest:
         manifest.scaffold_version = __version__

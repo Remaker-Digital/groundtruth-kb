@@ -16,6 +16,7 @@ actually copied by ``execute_upgrade``.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,30 @@ scaffold_version = "{version}"
 created_at = "2026-01-01T00:00:00Z"
 """,
         encoding="utf-8",
+    )
+
+
+def _setup_git_for_upgrade(target: Path) -> None:
+    """Initialize git + commit current tree so execute_upgrade preconditions pass.
+
+    Per bridge ``gtkb-rollback-receipts-014`` GO, execute_upgrade uses a
+    payload-branch-and-merge flow that anchors the rollback receipt on a
+    real merge commit. Tests must run inside a git work tree with clean
+    state so that precondition gates pass.
+    """
+    subprocess.run(["git", "init", "--initial-branch=main"], cwd=target, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=target, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=target, check=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=target, check=True)
+    # Disable Windows CRLF auto-conversion so byte-level file assertions
+    # don't trip on line endings that git would rewrite during checkouts.
+    subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=target, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=target, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "pre-upgrade snapshot", "--allow-empty"],
+        cwd=target,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -77,6 +102,7 @@ def test_execute_creates_missing_bridge_rule_at_same_version(tmp_path: Path, rul
     assert not rule_path.exists()
 
     actions = plan_upgrade(tmp_path)
+    _setup_git_for_upgrade(tmp_path)
     execute_upgrade(tmp_path, actions, force=False)
 
     assert rule_path.exists(), f"{rule_filename} should be copied by execute_upgrade at same version"
