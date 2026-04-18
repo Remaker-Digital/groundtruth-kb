@@ -1208,6 +1208,99 @@ def _try_auto_install(check: ToolCheck) -> ToolCheck:
     return check
 
 
+# ── DA harvest coverage ───────────────────────────────────────────────
+
+# Coverage thresholds (hard-coded per implementation GO condition in
+# bridge/gtkb-da-harvest-coverage-implementation-005.md).
+DA_HARVEST_COVERAGE_WARN_THRESHOLD = 95.0
+DA_HARVEST_COVERAGE_ERROR_THRESHOLD = 80.0
+
+
+def _check_da_harvest_coverage(target: Path) -> ToolCheck:
+    """Check DA bridge-thread coverage for active VERIFIED threads.
+
+    Uses the shared helper at ``groundtruth_kb.reporting.harvest_coverage``.
+    Status mapping:
+
+    - coverage_pct ``>=`` ``WARN_THRESHOLD`` (95.0)  → pass
+    - coverage_pct ``>=`` ``ERROR_THRESHOLD`` (80.0) → warning
+    - coverage_pct ``<``  ``ERROR_THRESHOLD``        → fail
+
+    Missing DB or missing INDEX is treated as a skipped (warning) check
+    rather than a hard fail — this keeps fresh scaffolds green until the
+    consumer project wires its bridge.
+    """
+    index_path = target / "bridge" / "INDEX.md"
+    db_path = target / "groundtruth.db"
+
+    if not index_path.exists() or not db_path.exists():
+        return ToolCheck(
+            name="DA harvest coverage",
+            required=False,
+            found=False,
+            status="warning",
+            message="DA harvest coverage: skipped (bridge/INDEX.md or groundtruth.db missing)",
+        )
+
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.reporting.harvest_coverage import (
+            compute_active_bridge_thread_coverage,
+        )
+
+        db = KnowledgeDB(str(db_path))
+        metrics = compute_active_bridge_thread_coverage(index_path, db)
+    except Exception as exc:  # intentional-catch: validation tool, error -> fail status
+        return ToolCheck(
+            name="DA harvest coverage",
+            required=False,
+            found=True,
+            status="fail",
+            message=f"DA harvest coverage: error computing metrics: {exc}",
+        )
+
+    pct = float(metrics["coverage_pct"])  # type: ignore[arg-type]
+    num = metrics["numerator_threads"]
+    denom = metrics["denominator_threads"]
+    uncovered_list = metrics["uncovered_thread_names"]
+    assert isinstance(uncovered_list, list)  # noqa: S101 - internal invariant
+    uncovered_preview = ", ".join(uncovered_list[:3])
+    if len(uncovered_list) > 3:
+        uncovered_preview += f", … (+{len(uncovered_list) - 3} more)"
+
+    if pct >= DA_HARVEST_COVERAGE_WARN_THRESHOLD:
+        return ToolCheck(
+            name="DA harvest coverage",
+            required=False,
+            found=True,
+            status="pass",
+            message=f"DA harvest coverage: {pct:.2f}% ({num}/{denom} active VERIFIED threads covered)",
+        )
+
+    if pct >= DA_HARVEST_COVERAGE_ERROR_THRESHOLD:
+        return ToolCheck(
+            name="DA harvest coverage",
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"DA harvest coverage: {pct:.2f}% ({num}/{denom}) below WARN threshold "
+                f"{DA_HARVEST_COVERAGE_WARN_THRESHOLD}% — uncovered: {uncovered_preview}"
+            ),
+        )
+
+    return ToolCheck(
+        name="DA harvest coverage",
+        required=False,
+        found=True,
+        status="fail",
+        message=(
+            f"DA harvest coverage: {pct:.2f}% ({num}/{denom}) below ERROR threshold "
+            f"{DA_HARVEST_COVERAGE_ERROR_THRESHOLD}% — uncovered: {uncovered_preview}"
+        ),
+    )
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 
 
@@ -1255,6 +1348,7 @@ def run_doctor(
         checks.append(_check_spec_intake_skill_present(target, profile))
         checks.append(_check_bridge_poller(target, "claude"))
         checks.append(_check_bridge_poller(target, "codex"))
+        checks.append(_check_da_harvest_coverage(target))
 
     # Auto-install pass
     if auto_install:
