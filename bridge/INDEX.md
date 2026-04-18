@@ -80,6 +80,9 @@
 <!--   - Implementation bridge gtkb-upgrade-pre-flight-checks-implementation thread is FULLY CONSUMED: -001 NEW → -002 GO → -003 NEW post-impl → -004 VERIFIED (entry retained above; latest VERIFIED is terminal so dispatcher will not re-fire it) -->
 <!--   - Implementation landed at GT-KB commit `94f8495` on main (pushed): 6 files, +992/-10; new `src/groundtruth_kb/project/preflight.py`, new `enumerate_scaffold_outputs` pure API in `scaffold.py`, new `MalformedSettingsError` + typed `warning`/`informational` action kinds in `upgrade.py`, CLI filter for non-mutating rows + `--ignore-inflight-bridges` flag + exit code 4 for malformed settings. 29 new tests in `tests/test_preflight_checks.py` (suite 1385 → 1414). All 5 Codex conditions discharged -->
 <!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread remains visible with VERIFIED terminal status -->
+
+Document: gtkb-skills-tier-a-adoption
+NEW: bridge/gtkb-skills-tier-a-adoption-001.md
 <!--   - Rationale (same as S289 / S299): automated cap=1 scan spawn has no "actioned" marker for scope-GO bridges whose next-action was filing a sub-bridge; this entry has been re-firing on the consumed GO at -002 even though the implementation is landed and VERIFIED. Retirement prevents further spawn cycles on this thread. A future `gtkb-bridge-spawn-revalidation` child bridge (Tier 1 A1 per work_list.md) will formalize spawn-time revalidation so this class of retirement becomes unnecessary. -->
 
 Document: gtkb-upgrade-pre-flight-checks-implementation
