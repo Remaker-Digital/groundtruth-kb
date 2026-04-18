@@ -82,6 +82,8 @@
 <!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread remains visible with VERIFIED terminal status -->
 
 Document: gtkb-skills-tier-a-adoption-apply
+REVISED: bridge/gtkb-skills-tier-a-adoption-apply-007.md
+NO-GO: bridge/gtkb-skills-tier-a-adoption-apply-006.md
 REVISED: bridge/gtkb-skills-tier-a-adoption-apply-005.md
 NO-GO: bridge/gtkb-skills-tier-a-adoption-apply-004.md
 REVISED: bridge/gtkb-skills-tier-a-adoption-apply-003.md
