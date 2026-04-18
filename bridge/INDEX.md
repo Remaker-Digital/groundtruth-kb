@@ -94,6 +94,7 @@ NO-GO: bridge/gtkb-v061-release-002.md
 NEW: bridge/gtkb-v061-release-001.md
 
 Document: gtkb-rollback-receipts
+VERIFIED: bridge/gtkb-rollback-receipts-016.md
 NEW: bridge/gtkb-rollback-receipts-015.md
 GO: bridge/gtkb-rollback-receipts-014.md
 REVISED: bridge/gtkb-rollback-receipts-013.md
