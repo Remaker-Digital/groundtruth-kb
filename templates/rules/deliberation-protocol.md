@@ -67,3 +67,27 @@ Both agents MUST search deliberations before starting substantive work.
 When citing deliberations in proposals or reviews:
 - Use `DELIB-NNNN` IDs when known
 - Use `bridge/{name}-NNN.md` file refs when DELIB-ID not yet assigned
+
+## Canonical Term Propagation Gate
+
+Any bridge proposal that introduces a NEW canonical term — a term that will
+appear in MemBase records, startup files, templates, or the doctor check —
+MUST list its propagation targets before Loyal Opposition issues GO:
+
+1. **MemBase record** — where the canonical definition will live (spec ID or
+   document ID).
+2. **CLAUDE.md glossary pointer** — confirm the term appears in the
+   CLAUDE.md glossary block or explicit pointer to
+   `.claude/rules/canonical-terminology.md`.
+3. **AGENTS.md glossary pointer** — confirm the term appears in the
+   AGENTS.md glossary block (dual-agent profiles).
+4. **`.claude/rules/canonical-terminology.md`** — confirm the term is defined
+   with not-to-be-confused-with, source, and implementation pointer.
+5. **Doctor check coverage** — if the term is profile-required, confirm
+   the required-term list in `.claude/rules/canonical-terminology.toml` is
+   updated.
+
+Reviews that introduce canonical terms without these propagation targets
+must be returned NO-GO with a propagation-targets finding. This converts
+canonical-term creation from a judgement call into a mechanical governance
+step (per SPEC-TERMINOLOGY-BRIDGE-GATE).

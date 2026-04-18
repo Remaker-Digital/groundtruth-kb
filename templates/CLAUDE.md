@@ -10,6 +10,21 @@ This project follows ADR-0001: Three-Tier Memory Architecture (MemBase = canonic
 
 ---
 
+## Canonical Terminology (ADR-0001 core vocabulary)
+
+| Term | Short definition |
+|------|-----------------|
+| **MemBase** | Canonical, authoritative store of specs and governed knowledge (`groundtruth.db`). |
+| **Deliberation Archive (DA)** | Design-reasoning tier — decisions, reviews, rejected alternatives. |
+| **MEMORY.md** | Operational notepad at repo root. Can coordinate work; cannot make anything true. |
+| **GroundTruth KB / GT-KB** | The product: MemBase + CLI + templates + doctor + bridge. |
+| **Prime Builder** | Implementing agent. Proposes, implements, tests. |
+| **Loyal Opposition** | Reviewing agent. Inspects, critiques, issues GO / NO-GO / VERIFIED. |
+
+Full glossary: `.claude/rules/canonical-terminology.md` (scaffolded). Record in MemBase.
+
+---
+
 ## Project Identity
 
 | Attribute | Value |

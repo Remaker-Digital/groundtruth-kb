@@ -191,7 +191,13 @@ cp "$TEMPLATES/bridge-os-poller-setup-prompt.md" ./bridge-os-poller-setup-prompt
 mkdir -p .claude/hooks .claude/rules
 cp "$TEMPLATES/hooks/"*.py .claude/hooks/
 cp "$TEMPLATES/rules/"*.md .claude/rules/
+cp "$TEMPLATES/rules/"*.toml .claude/rules/
 ```
+
+> **Note:** the `.toml` copy is required for `rules/canonical-terminology.toml`
+> (profile-aware doctor config). Prefer `gt project init` over the manual
+> copies above — it drives scaffold from `templates/managed-artifacts.toml`
+> and always copies every managed rule, regardless of extension.
 
 Edit `CLAUDE.md`, `MEMORY.md`, `BRIDGE-INVENTORY.md`, and the bridge setup
 prompt to replace placeholders with your project's details.

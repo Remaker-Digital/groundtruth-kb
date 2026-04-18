@@ -25,6 +25,8 @@ The shipped CLAUDE.md / MEMORY.md / deliberation-protocol templates implement AD
 |----------|---------|---------|
 | `CLAUDE.md` | Project rules and procedures for AI assistants | Project root |
 | `MEMORY.md` | Session state and operational notepad (per ADR-0001) | Project root |
+| `rules/canonical-terminology.md` | Canonical ADR-0001 glossary (MemBase, DA, Prime Builder, Loyal Opposition, etc.) | `.claude/rules/canonical-terminology.md` |
+| `rules/canonical-terminology.toml` | Profile-aware doctor config for required canonical terms | `.claude/rules/canonical-terminology.toml` |
 | `BRIDGE-INVENTORY.md` | Optional inventory of bridge directives, roles, schedules, prompts, and automations | Project root |
 | `bridge-os-poller-setup-prompt.md` | Prompt for configuring durable file bridge OS pollers and agent setup | Project root or operations docs |
 | `hooks/assertion-check.py` | SessionStart hook — run assertions on session start | `.claude/hooks/` |

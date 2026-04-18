@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — Canonical terminology surface
+
+- **Scaffolded canonical terminology glossary** — New
+  `templates/rules/canonical-terminology.md` (full ADR-0001 glossary:
+  MemBase, Deliberation Archive, MEMORY.md, Knowledge Database,
+  GroundTruth KB, GT-KB, Prime Builder, Loyal Opposition + full
+  `MEMBASE-4-CLAUDE.md` term set + alias disposition table) and
+  `templates/rules/canonical-terminology.toml` (profile-aware doctor
+  config for `local-only`, `dual-agent`, `dual-agent-webapp`,
+  `harness-memory`). Both delivered as managed `rule` artifacts in
+  `templates/managed-artifacts.toml` (ids
+  `rule.canonical-terminology` and `rule.canonical-terminology-config`),
+  copied to `.claude/rules/canonical-terminology.{md,toml}` in every
+  new scaffold.
+- **Startup-visible glossary blocks** — Concise glossary block added to
+  `templates/CLAUDE.md` (all profiles) and `templates/project/AGENTS.md`
+  (dual-agent profiles). One-line glossary pointer added to
+  `templates/MEMORY.md` and
+  `templates/project/codex-bootstrap/CODEX-SESSION-BOOTSTRAP.md`.
+- **Canonical Term Propagation Gate** — New section in
+  `templates/rules/deliberation-protocol.md` requires bridge proposals
+  that introduce NEW canonical terms to list propagation targets
+  (MemBase record, CLAUDE.md glossary, AGENTS.md glossary,
+  `.claude/rules/canonical-terminology.md`, doctor config) before Loyal
+  Opposition issues GO.
+- **Doctor canonical-terminology check** — New `gt project doctor`
+  check reads the profile-aware matrix from
+  `.claude/rules/canonical-terminology.toml` and verifies every
+  required file contains every required term. ERROR on missing
+  canonical terms (per owner decision `DELIB-0719`); WARN on minor
+  drift. Profile inheritance supported via `extends` (e.g.,
+  `dual-agent-webapp` extends `dual-agent`). `harness-memory` opt-in
+  profile skips MEMORY.md content check for projects whose MEMORY.md
+  lives outside the repo.
+- **Registry-driven upgrade** — `gt project upgrade --apply` idempotently
+  repairs missing canonical-terminology files via the existing
+  registry-driven `_plan_missing_managed_files` path (no `_MANAGED_*`
+  list re-introduction; AST gate `tests/test_no_parallel_manifests.py`
+  remains green).
+
+### Fixed
+
+- `templates/project/AGENTS.md` startup checklist now names root
+  `MEMORY.md` (not `memory/MEMORY.md`) — aligns with the GT-KB
+  scaffold contract that places `MEMORY.md` at repo root per ADR-0001.
+  Codex GO condition P1 carried forward from
+  `bridge/gtkb-canonical-terminology-surface-implementation-006.md`
+  via `-008`.
+
+### Docs
+
+- New `docs/reference/canonical-terminology.md` published reference page
+  with Mermaid diagram of the ADR-0001 three-tier memory architecture.
+- `mkdocs.yml` nav: added Canonical Terminology under Reference.
+- `docs/reference/templates.md` and `templates/README.md`: updated
+  inventory to list the two new canonical-terminology files.
+- `docs/bootstrap.md`: manual-copy snippet now copies `rules/*.toml` as
+  well as `rules/*.md` so manually bootstrapped projects receive the
+  canonical-terminology TOML config.
+
+### Registry
+
+- `templates/managed-artifacts.toml` grew from 40 to 42 records (rule
+  count 8 → 10). Header comment updated.
+
+### Tests
+
+- `tests/test_doctor_canonical_terminology.py` — 16 tests covering 4
+  profiles (local-only, dual-agent, dual-agent-webapp, harness-memory)
+  + extends inheritance + missing-config ERROR + full-scaffold
+  zero-ERROR + Codex P1 AGENTS.md path assertion.
+- `tests/test_managed_registry.py` — updated counts (42 total, 10
+  rules, local-only scaffold/upgrade includes the two new
+  canonical-terminology rule records).
+- `tests/test_scaffold_project.py` — added
+  `test_scaffold_agents_md_uses_root_memory_path` asserting generated
+  `AGENTS.md` names `MEMORY.md` (not `memory/MEMORY.md`).
+
 ## [0.6.0] - 2026-04-17
 
 ### Added — Phase A Tier A operational skills bundle
