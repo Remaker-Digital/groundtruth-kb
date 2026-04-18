@@ -114,9 +114,7 @@ def test_dual_agent_scaffold_agents_md_names_memory_md_not_memory_subdir(
         "Generated AGENTS.md must NOT reference 'memory/MEMORY.md' — GT-KB places "
         "MEMORY.md at repo root per ADR-0001. Codex GO condition P1-1."
     )
-    assert "MEMORY.md" in content, (
-        "Generated AGENTS.md must reference root 'MEMORY.md' in the startup checklist."
-    )
+    assert "MEMORY.md" in content, "Generated AGENTS.md must reference root 'MEMORY.md' in the startup checklist."
 
 
 # ---------------------------------------------------------------------------
@@ -158,8 +156,7 @@ def test_doctor_canonical_terminology_harness_memory_skips_memory_md_content(
 
     check = _check_canonical_terminology(target, "harness-memory")
     assert check.status == "pass", (
-        f"harness-memory must skip MEMORY.md content check; got "
-        f"{check.status}: {check.message}"
+        f"harness-memory must skip MEMORY.md content check; got {check.status}: {check.message}"
     )
 
 
@@ -211,9 +208,7 @@ def test_run_doctor_includes_canonical_terminology_check(tmp_path: Path, profile
     assert "canonical terminology" in names, f"profile {profile}: missing canonical terminology check"
     # And that check is pass on a fresh scaffold.
     ct = [c for c in report.checks if c.name == "canonical terminology"][0]
-    assert ct.status == "pass", (
-        f"profile {profile}: canonical terminology check failed on fresh scaffold: {ct.message}"
-    )
+    assert ct.status == "pass", f"profile {profile}: canonical terminology check failed on fresh scaffold: {ct.message}"
 
 
 @pytest.mark.parametrize("profile", ["local-only", "dual-agent", "dual-agent-webapp"])
@@ -222,7 +217,6 @@ def test_run_doctor_fresh_scaffold_zero_error(tmp_path: Path, profile: str) -> N
     target = _scaffold(tmp_path, profile)
     report = run_doctor(target, profile)
     errors = [c for c in report.checks if c.status == "fail"]
-    assert not errors, (
-        f"profile {profile}: fresh scaffold produced ERROR findings: "
-        + "; ".join(f"{c.name}: {c.message}" for c in errors)
+    assert not errors, f"profile {profile}: fresh scaffold produced ERROR findings: " + "; ".join(
+        f"{c.name}: {c.message}" for c in errors
     )

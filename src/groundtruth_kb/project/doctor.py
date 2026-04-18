@@ -876,13 +876,9 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
         )
 
     raw_terms = profile_cfg.get("required_startup_terms", [])
-    required_terms: list[str] = (
-        [t for t in raw_terms if isinstance(t, str)] if isinstance(raw_terms, list) else []
-    )
+    required_terms: list[str] = [t for t in raw_terms if isinstance(t, str)] if isinstance(raw_terms, list) else []
     raw_files = profile_cfg.get("required_files", [])
-    required_files: list[str] = (
-        [f for f in raw_files if isinstance(f, str)] if isinstance(raw_files, list) else []
-    )
+    required_files: list[str] = [f for f in raw_files if isinstance(f, str)] if isinstance(raw_files, list) else []
     missing_severity_raw = profile_cfg.get("missing_severity", "ERROR")
     missing_severity = str(missing_severity_raw).upper() if missing_severity_raw else "ERROR"
     memory_md_location = profile_cfg.get("memory_md_location", "project")
@@ -895,10 +891,7 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
             required=True,
             found=False,
             status="fail",
-            message=(
-                ".claude/rules/canonical-terminology.md missing — "
-                "run `gt project upgrade --apply` to restore."
-            ),
+            message=(".claude/rules/canonical-terminology.md missing — run `gt project upgrade --apply` to restore."),
         )
 
     # For each required file, verify each required term is present in it.
@@ -937,8 +930,7 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
             status=status,
             message=(
                 f"Missing canonical terms in profile {profile_name!r} "
-                f"required files: {'; '.join(missing_report[:6])}"
-                + ("; ..." if len(missing_report) > 6 else "")
+                f"required files: {'; '.join(missing_report[:6])}" + ("; ..." if len(missing_report) > 6 else "")
             ),
         )
 

@@ -11,7 +11,6 @@ from pathlib import Path
 
 from groundtruth_kb.db import KnowledgeDB
 
-
 SPECS: list[dict[str, object]] = [
     {
         "id": "SPEC-TERMINOLOGY-RECORD",

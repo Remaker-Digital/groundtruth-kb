@@ -1,4 +1,4 @@
-"""Fix SPEC-STARTHERE-* assertions that used ^ anchor.
+r"""Fix SPEC-STARTHERE-* assertions that used ^ anchor.
 
 Python's re.findall (used by the assertion engine) does not enable MULTILINE
 by default, so ^ matches only the start of the file. Rewrite affected patterns

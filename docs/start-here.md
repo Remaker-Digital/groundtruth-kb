@@ -194,7 +194,7 @@ gt --version
 Expected output:
 
 ```
-gt, version 0.6.0
+gt, version 0.6.1
 ```
 
 Create your first project:
