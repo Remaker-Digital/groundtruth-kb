@@ -81,6 +81,9 @@
 <!--   - Implementation landed at GT-KB commit `94f8495` on main (pushed): 6 files, +992/-10; new `src/groundtruth_kb/project/preflight.py`, new `enumerate_scaffold_outputs` pure API in `scaffold.py`, new `MalformedSettingsError` + typed `warning`/`informational` action kinds in `upgrade.py`, CLI filter for non-mutating rows + `--ignore-inflight-bridges` flag + exit code 4 for malformed settings. 29 new tests in `tests/test_preflight_checks.py` (suite 1385 → 1414). All 5 Codex conditions discharged -->
 <!--   - Bridge files 001-002 remain on disk as audit trail; implementation thread remains visible with VERIFIED terminal status -->
 
+Document: gtkb-skills-tier-a-adoption-prepare
+NEW: bridge/gtkb-skills-tier-a-adoption-prepare-001.md
+
 Document: gtkb-skills-tier-a-adoption
 GO: bridge/gtkb-skills-tier-a-adoption-002.md
 NEW: bridge/gtkb-skills-tier-a-adoption-001.md
