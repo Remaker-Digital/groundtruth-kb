@@ -182,10 +182,14 @@ created_at = "2026-01-01T00:00:00Z"
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(src.read_bytes())
 
-    rule_src = templates / "rules" / "prime-builder.md"
-    rule_dst = tmp_path / ".claude" / "rules" / "prime-builder.md"
-    rule_dst.parent.mkdir(parents=True, exist_ok=True)
-    rule_dst.write_bytes(rule_src.read_bytes())
+    # Pre-copy ALL local-only managed rule files so missing-file planner sees
+    # the project as fully scaffolded at current version. Post-canonical-
+    # terminology (v0.6.1): local-only has 3 managed rules.
+    for rule in ["prime-builder.md", "canonical-terminology.md", "canonical-terminology.toml"]:
+        src = templates / "rules" / rule
+        dst = tmp_path / ".claude" / "rules" / rule
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(src.read_bytes())
 
     actions = upgrade_mod.plan_upgrade(tmp_path)
     # No managed-file drift actions (local-only has no settings.json or gitignore

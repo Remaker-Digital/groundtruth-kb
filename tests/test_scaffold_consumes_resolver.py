@@ -17,9 +17,11 @@ from groundtruth_kb.project.managed_registry import (
 
 
 def test_scaffold_local_only_id_set_matches_baseline() -> None:
-    """local-only scaffold returns exactly the 14 hooks + prime-builder rule.
+    """local-only scaffold returns exactly the 14 hooks + 3 rules.
 
-    Baseline captured pre-sub-bridge. ownership-glob rows never enter the
+    Baseline post-canonical-terminology (v0.6.1):
+    14 hooks + rule.prime-builder + rule.canonical-terminology +
+    rule.canonical-terminology-config. ownership-glob rows never enter the
     scaffold plan (filtered by class in the helper).
     """
     ids = sorted(a.id for a in artifacts_for_scaffold("local-only"))
@@ -40,15 +42,21 @@ def test_scaffold_local_only_id_set_matches_baseline() -> None:
             "hook.session-start-governance",
             "hook.spec-before-code",
             "rule.prime-builder",
+            "rule.canonical-terminology",
+            "rule.canonical-terminology-config",
         ]
     )
     assert ids == expected
 
 
 def test_scaffold_dual_agent_id_set_matches_baseline() -> None:
-    """dual-agent scaffold returns the full 40-record registry set."""
+    """dual-agent scaffold returns the full 42-record registry set.
+
+    Post-canonical-terminology (v0.6.1): 40 pre-existing rows + 2 new
+    canonical-terminology rule rows = 42.
+    """
     ids = sorted(a.id for a in artifacts_for_scaffold("dual-agent"))
-    assert len(ids) == 40
+    assert len(ids) == 42
     # None are ownership-glob.
     for a in artifacts_for_scaffold("dual-agent"):
         assert isinstance(a, (FileArtifact, SettingsHookRegistration, GitignorePattern))
