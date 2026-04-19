@@ -498,34 +498,51 @@ plus two summary rows for `.claude/settings.local.json`.
 
 Two observations from this matrix:
 
-1. Of the 12 scaffold-time hook registrations in `.claude/settings.json`,
-   **11 are unrepairable** by the current upgrade planner. Only
-   `scanner-safe-writer.py` (row 4) is covered. This is the primary
-   drift gap for `.claude/settings.json` and the scope of the
-   `gtkb-upgrade-settings-merge` child bridge.
+1. **Post-C4 (gtkb-settings-merge):** of the 15 scaffold-time hook
+   registrations in `.claude/settings.json`, **0 are unrepairable** by the
+   upgrade planner. All 15 rows — 2 `SessionStart`, 5 `UserPromptSubmit`,
+   2 `PostToolUse`, 6 `PreToolUse` — are upgrade-managed and covered by
+   `_plan_settings_registration` + `_compute_target_event_list`. This closes
+   the primary drift gap for `.claude/settings.json` that the
+   `gtkb-upgrade-settings-merge` (C4) bridge targeted. (Historical note:
+   pre-C4, 11 of 12 registrations were unrepairable — only
+   `scanner-safe-writer.py` was covered. gtkb-da-governance-completeness
+   added 4 more registrations and promoted 3 of the existing ones to
+   upgrade-managed, leaving 10 still-unmanaged rows that C4 then promoted.)
 2. `.claude/settings.local.json` is **correctly** unmanaged today. It
    is the adopter-owned local overlay. The doctor check at
    `doctor.py:370` reports on what the adopter has placed there; it is
-   not a drift repair target. Any future settings child bridge must
-   preserve this split: settings.json = M (managed, tracked), settings.local.json = A (adopter-owned, ignored).
+   not a drift repair target. C4 preserves this split: settings.json = M
+   (managed, tracked), settings.local.json = A (adopter-owned, ignored).
+   (C4 did promote the `.claude/settings.local.json` gitignore **pattern**
+   to upgrade-managed — the pattern's presence is enforced, but the file's
+   contents remain adopter-owned.)
 
 ### 6.2 `.gitignore` same-version drift
 
-The single managed pattern is `.claude/hooks/*.log`
-(`src/groundtruth_kb/project/upgrade.py:79`). Everything else the
-scaffold writes to `.gitignore` is **unmanaged**:
+**Post-C4 (gtkb-settings-merge):** 4 managed patterns registered in
+`templates/managed-artifacts.toml` (class `gitignore-pattern`):
 
-- Bootstrap-written baseline (`bootstrap.py:19`): `__pycache__/`,
-  `*.pyc`, `.pytest_cache/`, `.ruff_cache/`, `.venv/`,
-  `groundtruth.db`, `.groundtruth/`, `.claude/settings.local.json`.
-- Bridge-profile additions (`scaffold.py:304`-`:308`): three
-  `independent-progress-assessments/bridge-automation/` runtime
-  state patterns.
+- `.claude/hooks/*.log` — Operational hook logs (original).
+- `groundtruth.db` — KB binary; must never be committed (promoted in C4).
+- `.groundtruth/` — KB working directory (chroma + cache) (promoted in C4).
+- `.claude/settings.local.json` — Adopter-owned local overlay (promoted in C4).
 
-If an adopter deletes `groundtruth.db` from their `.gitignore`,
-upgrade will not restore it. Future broadening of
-`_MANAGED_GITIGNORE_PATTERNS` is a candidate for the
-`gtkb-upgrade-settings-merge` or a dedicated gitignore child bridge.
+Adopter deletion of any of these 4 patterns now triggers an
+`append-gitignore` action and is restored by `execute_upgrade`.
+
+Still-unmanaged scaffold-written patterns (8 total, **explicitly deferred**
+from C4 as Python-tooling defaults with no known drift evidence):
+
+- Bootstrap-written baseline (`bootstrap.py:19`): `__pycache__/`, `*.pyc`,
+  `.pytest_cache/`, `.ruff_cache/`, `.venv/` (5 patterns).
+- Bridge-profile additions (`scaffold.py:432-441`): three
+  `independent-progress-assessments/bridge-automation/` runtime-state
+  patterns.
+
+If future adopter-field evidence shows drift on these 8 patterns, a follow-up
+bridge can promote them using the same pattern C4 established (add rows to
+the `gitignore-pattern` section of `templates/managed-artifacts.toml`).
 
 ### 6.3 Managed-file deletion drift (works today)
 
@@ -718,11 +735,16 @@ The managed-list surface also controls settings-registration and
 gitignore-pattern targets that do not appear as standalone rows above.
 These are implicit dependencies of the M classification:
 
-- **Settings registration (1 entry):** `scanner-safe-writer.py` under
-  `PreToolUse` (`upgrade.py:71`). Column "Upgrade manages" of row 39.
-- **Gitignore pattern (1 entry):** `.claude/hooks/*.log`
-  (`upgrade.py:79`). Not a separate row because it lives inside `.gitignore`
-  (row 6).
+- **Settings registration (15 entries post-C4):** all 15 scaffold-superset
+  registrations across 4 event classes (`SessionStart`, `UserPromptSubmit`,
+  `PostToolUse`, `PreToolUse`). See `artifacts_for_upgrade('dual-agent',
+  class_='settings-hook-registration')` for the current list. Column
+  "Upgrade manages" of row 39 is now fully M post-C4.
+- **Gitignore pattern (4 entries post-C4):** `.claude/hooks/*.log`,
+  `groundtruth.db`, `.groundtruth/`, `.claude/settings.local.json`. Not
+  separate rows because they live inside `.gitignore` (row 6). Row 6's
+  U-count drops by 3 after C4 but remains partial-M/U overall (8 patterns
+  still unmanaged — see §6.2).
 
 ### 9.3 Profile-dependent classification delta
 
@@ -758,6 +780,14 @@ The 20 U-class rows and the 2 partial-M rows are the primary surface
 for the next 7 child bridges. Row 6 is special because it straddles a
 ManagedPattern surface; row 39 is the focus of
 `gtkb-upgrade-settings-merge`.
+
+**Post-C4 update (gtkb-settings-merge):** Row 39 (`.claude/settings.json`)
+transitions from partial M/U to full M — all 15 event registrations are
+now upgrade-managed. Row 6 (`.gitignore`) remains partial M/U but its
+U-count drops by 3 (groundtruth.db, .groundtruth/, .claude/settings.local.json
+now managed). Full re-tabulation of the 55-row M/A/U/X matrix is out of
+scope for C4; a follow-up audit-refresh bridge should handle the
+comprehensive refresh.
 
 ---
 

@@ -473,7 +473,7 @@ event = "SessionStart"
 hook_filename = "session-start-governance.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -486,7 +486,7 @@ event = "SessionStart"
 hook_filename = "assertion-check.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -499,7 +499,7 @@ event = "UserPromptSubmit"
 hook_filename = "delib-search-gate.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -512,7 +512,7 @@ event = "UserPromptSubmit"
 hook_filename = "intake-classifier.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -525,7 +525,7 @@ event = "PostToolUse"
 hook_filename = "delib-search-tracker.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -538,7 +538,7 @@ event = "PreToolUse"
 hook_filename = "spec-before-code.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -551,7 +551,7 @@ event = "PreToolUse"
 hook_filename = "bridge-compliance-gate.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -564,7 +564,7 @@ event = "PreToolUse"
 hook_filename = "kb-not-markdown.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -577,7 +577,7 @@ event = "PreToolUse"
 hook_filename = "destructive-gate.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -590,7 +590,7 @@ event = "PreToolUse"
 hook_filename = "credential-scan.py"
 target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
@@ -667,7 +667,8 @@ upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
 
 # =========================================================================
-# GITIGNORE-PATTERN (1 record)
+# GITIGNORE-PATTERN (4 records — 1 original + 3 adopter-critical per
+# gtkb-settings-merge C4)
 # =========================================================================
 
 [[artifacts]]
@@ -675,6 +676,42 @@ class = "gitignore-pattern"
 id = "gitignore.hook-logs"
 pattern = ".claude/hooks/*.log"
 comment = "Operational hook logs"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "gitignore-pattern"
+id = "gitignore.kb-database"
+pattern = "groundtruth.db"
+comment = "KB binary; must never be committed"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "gitignore-pattern"
+id = "gitignore.kb-working-dir"
+pattern = ".groundtruth/"
+comment = "KB working directory (chroma + cache)"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+class = "gitignore-pattern"
+id = "gitignore.settings-local"
+pattern = ".claude/settings.local.json"
+comment = "Adopter-owned local overlay"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
