@@ -1916,6 +1916,74 @@ def scaffold_adrs_cmd(ctx: click.Context, profile: str, apply: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# D3: gt scaffold iac --profile azure-enterprise
+# ---------------------------------------------------------------------------
+
+
+@scaffold.command("iac")
+@click.option(
+    "--profile",
+    type=click.Choice(["azure-enterprise"]),
+    default="azure-enterprise",
+    help=(
+        "IaC scaffold profile. Currently only 'azure-enterprise' is supported "
+        "(45 Terraform skeleton files: 6 top-level + 13 modules x 3 files)."
+    ),
+)
+@click.option(
+    "--apply/--dry-run",
+    default=False,
+    help="Apply scaffold changes to the filesystem (default: dry-run).",
+)
+@click.option(
+    "--target-dir",
+    type=click.Path(path_type=Path),
+    default=".",
+    help="Target directory where the iac/azure/ tree is written (default: current directory).",
+)
+def scaffold_iac_cmd(profile: str, apply: bool, target_dir: Path) -> None:
+    """Generate Terraform skeleton files for the given profile (D3).
+
+    For ``azure-enterprise``, generates 45 Terraform files under ``iac/azure/``:
+
+    - 6 top-level: main.tf, variables.tf, outputs.tf, providers.tf,
+      README.md, terraform.tfvars.example
+    - 13 modules (one per Azure readiness taxonomy category), each with
+      main.tf / variables.tf / outputs.tf = 39 files.
+
+    **Scaffold is one-shot and adopter-owned.** Existing files are skipped
+    (never overwritten). If you want to reset a file to skeleton state,
+    delete it first and re-run scaffold.
+
+    Pair each module with the matching ADR-Azure-* instance from D2
+    (``gt scaffold adrs``): each skeleton references its ADR handle in a
+    TODO marker.
+    """
+    from groundtruth_kb.iac_scaffold import (
+        IacScaffoldConfig,
+        scaffold_azure_iac,
+    )
+
+    iac_config = IacScaffoldConfig(profile=profile, target_dir=target_dir)
+    report = scaffold_azure_iac(iac_config, dry_run=not apply)
+
+    mode = "DRY RUN" if report.dry_run else "APPLIED"
+    click.echo(f"Scaffold iac — profile={profile} — target={target_dir} — {mode}")
+    click.echo(f"  generated files: {len(report.generated)}")
+    click.echo(f"  skipped files:   {len(report.skipped)}")
+
+    if report.skipped:
+        click.echo("\nSkipped (already exist; adopter-owned):")
+        for s in report.skipped:
+            click.echo(f"  - {s['target_path']}: {s['reason']}")
+
+    if report.generated:
+        click.echo("\nGenerated files:")
+        for g in report.generated:
+            click.echo(f"  - {g['target_path']}")
+
+
+# ---------------------------------------------------------------------------
 # D2: gt check adrs --profile azure-enterprise
 # ---------------------------------------------------------------------------
 
