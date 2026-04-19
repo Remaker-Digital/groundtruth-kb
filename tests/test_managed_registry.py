@@ -53,8 +53,12 @@ def _registry_records() -> list[ManagedArtifact]:
 # ---------------------------------------------------------------------------
 
 
-def test_registry_total_is_fifty_one_records() -> None:
-    """51 total = 19 hooks + 10 rules + 6 skills + 15 settings + 1 gitignore.
+def test_registry_total_is_fifty_four_records() -> None:
+    """54 total = 19 hooks + 10 rules + 6 skills + 15 settings + 4 gitignore.
+
+    Post-C4 (gtkb-settings-merge): gitignore-pattern count rose from 1 to 4
+    with 3 new adopter-critical patterns (groundtruth.db, .groundtruth/,
+    .claude/settings.local.json) promoted to upgrade-managed.
 
     Post-governance-completeness (v0.6.x): hook count rose from 14 to 19 with
     the addition of 5 new governance hooks (_delib_common, turn-marker,
@@ -69,11 +73,14 @@ def test_registry_total_is_fifty_one_records() -> None:
     registry-only.
     """
     records = _registry_records()
-    assert len(records) == 51, f"expected 51 total registry records; got {len(records)}"
+    assert len(records) == 54, f"expected 54 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
-    """Class counts match the approved proposal (post-governance-completeness)."""
+    """Class counts match the approved proposal (post-C4 gtkb-settings-merge).
+
+    gitignore-pattern: 1 → 4 per C4 §2 (3 adopter-critical patterns promoted).
+    """
     records = _registry_records()
     counts: dict[str, int] = {}
     for r in records:
@@ -83,7 +90,7 @@ def test_registry_class_counts_match_proposal() -> None:
         "rule": 10,
         "skill": 6,
         "settings-hook-registration": 15,
-        "gitignore-pattern": 1,
+        "gitignore-pattern": 4,
     }
 
 
@@ -226,7 +233,11 @@ def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
 
 
 def test_scaffold_dual_agent_copies_everything() -> None:
-    """dual-agent scaffold copies 19 hooks + 10 rules + 6 skills + 15 settings + 1 gitignore.
+    """dual-agent scaffold copies 19 hooks + 10 rules + 6 skills + 15 settings + 4 gitignore.
+
+    Post-C4 (gtkb-settings-merge): gitignore-pattern scaffold count 1→4
+    (3 adopter-critical patterns added: groundtruth.db, .groundtruth/,
+    .claude/settings.local.json).
 
     Post-governance-completeness: hook count 14→19 (5 new governance hooks),
     settings-hook-registration count 11→15 (4 new event registrations).
@@ -240,7 +251,7 @@ def test_scaffold_dual_agent_copies_everything() -> None:
         "rule": 10,
         "skill": 6,
         "settings-hook-registration": 15,
-        "gitignore-pattern": 1,
+        "gitignore-pattern": 4,
     }
 
 
@@ -414,23 +425,38 @@ def test_settings_parity_exact_fifteen_row_matrix() -> None:
     assert by_event == expected
 
 
-def test_settings_upgrade_managed_set_post_governance_completeness() -> None:
-    """Upgrade-managed settings registrations: scanner-safe-writer + 4 governance.
+def test_settings_upgrade_managed_set_post_c4() -> None:
+    """Post-C4 (gtkb-settings-merge): all 15 scaffold-superset settings-hook
+    registrations are upgrade-managed.
 
-    Post-governance-completeness (gtkb-da-governance-completeness-implementation-015 §A):
-    the 4 new governance hook registrations are the first rows to opt in to
-    BOTH upgrade enforcement AND doctor enforcement. scanner-safe-writer
-    remains the only upgrade-managed PreToolUse registration.
+    Includes the 5 governance-era rows + 10 promoted rows from all four
+    event classes (2 SessionStart, 2 added UserPromptSubmit, 1 added
+    PostToolUse, 5 added PreToolUse). This closes the Area 6 drift gap:
+    0 scaffolded .claude/settings.json registrations remain unrepairable.
     """
     managed = artifacts_for_upgrade("dual-agent", class_="settings-hook-registration")
-    assert len(managed) == 5, f"expected 5 upgrade-managed settings-hook-registrations; got {len(managed)}"
+    assert len(managed) == 15, f"expected 15 upgrade-managed settings-hook-registrations post-C4; got {len(managed)}"
     by_filename = {r.hook_filename: r.event for r in managed if isinstance(r, SettingsHookRegistration)}
     assert by_filename == {
-        "scanner-safe-writer.py": "PreToolUse",
+        # SessionStart (promoted in C4)
+        "session-start-governance.py": "SessionStart",
+        "assertion-check.py": "SessionStart",
+        # UserPromptSubmit (3 governance + 2 promoted in C4)
         "turn-marker.py": "UserPromptSubmit",
         "delib-preflight-gate.py": "UserPromptSubmit",
         "gov09-capture.py": "UserPromptSubmit",
+        "delib-search-gate.py": "UserPromptSubmit",
+        "intake-classifier.py": "UserPromptSubmit",
+        # PostToolUse (1 governance + 1 promoted in C4)
         "owner-decision-capture.py": "PostToolUse",
+        "delib-search-tracker.py": "PostToolUse",
+        # PreToolUse (1 scanner-safe-writer + 5 promoted in C4)
+        "scanner-safe-writer.py": "PreToolUse",
+        "spec-before-code.py": "PreToolUse",
+        "bridge-compliance-gate.py": "PreToolUse",
+        "kb-not-markdown.py": "PreToolUse",
+        "destructive-gate.py": "PreToolUse",
+        "credential-scan.py": "PreToolUse",
     }
 
 
@@ -485,16 +511,17 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 51 records post-governance-completeness:
+    # dual-agent sees all 54 records post-C4 (gtkb-settings-merge):
     # 19 hooks (14 original + 5 new governance) + 10 rules + 6 skills +
-    # 15 settings (11 original + 4 new governance registrations) + 1 gitignore.
-    assert len(dual_agent) == 51
+    # 15 settings (11 original + 4 new governance registrations) +
+    # 4 gitignore (1 original + 3 adopter-critical patterns promoted in C4).
+    assert len(dual_agent) == 54
 
     local_only = load_managed_artifacts("local-only")
     # local-only sees all 14 ORIGINAL hooks (initial=ALL for those) +
     # rule.prime-builder + the 2 canonical-terminology rules = 17 records.
-    # The 5 new governance hooks are dual-agent-only, so local-only count
-    # is unchanged from pre-governance-completeness.
+    # The 5 new governance hooks are dual-agent-only, and the 3 new
+    # gitignore rows are dual-agent-only, so local-only count is unchanged.
     assert len(local_only) == 17
 
 

@@ -237,8 +237,8 @@ def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     Post-governance-completeness:
     - local-only scaffolds 17 = 14 hooks + 3 rules (unchanged; 5 new
       governance hooks are dual-agent-only).
-    - dual-agent scaffolds 51 = 19 hooks + 10 rules + 6 skills + 15 settings
-      + 1 gitignore.
+    - dual-agent scaffolds 54 = 19 hooks + 10 rules + 6 skills + 15 settings
+      + 4 gitignore (post-C4 gtkb-settings-merge).
 
     The sibling file contains only ownership-glob records which are filtered
     out by the helper — the ownership-glob exclusion invariant is preserved.
@@ -246,9 +246,9 @@ def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     # local-only unchanged: 17 (14 original hooks + 3 rules)
     ids = {a.id for a in artifacts_for_scaffold("local-only")}
     assert len(ids) == 17
-    # dual-agent scaffold: 51 rows post-governance-completeness.
+    # dual-agent scaffold: 54 rows post-C4 (51 → 54 via 3 new gitignore rows).
     ids_da = {a.id for a in artifacts_for_scaffold("dual-agent")}
-    assert len(ids_da) == 51
+    assert len(ids_da) == 54
     # None are ownership-glob.
     assert all("adopter-" not in i for i in ids_da), "ownership-glob leaked into scaffold"
 
