@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-21T06:36:36Z
+Generated: 2026-04-21T06:45:36Z
 
 ## Startup Disclosure
 
@@ -32,7 +32,7 @@ Generated: 2026-04-21T06:36:36Z
 - Open MemBase work items: 29
 - Actionable bridge/contention entries: 0
 - Drift changed paths: 0
-- Testing/tool rollup: 4 failing, 6 manual, 16 ready/passing
+- Testing/tool rollup: 7 failing, 6 manual, 16 ready/passing
 - GT-KB infrastructure posture: package 0.6.1; dry-run upgrade plan available: True
 
 ### Wrap-Up Trigger Commands
@@ -58,7 +58,7 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Focus this session on clearing release blockers. Start with Production credentials exposed in the deleted generated manifest must be rotated. Verify the result with scripts/release_candidate_gate.py and update governed evidence.
 
 4. **Repair Testing/Tool Integrations**
-   Current signal: 4 failing and 1 unknown integration(s) are visible.
+   Current signal: 7 failing and 1 unknown integration(s) are visible.
    Prompt details: Focus this session on restoring testing service/tool integration health. Start with GitHub Actions: Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions. Preserve GT-KB as infrastructure evidence.
 
 5. **Remediate Known Risks**

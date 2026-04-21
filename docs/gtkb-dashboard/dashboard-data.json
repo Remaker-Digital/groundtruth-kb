@@ -5,57 +5,6 @@
       "contention_actionable_bridge_count": 0,
       "deliberation_archive_current_total": 324,
       "drift_changed_path_count": 11,
-      "generated_at": "2026-04-21T00:06:35Z",
-      "membase_open_work_items": 29,
-      "pytest_file_count": 338,
-      "regression_release_blocker_count": 7,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 40,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 4,
-      "contention_actionable_bridge_count": 0,
-      "deliberation_archive_current_total": 324,
-      "drift_changed_path_count": 11,
-      "generated_at": "2026-04-21T00:09:35Z",
-      "membase_open_work_items": 29,
-      "pytest_file_count": 338,
-      "regression_release_blocker_count": 7,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 40,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 4,
-      "contention_actionable_bridge_count": 0,
-      "deliberation_archive_current_total": 324,
-      "drift_changed_path_count": 11,
-      "generated_at": "2026-04-21T00:12:35Z",
-      "membase_open_work_items": 29,
-      "pytest_file_count": 338,
-      "regression_release_blocker_count": 7,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 40,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 4,
-      "contention_actionable_bridge_count": 0,
-      "deliberation_archive_current_total": 324,
-      "drift_changed_path_count": 11,
       "generated_at": "2026-04-21T00:15:35Z",
       "membase_open_work_items": 29,
       "pytest_file_count": 338,
@@ -3399,6 +3348,57 @@
       "specification_current_total": 1847,
       "token_measurement_status": "not_exposed_by_current_harness",
       "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 3,
+      "contention_actionable_bridge_count": 0,
+      "deliberation_archive_current_total": 324,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-21T06:39:36Z",
+      "membase_open_work_items": 29,
+      "pytest_file_count": 338,
+      "regression_release_blocker_count": 7,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 40,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 3,
+      "contention_actionable_bridge_count": 0,
+      "deliberation_archive_current_total": 324,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-21T06:42:37Z",
+      "membase_open_work_items": 29,
+      "pytest_file_count": 338,
+      "regression_release_blocker_count": 7,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 40,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 3,
+      "contention_actionable_bridge_count": 0,
+      "deliberation_archive_current_total": 324,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-21T06:45:36Z",
+      "membase_open_work_items": 29,
+      "pytest_file_count": 338,
+      "regression_release_blocker_count": 7,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 40,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
     }
   ],
   "model": {
@@ -3416,6 +3416,32 @@
           },
           "source": "Testing Service / Tool Integrations",
           "why": "7 required workflow runs checked; health=failing"
+        },
+        {
+          "action": "Repair Pytest Coverage",
+          "owner_lane": "Prime Builder",
+          "remediation": "Inspect the pytest shard and merged coverage artifacts, reproduce the failing shard locally, then restore the configured coverage threshold before rerunning Python Tests.",
+          "severity": "red",
+          "shortcut": {
+            "kind": "web",
+            "label": "Open GitHub Actions",
+            "target": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions"
+          },
+          "source": "Testing Service / Tool Integrations",
+          "why": "failure on main@3cc1034, updated 2026-04-21T06:43:06Z"
+        },
+        {
+          "action": "Repair Release Candidate Gate",
+          "owner_lane": "Prime Builder",
+          "remediation": "Run the release candidate gate locally, fix the first failing release blocker or frontend gate, then rerun the Release Candidate Gate workflow.",
+          "severity": "red",
+          "shortcut": {
+            "kind": "web",
+            "label": "Open GitHub Actions",
+            "target": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions"
+          },
+          "source": "Testing Service / Tool Integrations",
+          "why": "failure on main@48d31cc, updated 2026-04-21T06:43:40Z"
         },
         {
           "action": "Repair SonarCloud",
@@ -3455,6 +3481,19 @@
           },
           "source": "Testing Service / Tool Integrations",
           "why": "failure on dependabot/github_actions/actions/setup-node-6@00aba5c, updated 2026-04-21T06:12:09Z"
+        },
+        {
+          "action": "Repair OpenAPI Compatibility",
+          "owner_lane": "Prime Builder",
+          "remediation": "Inspect the OpenAPI compatibility job output, confirm whether schema changes are intentional, then either restore compatibility or document/version the breaking API change.",
+          "severity": "red",
+          "shortcut": {
+            "kind": "web",
+            "label": "Open GitHub Actions",
+            "target": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions"
+          },
+          "source": "Testing Service / Tool Integrations",
+          "why": "failure on main@3cc1034, updated 2026-04-21T06:43:06Z"
         },
         {
           "action": "Production credentials exposed in the deleted generated manifest must be rotated.",
@@ -3520,54 +3559,15 @@
           },
           "source": "Release Readiness",
           "why": "Listed as a release-readiness blocker."
-        },
-        {
-          "action": "Review GT-KB scaffold upgrade plan",
-          "owner_lane": "Prime Builder",
-          "remediation": "Run the dry-run command, review the diff, and apply only with owner approval.",
-          "severity": "yellow",
-          "shortcut": {
-            "kind": "command",
-            "label": "Copy dry-run command",
-            "target": "python -c \"from groundtruth_kb.cli import main; main()\" project upgrade --dry-run --dir ."
-          },
-          "source": "GT-KB Upgrade Posture",
-          "why": "21 mutating dry-run action(s) are available."
-        },
-        {
-          "action": "GTKB-GOV-006: Close Agent Red release-readiness blocker list",
-          "owner_lane": "Prime Builder",
-          "remediation": "Execute or disposition through the governed backlog/bridge process.",
-          "severity": "yellow",
-          "shortcut": {
-            "kind": "file",
-            "label": "Open standing backlog",
-            "target": "memory/work_list.md"
-          },
-          "source": "Standing Backlog",
-          "why": "Standing backlog top priority."
-        },
-        {
-          "action": "GTKB-GOV-007: Revise commercial readiness NO-GO tracks for SPEC-1831, SPEC-1832, and SPEC-1833",
-          "owner_lane": "Prime Builder",
-          "remediation": "Execute or disposition through the governed backlog/bridge process.",
-          "severity": "yellow",
-          "shortcut": {
-            "kind": "file",
-            "label": "Open standing backlog",
-            "target": "memory/work_list.md"
-          },
-          "source": "Standing Backlog",
-          "why": "Standing backlog top priority."
         }
       ],
       "data_freshness": {
-        "generated_at": "2026-04-21T06:36:36Z",
-        "groundtruth_db_modified_at": "2026-04-21T06:36:41.451890Z",
-        "last_commit": "2026-04-20T23:33:29-07:00\nci: clear stage test release path",
+        "generated_at": "2026-04-21T06:45:36Z",
+        "groundtruth_db_modified_at": "2026-04-21T06:45:42.893505Z",
+        "last_commit": "2026-04-20T23:39:41-07:00\nci: finish release gate bootstrap",
         "repo_branch": "main",
-        "repo_sha": "3cc10348583897c4336ff556660d0c24a22288e1",
-        "repo_short_sha": "3cc10348",
+        "repo_sha": "48d31ccb8df608362e6d5e0b0a4a910fdafb3ac5",
+        "repo_short_sha": "48d31ccb",
         "scope_version": "agent_red_v1",
         "sources": [
           "groundtruth.db",
@@ -3584,7 +3584,7 @@
           "label": "Project Health",
           "status": "red",
           "tooltip": "Release blockers plus failing integrations.",
-          "value": "11 issues"
+          "value": "14 issues"
         },
         {
           "label": "Release Readiness",
@@ -3596,7 +3596,7 @@
           "label": "CI / Testing",
           "status": "red",
           "tooltip": "Live GitHub Actions health where available.",
-          "value": "4 failing"
+          "value": "7 failing"
         },
         {
           "label": "Security",
@@ -3624,7 +3624,7 @@
         }
       ],
       "quality_rollup": {
-        "failing": 4,
+        "failing": 7,
         "manual": 6,
         "ready_or_passing": 16,
         "total": 22,
@@ -3659,7 +3659,7 @@
           "severity": "red"
         },
         {
-          "evidence": "4 failing testing/service integration(s).",
+          "evidence": "7 failing testing/service integration(s).",
           "impact": "Release evidence is incomplete or stale.",
           "owner": "Prime Builder",
           "remediation": "Work through the failing integration remediation list.",
@@ -3759,7 +3759,7 @@
         "report-depth-prime-builder-context.md"
       ]
     },
-    "generated_at": "2026-04-21T06:36:36Z",
+    "generated_at": "2026-04-21T06:45:36Z",
     "governance_stance": [
       "Strict GOV enforcement where mechanically available",
       "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
@@ -3776,7 +3776,7 @@
             "count": 12,
             "label": "Commit",
             "latest_result": "recorded",
-            "latest_version": "v1.98.92-118-g3cc10348",
+            "latest_version": "v1.98.92-119-g48d31ccb",
             "stage": "commit",
             "status": "green"
           },
@@ -3789,12 +3789,12 @@
             "status": "red"
           },
           {
-            "count": 56,
+            "count": 55,
             "label": "Test Run",
-            "latest_result": "success",
+            "latest_result": "failure",
             "latest_version": "3cc10348",
             "stage": "test",
-            "status": "green"
+            "status": "red"
           },
           {
             "count": 2,
@@ -3816,6 +3816,81 @@
         "timeline": [
           {
             "branch": "main",
+            "commit": "48d31ccb",
+            "event": "Release Candidate Gate",
+            "notes": "event=push; run=24708031223",
+            "result": "failure",
+            "result_color": "red",
+            "source": "release-candidate-gate.yml",
+            "stage": "deployment",
+            "stage_label": "Deployment",
+            "test_results": "Workflow conclusion/status is the available test/build result.",
+            "timestamp": "2026-04-21T06:43:40Z",
+            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24708031223",
+            "version": "48d31ccb"
+          },
+          {
+            "branch": "main",
+            "commit": "3cc10348",
+            "event": "Python Tests",
+            "notes": "event=push; run=24707828729",
+            "result": "failure",
+            "result_color": "red",
+            "source": "python-tests.yml",
+            "stage": "test",
+            "stage_label": "Test Run",
+            "test_results": "Workflow conclusion/status is the available test/build result.",
+            "timestamp": "2026-04-21T06:43:06Z",
+            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828729",
+            "version": "3cc10348"
+          },
+          {
+            "branch": "main",
+            "commit": "48d31ccb",
+            "event": "Lint",
+            "notes": "event=push; run=24708031215",
+            "result": "success",
+            "result_color": "green",
+            "source": "lint.yml",
+            "stage": "test",
+            "stage_label": "Test Run",
+            "test_results": "Workflow conclusion/status is the available test/build result.",
+            "timestamp": "2026-04-21T06:41:29Z",
+            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24708031215",
+            "version": "48d31ccb"
+          },
+          {
+            "branch": "main",
+            "commit": "3cc10348",
+            "event": "Release Candidate Gate",
+            "notes": "event=push; run=24707828765",
+            "result": "failure",
+            "result_color": "red",
+            "source": "release-candidate-gate.yml",
+            "stage": "deployment",
+            "stage_label": "Deployment",
+            "test_results": "Workflow conclusion/status is the available test/build result.",
+            "timestamp": "2026-04-21T06:37:19Z",
+            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828765",
+            "version": "3cc10348"
+          },
+          {
+            "branch": "main",
+            "commit": "3cc10348",
+            "event": "Deploy docs site",
+            "notes": "event=push; run=24707828717",
+            "result": "success",
+            "result_color": "green",
+            "source": "deploy-docs.yml",
+            "stage": "deployment",
+            "stage_label": "Deployment",
+            "test_results": "Workflow conclusion/status is the available test/build result.",
+            "timestamp": "2026-04-21T06:36:59Z",
+            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828717",
+            "version": "3cc10348"
+          },
+          {
+            "branch": "main",
             "commit": "3cc10348",
             "event": "Lint",
             "notes": "event=push; run=24707828739",
@@ -3827,51 +3902,6 @@
             "test_results": "Workflow conclusion/status is the available test/build result.",
             "timestamp": "2026-04-21T06:35:26Z",
             "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828739",
-            "version": "3cc10348"
-          },
-          {
-            "branch": "main",
-            "commit": "3cc10348",
-            "event": "Release Candidate Gate",
-            "notes": "event=push; run=24707828765",
-            "result": "in_progress",
-            "result_color": "yellow",
-            "source": "release-candidate-gate.yml",
-            "stage": "deployment",
-            "stage_label": "Deployment",
-            "test_results": "Workflow conclusion/status is the available test/build result.",
-            "timestamp": "2026-04-21T06:34:54Z",
-            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828765",
-            "version": "3cc10348"
-          },
-          {
-            "branch": "main",
-            "commit": "3cc10348",
-            "event": "Deploy docs site",
-            "notes": "event=push; run=24707828717",
-            "result": "in_progress",
-            "result_color": "yellow",
-            "source": "deploy-docs.yml",
-            "stage": "deployment",
-            "stage_label": "Deployment",
-            "test_results": "Workflow conclusion/status is the available test/build result.",
-            "timestamp": "2026-04-21T06:34:54Z",
-            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828717",
-            "version": "3cc10348"
-          },
-          {
-            "branch": "main",
-            "commit": "3cc10348",
-            "event": "Python Tests",
-            "notes": "event=push; run=24707828729",
-            "result": "in_progress",
-            "result_color": "yellow",
-            "source": "python-tests.yml",
-            "stage": "test",
-            "stage_label": "Test Run",
-            "test_results": "Workflow conclusion/status is the available test/build result.",
-            "timestamp": "2026-04-21T06:34:53Z",
-            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828729",
             "version": "3cc10348"
           },
           {
@@ -4866,21 +4896,6 @@
           },
           {
             "branch": "develop",
-            "commit": "1979d06a",
-            "event": "Security Scan",
-            "notes": "event=push; run=24706586355",
-            "result": "failure",
-            "result_color": "red",
-            "source": "security-scan.yml",
-            "stage": "test",
-            "stage_label": "Test Run",
-            "test_results": "Workflow conclusion/status is the available test/build result.",
-            "timestamp": "2026-04-21T05:59:22Z",
-            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24706586355",
-            "version": "1979d06a"
-          },
-          {
-            "branch": "develop",
             "commit": "dfeea83a",
             "event": "SonarCloud",
             "notes": "event=push; run=24706591703",
@@ -4893,21 +4908,6 @@
             "timestamp": "2026-04-21T05:59:14Z",
             "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24706591703",
             "version": "dfeea83a"
-          },
-          {
-            "branch": "develop",
-            "commit": "1979d06a",
-            "event": "SonarCloud",
-            "notes": "event=push; run=24706586357",
-            "result": "failure",
-            "result_color": "red",
-            "source": "sonarcloud.yml",
-            "stage": "test",
-            "stage_label": "Test Run",
-            "test_results": "Workflow conclusion/status is the available test/build result.",
-            "timestamp": "2026-04-21T05:59:07Z",
-            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24706586357",
-            "version": "1979d06a"
           },
           {
             "branch": "develop",
@@ -5028,6 +5028,21 @@
             "timestamp": "2026-04-21T05:37:57.091791Z",
             "url": "",
             "version": "v1.14.0"
+          },
+          {
+            "branch": "",
+            "commit": "48d31ccb",
+            "event": "ci: finish release gate bootstrap",
+            "notes": "Remaker Digital",
+            "result": "recorded",
+            "result_color": "green",
+            "source": "git log",
+            "stage": "commit",
+            "stage_label": "Commit",
+            "test_results": "Correlate with workflow rows sharing this commit.",
+            "timestamp": "2026-04-20T23:39:41-07:00",
+            "url": "",
+            "version": "v1.98.92-119-g48d31ccb"
           },
           {
             "branch": "",
@@ -5193,21 +5208,6 @@
             "timestamp": "2026-04-18T18:11:32-07:00",
             "url": "",
             "version": "v1.98.18-425-g8dcdd4ae"
-          },
-          {
-            "branch": "",
-            "commit": "34905dc3",
-            "event": "memory: S301 wrap-up \u2014 E1 Apply in-flight status",
-            "notes": "Remaker Digital",
-            "result": "recorded",
-            "result_color": "green",
-            "source": "git log",
-            "stage": "commit",
-            "stage_label": "Commit",
-            "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-18T08:28:05-07:00",
-            "url": "",
-            "version": "v1.98.18-424-g34905dc3"
           },
           {
             "branch": "",
@@ -5759,15 +5759,41 @@
           ],
           "workflow_runs": [
             {
-              "conclusion": "",
+              "conclusion": "failure",
+              "createdAt": "2026-04-21T06:40:42Z",
+              "databaseId": 24708031223,
+              "event": "push",
+              "headBranch": "main",
+              "headSha": "48d31ccb8df608362e6d5e0b0a4a910fdafb3ac5",
+              "name": "Release Candidate Gate",
+              "status": "completed",
+              "updatedAt": "2026-04-21T06:43:40Z",
+              "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24708031223",
+              "workflowName": "Release Candidate Gate"
+            },
+            {
+              "conclusion": "success",
+              "createdAt": "2026-04-21T06:40:42Z",
+              "databaseId": 24708031215,
+              "event": "push",
+              "headBranch": "main",
+              "headSha": "48d31ccb8df608362e6d5e0b0a4a910fdafb3ac5",
+              "name": "Lint",
+              "status": "completed",
+              "updatedAt": "2026-04-21T06:41:29Z",
+              "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24708031215",
+              "workflowName": "Lint"
+            },
+            {
+              "conclusion": "failure",
               "createdAt": "2026-04-21T06:34:49Z",
               "databaseId": 24707828765,
               "event": "push",
               "headBranch": "main",
               "headSha": "3cc10348583897c4336ff556660d0c24a22288e1",
               "name": "Release Candidate Gate",
-              "status": "in_progress",
-              "updatedAt": "2026-04-21T06:34:54Z",
+              "status": "completed",
+              "updatedAt": "2026-04-21T06:37:19Z",
               "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828765",
               "workflowName": "Release Candidate Gate"
             },
@@ -5785,28 +5811,28 @@
               "workflowName": "Lint"
             },
             {
-              "conclusion": "",
+              "conclusion": "failure",
               "createdAt": "2026-04-21T06:34:49Z",
               "databaseId": 24707828729,
               "event": "push",
               "headBranch": "main",
               "headSha": "3cc10348583897c4336ff556660d0c24a22288e1",
               "name": "Python Tests",
-              "status": "in_progress",
-              "updatedAt": "2026-04-21T06:34:53Z",
+              "status": "completed",
+              "updatedAt": "2026-04-21T06:43:06Z",
               "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828729",
               "workflowName": "Python Tests"
             },
             {
-              "conclusion": "",
+              "conclusion": "success",
               "createdAt": "2026-04-21T06:34:49Z",
               "databaseId": 24707828717,
               "event": "push",
               "headBranch": "main",
               "headSha": "3cc10348583897c4336ff556660d0c24a22288e1",
               "name": "Deploy docs site",
-              "status": "in_progress",
-              "updatedAt": "2026-04-21T06:34:54Z",
+              "status": "completed",
+              "updatedAt": "2026-04-21T06:36:59Z",
               "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828717",
               "workflowName": "Deploy docs site"
             },
@@ -7031,32 +7057,6 @@
               "updatedAt": "2026-02-08T06:51:22Z",
               "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/21793912363",
               "workflowName": "Docs Quality"
-            },
-            {
-              "conclusion": "failure",
-              "createdAt": "2026-02-02T06:11:24Z",
-              "databaseId": 21579388989,
-              "event": "push",
-              "headBranch": "main",
-              "headSha": "849384a5bd9c7636f41239d2e3c5b0ea7be7171b",
-              "name": "Python Tests",
-              "status": "completed",
-              "updatedAt": "2026-02-02T06:12:10Z",
-              "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/21579388989",
-              "workflowName": "Python Tests"
-            },
-            {
-              "conclusion": "failure",
-              "createdAt": "2026-02-01T19:55:23Z",
-              "databaseId": 21569228996,
-              "event": "push",
-              "headBranch": "main",
-              "headSha": "c63ba9b774d233b16b21be80625f3bd70f428e75",
-              "name": "Python Tests",
-              "status": "completed",
-              "updatedAt": "2026-02-01T19:56:10Z",
-              "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/21569228996",
-              "workflowName": "Python Tests"
             }
           ]
         },
@@ -7109,21 +7109,21 @@
           ],
           "gaps": [],
           "gate_role": "API schema compatibility regression check.",
-          "health": "in_progress",
+          "health": "failing",
           "latest_run": {
-            "conclusion": "",
+            "conclusion": "failure",
             "createdAt": "2026-04-21T06:34:49Z",
             "databaseId": 24707828729,
             "event": "push",
             "headBranch": "main",
             "headSha": "3cc10348583897c4336ff556660d0c24a22288e1",
             "name": "Python Tests",
-            "status": "in_progress",
-            "updatedAt": "2026-04-21T06:34:53Z",
+            "status": "completed",
+            "updatedAt": "2026-04-21T06:43:06Z",
             "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828729",
             "workflowName": "Python Tests"
           },
-          "latest_run_summary": "in_progress on main@3cc1034, updated 2026-04-21T06:34:53Z",
+          "latest_run_summary": "failure on main@3cc1034, updated 2026-04-21T06:43:06Z",
           "order": 140,
           "remediation": "Inspect the OpenAPI compatibility job output, confirm whether schema changes are intentional, then either restore compatibility or document/version the breaking API change.",
           "scope": "implementation_infrastructure",
@@ -7193,21 +7193,21 @@
           ],
           "gaps": [],
           "gate_role": "Primary regression test and line-coverage gate.",
-          "health": "in_progress",
+          "health": "failing",
           "latest_run": {
-            "conclusion": "",
+            "conclusion": "failure",
             "createdAt": "2026-04-21T06:34:49Z",
             "databaseId": 24707828729,
             "event": "push",
             "headBranch": "main",
             "headSha": "3cc10348583897c4336ff556660d0c24a22288e1",
             "name": "Python Tests",
-            "status": "in_progress",
-            "updatedAt": "2026-04-21T06:34:53Z",
+            "status": "completed",
+            "updatedAt": "2026-04-21T06:43:06Z",
             "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828729",
             "workflowName": "Python Tests"
           },
-          "latest_run_summary": "in_progress on main@3cc1034, updated 2026-04-21T06:34:53Z",
+          "latest_run_summary": "failure on main@3cc1034, updated 2026-04-21T06:43:06Z",
           "order": 20,
           "remediation": "Inspect the pytest shard and merged coverage artifacts, reproduce the failing shard locally, then restore the configured coverage threshold before rerunning Python Tests.",
           "scope": "implementation_infrastructure",
@@ -7223,21 +7223,21 @@
           ],
           "gaps": [],
           "gate_role": "Top-level release readiness command for Python and frontend gates.",
-          "health": "in_progress",
+          "health": "failing",
           "latest_run": {
-            "conclusion": "",
-            "createdAt": "2026-04-21T06:34:49Z",
-            "databaseId": 24707828765,
+            "conclusion": "failure",
+            "createdAt": "2026-04-21T06:40:42Z",
+            "databaseId": 24708031223,
             "event": "push",
             "headBranch": "main",
-            "headSha": "3cc10348583897c4336ff556660d0c24a22288e1",
+            "headSha": "48d31ccb8df608362e6d5e0b0a4a910fdafb3ac5",
             "name": "Release Candidate Gate",
-            "status": "in_progress",
-            "updatedAt": "2026-04-21T06:34:54Z",
-            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828765",
+            "status": "completed",
+            "updatedAt": "2026-04-21T06:43:40Z",
+            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24708031223",
             "workflowName": "Release Candidate Gate"
           },
-          "latest_run_summary": "in_progress on main@3cc1034, updated 2026-04-21T06:34:54Z",
+          "latest_run_summary": "failure on main@48d31cc, updated 2026-04-21T06:43:40Z",
           "order": 30,
           "remediation": "Run the release candidate gate locally, fix the first failing release blocker or frontend gate, then rerun the Release Candidate Gate workflow.",
           "scope": "implementation_infrastructure",
@@ -7257,18 +7257,18 @@
           "health": "passing",
           "latest_run": {
             "conclusion": "success",
-            "createdAt": "2026-04-21T06:34:49Z",
-            "databaseId": 24707828739,
+            "createdAt": "2026-04-21T06:40:42Z",
+            "databaseId": 24708031215,
             "event": "push",
             "headBranch": "main",
-            "headSha": "3cc10348583897c4336ff556660d0c24a22288e1",
+            "headSha": "48d31ccb8df608362e6d5e0b0a4a910fdafb3ac5",
             "name": "Lint",
             "status": "completed",
-            "updatedAt": "2026-04-21T06:35:26Z",
-            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24707828739",
+            "updatedAt": "2026-04-21T06:41:29Z",
+            "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24708031215",
             "workflowName": "Lint"
           },
-          "latest_run_summary": "success on main@3cc1034, updated 2026-04-21T06:35:26Z",
+          "latest_run_summary": "success on main@48d31cc, updated 2026-04-21T06:41:29Z",
           "order": 40,
           "remediation": "Run the Ruff blocking and format checks locally, fix E/F/import/format findings in `src/` and `tests/`, then rerun the Lint workflow.",
           "scope": "implementation_infrastructure",
@@ -7455,7 +7455,7 @@
         "available": true,
         "changed_path_count": 0,
         "deleted_path_count": 0,
-        "raw_changed_path_count": 6,
+        "raw_changed_path_count": 8,
         "scope_confidence": "agent_red_current_heuristic",
         "untracked_path_count": 0
       },
@@ -7605,7 +7605,7 @@
         {
           "action": "Review for summarization, archival split, or index-first loading.",
           "evidence": {
-            "bytes": 132186,
+            "bytes": 132183,
             "lines": 3403
           },
           "target": "memory/gtkb-dashboard-history.json",
@@ -7617,7 +7617,7 @@
       "largest_files": [
         {
           "available": true,
-          "bytes": 132186,
+          "bytes": 132183,
           "lines": 3403,
           "path": "memory/gtkb-dashboard-history.json"
         },
@@ -7665,7 +7665,7 @@
         }
       ],
       "scope": "startup_loaded_files_and_coordination_state",
-      "total_bytes": 205887
+      "total_bytes": 205884
     },
     "token_reduction_options": [
       "Use the dashboard link before loading large artifacts into context.",
