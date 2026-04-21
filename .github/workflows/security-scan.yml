@@ -111,12 +111,26 @@ jobs:
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
 
+      - name: Validate Docker Scout ACR secrets
+        env:
+          ACR_SCOUT_USERNAME: ${{ secrets.ACR_SCOUT_USERNAME }}
+          ACR_SCOUT_PASSWORD: ${{ secrets.ACR_SCOUT_PASSWORD }}
+        run: |
+          if [ -z "$ACR_SCOUT_USERNAME" ]; then
+            echo "::error::ACR_SCOUT_USERNAME is required for Docker Scout ACR login"
+            exit 1
+          fi
+          if [ -z "$ACR_SCOUT_PASSWORD" ]; then
+            echo "::error::ACR_SCOUT_PASSWORD is required for Docker Scout ACR login"
+            exit 1
+          fi
+
       - name: Login to ACR
         uses: azure/docker-login@v2
         with:
           login-server: acragentredeastus.azurecr.io
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          username: ${{ secrets.ACR_SCOUT_USERNAME }}
+          password: ${{ secrets.ACR_SCOUT_PASSWORD }}
 
       - name: Build image for scanning
         run: docker build -t agent-red-scan:local . --no-cache

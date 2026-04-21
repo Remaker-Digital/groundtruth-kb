@@ -1,6 +1,6 @@
 # Release Readiness Recovery
 
-Last updated: 2026-04-21 07:11 America/Los_Angeles
+Last updated: 2026-04-21 07:39 America/Los_Angeles
 
 ## Current State
 
@@ -74,7 +74,8 @@ Current evidence:
   to `Remaker-Digital/agent-red-customer-engagement`.
 - Correct-project repository secrets visible through
   `gh secret list --repo Remaker-Digital/agent-red-customer-engagement` include
-  `SONAR_TOKEN`, last updated 2026-04-10T03:57:11Z.
+  `SONAR_TOKEN`, last updated 2026-04-10T03:57:11Z. No ACR or Docker Scout
+  scan secrets are currently configured in GitHub.
 - Correct-project workflow inventory now includes active `SonarCloud` and
   `Security Scan` workflows in
   `Remaker-Digital/agent-red-customer-engagement`.
@@ -85,7 +86,12 @@ Current evidence:
   completed by 2026-04-21T14:07:58Z.
 - Security Scan on `main@869f867a` failed in the Docker Scout job before image
   scanning because `ACR_USERNAME` was not configured as a repository secret.
-  Semgrep SAST, Bandit, and pip-audit jobs passed in the same run.
+  Semgrep SAST, Bandit, and pip-audit jobs passed in the same run. The
+  workflow has since been changed to use scan-only `ACR_SCOUT_USERNAME` and
+  `ACR_SCOUT_PASSWORD` secrets for Docker Scout ACR login.
+- Docker Scout is connected to `acragentredeastus.azurecr.io` through the
+  Docker Scout Azure Container Registry integration using an Azure-created
+  read-only registry token.
 - SonarCloud release evidence is now cleared for the exact candidate:
   `.github/workflows/sonarcloud.yml` runs on `main` and manual dispatch,
   filters the known native dependency from CI install, validates
@@ -107,9 +113,11 @@ Blocker disposition:
   owner-gated. Do not close without an explicit owner decision.
 - GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project
   configuration: cleared for `main@869f867a`.
-- GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`:
-  still blocked. Correct-project Security Scan on `main@869f867a` failed
-  because `ACR_USERNAME` is not configured as a repository secret.
+- GitHub Security Scan must pass with valid scan-only `ACR_SCOUT_USERNAME` and
+  `ACR_SCOUT_PASSWORD`: still blocked. Correct-project Security Scan on
+  `main@869f867a` failed before the scan-only split because `ACR_USERNAME` was
+  not configured as a repository secret; the current workflow now requires the
+  scan-only Docker Scout secrets instead.
 - `main` and `develop` release provenance: operational divergence is cleared
   for the current candidate (`develop` is 0 commits ahead of `main`), but the
   release-branch policy still needs owner/project disposition.
@@ -129,8 +137,9 @@ Recommended next actions:
 - Prime Builder: keep local remote, dashboard GitHub Actions evidence, and
   generated startup reports aligned to
   `Remaker-Digital/agent-red-customer-engagement`.
-- Repo admin: configure valid `ACR_USERNAME` and `ACR_PASSWORD` repository
-  secrets, then rerun Security Scan on the exact candidate.
+- Repo admin: configure valid `ACR_SCOUT_USERNAME` and `ACR_SCOUT_PASSWORD`
+  repository secrets from the Docker Scout read-only ACR token, then rerun
+  Security Scan on the exact candidate.
 - Owner/project: decide the release-branch policy now that `develop` has no
   commits ahead of `main` and `main` is 23 commits ahead of `develop`.
 
@@ -138,7 +147,8 @@ Recommended next actions:
 
 - Production credentials exposed in the deleted generated manifest must be rotated.
 - Owner must decide whether git history requires secret purging.
-- GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`.
+- GitHub Security Scan must pass with valid `ACR_SCOUT_USERNAME` and
+  `ACR_SCOUT_PASSWORD`.
 - Owner/project must decide the release-branch provenance policy for
   `main`/`develop`.
 - Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths.

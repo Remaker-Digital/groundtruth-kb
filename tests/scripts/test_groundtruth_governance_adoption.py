@@ -231,6 +231,18 @@ def test_sonarcloud_workflow_can_verify_exact_release_candidate() -> None:
     assert "SONAR_TOKEN" in workflow
 
 
+def test_security_scan_uses_scan_only_acr_secrets_for_docker_scout() -> None:
+    workflow = _read(".github/workflows/security-scan.yml")
+
+    assert "Validate Docker Scout ACR secrets" in workflow
+    assert "ACR_SCOUT_USERNAME" in workflow
+    assert "ACR_SCOUT_PASSWORD" in workflow
+    assert "username: ${{ secrets.ACR_SCOUT_USERNAME }}" in workflow
+    assert "password: ${{ secrets.ACR_SCOUT_PASSWORD }}" in workflow
+    assert "username: ${{ secrets.ACR_USERNAME }}" not in workflow
+    assert "password: ${{ secrets.ACR_PASSWORD }}" not in workflow
+
+
 def test_release_candidate_skill_documents_mem_and_da_evidence() -> None:
     skill = _read(".claude/skills/release-candidate-gate/SKILL.md")
 
