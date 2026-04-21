@@ -211,9 +211,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Testing Service / Tool Integrations" in dashboard_text
     assert 'id="testingServiceIntegrations"' in dashboard_text
     assert 'class="integration-drilldown"' in dashboard_text
-    assert 'class="status-dot red"' in dashboard_text
-    assert 'class="status-dot yellow"' in dashboard_text
-    assert 'class="status-dot green"' in dashboard_text
+    assert 'class="status-dot ' in dashboard_text
+    assert ".status-dot.red" in dashboard_text
+    assert ".status-dot.yellow" in dashboard_text
+    assert ".status-dot.green" in dashboard_text
     assert "Suggested Remediation" in dashboard_text
     assert "Open the latest failing required workflow runs" in dashboard_text
     assert "Verify the `SONAR_TOKEN` secret" in dashboard_text

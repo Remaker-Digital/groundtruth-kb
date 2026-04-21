@@ -46,4 +46,4 @@ pytest-json-report>=1.5.0
 # GroundTruth KB — specification-driven governance toolkit (S251 closeout)
 # Installed from GitHub tag for reproducible CI. Local dev can override
 # via requirements-local.txt with an editable sibling checkout.
-groundtruth-kb[search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.2.1
+groundtruth-kb[search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.6.1
