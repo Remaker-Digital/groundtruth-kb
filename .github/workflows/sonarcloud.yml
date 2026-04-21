@@ -7,9 +7,10 @@ name: SonarCloud
 
 on:
   push:
-    branches: [develop]
+    branches: [main, develop]
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read

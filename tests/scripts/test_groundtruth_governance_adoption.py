@@ -218,6 +218,15 @@ def test_release_candidate_gate_workflow_has_python_and_frontend_lanes() -> None
     assert "windows-latest" in workflow
 
 
+def test_sonarcloud_workflow_can_verify_exact_release_candidate() -> None:
+    workflow = _read(".github/workflows/sonarcloud.yml")
+
+    assert "branches: [main, develop]" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "Validate SonarCloud token" in workflow
+    assert "SONAR_TOKEN" in workflow
+
+
 def test_release_candidate_skill_documents_mem_and_da_evidence() -> None:
     skill = _read(".claude/skills/release-candidate-gate/SKILL.md")
 
