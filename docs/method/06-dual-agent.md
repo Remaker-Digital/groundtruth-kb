@@ -27,6 +27,20 @@ The evaluating agent. Responsible for:
 
 Loyal Opposition is the *whether it is good enough* agent. It does not implement — it inspects and critiques. Its output is a report, not a code change.
 
+### Owner-assigned active role
+
+Prime Builder and Loyal Opposition are roles, not model names. The owner assigns
+which capable harness is the active Prime Builder for a session or project.
+Implementation authority, file authority, and wrap-up responsibility attach to
+that Prime Builder assignment. Loyal Opposition restrictions attach only to the
+independent reviewer role.
+
+The default `dual-agent` scaffold still maps Claude Code to Prime Builder and
+Codex to Loyal Opposition because those are the battle-tested defaults. Adopter
+projects may override the mapping when another harness is designated as Prime
+Builder. When that happens, update role files, startup disclosures, dashboard
+notes, and bridge instructions so the active builder is stated explicitly.
+
 ## Vision Decision Filter
 
 Prime Builder and Loyal Opposition should evaluate options against the

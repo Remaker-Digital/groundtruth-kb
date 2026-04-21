@@ -11,8 +11,9 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -26,6 +27,9 @@ from groundtruth_kb.bootstrap import (
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.gates import GateRegistry
+
+if TYPE_CHECKING:
+    from groundtruth_kb.dashboard import DashboardPaths
 
 _DEFAULT_TOML = """\
 # GroundTruth KB project configuration
@@ -552,6 +556,190 @@ def serve(ctx: click.Context, port: int, host: str) -> None:
     click.echo(f"  Database: {config.db_path}\n")
 
     uvicorn.run(app, host=host, port=effective_port, log_level="info")
+
+
+# ---------------------------------------------------------------------------
+# gt dashboard
+# ---------------------------------------------------------------------------
+
+
+@main.group()
+def dashboard() -> None:
+    """Generate and run the local Grafana operations dashboard."""
+
+
+def _resolve_dashboard_config(ctx: click.Context, target_dir: str | None) -> GTConfig:
+    if target_dir:
+        project_root = Path(target_dir).resolve()
+        config_path = project_root / "groundtruth.toml"
+        if not config_path.exists():
+            raise click.ClickException(f"groundtruth.toml not found in {project_root}")
+        return GTConfig.load(config_path=config_path)
+    return _resolve_config(ctx)
+
+
+def _dashboard_paths(
+    config: GTConfig,
+    db_path: str | None,
+    runtime_root: str | None,
+    grafana_home: str | None,
+) -> DashboardPaths:
+    from groundtruth_kb.dashboard import resolve_dashboard_paths
+
+    return resolve_dashboard_paths(
+        config,
+        db_path=Path(db_path) if db_path else None,
+        runtime_root=Path(runtime_root) if runtime_root else None,
+        grafana_home=Path(grafana_home) if grafana_home else None,
+    )
+
+
+@dashboard.command("init")
+@click.option(
+    "--dir", "target_dir", type=click.Path(), default=None, help="Project directory (default: config auto-discovery)"
+)
+@click.option("--db-path", type=click.Path(), default=None, help="Dashboard SQLite path")
+@click.option("--runtime-root", type=click.Path(), default=None, help="Dashboard runtime directory")
+@click.option("--grafana-home", type=click.Path(), default=None, help="Grafana install/home directory")
+@click.pass_context
+def dashboard_init(
+    ctx: click.Context,
+    target_dir: str | None,
+    db_path: str | None,
+    runtime_root: str | None,
+    grafana_home: str | None,
+) -> None:
+    """Create dashboard DB, Grafana provisioning, and dashboard JSON."""
+    from groundtruth_kb.dashboard import initialize_dashboard
+
+    config = _resolve_dashboard_config(ctx, target_dir)
+    paths = _dashboard_paths(config, db_path, runtime_root, grafana_home)
+    initialize_dashboard(paths, config)
+    click.echo("GroundTruth KB dashboard initialized.")
+    click.echo(f"  Dashboard DB: {paths.db_path}")
+    click.echo(f"  Grafana provisioning: {paths.provisioning_dir}")
+    click.echo(f"  Dashboard JSON: {paths.dashboards_dir / 'groundtruth-kb-dashboard.json'}")
+
+
+@dashboard.command("refresh")
+@click.option(
+    "--dir", "target_dir", type=click.Path(), default=None, help="Project directory (default: config auto-discovery)"
+)
+@click.option("--db-path", type=click.Path(), default=None, help="Dashboard SQLite path")
+@click.option("--runtime-root", type=click.Path(), default=None, help="Dashboard runtime directory")
+@click.pass_context
+def dashboard_refresh(
+    ctx: click.Context,
+    target_dir: str | None,
+    db_path: str | None,
+    runtime_root: str | None,
+) -> None:
+    """Refresh the generated dashboard SQLite database."""
+    from groundtruth_kb.dashboard import refresh_dashboard_db, write_grafana_assets
+
+    config = _resolve_dashboard_config(ctx, target_dir)
+    paths = _dashboard_paths(config, db_path, runtime_root, None)
+    refresh_dashboard_db(paths, config)
+    write_grafana_assets(paths, config)
+    click.echo(f"Dashboard data refreshed: {paths.db_path}")
+
+
+@dashboard.command("install")
+@click.option(
+    "--dir", "target_dir", type=click.Path(), default=None, help="Project directory (default: config auto-discovery)"
+)
+@click.option("--db-path", type=click.Path(), default=None, help="Dashboard SQLite path")
+@click.option("--runtime-root", type=click.Path(), default=None, help="Dashboard runtime directory")
+@click.option("--grafana-home", type=click.Path(), default=None, help="Grafana install/home directory")
+@click.option("--skip-download", is_flag=True, help="Do not download Grafana; require an existing installation")
+@click.option("--skip-plugin", is_flag=True, help="Do not install the SQLite datasource plugin")
+@click.pass_context
+def dashboard_install(
+    ctx: click.Context,
+    target_dir: str | None,
+    db_path: str | None,
+    runtime_root: str | None,
+    grafana_home: str | None,
+    skip_download: bool,
+    skip_plugin: bool,
+) -> None:
+    """Install local Grafana OSS and the SQLite datasource plugin."""
+    from groundtruth_kb.dashboard import initialize_dashboard, install_grafana
+
+    config = _resolve_dashboard_config(ctx, target_dir)
+    paths = _dashboard_paths(config, db_path, runtime_root, grafana_home)
+    initialize_dashboard(paths, config)
+    try:
+        grafana_bin = install_grafana(paths, skip_download=skip_download, skip_plugin=skip_plugin)
+    except (FileNotFoundError, RuntimeError, subprocess.CalledProcessError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Grafana ready: {grafana_bin}")
+
+
+@dashboard.command("start")
+@click.option(
+    "--dir", "target_dir", type=click.Path(), default=None, help="Project directory (default: config auto-discovery)"
+)
+@click.option("--db-path", type=click.Path(), default=None, help="Dashboard SQLite path")
+@click.option("--runtime-root", type=click.Path(), default=None, help="Dashboard runtime directory")
+@click.option("--grafana-home", type=click.Path(), default=None, help="Grafana install/home directory")
+@click.option("--grafana-port", type=int, default=3000, show_default=True, help="Grafana HTTP port")
+@click.option("--refresh-port", type=int, default=8766, show_default=True, help="Refresh service HTTP port")
+@click.option("--interval-minutes", type=int, default=60, show_default=True, help="Scheduled refresh interval")
+@click.pass_context
+def dashboard_start(
+    ctx: click.Context,
+    target_dir: str | None,
+    db_path: str | None,
+    runtime_root: str | None,
+    grafana_home: str | None,
+    grafana_port: int,
+    refresh_port: int,
+    interval_minutes: int,
+) -> None:
+    """Start Grafana and the local dashboard refresh service."""
+    from groundtruth_kb.dashboard import start_dashboard
+
+    config = _resolve_dashboard_config(ctx, target_dir)
+    paths = _dashboard_paths(config, db_path, runtime_root, grafana_home)
+    try:
+        info = start_dashboard(
+            paths,
+            config,
+            grafana_port=grafana_port,
+            refresh_port=refresh_port,
+            interval_minutes=interval_minutes,
+        )
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo("GroundTruth KB dashboard started.")
+    click.echo(f"  Grafana: {info.grafana_url} (pid {info.grafana_pid})")
+    click.echo(f"  Refresh service: {info.refresh_url} (pid {info.refresh_pid})")
+
+
+@dashboard.command("stop")
+@click.option(
+    "--dir", "target_dir", type=click.Path(), default=None, help="Project directory (default: config auto-discovery)"
+)
+@click.option("--runtime-root", type=click.Path(), default=None, help="Dashboard runtime directory")
+@click.option("--grafana-home", type=click.Path(), default=None, help="Grafana install/home directory")
+@click.pass_context
+def dashboard_stop(
+    ctx: click.Context,
+    target_dir: str | None,
+    runtime_root: str | None,
+    grafana_home: str | None,
+) -> None:
+    """Stop dashboard processes started by ``gt dashboard start``."""
+    from groundtruth_kb.dashboard import stop_dashboard
+
+    config = _resolve_dashboard_config(ctx, target_dir)
+    paths = _dashboard_paths(config, None, runtime_root, grafana_home)
+    stopped = stop_dashboard(paths)
+    if stopped:
+        click.echo(f"Stopped dashboard processes: {', '.join(str(pid) for pid in stopped)}")
+    else:
+        click.echo("No dashboard processes were recorded as running.")
 
 
 # ── gt project (Layer 2 + 3) ─────────────────────────────────────────
