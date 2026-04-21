@@ -155,3 +155,29 @@ project. At minimum, keep an inventory of:
 See [Operational Configuration Capture](11-operational-configuration.md) for
 the full capture contract and [File Bridge Automation](12-file-bridge-automation.md)
 for the durable file-bridge polling pattern.
+
+## Harness role configuration comparison
+
+The current GroundTruth-KB dual-agent install is asymmetric. It configures
+Claude Code most strongly for the Prime Builder role and Codex most directly
+for the Loyal Opposition role. It does not yet fully implement a harness-neutral
+model where every capable harness, such as Claude Code, Codex, or Cursor, is
+prepared to assume either role.
+
+| Area | Prime Builder configuration | Loyal Opposition configuration | Current tests / enforcement | Gap |
+|---|---|---|---|---|
+| Default harness mapping | `claude-code` provider, `claude` CLI, `CLAUDE.md` plus `.claude/settings.json`, bridge role `prime`. | `codex` provider, `codex` CLI, `AGENTS.md`, bridge role `loyal-opposition`. | Scaffold tests verify default dual-agent outputs. | Registry only contains Claude Code and Codex. Cursor is not first-class. Role portability is not fully encoded. |
+| Primary instructions | `CLAUDE.md` and `.claude/rules/prime-builder.md` define builder responsibilities: specifications, implementation, tests, MemBase, and work items. | `AGENTS.md` and `.claude/rules/loyal-opposition.md` define review, critique, evidence, GO/NO-GO/VERIFIED output, and file-safety behavior. | Bootstrap and scaffold tests verify `CLAUDE.md`, `AGENTS.md`, and bridge files are created. | Loyal Opposition configuration is Codex-shaped through `AGENTS.md`, not a generic harness-neutral role package. |
+| Hooks and settings | `.claude/settings.json` registers Claude Code hooks such as session-start governance, spec-before-code, bridge compliance, destructive gate, credential scan, scanner-safe-writer, owner-decision capture, and deliberation gates. | Loyal Opposition receives project files and rules, but Codex does not automatically consume `.claude/settings.json` hooks. Its enforcement is mostly textual plus bridge and report workflow. | Doctor and scaffold tests check hook registration and managed artifact presence. | No native Codex or Cursor hook-registration parity exists today. |
+| Skills | Dual-agent install copies managed skills under `.claude/skills`: `decision-capture`, `bridge-propose`, and `spec-intake`. These mostly support Prime/spec/bridge workflows. | Loyal Opposition uses `AGENTS.md`, bootstrap documents, and report conventions. There is not yet an equivalent native Codex/Cursor Loyal Opposition skill package installed by GroundTruth-KB. | Skill scaffold and upgrade tests verify managed skills are copied and repaired. | Skills are Claude Code filesystem skills, not yet cross-harness plugin packages. |
+| Bridge behavior | Prime Builder writes `NEW` / `REVISED` bridge files, watches for `GO`, `NO-GO`, or `VERIFIED`, and owns implementation follow-through. | Loyal Opposition reads actionable `NEW` / `REVISED` entries, writes numbered review files, and marks `GO`, `NO-GO`, or `VERIFIED`. | Bridge inventory and scaffold tests verify file-bridge defaults. | Defaults are still Claude/Codex-oriented. Harness command slots exist conceptually, but complete multi-harness configuration is not enforced. |
+| Output locations | Prime Builder updates specifications, work items, implementation files, MemBase, bridge artifacts, and release/governance records. | Loyal Opposition reports go under `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` and related Loyal Opposition logs/bootstrap documents. | Scaffold copies Codex bootstrap and independent-progress-assessment files. | Directory names and contracts are Codex-specific rather than role-generic. |
+| Doctor / repair behavior | GroundTruth-KB doctor and upgrade flows strongly protect `.claude` hooks, rules, settings, and managed skills. | Some Loyal Opposition bridge rules and Codex bootstrap artifacts are scaffolded and repaired, but not all Loyal Opposition role enablement is verified as a complete harness package. | Tests cover settings warnings, missing bridge-rule repair, and missing managed-skill repair. | No doctor check yet proves every installed capable harness can act as Prime Builder or Loyal Opposition. |
+| Cursor | No current first-class Prime Builder provider. | No current first-class Loyal Opposition provider. | No provider-registry or scaffold tests for Cursor. | Cursor support remains a candidate implementation item, not current behavior. |
+
+Target state: every installed capable harness should receive role-ready
+configuration for Prime Builder and Loyal Opposition, with harness-native
+instructions, hooks, skills/plugins, bridge polling, and doctor checks where
+the harness supports those capabilities. The owner assigns the active Prime
+Builder role; the bridge participant that is not Prime Builder acts as Loyal
+Opposition.

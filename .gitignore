@@ -11,3 +11,5 @@ dist/
 *.egg-info/
 .venv/
 site/
+.groundtruth-chroma/
+.implementation-log-*.md

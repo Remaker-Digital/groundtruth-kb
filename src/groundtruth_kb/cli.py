@@ -1984,6 +1984,78 @@ def scaffold_iac_cmd(profile: str, apply: bool, target_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# D4: gt scaffold cicd --profile azure-enterprise
+# ---------------------------------------------------------------------------
+
+
+@scaffold.command("cicd")
+@click.option(
+    "--profile",
+    type=click.Choice(["azure-enterprise"]),
+    default="azure-enterprise",
+    help=(
+        "CI/CD scaffold profile. Currently only 'azure-enterprise' is supported "
+        "(12 GitHub Actions CI/CD skeleton files: 2 composite actions + 4 workflow "
+        "YAML + 1 workflow README + 5 adopter docs)."
+    ),
+)
+@click.option(
+    "--apply/--dry-run",
+    default=False,
+    help="Apply scaffold changes to the filesystem (default: dry-run).",
+)
+@click.option(
+    "--target-dir",
+    type=click.Path(path_type=Path),
+    default=".",
+    help="Target directory where the .github/ and docs/azure/ trees are written (default: current directory).",
+)
+def scaffold_cicd_cmd(profile: str, apply: bool, target_dir: Path) -> None:
+    """Generate GitHub Actions CI/CD skeleton files for the given profile (D4).
+
+    For ``azure-enterprise``, generates 12 files under ``.github/`` and
+    ``docs/azure/``:
+
+    - 2 composite actions: ``azure-oidc-login``, ``deploy-evidence``.
+    - 4 workflows: ``iac-validate``, ``iac-apply-staging``,
+      ``iac-apply-production``, ``drift-detection``.
+    - 1 workflow README.
+    - 5 adopter docs under ``docs/azure/``.
+
+    **Scaffold is one-shot and adopter-owned.** Existing files are skipped
+    (never overwritten). If you want to reset a file to skeleton state,
+    delete it first and re-run scaffold.
+
+    Pair with the D3 IaC scaffold (``gt scaffold iac``). The workflows
+    default ``TF_WORKING_DIR`` to ``iac/azure``, which matches the D3
+    tree; override via a GitHub Environment variable if your layout
+    differs.
+    """
+    from groundtruth_kb.cicd_scaffold import (
+        CicdScaffoldConfig,
+        scaffold_azure_cicd,
+    )
+
+    cicd_config = CicdScaffoldConfig(profile=profile, target_dir=target_dir)
+    report = scaffold_azure_cicd(cicd_config, dry_run=not apply)
+
+    mode = "DRY RUN" if report.dry_run else "APPLIED"
+    click.echo(f"Scaffold cicd — profile={profile} — target={target_dir} — {mode}")
+    click.echo(f"  generated files: {len(report.generated)}")
+    click.echo(f"  skipped files:   {len(report.skipped)}")
+
+    if report.skipped:
+        click.echo("\nSkipped (already exist; adopter-owned):")
+        for s in report.skipped:
+            click.echo(f"  - {s['target_path']}: {s['reason']}")
+
+    if report.generated:
+        click.echo("\nGenerated files:")
+        for g in report.generated:
+            click.echo(f"  - {g['target_path']}")
+
+
+# ---------------------------------------------------------------------------
 # D2: gt check adrs --profile azure-enterprise
 # ---------------------------------------------------------------------------
 
