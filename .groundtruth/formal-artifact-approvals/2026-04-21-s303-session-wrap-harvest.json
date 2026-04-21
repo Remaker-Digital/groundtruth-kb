@@ -1,0 +1,17 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "S303-SESSION-WRAP-HARVEST-2026-04-21",
+  "action": "session-wrap-deliberation-harvest",
+  "source_ref": "owner_conversation:2026-04-21-s303-wrap-permission",
+  "full_content": "Session wrap-up deliberation harvest approval for S303.\n\nOwner authorization:\n- Owner requested: run the full kb-session-wrap procedure.\n- After GOV gate blocked harvest, owner explicitly said: You have permission to mutate artifacts during session wrap-up.\n\nApproved operation:\n- Run the session deliberation harvest apply step for S303 through the project wrap-up procedure.\n- Use this approval only for session-wrap deliberation archive/source updates arising from the S303 wrap-up.\n- Do not use this approval for unrelated formal artifact edits, credential changes, deployment, or cleanup.\n",
+  "full_content_sha256": "3c7b7090e1e6eefa7fe2eaf1977b4ab63ba6bc40c2eb921ec62f884dc5d91b27",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner first requested: run the full kb-session-wrap procedure. After the formal-artifact gate blocked the harvest step, owner explicitly said: You have permission to mutate artifacts during session wrap-up.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Authorize the S303 session-wrap deliberation harvest step.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner",
+  "expires_at": "2026-04-22T08:00:00Z"
+}

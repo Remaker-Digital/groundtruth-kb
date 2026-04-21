@@ -1,6 +1,6 @@
 # Release Readiness Recovery
 
-Last updated: 2026-04-20 21:39 America/Los_Angeles
+Last updated: 2026-04-21 00:23 America/Los_Angeles
 
 ## Current State
 
@@ -10,7 +10,7 @@ Agent Red is in release-readiness recovery after a production-readiness inspecti
 - fail-open standalone admin behavior when deployed without an admin password,
 - static fallback signing secrets reaching production if env vars are absent,
 - red GitHub security/SonarCloud gates,
-- incomplete exact-candidate CI coverage on `develop`,
+- incomplete exact-candidate CI evidence for the active release branch,
 - in-memory production-facing commercial state requiring a launch-scope decision.
 
 ## Completed Recovery Work
@@ -54,10 +54,11 @@ supersede every blocker with governed evidence.
 
 Current evidence:
 
-- Local branch: `develop` at `99bc114b`.
-- Remote branch divergence: `origin/main...origin/develop` reports 7 commits
-  unique to `main` and 112 commits unique to `develop`; release provenance is
-  not reconciled.
+- Local branch: `main` at `760efa43`.
+- Remote branch divergence: `origin/main...origin/develop` reports 15 commits
+  unique to `main` and 0 commits unique to `develop`; `develop` no longer has
+  unreconciled release-candidate commits ahead of `main`, but the branch-policy
+  decision for future release provenance still needs owner/project disposition.
 - Generated manifest containment: `scripts/deploy/production-gateway-generated.yaml`
   does not exist in the working tree, remains tracked, and is staged as a
   pending deletion in local git status.
@@ -77,20 +78,15 @@ Current evidence:
   `Python Tests`; `gh workflow list` / `gh run list` found no active workflows
   named `SonarCloud` or `Security Scan` in
   `Remaker-Digital/agent-red-customer-engagement`.
-- Latest checked correct-project Python Tests run failed:
-  `https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/21579388989`
-  on `849384a5`, completed 2026-02-02T06:12:10Z. No latest-candidate green
-  Python/quality/security run exists on the correct project.
+- Exact-candidate GitHub Actions evidence for `main@760efa43` is green for
+  Release Candidate Gate, Python Tests, Lint, and Accessibility. The runs were
+  created 2026-04-21T07:00:46Z and completed by 2026-04-21T07:09:46Z.
 - Prior SonarCloud and Security Scan failures harvested from any non-authoritative
   repository are no longer release evidence for Agent Red.
-- Local workflow deltas already present in the working tree add Security Scan
-  path coverage, ACR login for Docker Scout, Bandit config usage, Sonar token
-  validation, and Sonar scanner action v6, but those deltas are not yet proven
-  by a green remote run on the exact candidate.
-- Local non-deploying release candidate gate passed under Python 3.14:
-  `python scripts/release_candidate_gate.py --skip-frontend` completed Ruff
-  E/F, import-cycle detection, Bandit, pip-audit, Codex hook parity, and 183
-  targeted tests.
+- Local non-deploying release candidate gate passed after the GT-KB dependency
+  alignment fix: `python scripts/release_candidate_gate.py --skip-frontend`
+  completed Ruff E/F, import-cycle detection, Bandit, pip-audit, Codex hook
+  parity, and 183 targeted tests.
 
 Blocker disposition:
 
@@ -105,12 +101,11 @@ Blocker disposition:
 - GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`:
   still blocked. No active correct-project Security Scan workflow/run evidence
   exists.
-- `main` and `develop` release provenance must be reconciled: still blocked by
-  branch divergence evidence.
-- Full Python 3.12 CI must pass on the exact candidate commit: still blocked
-  until release-candidate gate and Python workflows pass on the intended
-  release commit under Python 3.12. Local Python 3.14 gate evidence is green
-  but does not supersede exact-candidate CI.
+- `main` and `develop` release provenance: operational divergence is cleared
+  for the current candidate (`develop` is 0 commits ahead of `main`), but the
+  release-branch policy still needs owner/project disposition.
+- Full Python 3.12 CI on the exact candidate commit: cleared for
+  `main@760efa43` by green Release Candidate Gate and Python Tests runs.
 - Commercial durability launch scope must be decided for
   Shopify/Stripe/action-executor in-memory paths: still owner/product-scope
   gated.
@@ -125,11 +120,10 @@ Recommended next actions:
 - Prime Builder: keep local remote, dashboard GitHub Actions evidence, and
   generated startup reports aligned to
   `Remaker-Digital/agent-red-customer-engagement`.
-- Prime Builder or repo admin: add or restore SonarCloud, Security Scan, and
-  Release Candidate Gate workflows on the correct project, then run them on the
-  exact candidate.
-- Prime Builder: reconcile `main` and `develop` before recommending any
-  production GO.
+- Prime Builder or repo admin: add or restore SonarCloud and Security Scan
+  workflows on the correct project, then run them on the exact candidate.
+- Owner/project: decide the release-branch policy now that `develop` has no
+  commits ahead of `main` and `main` is 15 commits ahead of `develop`.
 
 ## Remaining Release Blockers
 
@@ -137,8 +131,8 @@ Recommended next actions:
 - Owner must decide whether git history requires secret purging.
 - GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project configuration.
 - GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`.
-- `main` and `develop` release provenance must be reconciled.
-- Full Python 3.12 CI must pass on the exact candidate commit.
+- Owner/project must decide the release-branch provenance policy for
+  `main`/`develop`.
 - Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths.
 
 ## Governance Notes

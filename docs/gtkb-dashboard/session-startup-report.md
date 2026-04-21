@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-21T06:45:36Z
+Generated: 2026-04-21T07:24:35Z
 
 ## Startup Disclosure
 
@@ -27,12 +27,12 @@ Generated: 2026-04-21T06:45:36Z
 
 ### Current Project State
 
-- Release blockers: 7
+- Release blockers: 6
 - Active backlog items: 3
 - Open MemBase work items: 29
 - Actionable bridge/contention entries: 0
 - Drift changed paths: 0
-- Testing/tool rollup: 7 failing, 6 manual, 16 ready/passing
+- Testing/tool rollup: 4 failing, 6 manual, 16 ready/passing
 - GT-KB infrastructure posture: package 0.6.1; dry-run upgrade plan available: True
 
 ### Wrap-Up Trigger Commands
@@ -54,11 +54,11 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Focus this session on the established top priority actions. Current priorities: GTKB-GOV-006: Close Agent Red release-readiness blocker list; GTKB-GOV-007: Revise commercial readiness NO-GO tracks for SPEC-1831, SPEC-1832, and SPEC-1833; GTKB-GOV-010: Maintain standing backlog harvest audit as release-gate input. Start with GTKB-GOV-006: Close Agent Red release-readiness blocker list; explain the current evidence, immediate next command, and expected verification.
 
 3. **Resolve Release Blockers**
-   Current signal: 7 release blocker(s) are visible in the dashboard.
+   Current signal: 6 release blocker(s) are visible in the dashboard.
    Prompt details: Focus this session on clearing release blockers. Start with Production credentials exposed in the deleted generated manifest must be rotated. Verify the result with scripts/release_candidate_gate.py and update governed evidence.
 
 4. **Repair Testing/Tool Integrations**
-   Current signal: 7 failing and 1 unknown integration(s) are visible.
+   Current signal: 4 failing and 1 unknown integration(s) are visible.
    Prompt details: Focus this session on restoring testing service/tool integration health. Start with GitHub Actions: Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions. Preserve GT-KB as infrastructure evidence.
 
 5. **Remediate Known Risks**
