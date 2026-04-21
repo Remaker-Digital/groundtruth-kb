@@ -214,6 +214,19 @@ class TestConfigurationDriftAcrossLayers:
             "Workflow must use '-f Dockerfile.test' flag"
         )
 
+    def test_production_dockerfile_avoids_curl_healthcheck_dependency(self):
+        """Production image healthcheck must not pull curl/libnghttp2 into the image."""
+        text = "\n".join(_get_dockerfile())
+        assert "apt-get upgrade -y" in text, (
+            "Dockerfile must upgrade base OS packages before Docker Scout scanning"
+        )
+        assert "curl" not in text, (
+            "Production Dockerfile must not install curl just for HEALTHCHECK"
+        )
+        assert "urllib.request.urlopen" in text, (
+            "Production Dockerfile must use Python stdlib healthcheck instead of curl"
+        )
+
 
 # ===========================================================================
 # 2. TestEnvironmentAssumptionMismatch
