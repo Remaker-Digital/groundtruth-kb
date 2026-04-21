@@ -19,6 +19,7 @@ jobs:
   sonarcloud:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +32,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt || true
+          python -m pip install --upgrade pip
+          grep -v '^agntcy-app-sdk' requirements.txt > /tmp/requirements-filtered.txt
+          pip install -r /tmp/requirements-filtered.txt
           pip install pytest pytest-cov
 
       - name: Run tests with coverage
