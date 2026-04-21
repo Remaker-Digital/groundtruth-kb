@@ -47,11 +47,7 @@ def test_standing_backlog_audit_summarizes_membase_work_items_and_release_blocke
     assert audit["work_items"]["status_counts"]["blocked"] >= 1
     assert any(item["priority"] == "P0" for item in audit["work_items"]["top_non_terminal"])
     assert "Production credentials exposed in the deleted generated manifest must be rotated." in audit["release_blockers"]
-    assert any(
-        blocker.startswith("If deploying repository HEAD rather than the last green code candidate, ")
-        and "required CI evidence must be obtained for `" in blocker
-        for blocker in audit["release_blockers"]
-    )
+    assert not any("required CI evidence must be obtained" in blocker for blocker in audit["release_blockers"])
     assert (
         "Owner/project must decide the release-branch provenance policy for "
         "`main`/`develop`."
