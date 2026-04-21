@@ -54,7 +54,8 @@ supersede every blocker with governed evidence.
 
 Current evidence:
 
-- Local branch: `main` at `760efa43`.
+- Local branch: `main` at `f06e28e5` after the session-wrap artifact commit.
+- Last green code candidate: `main@760efa43`.
 - Remote branch divergence: `origin/main...origin/develop` reports 15 commits
   unique to `main` and 0 commits unique to `develop`; `develop` no longer has
   unreconciled release-candidate commits ahead of `main`, but the branch-policy
@@ -78,9 +79,13 @@ Current evidence:
   `Python Tests`; `gh workflow list` / `gh run list` found no active workflows
   named `SonarCloud` or `Security Scan` in
   `Remaker-Digital/agent-red-customer-engagement`.
-- Exact-candidate GitHub Actions evidence for `main@760efa43` is green for
-  Release Candidate Gate, Python Tests, Lint, and Accessibility. The runs were
-  created 2026-04-21T07:00:46Z and completed by 2026-04-21T07:09:46Z.
+- GitHub Actions evidence for the last code candidate `main@760efa43` is green
+  for Release Candidate Gate, Python Tests, Lint, and Accessibility. The runs
+  were created 2026-04-21T07:00:46Z and completed by 2026-04-21T07:09:46Z.
+- No GitHub Actions run was visible yet for wrap-only HEAD `f06e28e5` during
+  wrap-up verification. Treat `760efa43` as the last green code candidate, or
+  rerun required gates on `f06e28e5` before treating repository HEAD as the
+  exact production candidate.
 - Prior SonarCloud and Security Scan failures harvested from any non-authoritative
   repository are no longer release evidence for Agent Red.
 - Local non-deploying release candidate gate passed after the GT-KB dependency
@@ -104,8 +109,10 @@ Blocker disposition:
 - `main` and `develop` release provenance: operational divergence is cleared
   for the current candidate (`develop` is 0 commits ahead of `main`), but the
   release-branch policy still needs owner/project disposition.
-- Full Python 3.12 CI on the exact candidate commit: cleared for
-  `main@760efa43` by green Release Candidate Gate and Python Tests runs.
+- Full Python 3.12 CI on the last code candidate commit: cleared for
+  `main@760efa43` by green Release Candidate Gate and Python Tests runs. If
+  deploying repository HEAD, rerun or obtain required CI evidence for
+  `f06e28e5`.
 - Commercial durability launch scope must be decided for
   Shopify/Stripe/action-executor in-memory paths: still owner/product-scope
   gated.
@@ -131,6 +138,8 @@ Recommended next actions:
 - Owner must decide whether git history requires secret purging.
 - GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project configuration.
 - GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`.
+- If deploying repository HEAD rather than the last green code candidate,
+  required CI evidence must be obtained for `f06e28e5`.
 - Owner/project must decide the release-branch provenance policy for
   `main`/`develop`.
 - Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths.

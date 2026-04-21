@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Proactive Session Wrap-Up
 
-Generated: 2026-04-21T07:24:35Z
+Generated: 2026-04-21T07:27:36Z
 
 ## Governance Principle
 
@@ -19,7 +19,7 @@ Generated: 2026-04-21T07:24:35Z
 
 - Active backlog items: 3
 - Open MemBase work items: 29
-- Release blockers: 6
+- Release blockers: 7
 - Actionable bridge/contention entries: 0
 - Drift changed paths: 0
 

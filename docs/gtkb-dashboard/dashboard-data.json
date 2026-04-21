@@ -5,23 +5,6 @@
       "contention_actionable_bridge_count": 0,
       "deliberation_archive_current_total": 324,
       "drift_changed_path_count": 11,
-      "generated_at": "2026-04-21T00:36:35Z",
-      "membase_open_work_items": 29,
-      "pytest_file_count": 338,
-      "regression_release_blocker_count": 7,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 40,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 4,
-      "contention_actionable_bridge_count": 0,
-      "deliberation_archive_current_total": 324,
-      "drift_changed_path_count": 11,
       "generated_at": "2026-04-21T00:37:09Z",
       "membase_open_work_items": 29,
       "pytest_file_count": 338,
@@ -3399,6 +3382,23 @@
       "specification_current_total": 1847,
       "token_measurement_status": "not_exposed_by_current_harness",
       "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 3,
+      "contention_actionable_bridge_count": 0,
+      "deliberation_archive_current_total": 324,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-21T07:27:36Z",
+      "membase_open_work_items": 29,
+      "pytest_file_count": 338,
+      "regression_release_blocker_count": 7,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 40,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
     }
   ],
   "model": {
@@ -3509,7 +3509,7 @@
           "why": "Listed as a release-readiness blocker."
         },
         {
-          "action": "Owner/project must decide the release-branch provenance policy for",
+          "action": "If deploying repository HEAD rather than the last green code candidate,",
           "owner_lane": "Owner / Prime Builder",
           "remediation": "Resolve, explicitly defer with owner approval, or supersede with newer governed evidence.",
           "severity": "red",
@@ -3562,12 +3562,12 @@
         }
       ],
       "data_freshness": {
-        "generated_at": "2026-04-21T07:24:35Z",
-        "groundtruth_db_modified_at": "2026-04-21T07:24:40.992522Z",
-        "last_commit": "2026-04-21T00:00:23-07:00\nci: align gtkb release gate dependencies",
+        "generated_at": "2026-04-21T07:27:36Z",
+        "groundtruth_db_modified_at": "2026-04-21T07:27:40.995842Z",
+        "last_commit": "2026-04-21T00:25:58-07:00\nchore: record s303 session wrap",
         "repo_branch": "main",
-        "repo_sha": "760efa4376d19a3a17612b7af04c827e21b0660b",
-        "repo_short_sha": "760efa43",
+        "repo_sha": "f06e28e5bad4a3dc3106931f6957389b5fb7d981",
+        "repo_short_sha": "f06e28e5",
         "scope_version": "agent_red_v1",
         "sources": [
           "groundtruth.db",
@@ -3584,13 +3584,13 @@
           "label": "Project Health",
           "status": "red",
           "tooltip": "Release blockers plus failing integrations.",
-          "value": "10 issues"
+          "value": "11 issues"
         },
         {
           "label": "Release Readiness",
           "status": "red",
           "tooltip": "Open release-readiness blockers from the governed evidence file.",
-          "value": "6 blockers"
+          "value": "7 blockers"
         },
         {
           "label": "CI / Testing",
@@ -3631,12 +3631,13 @@
         "unknown": 1
       },
       "release_readiness": {
-        "blocker_count": 6,
+        "blocker_count": 7,
         "blockers": [
           "Production credentials exposed in the deleted generated manifest must be rotated.",
           "Owner must decide whether git history requires secret purging.",
           "GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project configuration.",
           "GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`.",
+          "If deploying repository HEAD rather than the last green code candidate,",
           "Owner/project must decide the release-branch provenance policy for",
           "Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths."
         ],
@@ -3650,7 +3651,7 @@
       },
       "risk_register": [
         {
-          "evidence": "6 release blocker(s) remain.",
+          "evidence": "7 release blocker(s) remain.",
           "impact": "Stakeholder-ready release posture cannot be claimed.",
           "owner": "Owner / Prime Builder",
           "remediation": "Close, defer, or supersede every blocker with governed evidence.",
@@ -3758,7 +3759,7 @@
         "report-depth-prime-builder-context.md"
       ]
     },
-    "generated_at": "2026-04-21T07:24:35Z",
+    "generated_at": "2026-04-21T07:27:36Z",
     "governance_stance": [
       "Strict GOV enforcement where mechanically available",
       "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
@@ -3775,7 +3776,7 @@
             "count": 12,
             "label": "Commit",
             "latest_result": "recorded",
-            "latest_version": "v1.98.92-121-g760efa43",
+            "latest_version": "v1.98.92-122-gf06e28e5",
             "stage": "commit",
             "status": "green"
           },
@@ -5030,6 +5031,21 @@
           },
           {
             "branch": "",
+            "commit": "f06e28e5",
+            "event": "chore: record s303 session wrap",
+            "notes": "Remaker Digital",
+            "result": "recorded",
+            "result_color": "green",
+            "source": "git log",
+            "stage": "commit",
+            "stage_label": "Commit",
+            "test_results": "Correlate with workflow rows sharing this commit.",
+            "timestamp": "2026-04-21T00:25:58-07:00",
+            "url": "",
+            "version": "v1.98.92-122-gf06e28e5"
+          },
+          {
+            "branch": "",
             "commit": "760efa43",
             "event": "ci: align gtkb release gate dependencies",
             "notes": "Remaker Digital",
@@ -5192,21 +5208,6 @@
             "timestamp": "2026-04-18T18:40:54-07:00",
             "url": "",
             "version": "v1.98.18-428-g429053cf"
-          },
-          {
-            "branch": "",
-            "commit": "94d4b9dd",
-            "event": "feat(por): Step 16.D Phase 2 \u2014 orphan-test sibling-match auto-link + classification report",
-            "notes": "Remaker Digital",
-            "result": "recorded",
-            "result_color": "green",
-            "source": "git log",
-            "stage": "commit",
-            "stage_label": "Commit",
-            "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-18T18:34:45-07:00",
-            "url": "",
-            "version": "v1.98.18-427-g94d4b9dd"
           },
           {
             "branch": "",
@@ -7454,7 +7455,7 @@
         "available": true,
         "changed_path_count": 0,
         "deleted_path_count": 0,
-        "raw_changed_path_count": 8,
+        "raw_changed_path_count": 1,
         "scope_confidence": "agent_red_current_heuristic",
         "untracked_path_count": 0
       },
@@ -7486,10 +7487,11 @@
           "Owner must decide whether git history requires secret purging.",
           "GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project configuration.",
           "GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`.",
+          "If deploying repository HEAD rather than the last green code candidate,",
           "Owner/project must decide the release-branch provenance policy for",
           "Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths."
         ],
-        "release_blocker_count": 6,
+        "release_blocker_count": 7,
         "release_gate_script": "scripts/release_candidate_gate.py",
         "startup_self_initialization_test": "tests/scripts/test_session_self_initialization.py"
       },
@@ -7603,7 +7605,7 @@
         {
           "action": "Review for summarization, archival split, or index-first loading.",
           "evidence": {
-            "bytes": 132167,
+            "bytes": 132166,
             "lines": 3403
           },
           "target": "memory/gtkb-dashboard-history.json",
@@ -7615,7 +7617,7 @@
       "largest_files": [
         {
           "available": true,
-          "bytes": 132167,
+          "bytes": 132166,
           "lines": 3403,
           "path": "memory/gtkb-dashboard-history.json"
         },
@@ -7663,7 +7665,7 @@
         }
       ],
       "scope": "startup_loaded_files_and_coordination_state",
-      "total_bytes": 205868
+      "total_bytes": 205867
     },
     "token_reduction_options": [
       "Use the dashboard link before loading large artifacts into context.",
