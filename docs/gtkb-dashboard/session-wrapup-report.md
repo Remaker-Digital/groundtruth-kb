@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Proactive Session Wrap-Up
 
-Generated: 2026-04-21T05:57:36Z
+Generated: 2026-04-21T06:30:36Z
 
 ## Governance Principle
 
@@ -21,7 +21,7 @@ Generated: 2026-04-21T05:57:36Z
 - Open MemBase work items: 29
 - Release blockers: 7
 - Actionable bridge/contention entries: 0
-- Drift changed paths: 0
+- Drift changed paths: 1
 
 ## Suggested Next User Actions
 

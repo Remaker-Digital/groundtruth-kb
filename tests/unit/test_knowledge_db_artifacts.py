@@ -62,15 +62,16 @@ class TestSchemaExists:
             ).fetchall()
         )
         expected = sorted([
-            "assertion_runs", "backlog_snapshots", "documents",
-            "environment_config", "operational_procedures", "quality_scores",
-            "session_prompts", "specifications", "test_coverage",
-            "test_plan_phases", "test_plans", "test_procedures",
-            "testable_elements", "tests", "work_items",
+            "assertion_runs", "backlog_snapshots", "deliberation_specs",
+            "deliberation_work_items", "deliberations", "documents",
+            "environment_config", "operational_procedures", "pipeline_events",
+            "quality_scores", "session_prompts", "session_snapshots",
+            "spec_quality_scores", "specifications", "test_coverage", "test_plan_phases",
+            "test_plans", "test_procedures", "testable_elements", "tests", "work_items",
         ])
         assert tables == expected
 
-    def test_all_11_views_exist(self, db):
+    def test_all_views_exist(self, db):
         conn = db._get_conn()
         views = sorted(
             r[0] for r in conn.execute(
@@ -78,7 +79,7 @@ class TestSchemaExists:
             ).fetchall()
         )
         expected = sorted([
-            "current_backlog_snapshots", "current_documents",
+            "current_backlog_snapshots", "current_deliberations", "current_documents",
             "current_environment_config", "current_operational_procedures",
             "current_specifications", "current_testable_elements",
             "current_test_plan_phases", "current_test_plans",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -92,6 +93,10 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     )
 
     start_dispatcher = Path.home() / ".codex" / "agent-red-hooks" / "session_start_dispatch.py"
+    if not start_dispatcher.is_file():
+        assert os.environ.get("CI") == "true"
+        return
+
     start_text = start_dispatcher.read_text(encoding="utf-8")
     assert "--emit-report" in start_text
     assert "prime-builder" in start_text

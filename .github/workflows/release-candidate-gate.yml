@@ -75,6 +75,16 @@ jobs:
           npm --prefix admin/provider ci
           npm --prefix admin/shopify ci
 
+      - name: Prepare CI frontend environment
+        shell: pwsh
+        run: |
+          @"
+          VITE_API_URL=http://localhost:8000
+          VITE_SHOPIFY_API_KEY=ci_dummy_shopify_key
+          AGENT_RED_GITHUB_REPO=Remaker-Digital/agent-red-customer-engagement
+          GROUND_TRUTH_GITHUB_REPO=Remaker-Digital/groundtruth-kb
+          "@ | Set-Content -Path .env.local -Encoding UTF8 -NoNewline
+
       - name: Run frontend release-candidate gate
         shell: pwsh
         run: python scripts/release_candidate_gate.py --skip-python --include-frontend
