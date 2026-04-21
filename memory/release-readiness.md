@@ -1,6 +1,6 @@
 # Release Readiness Recovery
 
-Last updated: 2026-04-21 00:54 America/Los_Angeles
+Last updated: 2026-04-21 07:11 America/Los_Angeles
 
 ## Current State
 
@@ -9,7 +9,7 @@ Agent Red is in release-readiness recovery after a production-readiness inspecti
 - tracked generated production manifest with plaintext credentials,
 - fail-open standalone admin behavior when deployed without an admin password,
 - static fallback signing secrets reaching production if env vars are absent,
-- red GitHub security/SonarCloud gates,
+- red GitHub Security Scan gate,
 - owner-gated release provenance and secret-history decisions,
 - in-memory production-facing commercial state requiring a launch-scope decision.
 
@@ -54,9 +54,9 @@ supersede every blocker with governed evidence.
 
 Current evidence:
 
-- Local branch: `main` at `cd9c4625` after the wrapped-release-blocker parser fix.
-- Last green code candidate: `main@cd9c4625`.
-- Remote branch divergence: `origin/main...origin/develop` reports 18 commits
+- Local branch: `main` at `869f867a` after the SonarCloud trigger, dependency, and organization-key fixes.
+- Last green code candidate: `main@869f867a`.
+- Remote branch divergence: `origin/main...origin/develop` reports 23 commits
   unique to `main` and 0 commits unique to `develop`; `develop` no longer has
   unreconciled release-candidate commits ahead of `main`, but the branch-policy
   decision for future release provenance still needs owner/project disposition.
@@ -75,23 +75,22 @@ Current evidence:
 - Correct-project repository secrets visible through
   `gh secret list --repo Remaker-Digital/agent-red-customer-engagement` include
   `SONAR_TOKEN`, last updated 2026-04-10T03:57:11Z.
-- Correct-project workflow inventory currently lists `Docs Quality` and
-  `Python Tests`; `gh workflow list` / `gh run list` found no active workflows
-  named `SonarCloud` or `Security Scan` in
+- Correct-project workflow inventory now includes active `SonarCloud` and
+  `Security Scan` workflows in
   `Remaker-Digital/agent-red-customer-engagement`.
-- GitHub Actions evidence for the current candidate `main@cd9c4625` is green
-  for Release Candidate Gate, Python Tests, and Lint. Release Candidate Gate
-  included the Python 3.12 release gate and Windows frontend/widget gate. The
-  runs were created 2026-04-21T07:41:24Z and completed by
-  2026-04-21T07:50:44Z.
-- Security Scan on `main@cd9c4625` failed in the Docker Scout job before image
+- GitHub Actions evidence for the current candidate `main@869f867a` is green
+  for Release Candidate Gate, Python Tests, Lint, and SonarCloud. Release
+  Candidate Gate included the Python 3.12 release gate and Windows
+  frontend/widget gate. The runs were created 2026-04-21T13:59:04Z and
+  completed by 2026-04-21T14:07:58Z.
+- Security Scan on `main@869f867a` failed in the Docker Scout job before image
   scanning because `ACR_USERNAME` was not configured as a repository secret.
   Semgrep SAST, Bandit, and pip-audit jobs passed in the same run.
-- SonarCloud is active but still not release-ready evidence: the latest
-  SonarCloud runs are failing Dependabot pull-request runs where
-  `SONAR_TOKEN` is empty in the workflow context, and the current workflow does
-  not provide a manual dispatch or `main` push path for exact-candidate
-  SonarCloud verification.
+- SonarCloud release evidence is now cleared for the exact candidate:
+  `.github/workflows/sonarcloud.yml` runs on `main` and manual dispatch,
+  filters the known native dependency from CI install, validates
+  `SONAR_TOKEN`, and uses the discoverable Sonar organization key
+  `mike-remakerdigital`.
 - Prior SonarCloud and Security Scan failures harvested from any
   non-authoritative repository are no longer release evidence for Agent Red.
 - Local non-deploying release candidate gate passed after the wrapped-blocker
@@ -107,18 +106,15 @@ Blocker disposition:
 - Owner must decide whether git history requires secret purging: still
   owner-gated. Do not close without an explicit owner decision.
 - GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project
-  configuration: still blocked. `SONAR_TOKEN` exists as an Actions secret in
-  the correct project, but current SonarCloud runs are Dependabot PR runs where
-  that secret is empty; no exact-candidate `main@cd9c4625` SonarCloud run
-  exists.
+  configuration: cleared for `main@869f867a`.
 - GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`:
-  still blocked. Correct-project Security Scan on `main@cd9c4625` failed
+  still blocked. Correct-project Security Scan on `main@869f867a` failed
   because `ACR_USERNAME` is not configured as a repository secret.
 - `main` and `develop` release provenance: operational divergence is cleared
   for the current candidate (`develop` is 0 commits ahead of `main`), but the
   release-branch policy still needs owner/project disposition.
 - Full Python 3.12 CI on the current candidate commit: cleared for
-  `main@cd9c4625` by green Release Candidate Gate and Python Tests runs.
+  `main@869f867a` by green Release Candidate Gate and Python Tests runs.
 - Commercial durability launch scope must be decided for
   Shopify/Stripe/action-executor in-memory paths: still owner/product-scope
   gated.
@@ -133,19 +129,15 @@ Recommended next actions:
 - Prime Builder: keep local remote, dashboard GitHub Actions evidence, and
   generated startup reports aligned to
   `Remaker-Digital/agent-red-customer-engagement`.
-- Prime Builder or repo admin: add an exact-candidate SonarCloud trigger
-  (`workflow_dispatch` and/or `main` push) and repair Dependabot secret
-  behavior, then run SonarCloud on the exact candidate.
 - Repo admin: configure valid `ACR_USERNAME` and `ACR_PASSWORD` repository
   secrets, then rerun Security Scan on the exact candidate.
 - Owner/project: decide the release-branch policy now that `develop` has no
-  commits ahead of `main` and `main` is 18 commits ahead of `develop`.
+  commits ahead of `main` and `main` is 23 commits ahead of `develop`.
 
 ## Remaining Release Blockers
 
 - Production credentials exposed in the deleted generated manifest must be rotated.
 - Owner must decide whether git history requires secret purging.
-- GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project configuration.
 - GitHub Security Scan must pass with valid `ACR_USERNAME` and `ACR_PASSWORD`.
 - Owner/project must decide the release-branch provenance policy for
   `main`/`develop`.
