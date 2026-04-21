@@ -1,15 +1,14 @@
 # Release Readiness Recovery
 
-Last updated: 2026-04-21 08:17 America/Los_Angeles
+Last updated: 2026-04-21 08:52 America/Los_Angeles
 
 ## Current State
 
-Agent Red is in release-readiness recovery after a production-readiness inspection found P0/P1 blockers:
+Agent Red is in release-readiness recovery after a production-readiness inspection found P0/P1 blockers. The current code candidate is `main@e01e8ac` with green GitHub Actions evidence for Lint, Python Tests, Release Candidate Gate, SonarCloud, and Security Scan.
 
 - tracked generated production manifest with plaintext credentials,
 - fail-open standalone admin behavior when deployed without an admin password,
 - static fallback signing secrets reaching production if env vars are absent,
-- red GitHub Security Scan gate,
 - owner-gated release provenance and secret-history decisions,
 - in-memory production-facing commercial state requiring a launch-scope decision.
 
@@ -25,6 +24,8 @@ Agent Red is in release-readiness recovery after a production-readiness inspecti
 - Added `.github/workflows/release-candidate-gate.yml`.
 - Changed `.github/workflows/python-tests.yml` so full Python shards run on `develop` pushes.
 - Changed `.github/workflows/security-scan.yml` so Semgrep scans outside `src/` and Docker Scout logs into ACR before building.
+- Changed `.github/workflows/security-scan.yml` so Docker Scout uses scan-only ACR credentials and separate Docker Hub authentication secrets.
+- Reduced the production Docker image vulnerability surface by removing the curl healthcheck dependency, upgrading Debian packages during build, and switching the healthcheck to Python stdlib.
 - Added `pyOpenSSL>=26.0.0` to resolve dependency audit CVEs.
 - Added Bandit config for the Cosmos-query B608 heuristic and verified Bandit medium/high gate passes.
 - Added `.claude/skills/release-candidate-gate/SKILL.md` to make the non-deploying release gate an explicit local operator skill.
@@ -45,6 +46,7 @@ Observable regression coverage now includes:
 - `tests/scripts/test_groundtruth_governance_adoption.py` for GroundTruth adopter config, KnowledgeDB gate plugin config, governance hook/rule/skill presence, gitignore visibility, release workflow lanes, and work-queue ordering.
 - The governance adoption test now also requires the three upstream GT-KB managed skills and the local acting-Prime role mapping rule.
 - `python scripts\release_candidate_gate.py --skip-frontend` passed locally under Python 3.14 with Ruff E/F, import cycles, Bandit, pip-audit, and 147 targeted tests.
+- `tests/test_host/test_build_contract.py::TestConfigurationDriftAcrossLayers::test_production_dockerfile_avoids_curl_healthcheck_dependency` verifies the production Dockerfile does not depend on curl for healthchecks.
 
 ## 2026-04-20 Risk Register Remediation Pass
 
@@ -52,10 +54,10 @@ Claim: Production GO remains blocked. The risk-register remediation target is no
 to claim release readiness prematurely; it is to close, explicitly defer, or
 supersede every blocker with governed evidence.
 
-Current evidence:
+Historical evidence from that pass:
 
-- Local branch: `main` at `869f867a` after the SonarCloud trigger, dependency, and organization-key fixes.
-- Last green code candidate: `main@869f867a`.
+- Local branch was `main` at `869f867a` after the SonarCloud trigger, dependency, and organization-key fixes.
+- The last green code candidate at that point was `main@869f867a`.
 - Remote branch divergence: `origin/main...origin/develop` reports 23 commits
   unique to `main` and 0 commits unique to `develop`; `develop` no longer has
   unreconciled release-candidate commits ahead of `main`, but the branch-policy
@@ -120,10 +122,11 @@ Blocker disposition:
   owner-gated. Do not close without an explicit owner decision.
 - GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project
   configuration: cleared for `main@869f867a`.
-- GitHub Security Scan must pass with valid Docker Scout credentials: still
-  blocked. `ACR_SCOUT_USERNAME` and `ACR_SCOUT_PASSWORD` are configured, but
-  `docker/scout-action@v1` also requires Docker Hub authentication through
-  `DOCKER_SCOUT_HUB_USER` and `DOCKER_SCOUT_HUB_PAT`.
+- GitHub Security Scan must pass with valid Docker Scout credentials: was still
+  blocked in this pass. `ACR_SCOUT_USERNAME` and `ACR_SCOUT_PASSWORD` were configured, but
+  `docker/scout-action@v1` also required Docker Hub authentication through
+  `DOCKER_SCOUT_HUB_USER` and `DOCKER_SCOUT_HUB_PAT`. This blocker was later
+  cleared in the 2026-04-21 Docker Scout clearance pass below.
 - `main` and `develop` release provenance: operational divergence is cleared
   for the current candidate (`develop` is 0 commits ahead of `main`), but the
   release-branch policy still needs owner/project disposition.
@@ -145,16 +148,41 @@ Recommended next actions:
   `Remaker-Digital/agent-red-customer-engagement`.
 - Repo admin: configure valid `DOCKER_SCOUT_HUB_USER` and
   `DOCKER_SCOUT_HUB_PAT` repository secrets for Docker Scout Hub
-  authentication, then rerun Security Scan on the exact candidate.
+  authentication, then rerun Security Scan on the exact candidate. Completed
+  in the 2026-04-21 Docker Scout clearance pass below.
 - Owner/project: decide the release-branch policy now that `develop` has no
   commits ahead of `main` and `main` is 23 commits ahead of `develop`.
+
+## 2026-04-21 Docker Scout Clearance Pass
+
+Claim: The GitHub Security Scan release blocker is cleared for the current code candidate.
+
+Current evidence:
+
+- Current code candidate: `main@e01e8ac154675ca29a80a4cdfd0a9056dd00307c`.
+- GitHub Actions on `main@e01e8ac` are green for Lint, Python Tests, Release Candidate Gate, SonarCloud, and Security Scan.
+- Security Scan run `24731909565` completed successfully on `main@e01e8ac` after Docker Scout ACR and Docker Hub credentials were configured.
+- Docker Scout ACR credentials are present as repository secrets `ACR_SCOUT_USERNAME` and `ACR_SCOUT_PASSWORD`.
+- Docker Hub credentials are present as repository secrets `DOCKER_SCOUT_HUB_USER` and `DOCKER_SCOUT_HUB_PAT`.
+- Security Scan run `24731386383` previously proved Docker Scout authentication was working but failed on high CVEs in Debian packages pulled into the production image.
+- Commit `e01e8ac` removed the curl healthcheck dependency, upgraded Debian packages during image build, and switched the production healthcheck to Python stdlib.
+- Local targeted regression passed: `python -m pytest tests\test_host\test_build_contract.py::TestConfigurationDriftAcrossLayers::test_production_dockerfile_avoids_curl_healthcheck_dependency tests\multi_tenant\test_s175_scaling_680.py::TestUvicornWorkers::test_dockerfile_has_four_workers tests\multi_tenant\test_s175_scaling_680.py::TestLifecycleIntegration::test_dockerfile_has_tini_entrypoint -q --tb=short`.
+- Local governance regression passed: `python -m pytest tests\scripts\test_groundtruth_governance_adoption.py -q --tb=short`.
+- Standing backlog harvest regression passed: `python -m pytest tests\scripts\test_standing_backlog_harvest.py -q --tb=short`.
+- Standing backlog source audit now reports only owner/project-gated release blockers after the Security Scan blocker is removed from this record.
+
+Blocker disposition:
+
+- GitHub Security Scan must pass with valid Docker Scout credentials: cleared for `main@e01e8ac` by run `24731909565`.
+- Production credentials exposed in the deleted generated manifest must be rotated: still owner/secret-provider gated. Do not close without credential rotation evidence.
+- Owner must decide whether git history requires secret purging: still owner-gated. Do not close without an explicit owner decision.
+- `main` and `develop` release provenance: operational divergence is cleared for the current candidate, but the release-branch policy still needs owner/project disposition.
+- Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths: still owner/product-scope gated.
 
 ## Remaining Release Blockers
 
 - Production credentials exposed in the deleted generated manifest must be rotated.
 - Owner must decide whether git history requires secret purging.
-- GitHub Security Scan must pass with valid `DOCKER_SCOUT_HUB_USER` and
-  `DOCKER_SCOUT_HUB_PAT`.
 - Owner/project must decide the release-branch provenance policy for
   `main`/`develop`.
 - Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths.
