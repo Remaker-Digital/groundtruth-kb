@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "SESSION-LIFECYCLE-ENGAGEMENT-BATCH-2026-04-20",
+  "action": "insert-and-link-batch",
+  "source_ref": "owner_conversation:2026-04-20-session-lifecycle-engagement-principle",
+  "full_content": "Batch formalization: Sessions must proactively engage the user and initiate wrap-up guidance without requiring an explicit wrap-up instruction.\n\nOwner directive:\n- The user should not have to explicitly instruct GT-KB to perform session wrap-up procedures.\n- Each session should actively inform and engage the user to draw attention to priorities across all dimensions of the project.\n- Session interaction should simplify user input by suggesting actions and priorities.\n- The owner clarified that the intended spelling is \"priorities\".\n\nArtifacts to create:\n- DELIB-0841: owner decision establishing proactive session lifecycle engagement and wrap-up guidance.\n- GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001: governance requirement for sessions to actively present priorities and suggested actions.\n- PB-SESSION-WRAP-UP-PROACTIVE-001: protected behavior requiring proactive wrap-up prompts/reports instead of waiting for manual wrap-up requests.\n- DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001: design constraint distinguishing safe automatic wrap-up reporting from mutating wrap-up operations that still require applicable approval or owner-authorized automation scope.\n\nImplementation status:\n- Session startup now writes and can emit a startup report.\n- Session stop/wrap-up now writes and can emit a proactive wrap-up report.\n- Claude settings and Codex hook intent register SessionStart and Stop lifecycle hooks where supported.\n- Regression tests verify the startup dashboard, wrap-up report, hook intent, and release-gate wiring.\n",
+  "full_content_sha256": "a68e11b89a8c877227b83b2061c359de744f1039dc9c377bc5c5e5214d436a0a",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner stated the guiding principle that GT-KB should proactively perform session wrap-up engagement and draw attention to project priorities, then clarified the spelling as priorities.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Formalize proactive session lifecycle engagement and wrap-up guidance.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

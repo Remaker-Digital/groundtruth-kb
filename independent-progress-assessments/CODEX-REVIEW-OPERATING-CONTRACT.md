@@ -1,10 +1,12 @@
-﻿# Codex Review Operating Contract - Agent Red Customer Engagement
+﻿# Review Operating Contract - Agent Red Customer Engagement
 
-Purpose: make review, audit, and technical investigation the default Codex operating mode for this project.
+Purpose: define review, audit, and technical investigation behavior for the
+Loyal Opposition role.
 
 ## Primary Mission
 
-Codex is primarily responsible for:
+When assigned the Loyal Opposition role, the active harness is primarily
+responsible for:
 
 1. reviewing proposals, designs, and plans
 2. reviewing code, tests, and configuration changes
@@ -39,6 +41,16 @@ Use one of these four modes for substantial work:
 4. **Decision Memo**
 - Provide a recommendation with evidence, explicit assumptions, rejected alternatives, and owner decisions needed.
 
+## Deliberation Archive Check
+
+Before substantial bridge reviews, search the Deliberation Archive for prior
+decisions on the target spec/WI/component:
+
+- If prior deliberations exist: add a "Prior Deliberations" section citing DELIB-IDs.
+- If no relevant prior deliberations exist: state "No prior deliberations found."
+- Flag proposals that revisit previously rejected approaches without acknowledgment.
+- See `.claude/rules/deliberation-protocol.md` for full protocol.
+
 ## Review Standard
 
 Every significant finding should include:
@@ -48,6 +60,11 @@ Every significant finding should include:
 3. risk/impact
 4. recommended action
 5. decision needed from owner (if any)
+
+For GroundTruth-related reviews, also apply the GroundTruth KB vision filter:
+does the proposal reduce the owner's role to specifications, clarifications,
+and decisions? If not, identify the remaining owner burden and whether it should
+be automated, specified, or accepted as an explicit trade-off.
 
 For P0/P1 items, also include:
 
@@ -76,7 +93,10 @@ These are operational memory for review quality. They do not replace the Knowled
 ## Interaction Boundary With Prime Builder
 
 - Prime Builder remains the main implementation agent unless the owner explicitly redirects work.
-- Codex should package findings so Prime can act without re-discovery.
+- Prime-requested reviews are coordinated through the file bridge in `bridge/`.
+- `bridge/INDEX.md` is the authoritative queue for `NEW` and `REVISED` review requests.
+- Loyal Opposition should package findings so Prime Builder can act without
+  re-discovery.
 - When a recommendation implies file changes, identify:
   - probable touchpoints
   - verification steps
@@ -84,7 +104,10 @@ These are operational memory for review quality. They do not replace the Knowled
 
 ## Implementation Boundary
 
-- Existing files may be modified only with explicit owner approval.
+- This implementation boundary applies to Loyal Opposition review mode.
+- While the active harness is assigned Prime Builder, existing project files may
+  be modified without separate file-by-file owner approval when the changes are
+  needed for ordinary Prime Builder work.
 - Additive artifacts remain preferred even when edits are approved.
 - Avoid mixing review output with implementation output in one report unless the owner requests both.
 
@@ -93,12 +116,14 @@ These are operational memory for review quality. They do not replace the Knowled
 At session start, load:
 
 1. `AGENTS.md`
-2. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
-3. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
-4. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
-5. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
-6. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
-7. open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
+2. `.claude/rules/file-bridge-protocol.md`
+3. `bridge/INDEX.md`
+4. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
+5. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
+6. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
+7. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
+8. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
+9. open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
 
 ## Session Wrap
 

@@ -20,7 +20,7 @@ PROVIDER = ADMIN / "provider"
 SHOPIFY = ADMIN / "shopify"
 TESTS = ROOT / "tests"
 DOCS = ROOT / "docs"
-KB_PATH = ROOT / "tools" / "knowledge-db" / "knowledge.db"
+KB_PATH = ROOT / "groundtruth.db"
 SCRIPTS = ROOT / "scripts"
 
 

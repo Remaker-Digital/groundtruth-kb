@@ -2,7 +2,7 @@
 
 This document provides active guidance for AI assistants working on the Agent Red Customer Experience commercial project. It is loaded at the start of every session. **GOV-01: This file MUST NOT exceed 300 lines.**
 
-**Role precedence:** if `AGENTS.md` declares Loyal Opposition mode, that contract overrides any builder-first default in this file. In Loyal Opposition mode, Codex is analysis-first, report-oriented, and non-implementing unless Mike explicitly asks for implementation.
+**Role precedence:** obey the newest owner role assignment reflected in `AGENTS.md` and the startup role-mapping rules under `.claude/rules/`. Loyal Opposition guidance applies only when the owner has explicitly activated that mode for Codex; otherwise Codex operates as Prime Builder.
 
 > **📁 Reference data** (legal, pricing, infrastructure, AGNTCY rules): `CLAUDE-REFERENCE.md` — read on demand.
 > **📁 Architecture** (project structure, module inventory): `CLAUDE-ARCHITECTURE.md` — read on demand.
@@ -51,21 +51,27 @@ All new work in this repository must include:
 
 **Loyal Opposition role (Codex):** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work.
 
+**GroundTruth KB vision filter:** For GroundTruth-related work, prefer choices that reduce the owner's role to adding or refining specifications, answering clarification questions, and making explicit trade-off decisions. Flag approaches that leave routine implementation, deployment plumbing, traceability reconciliation, generated-artifact inspection, or cross-agent process state with the owner.
+
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
-**operating procedure.** 
-- Have your Loyal Opposition review every implementation proposal before you implement anything. 
-- Have your Loyal Opposition review the post-implementation report you produce after every implementation work session. 
-- Do not proceed to the next task or step without a GO agreement from your Loyal Opposition. 
-- If your Loyal Opposition stops responding, investigate and resolve the blockage. 
-- Do not delete post-implementation reports. 
+**operating procedure.** File-based bridge protocol. See `.claude/rules/file-bridge-protocol.md`.
+- **DO NOT implement anything without first preparing an implementation proposal and having it reviewed by Codex.**
+- **All implementation proposals MUST be reviewed by Codex before any code is written.**
+- **All post-implementation reports MUST be reviewed by Codex before committing.**
+- **Propose:** Save proposal to `bridge/{name}-001.md`, add NEW entry to `bridge/INDEX.md`.
+- **Review:** Codex scans INDEX for NEW/REVISED entries, reviews, adds GO or NO-GO version.
+- **Execute:** After Codex GO, implement code, tests, and verify.
+- **Report:** Save post-implementation report as new version, add NEW entry for verification.
+- **Verify:** Codex reviews report and adds VERIFIED or NO-GO version.
+- Both agents scan the index every 3 minutes via scheduled automation.
 - Before you deploy any build, ask this question: Is Agent Red ready for a full production deployment?
 
 ---
 
 ## Artifacts and Change Control
 
-**9 managed artifact types + 2 supporting records** in KB (`tools/knowledge-db/knowledge.db`). See `CLAUDE-ARCHITECTURE.md` § Artifact Inventory for full table/schema details.
+**9 managed artifact types + 2 supporting records** in KB (`groundtruth.db`). See `CLAUDE-ARCHITECTURE.md` § Artifact Inventory for full table/schema details.
 
 **Key principles:** Append-only versioning (`UNIQUE(id, version)`), no UPDATE/DELETE. Orchestrating artifacts (test plan, backlog) reference other artifacts by ID without duplicating content (SPEC-1499).
 
@@ -152,15 +158,27 @@ Key files: CLAUDE.md, memory/MEMORY.md
 Next: [describe task].
 ```
 
-### Session Start: Bridge Liveness Check (Mandatory)
+### Session Start: Bridge Index Scan (Mandatory)
 
-Before any session work proceeds, Prime Builder must verify the bridge is alive:
+At session start, scan `bridge/INDEX.md` for pending work:
 
-1. **Send** a bridge message to Codex: `"Report your current operating state"` (expected_response: `status_update`, artifact_refs: `["AGENTS.md"]`, action_items: `["Send operating state summary back to prime"]`).
-2. **Wait** for Codex to reply. Poll Prime's inbox every 15 seconds for up to 2 minutes.
-3. **Proceed** only after the reply is received. If no reply arrives within 2 minutes, report the bridge failure to the owner before continuing.
+1. **Read** `bridge/INDEX.md` and look for entries with GO or NO-GO status that haven't been actioned.
+2. **Report** any findings: "Bridge scan: N entries need attention" or "Bridge scan: clear."
+3. **Process** the oldest actionable entry first (GO → implement, NO-GO → revise).
 
-This check confirms the Prime↔Codex bridge is operational and both agents can communicate. Do not skip this step.
+### Session Start: Bridge Poller (Mandatory)
+
+After the initial bridge scan, create a recurring in-session poller:
+
+```
+CronCreate: cron="*/3 * * * *", recurring=true, prompt="Read bridge/INDEX.md. If the latest status on any document is GO or NO-GO that hasn't been actioned, report it and act: GO → implement per work list, NO-GO → read findings and revise. Otherwise report 'Bridge scan: clear.'"
+```
+
+This ensures Codex responses are detected and processed within 3 minutes throughout the session. The poller is session-scoped and dies when the session ends — this is intentional, since polling is only useful while someone is working. Note: the in-memory scheduler may silently drop jobs during long sessions; if the poller stops firing, recreate it manually.
+
+### Session Start: Active Work List (Mandatory)
+
+After the bridge scan, read `memory/work_list.md`. If it contains unchecked items, continue working through the list following the standard bridge protocol (propose → Codex GO → implement → post-impl report → Codex VERIFIED → commit → drop from list). Owner pre-approval is granted for all items on the list.
 
 ### Protected Behaviors & Removal Rule
 
@@ -179,8 +197,18 @@ This check confirms the Prime↔Codex bridge is operational and both agents can 
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
 - **DO NOT create new markdown files** to store canonical project knowledge or session memory outside approved exception paths.
-- **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
+- **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/runbooks/logs, `.claude/rules/` local control rules, external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
+
+### Deliberation Archive Protocol
+
+**Deliberation search is mandatory before proposals and reviews.** See `.claude/rules/deliberation-protocol.md` for full rules.
+
+- **Before proposing:** Search `search_deliberations()` for prior reviews on the same spec/WI/component. Cite DELIB-IDs in proposals.
+- **Before reviewing:** Search for prior deliberations. Add "Prior Deliberations" section to reviews.
+- **Owner decisions:** Archive immediately as `source_type=owner_conversation`.
+- **Session wrap:** Harvest runs automatically as part of `kb-session-wrap`.
+- **LO reports:** Include SPEC/WI IDs in report headers for linkage coverage.
 
 ### Session Wrap-Up & Handoff
 
@@ -213,6 +241,7 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 |--------|---------|-------------|
 | `main` | Production mirror. Always matches the most recent production deployment. | Merge from `develop` at deployment time. |
 | `develop` | Continuous development. All new features, fixes, and experiments land here. | Every session. |
+| `hotfix/*` | Emergency production patches. Branched from `main`, merged back to both `main` and `develop`. | Critical production issues only. |
 
 **Workflow:** `develop` → build/test → deploy to staging → staging verified → merge to `main` → deploy to production.
 
@@ -221,7 +250,15 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 2. Merge to `main` only as part of a production deployment operation.
 3. `main` must always be deployable — it represents what is running in production.
 4. Version tags (v1.98.x) are created on `develop` at build time and propagated to `main` via merge.
-5. Hotfixes: branch from `main`, fix, merge to both `main` and `develop`.
+5. Hotfixes follow the hotfix workflow below.
+
+**Hotfix Workflow:**
+1. Branch from `main` at the current production tag: `hotfix/v{version}-{issue}` (e.g., `hotfix/v1.98.92-critic-timeout`).
+2. Implement the minimal fix. CI (lint, tests, security scan) runs automatically on `hotfix/**` branches.
+3. Deploy the hotfix branch to staging for verification.
+4. After staging verification, merge to `main` and deploy to production (GOV-16 approval required).
+5. Immediately backport: merge `main` to `develop` to prevent divergence.
+6. Delete the hotfix branch after both merges are confirmed.
 
 ---
 

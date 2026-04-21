@@ -43,7 +43,7 @@ Agent Red follows a specification-first development methodology:
 
 ## Reporting Issues
 
-Use [GitHub Issues](https://github.com/mike-remakerdigital/agent-red/issues)
+Use [GitHub Issues](https://github.com/Remaker-Digital/agent-red-customer-engagement/issues)
 with the provided issue templates. Include:
 
 - Clear description of the problem or feature request

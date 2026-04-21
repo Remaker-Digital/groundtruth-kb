@@ -4,8 +4,9 @@
 # Paths are relative to this file's directory (tools/knowledge-db/).
 
 [groundtruth]
-db_path = "./knowledge.db"
+db_path = "../../groundtruth.db"
 project_root = "../.."
+chroma_path = "../../.groundtruth-chroma"
 app_title = "Agent Red Knowledge DB"
 brand_mark = "AR"
 brand_color = "#ff3621"

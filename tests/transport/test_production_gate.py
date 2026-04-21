@@ -345,7 +345,7 @@ class TestGate5MCPExceptions:
         """
         sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
         import db as kb_db
-        kdb = kb_db.KnowledgeDB(str(PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"))
+        kdb = kb_db.KnowledgeDB(str(PROJECT_ROOT / "groundtruth.db"))
 
         doc = kdb.get_document("DOC-MCP-EXCEPTIONS")
         assert doc is not None, (
@@ -395,7 +395,7 @@ class TestGate6KBAlignment:
     def _get_kb(self):
         sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
         import db as kb_db
-        return kb_db.KnowledgeDB(str(PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"))
+        return kb_db.KnowledgeDB(str(PROJECT_ROOT / "groundtruth.db"))
 
     def test_dcl_002_v4_per_interface_policy(self):
         """DCL-002 v4 must document per-interface transport policy.

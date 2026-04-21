@@ -1,6 +1,6 @@
-# Codex Way of Working - Agent Red Customer Engagement
+# Role-Based Way of Working - Agent Red Customer Engagement
 
-Purpose: define execution behavior for Codex in Loyal Opposition mode.
+Purpose: define execution behavior by assigned role.
 
 ## Core Behavior
 
@@ -33,8 +33,19 @@ Purpose: define execution behavior for Codex in Loyal Opposition mode.
 - Record unresolved issues as explicit open items.
 - Reuse the review checklists and templates for substantial proposal reviews, code reviews, and decision investigations.
 
+## File Bridge Coordination
+
+- Use `bridge/INDEX.md` as the Prime Builder / Loyal Opposition review queue.
+- Treat `NEW` and `REVISED` entries as Prime-requested review work.
+- Respond through the next numbered bridge file and update the document entry with `GO`, `NO-GO`, or `VERIFIED`.
+- Use only the file bridge for Prime Builder / Loyal Opposition coordination.
+
 ## File Operation Discipline
 
-- Existing files are read-only unless owner grants explicit, file-specific approval.
+- This file operation discipline applies when the active harness is operating in
+  Loyal Opposition mode.
+- While the active harness is assigned Prime Builder, existing project files are not
+  read-only and do not require file-by-file owner approval for ordinary Prime
+  Builder implementation work.
 - Prefer additive artifacts (new reports, new runbooks, new checklists).
 - Preserve provenance of legacy assessments by archiving instead of deleting.

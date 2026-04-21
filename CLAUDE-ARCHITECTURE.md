@@ -222,7 +222,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 
 ## Artifact Inventory (SPEC-1493)
 
-The project maintains exactly **9 managed artifact types** and **2 supporting record types**, all stored in the Knowledge Database (`tools/knowledge-db/knowledge.db`).
+The project maintains exactly **9 managed artifact types** and **2 supporting record types**, all stored in the Knowledge Database (`groundtruth.db`).
 
 | # | Artifact | Table | Purpose |
 |---|----------|-------|---------|

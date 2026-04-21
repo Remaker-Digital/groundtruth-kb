@@ -1,0 +1,68 @@
+---
+name: run-tests
+description: Run Agent Red tests using the thermal-safe batch runner or the live E2E test pipeline. Supports unit tests, integration tests, and full PLAN-001 E2E phases.
+argument-hint: [unit|live|pipeline] [options]
+allowed-tools: Bash, Read, Grep
+license: "Proprietary - Remaker Digital"
+compatibility:
+  - claude-code >= 1.0
+metadata:
+  project: agent-red-customer-experience
+  category: testing
+  references:
+    - references/pipeline-phases.md
+---
+
+# Run Tests
+
+Execute Agent Red's test suites. Two runners available depending on scope.
+
+**Arguments:** `$ARGUMENTS[0]` = mode (`unit`, `live`, `pipeline`, or batch name). Remaining args forwarded to runner.
+
+## Quick Reference
+
+| Command | What It Runs | Duration |
+|---------|-------------|----------|
+| `/run-tests` | All unit/integration (thermal-safe, skip live) | ~10 min |
+| `/run-tests unit -Fast` | Same, no cooling pauses | ~5 min |
+| `/run-tests core-a` | Multi-tenant batch (~2,400 tests) | ~4 min |
+| `/run-tests core-b` | Unit + migrations (~680 tests) | ~2 min |
+| `/run-tests agents-chat` | Agents + chat (~600 tests) | ~2 min |
+| `/run-tests integrations` | Integration + security (~400 tests) | ~2 min |
+| `/run-tests live` | Live E2E regression (sequential) | ~5 min |
+| `/run-tests pipeline staging` | Full PLAN-001 (13 phases vs staging) | ~30 min |
+| `/run-tests pipeline production` | Full PLAN-001 (13 phases vs production) | ~30 min |
+
+## Mode: Unit / Batch (thermal-safe runner)
+
+```powershell
+# Default (all, skip live):
+.\scripts\run-tests-thermal-safe.ps1 -Workers 4 -CoolDown 30 -SkipLive
+
+# Single batch:
+.\scripts\run-tests-thermal-safe.ps1 -Batch <batch-name>
+```
+
+See `references/pipeline-phases.md` for batch inventory and PowerShell parameters.
+
+## Mode: Pipeline (PLAN-001 E2E)
+
+```bash
+python scripts/test_pipeline.py --env <environment> --version <version>
+```
+
+See `references/pipeline-phases.md` for the 13 active phases, required env vars, and pipeline flags.
+
+## Decision Guide
+
+| Question | Use |
+|----------|-----|
+| "Did I break anything?" | `/run-tests` (unit, fast feedback) |
+| "Is staging ready for production?" | `/run-tests pipeline staging` |
+| "Is production healthy post-deploy?" | `/run-tests pipeline production` |
+| "Focus on a specific area" | `/run-tests core-a` or other batch name |
+
+## Interpreting Results
+
+- **Thermal-safe:** OVERALL: PASS/FAIL. 137 tests known test-ordering dependent.
+- **Pipeline:** Each phase PASS/FAIL/WARN/SKIP. Exit 0 = all passed. Logs in `logs/`.

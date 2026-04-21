@@ -39,7 +39,7 @@ from pathlib import Path
 
 # AR-specific paths
 _CONFIG_PATH = Path(__file__).resolve().parent / "groundtruth.toml"
-DB_PATH = Path(__file__).resolve().parent / "knowledge.db"
+DB_PATH = Path(__file__).resolve().parent.parent.parent / "groundtruth.db"
 
 # Patch the package-level default so KnowledgeDB() uses AR's path
 import groundtruth_kb.db as _gt_db
@@ -75,6 +75,26 @@ _default_registry = GateRegistry.from_config(
 )
 
 
+# ---------------------------------------------------------------------------
+# Transport governance symbols for assertion hooks.
+# Extracted from the loaded gate registry so that `.claude/hooks/assertion-check.py`
+# can import `from db import _TRANSPORT_GATED_SPECS, _resolve_test_file`.
+# ---------------------------------------------------------------------------
+_TRANSPORT_GATED_SPECS: frozenset[str] = frozenset()
+for _gate in _default_registry._gates:
+    if hasattr(_gate, '_spec_ids'):
+        _TRANSPORT_GATED_SPECS = _gate._spec_ids
+        break
+
+
+def _resolve_test_file(test_file: str | None) -> Path | None:
+    """Resolve a test_file path relative to the project root."""
+    if not test_file:
+        return None
+    p = _config.project_root / test_file
+    return p if p.exists() else None
+
+
 class KnowledgeDB(_KnowledgeDB):
     """AR-aware KnowledgeDB with default transport gate enforcement.
 
@@ -88,10 +108,19 @@ class KnowledgeDB(_KnowledgeDB):
         db_path: str | Path | None = None,
         gate_registry: GateRegistry | None = None,
         check_same_thread: bool = True,
+        chroma_path: str | Path | None = None,
     ):
         if gate_registry is None:
             gate_registry = _default_registry
-        super().__init__(db_path=db_path, gate_registry=gate_registry, check_same_thread=check_same_thread)
+        # Default chroma_path from groundtruth.toml config if not explicitly provided
+        if chroma_path is None and _config.chroma_path is not None:
+            chroma_path = _config.chroma_path
+        super().__init__(
+            db_path=db_path,
+            gate_registry=gate_registry,
+            check_same_thread=check_same_thread,
+            chroma_path=chroma_path,
+        )
 
 
 __all__ = [
@@ -99,6 +128,8 @@ __all__ = [
     "SCHEMA_SQL",
     "KnowledgeDB",
     "TransportEvidenceGateError",
+    "_TRANSPORT_GATED_SPECS",
+    "_resolve_test_file",
     "get_depth",
     "get_parent_id",
     "spec_sort_key",

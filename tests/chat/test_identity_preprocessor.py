@@ -118,11 +118,13 @@ class TestPreprocessIdentity:
     async def test_valid_otp_code_returns_otp_received(self, MockRepo, mock_verify_otp):
         """Valid 6-digit code after OTP sent → otp_received."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_otp_attempts=0,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_otp_attempts=0,
+            )
+        )
         repo.patch = AsyncMock()
         mock_verify_otp.return_value = True
 
@@ -138,11 +140,13 @@ class TestPreprocessIdentity:
     async def test_invalid_otp_code_returns_otp_invalid(self, MockRepo, mock_verify_otp):
         """Invalid 6-digit code → otp_invalid."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_otp_attempts=0,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_otp_attempts=0,
+            )
+        )
         repo.patch = AsyncMock()
         mock_verify_otp.return_value = False
 
@@ -159,7 +163,9 @@ class TestPreprocessIdentity:
         repo.read = AsyncMock(return_value=_make_conv_doc())
 
         result = await preprocess_identity(
-            "conv-001", "test-tenant", "What is your return policy?",
+            "conv-001",
+            "test-tenant",
+            "What is your return policy?",
         )
 
         assert result.action == "none"
@@ -169,10 +175,12 @@ class TestPreprocessIdentity:
     async def test_skip_during_otp_pending(self, MockRepo):
         """'skip' during OTP pending → skip_verification."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "skip")
 
@@ -184,10 +192,12 @@ class TestPreprocessIdentity:
     async def test_continue_as_guest_during_otp_pending(self, MockRepo):
         """'continue as guest' during OTP pending → skip_verification."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "continue as guest")
 
@@ -204,7 +214,8 @@ class TestPreprocessIdentity:
         mock_send_otp.return_value = True
 
         result = await preprocess_identity(
-            "conv-001", "test-tenant",
+            "conv-001",
+            "test-tenant",
             "my email is alice@example.com",
         )
 
@@ -217,9 +228,11 @@ class TestPreprocessIdentity:
     async def test_otp_code_without_prior_send(self, MockRepo):
         """6-digit code but no OTP was sent → action=none (defense)."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_otp_sent_at=None,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_otp_sent_at=None,
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "123456")
 
@@ -231,11 +244,13 @@ class TestPreprocessIdentity:
     async def test_rate_limit_exceeded_rejects(self, MockRepo):
         """More than 3 OTP attempts → otp_rate_limited."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_otp_attempts=_MAX_OTP_ATTEMPTS,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_otp_attempts=_MAX_OTP_ATTEMPTS,
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "123456")
 
@@ -278,7 +293,9 @@ class TestPreprocessIdentity:
         mock_send_otp.return_value = True
 
         result = await preprocess_identity(
-            "conv-001", "test-tenant", "it's alice@example.com",
+            "conv-001",
+            "test-tenant",
+            "it's alice@example.com",
         )
 
         assert result.action == "email_received"
@@ -295,7 +312,9 @@ class TestPreprocessIdentity:
         mock_send_otp.return_value = True
 
         result = await preprocess_identity(
-            "conv-001", "test-tenant", "email: alice@example.com",
+            "conv-001",
+            "test-tenant",
+            "email: alice@example.com",
         )
 
         assert result.action == "email_received"
@@ -309,7 +328,8 @@ class TestPreprocessIdentity:
         repo.read = AsyncMock(return_value=_make_conv_doc())
 
         result = await preprocess_identity(
-            "conv-001", "test-tenant",
+            "conv-001",
+            "test-tenant",
             "I bought from alice@ex.com and bob@ex.com",
         )
 
@@ -324,7 +344,9 @@ class TestPreprocessIdentity:
 
         long_msg = "A" * 180 + " alice@example.com " + "B" * 30
         result = await preprocess_identity(
-            "conv-001", "test-tenant", long_msg,
+            "conv-001",
+            "test-tenant",
+            long_msg,
         )
 
         assert result.action == "none"
@@ -334,9 +356,11 @@ class TestPreprocessIdentity:
     async def test_skip_phrase_not_during_otp_pending(self, MockRepo):
         """Skip phrase without OTP pending → passes to AI (no interception)."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_otp_sent_at=None,  # No OTP pending
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_otp_sent_at=None,  # No OTP pending
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "skip")
 
@@ -501,11 +525,13 @@ class TestPhoneSmsOtp:
     async def test_valid_sms_otp_returns_verified(self, MockRepo, mock_verify_sms):
         """Valid 6-digit code during SMS OTP pending → sms_otp_received + phone_verified."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_sms_attempts=0,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_sms_attempts=0,
+            )
+        )
         repo.patch = AsyncMock()
         mock_verify_sms.return_value = True
 
@@ -517,7 +543,10 @@ class TestPhoneSmsOtp:
         # Verify phone_verified is set (NOT customer_verified)
         patch_calls = repo.patch.call_args_list
         phone_verified_set = any(
-            any(op.get("path") == "/phone_verified" and op.get("value") is True for op in call.kwargs.get("operations", call.args[2] if len(call.args) > 2 else []))
+            any(
+                op.get("path") == "/phone_verified" and op.get("value") is True
+                for op in call.kwargs.get("operations", call.args[2] if len(call.args) > 2 else [])
+            )
             for call in patch_calls
         )
         assert phone_verified_set, "phone_verified must be set to True"
@@ -528,11 +557,13 @@ class TestPhoneSmsOtp:
     async def test_invalid_sms_otp_returns_invalid(self, MockRepo, mock_verify_sms):
         """Invalid 6-digit code during SMS OTP pending → sms_otp_invalid."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_sms_attempts=0,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_sms_attempts=0,
+            )
+        )
         repo.patch = AsyncMock()
         mock_verify_sms.return_value = False
 
@@ -546,11 +577,13 @@ class TestPhoneSmsOtp:
     async def test_sms_otp_rate_limited(self, MockRepo):
         """More than 3 SMS OTP attempts → sms_otp_rate_limited."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_sms_attempts=_MAX_SMS_OTP_ATTEMPTS,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_sms_attempts=_MAX_SMS_OTP_ATTEMPTS,
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "123456")
 
@@ -562,10 +595,12 @@ class TestPhoneSmsOtp:
     async def test_skip_during_sms_otp_pending(self, MockRepo):
         """'skip' during SMS OTP pending → skip_verification."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "skip")
 
@@ -576,15 +611,19 @@ class TestPhoneSmsOtp:
     async def test_email_takes_precedence_over_phone(self, MockRepo):
         """When email OTP is pending, email state machine handles codes."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_otp_attempts=0,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_otp_attempts=0,
+            )
+        )
         # Email OTP pending + SMS OTP pending → email takes precedence
-        with patch("src.chat.identity_preprocessor._verify_otp_for_conversation", new_callable=AsyncMock) as mock_verify:
+        with patch(
+            "src.chat.identity_preprocessor._verify_otp_for_conversation", new_callable=AsyncMock
+        ) as mock_verify:
             mock_verify.return_value = True
             repo.patch = AsyncMock()
 
@@ -599,9 +638,11 @@ class TestPhoneSmsOtp:
     async def test_phone_not_detected_when_email_collected(self, MockRepo):
         """Phone in message when email already collected → not detected (email path)."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+            )
+        )
 
         result = await preprocess_identity("conv-001", "test-tenant", "+15551234567")
 
@@ -614,11 +655,13 @@ class TestPhoneSmsOtp:
     async def test_phone_verified_does_not_set_customer_verified(self, MockRepo, mock_verify_sms):
         """Phone SMS OTP success sets phone_verified, NOT customer_verified."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_sms_attempts=0,
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_sms_attempts=0,
+            )
+        )
         repo.patch = AsyncMock()
         mock_verify_sms.return_value = True
 
@@ -627,7 +670,10 @@ class TestPhoneSmsOtp:
         # Check that customer_verified is never set to True
         patch_calls = repo.patch.call_args_list
         customer_verified_set = any(
-            any(op.get("path") == "/customer_verified" and op.get("value") is True for op in call.kwargs.get("operations", call.args[2] if len(call.args) > 2 else []))
+            any(
+                op.get("path") == "/customer_verified" and op.get("value") is True
+                for op in call.kwargs.get("operations", call.args[2] if len(call.args) > 2 else [])
+            )
             for call in patch_calls
         )
         assert not customer_verified_set, "customer_verified must NOT be set by phone OTP"
@@ -658,11 +704,15 @@ class TestPhoneSmsOtp:
         repo.patch = AsyncMock()
         mock_tier_gate.return_value = True  # professional+ tier
 
-        with patch("src.chat.identity_preprocessor._send_sms_otp_for_conversation", new_callable=AsyncMock) as mock_send:
+        with patch(
+            "src.chat.identity_preprocessor._send_sms_otp_for_conversation", new_callable=AsyncMock
+        ) as mock_send:
             mock_send.return_value = True
 
             result = await preprocess_identity(
-                "conv-001", "test-tenant", "my phone is +15551234567",
+                "conv-001",
+                "test-tenant",
+                "my phone is +15551234567",
             )
 
         assert result.action == "phone_received"
@@ -679,10 +729,12 @@ class TestDualStatePreprocessor:
     async def test_email_pending_then_phone_starts_sms(self, MockRepo, mock_send_sms, mock_tier_gate):
         """Email OTP pending + customer sends phone -> SMS OTP also started."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
         repo.patch = AsyncMock()
         mock_send_sms.return_value = True
         mock_tier_gate.return_value = True
@@ -699,10 +751,12 @@ class TestDualStatePreprocessor:
     async def test_sms_pending_then_email_starts_email_otp(self, MockRepo, mock_send_otp):
         """SMS OTP pending + customer sends email -> email OTP also started."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
         repo.patch = AsyncMock()
         mock_send_otp.return_value = True
 
@@ -719,10 +773,12 @@ class TestDualStatePreprocessor:
     async def test_email_pending_phone_blocked_by_tier(self, MockRepo, mock_send_sms, mock_tier_gate):
         """Email OTP pending + phone detected but starter tier -> no SMS, pass through."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
         mock_tier_gate.return_value = False  # starter tier
 
         result = await preprocess_identity("conv-001", "test-tenant", "+15551234567")
@@ -736,12 +792,14 @@ class TestDualStatePreprocessor:
     async def test_both_pending_code_verifies_email_first(self, MockRepo, mock_verify_otp):
         """Both email+SMS pending + 6-digit code -> email OTP verified (email precedence)."""
         repo = MockRepo.return_value
-        repo.read = AsyncMock(return_value=_make_conv_doc(
-            identity_email="alice@example.com",
-            identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
-            identity_phone="+15551234567",
-            identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
-        ))
+        repo.read = AsyncMock(
+            return_value=_make_conv_doc(
+                identity_email="alice@example.com",
+                identity_otp_sent_at=datetime.now(timezone.utc).isoformat(),
+                identity_phone="+15551234567",
+                identity_sms_sent_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
         repo.patch = AsyncMock()
         mock_verify_otp.return_value = True
 
@@ -750,3 +808,84 @@ class TestDualStatePreprocessor:
         assert result.action == "otp_received"
         assert result.email == "alice@example.com"
         mock_verify_otp.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for _send_sms_otp_for_conversation internals (WI-3038)
+# ---------------------------------------------------------------------------
+
+
+class TestSendSmsOtpForConversationInternals:
+    """Test that _send_sms_otp_for_conversation correctly handles _send_sms() returning False.
+
+    Covers the silent-failure path identified by Codex S276 advisory: the transport
+    function _send_sms() returns False on failure without raising, so callers must
+    explicitly branch on the return value.
+
+    Fixture pattern (per bridge `agent-red-sms-otp-hardening-002` NO-GO): patch the
+    `VerificationTokenRepository` class directly rather than `get_cosmos_manager`,
+    because the repository module imports `get_cosmos_manager` at load time and the
+    mock must intercept at the class-instantiation point, not the module attribute.
+    """
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_send_sms_returns_false(self):
+        """_send_sms() returning False must propagate as False return from caller (WI-3038)."""
+        mock_token_repo = MagicMock()
+        mock_token_repo.delete_token = AsyncMock(return_value=True)
+        mock_token_repo.create_token = AsyncMock(return_value={"id": "otp:test-tenant-001:+15551234567"})
+
+        mock_container = MagicMock()
+        mock_container.patch_item = AsyncMock(return_value={})
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        mock_send_sms = AsyncMock(return_value=False)
+
+        with (
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+            patch("src.multi_tenant.sms_verification._send_sms", mock_send_sms),
+        ):
+            from src.chat.identity_preprocessor import _send_sms_otp_for_conversation
+
+            result = await _send_sms_otp_for_conversation(
+                phone="+15551234567",
+                tenant_id="test-tenant-001",
+            )
+
+        assert result is False
+        # Per -002 NO-GO condition 3: assert _send_sms was awaited so the test
+        # cannot pass by returning False from an earlier broad-exception path.
+        mock_send_sms.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_send_sms_succeeds(self):
+        """_send_sms() returning True must propagate as True return from caller."""
+        mock_token_repo = MagicMock()
+        mock_token_repo.delete_token = AsyncMock(return_value=True)
+        mock_token_repo.create_token = AsyncMock(return_value={"id": "otp:test-tenant-001:+15551234567"})
+
+        mock_container = MagicMock()
+        mock_container.patch_item = AsyncMock(return_value={})
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        mock_send_sms = AsyncMock(return_value=True)
+
+        with (
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+            patch("src.multi_tenant.sms_verification._send_sms", mock_send_sms),
+        ):
+            from src.chat.identity_preprocessor import _send_sms_otp_for_conversation
+
+            result = await _send_sms_otp_for_conversation(
+                phone="+15551234567",
+                tenant_id="test-tenant-001",
+            )
+
+        assert result is True
+        mock_send_sms.assert_awaited_once()

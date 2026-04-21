@@ -1240,7 +1240,7 @@
   },
   {
     "id": "BATCH1-178",
-    "text": "All references to the old GitHub repo URL MUST be updated to the new URL: https://github.com/mike-remakerdigital/agent-red",
+    "text": "All references to the old GitHub repo URL MUST be updated to the new URL: https://github.com/Remaker-Digital/agent-red-customer-engagement",
     "source_session": "2bb20935-93f7-41f2-ae59-c7f9df62ca40",
     "source_type": "owner_directive",
     "domain": "GENERAL"

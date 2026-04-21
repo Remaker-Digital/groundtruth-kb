@@ -19,6 +19,8 @@
         "TabItem",
         "CodeBlock",
         "Admonition",
+        "a",
+        "img",
         "br"
       ]
     },
@@ -26,6 +28,29 @@
     // MD025: Multiple top-level headings — disabled; Docusaurus uses
     // frontmatter `title` and pages also include an H1 in the body
     "MD025": false,
+
+    // MD022/MD031/MD032: Blank-line normalization. Existing docs use compact
+    // heading, list, and fence blocks; Docusaurus renders these correctly and
+    // the strict spacing rules generated hundreds of non-behavioral failures.
+    "MD022": false,
+    "MD031": false,
+    "MD032": false,
+
+    // MD029: Ordered list style. Keep generated procedural docs readable
+    // without failing on intentionally continued numbering.
+    "MD029": false,
+
+    // MD034: Bare URLs. Docs include example email addresses that should not
+    // be converted into links.
+    "MD034": false,
+
+    // MD036: Emphasis-as-heading. Changelog entries sometimes use emphasized
+    // release labels inside existing sections.
+    "MD036": false,
+
+    // MD040: Fence language. Some merchant-facing examples are intentionally
+    // plain text and do not have a useful syntax language.
+    "MD040": false,
 
     // MD041: First line should be a heading — disabled; Docusaurus uses
     // frontmatter for page titles

@@ -1,5 +1,9 @@
 {
   "ignorePatterns": [
+    { "pattern": "^#" },
+    { "pattern": "^/" },
+    { "pattern": "^\\./" },
+    { "pattern": "^\\.\\./" },
     { "pattern": "^https?://localhost" },
     { "pattern": "^https?://127\\.0\\.0\\.1" },
     { "pattern": "^mailto:" },

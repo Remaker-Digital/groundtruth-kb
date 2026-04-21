@@ -112,6 +112,28 @@ Purpose: persistent record of owner decisions and standing operating choices tha
 - status:
   Active
 
+### 2026-04-09 - Bridge implementation ownership is reversed from the default relationship
+
+- source:
+  Owner clarification in session on 2026-04-09.
+- decision:
+  For bridge runtime, protocol, poller, worker, and handshake work, Codex is the implementation owner and Prime Builder is the reviewer.
+- impact:
+  Future bridge sessions should not wait for Prime-authored implementation proposals. Codex should inspect, correct, implement, verify, and then send Prime an implementation report or targeted review request.
+- status:
+  Active
+
+### 2026-04-09 - Bridge protocol is asynchronous, not transactional
+
+- source:
+  Owner clarification in session on 2026-04-09.
+- decision:
+  The bridge should be treated as asynchronous message passing rather than transactional request/reply. Not all messages are replies, not all messages require replies, and retries should be reserved for important requests.
+- impact:
+  Future bridge reviews, diagnostics, and implementations should avoid reasoning from "pending outbound" to "the peer is waiting" unless an important request or deadline explicitly makes that true.
+- status:
+  Active
+
 ---
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

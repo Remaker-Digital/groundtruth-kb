@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import tempfile
 from datetime import UTC
 
 from fastapi import FastAPI
@@ -62,8 +63,8 @@ logger = logging.getLogger(__name__)
 #
 # Solution: Use a shared temp file as a cross-worker secret store.
 # The first process to start writes the secret; all others read it.
-# The file is in /tmp (container-local, not shared across replicas).
-_VERIFICATION_SECRET_PATH = "/tmp/.agent-red-verification-secret"
+# The file is in the system temp directory (container-local, not shared across replicas).
+_VERIFICATION_SECRET_PATH = os.path.join(tempfile.gettempdir(), ".agent-red-verification-secret")
 
 
 def _ensure_verification_secret() -> str:
@@ -214,6 +215,48 @@ def register_middleware(app: FastAPI) -> None:
 # =========================================================================
 # Startup handlers (defined at module level for direct test imports)
 # =========================================================================
+
+_DEPLOYED_ENVIRONMENTS = {"staging", "production"}
+_SIGNING_SECRET_MIN_LENGTH = 32
+
+
+def _current_environment() -> str:
+    """Return normalized runtime environment."""
+    return os.environ.get("ENVIRONMENT", "development").lower().strip()
+
+
+def _require_env_value(name: str, *, min_length: int = 1) -> str:
+    """Return a required environment value or raise a startup-blocking error."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(f"{name} is required for {_current_environment()} startup")
+    if len(value) < min_length:
+        raise RuntimeError(
+            f"{name} must be at least {min_length} characters for {_current_environment()} startup"
+        )
+    return value
+
+
+async def _startup_required_deployed_config() -> None:
+    """Fail closed when deployed environments are missing release-critical config."""
+    environment = _current_environment()
+    if environment not in _DEPLOYED_ENVIRONMENTS:
+        return
+
+    _require_env_value("ADMIN_PREVIEW_PASSWORD", min_length=12)
+    for name in (
+        "ADMIN_SESSION_SECRET",
+        "MAGIC_LINK_JWT_SECRET",
+        "MFA_JWT_SECRET",
+        "CUSTOMER_TOKEN_SECRET",
+    ):
+        _require_env_value(name, min_length=_SIGNING_SECRET_MIN_LENGTH)
+
+    app_base_url = _require_env_value("APP_BASE_URL")
+    if app_base_url.startswith(("http://localhost", "http://127.0.0.1")):
+        raise RuntimeError("APP_BASE_URL must not point at localhost in deployed environments")
+
+    _require_env_value("APP_CORS_ORIGINS")
 
 
 async def _startup_verification_secret() -> None:
@@ -2129,6 +2172,7 @@ def register_startup_handlers(app: FastAPI | None = None) -> None:
     _lifecycle_startup_handlers.clear()
     _lifecycle_startup_handlers.extend(
         [
+            _startup_required_deployed_config,
             _startup_verification_secret,
             _startup_cosmos_db,
             _startup_tenant_resolution,

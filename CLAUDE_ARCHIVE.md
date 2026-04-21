@@ -498,13 +498,13 @@ Each tier includes a platform fee (infrastructure, features, support) and an inc
 
 | Attribute | Value |
 |-----------|-------|
-| **Account** | mike-remakerdigital |
-| **Repository** | [agent-red](https://github.com/mike-remakerdigital/agent-red) |
+| **Account** | Remaker-Digital |
+| **Repository** | [agent-red-customer-engagement](https://github.com/Remaker-Digital/agent-red-customer-engagement) |
 | **Plan** | Professional |
 | **Branch Protection** | main (require PR, require reviews) |
 | **Project Board** | TBD — create on new repo |
 
-**Association Rule:** The repository `mike-remakerdigital/agent-red` is the canonical home for this project. All issues, tracking, and project management for this repository use that repo exclusively.
+**Association Rule:** The repository `Remaker-Digital/agent-red-customer-engagement` is the canonical home for this project. All issues, tracking, and project management for this repository use that repo exclusively.
 
 ---
 
@@ -916,7 +916,7 @@ The owner values active feedback on their communication effectiveness. When proc
 - [x] Commercial proposal migrated (COMMERCIAL-SAAS-PROPOSAL.md)
 - [x] Product features for RAG migrated (PRODUCT-FEATURES-RAG.md)
 - [x] Website content migrated (5 pages)
-- [x] GitHub repository created (mike-remakerdigital/agent-red, Professional plan)
+- [x] GitHub repository created (Remaker-Digital/agent-red-customer-engagement, Professional plan)
 - [x] Initial commit pushed
 - [x] Docker development environment (Dockerfile, docker-compose.yml, requirements.txt)
 - [x] AGNTCY baseline verified - local Docker (15 containers, 97.8% unit tests, 99.3% integration tests)

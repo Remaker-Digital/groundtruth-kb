@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0836",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-04-20-codex-hook-windows-limitation",
+  "full_content": "Decision: The owner understands and agrees that Codex hooks are currently disabled on Windows, so Agent Red should treat .codex/config.toml and .codex/hooks.json as forward-compatible hook intent while using scripts/check_codex_hook_parity.py and release-candidate-gate regression tests as mechanically active Windows enforcement.\n\nContext:\n- Official Codex docs state hooks are experimental and Windows support is temporarily disabled.\n- The owner accepted this limitation after Codex explained it.\n- The implementation added a project-scoped Codex config package, a verifier, regression tests, and release-gate wiring.\n\nImplications:\n- Strict GOV enforcement remains active through Claude Code hooks and release-gate verification today.\n- Codex-native hook enforcement should become active automatically where Codex hook runtime support exists.\n- Until Windows hook support is restored, Codex sessions must not represent .codex/hooks.json as a live Windows interception boundary.\n",
+  "full_content_sha256": "2382706d0f1a74b4ffe0e46929b28b765079b8363f0bfddb7f135af7f1ccef20",
+  "approval_mode": "acknowledge",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner said: I understand and agree.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Capture owner acknowledgement of Codex Windows hook limitation and fallback enforcement posture.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

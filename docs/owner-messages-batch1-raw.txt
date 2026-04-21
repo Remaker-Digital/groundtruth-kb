@@ -158,9 +158,9 @@ If so, please:
 
 - update your knowledge base with all new architecture/design decisions and work items
 - clean up any unnecessary artifacts
-- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- commit and push to GitHub (https://github.com/Remaker-Digital/agent-red-customer-engagement)
 - update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
-- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- update the GitHub wiki (https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki)
 - provide a prompt which I can use to initialize the next session and continue working on prioritized work items
 ---END---
 
@@ -326,9 +326,9 @@ If so, please:
 
 - update your knowledge base with all new architecture/design decisions, project enhancements and future (or incomplete) work items
 - clean up all unnecessary artifacts, such as expired temp files, scratch files or obsolete (unused or superceeded) documents
-- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- commit and push to GitHub (https://github.com/Remaker-Digital/agent-red-customer-engagement)
 - update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
-- update the GitHub wiki with all new content describing this project (https://github.com/mike-remakerdigital/agent-red/wiki) 
+- update the GitHub wiki with all new content describing this project (https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki) 
 - provide a prompt which I can use to initialize the next session and continue working on prioritized work items
 ---END---
 
@@ -677,9 +677,9 @@ Please:
 - confirm that all of my instructions been written into the relevant Repeatable Procedures for future regression tests
 - clean up all unnecessary artifacts, such as expired temp files, scratch files or obsolete (unused or superseded) documents
 - Update the agentredcx.com content with details of new features and/or UI changes
-- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- commit and push to GitHub (https://github.com/Remaker-Digital/agent-red-customer-engagement)
 - update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
-- update the GitHub wiki with all new content describing this project (https://github.com/mike-remakerdigital/agent-red/wiki)
+- update the GitHub wiki with all new content describing this project (https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki)
 - Push the latest build to production (unless you recommend against it)
 - provide a prompt which I can use to initialize the next session and continue working on prioritized work items
 ---END---
@@ -1266,9 +1266,9 @@ Please:
 - update your knowledge base with all new architecture/design decisions, project enhancements and future (or incomplete) work items
 - clean up all unnecessary artifacts, such as expired temp files, scratch files or obsolete (unused or superseded) documents
 - Update the agentredcx.com content with details of new features and/or UI changes
-- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- commit and push to GitHub (https://github.com/Remaker-Digital/agent-red-customer-engagement)
 - update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
-- update the GitHub wiki with all new content describing this project (https://github.com/mike-remakerdigital/agent-red/wiki) 
+- update the GitHub wiki with all new content describing this project (https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki) 
 - Push the latest build to production (unless you recommend against it)
 - provide a prompt which I can use to initialize the next session and continue working on prioritized work items
 ---END---
@@ -1278,9 +1278,9 @@ Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
 Current status: API Gateway v1.7.0 deployed. Storefront onboarding complete (tenant #1 provisioned, KB seeded, widget configured, marketing pages created). TWO CRITICAL BLOCKERS remain before AI behavior testing can begin.
-GitHub: https://github.com/mike-remakerdigital/agent-red
+GitHub: https://github.com/Remaker-Digital/agent-red-customer-engagement
 GitHub project: https://github.com/users/mike-remakerdigital/projects/1
-GitHub wiki: https://github.com/mike-remakerdigital/agent-red/wiki
+GitHub wiki: https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki
 
 CRITICAL BLOCKER #1 — Config Persistence Bug (Issue #31, WI #206):
 PUT /api/config returns {"success": true, "version": 1} with correct changes, but GET /api/config returns {"version": 0} with platform defaults. TenantConfigProcessor was not wired to Cosmos DB repos at startup — fixed in v1.7.0 (_startup_config_processor + _startup_dashboard_services added to main.py) — but bug persists. Investigate PreferencesRepository.create_version() in src/multi_tenant/repository.py. Check: (1) is it swallowing exceptions, (2) document ID format (provisioning script uses {tenant_id}_preferences_v1), (3) partition key alignment, (4) 60s cache TTL in TenantConfigProcessor.
@@ -1331,9 +1331,9 @@ If so, please:
 
 - update your knowledge base with all new architecture/design decisions and work items
 - clean up any unnecessary artifacts
-- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- commit and push to GitHub (https://github.com/Remaker-Digital/agent-red-customer-engagement)
 - update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
-- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- update the GitHub wiki (https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki)
 - provide a prompt which I can use to initialize the next session and continue working on prioritized work items
 ---END---
 
@@ -1477,9 +1477,9 @@ If so, please:
 
 - update your knowledge base with all new architecture/design decisions and work items
 - clean up any unnecessary artifacts
-- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- commit and push to GitHub (https://github.com/Remaker-Digital/agent-red-customer-engagement)
 - update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
-- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- update the GitHub wiki (https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki)
 - provide a prompt which I can use to initialize the next session and continue working on prioritized work items
 ---END---
 
@@ -1535,7 +1535,7 @@ Remaker Digital storefront strategy (decided 2026-02-03):
 
 Next priority: Production deployment sprint (#25) — push Docker image to ACR, run Terraform apply, verify Container Apps health. This unblocks the storefront (#26), which unblocks Mazel's UX evaluation (#27).
 
-Important context: Tidio = functional reference. Zapier = visual reference. Persistent Customer Memory = launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting. Wiki at https://github.com/mike-remakerdigital/agent-red/wiki — 49 pages including Design & UX consultant section.
+Important context: Tidio = functional reference. Zapier = visual reference. Persistent Customer Memory = launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting. Wiki at https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki — 49 pages including Design & UX consultant section.
 ---END---
 
 ### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=2 LEN=975
@@ -1772,7 +1772,7 @@ Remaker Digital storefront strategy (decided 2026-02-03):
 
 Next priority: Production deployment sprint (#25) — push Docker image to ACR, run Terraform apply, verify Container Apps health. This unblocks the storefront (#26), which unblocks Mazel's UX evaluation (#27).
 
-Important context: Tidio = functional reference. Zapier = visual reference. Persistent Customer Memory = launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting. Wiki at https://github.com/mike-remakerdigital/agent-red/wiki — 49 pages including Design & UX consultant section.
+Important context: Tidio = functional reference. Zapier = visual reference. Persistent Customer Memory = launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting. Wiki at https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki — 49 pages including Design & UX consultant section.
 ---END---
 
 ### SESSION=2ae0b744-51ad-450d-be92-3d68e1046e11 MSG=3 LEN=325
@@ -1790,9 +1790,9 @@ If so, please:
 
 - update your knowledge base with all new architecture/design decisions and work items
 - clean up any unnecessary artifacts
-- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- commit and push to GitHub (https://github.com/Remaker-Digital/agent-red-customer-engagement)
 - update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
-- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- update the GitHub wiki (https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki)
 - provide a prompt which I can use to initialize the next session and continue working on prioritized work items
 ---END---
 
@@ -1806,7 +1806,7 @@ Important context: Tidio is the primary functional reference. Zapier is the visu
 
 Please review CLAUDE.md.
 
-The URL to the GitHub repo for this project has changed and this account has been upgraded to "Professional": https://github.com/mike-remakerdigital/agent-red
+The URL to the GitHub repo for this project has changed and this account has been upgraded to "Professional": https://github.com/Remaker-Digital/agent-red-customer-engagement
 
 (1) update all references to the old repo URL
 (2) Publish all material to the wiki

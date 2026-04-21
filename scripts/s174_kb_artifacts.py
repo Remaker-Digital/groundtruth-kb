@@ -10,7 +10,7 @@ import sqlite3
 import json
 from datetime import datetime
 
-DB_PATH = "tools/knowledge-db/knowledge.db"
+DB_PATH = "groundtruth.db"
 
 
 def main():

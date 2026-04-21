@@ -769,6 +769,7 @@ A new centralized identity preprocessing stage has been added to the chat pipeli
 - **10th verification dimension:** New "Color Mode Consistency" test dimension (CM.1–CM.4) added to both UI test procedures — verifying light mode rendering, dark mode regression, widget preview isolation, and toggle persistence.
 
 ### Light-mode palette
+
 | Token | Dark | Light |
 |-------|------|-------|
 | Chrome | `#0c0a09` | `#f5f5f5` |

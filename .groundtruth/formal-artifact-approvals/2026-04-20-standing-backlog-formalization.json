@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "STANDING-BACKLOG-FORMALIZATION-BATCH-2026-04-20",
+  "action": "insert-and-link-batch",
+  "source_ref": "owner_conversation:2026-04-20-standing-backlog-formalization-approved",
+  "full_content": "Batch formalization: Standing backlog is a governed cross-session work authority.\n\nOwner approval:\n- User approved formalizing the standing backlog.\n- User asked whether formalization will cause the artifact to be treated the same way specifications are.\n\nArtifacts to create:\n- DELIB-0838: owner decision approving standing backlog formalization.\n- GOV-STANDING-BACKLOG-001: governance requirement that Agent Red maintains a durable cross-session standing backlog.\n- PB-STANDING-BACKLOG-CONTINUITY-001: protected behavior preventing silent backlog bypass, reordering, or dropping.\n- ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001: architecture decision to use memory/work_list.md as the current human-readable standing backlog authority while MemBase defines the governance contract.\n- DCL-STANDING-BACKLOG-SCHEMA-001: design constraint requiring stable continuation fields for backlog entries.\n\nClarification:\n- The backlog contract is treated like other formal GT-KB specifications: it is represented in MemBase, linked to a Deliberation Archive decision, cited in rules, regression-tested, and release-gate visible.\n- Individual backlog entries remain work items/queue entries unless separately promoted to GOV, SPEC, PB, ADR, DCL, or another formal artifact type.\n",
+  "full_content_sha256": "46e45765f51b663a866af0ce0be5e8b5288b4170af1f9950fc95e33d65a3452f",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner said: Yes, approved. The formalization of this artifact will cause it to be treated in the same way specifications are, correct?",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Formalize standing backlog as governed cross-session work authority with specification-like treatment.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

@@ -60,8 +60,11 @@ _RATE_MAX = 3  # max 3 OTP requests per window per IP
 def _is_rate_limited(client_ip: str) -> bool:
     """Check if IP has exceeded OTP request rate limit (SPEC-1694)."""
     from src.multi_tenant.security_hardening import get_rate_limit_backend
+
     return get_rate_limit_backend().is_limited(
-        f"widget_otp:{client_ip}", max_requests=_RATE_MAX, window_seconds=_RATE_WINDOW,
+        f"widget_otp:{client_ip}",
+        max_requests=_RATE_MAX,
+        window_seconds=_RATE_WINDOW,
     )
 
 
@@ -161,7 +164,8 @@ async def send_otp(
     if _is_rate_limited(client_ip):
         logger.warning(
             "Widget OTP rate limit exceeded: ip=%s tenant=%s",
-            client_ip, ctx.tenant_id,
+            client_ip,
+            ctx.tenant_id,
         )
         # Still return success to prevent timing attacks
         return OtpSendResponse()
@@ -221,7 +225,8 @@ async def send_otp(
 
         logger.info(
             "Widget OTP sent: tenant=%s email=%s",
-            ctx.tenant_id, body.email,
+            ctx.tenant_id,
+            body.email,
         )
 
     except Exception:
@@ -276,7 +281,9 @@ async def verify_otp(
         if attempts >= _MAX_VERIFY_ATTEMPTS:
             logger.warning(
                 "Widget OTP locked (max attempts): tenant=%s email=%s attempts=%d",
-                ctx.tenant_id, body.email, attempts,
+                ctx.tenant_id,
+                body.email,
+                attempts,
             )
             return OtpVerifyResponse(verified=False)
 
@@ -299,7 +306,9 @@ async def verify_otp(
                 )
             logger.info(
                 "Widget OTP mismatch: tenant=%s email=%s attempt=%d",
-                ctx.tenant_id, body.email, attempts + 1,
+                ctx.tenant_id,
+                body.email,
+                attempts + 1,
             )
             return OtpVerifyResponse(verified=False)
 
@@ -315,7 +324,8 @@ async def verify_otp(
 
         logger.info(
             "Widget OTP verified: tenant=%s email=%s",
-            ctx.tenant_id, body.email,
+            ctx.tenant_id,
+            body.email,
         )
 
         return OtpVerifyResponse(
@@ -375,12 +385,16 @@ def _generate_customer_token(
     secret = os.environ.get("CUSTOMER_TOKEN_SECRET", "agentred-customer-token-default")
     expires_at = int(time.time()) + (2 * 60 * 60)  # 2 hours
 
-    payload = json.dumps({
-        "tenant_id": tenant_id,
-        "email": email,
-        "name": name,
-        "exp": expires_at,
-    }, separators=(",", ":"), sort_keys=True)
+    payload = json.dumps(
+        {
+            "tenant_id": tenant_id,
+            "email": email,
+            "name": name,
+            "exp": expires_at,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
 
     # HMAC-SHA256 signature
     sig = hmac.new(
@@ -418,7 +432,8 @@ def decode_customer_token(token: str) -> dict[str, Any] | None:
 
         # Verify signature
         secret = os.environ.get(
-            "CUSTOMER_TOKEN_SECRET", "agentred-customer-token-default",
+            "CUSTOMER_TOKEN_SECRET",
+            "agentred-customer-token-default",
         )
         expected_sig = hmac.new(
             secret.encode(),
@@ -607,7 +622,8 @@ async def send_sms_otp(
     if _is_rate_limited(client_ip):
         logger.warning(
             "SMS OTP rate limit exceeded: ip=%s tenant=%s",
-            client_ip, ctx.tenant_id,
+            client_ip,
+            ctx.tenant_id,
         )
         return SmsSendResponse()
 
@@ -615,7 +631,8 @@ async def send_sms_otp(
         # Tier gate: professional+ only
         if not await _check_tier_gate(ctx.tenant_id):
             logger.info(
-                "SMS OTP blocked by tier gate: tenant=%s", ctx.tenant_id,
+                "SMS OTP blocked by tier gate: tenant=%s",
+                ctx.tenant_id,
             )
             return SmsSendResponse(
                 sent=True,
@@ -671,11 +688,14 @@ async def send_sms_otp(
         # Send SMS via ACS
         from src.multi_tenant.sms_verification import _send_sms
 
-        await _send_sms(phone, otp_code)
+        sent = await _send_sms(phone, otp_code)
+        if not sent:
+            return SmsSendResponse(sent=False, message="Unable to send verification code. Please try again.")
 
         logger.info(
             "SMS OTP sent: tenant=%s phone=%s***",
-            ctx.tenant_id, phone[:6],
+            ctx.tenant_id,
+            phone[:6],
         )
 
     except Exception:
@@ -737,7 +757,9 @@ async def verify_sms_otp(
         if attempts >= _MAX_VERIFY_ATTEMPTS:
             logger.warning(
                 "SMS OTP locked (max attempts): tenant=%s phone=%s*** attempts=%d",
-                ctx.tenant_id, phone[:6], attempts,
+                ctx.tenant_id,
+                phone[:6],
+                attempts,
             )
             return SmsVerifyResponse(verified=False)
 
@@ -761,7 +783,9 @@ async def verify_sms_otp(
                 )
             logger.info(
                 "SMS OTP mismatch: tenant=%s phone=%s*** attempt=%d",
-                ctx.tenant_id, phone[:6], attempts + 1,
+                ctx.tenant_id,
+                phone[:6],
+                attempts + 1,
             )
             return SmsVerifyResponse(verified=False)
 
@@ -776,7 +800,8 @@ async def verify_sms_otp(
 
         logger.info(
             "SMS OTP verified: tenant=%s phone=%s***",
-            ctx.tenant_id, phone[:6],
+            ctx.tenant_id,
+            phone[:6],
         )
 
         return SmsVerifyResponse(
@@ -787,5 +812,3 @@ async def verify_sms_otp(
     except Exception:
         logger.exception("Error verifying SMS OTP")
         return SmsVerifyResponse(verified=False)
-
-

@@ -143,7 +143,8 @@ async def _start_health_sidecar(service_name: str) -> web.AppRunner:
 
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", _HEALTH_PORT)
+    # Container Apps probes require this sidecar to listen on all interfaces.
+    site = web.TCPSite(runner, "0.0.0.0", _HEALTH_PORT)  # nosec B104
     await site.start()
     logger.info("Health sidecar listening on 0.0.0.0:%d/healthz", _HEALTH_PORT)
     return runner

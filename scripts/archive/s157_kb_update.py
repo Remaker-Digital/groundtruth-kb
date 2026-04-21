@@ -140,7 +140,7 @@ db.insert_document(
         "## SPEC-1667 SPA Authentication\n\n"
         "SPA platform admin credentials seeded in both environments.\n"
         "Production key stored in Key Vault: SPA-PLATFORM-ADMIN-KEY.\n"
-        "Staging key: ar_spa_plat_mdbq-Sm3vE5Qj3d4H2Dk82juVsB42wg3.\n\n"
+        "Staging key: [REDACTED — stored in Key Vault as SPA-PLATFORM-ADMIN-KEY].\n\n"
         "## Known Issues\n\n"
         "- Production Cosmos has no seeded tenant API keys (pre-existing).\n"
         "- Git push blocked by .github/workflows/lint.yml OAuth scope.\n"

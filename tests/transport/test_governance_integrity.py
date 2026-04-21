@@ -47,9 +47,9 @@ def test_db():
     from groundtruth_kb.gates_transport import TransportEvidenceGate
     import db as kb_db
 
-    src_db = _PROJECT_ROOT / "tools" / "knowledge-db" / "knowledge.db"
+    src_db = _PROJECT_ROOT / "groundtruth.db"
     tmp_dir = tempfile.mkdtemp(prefix="governance_test_")
-    tmp_db = Path(tmp_dir) / "test_knowledge.db"
+    tmp_db = Path(tmp_dir) / "test_groundtruth.db"
     shutil.copy2(src_db, tmp_db)
 
     gate = TransportEvidenceGate(

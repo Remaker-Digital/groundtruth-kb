@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "SESSION-GOVERNANCE-FORMALIZATION-BATCH-2026-04-20",
+  "action": "insert-and-link-batch",
+  "source_ref": "owner_conversation:2026-04-20-ensure-session-decisions-formalized",
+  "full_content": "Batch formalization: Session governance directives and principles are mapped to MemBase records and audit evidence.\n\nArtifacts to create:\n- GOV-RELEASE-READINESS-GOVERNED-TESTING-001 for DELIB-0828 release-readiness testing/governance approval.\n- GOV-GTKB-ADOPTION-ENFORCEMENT-001 for DELIB-0829 GT-KB adoption and candidate work queue directive.\n- GOV-ACTING-PRIME-BUILDER-001 for DELIB-0830 acting Prime Builder role assignment while canonical Prime is unavailable.\n- GOV-HARNESS-ROLE-PORTABILITY-001 for DELIB-0831 portable harness-assigned role principle.\n- GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001 for DELIB-0832/0833 GT-KB install and harness role configuration principle/comparison.\n- GOV-AGENT-RED-GTKB-CONFORMANCE-001 for DELIB-0834 Agent Red as a fully-conformant GT-KB-supported application.\n- ADR-CODEX-HOOK-PARITY-FALLBACK-001 for DELIB-0836 Codex hook Windows limitation and fallback verifier/release-gate architecture.\n- GOV-SESSION-FORMALIZATION-AUDIT-001 and DELIB-0837 for this audit pass requiring all decisions, directives, and principles in the session to be identified and mapped to their respective artifacts.\n\nThe batch also updates .claude/rules/acting-prime-builder.md, memory/work_list.md, and governance regression tests so drift is observable.\n",
+  "full_content_sha256": "7728fc18cb005d1156070f541b0f03a81541dc7099be01d32b70ba1489a8264b",
+  "approval_mode": "acknowledge",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner said: Please ensure that all decisions, directives and principles in this session have been identified and applied to their respective artifacts.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Formalize and audit all session governance directives across DA, MemBase, rules, work queue, and tests.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

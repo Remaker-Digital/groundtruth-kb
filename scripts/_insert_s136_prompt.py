@@ -3,7 +3,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db'))
 from db import KnowledgeDB
 
-db_path = os.path.join(os.path.dirname(__file__), '..', 'tools', 'knowledge-db', 'knowledge.db')
+db_path = os.path.join(os.path.dirname(__file__), '..', 'groundtruth.db')
 db = KnowledgeDB(db_path)
 
 prompt = r"""Continue work on Agent Red Customer Experience commercial project.

@@ -104,6 +104,25 @@
 
 ---
 
+### 2026-04-10 - S276 Owner-Decision Log and Residual Risks
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | WI-3030 async-only scope reduction accepted by owner: launch scope reduced to asynchronous escalation only; real-time inbox and co-pilot completion deferred. | INSIGHTS-2026-04-10-S276-OWNER-DECISION-LOG.md; owner decision in Prime message 7233def8. | Preserve explicit scope-reduction language in all closure, release, and retrospective material to prevent governance drift. | Open (post-deploy governance watch) |
+| Technical | WI-3031 deploy-path durability risk: scaling intent for production minReplicas is carried by manual deploy-time action; `deploy.py` does not encode the scaling baseline. | INSIGHTS-2026-04-10-S276-OWNER-DECISION-LOG.md; prior advisory INSIGHTS-2026-04-10-01-21-25-S275-WI-RESOLUTION-ADVISORY.md. | Add `minReplicas` enforcement to `deploy.py` or equivalent release control so scaling baseline cannot be skipped. | Open (follow-up WI required) |
+| Technical | 68 unmapped active specs remain a traceability weakness; not a deployment gate per owner decision in S276. | INSIGHTS-2026-04-10-FRESH-SPEC-IMPLEMENTATION-EVAL-INTERIM.md; owner classification as post-deploy hygiene. | Include SPEC-1879..SPEC-1882 cluster and governance/architecture unmapped specs in next Loyal Opposition audit set after production deploy. | Deferred (post-deploy hygiene) |
+
+---
+
+### 2026-04-21 - Startup token and wrap-up feedback
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Fresh-session startup token load improved to owner-observed `23k / 258k`, but live token measurement is still manual because the harness does not expose the value to the dashboard generator. | Mike feedback and screenshot on 2026-04-21; INSIGHTS-2026-04-21-STARTUP-TOKEN-AND-PREMATURE-WRAPUP-FEEDBACK.md; `docs/gtkb-dashboard/session-startup-report.md` reports `not_exposed_by_current_harness`. | Preserve `23k` as the latest manual benchmark and continue reducing injected startup payload while pursuing mechanical token capture. | Open |
+| Process | Wrap-up behavior can fire or appear to fire before Mike has a practical chance to answer the startup focus chooser. | Mike feedback on 2026-04-21; `.claude/SCHEDULE.md` session-end wrap-up group; proactive wrap-up rules in `.claude/rules/acting-prime-builder.md`; generated wrap-up report in `docs/gtkb-dashboard/session-wrapup-report.md`. | Implemented one-shot startup lifecycle guard and scheduler keyword tightening; verified with `python -m pytest tests/scripts/test_session_self_initialization.py tests/ops/test_hooks_specs.py tests/scripts/test_codex_hook_parity.py -q --tb=short` and `python scripts/check_codex_hook_parity.py`. | Resolved |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).

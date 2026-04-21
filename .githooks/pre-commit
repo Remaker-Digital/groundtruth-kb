@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Pre-commit hook: PowerShell syntax validation for staged .ps1 files.
+# Delegates to .githooks/pre-commit-ps1-parse.ps1 when PS1 files are staged.
+#
+# Activation (one-time, per developer):
+#   git config core.hooksPath .githooks
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+set -e
+
+# Only proceed if PowerShell is available
+PWSH=""
+if command -v pwsh &>/dev/null; then
+    PWSH="pwsh"
+elif command -v powershell.exe &>/dev/null; then
+    PWSH="powershell.exe"
+else
+    # PowerShell not available (non-Windows environment) — skip gracefully
+    exit 0
+fi
+
+# Only proceed if any staged files are .ps1
+STAGED_PS1=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -c '\.ps1$' || true)
+if [ "$STAGED_PS1" -eq 0 ]; then
+    exit 0
+fi
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+"$PWSH" -NoProfile -ExecutionPolicy Bypass \
+    -File "$REPO_ROOT/.githooks/pre-commit-ps1-parse.ps1" || exit 1

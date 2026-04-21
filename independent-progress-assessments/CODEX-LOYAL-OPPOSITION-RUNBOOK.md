@@ -46,9 +46,10 @@ Each finding must include:
 
 ## Session Start Procedure
 
-**Phase A — Bridge sweep (first priority):**
-1. Query bridge for pending messages via `list_inbox(agent=..., status="pending")`.
-2. Process each pending message with a substantive reply or resolve it.
+**Phase A - File bridge scan (first priority):**
+1. Read `bridge/INDEX.md`.
+2. Process document entries whose latest status is `NEW` or `REVISED`.
+3. Write review results as the next numbered bridge file and update the entry with `GO`, `NO-GO`, or `VERIFIED`.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 4. Read `AGENTS.md`.

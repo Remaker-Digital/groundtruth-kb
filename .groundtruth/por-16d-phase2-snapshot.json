@@ -1,0 +1,1203 @@
+{
+  "as_of_pre_apply": true,
+  "class_a_matches": [
+    {
+      "orphan_id": "TEST-7590",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0001",
+      "target_spec_id": "295",
+      "test_class": "TestAppCreation",
+      "test_file": "tests/agents/test_agent_app.py",
+      "test_function": "test_app_02_app_title_includes_agent_type"
+    },
+    {
+      "orphan_id": "TEST-7598",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0002",
+      "target_spec_id": "SPEC-1396",
+      "test_class": "TestAnalyticsCollectorAgent",
+      "test_file": "tests/agents/test_agent_class_specs.py",
+      "test_function": "test_class_exists"
+    },
+    {
+      "orphan_id": "TEST-7609",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0005",
+      "target_spec_id": "SPEC-1411",
+      "test_class": "TestResponseGeneratorAgent",
+      "test_file": "tests/agents/test_agent_class_specs.py",
+      "test_function": "test_class_exists"
+    },
+    {
+      "orphan_id": "TEST-7616",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0007",
+      "target_spec_id": "SPEC-0206",
+      "test_class": "TestAnalyticsCollection",
+      "test_file": "tests/agents/test_analytics_collector.py",
+      "test_function": "test_ac_01_collects_pipeline_analytics"
+    },
+    {
+      "orphan_id": "TEST-7629",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0008",
+      "target_spec_id": "SPEC-1398",
+      "test_class": "TestHandleMessage",
+      "test_file": "tests/agents/test_base_agent.py",
+      "test_function": "test_base_06_echo_agent_returns_result"
+    },
+    {
+      "orphan_id": "TEST-7631",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0009",
+      "target_spec_id": "SPEC-1398",
+      "test_class": "TestHandleMessage",
+      "test_file": "tests/agents/test_base_agent.py",
+      "test_function": "test_base_08_failing_agent_returns_error"
+    },
+    {
+      "orphan_id": "TEST-7635",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0010",
+      "target_spec_id": "SPEC-1398",
+      "test_class": "TestHandleMessage",
+      "test_file": "tests/agents/test_base_agent.py",
+      "test_function": "test_base_12_create_agent_topic"
+    },
+    {
+      "orphan_id": "TEST-7639",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0022",
+      "target_spec_id": "SPEC-1400",
+      "test_class": "TestCriticVerdicts",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_01_approved_response"
+    },
+    {
+      "orphan_id": "TEST-7640",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0023",
+      "target_spec_id": "SPEC-1400",
+      "test_class": "TestCriticVerdicts",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_02_rejected_response"
+    },
+    {
+      "orphan_id": "TEST-7641",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0024",
+      "target_spec_id": "SPEC-1400",
+      "test_class": "TestCriticVerdicts",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_03_modified_response"
+    },
+    {
+      "orphan_id": "TEST-7642",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0025",
+      "target_spec_id": "SPEC-1400",
+      "test_class": "TestCriticVerdicts",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_04_modified_without_text_is_rejection"
+    },
+    {
+      "orphan_id": "TEST-7643",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0026",
+      "target_spec_id": "SPEC-0751",
+      "test_class": "TestFailClosed",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_05_no_client_blocks"
+    },
+    {
+      "orphan_id": "TEST-7644",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0027",
+      "target_spec_id": "SPEC-0751",
+      "test_class": "TestFailClosed",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_06_openai_exception_blocks"
+    },
+    {
+      "orphan_id": "TEST-7645",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0028",
+      "target_spec_id": "SPEC-0751",
+      "test_class": "TestFailClosed",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_07_json_parse_failure_rejects"
+    },
+    {
+      "orphan_id": "TEST-7646",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0029",
+      "target_spec_id": "SPEC-0751",
+      "test_class": "TestFailClosed",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_08_unknown_verdict_rejects"
+    },
+    {
+      "orphan_id": "TEST-7647",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0019",
+      "target_spec_id": "SPEC-0258",
+      "test_class": "TestCriticPromptConstruction",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_09_kb_titles_included_in_prompt"
+    },
+    {
+      "orphan_id": "TEST-7649",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0020",
+      "target_spec_id": "SPEC-1401",
+      "test_class": "TestCriticPromptConstruction",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_11_uses_json_mode"
+    },
+    {
+      "orphan_id": "TEST-7650",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0021",
+      "target_spec_id": "SPEC-1401",
+      "test_class": "TestCriticPromptConstruction",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_12_result_includes_metadata"
+    },
+    {
+      "orphan_id": "TEST-7651",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0011",
+      "target_spec_id": "SPEC-1400",
+      "test_class": "TestCriticIdentity",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_13_agent_type"
+    },
+    {
+      "orphan_id": "TEST-7652",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0012",
+      "target_spec_id": "SPEC-1400",
+      "test_class": "TestCriticIdentity",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_14_configure"
+    },
+    {
+      "orphan_id": "TEST-7653",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0013",
+      "target_spec_id": "SPEC-0751",
+      "test_class": "TestCriticIdentity",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_15_fail_closed_result_structure"
+    },
+    {
+      "orphan_id": "TEST-7654",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0014",
+      "target_spec_id": "SPEC-0644",
+      "test_class": "TestCriticJailbreakDetection",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_16_rule7_covers_indirect_compliance"
+    },
+    {
+      "orphan_id": "TEST-7655",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0015",
+      "target_spec_id": "SPEC-0644",
+      "test_class": "TestCriticJailbreakDetection",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_17_rule7_covers_system_prompt_extraction"
+    },
+    {
+      "orphan_id": "TEST-7656",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0016",
+      "target_spec_id": "SPEC-0644",
+      "test_class": "TestCriticJailbreakDetection",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_18_rule7_three_subrules_present"
+    },
+    {
+      "orphan_id": "TEST-7657",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0017",
+      "target_spec_id": "SPEC-0751",
+      "test_class": "TestCriticJailbreakDetection",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_19_indirect_jailbreak_rejected"
+    },
+    {
+      "orphan_id": "TEST-7658",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0018",
+      "target_spec_id": "SPEC-0644",
+      "test_class": "TestCriticJailbreakDetection",
+      "test_file": "tests/agents/test_critic_supervisor.py",
+      "test_function": "test_cs_20_system_prompt_extraction_rejected"
+    },
+    {
+      "orphan_id": "TEST-7659",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0030",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationAnalysis",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_01_extracts_reason_and_urgency"
+    },
+    {
+      "orphan_id": "TEST-7660",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0031",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationAnalysis",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_02_low_urgency_escalation"
+    },
+    {
+      "orphan_id": "TEST-7661",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0032",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationAnalysis",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_03_includes_system_prompt"
+    },
+    {
+      "orphan_id": "TEST-7662",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0033",
+      "target_spec_id": "SPEC-1404",
+      "test_class": "TestEscalationAnalysis",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_04_uses_json_mode"
+    },
+    {
+      "orphan_id": "TEST-7663",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0037",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationFallback",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_05_no_client_returns_default"
+    },
+    {
+      "orphan_id": "TEST-7664",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0038",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationFallback",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_06_openai_exception_returns_default"
+    },
+    {
+      "orphan_id": "TEST-7665",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0039",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationFallback",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_07_json_parse_failure"
+    },
+    {
+      "orphan_id": "TEST-7666",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0040",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationFallback",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_08_partial_json_uses_defaults"
+    },
+    {
+      "orphan_id": "TEST-7667",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0041",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationFallback",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_09_empty_response_content"
+    },
+    {
+      "orphan_id": "TEST-7668",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0042",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationIdentity",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_10_agent_type"
+    },
+    {
+      "orphan_id": "TEST-7669",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0043",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationIdentity",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_11_configure"
+    },
+    {
+      "orphan_id": "TEST-7670",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0034",
+      "target_spec_id": "SPEC-0614",
+      "test_class": "TestEscalationCategory",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_12_category_in_response"
+    },
+    {
+      "orphan_id": "TEST-7671",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0035",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationCategory",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_13_category_fallback_no_client"
+    },
+    {
+      "orphan_id": "TEST-7672",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0036",
+      "target_spec_id": "SPEC-1403",
+      "test_class": "TestEscalationCategory",
+      "test_file": "tests/agents/test_escalation_handler.py",
+      "test_function": "test_eh_14_category_fallback_on_error"
+    },
+    {
+      "orphan_id": "TEST-7673",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0044",
+      "target_spec_id": "SPEC-1406",
+      "test_class": "TestClassification",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_01_classifies_greeting"
+    },
+    {
+      "orphan_id": "TEST-7674",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0045",
+      "target_spec_id": "SPEC-1489",
+      "test_class": "TestClassification",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_02_classifies_product_question"
+    },
+    {
+      "orphan_id": "TEST-7675",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0046",
+      "target_spec_id": "SPEC-1489",
+      "test_class": "TestClassification",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_03_all_taxonomy_intents_recognized"
+    },
+    {
+      "orphan_id": "TEST-7676",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0047",
+      "target_spec_id": "SPEC-1489",
+      "test_class": "TestClassificationEdgeCases",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_04_no_openai_client_returns_default"
+    },
+    {
+      "orphan_id": "TEST-7677",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0048",
+      "target_spec_id": "SPEC-1489",
+      "test_class": "TestClassificationEdgeCases",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_05_unknown_intent_normalized_to_general_inquiry"
+    },
+    {
+      "orphan_id": "TEST-7678",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0049",
+      "target_spec_id": "SPEC-1489",
+      "test_class": "TestClassificationEdgeCases",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_06_json_parse_failure_returns_default"
+    },
+    {
+      "orphan_id": "TEST-7679",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0050",
+      "target_spec_id": "SPEC-1489",
+      "test_class": "TestClassificationEdgeCases",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_07_empty_response_content"
+    },
+    {
+      "orphan_id": "TEST-7680",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0051",
+      "target_spec_id": "SPEC-1406",
+      "test_class": "TestClassificationEdgeCases",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_08_confidence_coerced_to_float"
+    },
+    {
+      "orphan_id": "TEST-7682",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0052",
+      "target_spec_id": "SPEC-1406",
+      "test_class": "TestIntentClassifierIdentity",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_10_agent_type"
+    },
+    {
+      "orphan_id": "TEST-7683",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0053",
+      "target_spec_id": "SPEC-1406",
+      "test_class": "TestIntentClassifierIdentity",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_11_configure_sets_client"
+    },
+    {
+      "orphan_id": "TEST-7684",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0054",
+      "target_spec_id": "SPEC-1398",
+      "test_class": "TestIntentClassifierIdentity",
+      "test_file": "tests/agents/test_intent_classifier.py",
+      "test_function": "test_ic_12_handle_message_integration"
+    },
+    {
+      "orphan_id": "TEST-7688",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0055",
+      "target_spec_id": "SPEC-1408",
+      "test_class": "TestHybridSearch",
+      "test_file": "tests/agents/test_knowledge_retrieval.py",
+      "test_function": "test_kr_04_intent_source_mapping"
+    },
+    {
+      "orphan_id": "TEST-7701",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0065",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpMergeStrategy",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_01_both_populated"
+    },
+    {
+      "orphan_id": "TEST-7702",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0066",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpMergeStrategy",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_02_kb_only"
+    },
+    {
+      "orphan_id": "TEST-7703",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0067",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpMergeStrategy",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_03_mcp_only"
+    },
+    {
+      "orphan_id": "TEST-7704",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0068",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpMergeStrategy",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_04_sources_combined_with_type_tags"
+    },
+    {
+      "orphan_id": "TEST-7705",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0069",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpMergeStrategy",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_05_mcp_trace_preserved"
+    },
+    {
+      "orphan_id": "TEST-7706",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0056",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestFindSearchTool",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_06_search_prefix_preferred"
+    },
+    {
+      "orphan_id": "TEST-7707",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0057",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestFindSearchTool",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_07_fallback_to_first"
+    },
+    {
+      "orphan_id": "TEST-7708",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0058",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestFindSearchTool",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_08_empty_returns_none"
+    },
+    {
+      "orphan_id": "TEST-7709",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0059",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpAugmentation",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_09_mcp_augments_kb"
+    },
+    {
+      "orphan_id": "TEST-7710",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0060",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpAugmentation",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_10_mcp_failure_fallthrough"
+    },
+    {
+      "orphan_id": "TEST-7711",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0061",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpAugmentation",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_11_no_configs_skips_mcp"
+    },
+    {
+      "orphan_id": "TEST-7714",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0062",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpAugmentation",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_14_try_mcp_success"
+    },
+    {
+      "orphan_id": "TEST-7717",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0063",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpBackwardCompat",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_19_no_mcp_fields_in_payload"
+    },
+    {
+      "orphan_id": "TEST-7718",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0064",
+      "target_spec_id": "SPEC-1409",
+      "test_class": "TestKrMcpBackwardCompat",
+      "test_file": "tests/agents/test_knowledge_retrieval_mcp.py",
+      "test_function": "test_krmcp_20_empty_tenant_id"
+    },
+    {
+      "orphan_id": "TEST-7720",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0070",
+      "target_spec_id": "SPEC-1412",
+      "test_class": "TestNonStreamingProcess",
+      "test_file": "tests/agents/test_response_generator.py",
+      "test_function": "test_rg_02_uses_custom_model"
+    },
+    {
+      "orphan_id": "TEST-7733",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0076",
+      "target_spec_id": "SPEC-1168",
+      "test_class": "TestConsentModels",
+      "test_file": "tests/chat/test_consent_endpoint.py",
+      "test_function": "test_consent_update_request_granted"
+    },
+    {
+      "orphan_id": "TEST-7736",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0074",
+      "target_spec_id": "SPEC-0292",
+      "test_class": "TestConsentEndpoint",
+      "test_file": "tests/chat/test_consent_endpoint.py",
+      "test_function": "test_consent_granted_updates_profile"
+    },
+    {
+      "orphan_id": "TEST-7737",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0073",
+      "target_spec_id": "SPEC-0292",
+      "test_class": "TestConsentEndpoint",
+      "test_file": "tests/chat/test_consent_endpoint.py",
+      "test_function": "test_consent_denied_updates_profile"
+    },
+    {
+      "orphan_id": "TEST-7738",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0075",
+      "target_spec_id": "SPEC-1168",
+      "test_class": "TestConsentEndpoint",
+      "test_file": "tests/chat/test_consent_endpoint.py",
+      "test_function": "test_consent_invalid_status_raises_422"
+    },
+    {
+      "orphan_id": "TEST-7739",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0072",
+      "target_spec_id": "SPEC-1168",
+      "test_class": "TestConsentEndpoint",
+      "test_file": "tests/chat/test_consent_endpoint.py",
+      "test_function": "test_consent_conversation_not_found_raises_404"
+    },
+    {
+      "orphan_id": "TEST-7740",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0071",
+      "target_spec_id": "SPEC-0292",
+      "test_class": "TestConsentEndpoint",
+      "test_file": "tests/chat/test_consent_endpoint.py",
+      "test_function": "test_consent_audit_logged"
+    },
+    {
+      "orphan_id": "TEST-7745",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0077",
+      "target_spec_id": "SPEC-0768",
+      "test_class": "TestIdentityPipelineWiring",
+      "test_file": "tests/chat/test_identity_pipeline_wiring.py",
+      "test_function": "test_identity_actions_that_bypass_pipeline"
+    },
+    {
+      "orphan_id": "TEST-7746",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0078",
+      "target_spec_id": "SPEC-1278",
+      "test_class": "TestIdentityStreamEventOrder",
+      "test_file": "tests/chat/test_identity_pipeline_wiring.py",
+      "test_function": "test_identity_stream_emits_stage_before_token"
+    },
+    {
+      "orphan_id": "TEST-7747",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0079",
+      "target_spec_id": "SPEC-0840",
+      "test_class": "TestIdentityStreamEventOrder",
+      "test_file": "tests/chat/test_identity_pipeline_wiring.py",
+      "test_function": "test_identity_stream_stage_event_matches_pipeline_format"
+    },
+    {
+      "orphan_id": "TEST-7749",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0080",
+      "target_spec_id": "SPEC-0768",
+      "test_class": "TestPreprocessIdentity",
+      "test_file": "tests/chat/test_identity_preprocessor.py",
+      "test_function": "test_email_message_sends_otp"
+    },
+    {
+      "orphan_id": "TEST-7750",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0086",
+      "target_spec_id": "SPEC-0768",
+      "test_class": "TestPreprocessIdentity",
+      "test_file": "tests/chat/test_identity_preprocessor.py",
+      "test_function": "test_valid_otp_code_returns_otp_received"
+    },
+    {
+      "orphan_id": "TEST-7751",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0082",
+      "target_spec_id": "SPEC-0768",
+      "test_class": "TestPreprocessIdentity",
+      "test_file": "tests/chat/test_identity_preprocessor.py",
+      "test_function": "test_invalid_otp_code_returns_otp_invalid"
+    },
+    {
+      "orphan_id": "TEST-7756",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0084",
+      "target_spec_id": "SPEC-1264",
+      "test_class": "TestPreprocessIdentity",
+      "test_file": "tests/chat/test_identity_preprocessor.py",
+      "test_function": "test_otp_code_without_prior_send"
+    },
+    {
+      "orphan_id": "TEST-7757",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0085",
+      "target_spec_id": "SPEC-1241",
+      "test_class": "TestPreprocessIdentity",
+      "test_file": "tests/chat/test_identity_preprocessor.py",
+      "test_function": "test_rate_limit_exceeded_rejects"
+    },
+    {
+      "orphan_id": "TEST-7760",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0081",
+      "target_spec_id": "SPEC-0866",
+      "test_class": "TestPreprocessIdentity",
+      "test_file": "tests/chat/test_identity_preprocessor.py",
+      "test_function": "test_flexible_email_its_pattern"
+    },
+    {
+      "orphan_id": "TEST-7763",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0083",
+      "target_spec_id": "SPEC-0768",
+      "test_class": "TestPreprocessIdentity",
+      "test_file": "tests/chat/test_identity_preprocessor.py",
+      "test_function": "test_long_message_with_email_not_extracted"
+    },
+    {
+      "orphan_id": "TEST-7774",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0087",
+      "target_spec_id": "SPEC-0713",
+      "test_class": "TestPipelineEscalation",
+      "test_file": "tests/chat/test_pipeline_escalation.py",
+      "test_function": "test_pe_01_passes_category_to_session"
+    },
+    {
+      "orphan_id": "TEST-7775",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0088",
+      "target_spec_id": "SPEC-0713",
+      "test_class": "TestPipelineEscalation",
+      "test_file": "tests/chat/test_pipeline_escalation.py",
+      "test_function": "test_pe_02_auto_assigns_agent"
+    },
+    {
+      "orphan_id": "TEST-7776",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0089",
+      "target_spec_id": "SPEC-0666",
+      "test_class": "TestPipelineEscalation",
+      "test_file": "tests/chat/test_pipeline_escalation.py",
+      "test_function": "test_pe_03_no_agent_available_proceeds"
+    },
+    {
+      "orphan_id": "TEST-7777",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0090",
+      "target_spec_id": "SPEC-0713",
+      "test_class": "TestEscalateConversation",
+      "test_file": "tests/chat/test_session_escalation.py",
+      "test_function": "test_se_01_sets_category_and_assigned_to"
+    },
+    {
+      "orphan_id": "TEST-7779",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0091",
+      "target_spec_id": "SPEC-0716",
+      "test_class": "TestFindBestAgent",
+      "test_file": "tests/chat/test_session_escalation.py",
+      "test_function": "test_se_03_returns_lowest_workload"
+    },
+    {
+      "orphan_id": "TEST-7780",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0092",
+      "target_spec_id": "SPEC-0716",
+      "test_class": "TestFindBestAgent",
+      "test_file": "tests/chat/test_session_escalation.py",
+      "test_function": "test_se_04_respects_concurrency_cap"
+    },
+    {
+      "orphan_id": "TEST-7781",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0093",
+      "target_spec_id": "SPEC-0713",
+      "test_class": "TestFindBestAgent",
+      "test_file": "tests/chat/test_session_escalation.py",
+      "test_function": "test_se_05_returns_none_when_no_match"
+    },
+    {
+      "orphan_id": "TEST-7782",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0094",
+      "target_spec_id": "SPEC-0613",
+      "test_class": "TestFindBestAgent",
+      "test_file": "tests/chat/test_session_escalation.py",
+      "test_function": "test_se_06_falls_back_to_general_inquiry"
+    },
+    {
+      "orphan_id": "TEST-7784",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0100",
+      "target_spec_id": "SPEC-0289",
+      "test_class": "TestPiiScrubberConfig",
+      "test_file": "tests/chat/test_session_pii_scrubbing.py",
+      "test_function": "test_scrubber_disabled_by_default"
+    },
+    {
+      "orphan_id": "TEST-7785",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0101",
+      "target_spec_id": "SPEC-0289",
+      "test_class": "TestPiiScrubberConfig",
+      "test_file": "tests/chat/test_session_pii_scrubbing.py",
+      "test_function": "test_set_pii_scrubber_enabled"
+    },
+    {
+      "orphan_id": "TEST-7789",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0097",
+      "target_spec_id": "SPEC-0289",
+      "test_class": "TestCustomerMessagePiiScrubbing",
+      "test_file": "tests/chat/test_session_pii_scrubbing.py",
+      "test_function": "test_scrubs_email_when_enabled"
+    },
+    {
+      "orphan_id": "TEST-7790",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0099",
+      "target_spec_id": "SPEC-0289",
+      "test_class": "TestCustomerMessagePiiScrubbing",
+      "test_file": "tests/chat/test_session_pii_scrubbing.py",
+      "test_function": "test_scrubs_phone_when_enabled"
+    },
+    {
+      "orphan_id": "TEST-7791",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0098",
+      "target_spec_id": "SPEC-0289",
+      "test_class": "TestCustomerMessagePiiScrubbing",
+      "test_file": "tests/chat/test_session_pii_scrubbing.py",
+      "test_function": "test_scrubs_multiple_pii_patterns"
+    },
+    {
+      "orphan_id": "TEST-7794",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0096",
+      "target_spec_id": "SPEC-0289",
+      "test_class": "TestAiMessagePiiScrubbing",
+      "test_file": "tests/chat/test_session_pii_scrubbing.py",
+      "test_function": "test_scrubs_email_in_ai_response"
+    },
+    {
+      "orphan_id": "TEST-7796",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0095",
+      "target_spec_id": "SPEC-0289",
+      "test_class": "TestAiMessagePiiScrubbing",
+      "test_file": "tests/chat/test_session_pii_scrubbing.py",
+      "test_function": "test_disabled_after_toggle"
+    },
+    {
+      "orphan_id": "TEST-7798",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0102",
+      "target_spec_id": "SPEC-1233",
+      "test_class": "TestClassifyOpenaiError",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_rate_limit_by_status_429"
+    },
+    {
+      "orphan_id": "TEST-7813",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0103",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_basic_error_event"
+    },
+    {
+      "orphan_id": "TEST-7814",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0110",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_with_recoverable_false"
+    },
+    {
+      "orphan_id": "TEST-7815",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0112",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_with_tokens_sent"
+    },
+    {
+      "orphan_id": "TEST-7816",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0111",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_with_stage"
+    },
+    {
+      "orphan_id": "TEST-7817",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0105",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_full_fields"
+    },
+    {
+      "orphan_id": "TEST-7818",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0109",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_tokens_sent_zero"
+    },
+    {
+      "orphan_id": "TEST-7819",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0108",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_sse_serialization"
+    },
+    {
+      "orphan_id": "TEST-7820",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0104",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_default_code"
+    },
+    {
+      "orphan_id": "TEST-7821",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0107",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_omits_none_tokens"
+    },
+    {
+      "orphan_id": "TEST-7822",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0106",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestEnhancedErrorEvent",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_error_event_omits_none_stage"
+    },
+    {
+      "orphan_id": "TEST-7823",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0114",
+      "target_spec_id": "131",
+      "test_class": "TestPipelineMidStreamErrors",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_rate_limit_mid_stream_emits_classified_error"
+    },
+    {
+      "orphan_id": "TEST-7824",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0113",
+      "target_spec_id": "131",
+      "test_class": "TestPipelineMidStreamErrors",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_content_filter_mid_stream_non_recoverable"
+    },
+    {
+      "orphan_id": "TEST-7826",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0115",
+      "target_spec_id": "SPEC-0262",
+      "test_class": "TestPipelineOuterErrorEvents",
+      "test_file": "tests/chat/test_sse_error_handling.py",
+      "test_function": "test_pipeline_timeout_has_stage"
+    },
+    {
+      "orphan_id": "TEST-7829",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0122",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestSSEEventFormat",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_token_event_sse_format"
+    },
+    {
+      "orphan_id": "TEST-7830",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0119",
+      "target_spec_id": "SPEC-1161",
+      "test_class": "TestSSEEventFormat",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_done_event_sse_format"
+    },
+    {
+      "orphan_id": "TEST-7831",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0121",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestSSEEventFormat",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_stage_event_sse_format"
+    },
+    {
+      "orphan_id": "TEST-7832",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0123",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestSSEEventFormat",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_validated_event_sse_format"
+    },
+    {
+      "orphan_id": "TEST-7833",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0120",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestSSEEventFormat",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_error_event_sse_format"
+    },
+    {
+      "orphan_id": "TEST-7838",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0118",
+      "target_spec_id": "SPEC-1161",
+      "test_class": "TestSSEDoneEvent",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_done_event_type"
+    },
+    {
+      "orphan_id": "TEST-7839",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0116",
+      "target_spec_id": "SPEC-1161",
+      "test_class": "TestSSEDoneEvent",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_done_event_in_sse_format"
+    },
+    {
+      "orphan_id": "TEST-7840",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0117",
+      "target_spec_id": "SPEC-1161",
+      "test_class": "TestSSEDoneEvent",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_done_event_includes_turn_count"
+    },
+    {
+      "orphan_id": "TEST-7845",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0125",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestSSERetraction",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_retracted_event_format"
+    },
+    {
+      "orphan_id": "TEST-7846",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0126",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestSSERetraction",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_retracted_event_type"
+    },
+    {
+      "orphan_id": "TEST-7847",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0124",
+      "target_spec_id": "SPEC-1157",
+      "test_class": "TestSSERetraction",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_retracted_event_contains_replacement"
+    },
+    {
+      "orphan_id": "TEST-7848",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0127",
+      "target_spec_id": "SPEC-1159",
+      "test_class": "TestSSERetraction",
+      "test_file": "tests/chat/test_sse_integration.py",
+      "test_function": "test_stream_then_validate_event_sequence"
+    },
+    {
+      "orphan_id": "TEST-7851",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0128",
+      "target_spec_id": "132",
+      "test_class": "TestMeteringCallback",
+      "test_file": "tests/chat/test_sse_metering_multitab.py",
+      "test_function": "test_metering_132_03_callback_invoked_on_first_event"
+    },
+    {
+      "orphan_id": "TEST-7853",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0129",
+      "target_spec_id": "SPEC-0712",
+      "test_class": "TestMeteringCallback",
+      "test_file": "tests/chat/test_sse_metering_multitab.py",
+      "test_function": "test_metering_132_05_callback_invoked_only_once"
+    },
+    {
+      "orphan_id": "TEST-7857",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0132",
+      "target_spec_id": "132",
+      "test_class": "TestRecordFirstChunk",
+      "test_file": "tests/chat/test_sse_metering_multitab.py",
+      "test_function": "test_metering_132_09_record_patches_conversation"
+    },
+    {
+      "orphan_id": "TEST-7868",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0130",
+      "target_spec_id": "SPEC-0748",
+      "test_class": "TestMultiTabTracking",
+      "test_file": "tests/chat/test_sse_metering_multitab.py",
+      "test_function": "test_tab_133_08_separate_conversations_count_independently"
+    },
+    {
+      "orphan_id": "TEST-7873",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0131",
+      "target_spec_id": "SPEC-1126",
+      "test_class": "TestMultiTabTracking",
+      "test_file": "tests/chat/test_sse_metering_multitab.py",
+      "test_function": "test_tab_133_13_cross_tenant_tab_isolation"
+    },
+    {
+      "orphan_id": "TEST-7875",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0134",
+      "target_spec_id": "SPEC-0460",
+      "test_class": "TestStreamStatusEndpoint",
+      "test_file": "tests/chat/test_sse_metering_multitab.py",
+      "test_function": "test_tab_133_15_stream_status_active"
+    },
+    {
+      "orphan_id": "TEST-7879",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0133",
+      "target_spec_id": "SPEC-0853",
+      "test_class": "TestStreamEndpointTabId",
+      "test_file": "tests/chat/test_sse_metering_multitab.py",
+      "test_function": "test_tab_133_19_duplicate_tab_id_is_idempotent"
+    },
+    {
+      "orphan_id": "TEST-7883",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0136",
+      "target_spec_id": "SPEC-0705",
+      "test_class": "TestSystemPromptIdentityRules",
+      "test_file": "tests/chat/test_system_prompt_identity.py",
+      "test_function": "test_shopify_customer_no_layer_6"
+    },
+    {
+      "orphan_id": "TEST-7885",
+      "orphan_version_before_apply": 3,
+      "sibling_id": "TEST-0135",
+      "target_spec_id": "SPEC-1405",
+      "test_class": "TestSystemPromptIdentityRules",
+      "test_file": "tests/chat/test_system_prompt_identity.py",
+      "test_function": "test_identity_rules_on_escalation_handler_too"
+    }
+  ],
+  "phase": "POR-16D-Phase-2"
+}

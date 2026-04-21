@@ -1,0 +1,66 @@
+---
+name: release-candidate-gate
+description: Run the non-deploying Agent Red release-candidate gate before treating a build as production deployable. Covers Python security checks, targeted regression tests, frontend builds, and GroundTruth governance adoption checks.
+argument-hint: [--python-only|--frontend-only|--full]
+allowed-tools: Bash, Read, Grep
+license: "Proprietary - Remaker Digital"
+compatibility:
+  - claude-code >= 1.0
+metadata:
+  project: agent-red-customer-experience
+  category: release-readiness
+  governance: production-release, GroundTruth-KB, Deliberation-Archive, MemBase
+---
+
+# Release Candidate Gate
+
+Use this skill before calling a build production-ready. The gate is non-deploying:
+it does not push images, update Azure resources, call live services, or mutate
+external infrastructure.
+
+## Commands
+
+Run the complete local gate:
+
+```powershell
+python scripts/release_candidate_gate.py --include-frontend
+```
+
+Run the Python/security side only:
+
+```powershell
+python scripts/release_candidate_gate.py --skip-frontend
+```
+
+Run the frontend side only:
+
+```powershell
+python scripts/release_candidate_gate.py --skip-python --include-frontend
+```
+
+CI must prove the Python gate under the production target interpreter:
+
+```powershell
+python scripts/release_candidate_gate.py --require-python 3.12 --skip-frontend
+```
+
+## Required Evidence
+
+Before reporting GO confidence, record:
+
+- release gate command, result, and key counts;
+- any skipped live/deploy checks and why they are out of scope;
+- MemBase update path or KnowledgeDB document ID;
+- Deliberation Archive source reference or DELIB ID;
+- regression test files that would fail if the change regressed.
+
+## Stop Conditions
+
+Stop and report NO-GO if:
+
+- the generated production gateway manifest exists or is still tracked;
+- Ruff E/F, import-cycle, Bandit, or pip-audit gates fail;
+- targeted auth/config/deploy/release-gate tests fail;
+- frontend tests or any admin/widget build fails;
+- GroundTruth-KB governance adoption checks fail;
+- Python 3.12 proof is missing for the build being considered for deployment.

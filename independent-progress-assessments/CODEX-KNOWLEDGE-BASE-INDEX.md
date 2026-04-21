@@ -6,6 +6,8 @@ Purpose: index of Loyal Opposition artifacts maintained for Codex and Prime Buil
 
 - `CODEX-SESSION-BOOTSTRAP.md`
 - `CODEX-SESSION-PROMPT-EXTENSIBILITY.md`
+- `CODEX-STANDING-PRIORITIES.md`
+- `GROUNDTRUTH-KB-VISION.md`
 - `CODEX-WAY-OF-WORKING.md`
 - `CODEX-REVIEW-OPERATING-CONTRACT.md`
 - `CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
@@ -24,6 +26,8 @@ Purpose: index of Loyal Opposition artifacts maintained for Codex and Prime Buil
 
 - Project root `AGENTS.md` defines default Loyal Opposition operating contract.
 - `CODEX-SESSION-BOOTSTRAP.md` is the one-file deterministic startup guide for restart behavior and review-mode flags.
+- `CODEX-STANDING-PRIORITIES.md` defines persistent Prime-review and bridge-reliability priorities loaded at startup.
+- `GROUNDTRUTH-KB-VISION.md` records the owner-stated GroundTruth KB software-factory vision and owner-burden decision filter.
 - `CODEX-REVIEW-OPERATING-CONTRACT.md` defines Codex-first review and investigation behavior.
 
 ## Legacy Cursor Artifact Location

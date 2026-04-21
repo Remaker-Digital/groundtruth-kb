@@ -1,14 +1,23 @@
-﻿# Codex Session Bootstrap - Agent Red Customer Engagement
+﻿# Session Bootstrap - Agent Red Customer Engagement
 
-Purpose: one short startup file that makes Codex session behavior deterministic after restart.
+Purpose: one short startup file that makes session behavior deterministic after
+restart.
 
 ## What To Expect On Restart
 
-These changes take effect automatically when Codex starts in this workspace and reads `AGENTS.md`:
+These changes take effect automatically when the active AI harness starts in
+this workspace and reads `AGENTS.md`:
 
-- Codex is review-first by default.
-- Proposal review, code review, and alternatives investigation are the primary work modes.
-- The Codex review contract, checklists, and templates are part of the expected startup context.
+- The assigned operating role must be loaded before role-specific permissions or
+  restrictions are applied.
+- Prime Builder work follows Prime Builder governance; Loyal Opposition review
+  follows Loyal Opposition governance.
+- Prime Builder / Loyal Opposition coordination uses the file bridge in
+  `bridge/`.
+- Proposal review, code review, and alternatives investigation are the primary
+  work modes when the active role is Loyal Opposition.
+- The review contract, checklists, and templates are part of the expected
+  startup context when the active role is Loyal Opposition.
 
 These changes now activate automatically when `AGENTS.md` declares Loyal Opposition mode:
 
@@ -25,17 +34,20 @@ Optional local environment overrides remain available:
 
 ## Recommended Review-Session Startup
 
-**Phase A — Bridge sweep (first priority):**
-1. Query bridge for pending messages via `list_inbox(agent=..., status="pending")`.
-2. Process each pending message with a substantive reply or resolve it.
-3. Report sweep count: "Bridge sweep: N messages processed."
+**Phase A — File bridge scan (first priority):**
+1. Read `bridge/INDEX.md`.
+2. Identify document entries whose latest status is `NEW` or `REVISED`.
+3. Process actionable entries from oldest to newest using `.claude/rules/file-bridge-protocol.md`.
+4. Report scan count: "File bridge scan: N entries processed."
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
-5. Start Codex in this workspace:
+5. Start the assigned AI harness in this workspace:
    `E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement`
 6. Review-mode hooks should auto-activate from `AGENTS.md`. Only set an environment flag if you need to force or override the detected mode.
-7. Confirm Codex loads:
+7. Confirm the assigned AI harness loads:
    - `AGENTS.md`
+   - `.claude/rules/prime-builder-role.md` or the currently assigned role file
+   - `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`
    - `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
    - `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
    - `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
@@ -47,10 +59,20 @@ Optional local environment overrides remain available:
 
 ## Quick Restart Prompt
 
-Use this at the start of a new Codex session if needed:
+Use this at the start of a new session if needed:
 
 ```text
-Start in the Agent Red Codex review role. Load AGENTS.md, independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md, independent-progress-assessments/CODEX-WAY-OF-WORKING.md, independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md, independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md, and independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md. Default to proposal review, code review, and alternatives investigation unless I explicitly ask for implementation.
+Start in the Agent Red role recorded by `.claude/rules/prime-builder-role.md`
+or the currently assigned role file. Load AGENTS.md,
+independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md,
+independent-progress-assessments/CODEX-STANDING-PRIORITIES.md,
+independent-progress-assessments/CODEX-WAY-OF-WORKING.md,
+independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md,
+independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md, and
+independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md. Apply only the
+permissions and restrictions for the assigned operating role. Use
+bridge/INDEX.md as the file-bridge review queue when counterpart review is
+active.
 ```
 
 ## Read-Only Review Mode Behavior

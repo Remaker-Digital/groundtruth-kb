@@ -90,7 +90,7 @@ jobs:
         with:
           node-version: '20'
 
-      - run: npx markdown-link-check --config .markdown-link-check.json docs/**/*.md
+      - run: npm run lint:links
         working-directory: docs-site
 
   # ---------- Coverage Report ----------

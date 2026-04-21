@@ -1,0 +1,103 @@
+---
+name: kb-assert
+description: "Run architecture-layer assertions (ADR/DCL) and optionally record results in assertion_runs. Displays compliance dashboard grouped by family."
+argument-hint: "[--dry-run] [--record]"
+allowed-tools: Bash, Read
+license: "Proprietary - Remaker Digital"
+compatibility:
+  - claude-code >= 1.0
+metadata:
+  project: agent-red-customer-experience
+  category: governance
+  governance: GOV-20
+---
+
+# KB Architecture Assertion Runner
+
+Run all ADR/DCL assertions against the codebase and display a compliance dashboard.
+
+**Arguments:**
+- `--dry-run` (default for review-mode operation): Print results without recording to assertion_runs
+- `--record` (Prime only): Record results in assertion_runs table
+
+## Behavior
+
+```python
+import importlib.util, json
+from datetime import datetime, timezone
+
+spec_mod = importlib.util.spec_from_file_location('db', 'tools/knowledge-db/db.py')
+dbmod = importlib.util.module_from_spec(spec_mod)
+spec_mod.loader.exec_module(dbmod)
+kdb = dbmod.KnowledgeDB()
+
+import sqlite3
+db = sqlite3.connect('groundtruth.db')
+
+# Get all ADR/DCL specs
+rows = db.execute("""
+    SELECT s.id, s.version, s.title, s.status, s.type, s.assertions
+    FROM specifications s
+    INNER JOIN (SELECT id, MAX(version) as mv FROM specifications GROUP BY id) latest
+    ON s.id = latest.id AND s.version = latest.mv
+    WHERE s.type IN ('architecture_decision', 'design_constraint')
+    AND s.status != 'retired'
+    ORDER BY s.id
+""").fetchall()
+
+families = {
+    'Transport/Container': ['ADR-001', 'ADR-002', 'ADR-004', 'DCL-002', 'DCL-003'],
+    'Zero-Knowledge/Isolation': ['ADR-006', 'ADR-007'],
+    'MCP/Plugin/Binding': ['ADR-003', 'DCL-005'],
+    'KB/Governance': ['DCL-001'],
+    'RBAC': ['ADR-005'],
+    'Test/Contract': ['DCL-004'],
+}
+
+# Run assertions for each
+results = {}
+for row in rows:
+    spec_id, version, title, status, spec_type, assertions_raw = row
+    has_assertions = bool(assertions_raw and json.loads(assertions_raw))
+
+    if has_assertions and status in ('implemented', 'verified', 'specified'):
+        validation = kdb.validate_dcl_constraints(spec_id)
+        passed = validation[0]['passed'] if validation else False
+        results[spec_id] = {'status': status, 'passed': passed, 'version': version,
+                           'classification': 'ENFORCED' if passed and status in ('implemented','verified') else
+                                            'SPECIFIED' if status == 'specified' else 'FAILING'}
+    else:
+        results[spec_id] = {'status': status, 'passed': None, 'version': version,
+                           'classification': 'UNASSESSED'}
+
+# Display dashboard
+for family, ids in families.items():
+    print(f"--- {family} ---")
+    for sid in ids:
+        r = results.get(sid, {'classification': 'MISSING', 'status': '?'})
+        print(f"  {sid:12s} {r['classification']:12s} ({r['status']})")
+    print()
+
+enforced = sum(1 for r in results.values() if r['classification'] == 'ENFORCED')
+specified = sum(1 for r in results.values() if r['classification'] == 'SPECIFIED')
+failing = sum(1 for r in results.values() if r['classification'] == 'FAILING')
+unassessed = sum(1 for r in results.values() if r['classification'] == 'UNASSESSED')
+print(f"Summary: {enforced} ENFORCED, {specified} SPECIFIED, {failing} FAILING, {unassessed} UNASSESSED")
+```
+
+## Recording (--record flag, Prime only)
+
+If `--record` is passed, after displaying results, record each passing/failing result in `assertion_runs`:
+
+```python
+for spec_id, r in results.items():
+    if r['passed'] is not None:
+        conn = kdb._get_conn()
+        conn.execute(
+            'INSERT INTO assertion_runs (spec_id, spec_version, run_at, overall_passed, results, triggered_by) VALUES (?, ?, ?, ?, ?, ?)',
+            (spec_id, r['version'], datetime.now(timezone.utc).isoformat(),
+             1 if r['passed'] else 0, '[]', 'kb-assert-skill'))
+        conn.commit()
+```
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

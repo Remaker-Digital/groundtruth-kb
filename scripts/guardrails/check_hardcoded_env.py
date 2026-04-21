@@ -89,6 +89,9 @@ EXCLUDED = [
     re.compile(r"container-load-results/"),
     re.compile(r"\.html$"),
     re.compile(r"independent-progress-assessments/"),
+    # Bridge proposal/review audit trail — narrative prose quotes example
+    # test-key strings; symmetric precedent with independent-progress-assessments/.
+    re.compile(r"^bridge/"),
     re.compile(r"\.env"),
     re.compile(r"deploy/.*\.(ps1|sh)$"),
     re.compile(r"Dockerfile"),

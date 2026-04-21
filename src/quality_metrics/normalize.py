@@ -52,7 +52,7 @@ def normalize_test_result(value: str | None) -> str:
     raise ValueError(f"Unknown test result value: {value!r}")
 
 
-def normalize_all_kb_results(db_path: str = "tools/knowledge-db/knowledge.db") -> dict[str, int]:
+def normalize_all_kb_results(db_path: str = "groundtruth.db") -> dict[str, int]:
     """Migrate all last_result values in the KB to canonical form.
 
     Returns a summary of how many values were normalized per canonical type.
@@ -83,7 +83,7 @@ def normalize_all_kb_results(db_path: str = "tools/knowledge-db/knowledge.db") -
     return counts
 
 
-def auto_link_testable_elements(db_path: str = "tools/knowledge-db/knowledge.db") -> dict[str, Any]:
+def auto_link_testable_elements(db_path: str = "groundtruth.db") -> dict[str, Any]:
     """Auto-link testable elements to specifications by pattern matching.
 
     Scans testable elements without a spec_id and attempts to link them

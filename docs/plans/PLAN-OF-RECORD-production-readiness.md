@@ -1,12 +1,12 @@
-# Plan-of-Record v3: Agent Red Production Readiness
+# Plan-of-Record v4: Agent Red Production Readiness
 
 **Status:** PLAN-OF-RECORD (default resume target after interrupts)
 **Created:** S270 (2026-04-08)
-**Version:** 6 — Step 11 closed S275 (budget tests already present, 15/15 pass); Step 10 closed S271
-**Owner approval:** Pending
-**Codex review:** v4 CI GO received (2026-04-09, commit 3c5b6359 all shards green).
+**Version:** 7 — Step 16 added S295 (spec hygiene remediation, post-production); production operational at v1.98.92 (Step 15 closed S276)
+**Owner approval:** GOV-16 APPROVED for production deploy (S276)
+**Codex review:** v4 CI GO received (2026-04-09, commit 3c5b6359 all shards green); production deploy validated S276.
 **Spec refs:** SPEC-1879, GOV-16, GOV-17
-**Target:** v1.98.91 production-ready build
+**Target:** v1.98.92 production-ready build (ACHIEVED S276); Step 14 (E2E phone OTP smoke) blocked on toll-free carrier approval; Step 16 (spec hygiene) pending post-production.
 
 ---
 
@@ -47,7 +47,7 @@ action.
 
 ---
 
-## Remaining Steps (8-15)
+## Remaining Steps (8-16)
 
 ### Step 8: Verify CI test suite passes on develop ✅ (S271)
 
@@ -180,6 +180,39 @@ v1.98.91, we must validate that the production baseline is correct.
 gracefully — customers who provide phone numbers will fall through to
 conversation without verification (same as v1.98.89 behavior). No data loss.
 Rollback to v1.98.89 is available via `python deploy.py --env production --version 1.98.89`.
+
+### Step 16: Spec hygiene remediation (post-production, non-blocking) 🔄 IN PROGRESS — 16.A/16.B/16.C complete; 16.D/16.E remain
+
+**Phase 16.A — COMPLETE (S297).** The 22 verified-but-untested track is closed. Invariant: 0 verified requirement-type specs with 0 non-stale test links (excluding governance specs GOV-14/15/16 and owner-approved exception SPEC-GTKB-SCOPE per S297 decision, archived as DELIB-0711). 4 specs have current passing tests (SPEC-0439/0604/1097/1165); 15 specs reverted to implemented with 7 hygiene WIs (WI-3178–WI-3184) open; 3 governance specs verified by assertion runs; 1 scope-boundary spec excepted by owner.
+
+**Scope:** Close the spec traceability gap identified across S275 and S291:
+- **118 untested specs** (Phase 1.5 audit, S291):
+  - 22 verified-but-untested — **CLOSED (S297).** S291 bridge work VERIFIED; Step 16.A closure verified with invariant query. 4 verified with tests, 15 reverted to implemented (7 hygiene WIs open), 3 governance (out-of-scope), 1 owner-excepted (SPEC-GTKB-SCOPE).
+  - 90 implemented-untested (Phase 1.5 framing) — superseded by Phase 16.B classifier which re-scoped to 193 implemented-untested requirements. **CLOSED (S297).** 16.C four-stream remediation executed; 38 specs remain tracked via hygiene WIs (WI-3185..WI-3218, WI-3221..WI-3224). DELIB-0714 archives results.
+  - 6 specified-untested — expected (specifications without implementation yet); no action.
+- **Orphan-test reconciliation** — the original "10,440 orphan tests of 11,066 total (94.3%)" figure (pre-S297) is stale. Post-16.C reality, corrected via live KB query 2026-04-18 per bridge `por-step16d-phantom-link-cleanup`: of 11,142 latest-version tests, 254 had empty `spec_id` and 2,068 had phantom `spec_id` values (spec_id set but not resolving to any spec in the KB). Phase 1 of 16.D cleared the 2,068 phantom links to empty-string, yielding a unified 2,322-test orphan pool (20.8%) for Phase 2 triage. Phase 2 will link, re-spec, or retire tests toward the 16.E exit criterion of ≤ 100 orphans. WI-3171 ID was reused by a later deploy-scaling bridge; no fresh WI is required because the two-phase bridge thread is the tracking surface.
+
+**Preconditions:**
+- [x] Step 15 (production deploy) COMPLETE — v1.98.92 deployed 2026-04 (S276), production operational, bridge infrastructure stable (S295).
+- [x] Methodology review of Phase 1.5 artifact (S297) — pattern does not generalize; 193-spec scope partitioned into five classifier categories and remediated via four parallel sub-streams. See Phase 16.B/16.C below.
+
+**Action (phased):**
+1. **Phase 16.A** — ✅ COMPLETE (S297). Verified-but-untested track closed. Invariant passes with 0 violations. DELIB-0711 archives owner decision.
+2. **Phase 16.B** — ✅ COMPLETE (S297). Methodology review VERIFIED (bridge `por-step16b-methodology-review-006`). 193 implemented-untested requirements partitioned into 5 categories (α' 151, β' 4, γ' 19, δ' 15, ζ' 4). Option B (multi-stream remediation) chosen via owner decision DELIB-0713. DELIB-0712 archives the methodology finding.
+3. **Phase 16.C** — ✅ COMPLETE (S297). All 4 sub-streams VERIFIED: Stream A (-010, 151 α' refreshed via 122 update_test + 49 insert_test), Stream B (-006, 4 ζ' triaged via 1 WI + 3 relinks/18 fresh TEST IDs), Stream C (-004, 4 β' triaged via 1 relink + 3 WIs), Stream D (-010, 34 γ'+δ' hygiene WIs). Classifier transition: target_count 193 → 38. 38 open hygiene WIs (WI-3185..WI-3218 + WI-3221..WI-3224) track remediation backlog. 0 spec-status mutations. DELIB-0714 archives consolidated results.
+4. **Phase 16.D** — Orphan test rationalization, multi-phase.
+   - **Phase 1 (phantom-link cleanup)** — 2,068 phantom `spec_id` values cleared to empty-string via bridge `por-step16d-phantom-link-cleanup` (2026-04-18); orphan pool unified at 2,322 tests. Phase 1 VERIFIED.
+   - **Phase 2 (sibling-match auto-link + classification)** — bridge `por-step16d-orphan-triage-phase2` (2026-04-18). 133 Class A orphans auto-linked via strict sibling-match (same test_file/class/function triple as a spec-linked test, no multi-spec conflicts). Post-Phase-2 orphan pool: 2,189. Full classification report: A=133 (applied), B=1,703 (file-bucket orphans where other tests in same file link to specs), C=481 (tests across 11 fully-orphaned files), D=5 (null or missing test_file). Report at `.groundtruth/por-16d-phase2-classification.json`.
+   - **Phase 3+ (remaining classes)** — scope driven by Phase 2 report. B/C/D classes need judgment-based decisions (retire, re-spec, new-spec) that follow-on bridges will address.
+5. **Phase 16.E** — Re-run verification + orphan-test count. Exit when untested-spec count ≤ 6 (specified only) and orphan-test count ≤ 100 (sampling tolerance). (Note: the old POR reference to `tools/knowledge-db/db.py assert` is stale — that shim has no CLI entrypoint; the real assertion command is TBD and should be captured in Phase 16.E scoping.)
+
+**Gate:** Spec traceability matrix is credible for external audit / due diligence (spec count matches implemented behavior; test count matches covered behaviors; no silent coverage gaps).
+
+**Why this is a POR step and not a rolling backlog item:** External due diligence and go-to-market credibility require a clean traceability story. Leaving 118 untested specs and 2,322 orphan tests (corrected from the original 10,440 figure) in ambient MEMORY.md backlog risks the gap growing (new untracked tests, new provisional specs) without a forcing function. Step 16 creates the forcing function.
+
+**Ownership:** Prime Builder drives Phase 16.A–16.C; Phase 16.D (orphan tests) may be delegated to a subagent or scripted where the linkage inference is tractable; Phase 16.E requires owner confirmation that the exit metrics are met.
+
+**Rollback plan:** Spec status changes in the KB are append-only (new version rows); all remediation is reversible via `db.update_spec(... version=N-1)`. Test deletions are git-reversible. No production impact.
 
 ---
 
