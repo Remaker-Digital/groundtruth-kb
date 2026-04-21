@@ -110,14 +110,28 @@ def release_blocker_summary(project_root: Path) -> list[str]:
     text = (project_root / "memory" / "release-readiness.md").read_text(encoding="utf-8")
     in_section = False
     blockers: list[str] = []
+    current_blocker: list[str] = []
+
+    def flush_blocker() -> None:
+        if current_blocker:
+            blockers.append(" ".join(current_blocker).strip())
+            current_blocker.clear()
+
     for line in text.splitlines():
         if line.startswith("## Remaining Release Blockers"):
             in_section = True
             continue
         if in_section and line.startswith("## "):
+            flush_blocker()
             break
         if in_section and line.startswith("- "):
-            blockers.append(line[2:].strip())
+            flush_blocker()
+            current_blocker.append(line[2:].strip())
+            continue
+        if in_section and current_blocker and line.startswith("  "):
+            current_blocker.append(line.strip())
+    else:
+        flush_blocker()
     return blockers
 
 
