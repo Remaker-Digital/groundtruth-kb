@@ -44,12 +44,18 @@ a product with GroundTruth looks like — from first install to production.
 pip install groundtruth-kb
 gt project init my-project --owner "Your Organization" --init-git
 gt --config my-project/groundtruth.toml summary
+cd my-project
+gt dashboard init
 ```
 
 See the [Start Here](start-here.md) guide for a complete walkthrough, or the
-[Bootstrap Guide](bootstrap.md) for a 10-step technical reference.
+[CTO Evaluation Guide](cto-evaluation.md) for the pip install and dashboard
+path. The [Bootstrap Guide](bootstrap.md) is a 10-step technical reference.
 
 ## Tooling
+
+The pip package includes the CLI, project scaffolding, web UI entrypoint, and
+`gt dashboard` commands for a local Grafana operations dashboard.
 
 - **CLI** (`gt`) — init, seed, assert, summary, history, config, serve, project management
 - **Web UI** — read-only dashboard with branding, filtering, and assertion results

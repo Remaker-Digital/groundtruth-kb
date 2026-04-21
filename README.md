@@ -24,6 +24,8 @@ Windows workstation with internet access.
 
 Already a developer-preview adopter? Jump straight to:
 
+- [CTO Evaluation Guide](docs/cto-evaluation.md) - pip install, dashboard, lifecycle, services, roles
+
 - [Day in the Life](docs/day-in-the-life.md) — a synthetic first week
 - [Evidence](docs/evidence.md) — live metrics, every row dated + pinned to a commit
 - [Known Limitations](docs/known-limitations.md) — open gaps, stated plainly
@@ -66,6 +68,15 @@ gt serve
 # Visit http://localhost:8090
 ```
 
+**Operations dashboard** (local Grafana + generated SQLite reporting DB):
+
+```powershell
+gt dashboard init
+gt dashboard install
+gt dashboard start
+# Visit http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard
+```
+
 **Same-day prototype** (includes example data):
 
 ```powershell
@@ -103,15 +114,17 @@ discipline layer.
 
 ## Status
 
-This project is in early development (v0.6.0, developer-preview). The
+This project is in early development (v0.6.1, developer-preview). The
 toolkit is extracted from a production system managing 2,000+
 specifications and 11,000+ tests. See
 [docs/known-limitations.md](docs/known-limitations.md) for current gaps.
 
 Project scaffolding (`gt project init`), environment verification
 (`gt project doctor`), and scaffold upgrades (`gt project upgrade`) are
-available. Three profiles support different team configurations:
-`local-only`, `dual-agent`, and `dual-agent-webapp`.
+available. The local operations dashboard (`gt dashboard init/install/start`)
+generates Grafana provisioning and a dashboard SQLite database from the pip
+package. Three profiles support different team configurations: `local-only`,
+`dual-agent`, and `dual-agent-webapp`.
 
 ## Documentation
 

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `gt dashboard` command group for a pip-installed local operations dashboard:
+  `init`, `refresh`, `install`, `start`, and `stop`.
+- Generated Grafana provisioning, dashboard JSON, and a local
+  `.groundtruth/dashboard/gtkb-dashboard.sqlite` reporting database.
+- CTO evaluation guide covering pip install, dashboard setup, session lifecycle,
+  third-party services, and Prime Builder / Loyal Opposition role boundaries.
+
+### Changed
+
+- README, Start Here, Desktop Setup, Sessions, Dual-Agent, and CLI reference
+  docs now describe the package-generated dashboard and the owner-assigned
+  Prime Builder role model.
+
 ## [0.4.0] - 2026-04-14
 
 ### Added

@@ -314,6 +314,75 @@ gt serve --host 0.0.0.0 --port 8080
 
 ---
 
+## Dashboard Commands
+
+Generate and run the local Grafana operations dashboard. These commands are
+available from the base pip package; Grafana itself remains an external local
+runtime.
+
+### gt dashboard init
+
+Create the generated dashboard database, Grafana datasource provisioning,
+dashboard provider provisioning, and dashboard JSON.
+
+```
+gt dashboard init [--dir <path>] [--db-path <path>] [--runtime-root <path>] [--grafana-home <path>]
+```
+
+Defaults:
+
+- Project root: resolved from `groundtruth.toml`
+- Dashboard DB: `.groundtruth/dashboard/gtkb-dashboard.sqlite`
+- Grafana assets: `.groundtruth/dashboard/grafana/`
+- Grafana home: `.groundtruth/tools/grafana`
+
+### gt dashboard refresh
+
+Refresh dashboard data from MemBase and rewrite Grafana assets.
+
+```
+gt dashboard refresh [--dir <path>] [--db-path <path>] [--runtime-root <path>]
+```
+
+Use this at session start, session wrap-up, or before showing the dashboard to
+an evaluator.
+
+### gt dashboard install
+
+Install local Grafana OSS and the `frser-sqlite-datasource` plugin.
+
+```
+gt dashboard install [--dir <path>] [--grafana-home <path>] [--skip-download] [--skip-plugin]
+```
+
+`--skip-download` requires an existing Grafana installation at `--grafana-home`.
+`--skip-plugin` is for locked-down environments where the SQLite datasource
+plugin is installed through enterprise tooling.
+
+### gt dashboard start
+
+Start the dashboard refresh service and Grafana.
+
+```
+gt dashboard start [--dir <path>] [--grafana-port 3000] [--refresh-port 8766] [--interval-minutes 60]
+```
+
+Default dashboard URL:
+
+```
+http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard
+```
+
+### gt dashboard stop
+
+Stop processes started by `gt dashboard start`.
+
+```
+gt dashboard stop [--dir <path>] [--runtime-root <path>]
+```
+
+---
+
 ## Project Commands
 
 Project scaffold, workstation verification, and upgrade commands.
@@ -962,6 +1031,59 @@ gt scaffold specs --profile full --apply
 scaffold by default. To include scaffold specs during project creation,
 call `scaffold_project()` with `ScaffoldOptions(spec_scaffold=...)` from
 the Python API. A CLI flag for this is planned for a future release.
+
+---
+
+### gt scaffold adrs
+
+Generate Azure enterprise instance-ADR skeletons.
+
+```
+gt scaffold adrs [--profile azure-enterprise] [--apply | --dry-run]
+```
+
+Default dry-run output lists the ADRs that would be inserted. `--apply`
+persists the skeletons into MemBase with adopter-answer placeholders.
+
+### gt scaffold iac
+
+Generate Azure enterprise Terraform skeleton files.
+
+```
+gt scaffold iac [--profile azure-enterprise] [--apply | --dry-run] [--target-dir <path>]
+```
+
+Default dry-run output lists the files that would be written under
+`iac/azure/`. Existing files are skipped; the scaffold never overwrites
+adopter-owned IaC.
+
+### gt scaffold cicd
+
+Generate Azure enterprise GitHub Actions and supporting CI/CD docs.
+
+```
+gt scaffold cicd [--profile azure-enterprise] [--apply | --dry-run] [--target-dir <path>]
+```
+
+Default dry-run output lists workflow and documentation files that would be
+written under `.github/` and `docs/azure/`. Existing files are skipped.
+
+## Check Commands
+
+Verification commands for scaffolded artifacts.
+
+### gt check adrs
+
+Verify that all Azure enterprise instance ADRs have been answered by the
+adopter-owner.
+
+```
+gt check adrs [--profile azure-enterprise] [--json]
+```
+
+Exit code `0` means every expected ADR is present and has non-placeholder
+Decision, Rationale, and Rejected alternatives sections. Non-zero means one or
+more ADRs are missing or still unanswered.
 
 ---
 

@@ -25,6 +25,7 @@ local-first setup that supports:
 | [Python 3.11+](https://www.python.org/downloads/) | Runs `groundtruth-kb` and the `gt` CLI | Yes |
 | [Git](https://git-scm.com/downloads) | Clone, version control, template workflows | Yes |
 | [GitHub account](https://github.com/) | Install from GitHub, collaborate, and push changes | Yes |
+| [Grafana OSS](https://grafana.com/grafana/download) | Local operations dashboard runtime; `gt dashboard install` can install it on Windows | Recommended |
 
 ### Recommended for the AI-assisted desktop path
 
@@ -112,7 +113,20 @@ gt --config groundtruth.toml summary
 `gt project doctor` checks installed tools, verifies configuration, and
 produces a readiness report highlighting any missing prerequisites.
 
-### 4. Open the project in your editor and complete the first edits
+### 4. Generate the operations dashboard
+
+```bash
+gt dashboard init
+gt dashboard install
+gt dashboard start
+```
+
+Open `http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard`.
+If enterprise policy requires a managed Grafana install, install Grafana and
+the SQLite datasource plugin through the approved channel and pass
+`--grafana-home` to `gt dashboard install` or `gt dashboard start`.
+
+### 5. Open the project in your editor and complete the first edits
 
 Before the first real session:
 
@@ -147,9 +161,10 @@ Use this sequence for a client workshop or kickoff:
 1. Install Python, Git, and GroundTruth.
 2. Verify the client has GitHub access to the repo.
 3. Run `gt bootstrap-desktop ...`.
-4. Open the scaffolded project and review `CLAUDE.md`, `MEMORY.md`, and `BRIDGE-INVENTORY.md`.
-5. Create the first spec and linked test.
-6. Decide whether to stay local-first or add Docker/Azure on day one.
+4. Generate the dashboard with `gt dashboard init`.
+5. Open the scaffolded project and review `CLAUDE.md`, `MEMORY.md`, and `BRIDGE-INVENTORY.md`.
+6. Create the first spec and linked test.
+7. Decide whether to stay local-first or add Docker/Azure on day one.
 
 ## When to add cloud/container tooling
 
