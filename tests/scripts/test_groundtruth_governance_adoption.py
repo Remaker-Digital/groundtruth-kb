@@ -237,6 +237,10 @@ def test_security_scan_uses_scan_only_acr_secrets_for_docker_scout() -> None:
     assert "Validate Docker Scout ACR secrets" in workflow
     assert "ACR_SCOUT_USERNAME" in workflow
     assert "ACR_SCOUT_PASSWORD" in workflow
+    assert "DOCKER_SCOUT_HUB_USER" in workflow
+    assert "DOCKER_SCOUT_HUB_PAT" in workflow
+    assert "Login to Docker Hub for Docker Scout" in workflow
+    assert "docker/login-action@v4" in workflow
     assert "username: ${{ secrets.ACR_SCOUT_USERNAME }}" in workflow
     assert "password: ${{ secrets.ACR_SCOUT_PASSWORD }}" in workflow
     assert "username: ${{ secrets.ACR_USERNAME }}" not in workflow
