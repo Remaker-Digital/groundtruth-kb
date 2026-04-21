@@ -226,7 +226,7 @@ def test_sonarcloud_workflow_can_verify_exact_release_candidate() -> None:
     assert "workflow_dispatch:" in workflow
     assert "timeout-minutes: 15" in workflow
     assert "grep -v '^agntcy-app-sdk' requirements.txt" in workflow
-    assert "sonar.organization=remaker-digital" in sonar_properties
+    assert "sonar.organization=mike-remakerdigital" in sonar_properties
     assert "Validate SonarCloud token" in workflow
     assert "SONAR_TOKEN" in workflow
 
