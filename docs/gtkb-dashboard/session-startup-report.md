@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-21T06:30:36Z
+Generated: 2026-04-21T06:36:36Z
 
 ## Startup Disclosure
 
@@ -31,8 +31,8 @@ Generated: 2026-04-21T06:30:36Z
 - Active backlog items: 3
 - Open MemBase work items: 29
 - Actionable bridge/contention entries: 0
-- Drift changed paths: 1
-- Testing/tool rollup: 7 failing, 6 manual, 16 ready/passing
+- Drift changed paths: 0
+- Testing/tool rollup: 4 failing, 6 manual, 16 ready/passing
 - GT-KB infrastructure posture: package 0.6.1; dry-run upgrade plan available: True
 
 ### Wrap-Up Trigger Commands
@@ -58,11 +58,11 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Focus this session on clearing release blockers. Start with Production credentials exposed in the deleted generated manifest must be rotated. Verify the result with scripts/release_candidate_gate.py and update governed evidence.
 
 4. **Repair Testing/Tool Integrations**
-   Current signal: 7 failing and 1 unknown integration(s) are visible.
+   Current signal: 4 failing and 1 unknown integration(s) are visible.
    Prompt details: Focus this session on restoring testing service/tool integration health. Start with GitHub Actions: Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions. Preserve GT-KB as infrastructure evidence.
 
 5. **Remediate Known Risks**
-   Current signal: 4 active risk(s) are summarized from release, integration, GT-KB, and drift signals.
+   Current signal: 3 active risk(s) are summarized from release, integration, GT-KB, and drift signals.
    Prompt details: Focus this session on the dashboard risk register. Start with Production GO is blocked; recommended action: Close, defer, or supersede every blocker with governed evidence.
 
 6. **Clear Stage/Test Release Path**
@@ -74,7 +74,7 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Continue from the last session using the dashboard action center. Start with Repair GitHub Actions; explain current evidence, next command, and expected verification.
 
 8. **Clean For Internal Review**
-   Current signal: 1 changed path(s) are visible in dashboard drift.
+   Current signal: 0 changed path(s) are visible in dashboard drift.
    Prompt details: Clean and tidy for internal review. Inventory changed paths, separate unrelated work, run focused checks, and prepare a concise review handoff without modifying formal artifacts unless explicitly approved.
 
 9. **Pick From Standing Backlog**

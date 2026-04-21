@@ -71,6 +71,7 @@ jobs:
         shell: pwsh
         run: |
           npm --prefix widget ci
+          npm --prefix admin ci
           npm --prefix admin/standalone ci
           npm --prefix admin/provider ci
           npm --prefix admin/shopify ci
