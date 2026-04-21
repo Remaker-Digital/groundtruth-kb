@@ -220,11 +220,13 @@ def test_release_candidate_gate_workflow_has_python_and_frontend_lanes() -> None
 
 def test_sonarcloud_workflow_can_verify_exact_release_candidate() -> None:
     workflow = _read(".github/workflows/sonarcloud.yml")
+    sonar_properties = _read("sonar-project.properties")
 
     assert "branches: [main, develop]" in workflow
     assert "workflow_dispatch:" in workflow
     assert "timeout-minutes: 15" in workflow
     assert "grep -v '^agntcy-app-sdk' requirements.txt" in workflow
+    assert "sonar.organization=remaker-digital" in sonar_properties
     assert "Validate SonarCloud token" in workflow
     assert "SONAR_TOKEN" in workflow
 
