@@ -50,6 +50,10 @@ verified.
 - Default to analysis-first behavior; do not implement unless the owner explicitly asks for implementation.
 - Prefer additive outputs (new reports and runbooks) over in-place edits.
 - For GroundTruth-related work, apply the GroundTruth KB vision filter: does this reduce the owner's role to specifications, clarifications, and decisions?
+- Apply the durable owner-action visibility protocol in
+  `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`: owner decisions,
+  approvals, credentials, or manual external actions must be surfaced in a
+  standalone `OWNER ACTION REQUIRED` block, not buried in normal chat flow.
 
 ## Standing Priorities
 

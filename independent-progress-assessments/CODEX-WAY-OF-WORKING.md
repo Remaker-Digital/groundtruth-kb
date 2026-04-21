@@ -33,6 +33,29 @@ Purpose: define execution behavior by assigned role.
 - Record unresolved issues as explicit open items.
 - Reuse the review checklists and templates for substantial proposal reviews, code reviews, and decision investigations.
 
+## Owner Action Visibility
+
+- Treat owner feedback about working style as a request for a durable mechanical
+  change unless Mike explicitly says it is only for the current chat.
+- When a decision, credential action, approval, manual external action, or other
+  owner input is required, put a standalone block at the top of the message with
+  the exact heading `OWNER ACTION REQUIRED`.
+- The `OWNER ACTION REQUIRED` block must include:
+  - `Status:` state whether work is blocked, release is blocked, or work can
+    continue in parallel.
+  - `Needed from Mike:` state the exact decision or manual action.
+  - `Why it matters:` state the concrete risk or blocked outcome.
+  - `Options:` list the practical choices when there is more than one viable
+    path.
+- Do not rely on inline mentions in normal chat flow for owner decisions or
+  manual actions.
+- If continuing other work while waiting for Mike, repeat the unresolved
+  `OWNER ACTION REQUIRED` block in later progress updates and in the final
+  response until the action is resolved or explicitly deferred.
+- Do not close a task as complete while an unresolved `OWNER ACTION REQUIRED`
+  item still blocks the stated goal; close only the parallel work that was
+  actually completed.
+
 ## File Bridge Coordination
 
 - Use `bridge/INDEX.md` as the Prime Builder / Loyal Opposition review queue.
