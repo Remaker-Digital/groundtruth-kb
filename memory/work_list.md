@@ -5,7 +5,183 @@ propose via bridge → wait for Codex GO → implement → post-impl report → 
 
 Do not wait for owner approval between items. Continue unsupervised.
 
+## Completed During Current Session
+
+### GTKB-GOV-000 — DONE — Implement strict formal artifact approval gate with scoped auto-approval mode
+
+**Priority:** TOP. Owner decision `DELIB-0835` and formal records `GOV-ARTIFACT-APPROVAL-001`, `PB-ARTIFACT-APPROVAL-001`, `ADR-ARTIFACT-FORMALIZATION-GATE-001`, and `DCL-ARTIFACT-APPROVAL-HOOK-001` require GT-KB artifact formalization to bias toward strict review, full native-format display, approval or acknowledgement evidence, and rich auditability.
+
+**Outcome:** implemented a tracked `PreToolUse` hook at `.claude/hooks/formal-artifact-approval-gate.py`, registered it in `.claude/settings.json`, added manual approval and scoped auto-approval packet validation, and wired `tests/hooks/test_formal_artifact_approval_gate.py` into `scripts/release_candidate_gate.py`.
+
+**Regression visibility:** `tests/hooks/test_formal_artifact_approval_gate.py` covers blocked unapproved writes, approved writes, scoped auto-approval writes, and rejection of auto-approval flows that omit transcript capture. `tests/scripts/test_groundtruth_governance_adoption.py` verifies the hook registration, MemBase records, work-list record, and release-candidate gate wiring.
+
+**Verification:** formal records promoted to `verified` after implementation. Approval packet: `.groundtruth/formal-artifact-approvals/2026-04-20-strict-gov-enforcement-verified.json`.
+
+### GTKB-GOV-000A — DONE — Add Codex hook parity package and Windows-aware verifier
+
+**Priority:** TOP follow-on to `GTKB-GOV-000`. Owner accepted the Codex runtime limitation that hooks are currently disabled on Windows, while directing that strict GOV enforcement still be made mechanically active to the extent possible for Codex.
+
+**Outcome:** added tracked Codex hook intent at `.codex/config.toml` and `.codex/hooks.json`, registering the same formal artifact approval `PreToolUse` gate for future/non-Windows Codex hook runtimes. Added `scripts/check_codex_hook_parity.py` as the mechanically active Windows fallback verifier.
+
+**Regression visibility:** `tests/scripts/test_codex_hook_parity.py` verifies the Codex package and documents the Windows runtime limitation. `tests/scripts/test_groundtruth_governance_adoption.py` verifies the package is present, not git-ignored, and wired into the release-candidate gate. `scripts/release_candidate_gate.py` now runs `check_codex_hook_parity.py` before the governance pytest lane.
+
+**Decision capture:** owner acknowledgement recorded as `DELIB-0836`. Approval packet: `.groundtruth/formal-artifact-approvals/2026-04-20-codex-hook-parity-decision.json`.
+
+### GTKB-GOV-000B — DONE — Audit and formalize session decisions across artifacts
+
+**Priority:** TOP follow-on to owner request. Owner asked to ensure all decisions, directives, and principles in this session were identified and applied to their respective artifacts.
+
+**Outcome:** added `DELIB-0837` and MemBase records `GOV-RELEASE-READINESS-GOVERNED-TESTING-001`, `GOV-GTKB-ADOPTION-ENFORCEMENT-001`, `GOV-ACTING-PRIME-BUILDER-001`, `GOV-HARNESS-ROLE-PORTABILITY-001`, `GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001`, `GOV-AGENT-RED-GTKB-CONFORMANCE-001`, `ADR-CODEX-HOOK-PARITY-FALLBACK-001`, and `GOV-SESSION-FORMALIZATION-AUDIT-001`.
+
+**Regression visibility:** `tests/scripts/test_groundtruth_governance_adoption.py` verifies the new MemBase records, the DELIB-to-spec mapping, the audit entry, and rule references.
+
+**Approval packet:** `.groundtruth/formal-artifact-approvals/2026-04-20-session-formalization-audit-batch.json`.
+
+### GTKB-GOV-000C — DONE — Formalize standing backlog as governed cross-session work authority
+
+**Priority:** TOP follow-on to owner approval. Owner approved formalizing the standing backlog and asked whether the formalized artifact will be treated in the same way specifications are.
+
+**Outcome:** added `DELIB-0838` and MemBase records `GOV-STANDING-BACKLOG-001`, `PB-STANDING-BACKLOG-CONTINUITY-001`, `ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001`, and `DCL-STANDING-BACKLOG-SCHEMA-001`.
+
+**Clarification:** the standing backlog governance contract is treated like other formal GT-KB specifications: represented in MemBase, linked to DA, cited in rules, regression-tested, and release-gate visible. Individual backlog entries remain queue/work items unless separately promoted to GOV, SPEC, PB, ADR, DCL, or another formal artifact type.
+
+**Regression visibility:** `tests/scripts/test_groundtruth_governance_adoption.py` verifies the standing backlog records, the `DELIB-0838` decision, rule references, and work-list continuity evidence.
+
+**Approval packet:** `.groundtruth/formal-artifact-approvals/2026-04-20-standing-backlog-formalization.json`.
+
+### GTKB-GOV-011 — DONE — Implement session self-initialization dashboard, startup disclosure, and proactive wrap-up
+
+**Priority:** TOP. Owner directive `DELIB-0840` and records `GOV-SESSION-SELF-INITIALIZATION-001`, `PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001`, `SPEC-PROJECT-DASHBOARD-KPI-LINK-001`, and `DCL-SESSION-STARTUP-TOKEN-BUDGET-001` required fresh sessions to self-initialize with explicit role, governance, dashboard, priority, and token-budget context. Owner directive `DELIB-0841` and records `GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001`, `PB-SESSION-WRAP-UP-PROACTIVE-001`, and `DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001` added proactive session wrap-up guidance and priority engagement.
+
+**Outcome:** implemented `scripts/session_self_initialization.py`, which generates a startup model, live local dashboard (`docs/gtkb-dashboard/index.html`), dashboard data (`docs/gtkb-dashboard/dashboard-data.json`), startup report, proactive wrap-up report, and bounded time-series KPI history (`memory/gtkb-dashboard-history.json`). `.claude/settings.json` now registers `SessionStart` and `Stop` lifecycle hooks. `.codex/hooks.json` carries matching Codex hook intent, with Windows runtime limitations covered by `scripts/check_codex_hook_parity.py`. The startup report presents the role being assumed, enabled skills, plug-ins, directives, hooks, governance stance, live project dashboard link, three top priority user actions, and token-budget reduction options. The proactive wrap-up report draws attention to priorities across project dimensions and points to `.claude/skills/kb-session-wrap/SKILL.md` without performing mutating wrap-up operations automatically.
+
+**Regression visibility:** `tests/scripts/test_session_self_initialization.py` verifies startup disclosure text, dashboard-link availability, KPI inventory, top-three action selection, wrap-up reporting, and token-budget/reduction-option reporting. `tests/scripts/test_codex_hook_parity.py`, `tests/scripts/test_groundtruth_governance_adoption.py`, and `tests/scripts/test_release_candidate_gate.py` verify lifecycle hook intent and release-gate wiring. Approval packets: `.groundtruth/formal-artifact-approvals/2026-04-20-session-lifecycle-engagement-principle.json` and `.groundtruth/formal-artifact-approvals/2026-04-20-gtkb-gov-011-implementation-verification.json`.
+
+### AR-DASH-001 — DONE — Correct dashboard scope to Agent Red product state
+
+**Priority:** TOP. Owner clarification 2026-04-20: the dashboard should show the Agent Red project, with GT-KB treated retroactively as pre-existing implementation infrastructure used to implement Agent Red.
+
+**Outcome:** updated `scripts/session_self_initialization.py` so the generated dashboard is titled "Agent Red Project Dashboard", carries `agent_red_v1` scope metadata, filters primary KPI counts through an Agent Red scope classifier, excludes GT-KB framework/upstream work from primary dashboard metrics, and reports GT-KB only in a subordinate "Implementation Infrastructure" section. Historical Agent Red project rows are backfilled from `groundtruth.db` version history with `scope_confidence="agent_red_inferred"`; current live rows use `scope_confidence="agent_red_current_heuristic"`. Mixed-scope pre-existing dashboard history rows are no longer reused.
+
+**Historical harvest:** `memory/gtkb-dashboard-history.json` now contains Agent Red-scoped historical rows from `2026-02-26` through the current session. The rendered dashboard currently exposes 56 session points and 54 calendar-day points. Historical rows intentionally leave unavailable operational metrics as `None` rather than inventing drift, release-blocker, or bridge-contention history.
+
+**Regression visibility:** `tests/scripts/test_session_self_initialization.py` asserts the Agent Red title, scope metadata, historical backfill rows, infrastructure/product separation, and exclusion of upstream GT-KB dashboard priorities. `tests/scripts/test_groundtruth_governance_adoption.py` continues to verify dashboard artifact presence and release-gate wiring.
+
+**Verification:** `python -m pytest tests\scripts\test_session_self_initialization.py -q --tb=short` passed. `python -m pytest tests\scripts\test_groundtruth_governance_adoption.py -q --tb=short` passed with one unrelated ChromaDB deprecation warning. Browser runtime verification found 6 tiles, 5 signals, 8 sparklines, 2 composite lines, 160 heatmap cells, 56 session points, 54 calendar-day points, and 0 page errors.
+
+**Formal artifact note:** no DA/GOV/SPEC/PB/ADR/DCL records were created or mutated in this implementation pass. The owner clarification is enforced in code, tests, dashboard data, and this standing-backlog record; formal canonical promotion remains available as a separate approval-gated follow-up if desired.
+
+### GTKB-GOV-005 - DONE - Reconcile live bridge GO/NO-GO entries into standing backlog dispositions
+
+**Priority:** TOP. Standing backlog source audit found six latest bridge entries with `GO` or `NO-GO` status in `bridge/INDEX.md`.
+
+**Outcome:** reconciled every live bridge entry into an explicit standing-backlog disposition without mutating the file-bridge audit trail:
+
+- `gtkb-azure-cicd-gates` `GO` is assigned to `GTKB-GOV-009` for execution or owner-approved supersession/deferment in the `groundtruth-kb` checkout.
+- `agent-red-bridge-dispatcher-deferral-enforcement` `GO` is scope-only and is superseded by the follow-on implementation thread tracked by `GTKB-GOV-008`; it does not authorize direct implementation.
+- `agent-red-bridge-dispatcher-deferral-enforcement-implementation` `NO-GO` is assigned to `GTKB-GOV-008` for a revised implementation bridge covering shared parser status recognition, guard tests, generated-wrapper verification, and owner-decision gates.
+- `commercial-readiness-spec-1831-startup-wiring` `NO-GO` is assigned to `GTKB-GOV-007` for a revised bridge that seeds the alert-engine/provider-admin rule store or formally revises the spec.
+- `commercial-readiness-spec-verification` `NO-GO` is assigned to `GTKB-GOV-007` for a revised SPEC-1832 bridge covering post-auth middleware 403 audit, SPEC-1837 archival semantics, and exact post-apply KB assertions.
+- `commercial-readiness-spec-1833-ready-propagation` `NO-GO` is assigned to `GTKB-GOV-007` for a revised bridge requiring exact HTTP 503 readiness behavior, cache-isolated route tests, and no premature `verified` promotion while concurrency remains unresolved.
+
+**Evidence report:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-BRIDGE-DISPOSITIONS-2026-04-20.md`.
+
+**Regression visibility:** `scripts/audit_standing_backlog_sources.py` still reports the live bridge entries by design; child backlog items `GTKB-GOV-007`, `GTKB-GOV-008`, and `GTKB-GOV-009` preserve actionability until the underlying bridge threads are revised, executed, deferred, or superseded.
+
 ## Active Items
+
+### GTKB-MASS-001 - Execute GT-KB mass-adoption readiness plan
+
+**Priority:** TOP. Owner directive 2026-04-20: prepare GT-KB for commit, merge, push, and mass adoption as soon as possible, while preserving evidence-based release discipline. This item supersedes the current active queue ordering until it is complete or explicitly paused by owner decision.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-MASS-ADOPTION-READINESS-PLAN-2026-04-20.md`.
+
+**Required outcome:** make GT-KB ready for scoped commit, review-branch push, merge, and mass adoption by executing the ordered readiness program:
+
+1. classify dirty worktree paths and isolate the first commit scope,
+2. run the next fresh-session startup acceptance test,
+3. close or owner-disposition release blockers,
+4. apply or defer GT-KB scaffold/adoption drift,
+5. repair failing or stale testing/tool integrations,
+6. run clean-adopter install/startup/dashboard/upgrade/rollback tests,
+7. push only scoped evidence-backed commits,
+8. merge only after required CI and owner decisions are green or formally deferred.
+
+**Next-session acceptance gate:** test session startup first. A fresh session must present role/governance context, a usable dashboard link, directly actionable session-focus choices, Agent Red dashboard scope with GT-KB as infrastructure, top-of-page dated delivery timeline, and tool-integration remediation guidance before substantive work begins. The startup must not present the invalid `app://-/index.html?hostId=local` dashboard link.
+
+**Regression visibility:** use `tests/scripts/test_session_self_initialization.py`, `tests/scripts/test_groundtruth_governance_adoption.py`, `tests/scripts/test_release_candidate_gate.py`, `scripts/release_candidate_gate.py`, browser verification of `docs/gtkb-dashboard/index.html`, and the clean-adopter test matrix described in the plan report. Keep this item at the top until the plan report's commit/merge/push and mass-adoption criteria are satisfied or explicitly superseded.
+
+### GTKB-GOV-001 — Complete Agent Red Tier A managed-skill adoption apply
+
+**Priority:** TOP. Owner directive 2026-04-19: adopt and enforce, to the extent possible, all GroundTruth-KB governance specifications, skills, subsystems, and integrations available to Agent Red.
+
+**Required outcome:** finish the pending `gtkb-skills-tier-a-adoption-apply` thread or supersede it with an owner-approved direct apply record. Confirm all GroundTruth-KB v0.6.1 Tier A managed hooks, rules, skills, settings registrations, and gitignore exceptions are either adopted, explicitly rejected with rationale, or recorded as project-owned overlays.
+
+**Regression visibility:** keep `tests/scripts/test_groundtruth_governance_adoption.py` in the release-candidate gate and extend it for every newly adopted managed artifact.
+
+### GTKB-GOV-002 — Promote Agent Red release-candidate gate into the GT-KB managed skill/doctor model
+
+**Priority:** TOP. Candidate skill identified during release-readiness hardening: `.claude/skills/release-candidate-gate/SKILL.md` now exists locally for Agent Red, but it is not yet an upstream GroundTruth-KB managed skill or doctor/readiness plugin.
+
+**Required outcome:** add an upstream GT-KB bridge/work item for a reusable release-candidate gate skill or doctor check that downstream adopters can install through the managed artifact registry. It should cover security scans, dependency audit, targeted regression suites, frontend builds, DA/MemBase update evidence, and Python-version proof.
+
+**Regression visibility:** upstream GT-KB tests should prove scaffold/install/upgrade behavior; Agent Red tests should prove the local gate remains wired into CI.
+
+### GTKB-GOV-003 — Add an Agent Red governance-adoption doctor check
+
+**Priority:** TOP. Candidate integration identified during this pass: Agent Red can verify GT-KB adoption through tests, but there is no first-class `gt project doctor` or plugin-style command that reports adopter drift across `groundtruth.toml`, `.claude` hooks/rules/skills, workflow gates, and KnowledgeDB gate plugins.
+
+**Required outcome:** implement or request an upstream GT-KB doctor/readiness check for adopter drift, including managed-vs-project-owned dispositions and local-only settings such as `.claude/settings.local.json`.
+
+**Regression visibility:** add fixture-based GT-KB tests for drift detection and keep Agent Red's release gate invoking the local adoption test until the upstream doctor is available.
+
+### GTKB-GOV-004 — Complete MemBase work-item harvest into standing backlog snapshots
+
+**Priority:** TOP. Standing backlog source audit found `groundtruth.db` still has 1994 open work items, 14 new, 4 in_progress, 8 unresolved, 1 blocked, 17 specified, 1 created, and 1 deferred work item. These cannot be pasted wholesale into `memory/work_list.md` without making the backlog unusable, but they must be reconciled into backlog snapshots or a structured GT-KB work queue.
+
+**Required outcome:** classify non-terminal MemBase work items into active release blockers, grouped backlog snapshots, obsolete/superseded rows, or separately governed work streams. Start with P0/P1 rows and reconcile `WI-1515`, `WI-1567` through `WI-1569`, `WI-1637`, and `WI-3026` through `WI-3027` explicitly.
+
+**Regression visibility:** keep `scripts/audit_standing_backlog_sources.py` and `tests/scripts/test_standing_backlog_harvest.py` in the release-candidate gate until an upstream GT-KB doctor/check replaces them.
+
+### GTKB-GOV-006 — Close Agent Red release-readiness blocker list
+
+**Priority:** TOP. `memory/release-readiness.md` still lists release blockers that must be closed or explicitly deferred before a production GO: credential rotation, git history purge decision, SonarCloud pass, security scan pass, main/develop provenance reconciliation, exact-candidate Python 3.12 CI, and commercial durability launch-scope decision.
+
+**Required outcome:** update release-readiness evidence with current GitHub/CI proof, owner decisions, credential-rotation evidence, and branch provenance. Do not recommend production GO until every listed blocker is resolved, explicitly deferred with owner approval, or superseded.
+
+**Regression visibility:** release-candidate gate remains required; backlog harvest tests assert the release blocker list is still visible.
+
+### GTKB-GOV-007 — Revise commercial readiness NO-GO tracks for SPEC-1831, SPEC-1832, and SPEC-1833
+
+**Priority:** TOP. Live commercial readiness NO-GO entries require revised proposals before implementation: SPEC-1831 default alert startup must seed the engine/provider-admin rule store, SPEC-1832 API-key usage audit and retention must cover post-auth middleware 403 and SPEC-1837 archival semantics, and SPEC-1833 `/ready` Cosmos failure propagation must return HTTP 503 and avoid premature verified promotion while concurrency remains unresolved.
+
+**Required outcome:** file or obtain revised bridge proposals that satisfy the latest NO-GO findings, then implement only after GO. Preserve owner-decision and KB-promotion discipline.
+
+**Regression visibility:** bridge entries remain visible through `scripts/audit_standing_backlog_sources.py`; affected tests must cover the revised route, middleware, retention, and alert-engine contracts.
+
+### GTKB-GOV-008 — Repair bridge dispatcher deferral enforcement
+
+**Priority:** TOP. Live bridge dispatcher deferral enforcement implementation is NO-GO because the shared freshness parser still ignores `DEFERRED`, status recognition is duplicated across parser paths, generated-wrapper handling conflicts with ignored output policy, and owner-only mute authority decisions are not recorded.
+
+**Required outcome:** revise the implementation bridge to update shared parser/guard logic, parity-test scanner status vocabularies, verify generated wrapper regeneration without committing ignored outputs, and record explicit owner decisions for option selection/status name/mute authority or keep those behind an owner-decision gate.
+
+**Regression visibility:** PowerShell bridge-automation tests must prove muted/deferred entries suppress dispatch for `NEW`, `REVISED`, `GO`, and `NO-GO` snapshots without suppressing unrelated entries.
+
+### GTKB-GOV-009 — Execute or supersede GT-KB Azure CI/CD gates GO
+
+**Priority:** TOP. `gtkb-azure-cicd-gates` is latest GO for D4 scaffold-only Azure CI/CD templates with seven binding GO conditions, including no managed-artifact registry path, no overwrite mode, exact 12-path inventory, OIDC contract, environment declaration, actionlint evidence, and pytest/mypy/ruff verification.
+
+**Required outcome:** implement the GO in the `groundtruth-kb` checkout or explicitly supersede/defer it with owner approval. Preserve actionlint evidence using a supported invocation.
+
+**Regression visibility:** upstream GT-KB tests must cover template path equality, no-overwrite behavior, OIDC input/env contract, environment usage, and actionlint workflow validation.
+
+### GTKB-GOV-010 — Maintain standing backlog harvest audit as release-gate input
+
+**Priority:** TOP. The standing backlog cannot be considered fully populated without a repeatable harvest check over bridge status, MemBase work items, release-readiness blockers, and independent progress artifacts.
+
+**Required outcome:** keep `scripts/audit_standing_backlog_sources.py`, `tests/scripts/test_standing_backlog_harvest.py`, and `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md` current until GT-KB provides a first-class standing-backlog doctor. Future sessions should update the harvest report or supersede it with a structured snapshot when source counts change materially.
+
+**Regression visibility:** release-candidate gate runs the standing backlog harvest test.
 
 ### ℹ️ DA-gov dispatch loop — escalation OBSOLETE (resolved by owner action 2026-04-18)
 

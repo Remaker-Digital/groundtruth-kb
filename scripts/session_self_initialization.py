@@ -1,0 +1,4202 @@
+#!/usr/bin/env python3
+"""Generate the Agent Red / GT-KB fresh-session startup report and dashboard."""
+
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import tomllib
+from collections import Counter
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DASHBOARD_DIR = PROJECT_ROOT / "docs" / "gtkb-dashboard"
+DEFAULT_HISTORY_PATH = PROJECT_ROOT / "memory" / "gtkb-dashboard-history.json"
+PDF_EXPORT_FILENAME = "agent-red-project-dashboard.pdf"
+MAX_HISTORY = 200
+DASHBOARD_SCOPE_VERSION = "agent_red_v1"
+DASHBOARD_SCOPE_NOTE = (
+    "Agent Red product/project dashboard. GT-KB is treated as pre-existing "
+    "implementation infrastructure and is excluded from primary product KPIs."
+)
+ROLE_PROFILES: dict[str, dict[str, str]] = {
+    "prime-builder": {
+        "assumed_role": "Prime Builder",
+        "role_assignment": "active AI harness assigned by owner until further notice",
+        "bridge": "available when the owner requests counterpart review through bridge/INDEX.md",
+        "role_mapping_source": ".claude/rules/prime-builder-role.md",
+    },
+    "acting-prime-builder": {
+        "assumed_role": "Acting Prime Builder",
+        "role_assignment": "active AI harness assigned by owner for this session",
+        "bridge": "unavailable for non-standard session unless owner restores it",
+        "role_mapping_source": ".claude/rules/acting-prime-builder.md",
+    },
+    "loyal-opposition": {
+        "assumed_role": "Loyal Opposition",
+        "role_assignment": "active AI harness assigned by owner for counterpart review",
+        "bridge": "available through bridge/INDEX.md for latest NEW or REVISED entries",
+        "role_mapping_source": "AGENTS.md",
+    },
+}
+LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
+
+NON_TERMINAL_WORK_ITEM_STATUSES = {
+    "blocked",
+    "created",
+    "deferred",
+    "in_progress",
+    "new",
+    "open",
+    "specified",
+    "unresolved",
+}
+ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
+AGENT_RED_SCOPE_INCLUDED = {
+    "agent_red_product",
+    "agent_red_release",
+    "agent_red_operations",
+    "agent_red_governance_adoption",
+}
+AGENT_RED_PRIMARY_SCOPE_INCLUDED = {
+    "agent_red_product",
+    "agent_red_release",
+    "agent_red_operations",
+}
+GTKB_SCOPE_EXCLUDED = {"gtkb_framework", "gtkb_upstream"}
+
+GTKB_EXCLUDE_TERMS = (
+    "gtkb",
+    "gt-kb",
+    "groundtruth",
+    "groundtruth-kb",
+    "managed-artifact",
+    "managed artifact",
+    "managed-skill",
+    "managed skill",
+    "doctor",
+    "scaffold",
+    "deliberation archive",
+    "formal artifact",
+    "session self-initialization",
+    "session startup",
+    "session lifecycle",
+    "wrap-up",
+    "codex hook",
+    "hook parity",
+    "loyal opposition",
+    "file bridge",
+    "bridge dispatcher",
+    "bridge automation",
+    "poller",
+    "standing backlog",
+    "artifact approval",
+    "knowledge database",
+    "knowledge db",
+    "membase",
+)
+
+AGENT_RED_RELEASE_TERMS = (
+    "agent red",
+    "release",
+    "production",
+    "commercial readiness",
+    "commercial-readiness",
+    "shopify",
+    "stripe",
+    "credential",
+    "security",
+    "sonarcloud",
+    "python 3.12",
+    "provenance",
+    "deploy",
+    "container app",
+    "azure",
+)
+
+AGENT_RED_PRODUCT_TERMS = (
+    "widget",
+    "tenant",
+    "admin",
+    "customer",
+    "storefront",
+    "billing",
+    "sms",
+    "otp",
+    "mfa",
+    "magic link",
+    "inbox",
+    "conversation",
+    "pipeline",
+    "cosmos",
+    "standalone",
+    "provider",
+    "superadmin",
+    "api key",
+    "trial",
+    "usage",
+)
+
+AGENT_RED_PATH_PREFIXES = (
+    "src/",
+    "admin/",
+    "widget/",
+    "extensions/",
+    "evaluation/",
+    "config/",
+    "tests/multi_tenant/",
+    "tests/unit/",
+    "tests/widget/",
+    "tests/security/",
+    "tests/e2e",
+    "tests/rag-documents-upload/",
+    "scripts/deploy/",
+    "docs/shopify/",
+    "docs/architecture/",
+    "docs/plans/",
+    "docs/research/",
+)
+
+GTKB_PATH_PREFIXES = (
+    ".claude/",
+    ".codex/",
+    ".groundtruth/",
+    "docs/gtkb-dashboard/",
+    "independent-progress-assessments/",
+    "scripts/session_self_initialization.py",
+    "scripts/check_codex_hook_parity.py",
+    "scripts/audit_standing_backlog_sources.py",
+    "tests/scripts/",
+    "tests/hooks/",
+    "memory/gtkb-dashboard-history.json",
+)
+
+STARTUP_PRUNING_RELATIVE_FILES = (
+    "AGENTS.md",
+    "CLAUDE.md",
+    "bridge/INDEX.md",
+    "independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md",
+    "independent-progress-assessments/CODEX-STANDING-PRIORITIES.md",
+    "independent-progress-assessments/GROUNDTRUTH-KB-VISION.md",
+    "independent-progress-assessments/CODEX-WAY-OF-WORKING.md",
+    "independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md",
+    "independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md",
+    "independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md",
+    "independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md",
+    "independent-progress-assessments/LOYAL-OPPOSITION-LOG.md",
+    ".claude/rules/deliberation-protocol.md",
+    ".claude/settings.json",
+    "memory/gtkb-dashboard-history.json",
+)
+STARTUP_PRUNING_LARGE_FILE_BYTES = 50_000
+STARTUP_PRUNING_TOTAL_WARN_BYTES = 250_000
+WRAPUP_TRIGGER_COMMANDS = (
+    "wrap up",
+    "wrap up this session",
+    "session wrap-up",
+    "run session wrap-up",
+    "close this session",
+    "end this session",
+    "new session",
+    "fresh session",
+    "start a new session",
+    "start a fresh session",
+    "begin a new session",
+    "begin a fresh session",
+    "open a new session",
+    "prepare a new session",
+    "initialize a new session",
+    "start fresh",
+    "begin fresh",
+)
+
+
+def _run_verified_bridge_startup_maintenance(project_root: Path) -> dict[str, Any]:
+    """Archive VERIFIED bridge threads and prune them from the startup index."""
+    try:
+        from retroactive_harvest_bridge_threads import archive_verified_threads_and_prune_index
+
+        return archive_verified_threads_and_prune_index(
+            index_path=project_root / "bridge" / "INDEX.md",
+            bridge_dir=project_root / "bridge",
+            kb_path=str(project_root / "groundtruth.db"),
+        )
+    except Exception as exc:  # noqa: BLE001 - startup report should still render
+        return {
+            "verified_threads_seen": 0,
+            "already_archived": 0,
+            "inserted": 0,
+            "pruned_from_index": 0,
+            "failed_count": 1,
+            "failed": [str(exc)],
+            "kept_unarchived": 0,
+        }
+
+
+def _file_size_profile(project_root: Path, relative_path: str) -> dict[str, Any] | None:
+    path = project_root / relative_path
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        stat = path.stat()
+    except OSError as exc:
+        return {"path": relative_path, "available": False, "error": str(exc)}
+    return {
+        "path": relative_path,
+        "available": True,
+        "bytes": stat.st_size,
+        "lines": text.count("\n") + (1 if text else 0),
+    }
+
+
+def _latest_insight_profile(project_root: Path) -> dict[str, Any] | None:
+    insight_dir = project_root / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    try:
+        latest = max((p for p in insight_dir.iterdir() if p.is_file()), key=lambda p: p.stat().st_mtime)
+    except (FileNotFoundError, ValueError):
+        return None
+    return _file_size_profile(project_root, str(latest.relative_to(project_root)).replace("\\", "/"))
+
+
+def _startup_pruning_scan(
+    project_root: Path,
+    bridge_maintenance: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Measure startup-loaded file bloat and identify safe pruning candidates."""
+    profiles = [
+        profile
+        for profile in (_file_size_profile(project_root, rel) for rel in STARTUP_PRUNING_RELATIVE_FILES)
+        if profile is not None
+    ]
+    latest_insight = _latest_insight_profile(project_root)
+    if latest_insight is not None:
+        profiles.append(latest_insight)
+
+    available_profiles = [p for p in profiles if p.get("available")]
+    total_bytes = sum(int(p.get("bytes", 0)) for p in available_profiles)
+    largest = sorted(available_profiles, key=lambda p: int(p.get("bytes", 0)), reverse=True)[:8]
+
+    candidates: list[dict[str, Any]] = []
+    if bridge_maintenance and (
+        bridge_maintenance.get("inserted")
+        or bridge_maintenance.get("already_archived")
+        or bridge_maintenance.get("pruned_from_index")
+        or (bridge_maintenance.get("comment_compaction") or {}).get("removed_comment_lines")
+    ):
+        candidates.append({
+            "type": "completed",
+            "target": "bridge/INDEX.md",
+            "action": (
+                "Archived terminal bridge state and compacted oversized historical "
+                "comment blocks from the active startup index."
+            ),
+            "evidence": bridge_maintenance,
+        })
+
+    for profile in largest:
+        if int(profile.get("bytes", 0)) >= STARTUP_PRUNING_LARGE_FILE_BYTES:
+            candidates.append({
+                "type": "candidate",
+                "target": profile["path"],
+                "action": "Review for summarization, archival split, or index-first loading.",
+                "evidence": {
+                    "bytes": profile["bytes"],
+                    "lines": profile["lines"],
+                },
+            })
+
+    if total_bytes >= STARTUP_PRUNING_TOTAL_WARN_BYTES:
+        candidates.append({
+            "type": "candidate",
+            "target": "session startup corpus",
+            "action": "Reduce default startup reads to compact indices plus targeted detail files.",
+            "evidence": {"total_bytes": total_bytes, "file_count": len(available_profiles)},
+        })
+
+    return {
+        "scope": "startup_loaded_files_and_coordination_state",
+        "total_bytes": total_bytes,
+        "file_count": len(available_profiles),
+        "largest_files": largest,
+        "candidate_count": len([c for c in candidates if c["type"] == "candidate"]),
+        "completed_count": len([c for c in candidates if c["type"] == "completed"]),
+        "candidates": candidates,
+    }
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+_LOCAL_ENV_CACHE: dict[str, str] | None = None
+
+
+def _local_env_values() -> dict[str, str]:
+    """Read non-secret routing values from local env files without logging them."""
+
+    global _LOCAL_ENV_CACHE
+    if _LOCAL_ENV_CACHE is not None:
+        return _LOCAL_ENV_CACHE
+
+    values: dict[str, str] = {}
+    for path in (PROJECT_ROOT / ".env.local", PROJECT_ROOT / "env.local"):
+        if not path.is_file():
+            continue
+        for raw_line in _read_text(path).splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    _LOCAL_ENV_CACHE = values
+    return values
+
+
+def _local_env_value(name: str, default: str = "") -> str:
+    return os.environ.get(name) or _local_env_values().get(name, default)
+
+
+def _github_repo_slug(value: str) -> str:
+    repo = value.strip()
+    if repo.startswith("git@github.com:"):
+        repo = repo.split(":", 1)[1]
+    if repo.startswith("https://github.com/"):
+        repo = repo.removeprefix("https://github.com/")
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    return repo.strip("/")
+
+
+def _github_repo_url(repo_slug: str) -> str:
+    return f"https://github.com/{repo_slug}.git"
+
+
+def _normalize_path(value: str) -> str:
+    return value.replace("\\", "/").strip().lstrip("./").lower()
+
+
+def _extract_paths(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, list):
+        return [_normalize_path(str(item)) for item in value if str(item).strip()]
+    text = str(value).strip()
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return [_normalize_path(part) for part in re.split(r"[,;\n]", text) if part.strip()]
+    if isinstance(parsed, list):
+        return [_normalize_path(str(item)) for item in parsed if str(item).strip()]
+    return [_normalize_path(text)]
+
+
+def _path_matches(path: str, prefixes: tuple[str, ...]) -> bool:
+    normalized = _normalize_path(path)
+    return any(normalized.startswith(prefix) for prefix in prefixes)
+
+
+def _combined_text(row: dict[str, Any] | sqlite3.Row) -> str:
+    values = dict(row).values() if isinstance(row, sqlite3.Row) else row.values()
+    values = [str(value or "") for value in values]
+    return " ".join(values).lower()
+
+
+def classify_dashboard_scope(row: dict[str, Any] | sqlite3.Row) -> str:
+    """Classify whether a record belongs in Agent Red project dashboard KPIs."""
+
+    text = _combined_text(row)
+    row_data = dict(row) if isinstance(row, sqlite3.Row) else row
+    identifier = str(row_data.get("id", "")).upper()
+    title = str(row_data.get("title", ""))
+    source_paths = _extract_paths(row_data.get("source_paths"))
+    test_file = str(row_data.get("test_file", "") or "")
+    path_values = [*source_paths, _normalize_path(test_file)]
+
+    if identifier.startswith("AR-") or "agent red project dashboard" in text:
+        return "agent_red_operations"
+    if identifier.startswith("GTKB-") and any(
+        term in text
+        for term in (
+            "upstream gt-kb",
+            "managed skill",
+            "managed-skill",
+            "managed artifact",
+            "managed-artifact",
+            "doctor/readiness",
+            "future adopters",
+            "reusable release-candidate gate",
+        )
+    ):
+        return "gtkb_upstream"
+    if identifier.startswith("GTKB-") and any(
+        term in text
+        for term in (
+            "agent red release",
+            "release-readiness",
+            "release readiness",
+            "commercial readiness",
+            "commercial-readiness",
+            "spec-1831",
+            "spec-1832",
+            "spec-1833",
+        )
+    ):
+        return "agent_red_release"
+    if any(_path_matches(path, GTKB_PATH_PREFIXES) for path in path_values):
+        return "gtkb_framework"
+    if "gtkb" in identifier or identifier.startswith(("GOV-", "PB-", "ADR-", "DCL-")):
+        return "gtkb_framework"
+    if any(term in text for term in GTKB_EXCLUDE_TERMS):
+        if any(term in text for term in ("agent red release", "release readiness", "release-readiness")):
+            return "agent_red_governance_adoption"
+        return "gtkb_framework"
+    if any(_path_matches(path, AGENT_RED_PATH_PREFIXES) for path in path_values):
+        return "agent_red_product"
+    if any(term in text for term in AGENT_RED_RELEASE_TERMS):
+        return "agent_red_release"
+    if any(term in text for term in AGENT_RED_PRODUCT_TERMS):
+        return "agent_red_product"
+    if title.startswith("Test:"):
+        return "agent_red_product"
+    return "unknown"
+
+
+def _scope_counts(rows: list[dict[str, Any] | sqlite3.Row]) -> dict[str, int]:
+    return dict(sorted(Counter(classify_dashboard_scope(row) for row in rows).items()))
+
+
+def _is_agent_red_scope(row: dict[str, Any] | sqlite3.Row, *, primary_only: bool = False) -> bool:
+    included = AGENT_RED_PRIMARY_SCOPE_INCLUDED if primary_only else AGENT_RED_SCOPE_INCLUDED
+    return classify_dashboard_scope(row) in included
+
+
+def _sqlite_count(connection: sqlite3.Connection, table_or_view: str) -> int:
+    return int(connection.execute(f"SELECT COUNT(*) FROM {table_or_view}").fetchone()[0])
+
+
+def _sqlite_group_count(connection: sqlite3.Connection, table_or_view: str, column: str) -> dict[str, int]:
+    rows = connection.execute(
+        f"SELECT {column}, COUNT(*) AS count FROM {table_or_view} GROUP BY {column} ORDER BY {column}"
+    )
+    return {str(row[0] or "none"): int(row[1]) for row in rows}
+
+
+def _database_metrics(project_root: Path) -> dict[str, Any]:
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return {"available": False, "error": f"missing {db_path.name}"}
+
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        specifications = [dict(row) for row in connection.execute("SELECT * FROM current_specifications")]
+        work_items = [dict(row) for row in connection.execute("SELECT * FROM current_work_items")]
+        tests = [dict(row) for row in connection.execute("SELECT * FROM current_tests")]
+        deliberations = [dict(row) for row in connection.execute("SELECT * FROM current_deliberations")]
+        agent_red_specs = [row for row in specifications if _is_agent_red_scope(row)]
+        agent_red_work_items = [row for row in work_items if _is_agent_red_scope(row)]
+        agent_red_tests = [row for row in tests if _is_agent_red_scope(row)]
+        agent_red_deliberations = [row for row in deliberations if _is_agent_red_scope(row)]
+        open_work_items = [
+            row
+            for row in agent_red_work_items
+            if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
+        ]
+        return {
+            "available": True,
+            "specifications": {
+                "current_total": len(agent_red_specs),
+                "raw_current_total": len(specifications),
+                "status_counts": dict(sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())),
+                "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in agent_red_specs).items())),
+                "scope_counts": _scope_counts(specifications),
+                "scope_confidence": "agent_red_current_heuristic",
+            },
+            "membase": {
+                "work_item_status_counts": dict(
+                    sorted(Counter(str(row.get("resolution_status") or "none") for row in agent_red_work_items).items())
+                ),
+                "open_work_items": len(open_work_items),
+                "raw_open_work_items": sum(
+                    1
+                    for row in work_items
+                    if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
+                ),
+                "test_records": len(agent_red_tests),
+                "test_procedure_records": _sqlite_count(connection, "test_procedures"),
+                "scope_counts": _scope_counts(work_items),
+                "scope_confidence": "agent_red_current_heuristic",
+            },
+            "deliberation_archive": {
+                "current_total": len(agent_red_deliberations),
+                "raw_current_total": len(deliberations),
+                "outcome_counts": dict(
+                    sorted(Counter(str(row.get("outcome") or "none") for row in agent_red_deliberations).items())
+                ),
+                "scope_counts": _scope_counts(deliberations),
+                "scope_confidence": "agent_red_current_heuristic",
+            },
+            "scope": {
+                "version": DASHBOARD_SCOPE_VERSION,
+                "note": DASHBOARD_SCOPE_NOTE,
+                "excluded_scopes": sorted(GTKB_SCOPE_EXCLUDED),
+            },
+        }
+    finally:
+        connection.close()
+
+
+def _parse_active_work_items(work_list_text: str) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    in_active = False
+    current: dict[str, str] | None = None
+    body_lines: list[str] = []
+    for line in work_list_text.splitlines():
+        if line.startswith("## Active Items"):
+            in_active = True
+            continue
+        if in_active and line.startswith("## "):
+            if current:
+                current["body"] = "\n".join(body_lines).strip()
+                items.append(current)
+            break
+        if not in_active:
+            continue
+        if line.startswith("### "):
+            if current:
+                current["body"] = "\n".join(body_lines).strip()
+                items.append(current)
+            heading = line[4:].strip()
+            body_lines = []
+            match = re.match(r"(?P<id>[A-Z0-9-]+)\s+[—-]\s+(?P<title>.+)", heading)
+            if match:
+                current = {"id": match.group("id"), "title": match.group("title")}
+            else:
+                current = {"id": heading.split()[0], "title": heading}
+            continue
+        if current:
+            body_lines.append(line)
+    if in_active and current and current not in items:
+        current["body"] = "\n".join(body_lines).strip()
+        items.append(current)
+    return items
+
+
+def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    items = _parse_active_work_items(_read_text(project_root / "memory" / "work_list.md"))
+    classified = []
+    for item in items:
+        row = {"id": item["id"], "title": item["title"], "description": item.get("body", "")}
+        classified.append({**item, "scope": classify_dashboard_scope(row)})
+    primary_items = [item for item in classified if item["scope"] in AGENT_RED_PRIMARY_SCOPE_INCLUDED]
+    visible_items = primary_items or [item for item in classified if item["scope"] in AGENT_RED_SCOPE_INCLUDED]
+    return {
+        "active_item_count": len(visible_items),
+        "raw_active_item_count": len(items),
+        "top_priority_actions": visible_items[:3],
+        "source": "memory/work_list.md",
+        "scope_counts": dict(sorted(Counter(item["scope"] for item in classified).items())),
+        "scope_confidence": "agent_red_current_heuristic",
+    }, visible_items[:3]
+
+
+def _bridge_metrics(project_root: Path) -> dict[str, Any]:
+    entries: list[dict[str, str]] = []
+    current_document: str | None = None
+    for line in _read_text(project_root / "bridge" / "INDEX.md").splitlines():
+        if line.startswith("Document: "):
+            current_document = line.split(": ", 1)[1].strip()
+            continue
+        if not current_document:
+            continue
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/[^\s]+)", line)
+        if not match:
+            continue
+        entries.append({"document": current_document, "status": match.group(1), "path": match.group(2)})
+        current_document = None
+
+    classified = []
+    for entry in entries:
+        content = _read_text(project_root / entry["path"])
+        row = {
+            "id": entry["document"],
+            "title": entry["document"].replace("-", " "),
+            "description": content[:4000],
+            "source_paths": [entry["path"]],
+        }
+        classified.append({**entry, "scope": classify_dashboard_scope(row)})
+
+    visible_entries = [entry for entry in classified if entry["scope"] in AGENT_RED_PRIMARY_SCOPE_INCLUDED]
+    counts = Counter(entry["status"] for entry in visible_entries)
+    actionable = [entry for entry in visible_entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES]
+    return {
+        "latest_status_counts": dict(sorted(counts.items())),
+        "actionable_count": len(actionable),
+        "actionable_by_status": dict(sorted(Counter(entry["status"] for entry in actionable).items())),
+        "oldest_actionable": actionable[:5],
+        "raw_latest_status_counts": dict(sorted(Counter(entry["status"] for entry in entries).items())),
+        "raw_actionable_count": sum(1 for entry in entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES),
+        "scope_counts": dict(sorted(Counter(entry["scope"] for entry in classified).items())),
+        "scope_confidence": "agent_red_current_heuristic",
+    }
+
+
+def _release_blockers(project_root: Path) -> list[str]:
+    text = _read_text(project_root / "memory" / "release-readiness.md")
+    blockers: list[str] = []
+    in_section = False
+    for line in text.splitlines():
+        if line.startswith("## Remaining Release Blockers"):
+            in_section = True
+            continue
+        if in_section and line.startswith("## "):
+            break
+        if in_section and line.startswith("- "):
+            blockers.append(line[2:].strip())
+    return blockers
+
+
+def _git_drift(project_root: Path) -> dict[str, Any]:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=project_root,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"available": False, "error": str(exc)}
+
+    if result.returncode != 0:
+        return {"available": False, "error": result.stderr.strip()}
+
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    agent_red_lines = [
+        line
+        for line in lines
+        if _path_matches(line[3:] if len(line) > 3 else line, AGENT_RED_PATH_PREFIXES)
+        and not _path_matches(line[3:] if len(line) > 3 else line, GTKB_PATH_PREFIXES)
+    ]
+    return {
+        "available": True,
+        "changed_path_count": len(agent_red_lines),
+        "raw_changed_path_count": len(lines),
+        "untracked_path_count": sum(1 for line in agent_red_lines if line.startswith("??")),
+        "deleted_path_count": sum(1 for line in agent_red_lines if "D" in line[:2]),
+        "scope_confidence": "agent_red_current_heuristic",
+    }
+
+
+def _discover_skill_files(project_root: Path) -> list[Path]:
+    roots = [
+        project_root / ".claude" / "skills",
+        Path.home() / ".codex" / "skills",
+        Path.home() / ".agents" / "skills",
+    ]
+    skill_files: list[Path] = []
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in root.rglob("SKILL.md"):
+            try:
+                path.relative_to(root)
+            except ValueError:
+                continue
+            skill_files.append(path)
+    return sorted(set(skill_files), key=lambda path: str(path).lower())
+
+
+def _skill_name(path: Path) -> str:
+    return path.parent.name
+
+
+def _plugin_inventory() -> list[str]:
+    plugins: set[str] = set()
+    plugin_cache = Path.home() / ".codex" / "plugins" / "cache"
+    if plugin_cache.is_dir():
+        for path in plugin_cache.glob("*/*"):
+            if path.is_dir():
+                plugins.add(path.name)
+    return sorted(plugins)
+
+
+def _command_available(command: str) -> bool:
+    return shutil.which(command) is not None
+
+
+def _git_remote_origin(project_root: Path) -> dict[str, Any]:
+    configured_repo = _github_repo_slug(_local_env_value("AGENT_RED_GITHUB_REPO"))
+    if configured_repo:
+        return {
+            "present": True,
+            "host": "github.com",
+            "repository": configured_repo,
+            "source": "AGENT_RED_GITHUB_REPO",
+            "remote_url": _github_repo_url(configured_repo),
+        }
+
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=project_root,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"present": False, "host": None, "repository": None, "error": str(exc)}
+
+    if result.returncode != 0:
+        return {"present": False, "host": None, "repository": None, "error": result.stderr.strip()}
+
+    remote_url = result.stdout.strip()
+    host = "github.com" if "github.com" in remote_url.lower() else "unknown"
+    repository = remote_url.rstrip("/").removesuffix(".git").split(":")[-1].split("github.com/")[-1]
+    return {
+        "present": bool(remote_url),
+        "host": host,
+        "repository": repository if "/" in repository else None,
+        "source": "git remote origin",
+        "remote_url": remote_url,
+    }
+
+
+def _command_output(command: list[str], cwd: Path, timeout: int = 10) -> dict[str, Any]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"ok": False, "stdout": "", "stderr": str(exc), "returncode": None}
+    return {
+        "ok": result.returncode == 0,
+        "stdout": result.stdout.strip(),
+        "stderr": result.stderr.strip(),
+        "returncode": result.returncode,
+    }
+
+
+def _read_toml(path: Path) -> dict[str, Any]:
+    try:
+        with path.open("rb") as handle:
+            return tomllib.load(handle)
+    except (FileNotFoundError, tomllib.TOMLDecodeError):
+        return {}
+
+
+def _version_tuple(value: str | None) -> tuple[int, ...]:
+    if not value:
+        return ()
+    match = re.search(r"(\d+(?:\.\d+){0,3})", value)
+    if not match:
+        return ()
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def _compare_versions(left: str | None, right: str | None) -> int:
+    left_tuple = _version_tuple(left)
+    right_tuple = _version_tuple(right)
+    width = max(len(left_tuple), len(right_tuple), 1)
+    padded_left = left_tuple + (0,) * (width - len(left_tuple))
+    padded_right = right_tuple + (0,) * (width - len(right_tuple))
+    return (padded_left > padded_right) - (padded_left < padded_right)
+
+
+def _repo_web_url(remote_url: str | None) -> str | None:
+    if not remote_url:
+        return None
+    value = remote_url.strip()
+    if value.startswith("git@github.com:"):
+        value = "https://github.com/" + value.split(":", 1)[1]
+    if value.endswith(".git"):
+        value = value[:-4]
+    return value
+
+
+def _latest_remote_semver_tag(remote_url: str) -> dict[str, Any]:
+    result = _command_output(["git", "ls-remote", "--tags", "--sort=-v:refname", remote_url], PROJECT_ROOT, timeout=12)
+    if not result["ok"]:
+        return {"available": False, "tag": None, "sha": None, "error": result["stderr"]}
+    tags: dict[str, str] = {}
+    for line in result["stdout"].splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            continue
+        sha, ref = parts
+        if ref.endswith("^{}"):
+            ref = ref[:-3]
+        tag = ref.removeprefix("refs/tags/")
+        if _version_tuple(tag):
+            tags[tag] = sha
+    if not tags:
+        return {"available": False, "tag": None, "sha": None, "error": "no semver tags found"}
+    tag = sorted(tags, key=_version_tuple, reverse=True)[0]
+    return {"available": True, "tag": tag, "sha": tags[tag], "error": None}
+
+
+def _remote_branch_sha(remote_url: str, branch: str = "main") -> dict[str, Any]:
+    result = _command_output(["git", "ls-remote", remote_url, f"refs/heads/{branch}"], PROJECT_ROOT, timeout=12)
+    if not result["ok"]:
+        return {"available": False, "branch": branch, "sha": None, "error": result["stderr"]}
+    first_line = result["stdout"].splitlines()[0] if result["stdout"] else ""
+    sha = first_line.split()[0] if first_line else None
+    return {"available": bool(sha), "branch": branch, "sha": sha, "error": None if sha else "branch not found"}
+
+
+def _gtkb_package_info() -> dict[str, Any]:
+    try:
+        module = __import__("groundtruth_kb")
+    except Exception as exc:  # pragma: no cover - defensive in partially installed environments.
+        return {"available": False, "version": None, "file": None, "error": str(exc)}
+    return {
+        "available": True,
+        "version": getattr(module, "__version__", None),
+        "file": str(getattr(module, "__file__", "")),
+        "error": None,
+    }
+
+
+def _git_checkout_info(path: Path) -> dict[str, Any]:
+    if not path.is_dir():
+        return {"available": False, "path": str(path), "error": "checkout not found"}
+    branch = _command_output(["git", "branch", "--show-current"], path)
+    sha = _command_output(["git", "rev-parse", "HEAD"], path)
+    short_sha = _command_output(["git", "rev-parse", "--short", "HEAD"], path)
+    remote = _command_output(["git", "remote", "get-url", "origin"], path)
+    status = _command_output(["git", "status", "--porcelain"], path)
+    if not sha["ok"]:
+        return {"available": False, "path": str(path), "error": sha["stderr"]}
+    return {
+        "available": True,
+        "path": str(path),
+        "branch": branch["stdout"] if branch["ok"] else None,
+        "sha": sha["stdout"],
+        "short_sha": short_sha["stdout"] if short_sha["ok"] else None,
+        "remote_url": remote["stdout"] if remote["ok"] else None,
+        "dirty_path_count": len([line for line in status["stdout"].splitlines() if line.strip()]) if status["ok"] else None,
+        "error": None,
+    }
+
+
+def _gtkb_upgrade_plan(project_root: Path) -> dict[str, Any]:
+    try:
+        from groundtruth_kb.project.upgrade import plan_upgrade
+    except Exception as exc:  # pragma: no cover - defensive in partially installed environments.
+        return {"available": False, "error": str(exc), "action_count": None, "action_counts": {}, "sample_actions": []}
+
+    try:
+        actions = plan_upgrade(project_root)
+    except Exception as exc:
+        return {"available": False, "error": str(exc), "action_count": None, "action_counts": {}, "sample_actions": []}
+
+    action_counts = dict(sorted(Counter(action.action for action in actions).items()))
+    mutating_actions = [
+        action for action in actions if action.action not in {"warning", "informational"}
+    ]
+    sample_actions = [
+        {"action": action.action, "file": action.file, "reason": action.reason}
+        for action in mutating_actions[:12]
+    ]
+    return {
+        "available": True,
+        "error": None,
+        "action_count": len(actions),
+        "mutating_action_count": len(mutating_actions),
+        "action_counts": action_counts,
+        "sample_actions": sample_actions,
+    }
+
+
+def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
+    config = _read_toml(project_root / "groundtruth.toml")
+    scaffold_version = config.get("project", {}).get("scaffold_version")
+    package = _gtkb_package_info()
+    inferred_checkout = None
+    if package.get("file"):
+        package_path = Path(str(package["file"]))
+        if len(package_path.parents) >= 3 and (package_path.parents[2] / "pyproject.toml").is_file():
+            inferred_checkout = package_path.parents[2]
+    adjacent_checkout = project_root.parent / "groundtruth-kb"
+    checkout_path = inferred_checkout or adjacent_checkout
+    checkout = _git_checkout_info(checkout_path)
+    configured_gtkb_repo = _github_repo_slug(_local_env_value("GROUND_TRUTH_GITHUB_REPO"))
+    remote_url = (
+        _github_repo_url(configured_gtkb_repo)
+        if configured_gtkb_repo
+        else checkout.get("remote_url") or "https://github.com/Remaker-Digital/groundtruth-kb.git"
+    )
+    latest_release = _latest_remote_semver_tag(str(remote_url))
+    latest_main = _remote_branch_sha(str(remote_url), "main")
+    upgrade_plan = _gtkb_upgrade_plan(project_root)
+
+    package_version = package.get("version")
+    latest_release_version = latest_release.get("tag")
+    release_upgrade_available = (
+        latest_release.get("available")
+        and package_version is not None
+        and _compare_versions(str(package_version), str(latest_release_version)) < 0
+    )
+    scaffold_upgrade_available = bool(upgrade_plan.get("mutating_action_count"))
+    local_main_sha = checkout.get("sha")
+    unreleased_upstream_changes = bool(
+        latest_main.get("sha") and local_main_sha and latest_main.get("sha") != local_main_sha
+    )
+    if latest_main.get("sha") and local_main_sha and latest_main.get("sha") == local_main_sha and latest_release.get("tag"):
+        count_result = _command_output(
+            ["git", "rev-list", "--count", f"{latest_release['tag']}..HEAD"],
+            Path(str(checkout_path)),
+            timeout=8,
+        )
+        unreleased_commit_count = int(count_result["stdout"]) if count_result["ok"] and count_result["stdout"].isdigit() else None
+    else:
+        unreleased_commit_count = None
+
+    if release_upgrade_available:
+        status = "release_upgrade_available"
+    elif scaffold_upgrade_available:
+        status = "scaffold_upgrade_plan_available"
+    elif unreleased_upstream_changes or (unreleased_commit_count or 0) > 0:
+        status = "unreleased_upstream_changes_available"
+    else:
+        status = "current_release"
+
+    plan_command = 'gt project upgrade --dry-run --dir .'
+    apply_command = 'gt project upgrade --apply --dir .'
+    fallback_prefix = 'python -c "from groundtruth_kb.cli import main; main()"'
+    return {
+        "status": status,
+        "scope": "implementation_infrastructure",
+        "package_version": package_version,
+        "package_file": package.get("file"),
+        "package_import_available": package.get("available"),
+        "scaffold_version": scaffold_version,
+        "repo_url": _repo_web_url(str(remote_url)),
+        "remote_url": remote_url,
+        "latest_release_tag": latest_release.get("tag"),
+        "latest_release_sha": latest_release.get("sha"),
+        "latest_main_branch": latest_main.get("branch"),
+        "latest_main_sha": latest_main.get("sha"),
+        "local_checkout": checkout,
+        "release_upgrade_available": release_upgrade_available,
+        "scaffold_upgrade_available": scaffold_upgrade_available,
+        "unreleased_upstream_changes_available": unreleased_upstream_changes or (unreleased_commit_count or 0) > 0,
+        "unreleased_commit_count": unreleased_commit_count,
+        "gt_cli_available": _command_available("gt"),
+        "plan_command": plan_command if _command_available("gt") else f"{fallback_prefix} project upgrade --dry-run --dir .",
+        "apply_command": apply_command if _command_available("gt") else f"{fallback_prefix} project upgrade --apply --dir .",
+        "apply_enabled": False,
+        "apply_gate": "Static dashboard cannot execute local shell. Apply requires owner approval, clean/acknowledged git state, dry-run review, and post-upgrade tests.",
+        "upgrade_plan": upgrade_plan,
+        "latest_release_probe_error": latest_release.get("error"),
+        "latest_main_probe_error": latest_main.get("error"),
+    }
+
+
+def _gh_auth_status(project_root: Path) -> str:
+    if not _command_available("gh"):
+        return "gh_cli_missing"
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"],
+            cwd=project_root,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "unknown"
+    return "authenticated" if result.returncode == 0 else "not_authenticated_or_unavailable"
+
+
+def _workflow_name(path: Path) -> str:
+    text = _read_text(path)
+    match = re.search(r"(?m)^name:\s*['\"]?([^'\"]+?)['\"]?\s*$", text)
+    return match.group(1).strip() if match else path.stem.replace("-", " ").title()
+
+
+def _workflow_inventory(project_root: Path) -> dict[str, dict[str, Any]]:
+    workflows_dir = project_root / ".github" / "workflows"
+    if not workflows_dir.is_dir():
+        return {}
+    inventory = {}
+    for path in sorted([*workflows_dir.glob("*.yml"), *workflows_dir.glob("*.yaml")]):
+        inventory[path.name] = {
+            "file": path.name,
+            "name": _workflow_name(path),
+            "text": _read_text(path),
+        }
+    return inventory
+
+
+def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dict[str, Any]:
+    if gh_auth_status != "authenticated":
+        return {"available": False, "reason": gh_auth_status, "runs_by_workflow": {}}
+    repo = _github_repo_slug(_local_env_value("AGENT_RED_GITHUB_REPO"))
+    command = [
+        "gh",
+        "run",
+        "list",
+        "--limit",
+        "100",
+        "--json",
+        "databaseId,name,workflowName,status,conclusion,headBranch,headSha,createdAt,updatedAt,event,url",
+    ]
+    if repo:
+        command.extend(["--repo", repo])
+    try:
+        result = subprocess.run(
+            command,
+            cwd=project_root,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=8,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"available": False, "reason": str(exc), "runs_by_workflow": {}}
+
+    if result.returncode != 0:
+        return {"available": False, "reason": result.stderr.strip(), "runs_by_workflow": {}}
+
+    try:
+        runs = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        return {"available": False, "reason": f"invalid gh json: {exc}", "runs_by_workflow": {}}
+
+    latest: dict[str, dict[str, Any]] = {}
+    for run in runs:
+        workflow_name = str(run.get("workflowName") or run.get("name") or "")
+        if workflow_name and workflow_name not in latest:
+            latest[workflow_name] = run
+    return {
+        "available": True,
+        "queried_at": _now_iso(),
+        "repository": repo or "current git remote",
+        "runs": runs,
+        "runs_by_workflow": latest,
+    }
+
+
+def _workflow_run_health(run: dict[str, Any] | None) -> str:
+    if not run:
+        return "no_recent_run"
+    status = run.get("status")
+    conclusion = run.get("conclusion")
+    if status and status != "completed":
+        return str(status)
+    if conclusion == "success":
+        return "passing"
+    if conclusion in {"failure", "timed_out", "cancelled", "action_required"}:
+        return "failing"
+    return str(conclusion or "unknown")
+
+
+def _workflow_run_summary(run: dict[str, Any] | None) -> str:
+    if not run:
+        return "No recent run returned by gh."
+    sha = str(run.get("headSha") or "")
+    short_sha = sha[:7] if sha else "unknown"
+    conclusion = run.get("conclusion") or run.get("status") or "unknown"
+    branch = run.get("headBranch") or "unknown"
+    updated_at = run.get("updatedAt") or run.get("createdAt") or "unknown time"
+    return f"{conclusion} on {branch}@{short_sha}, updated {updated_at}"
+
+
+def _status_from_requirements(requirements: list[bool], manual: bool = False) -> str:
+    if requirements and all(requirements):
+        return "manual" if manual else "ready"
+    if any(requirements):
+        return "partial"
+    return "not_wired"
+
+
+def _package_json(project_root: Path, relative_path: str) -> dict[str, Any]:
+    try:
+        return json.loads((project_root / relative_path).read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _package_has_script(package_data: dict[str, Any], script_name: str) -> bool:
+    return script_name in package_data.get("scripts", {})
+
+
+def _package_has_dependency(package_data: dict[str, Any], dependency_name: str) -> bool:
+    return dependency_name in package_data.get("dependencies", {}) or dependency_name in package_data.get(
+        "devDependencies", {}
+    )
+
+
+def _dependency_declared(project_root: Path, dependency_name: str) -> bool:
+    text = "\n".join(
+        _read_text(project_root / path)
+        for path in ["requirements.txt", "requirements-test.txt", "requirements-local.txt"]
+    )
+    return bool(re.search(rf"(?im)^\s*{re.escape(dependency_name)}(?:[<>=~!].*)?$", text))
+
+
+def _workflow_text(workflows: dict[str, dict[str, Any]], filename: str) -> str:
+    return str(workflows.get(filename, {}).get("text") or "")
+
+
+def _workflow_run(
+    runs: dict[str, Any],
+    workflows: dict[str, dict[str, Any]],
+    filename: str,
+    fallback_name: str | None = None,
+) -> dict[str, Any] | None:
+    workflow_name = str(workflows.get(filename, {}).get("name") or fallback_name or "")
+    return runs.get("runs_by_workflow", {}).get(workflow_name)
+
+
+def _workflow_default_tag(workflow_text: str) -> str | None:
+    match = re.search(r"(?im)^\s*default:\s*['\"]?(v\d+\.\d+\.\d+(?:[-.\w]*)?)", workflow_text)
+    return match.group(1) if match else None
+
+
+def _version_from_text(*values: Any) -> str | None:
+    text = " ".join(str(value or "") for value in values)
+    match = re.search(r"\bv\d+\.\d+\.\d+(?:[-.\w]*)?\b", text)
+    return match.group(0) if match else None
+
+
+def _current_version_manifest(project_root: Path) -> dict[str, Any]:
+    versions: dict[str, Any] = {}
+    pyproject = _read_toml(project_root / "pyproject.toml")
+    if pyproject.get("project", {}).get("version"):
+        versions["python_package"] = pyproject["project"]["version"]
+    api_version_text = _read_text(project_root / "src" / "api_versioning.py")
+    api_match = re.search(r'API_VERSION\s*=\s*["\']([^"\']+)["\']', api_version_text)
+    if api_match:
+        versions["api_version"] = api_match.group(1)
+    for label, relative_path in {
+        "root_package": "package.json",
+        "widget": "widget/package.json",
+        "admin": "admin/package.json",
+        "docs_site": "docs-site/package.json",
+    }.items():
+        package = _package_json(project_root, relative_path)
+        if package.get("version"):
+            versions[label] = package["version"]
+    return {
+        "versions": versions,
+        "display": ", ".join(f"{key}: {value}" for key, value in versions.items()) or "No package version files found.",
+    }
+
+
+def _recent_git_commits(project_root: Path, limit: int = 12) -> list[dict[str, Any]]:
+    result = _command_output(
+        ["git", "log", "--date=iso-strict", "--pretty=format:%H%x1f%h%x1f%cI%x1f%an%x1f%s", "-n", str(limit)],
+        project_root,
+        timeout=10,
+    )
+    if not result["ok"]:
+        return []
+    commits = []
+    for line in result["stdout"].splitlines():
+        parts = line.split("\x1f")
+        if len(parts) != 5:
+            continue
+        sha, short_sha, committed_at, author, subject = parts
+        described = _command_output(["git", "describe", "--tags", "--always", "--abbrev=8", sha], project_root, timeout=4)
+        commits.append(
+            {
+                "sha": sha,
+                "short_sha": short_sha,
+                "committed_at": committed_at,
+                "author": author,
+                "subject": subject,
+                "version": described["stdout"] if described["ok"] else short_sha,
+            }
+        )
+    return commits
+
+
+def _image_refs_from_file(path: Path) -> list[dict[str, str]]:
+    text = _read_text(path)
+    refs = []
+    for match in re.finditer(r"(acragentredeastus\.azurecr\.io/([\w.-]+):([\w.-]+))", text):
+        refs.append({"image": match.group(1), "component": match.group(2), "version": match.group(3)})
+    return refs
+
+
+def _workflow_stage(workflow_name: str, run_name: str = "") -> str:
+    text = f"{workflow_name} {run_name}".lower()
+    if "production" in text or re.search(r"\bprod\b", text):
+        return "production_deployment" if "deploy" in text or "release" in text or "upgrade" in text else "production_test"
+    if "staging" in text:
+        return "staging_deployment" if "deploy" in text or "release" in text or "upgrade" in text else "staging_test"
+    if "build" in text or "container" in text or "docker" in text:
+        return "build"
+    if any(term in text for term in ("test", "lint", "security", "sonar", "coverage", "accessibility", "chromatic", "quality")):
+        return "test"
+    if "deploy" in text or "release" in text or "upgrade" in text:
+        return "deployment"
+    return "workflow"
+
+
+def _stage_label(stage: str) -> str:
+    return {
+        "commit": "Commit",
+        "build": "Build",
+        "test": "Test Run",
+        "deployment": "Deployment",
+        "staging_deployment": "Staging Deployment",
+        "staging_test": "Staging Test",
+        "production_deployment": "Production Deployment",
+        "production_test": "Production Test",
+        "workflow": "Workflow",
+    }.get(stage, stage.replace("_", " ").title())
+
+
+def _result_color(result: str) -> str:
+    value = str(result or "").lower()
+    if value in {"success", "passing", "pass", "recorded", "configured"}:
+        return "green"
+    if value in {"failure", "failed", "failing", "timed_out", "cancelled", "action_required"}:
+        return "red"
+    return "yellow"
+
+
+def _delivery_timeline(project_root: Path, infrastructure: dict[str, Any]) -> dict[str, Any]:
+    workflows = _workflow_inventory(project_root)
+    workflow_name_to_file = {str(details.get("name")): filename for filename, details in workflows.items()}
+    github = infrastructure.get("testing_service_integrations", {}).get("github", {})
+    runs = list(github.get("workflow_runs") or [])
+    version_manifest = _current_version_manifest(project_root)
+    rows: list[dict[str, Any]] = []
+
+    for commit in _recent_git_commits(project_root):
+        rows.append(
+            {
+                "timestamp": commit["committed_at"],
+                "stage": "commit",
+                "stage_label": _stage_label("commit"),
+                "event": commit["subject"],
+                "version": commit["version"],
+                "commit": commit["short_sha"],
+                "branch": "",
+                "result": "recorded",
+                "result_color": "green",
+                "test_results": "Correlate with workflow rows sharing this commit.",
+                "source": "git log",
+                "url": "",
+                "notes": commit["author"],
+            }
+        )
+
+    for run in runs[:80]:
+        workflow_name = str(run.get("workflowName") or run.get("name") or "Workflow")
+        workflow_file = workflow_name_to_file.get(workflow_name)
+        workflow_text = _workflow_text(workflows, workflow_file) if workflow_file else ""
+        stage = _workflow_stage(workflow_name, str(run.get("name") or ""))
+        result = str(run.get("conclusion") or run.get("status") or "unknown")
+        version = _version_from_text(run.get("name"), workflow_name) or _workflow_default_tag(workflow_text)
+        if not version:
+            version = str(run.get("headSha") or "")[:8] or "not recorded"
+        rows.append(
+            {
+                "timestamp": run.get("updatedAt") or run.get("createdAt") or "",
+                "stage": stage,
+                "stage_label": _stage_label(stage),
+                "event": workflow_name,
+                "version": version,
+                "commit": str(run.get("headSha") or "")[:8],
+                "branch": run.get("headBranch") or "",
+                "result": result,
+                "result_color": _result_color(result),
+                "test_results": "Workflow conclusion/status is the available test/build result.",
+                "source": workflow_file or "GitHub Actions",
+                "url": run.get("url") or "",
+                "notes": f"event={run.get('event') or 'unknown'}; run={run.get('databaseId') or 'unknown'}",
+            }
+        )
+
+    for filename, details in sorted(workflows.items()):
+        if not filename.startswith("build-"):
+            continue
+        default_tag = _workflow_default_tag(str(details.get("text") or "")) or "input tag required"
+        workflow_path = project_root / ".github" / "workflows" / filename
+        workflow_timestamp = (
+            datetime.fromtimestamp(workflow_path.stat().st_mtime, UTC).isoformat().replace("+00:00", "Z")
+            if workflow_path.is_file()
+            else ""
+        )
+        rows.append(
+            {
+                "timestamp": workflow_timestamp,
+                "stage": "build",
+                "stage_label": _stage_label("build"),
+                "event": str(details.get("name") or filename),
+                "version": default_tag,
+                "commit": "",
+                "branch": "workflow_dispatch",
+                "result": "configured",
+                "result_color": "green",
+                "test_results": "Build workflow is configured; latest run evidence appears above when GitHub returns it.",
+                "source": f".github/workflows/{filename}",
+                "url": "",
+                "notes": "Manual build workflow.",
+            }
+        )
+
+    deployment_files = [
+        ("staging_deployment", project_root / "scripts" / "agent-container-template.yaml"),
+        ("staging_deployment", project_root / "scripts" / "deploy" / "build-and-deploy-staging.ps1"),
+        ("production_deployment", project_root / "scripts" / "deploy" / "api-gateway-restore.yaml"),
+        ("production_deployment", project_root / "scripts" / "deploy" / "upgrade.ps1"),
+        ("production_deployment", project_root / "scripts" / "deploy" / "rollback.ps1"),
+    ]
+    for stage, path in deployment_files:
+        if not path.is_file():
+            continue
+        refs = _image_refs_from_file(path)
+        version = ", ".join(sorted({ref["version"] for ref in refs})) or _version_from_text(_read_text(path)) or "parameterized"
+        rows.append(
+            {
+                "timestamp": datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat().replace("+00:00", "Z"),
+                "stage": stage,
+                "stage_label": _stage_label(stage),
+                "event": path.name,
+                "version": version,
+                "commit": "",
+                "branch": "",
+                "result": "configured",
+                "result_color": "yellow",
+                "test_results": "Deployment script/manifest evidence only; live environment revision was not queried.",
+                "source": path.relative_to(project_root).as_posix(),
+                "url": "",
+                "notes": "; ".join(ref["image"] for ref in refs[:3]) or "No pinned image found.",
+            }
+        )
+
+    rows = sorted(rows, key=lambda row: str(row.get("timestamp") or "0000"), reverse=True)
+    summary = []
+    for stage in ["commit", "build", "test", "staging_deployment", "production_deployment"]:
+        stage_rows = [row for row in rows if row.get("stage") == stage]
+        latest = stage_rows[0] if stage_rows else {}
+        summary.append(
+            {
+                "stage": stage,
+                "label": _stage_label(stage),
+                "count": len(stage_rows),
+                "latest_result": latest.get("result") or "not detected",
+                "latest_version": latest.get("version") or "not recorded",
+                "status": _result_color(str(latest.get("result") or "unknown")) if latest else "yellow",
+            }
+        )
+    return {
+        "version_manifest": version_manifest,
+        "stage_summary": summary,
+        "timeline": rows[:160],
+        "source_note": (
+            "Commit evidence comes from local git log; build/test evidence comes from GitHub Actions when gh is "
+            "authenticated; deployment evidence comes from local staging/production scripts and manifests unless a "
+            "deployment workflow/run is available."
+        ),
+    }
+
+
+def _integration(
+    *,
+    order: int,
+    display_name: str,
+    status: str,
+    gate_role: str,
+    evidence: list[str],
+    remediation: str,
+    artifacts: list[str] | None = None,
+    gaps: list[str] | None = None,
+    workflow_file: str | None = None,
+    latest_run: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    health = _workflow_run_health(latest_run)
+    latest_run_summary = _workflow_run_summary(latest_run)
+    if latest_run is None and workflow_file is None:
+        if status == "manual":
+            health = "manual"
+            latest_run_summary = "Manual/local capability; no GitHub Actions run expected."
+        else:
+            health = "configured"
+            latest_run_summary = "Configuration detected; no single workflow run is associated."
+    return {
+        "order": order,
+        "display_name": display_name,
+        "status": status,
+        "scope": "implementation_infrastructure",
+        "health": health,
+        "latest_run": latest_run,
+        "latest_run_summary": latest_run_summary,
+        "workflow_file": workflow_file,
+        "gate_role": gate_role,
+        "remediation": remediation,
+        "evidence": evidence,
+        "artifacts": artifacts or [],
+        "gaps": gaps or [],
+    }
+
+
+def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dict[str, Any]:
+    workflows = _workflow_inventory(project_root)
+    workflow_names = sorted(workflows)
+    workflow_set = set(workflow_names)
+    remote = _git_remote_origin(project_root)
+    gh_auth_status = _gh_auth_status(project_root)
+    gh_runs = _latest_github_workflow_runs(project_root, gh_auth_status)
+    github_plugin_detected = any(plugin.lower() == "github" for plugin in plugins)
+    pyproject_text = _read_text(project_root / "pyproject.toml")
+    sonar_text = _read_text(project_root / "sonar-project.properties")
+    dependabot_text = _read_text(project_root / ".github" / "dependabot.yml")
+    python_tests_text = _workflow_text(workflows, "python-tests.yml")
+    lint_text = _workflow_text(workflows, "lint.yml")
+    security_text = _workflow_text(workflows, "security-scan.yml")
+    widget_package = _package_json(project_root, "widget/package.json")
+    docs_package = _package_json(project_root, "docs-site/package.json")
+    admin_package = _package_json(project_root, "admin/package.json")
+    dependabot_ecosystems = sorted(set(re.findall(r'package-ecosystem:\s*["\']?([^"\'\n]+)', dependabot_text)))
+    required_workflow_files = [
+        "python-tests.yml",
+        "release-candidate-gate.yml",
+        "lint.yml",
+        "security-scan.yml",
+        "sonarcloud.yml",
+        "docs-quality.yml",
+        "accessibility.yml",
+    ]
+    required_runs = [
+        _workflow_run(gh_runs, workflows, filename)
+        for filename in required_workflow_files
+        if filename in workflow_set
+    ]
+    required_health = [_workflow_run_health(run) for run in required_runs]
+    parent_health = (
+        "failing"
+        if "failing" in required_health
+        else "running"
+        if any(health not in {"passing", "no_recent_run"} for health in required_health)
+        else "passing"
+        if required_runs and all(health == "passing" for health in required_health)
+        else "partial_history"
+    )
+    ready = (
+        remote.get("host") == "github.com"
+        and bool(workflow_names)
+        and "python-tests.yml" in workflow_set
+        and "release-candidate-gate.yml" in workflow_set
+        and gh_auth_status == "authenticated"
+    )
+    partially_configured = (
+        remote.get("present")
+        or bool(workflow_names)
+        or github_plugin_detected
+        or _command_available("gh")
+    )
+    integrations = {
+        "github": {
+            "order": 10,
+            "display_name": "GitHub Actions",
+            "status": "ready" if ready else "partial" if partially_configured else "not_configured",
+            "scope": "implementation_infrastructure",
+            "health": parent_health if gh_runs.get("available") else "live_state_unavailable",
+            "latest_run_summary": (
+                f"{len(required_runs)} required workflow runs checked; health={parent_health}"
+                if gh_runs.get("available")
+                else "Latest workflow run state unavailable."
+            ),
+            "remote_present": remote.get("present", False),
+            "remote_host": remote.get("host"),
+            "repository": remote.get("repository"),
+            "workflow_count": len(workflow_names),
+            "workflow_names": workflow_names,
+            "python_tests_workflow": "python-tests.yml" in workflow_set,
+            "release_candidate_gate_workflow": "release-candidate-gate.yml" in workflow_set,
+            "security_scan_workflow": "security-scan.yml" in workflow_set,
+            "docs_quality_workflow": "docs-quality.yml" in workflow_set,
+            "github_plugin_detected": github_plugin_detected,
+            "gh_cli_available": _command_available("gh"),
+            "gh_auth_status": gh_auth_status,
+            "latest_run_source": "gh run list" if gh_runs.get("available") else gh_runs.get("reason"),
+            "latest_run_repository": gh_runs.get("repository"),
+            "workflow_runs": gh_runs.get("runs", [])[:100],
+            "gate_role": "Parent CI runner and repository service for automated release evidence.",
+            "remediation": "Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions.",
+            "evidence": [
+                f"remote: {remote.get('host') or 'none'}",
+                f"repo: {remote.get('repository') or 'unknown'}",
+                f"workflows: {len(workflow_names)}",
+                f"gh CLI: {gh_auth_status}",
+                f"plugin: {'yes' if github_plugin_detected else 'no'}",
+                f"release gate: {'yes' if 'release-candidate-gate.yml' in workflow_set else 'no'}",
+            ],
+            "artifacts": ["GitHub Actions runs", "uploaded CI artifacts", "PR checks"],
+            "gaps": [] if gh_runs.get("available") else ["Latest workflow run state was not available during generation."],
+            "state_source": "AGENT_RED_GITHUB_REPO or local git remote, .github/workflows, local harness plugin cache, gh CLI status, and gh run list when available",
+        }
+    }
+    integrations["pytest_coverage"] = _integration(
+        order=20,
+        display_name="Pytest Coverage",
+        status=_status_from_requirements(
+            [
+                "python-tests.yml" in workflow_set,
+                "--cov=src" in python_tests_text,
+                "coverage-merged.json" in python_tests_text,
+                "fail_under = 75" in pyproject_text,
+            ]
+        ),
+        workflow_file="python-tests.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "python-tests.yml"),
+        gate_role="Primary regression test and line-coverage gate.",
+        remediation="Inspect the pytest shard and merged coverage artifacts, reproduce the failing shard locally, then restore the configured coverage threshold before rerunning Python Tests.",
+        evidence=["pytest shards configured", "merged coverage artifact configured", "coverage fail_under=75"],
+        artifacts=["test-results-*.xml", "coverage-*.xml", "coverage-merged.json"],
+    )
+    integrations["release_candidate_gate"] = _integration(
+        order=30,
+        display_name="Release Candidate Gate",
+        status=_status_from_requirements(["release-candidate-gate.yml" in workflow_set]),
+        workflow_file="release-candidate-gate.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "release-candidate-gate.yml"),
+        gate_role="Top-level release readiness command for Python and frontend gates.",
+        remediation="Run the release candidate gate locally, fix the first failing release blocker or frontend gate, then rerun the Release Candidate Gate workflow.",
+        evidence=["release-candidate-gate workflow present", "scripts/release_candidate_gate.py referenced"],
+    )
+    integrations["ruff_lint_format"] = _integration(
+        order=40,
+        display_name="Ruff Lint / Format",
+        status=_status_from_requirements(["lint.yml" in workflow_set, "ruff check" in lint_text, "ruff format" in lint_text]),
+        workflow_file="lint.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "lint.yml"),
+        gate_role="Static Python correctness and formatting gate.",
+        remediation="Run the Ruff blocking and format checks locally, fix E/F/import/format findings in `src/` and `tests/`, then rerun the Lint workflow.",
+        evidence=["ruff blocking E/F check", "ruff advisory all-rules check", "ruff format check"],
+    )
+    integrations["sonarcloud"] = _integration(
+        order=50,
+        display_name="SonarCloud",
+        status=_status_from_requirements(["sonarcloud.yml" in workflow_set, "sonar.projectKey=" in sonar_text]),
+        workflow_file="sonarcloud.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "sonarcloud.yml"),
+        gate_role="External code quality and coverage ingestion service.",
+        remediation="Verify the `SONAR_TOKEN` secret, Sonar project key, and organization, then inspect the SonarCloud run log or quality gate and rerun after configuration is repaired.",
+        evidence=["sonar-project.properties present", "SonarCloud workflow present"],
+        artifacts=["coverage.xml"],
+        gaps=["SONAR_TOKEN presence cannot be verified from local files."],
+    )
+    integrations["semgrep_sast"] = _integration(
+        order=60,
+        display_name="Semgrep SAST",
+        status=_status_from_requirements(["security-scan.yml" in workflow_set, "semgrep" in security_text]),
+        workflow_file="security-scan.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "security-scan.yml"),
+        gate_role="Static application security scan.",
+        remediation="Open the Semgrep artifact and workflow log, remediate reported SAST or secret findings, and rerun Security Scan.",
+        evidence=["Semgrep Python/security/secrets rules configured"],
+        artifacts=["semgrep-results"],
+    )
+    integrations["bandit"] = _integration(
+        order=70,
+        display_name="Bandit",
+        status=_status_from_requirements(["security-scan.yml" in workflow_set, "bandit" in security_text, "[tool.bandit]" in pyproject_text]),
+        workflow_file="security-scan.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "security-scan.yml"),
+        gate_role="Python security linting.",
+        remediation="Open the Bandit artifact, review high-confidence findings against `pyproject.toml` skips, fix real issues or document justified suppressions, then rerun Security Scan.",
+        evidence=["Bandit configured in pyproject.toml", "Bandit workflow job present"],
+        artifacts=["bandit-results"],
+    )
+    integrations["pip_audit"] = _integration(
+        order=80,
+        display_name="pip-audit",
+        status=_status_from_requirements(["pip-audit" in security_text or "pip-audit" in lint_text]),
+        workflow_file="security-scan.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "security-scan.yml"),
+        gate_role="Python dependency vulnerability scan.",
+        remediation="Run `pip-audit` against the project requirements, upgrade vulnerable packages or add an explicit justified advisory disposition, then rerun Security Scan.",
+        evidence=["pip-audit configured in security/lint workflows"],
+        artifacts=["pip-audit JSON output"],
+    )
+    integrations["docker_scout"] = _integration(
+        order=90,
+        display_name="Docker Scout",
+        status=_status_from_requirements(["security-scan.yml" in workflow_set, "docker/scout-action" in security_text]),
+        workflow_file="security-scan.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "security-scan.yml"),
+        gate_role="Container CVE gate for high and critical findings.",
+        remediation="Verify ACR/Docker credentials, rebuild the scan image, review Docker Scout high/critical CVEs, update the base image or dependencies, then rerun Security Scan.",
+        evidence=["Docker Scout action configured", "Dockerfile build scan configured"],
+        gaps=["ACR credentials cannot be verified from local files."],
+    )
+    integrations["accessibility_axe"] = _integration(
+        order=100,
+        display_name="axe-core Accessibility",
+        status=_status_from_requirements(["accessibility.yml" in workflow_set, (project_root / "tests" / "accessibility").is_dir()]),
+        workflow_file="accessibility.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "accessibility.yml"),
+        gate_role="WCAG 2.1 AA accessibility enforcement.",
+        remediation="Open `a11y-results.xml`, reproduce the affected Playwright/axe test locally, fix critical or serious WCAG violations, then rerun Accessibility.",
+        evidence=["tests/accessibility present", "Playwright Chromium install configured"],
+        artifacts=["a11y-results.xml"],
+    )
+    integrations["chromatic"] = _integration(
+        order=110,
+        display_name="Chromatic",
+        status=_status_from_requirements(
+            ["chromatic.yml" in workflow_set, _package_has_script(widget_package, "chromatic")]
+        ),
+        workflow_file="chromatic.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "chromatic.yml"),
+        gate_role="Storybook/widget visual review baseline service.",
+        remediation="Verify `CHROMATIC_PROJECT_TOKEN`, inspect the Chromatic build for visual diffs or build errors, accept intentional baselines or fix regressions, then rerun Chromatic.",
+        evidence=["widget chromatic script present", "Chromatic workflow present"],
+        gaps=["CHROMATIC_PROJECT_TOKEN presence cannot be verified from local files."],
+    )
+    integrations["visual_regression"] = _integration(
+        order=120,
+        display_name="Playwright Visual Regression",
+        status=_status_from_requirements(["visual-regression.yml" in workflow_set, (project_root / "tests" / "provider_visual").is_dir()]),
+        workflow_file="visual-regression.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "visual-regression.yml"),
+        gate_role="Provider/admin screenshot baseline generation.",
+        remediation="Review generated screenshot artifacts, compare unexpected diffs against intended UI behavior, update baselines only after review, then rerun Visual Regression.",
+        evidence=["provider visual tests present", "Playwright browser install configured"],
+        artifacts=["screenshot-baselines", "visual-results.xml"],
+        gaps=["Workflow is dispatch-only until baseline enforcement phase."],
+    )
+    integrations["docs_quality"] = _integration(
+        order=130,
+        display_name="Docs Quality",
+        status=_status_from_requirements(
+            [
+                "docs-quality.yml" in workflow_set,
+                _package_has_script(docs_package, "build"),
+                _package_has_script(docs_package, "audit:coverage"),
+            ]
+        ),
+        workflow_file="docs-quality.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "docs-quality.yml"),
+        gate_role="Documentation build, lint, link, and coverage checks.",
+        remediation="Run the docs build, prose lint, markdown lint, link check, and coverage audit locally; fix broken links or missing coverage before rerunning Docs Quality.",
+        evidence=["Docusaurus build", "docs coverage audit", "markdown/link checks configured"],
+    )
+    integrations["openapi_compatibility"] = _integration(
+        order=140,
+        display_name="OpenAPI Compatibility",
+        status=_status_from_requirements(["openapi-compat" in python_tests_text, "@comparest/cli" in python_tests_text]),
+        workflow_file="python-tests.yml",
+        latest_run=_workflow_run(gh_runs, workflows, "python-tests.yml"),
+        gate_role="API schema compatibility regression check.",
+        remediation="Inspect the OpenAPI compatibility job output, confirm whether schema changes are intentional, then either restore compatibility or document/version the breaking API change.",
+        evidence=["OpenAPI schema diff job present", "@comparest/cli configured"],
+    )
+    integrations["dependabot"] = _integration(
+        order=150,
+        display_name="Dependabot",
+        status=_status_from_requirements([bool(dependabot_ecosystems)]),
+        gate_role="Dependency freshness automation across package ecosystems.",
+        remediation="Inspect failing Dependabot update PR checks, update constraints or lockfiles as needed, and close superseded dependency PRs once a clean update lands.",
+        evidence=[f"ecosystems: {', '.join(dependabot_ecosystems) or 'none'}"],
+        artifacts=["Dependabot pull requests"],
+    )
+    integrations["container_builds"] = _integration(
+        order=160,
+        display_name="Container Build Workflows",
+        status=_status_from_requirements(
+            [
+                "build-api-gateway.yml" in workflow_set,
+                "build-slim-gateway.yml" in workflow_set,
+                "build-agent-containers.yml" in workflow_set,
+                "build-test-host.yml" in workflow_set,
+            ]
+        ),
+        gate_role="Build and publish deployable/test container images.",
+        remediation="Inspect the failed container build log, verify ACR credentials and Dockerfile paths, rebuild the target image locally, then rerun the affected build workflow.",
+        evidence=["API gateway, slim gateway, agent container, and test-host workflows present"],
+        gaps=["ACR credential state cannot be verified from local files."],
+    )
+    integrations["locust_performance"] = _integration(
+        order=170,
+        display_name="Locust Performance",
+        status=_status_from_requirements(
+            [(project_root / "tests" / "performance" / "locustfile.py").is_file(), _dependency_declared(project_root, "locust")],
+            manual=True,
+        ),
+        gate_role="Manual/local load and latency testing capability.",
+        remediation="If performance evidence is required, run the Locust profile against the intended environment and publish the latency/error summary into release evidence.",
+        evidence=["tests/performance/locustfile.py present", "locust dependency declared"],
+        gaps=["No GitHub Actions workflow currently wires this as an automated gate."],
+    )
+    integrations["mutation_testing"] = _integration(
+        order=180,
+        display_name="Mutation Testing",
+        status=_status_from_requirements(["[tool.mutmut]" in pyproject_text, _dependency_declared(project_root, "mutmut")], manual=True),
+        gate_role="Session-scoped test oracle quality check.",
+        remediation="Run mutation testing on changed modules, strengthen assertions for surviving mutants, and record the mutation score in session or release evidence.",
+        evidence=["mutmut configured in pyproject.toml", "mutmut dependency declared"],
+        gaps=["No GitHub Actions workflow currently publishes mutation score."],
+    )
+    integrations["contract_testing"] = _integration(
+        order=190,
+        display_name="Pact / Contract Testing",
+        status=_status_from_requirements([_package_has_dependency(widget_package, "@pact-foundation/pact")], manual=True),
+        gate_role="Consumer/provider contract testing capability.",
+        remediation="Add or run Pact contract verification for widget/provider boundaries and publish pact results or broker status before treating this as an automated gate.",
+        evidence=["@pact-foundation/pact dependency present in widget package"],
+        gaps=["No Pact workflow or broker/report integration found."],
+    )
+    integrations["property_testing"] = _integration(
+        order=200,
+        display_name="Hypothesis Property Tests",
+        status=_status_from_requirements([_dependency_declared(project_root, "hypothesis"), "property:" in pyproject_text], manual=True),
+        gate_role="Property-based test capability through pytest.",
+        remediation="Use Hypothesis for changed logic with broad input space, then run the relevant property-marked pytest target and capture failures as regression tests.",
+        evidence=["hypothesis dependency declared", "pytest property marker configured"],
+    )
+    integrations["schemathesis_api"] = _integration(
+        order=210,
+        display_name="Schemathesis API Testing",
+        status=_status_from_requirements([_dependency_declared(project_root, "schemathesis")], manual=True),
+        gate_role="API schema fuzzing capability.",
+        remediation="Run Schemathesis against the current OpenAPI schema and target service, triage generated failures, then decide whether to promote it into CI.",
+        evidence=["schemathesis dependency declared"],
+        gaps=["No GitHub Actions workflow currently wires Schemathesis as an automated gate."],
+    )
+    integrations["admin_eslint"] = _integration(
+        order=220,
+        display_name="Admin ESLint",
+        status=_status_from_requirements([_package_has_script(admin_package, "lint")], manual=True),
+        gate_role="Admin TypeScript/React linting capability.",
+        remediation="Run the admin ESLint script locally, fix TypeScript/React/a11y lint findings, and consider wiring it into CI if it gates release readiness.",
+        evidence=["admin lint script present"],
+        gaps=["No GitHub Actions workflow currently wires admin ESLint as an automated gate."],
+    )
+    return integrations
+
+
+def _hook_inventory(project_root: Path) -> dict[str, list[str]]:
+    inventory: dict[str, list[str]] = {}
+    for label, path in {
+        "claude": project_root / ".claude" / "settings.json",
+        "codex": project_root / ".codex" / "hooks.json",
+    }.items():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            inventory[label] = []
+            continue
+        hooks = []
+        for event_name, groups in data.get("hooks", {}).items():
+            for group in groups:
+                for hook in group.get("hooks", []):
+                    command = hook.get("command")
+                    if isinstance(command, str):
+                        hooks.append(f"{event_name}: {command}")
+        inventory[label] = hooks
+    return inventory
+
+
+def _token_metric() -> dict[str, Any]:
+    raw = os.environ.get("GTKB_STARTUP_TOKENS_CONSUMED") or os.environ.get("CODEX_STARTUP_TOKENS_CONSUMED")
+    if raw:
+        try:
+            return {
+                "tokens_consumed_before_user_input": int(raw),
+                "measurement_status": "measured_from_environment",
+            }
+        except ValueError:
+            return {
+                "tokens_consumed_before_user_input": None,
+                "measurement_status": f"invalid_environment_value:{raw}",
+            }
+    return {
+        "tokens_consumed_before_user_input": None,
+        "measurement_status": "not_exposed_by_current_harness",
+    }
+
+
+def _repo_state(project_root: Path) -> dict[str, Any]:
+    branch = _command_output(["git", "branch", "--show-current"], project_root)
+    sha = _command_output(["git", "rev-parse", "HEAD"], project_root)
+    short_sha = _command_output(["git", "rev-parse", "--short", "HEAD"], project_root)
+    last_commit = _command_output(["git", "log", "-1", "--format=%cd%n%s", "--date=iso-strict"], project_root)
+    return {
+        "branch": branch["stdout"] if branch["ok"] else None,
+        "sha": sha["stdout"] if sha["ok"] else None,
+        "short_sha": short_sha["stdout"] if short_sha["ok"] else None,
+        "last_commit": last_commit["stdout"] if last_commit["ok"] else None,
+    }
+
+
+def _dashboard_status_color(status: str) -> str:
+    if status in {"red", "yellow", "green"}:
+        return status
+    if status in {"failing", "blocked", "not_wired", "needs_attention"}:
+        return "red"
+    if status in {"warning", "manual", "partial", "unknown", "no_recent_run", "watch"}:
+        return "yellow"
+    return "green"
+
+
+def _health_pill(label: str, status: str, value: str, tooltip: str) -> dict[str, str]:
+    return {"label": label, "status": _dashboard_status_color(status), "value": value, "tooltip": tooltip}
+
+
+def _shortcut(label: str, target: str, kind: str = "file") -> dict[str, str]:
+    return {"label": label, "target": target, "kind": kind}
+
+
+def _dashboard_intelligence(
+    *,
+    project_root: Path,
+    generated_at: str,
+    metrics: dict[str, Any],
+    top_actions: list[dict[str, Any]],
+    blockers: list[str],
+    infrastructure: dict[str, Any],
+) -> dict[str, Any]:
+    integrations = infrastructure["testing_service_integrations"]
+    failing_integrations = [item for item in integrations.values() if item.get("health") == "failing"]
+    manual_integrations = [item for item in integrations.values() if item.get("status") == "manual"]
+    unknown_integrations = [
+        item
+        for item in integrations.values()
+        if item.get("health") in {"no_recent_run", "live_state_unavailable", "partial_history"}
+    ]
+    release_blockers = metrics["regression"].get("release_blocker_count") or 0
+    bridge_actions = metrics["contention"].get("actionable_count") or 0
+    drift_count = metrics["drift"].get("changed_path_count") or 0
+    upgrade_posture = infrastructure["gtkb_upgrade_posture"]
+    scaffold_actions = upgrade_posture.get("upgrade_plan", {}).get("mutating_action_count") or 0
+    repo_state = _repo_state(project_root)
+    database_path = project_root / "groundtruth.db"
+    db_mtime = (
+        datetime.fromtimestamp(database_path.stat().st_mtime, UTC).isoformat().replace("+00:00", "Z")
+        if database_path.is_file()
+        else None
+    )
+    release_status = "red" if release_blockers else "green"
+    ci_status = "red" if failing_integrations else "yellow" if unknown_integrations else "green"
+    governance_status = "red" if bridge_actions else "yellow" if scaffold_actions else "green"
+    drift_status = "red" if drift_count > 25 else "yellow" if drift_count else "green"
+    gtkb_status = "yellow" if scaffold_actions or upgrade_posture.get("unreleased_upstream_changes_available") else "green"
+    data_status = "yellow" if unknown_integrations else "green"
+    health = [
+        _health_pill("Project Health", "red" if release_blockers or failing_integrations else drift_status, f"{release_blockers + len(failing_integrations)} issues", "Release blockers plus failing integrations."),
+        _health_pill("Release Readiness", release_status, f"{release_blockers} blockers", "Open release-readiness blockers from the governed evidence file."),
+        _health_pill("CI / Testing", ci_status, f"{len(failing_integrations)} failing", "Live GitHub Actions health where available."),
+        _health_pill("Security", "red" if any(item.get("display_name") in {"Semgrep SAST", "Bandit", "pip-audit", "Docker Scout"} and item.get("health") == "failing" for item in integrations.values()) else "green", "scan posture", "Security and supply-chain workflow state."),
+        _health_pill("Governance", governance_status, f"{bridge_actions} bridge items", "Actionable bridge entries and GT-KB scaffold drift."),
+        _health_pill("GT-KB", gtkb_status, str(upgrade_posture.get("status")), "Installed GT-KB package/scaffold and upstream posture."),
+        _health_pill("Data Freshness", data_status, "live probes", "Whether network-backed and local probes returned current evidence."),
+    ]
+
+    action_center: list[dict[str, Any]] = []
+    for item in failing_integrations[:8]:
+        action_center.append(
+            {
+                "severity": "red",
+                "owner_lane": "Prime Builder",
+                "action": f"Repair {item.get('display_name')}",
+                "why": item.get("latest_run_summary") or "Integration is failing.",
+                "remediation": item.get("remediation"),
+                "shortcut": _shortcut("Open GitHub Actions", "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions", "web"),
+                "source": "Testing Service / Tool Integrations",
+            }
+        )
+    for blocker in blockers[:5]:
+        action_center.append(
+            {
+                "severity": "red",
+                "owner_lane": "Owner / Prime Builder",
+                "action": blocker,
+                "why": "Listed as a release-readiness blocker.",
+                "remediation": "Resolve, explicitly defer with owner approval, or supersede with newer governed evidence.",
+                "shortcut": _shortcut("Open release readiness", "memory/release-readiness.md"),
+                "source": "Release Readiness",
+            }
+        )
+    if scaffold_actions:
+        action_center.append(
+            {
+                "severity": "yellow",
+                "owner_lane": "Prime Builder",
+                "action": "Review GT-KB scaffold upgrade plan",
+                "why": f"{scaffold_actions} mutating dry-run action(s) are available.",
+                "remediation": "Run the dry-run command, review the diff, and apply only with owner approval.",
+                "shortcut": _shortcut("Copy dry-run command", str(upgrade_posture.get("plan_command")), "command"),
+                "source": "GT-KB Upgrade Posture",
+            }
+        )
+    for item in top_actions[:3]:
+        action_center.append(
+            {
+                "severity": "yellow",
+                "owner_lane": "Prime Builder",
+                "action": f"{item['id']}: {item['title']}",
+                "why": "Standing backlog top priority.",
+                "remediation": "Execute or disposition through the governed backlog/bridge process.",
+                "shortcut": _shortcut("Open standing backlog", "memory/work_list.md"),
+                "source": "Standing Backlog",
+            }
+        )
+
+    risks = []
+    if release_blockers:
+        risks.append(
+            {
+                "severity": "red",
+                "risk": "Production GO is blocked",
+                "evidence": f"{release_blockers} release blocker(s) remain.",
+                "impact": "Stakeholder-ready release posture cannot be claimed.",
+                "remediation": "Close, defer, or supersede every blocker with governed evidence.",
+                "owner": "Owner / Prime Builder",
+            }
+        )
+    if failing_integrations:
+        risks.append(
+            {
+                "severity": "red",
+                "risk": "Automated quality gates are failing",
+                "evidence": f"{len(failing_integrations)} failing testing/service integration(s).",
+                "impact": "Release evidence is incomplete or stale.",
+                "remediation": "Work through the failing integration remediation list.",
+                "owner": "Prime Builder",
+            }
+        )
+    if scaffold_actions:
+        risks.append(
+            {
+                "severity": "yellow",
+                "risk": "GT-KB scaffold drift",
+                "evidence": f"{scaffold_actions} mutating upgrade action(s) are planned.",
+                "impact": "Project governance runtime may lag the installed GT-KB package.",
+                "remediation": "Review `gt project upgrade --dry-run` and apply only after owner approval.",
+                "owner": "Prime Builder / Owner",
+            }
+        )
+    if drift_count:
+        risks.append(
+            {
+                "severity": drift_status,
+                "risk": "Working tree drift",
+                "evidence": f"{drift_count} Agent Red changed path(s).",
+                "impact": "Dashboard evidence may include uncommitted local state.",
+                "remediation": "Review drift and stage/commit or explicitly defer it.",
+                "owner": "Prime Builder",
+            }
+        )
+
+    return {
+        "health": health,
+        "action_center": action_center[:12],
+        "risk_register": risks,
+        "release_readiness": {
+            "status": release_status,
+            "blocker_count": release_blockers,
+            "blockers": blockers,
+            "release_gate_script": metrics["regression"].get("release_gate_script"),
+            "shortcut": _shortcut("Open release-readiness evidence", "memory/release-readiness.md"),
+        },
+        "quality_rollup": {
+            "total": len(integrations),
+            "failing": len(failing_integrations),
+            "manual": len(manual_integrations),
+            "unknown": len(unknown_integrations),
+            "ready_or_passing": sum(1 for item in integrations.values() if item.get("health") in {"passing", "configured"} or item.get("status") == "ready"),
+        },
+        "data_freshness": {
+            "generated_at": generated_at,
+            "groundtruth_db_modified_at": db_mtime,
+            "repo_branch": repo_state.get("branch"),
+            "repo_sha": repo_state.get("sha"),
+            "repo_short_sha": repo_state.get("short_sha"),
+            "last_commit": repo_state.get("last_commit"),
+            "scope_version": DASHBOARD_SCOPE_VERSION,
+            "sources": [
+                "groundtruth.db",
+                "memory/work_list.md",
+                "memory/release-readiness.md",
+                "bridge/INDEX.md",
+                ".github/workflows",
+                "GitHub Actions via gh when authenticated",
+                "GT-KB package and upstream repository probes",
+            ],
+        },
+        "shortcuts": [
+            _shortcut("Open dashboard data", "docs/gtkb-dashboard/dashboard-data.json"),
+            _shortcut("Open release readiness", "memory/release-readiness.md"),
+            _shortcut("Open standing backlog", "memory/work_list.md"),
+            _shortcut("Open bridge index", "bridge/INDEX.md"),
+            _shortcut("Open GitHub Actions", "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions", "web"),
+            _shortcut("Open GT-KB upstream", "https://github.com/Remaker-Digital/groundtruth-kb", "web"),
+        ],
+    }
+
+
+def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str = "prime-builder") -> dict[str, Any]:
+    """Collect the complete startup disclosure model without writing files."""
+
+    generated_at = _now_iso()
+    database = _database_metrics(project_root)
+    backlog, top_actions = _backlog_metrics(project_root)
+    blockers = _release_blockers(project_root)
+    skill_files = _discover_skill_files(project_root)
+    rule_files = sorted((project_root / ".claude" / "rules").glob("*.md"))
+    hook_files = sorted((project_root / ".claude" / "hooks").glob("*.py"))
+    test_files = sorted((project_root / "tests").rglob("test_*.py"))
+    plugins = _plugin_inventory()
+    agent_red_test_files = [
+        path
+        for path in test_files
+        if _path_matches(path.relative_to(project_root).as_posix(), AGENT_RED_PATH_PREFIXES)
+    ]
+    metrics = {
+        "backlog": backlog,
+        "membase": database.get("membase", {}),
+        "deliberation_archive": database.get("deliberation_archive", {}),
+        "tests": {
+            "pytest_file_count": len(agent_red_test_files),
+            "raw_pytest_file_count": len(test_files),
+            "test_records": database.get("membase", {}).get("test_records"),
+            "test_procedure_records": database.get("membase", {}).get("test_procedure_records"),
+            "scope_confidence": "agent_red_current_heuristic",
+        },
+        "templates": {
+            "skill_template_count": len(skill_files),
+            "rule_template_count": len(rule_files),
+            "hook_template_count": len(hook_files),
+            "scope": "implementation_infrastructure",
+        },
+        "specifications": database.get("specifications", {}),
+        "drift": _git_drift(project_root),
+        "regression": {
+            "release_blocker_count": len(blockers),
+            "blockers": blockers,
+            "release_gate_script": "scripts/release_candidate_gate.py",
+            "startup_self_initialization_test": "tests/scripts/test_session_self_initialization.py",
+        },
+        "contention": _bridge_metrics(project_root),
+        "tokens": _token_metric(),
+    }
+    infrastructure = {
+        "instrumentation": "GT-KB",
+        "scope_note": "Infrastructure is reported separately from primary Agent Red product KPIs.",
+        "skill_template_count": len(skill_files),
+        "rule_template_count": len(rule_files),
+        "hook_template_count": len(hook_files),
+        "hook_registrations": _hook_inventory(project_root),
+        "dashboard_history_path": "memory/gtkb-dashboard-history.json",
+        "gtkb_upgrade_posture": _gtkb_upgrade_posture(project_root),
+        "testing_service_integrations": _testing_service_integrations(project_root, plugins),
+    }
+    infrastructure["delivery_timeline"] = _delivery_timeline(project_root, infrastructure)
+    dashboard_intelligence = _dashboard_intelligence(
+        project_root=project_root,
+        generated_at=generated_at,
+        metrics=metrics,
+        top_actions=top_actions,
+        blockers=blockers,
+        infrastructure=infrastructure,
+    )
+
+    return {
+        "generated_at": generated_at,
+        "role": ROLE_PROFILES.get(role_profile, ROLE_PROFILES["prime-builder"]),
+        "governance_stance": [
+            "Strict GOV enforcement where mechanically available",
+            "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
+            "Standing backlog is the governed cross-session work authority",
+            "GT-KB adoption and release-readiness evidence remain release-gate visible",
+            "Harness hook limitations require parity checks and explicit fallback disclosure",
+        ],
+        "skills": {
+            "count": len(skill_files),
+            "items": [_skill_name(path) for path in skill_files[:80]],
+            "source": "project .claude/skills plus local harness skill directories",
+        },
+        "plugins": {
+            "items": plugins,
+            "source": "local harness plugin cache when present",
+        },
+        "directives": {
+            "rule_files": [path.name for path in rule_files],
+            "hook_files": [path.name for path in hook_files],
+            "hook_registrations": _hook_inventory(project_root),
+        },
+        "dashboard_requirements": {
+            "spec_id": "SPEC-PROJECT-DASHBOARD-KPI-LINK-001",
+            "scope_version": DASHBOARD_SCOPE_VERSION,
+            "scope_note": DASHBOARD_SCOPE_NOTE,
+            "subsystems": [
+                "backlog",
+                "MemBase",
+                "Deliberation Archive",
+                "tests",
+                "templates",
+                "specifications",
+                "drift",
+                "regression",
+                "contention",
+                "tokens consumed before user input",
+            ],
+        },
+        "metrics": metrics,
+        "infrastructure": infrastructure,
+        "dashboard_intelligence": dashboard_intelligence,
+        "top_priority_actions": top_actions,
+        "token_reduction_options": [
+            "Use the dashboard link before loading large artifacts into context.",
+            "Read indices and summaries first; open full artifacts only when needed.",
+            "Load only the specific skill body required for the current turn.",
+            "Use cached startup snapshots for stable KPI instead of re-scanning everything.",
+            "Propose explicit governance relaxation only when the audit trail can preserve the tradeoff.",
+        ],
+    }
+
+
+def _snapshot_from_model(model: dict[str, Any]) -> dict[str, Any]:
+    metrics = model["metrics"]
+    return {
+        "scope_version": DASHBOARD_SCOPE_VERSION,
+        "scope_confidence": "agent_red_current_heuristic",
+        "scope_source": "current dashboard model",
+        "generated_at": model["generated_at"],
+        "backlog_active_items": metrics["backlog"].get("active_item_count"),
+        "membase_open_work_items": metrics["membase"].get("open_work_items"),
+        "deliberation_archive_current_total": metrics["deliberation_archive"].get("current_total"),
+        "pytest_file_count": metrics["tests"].get("pytest_file_count"),
+        "skill_template_count": metrics["templates"].get("skill_template_count"),
+        "specification_current_total": metrics["specifications"].get("current_total"),
+        "drift_changed_path_count": metrics["drift"].get("changed_path_count"),
+        "regression_release_blocker_count": metrics["regression"].get("release_blocker_count"),
+        "contention_actionable_bridge_count": metrics["contention"].get("actionable_count"),
+        "tokens_consumed_before_user_input": metrics["tokens"].get("tokens_consumed_before_user_input"),
+        "token_measurement_status": metrics["tokens"].get("measurement_status"),
+    }
+
+
+def _load_history(history_path: Path) -> list[dict[str, Any]]:
+    try:
+        data = json.loads(history_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [
+        row
+        for row in data
+        if isinstance(row, dict) and row.get("scope_version") == DASHBOARD_SCOPE_VERSION
+    ]
+
+
+def _write_history(
+    history_path: Path,
+    snapshot: dict[str, Any],
+    *,
+    seed_history: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    history = seed_history or []
+    snapshot_day = str(snapshot.get("generated_at", ""))[:10]
+    existing = [
+        row
+        for row in _load_history(history_path)
+        if not (
+            str(row.get("generated_at", ""))[:10] >= snapshot_day
+            and row.get("scope_confidence") == "agent_red_inferred"
+        )
+    ]
+    seen = {row.get("generated_at") for row in history}
+    history.extend(row for row in existing if row.get("generated_at") not in seen)
+    history = sorted(history, key=lambda row: str(row.get("generated_at") or ""))
+    if not history or history[-1] != snapshot:
+        history.append(snapshot)
+    deduped: dict[str, dict[str, Any]] = {}
+    for row in history:
+        generated_at = str(row.get("generated_at") or "")
+        if generated_at:
+            deduped[generated_at] = row
+    history = [deduped[key] for key in sorted(deduped)]
+    history = history[-MAX_HISTORY:]
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    history_path.write_text(json.dumps(history, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return history
+
+
+def _version_rows(connection: sqlite3.Connection, table: str) -> list[dict[str, Any]]:
+    return [
+        dict(row)
+        for row in connection.execute(
+            f"SELECT * FROM {table} WHERE changed_at IS NOT NULL AND changed_at != '' ORDER BY changed_at, id, version"
+        )
+    ]
+
+
+def _historical_agent_red_backfill(project_root: Path) -> list[dict[str, Any]]:
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return []
+
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        table_rows = {
+            "specifications": _version_rows(connection, "specifications"),
+            "work_items": _version_rows(connection, "work_items"),
+            "tests": _version_rows(connection, "tests"),
+            "deliberations": _version_rows(connection, "deliberations"),
+        }
+    finally:
+        connection.close()
+
+    dates = sorted(
+        {
+            str(row.get("changed_at", ""))[:10]
+            for rows in table_rows.values()
+            for row in rows
+            if str(row.get("changed_at", ""))[:10]
+        }
+    )
+    states: dict[str, dict[str, dict[str, Any]]] = {name: {} for name in table_rows}
+    indexes = {name: 0 for name in table_rows}
+    snapshots: list[dict[str, Any]] = []
+
+    for day in dates:
+        for table, rows in table_rows.items():
+            index = indexes[table]
+            while index < len(rows) and str(rows[index].get("changed_at", ""))[:10] <= day:
+                states[table][str(rows[index].get("id"))] = rows[index]
+                index += 1
+            indexes[table] = index
+
+        specs = [row for row in states["specifications"].values() if _is_agent_red_scope(row)]
+        work_items = [row for row in states["work_items"].values() if _is_agent_red_scope(row)]
+        tests = [row for row in states["tests"].values() if _is_agent_red_scope(row)]
+        deliberations = [row for row in states["deliberations"].values() if _is_agent_red_scope(row)]
+        open_work_items = [
+            row
+            for row in work_items
+            if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
+        ]
+        pytest_files = {
+            _normalize_path(str(row.get("test_file") or ""))
+            for row in tests
+            if str(row.get("test_file") or "").strip()
+        }
+
+        snapshots.append(
+            {
+                "scope_version": DASHBOARD_SCOPE_VERSION,
+                "scope_confidence": "agent_red_inferred",
+                "scope_source": "groundtruth.db version history by changed_at",
+                "generated_at": f"{day}T23:59:59Z",
+                "backlog_active_items": None,
+                "membase_open_work_items": len(open_work_items),
+                "deliberation_archive_current_total": len(deliberations),
+                "pytest_file_count": len(pytest_files),
+                "skill_template_count": None,
+                "specification_current_total": len(specs),
+                "drift_changed_path_count": None,
+                "regression_release_blocker_count": None,
+                "contention_actionable_bridge_count": None,
+                "tokens_consumed_before_user_input": None,
+                "token_measurement_status": "not_exposed_by_current_harness",
+            }
+        )
+    return snapshots
+
+
+def _markdown_list(items: list[str], *, limit: int = 20) -> str:
+    visible = items[:limit]
+    lines = [f"- {item}" for item in visible]
+    if len(items) > limit:
+        lines.append(f"- ... {len(items) - limit} more")
+    return "\n".join(lines) if lines else "- none detected"
+
+
+def _first_text(items: list[Any], default: str) -> str:
+    return str(items[0]) if items else default
+
+
+def _sentence_fragment(value: Any, default: str) -> str:
+    text = str(value or default).strip()
+    return text.rstrip(".")
+
+
+def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
+    metrics = model["metrics"]
+    intelligence = model.get("dashboard_intelligence", {})
+    startup_pruning = model.get("startup_pruning", {})
+    token_reduction_options = model.get("token_reduction_options", [])
+    integrations = model["infrastructure"]["testing_service_integrations"]
+    failing_integrations = [item for item in integrations.values() if item.get("health") == "failing"]
+    unknown_integrations = [
+        item
+        for item in integrations.values()
+        if item.get("health") in {"no_recent_run", "live_state_unavailable", "partial_history"}
+    ]
+    blockers = metrics["regression"].get("blockers") or []
+    risks = intelligence.get("risk_register", [])
+    action_center = intelligence.get("action_center", [])
+    top_actions = model["top_priority_actions"]
+    release_blocker_count = metrics["regression"].get("release_blocker_count") or 0
+    drift_count = metrics["drift"].get("changed_path_count") or 0
+    new_count = int(metrics["contention"].get("latest_status_counts", {}).get("NEW", 0) or 0)
+    revised_count = int(metrics["contention"].get("latest_status_counts", {}).get("REVISED", 0) or 0)
+    actionable_review_count = new_count + revised_count
+    first_blocker = _sentence_fragment(
+        _first_text(blockers, "run the release gate and confirm no blocker evidence is stale"),
+        "run the release gate and confirm no blocker evidence is stale",
+    )
+    first_integration = failing_integrations[0] if failing_integrations else unknown_integrations[0] if unknown_integrations else {}
+    first_integration_name = _sentence_fragment(
+        first_integration.get("display_name"),
+        "the highest-risk testing integration",
+    )
+    first_integration_remediation = _sentence_fragment(
+        first_integration.get("remediation"),
+        "refresh live evidence and confirm the integration still gates the release path",
+    )
+    first_risk = risks[0] if risks else {}
+    first_action = action_center[0] if action_center else {}
+    first_backlog = top_actions[0] if top_actions else {}
+    startup_candidate_count = int(startup_pruning.get("candidate_count", 0) or 0)
+    backlog_label = (
+        f"{first_backlog.get('id')}: {first_backlog.get('title')}"
+        if first_backlog
+        else "the first active standing-backlog item"
+    )
+    token_option_summary = "; ".join(item.rstrip(".") for item in token_reduction_options) or (
+        "prefer dashboard and index-first reads before loading full artifacts"
+    )
+    action_summary = "; ".join(
+        f"{item.get('id')}: {_sentence_fragment(item.get('title'), 'standing backlog priority')}"
+        for item in top_actions[:3]
+    ) or "No active standing-backlog items found"
+    file_bridge_summary = (
+        f"file bridge scan shows {actionable_review_count} latest NEW/REVISED entr"
+        f"{'y' if actionable_review_count == 1 else 'ies'}"
+    )
+
+    return [
+        {
+            "label": "Optimize Startup Token Consumption",
+            "reason": (
+                f"{startup_candidate_count} startup reduction candidate(s) are currently visible."
+                if startup_candidate_count
+                else "Startup context can be reduced by preferring dashboard and index-first reads."
+            ),
+            "prompt": (
+                "Focus this session on reducing startup token consumption. Review the startup-loaded artifacts, "
+                "prefer dashboard and index-first reads, and trim default startup context to the minimum evidence needed. "
+                f"Use this reduction set: {token_option_summary}."
+            ),
+        },
+        {
+            "label": "Top Priority Actions",
+            "reason": (
+                f"The standing backlog already identifies the three highest-priority governed actions for this session, and the "
+                f"{file_bridge_summary}."
+            ),
+            "prompt": (
+                "Focus this session on the established top priority actions. Current priorities: "
+                f"{action_summary}. Start with {backlog_label}; explain the current evidence, immediate next command, "
+                "and expected verification."
+            ),
+        },
+        {
+            "label": "Resolve Release Blockers",
+            "reason": f"{release_blocker_count} release blocker(s) are visible in the dashboard.",
+            "prompt": (
+                "Focus this session on clearing release blockers. Start with "
+                f"{first_blocker}. Verify the result with scripts/release_candidate_gate.py and update governed evidence."
+            ),
+        },
+        {
+            "label": "Repair Testing/Tool Integrations",
+            "reason": f"{len(failing_integrations)} failing and {len(unknown_integrations)} unknown integration(s) are visible.",
+            "prompt": (
+                "Focus this session on restoring testing service/tool integration health. Start with "
+                f"{first_integration_name}: {first_integration_remediation}. Preserve GT-KB as infrastructure evidence."
+            ),
+        },
+        {
+            "label": "Remediate Known Risks",
+            "reason": f"{len(risks)} active risk(s) are summarized from release, integration, GT-KB, and drift signals.",
+            "prompt": (
+                "Focus this session on the dashboard risk register. Start with "
+                f"{_sentence_fragment(first_risk.get('risk'), 'the highest-severity current risk')}; recommended action: "
+                f"{_sentence_fragment(first_risk.get('remediation'), 'turn the risk into a concrete owner-approved action and verify the evidence')}."
+            ),
+        },
+        {
+            "label": "Clear Stage/Test Release Path",
+            "reason": "Release readiness, regression, integration, and staging evidence should converge before stakeholder release.",
+            "prompt": (
+                "Prepare for release by clearing the path to stage and test. Confirm release blockers, required checks, "
+                "tool integrations, staging readiness, and evidence freshness before recommending a release decision."
+            ),
+        },
+        {
+            "label": "Continue Last Session",
+            "reason": "The action center identifies the most immediate current-session continuation point.",
+            "prompt": (
+                "Continue from the last session using the dashboard action center. Start with "
+                f"{first_action.get('action', backlog_label)}; explain current evidence, next command, and expected verification."
+            ),
+        },
+        {
+            "label": "Clean For Internal Review",
+            "reason": f"{drift_count} changed path(s) are visible in dashboard drift.",
+            "prompt": (
+                "Clean and tidy for internal review. Inventory changed paths, separate unrelated work, run focused checks, "
+                "and prepare a concise review handoff without modifying formal artifacts unless explicitly approved."
+            ),
+        },
+        {
+            "label": "Pick From Standing Backlog",
+            "reason": "Standing backlog remains the governed cross-session work authority.",
+            "prompt": (
+                "Choose work from the standing backlog. Start with "
+                f"{backlog_label}; restate the governing evidence, required approvals, implementation scope, and verification plan."
+            ),
+        },
+    ]
+
+
+def _render_session_focus_options(options: list[dict[str, str]]) -> str:
+    blocks: list[str] = []
+    for index, option in enumerate(options, start=1):
+        blocks.extend(
+            [
+                f"{index}. **{option['label']}**",
+                f"   Current signal: {option['reason']}",
+                f"   Prompt details: {option['prompt']}",
+                "",
+            ]
+        )
+    return "\n".join(blocks).rstrip()
+
+
+def _render_startup_pruning(model: dict[str, Any]) -> str:
+    pruning = model.get("startup_pruning")
+    if not pruning:
+        return "Startup pruning scan not run for this command."
+
+    largest = pruning.get("largest_files", [])[:5]
+    candidates = pruning.get("candidates", [])[:8]
+    lines = [
+        f"- Startup corpus measured: {pruning.get('file_count')} files, {pruning.get('total_bytes')} bytes.",
+        f"- Completed pruning actions: {pruning.get('completed_count')}",
+        f"- Candidate reductions: {pruning.get('candidate_count')}",
+    ]
+    if largest:
+        lines.append("- Largest startup inputs:")
+        for item in largest:
+            lines.append(f"  - `{item.get('path')}`: {item.get('bytes')} bytes / {item.get('lines')} lines")
+    if candidates:
+        lines.append("- Pruning queue:")
+        for item in candidates:
+            lines.append(f"  - `{item.get('target')}`: {item.get('action')}")
+    return "\n".join(lines)
+
+
+def _render_current_project_state(model: dict[str, Any]) -> str:
+    metrics = model["metrics"]
+    intelligence = model.get("dashboard_intelligence", {})
+    release = intelligence.get("release_readiness", {})
+    quality = intelligence.get("quality_rollup", {})
+    upgrade_posture = model.get("infrastructure", {}).get("gtkb_upgrade_posture", {})
+
+    return "\n".join(
+        [
+            f"- Release blockers: {release.get('blocker_count', metrics['regression'].get('release_blocker_count'))}",
+            f"- Active backlog items: {metrics['backlog'].get('active_item_count')}",
+            f"- Open MemBase work items: {metrics['membase'].get('open_work_items')}",
+            f"- Actionable bridge/contention entries: {metrics['contention'].get('actionable_count')}",
+            f"- Drift changed paths: {metrics['drift'].get('changed_path_count')}",
+            (
+                "- Testing/tool rollup: "
+                f"{quality.get('failing', 'unknown')} failing, "
+                f"{quality.get('manual', 'unknown')} manual, "
+                f"{quality.get('ready_or_passing', 'unknown')} ready/passing"
+            ),
+            (
+                "- GT-KB infrastructure posture: "
+                f"package {upgrade_posture.get('package_version', 'unknown')}; "
+                f"dry-run upgrade plan available: {upgrade_posture.get('upgrade_plan', {}).get('available', False)}"
+            ),
+        ]
+    )
+
+
+def _render_file_bridge_scan(model: dict[str, Any]) -> str:
+    contention = model["metrics"]["contention"]
+    new_count = int(contention.get("latest_status_counts", {}).get("NEW", 0) or 0)
+    revised_count = int(contention.get("latest_status_counts", {}).get("REVISED", 0) or 0)
+    actionable_review_count = new_count + revised_count
+    if actionable_review_count:
+        return (
+            f"- File bridge scan: {actionable_review_count} latest NEW/REVISED entr"
+            f"{'y' if actionable_review_count == 1 else 'ies'} identified."
+        )
+    return "- File bridge scan: 0 latest NEW/REVISED entries identified."
+
+
+def _render_wrapup_trigger_commands() -> str:
+    examples = ", ".join(f"`{command}`" for command in WRAPUP_TRIGGER_COMMANDS)
+    return "\n".join(
+        [
+            "- Wrap-up trigger: use one of the documented commands as a standalone message.",
+            f"- Accepted wrap-up commands: {examples}.",
+            "- Optional leading or trailing `please` and final punctuation are accepted.",
+        ]
+    )
+
+
+def render_report(model: dict[str, Any], dashboard_uri: str) -> str:
+    role = model["role"]
+    metrics = model["metrics"]
+    session_focus_options = _session_focus_options(model)
+    token_count = metrics["tokens"]["tokens_consumed_before_user_input"]
+    token_count_text = "unavailable" if token_count is None else str(token_count)
+
+    return "\n".join(
+        [
+            "# Agent Red / GT-KB Fresh Session Startup",
+            "",
+            f"Generated: {model['generated_at']}",
+            "",
+            "## Startup Disclosure",
+            "",
+            "### Role And Governance Stance",
+            "",
+            f"- Role being assumed: {role['assumed_role']}",
+            f"- Role assignment: {role['role_assignment']}",
+            f"- Bridge: {role['bridge']}",
+            f"- Role mapping source: {role['role_mapping_source']}",
+            "",
+            _markdown_list(model["governance_stance"]),
+            "",
+            "### Live Project Dashboard",
+            "",
+            f"- Dashboard: [Agent Red Project Dashboard]({dashboard_uri})",
+            "- KPI coverage: Agent Red backlog, MemBase work items, Deliberation Archive records, tests, specifications, drift, regression, contention, and tokens consumed at session start before user input.",
+            f"- Dashboard scope: {model['dashboard_requirements']['scope_note']}",
+            f"- Token measurement status: {metrics['tokens']['measurement_status']}",
+            f"- Tokens consumed before user input: {token_count_text}",
+            "",
+            "### Current Project State",
+            "",
+            _render_current_project_state(model),
+            "",
+            "### Wrap-Up Trigger Commands",
+            "",
+            _render_wrapup_trigger_commands(),
+            "",
+            "## Choose This Session's Focus",
+            "",
+            "Reply with the number or exact label. Each option is generated from the current dashboard evidence.",
+            "",
+            _render_session_focus_options(session_focus_options),
+            "",
+            "Or provide a prompt for something else.",
+        ]
+    )
+
+
+def render_wrapup_notice(model: dict[str, Any], dashboard_uri: str) -> str:
+    metrics = model["metrics"]
+    actions = model["top_priority_actions"]
+    action_lines = [
+        f"{index}. {item['id']}: {item['title']}"
+        for index, item in enumerate(actions, start=1)
+    ] or ["1. No active standing-backlog items found."]
+
+    return "\n".join(
+        [
+            "# Agent Red / GT-KB Proactive Session Wrap-Up",
+            "",
+            f"Generated: {model['generated_at']}",
+            "",
+            "## Governance Principle",
+            "",
+            "- The user should not have to explicitly instruct GT-KB to perform session wrap-up procedures.",
+            "- Each session should actively inform and engage the user across project priorities.",
+            "- Suggested actions should simplify user input by presenting clear next choices.",
+            "",
+            "## Wrap-Up Procedure Entry Point",
+            "",
+            "- Procedure skill: `.claude/skills/kb-session-wrap/SKILL.md`",
+            f"- Dashboard: [Agent Red Project Dashboard]({dashboard_uri})",
+            "- Safe automatic action: this report is generated without mutating MemBase, git history, or external infrastructure.",
+            "- Mutating wrap-up actions still require the applicable approval, acknowledgement, or owner-authorized automation scope.",
+            "",
+            "## Current Priority Signals",
+            "",
+            f"- Active backlog items: {metrics['backlog'].get('active_item_count')}",
+            f"- Open MemBase work items: {metrics['membase'].get('open_work_items')}",
+            f"- Release blockers: {metrics['regression'].get('release_blocker_count')}",
+            f"- Actionable bridge/contention entries: {metrics['contention'].get('actionable_count')}",
+            f"- Drift changed paths: {metrics['drift'].get('changed_path_count')}",
+            "",
+            "## Suggested Next User Actions",
+            "",
+            "\n".join(action_lines),
+            "",
+            "## Suggested Wrap-Up Actions",
+            "",
+            "1. Review the dashboard and startup/wrap-up reports before opening large artifacts.",
+            "2. Confirm whether to run the full `kb-session-wrap` procedure for this session.",
+            "3. Confirm whether any formal artifacts, backlog entries, or release blockers need owner disposition before the next session.",
+            "",
+        ]
+    )
+
+
+def _render_metric_table(snapshot: dict[str, Any]) -> str:
+    rows = []
+    for key, value in snapshot.items():
+        rows.append(
+            "<tr>"
+            f"<th>{html.escape(key.replace('_', ' ').title())}</th>"
+            f"<td>{html.escape(str(value))}</td>"
+            "</tr>"
+        )
+    return "\n".join(rows)
+
+
+def _link_for_shortcut(shortcut: dict[str, str]) -> str:
+    label = html.escape(str(shortcut.get("label") or "Open"))
+    target = str(shortcut.get("target") or "")
+    kind = shortcut.get("kind") or "file"
+    if kind == "web":
+        return f'<a href="{html.escape(target, quote=True)}">{label}</a>'
+    if kind == "command":
+        return f'<code>{html.escape(target)}</code>'
+    return f'<a href="../../{html.escape(target, quote=True)}">{label}</a>'
+
+
+def _render_health_strip(health: list[dict[str, str]]) -> str:
+    return "\n".join(
+        "<section "
+        f'class="health-card {html.escape(item["status"])}" '
+        f'title="{html.escape(item["tooltip"], quote=True)}">'
+        f'<span class="health-label">{html.escape(item["label"])}</span>'
+        f'<strong>{html.escape(item["value"])}</strong>'
+        "</section>"
+        for item in health
+    )
+
+
+def _render_action_center(actions: list[dict[str, Any]]) -> str:
+    rows = []
+    for action in actions:
+        shortcut = action.get("shortcut") or {}
+        rows.append(
+            "<tr>"
+            f'<th><span class="severity-dot {html.escape(str(action.get("severity")))}"></span>{html.escape(str(action.get("action")))}</th>'
+            f"<td>{html.escape(str(action.get('owner_lane')))}</td>"
+            f"<td>{html.escape(str(action.get('why')))}</td>"
+            f"<td>{html.escape(str(action.get('remediation')))}</td>"
+            f"<td>{_link_for_shortcut(shortcut)}</td>"
+            f"<td>{html.escape(str(action.get('source')))}</td>"
+            "</tr>"
+        )
+    return "\n".join(rows) or '<tr><td colspan="6">No corrective actions detected.</td></tr>'
+
+
+def _render_risk_register(risks: list[dict[str, Any]]) -> str:
+    rows = []
+    for risk in risks:
+        rows.append(
+            "<tr>"
+            f'<th><span class="severity-dot {html.escape(str(risk.get("severity")))}"></span>{html.escape(str(risk.get("risk")))}</th>'
+            f"<td>{html.escape(str(risk.get('evidence')))}</td>"
+            f"<td>{html.escape(str(risk.get('impact')))}</td>"
+            f"<td>{html.escape(str(risk.get('remediation')))}</td>"
+            f"<td>{html.escape(str(risk.get('owner')))}</td>"
+            "</tr>"
+        )
+    return "\n".join(rows) or '<tr><td colspan="5">No active risks detected by current dashboard probes.</td></tr>'
+
+
+def _render_release_readiness(release: dict[str, Any]) -> str:
+    blockers = release.get("blockers") or []
+    blocker_rows = "\n".join(
+        "<tr>"
+        f"<th>Blocker {index}</th>"
+        f"<td>{html.escape(str(blocker))}</td>"
+        "</tr>"
+        for index, blocker in enumerate(blockers, start=1)
+    )
+    if not blocker_rows:
+        blocker_rows = '<tr><td colspan="2">No release blockers detected.</td></tr>'
+    return f"""
+  <section class="split-panel">
+    <div class="panel-visual {html.escape(str(release.get("status")))}">
+      <span>Release Readiness</span>
+      <strong>{html.escape(str(release.get("blocker_count")))} blockers</strong>
+      <small>{html.escape(str(release.get("release_gate_script")))}</small>
+    </div>
+    <div>
+      <table>
+        <tbody>{blocker_rows}</tbody>
+      </table>
+      <p class="shortcut-row">{_link_for_shortcut(release.get("shortcut", {}))}</p>
+    </div>
+  </section>
+"""
+
+
+def _render_quality_rollup(rollup: dict[str, Any]) -> str:
+    cards = [
+        ("Total", rollup.get("total"), "green"),
+        ("Failing", rollup.get("failing"), "red"),
+        ("Manual", rollup.get("manual"), "yellow"),
+        ("No Recent / Unknown", rollup.get("unknown"), "yellow"),
+        ("Ready / Passing", rollup.get("ready_or_passing"), "green"),
+    ]
+    return "\n".join(
+        f'<section class="mini-card {color}"><span>{html.escape(label)}</span><strong>{html.escape(str(value))}</strong></section>'
+        for label, value, color in cards
+    )
+
+
+def _render_data_freshness(freshness: dict[str, Any]) -> str:
+    sources = ", ".join(str(source) for source in freshness.get("sources", []))
+    rows = {
+        "Generated At": freshness.get("generated_at"),
+        "GroundTruth DB Modified": freshness.get("groundtruth_db_modified_at"),
+        "Repo Branch": freshness.get("repo_branch"),
+        "Repo SHA": freshness.get("repo_short_sha"),
+        "Scope Version": freshness.get("scope_version"),
+        "Sources": sources,
+    }
+    return "\n".join(
+        "<tr>"
+        f"<th>{html.escape(label)}</th>"
+        f"<td>{html.escape(str(value))}</td>"
+        "</tr>"
+        for label, value in rows.items()
+    )
+
+
+def _render_shortcuts(shortcuts: list[dict[str, str]]) -> str:
+    return "\n".join(
+        f'<span class="shortcut-chip">{_link_for_shortcut(shortcut)}</span>'
+        for shortcut in shortcuts
+    )
+
+
+def _render_delivery_timeline_summary(summary: list[dict[str, Any]]) -> str:
+    return "\n".join(
+        "<section "
+        f'class="timeline-stage {html.escape(str(item.get("status")))}">'
+        f'<span>{html.escape(str(item.get("label")))}</span>'
+        f'<strong>{html.escape(str(item.get("count")))}</strong>'
+        f'<small>{html.escape(str(item.get("latest_result")))} / {html.escape(str(item.get("latest_version")))}</small>'
+        "</section>"
+        for item in summary
+    )
+
+
+def _timeline_link(row: dict[str, Any]) -> str:
+    url = str(row.get("url") or "")
+    source = html.escape(str(row.get("source") or ""))
+    if url:
+        return f'<a href="{html.escape(url, quote=True)}">{source or "Open"}</a>'
+    return source
+
+
+def _timeline_ordered_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(rows, key=lambda row: str(row.get("timestamp") or "9999"))
+
+
+def _timeline_date_label(timestamp: Any) -> str:
+    text = str(timestamp or "").strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}", text):
+        return text[:10]
+    return "Configuration"
+
+
+def _render_delivery_timeline_rail(rows: list[dict[str, Any]]) -> str:
+    grouped: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    for index, row in enumerate(_timeline_ordered_rows(rows), start=1):
+        grouped.setdefault(_timeline_date_label(row.get("timestamp")), []).append((index, row))
+    rendered = []
+    for date_label, events in grouped.items():
+        event_cards = []
+        for index, row in events:
+            event_cards.append(
+                '<section class="timeline-event">'
+                f'<span class="timeline-node {html.escape(str(row.get("result_color")))}">{index}</span>'
+                f'<span class="timeline-date-inline">{html.escape(date_label)}</span>'
+                f'<span class="timeline-stage-label">{html.escape(str(row.get("stage_label")))}</span>'
+                f'<strong>{html.escape(str(row.get("event") or "Event"))}</strong>'
+                f'<small>{html.escape(str(row.get("version") or "not recorded"))}</small>'
+                "</section>"
+            )
+        rendered.append(
+            '<section class="timeline-day-group">'
+            f'<div class="timeline-date-badge">{html.escape(date_label)}<span>{len(events)} event{"s" if len(events) != 1 else ""}</span></div>'
+            f'<div class="timeline-day-events">{"".join(event_cards)}</div>'
+            "</section>"
+        )
+    return "\n".join(rendered) or '<p class="note">No delivery timeline evidence detected.</p>'
+
+
+def _render_delivery_timeline_details(rows: list[dict[str, Any]]) -> str:
+    rendered = []
+    for index, row in enumerate(_timeline_ordered_rows(rows), start=1):
+        rendered.append(
+            f"""
+      <details class="timeline-detail" id="timeline-event-{index}">
+        <summary><span class="result-pill {html.escape(str(row.get("result_color")))}">{index}. {html.escape(str(row.get("stage_label")))}</span> {html.escape(str(row.get("event") or "Event"))} <span>{html.escape(_timeline_date_label(row.get("timestamp")))} / {html.escape(str(row.get("version") or "not recorded"))}</span></summary>
+        <table>
+          <tbody>
+            <tr><th>Calendar Date</th><td>{html.escape(_timeline_date_label(row.get("timestamp")))}</td></tr>
+            <tr><th>Time</th><td>{html.escape(str(row.get("timestamp") or "configuration"))}</td></tr>
+            <tr><th>Version / Build</th><td>{html.escape(str(row.get("version") or "not recorded"))}</td></tr>
+            <tr><th>Commit</th><td>{html.escape(str(row.get("commit") or ""))}</td></tr>
+            <tr><th>Branch</th><td>{html.escape(str(row.get("branch") or ""))}</td></tr>
+            <tr><th>Result</th><td>{html.escape(str(row.get("result") or "unknown"))}</td></tr>
+            <tr><th>Test Results</th><td>{html.escape(str(row.get("test_results") or ""))}</td></tr>
+            <tr><th>Source</th><td>{_timeline_link(row)}</td></tr>
+            <tr><th>Notes</th><td>{html.escape(str(row.get("notes") or ""))}</td></tr>
+          </tbody>
+        </table>
+      </details>"""
+        )
+    return "\n".join(rendered) or '<p class="note">No delivery timeline details detected.</p>'
+
+
+def _render_delivery_timeline(timeline: dict[str, Any]) -> str:
+    version_manifest = timeline.get("version_manifest") or {}
+    return f"""
+  <details class="drilldown print-page" id="deliveryTimeline" open>
+    <summary>Delivery Timeline <span>Commits, builds, staging/production deployment evidence, versions, and test results.</span></summary>
+    <div class="timeline-wrap">
+      <p class="note">{html.escape(str(timeline.get("source_note") or ""))}</p>
+      <p class="note">Version manifest: {html.escape(str(version_manifest.get("display") or "not recorded"))}</p>
+      <div class="timeline-strip">
+        {_render_delivery_timeline_summary(timeline.get("stage_summary", []))}
+      </div>
+      <div class="timeline-rail" aria-label="Delivery events from oldest to latest">
+        {_render_delivery_timeline_rail(timeline.get("timeline", []))}
+      </div>
+      <div class="timeline-detail-list">
+        {_render_delivery_timeline_details(timeline.get("timeline", []))}
+      </div>
+    </div>
+  </details>
+"""
+
+
+def _short_sha(value: Any) -> str:
+    text = str(value or "")
+    return text[:7] if text else "unknown"
+
+
+def _render_gtkb_upgrade_posture(posture: dict[str, Any]) -> str:
+    checkout = posture.get("local_checkout") or {}
+    upgrade_plan = posture.get("upgrade_plan") or {}
+    repo_url = posture.get("repo_url")
+    repo_cell = (
+        f'<a href="{html.escape(str(repo_url), quote=True)}">{html.escape(str(repo_url))}</a>'
+        if repo_url
+        else "unknown"
+    )
+    action_counts = upgrade_plan.get("action_counts") or {}
+    action_summary = ", ".join(f"{key}: {value}" for key, value in action_counts.items()) or "none"
+    sample_actions = upgrade_plan.get("sample_actions") or []
+    sample_rows = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(str(action.get('action')))}</td>"
+        f"<td>{html.escape(str(action.get('file')))}</td>"
+        f"<td>{html.escape(str(action.get('reason')))}</td>"
+        "</tr>"
+        for action in sample_actions
+    )
+    if not sample_rows:
+        sample_rows = '<tr><td colspan="3">No mutating dry-run actions detected.</td></tr>'
+    apply_state = "Disabled in static dashboard; owner-approved execution required."
+    return f"""
+  <h3>GT-KB Version / Upgrade Posture</h3>
+  <table>
+    <tbody>
+      <tr><th>Status</th><td>{html.escape(str(posture.get("status")))}</td></tr>
+      <tr><th>Package Version</th><td>{html.escape(str(posture.get("package_version")))}</td></tr>
+      <tr><th>Scaffold Version</th><td>{html.escape(str(posture.get("scaffold_version")))}</td></tr>
+      <tr><th>Package Source</th><td>{html.escape(str(posture.get("package_file")))}</td></tr>
+      <tr><th>Upstream Repository</th><td>{repo_cell}</td></tr>
+      <tr><th>Latest Release</th><td>{html.escape(str(posture.get("latest_release_tag")))} @ {_short_sha(posture.get("latest_release_sha"))}</td></tr>
+      <tr><th>Upstream Main</th><td>{html.escape(str(posture.get("latest_main_branch")))} @ {_short_sha(posture.get("latest_main_sha"))}</td></tr>
+      <tr><th>Local Checkout</th><td>{html.escape(str(checkout.get("path")))} @ {_short_sha(checkout.get("sha"))} ({html.escape(str(checkout.get("branch") or "unknown"))})</td></tr>
+      <tr><th>Unreleased Commits After Latest Release</th><td>{html.escape(str(posture.get("unreleased_commit_count")))}</td></tr>
+      <tr><th>Release Upgrade Available</th><td>{html.escape(str(posture.get("release_upgrade_available")))}</td></tr>
+      <tr><th>Scaffold Upgrade Plan Available</th><td>{html.escape(str(posture.get("scaffold_upgrade_available")))}</td></tr>
+      <tr><th>GT CLI Available</th><td>{html.escape(str(posture.get("gt_cli_available")))}</td></tr>
+      <tr><th>Dry-Run Plan Command</th><td><code>{html.escape(str(posture.get("plan_command")))}</code></td></tr>
+      <tr><th>Apply Command</th><td><code>{html.escape(str(posture.get("apply_command")))}</code><br>{html.escape(apply_state)}</td></tr>
+      <tr><th>Apply Gate</th><td>{html.escape(str(posture.get("apply_gate")))}</td></tr>
+      <tr><th>Dry-Run Action Counts</th><td>{html.escape(action_summary)}</td></tr>
+    </tbody>
+  </table>
+  <details class="drilldown" id="gtkbUpgradePlan">
+    <summary>GT-KB Upgrade Plan Sample <span>Open for representative mutating dry-run actions.</span></summary>
+    <table>
+      <thead>
+        <tr><th>Action</th><th>File</th><th>Reason</th></tr>
+      </thead>
+      <tbody>
+        {sample_rows}
+      </tbody>
+    </table>
+  </details>
+"""
+
+
+def _integration_status_dot(details: dict[str, Any]) -> tuple[str, str]:
+    health = str(details.get("health") or "")
+    status = str(details.get("status") or "")
+    if health == "failing" or status == "not_wired":
+        return "red", "Needs attention"
+    if health in {"passing", "configured"} and status == "ready":
+        return "green", "Ready"
+    if status == "manual" or health == "manual":
+        return "yellow", "Manual"
+    if status == "partial" or health in {"no_recent_run", "partial_history", "live_state_unavailable", "running"}:
+        return "yellow", "Needs review"
+    if status == "ready":
+        return "green", "Ready"
+    return "yellow", "Needs review"
+
+
+def _html_id_fragment(value: str) -> str:
+    fragment = re.sub(r"[^a-zA-Z0-9_-]+", "-", value.strip()).strip("-")
+    return fragment or "integration"
+
+
+def _render_testing_service_integrations(integrations: dict[str, Any]) -> str:
+    sections = []
+    ordered = sorted(integrations.items(), key=lambda item: (item[1].get("order", 999), item[0]))
+    for name, details in ordered:
+        display_name = details.get("display_name") or {"github": "GitHub"}.get(name, name.title())
+        evidence = details.get("evidence") or []
+        artifacts = details.get("artifacts") or []
+        gaps = details.get("gaps") or []
+        evidence_text = "; ".join(str(item) for item in evidence[:6]) or "No local evidence found."
+        artifact_text = "; ".join(str(item) for item in artifacts[:4]) or "None declared."
+        if gaps:
+            artifact_text = f"{artifact_text} Gaps: {'; '.join(str(item) for item in gaps[:3])}"
+        remediation_text = str(details.get("remediation") or "No remediation recorded.")
+        dot_class, dot_label = _integration_status_dot(details)
+        section_id = f"integration-{_html_id_fragment(name)}"
+        fact_rows = [
+            ("Integration", display_name),
+            ("Config", str(details.get("status"))),
+            ("Health", str(details.get("health"))),
+            ("Latest Run", str(details.get("latest_run_summary"))),
+            ("Gate Role", str(details.get("gate_role") or "Unclassified testing support.")),
+            ("Suggested Remediation", remediation_text),
+            ("Local Evidence", evidence_text),
+            ("Artifacts / Gaps", artifact_text),
+        ]
+        rows = "\n".join(
+            "<tr>"
+            f"<th>{html.escape(label)}</th>"
+            f"<td>{html.escape(value)}</td>"
+            "</tr>"
+            for label, value in fact_rows
+        )
+        sections.append(
+            f"""
+    <details class="integration-drilldown" id="{html.escape(section_id, quote=True)}">
+      <summary><span class="status-dot {dot_class}" aria-label="{html.escape(dot_label, quote=True)}"></span>{html.escape(display_name)} <span>{html.escape(str(details.get("health")))} / {html.escape(str(details.get("status")))}</span></summary>
+      <table>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>
+    </details>"""
+        )
+    return f"""
+  <details class="drilldown" id="testingServiceIntegrations">
+    <summary>Testing Service / Tool Integrations <span>Open for per-service health, remediation, evidence, and artifacts.</span></summary>
+    <div class="integration-list">
+      {"".join(sections)}
+    </div>
+  </details>
+"""
+
+
+def _json_for_script(data: dict[str, Any]) -> str:
+    return (
+        json.dumps(data, sort_keys=True)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
+
+
+def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> str:
+    current = _snapshot_from_model(model)
+    intelligence = model.get("dashboard_intelligence", {})
+    history_rows = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(str(row.get('generated_at')))}</td>"
+        f"<td>{html.escape(str(row.get('backlog_active_items')))}</td>"
+        f"<td>{html.escape(str(row.get('membase_open_work_items')))}</td>"
+        f"<td>{html.escape(str(row.get('deliberation_archive_current_total')))}</td>"
+        f"<td>{html.escape(str(row.get('pytest_file_count')))}</td>"
+        f"<td>{html.escape(str(row.get('specification_current_total')))}</td>"
+        f"<td>{html.escape(str(row.get('drift_changed_path_count')))}</td>"
+        f"<td>{html.escape(str(row.get('regression_release_blocker_count')))}</td>"
+        f"<td>{html.escape(str(row.get('contention_actionable_bridge_count')))}</td>"
+        f"<td>{html.escape(str(row.get('tokens_consumed_before_user_input')))}</td>"
+        f"<td>{html.escape(str(row.get('scope_confidence')))}</td>"
+        "</tr>"
+        for row in history[-40:]
+    )
+    dashboard_json = html.escape(json.dumps(model["dashboard_requirements"]["subsystems"]))
+    dashboard_payload = _json_for_script({"model": model, "history": history})
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Agent Red Project Dashboard</title>
+  <style>
+    :root {{
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #d8dde3;
+      --soft: #eef1f4;
+      --red: #b42318;
+      --amber: #b45309;
+      --green: #2f6b2f;
+      --teal: #0f766e;
+      --indigo: #4338ca;
+    }}
+    body {{
+      font-family: Arial, sans-serif;
+      margin: 28px;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.45;
+    }}
+    main {{ max-width: 1280px; margin: 0 auto; }}
+    h1, h2, h3 {{ color: #1d252c; letter-spacing: 0; }}
+    h1 {{ font-size: 28px; margin-bottom: 6px; }}
+    h2 {{ margin-top: 30px; }}
+    a {{ color: #0f766e; }}
+    table {{ width: 100%; border-collapse: collapse; background: var(--panel); margin: 16px 0 28px; }}
+    th, td {{ border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }}
+    th {{ background: var(--soft); }}
+    code {{ background: var(--soft); padding: 1px 4px; }}
+    .note {{ background: var(--panel); border: 1px solid var(--line); padding: 12px; }}
+    .dashboard-hero {{
+      background: linear-gradient(135deg, #12343b 0%, #1f5f5b 52%, #6b5b2a 100%);
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 22px;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }}
+    .dashboard-hero h1 {{ color: #ffffff; margin-top: 0; }}
+    .hero-grid {{
+      display: grid;
+      grid-template-columns: minmax(260px, 1.2fr) minmax(220px, 0.8fr);
+      gap: 18px;
+      align-items: end;
+    }}
+    .hero-meta {{ color: #e8f3f1; margin: 5px 0; }}
+    .export-button {{
+      background: #ffffff;
+      border: 1px solid #ffffff;
+      border-radius: 8px;
+      color: #12343b;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 10px 14px;
+      width: fit-content;
+    }}
+    .health-strip {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin: 18px 0;
+    }}
+    .health-card, .mini-card {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 7px solid var(--green);
+      border-radius: 8px;
+      padding: 12px;
+    }}
+    .health-card.red, .mini-card.red {{ border-left-color: var(--red); }}
+    .health-card.yellow, .mini-card.yellow {{ border-left-color: var(--amber); }}
+    .health-card.green, .mini-card.green {{ border-left-color: var(--green); }}
+    .health-label, .mini-card span {{
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+    }}
+    .health-card strong, .mini-card strong {{ display: block; font-size: 20px; margin-top: 4px; }}
+    .section-band {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      margin: 16px 0 24px;
+    }}
+    .section-band h2 {{ margin-top: 0; }}
+    .severity-dot {{
+      border-radius: 50%;
+      display: inline-block;
+      height: 10px;
+      margin-right: 7px;
+      width: 10px;
+    }}
+    .severity-dot.red {{ background: var(--red); }}
+    .severity-dot.yellow {{ background: var(--amber); }}
+    .severity-dot.green {{ background: var(--green); }}
+    .split-panel {{
+      display: grid;
+      grid-template-columns: minmax(220px, 0.45fr) minmax(320px, 1fr);
+      gap: 14px;
+      align-items: stretch;
+    }}
+    .panel-visual {{
+      border-radius: 8px;
+      color: #ffffff;
+      display: grid;
+      place-content: center;
+      min-height: 180px;
+      padding: 18px;
+      text-align: center;
+    }}
+    .panel-visual.red {{ background: #8b1e3f; }}
+    .panel-visual.yellow {{ background: #8b5a0a; }}
+    .panel-visual.green {{ background: #2f6b2f; }}
+    .panel-visual strong {{ display: block; font-size: 34px; margin: 8px 0; }}
+    .quality-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }}
+    .shortcut-row {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 0;
+    }}
+    .shortcut-chip {{
+      background: #eef7f5;
+      border: 1px solid #bdd8d3;
+      border-radius: 8px;
+      display: inline-block;
+      padding: 6px 9px;
+    }}
+    .timeline-wrap {{
+      padding: 0 12px 12px;
+    }}
+    .timeline-strip {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }}
+    .timeline-stage {{
+      background: #fbfcfd;
+      border: 1px solid var(--line);
+      border-left: 7px solid var(--amber);
+      border-radius: 8px;
+      padding: 12px;
+    }}
+    .timeline-stage.green {{ border-left-color: var(--green); }}
+    .timeline-stage.red {{ border-left-color: var(--red); }}
+    .timeline-stage.yellow {{ border-left-color: var(--amber); }}
+    .timeline-stage span, .timeline-stage small {{ color: var(--muted); display: block; }}
+    .timeline-stage strong {{ display: block; font-size: 24px; margin: 4px 0; }}
+    .result-pill {{
+      border-radius: 8px;
+      color: #ffffff;
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      padding: 3px 7px;
+    }}
+    .result-pill.green {{ background: var(--green); }}
+    .result-pill.red {{ background: var(--red); }}
+    .result-pill.yellow {{ background: var(--amber); }}
+    .timeline-rail {{
+      align-items: stretch;
+      display: flex;
+      gap: 16px;
+      margin: 18px 0;
+      overflow-x: auto;
+      padding: 10px 0 18px;
+      position: relative;
+    }}
+    .timeline-rail::before {{
+      background: var(--line);
+      content: "";
+      height: 3px;
+      left: 0;
+      position: absolute;
+      right: 0;
+      top: 32px;
+    }}
+    .timeline-day-group {{
+      display: grid;
+      flex: 0 0 auto;
+      gap: 8px;
+      min-width: 210px;
+      position: relative;
+      z-index: 1;
+    }}
+    .timeline-date-badge {{
+      align-self: start;
+      background: #173f3b;
+      border-radius: 8px;
+      color: #ffffff;
+      font-weight: 700;
+      padding: 7px 9px;
+      width: fit-content;
+    }}
+    .timeline-date-badge span {{
+      color: #d8ebe7;
+      display: block;
+      font-size: 12px;
+      font-weight: 400;
+      margin-top: 2px;
+    }}
+    .timeline-day-events {{
+      display: flex;
+      gap: 10px;
+    }}
+    .timeline-event {{
+      background: #fbfcfd;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      flex: 0 0 185px;
+      min-height: 126px;
+      padding: 8px;
+      position: relative;
+      z-index: 1;
+    }}
+    .timeline-node {{
+      align-items: center;
+      border: 3px solid #ffffff;
+      border-radius: 50%;
+      color: #ffffff;
+      display: flex;
+      font-size: 12px;
+      font-weight: 700;
+      height: 31px;
+      justify-content: center;
+      margin-bottom: 8px;
+      width: 31px;
+    }}
+    .timeline-node.green {{ background: var(--green); }}
+    .timeline-node.red {{ background: var(--red); }}
+    .timeline-node.yellow {{ background: var(--amber); }}
+    .timeline-date-inline {{
+      color: #173f3b;
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }}
+    .timeline-stage-label {{
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+    }}
+    .timeline-event strong {{
+      display: block;
+      margin: 3px 0;
+      overflow-wrap: anywhere;
+    }}
+    .timeline-event small {{
+      color: var(--muted);
+      display: block;
+      overflow-wrap: anywhere;
+    }}
+    .timeline-detail-list {{
+      display: grid;
+      gap: 8px;
+    }}
+    .timeline-detail {{
+      background: #fbfcfd;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }}
+    .timeline-detail summary {{
+      align-items: center;
+      cursor: pointer;
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+    }}
+    .timeline-detail summary span:last-child {{
+      color: var(--muted);
+      margin-left: auto;
+    }}
+    .timeline-detail table {{
+      margin: 0;
+    }}
+    .dashboard-meta {{ color: var(--muted); margin-top: 0; }}
+    .metric-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin: 18px 0 10px;
+    }}
+    .metric-tile {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--teal);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 108px;
+    }}
+    .metric-tile.watch {{ border-left-color: var(--red); }}
+    .metric-tile.steady {{ border-left-color: var(--amber); }}
+    .metric-tile.growth {{ border-left-color: var(--green); }}
+    .tile-label {{ color: var(--muted); font-size: 13px; }}
+    .tile-value {{ font-size: 30px; font-weight: 700; margin: 5px 0; }}
+    .tile-delta {{ font-size: 13px; color: var(--muted); }}
+    .visual-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+      margin: 16px 0 8px;
+    }}
+    .chart-panel {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 238px;
+    }}
+    .chart-panel h3 {{ margin: 0 0 6px; font-size: 16px; }}
+    .chart-subtitle {{ color: var(--muted); font-size: 13px; margin: 0 0 10px; }}
+    .sparkline {{
+      width: 100%;
+      height: 118px;
+      display: block;
+      border: 1px solid var(--line);
+      background: #fbfcfd;
+    }}
+    .chart-legend {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }}
+    .legend-swatch {{
+      display: inline-block;
+      width: 18px;
+      height: 3px;
+      margin-right: 5px;
+      vertical-align: middle;
+    }}
+    .signal-list {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+      padding: 0;
+      list-style: none;
+    }}
+    .signal-list li {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }}
+    .signal-kicker {{
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }}
+    .signal-text {{ display: block; margin-top: 3px; }}
+    .controls {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 16px 0 4px;
+    }}
+    .controls label {{ font-weight: 700; }}
+    .controls select {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 9px;
+      background: #ffffff;
+      color: var(--ink);
+      font: inherit;
+    }}
+    .controls span {{ color: var(--muted); font-size: 13px; }}
+    .heatmap {{
+      display: grid;
+      grid-template-columns: minmax(110px, 1fr) repeat(var(--cols), minmax(18px, 1fr));
+      gap: 3px;
+      align-items: center;
+      overflow-x: auto;
+    }}
+    .heatmap-label {{ color: var(--muted); font-size: 12px; white-space: nowrap; }}
+    .heatmap-cell {{
+      height: 18px;
+      border: 1px solid #ffffff;
+      background: var(--soft);
+    }}
+    details.drilldown {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 16px 0 28px;
+    }}
+    details.drilldown summary {{
+      cursor: pointer;
+      font-weight: 700;
+      padding: 12px 14px;
+      color: #1d252c;
+      list-style-position: inside;
+    }}
+    details.drilldown summary span {{
+      color: var(--muted);
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 400;
+      margin-left: 8px;
+    }}
+    details.drilldown table {{ margin: 0; }}
+    details.drilldown .history-wrap {{ margin: 0; }}
+    .integration-list {{
+      display: grid;
+      gap: 10px;
+      padding: 0 12px 12px;
+    }}
+    details.integration-drilldown {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }}
+    details.integration-drilldown summary {{
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+    }}
+    details.integration-drilldown summary span:last-child {{
+      margin-left: auto;
+    }}
+    .status-dot {{
+      border-radius: 50%;
+      display: inline-block;
+      height: 11px;
+      min-width: 11px;
+      width: 11px;
+    }}
+    .status-dot.red {{ background: var(--red); }}
+    .status-dot.yellow {{ background: var(--amber); }}
+    .status-dot.green {{ background: var(--green); }}
+    .history-wrap {{ overflow-x: auto; }}
+    @media print {{
+      body {{ margin: 0; background: #ffffff; }}
+      main {{ max-width: none; }}
+      .export-button, .controls {{ display: none; }}
+      .section-band, details.drilldown, .dashboard-hero {{ break-inside: avoid; }}
+      details.drilldown, details.integration-drilldown {{ display: block; }}
+      details.drilldown > summary, details.integration-drilldown > summary {{ break-after: avoid; }}
+      h2 {{ break-after: avoid; }}
+      tr {{ break-inside: avoid; }}
+      .print-page {{ break-before: page; }}
+    }}
+  </style>
+</head>
+<body>
+<main>
+  <section class="dashboard-hero">
+    <div class="hero-grid">
+      <div>
+        <h1>Agent Red Project Dashboard</h1>
+        <p class="hero-meta">Generated: {html.escape(model["generated_at"])}</p>
+        <p class="hero-meta">Branch: {html.escape(str(intelligence.get("data_freshness", {}).get("repo_branch")))} @ {html.escape(str(intelligence.get("data_freshness", {}).get("repo_short_sha")))}</p>
+        <p>{html.escape(model["dashboard_requirements"]["scope_note"])}</p>
+      </div>
+      <div>
+        <button id="exportDashboard" class="export-button" title="Open the generated PDF export. If blocked, use browser Print to PDF.">Export PDF</button>
+        <p class="hero-meta">Stakeholder export: {PDF_EXPORT_FILENAME}</p>
+      </div>
+    </div>
+  </section>
+
+  {_render_delivery_timeline(model["infrastructure"].get("delivery_timeline", {}))}
+
+  <section class="health-strip" aria-label="Executive health status">
+    {_render_health_strip(intelligence.get("health", []))}
+  </section>
+
+  <section class="section-band">
+    <h2>Action Center</h2>
+    <table>
+      <thead>
+        <tr><th>Action</th><th>Lane</th><th>Why</th><th>Remediation</th><th>Shortcut</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        {_render_action_center(intelligence.get("action_center", []))}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section-band">
+    <h2>Shortcuts</h2>
+    <p class="shortcut-row">{_render_shortcuts(intelligence.get("shortcuts", []))}</p>
+  </section>
+
+  <p class="note">Time-series KPI coverage: <code>{dashboard_json}</code></p>
+
+  <h2>Executive Signals</h2>
+  <div class="controls">
+    <label for="timeIncrement">Change increment</label>
+    <select id="timeIncrement">
+      <option value="sessions">Sessions</option>
+      <option value="calendar-days">Calendar days</option>
+    </select>
+    <span id="incrementSummary">Showing one point per dashboard snapshot.</span>
+  </div>
+  <div id="metricTiles" class="metric-grid" aria-live="polite"></div>
+
+  <h2>Trend Signals</h2>
+  <ul id="signalList" class="signal-list"></ul>
+
+  <h2>KPI Movement</h2>
+  <div id="chartGrid" class="visual-grid"></div>
+
+  <h2>Divergence And Convergence</h2>
+  <div class="visual-grid">
+    <section class="chart-panel">
+      <h3>Work Pressure vs Knowledge Surface</h3>
+      <p class="chart-subtitle">Normalized movement shows whether backlog, blockers, bridge contention, and drift are converging with or diverging from MemBase, DA, specs, and tests.</p>
+      <svg id="pressureKnowledgeChart" class="sparkline" viewBox="0 0 640 180" role="img" aria-label="Normalized work pressure and knowledge surface trend"></svg>
+      <div class="chart-legend">
+        <span><span class="legend-swatch" style="background: var(--red);"></span>Work pressure</span>
+        <span><span class="legend-swatch" style="background: var(--green);"></span>Knowledge surface</span>
+      </div>
+    </section>
+    <section class="chart-panel">
+      <h3>Change Heatmap</h3>
+      <p class="chart-subtitle">Darker cells mark where each metric moved relative to its observed range. Pale rows are stable.</p>
+      <div id="changeHeatmap" class="heatmap"></div>
+    </section>
+  </div>
+
+  <section class="section-band print-page">
+    <h2>Release Readiness</h2>
+    {_render_release_readiness(intelligence.get("release_readiness", {}))}
+  </section>
+
+  <section class="section-band">
+    <h2>Quality / Security / Testing Rollup</h2>
+    <div class="quality-grid">
+      {_render_quality_rollup(intelligence.get("quality_rollup", {}))}
+    </div>
+    <p class="note">Open the integration drilldowns below for per-service health, remediation, artifacts, and gaps.</p>
+  </section>
+
+  <section class="section-band">
+    <h2>Risk Register</h2>
+    <table>
+      <thead>
+        <tr><th>Risk</th><th>Evidence</th><th>Impact</th><th>Remediation</th><th>Owner</th></tr>
+      </thead>
+      <tbody>
+        {_render_risk_register(intelligence.get("risk_register", []))}
+      </tbody>
+    </table>
+  </section>
+
+  <details class="drilldown" id="currentSnapshot">
+    <summary>Current Snapshot <span>Open for the full current metric table.</span></summary>
+    <table>
+      <tbody>
+        {_render_metric_table(current)}
+      </tbody>
+    </table>
+  </details>
+
+  <details class="drilldown" id="timeSeriesHistory">
+    <summary>Time-Series KPI History <span>Open for the latest 40 scoped history rows.</span></summary>
+    <div class="history-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Generated At</th>
+            <th>Backlog</th>
+            <th>MemBase Open WI</th>
+            <th>DA Total</th>
+            <th>Tests</th>
+            <th>Specs</th>
+            <th>Drift</th>
+            <th>Regression</th>
+            <th>Contention</th>
+            <th>Tokens</th>
+            <th>Scope</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history_rows}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <h2>Implementation Infrastructure</h2>
+  <p class="note">GT-KB is reported here only as project instrumentation, not as the product represented by the primary KPIs.</p>
+  <table>
+    <tbody>
+      <tr><th>Instrumentation</th><td>{html.escape(str(model["infrastructure"].get("instrumentation")))}</td></tr>
+      <tr><th>Skill Templates</th><td>{html.escape(str(model["infrastructure"].get("skill_template_count")))}</td></tr>
+      <tr><th>Rule Templates</th><td>{html.escape(str(model["infrastructure"].get("rule_template_count")))}</td></tr>
+      <tr><th>Hook Templates</th><td>{html.escape(str(model["infrastructure"].get("hook_template_count")))}</td></tr>
+      <tr><th>Dashboard History</th><td>{html.escape(str(model["infrastructure"].get("dashboard_history_path")))}</td></tr>
+    </tbody>
+  </table>
+  {_render_gtkb_upgrade_posture(model["infrastructure"].get("gtkb_upgrade_posture", {}))}
+  {_render_testing_service_integrations(model["infrastructure"].get("testing_service_integrations", {}))}
+
+  <details class="drilldown print-page" id="dataFreshness">
+    <summary>Data Freshness / Provenance <span>Open for source and evidence timing.</span></summary>
+    <table>
+      <tbody>
+        {_render_data_freshness(intelligence.get("data_freshness", {}))}
+      </tbody>
+    </table>
+  </details>
+  <script id="dashboardData" type="application/json">{dashboard_payload}</script>
+  <script>
+    const dashboard = JSON.parse(document.getElementById("dashboardData").textContent);
+    const history = dashboard.history || [];
+    let selectedIncrement = "sessions";
+    const metrics = [
+      {{ key: "backlog_active_items", label: "Backlog", group: "pressure", lowerIsBetter: true, color: "#b42318" }},
+      {{ key: "membase_open_work_items", label: "MemBase Open WI", group: "knowledge", lowerIsBetter: true, color: "#0f766e" }},
+      {{ key: "deliberation_archive_current_total", label: "Deliberation Archive", group: "knowledge", lowerIsBetter: false, color: "#4338ca" }},
+      {{ key: "pytest_file_count", label: "Pytest Files", group: "knowledge", lowerIsBetter: false, color: "#2f6b2f" }},
+      {{ key: "specification_current_total", label: "Specifications", group: "knowledge", lowerIsBetter: false, color: "#6d4c41" }},
+      {{ key: "drift_changed_path_count", label: "Drift Changed Paths", group: "pressure", lowerIsBetter: true, color: "#b45309" }},
+      {{ key: "regression_release_blocker_count", label: "Release Blockers", group: "pressure", lowerIsBetter: true, color: "#8b1e3f" }},
+      {{ key: "contention_actionable_bridge_count", label: "Bridge Contention", group: "pressure", lowerIsBetter: true, color: "#5b5f97" }}
+    ];
+
+    function dateKey(row) {{
+      return String(row.generated_at || "").slice(0, 10) || "unknown";
+    }}
+
+    function aggregateByCalendarDay(rows) {{
+      const byDay = new Map();
+      rows.forEach((row) => byDay.set(dateKey(row), row));
+      return Array.from(byDay.entries()).map(([day, row]) => ({{
+        ...row,
+        generated_at: day,
+        source_sample_count: rows.filter((candidate) => dateKey(candidate) === day).length
+      }}));
+    }}
+
+    function activeHistory() {{
+      return selectedIncrement === "calendar-days" ? aggregateByCalendarDay(history) : history;
+    }}
+
+    function incrementLabel() {{
+      return selectedIncrement === "calendar-days" ? "calendar day" : "session";
+    }}
+
+    function numericSeries(key) {{
+      return activeHistory().map((row) => Number(row[key])).filter((value) => Number.isFinite(value));
+    }}
+
+    function deltaFor(def) {{
+      const values = numericSeries(def.key);
+      const first = values[0];
+      const last = values[values.length - 1];
+      const delta = Number.isFinite(first) && Number.isFinite(last) ? last - first : 0;
+      return {{ values, first, last, delta }};
+    }}
+
+    function statusFor(def, delta) {{
+      if (delta === 0) return "steady";
+      const improving = def.lowerIsBetter ? delta < 0 : delta > 0;
+      return improving ? "growth" : "watch";
+    }}
+
+    function formatDelta(delta) {{
+      if (delta === 0) return "no movement";
+      return `${{delta > 0 ? "+" : ""}}${{delta}} since first ${{incrementLabel()}}`;
+    }}
+
+    function pointsFor(values, width, height, pad) {{
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const span = max - min || 1;
+      return values.map((value, index) => {{
+        const x = pad + (index * (width - pad * 2)) / Math.max(values.length - 1, 1);
+        const y = height - pad - ((value - min) / span) * (height - pad * 2);
+        return `${{x.toFixed(1)}},${{y.toFixed(1)}}`;
+      }}).join(" ");
+    }}
+
+    function renderMetricTiles() {{
+      const selected = metrics.filter((def) => [
+        "backlog_active_items",
+        "drift_changed_path_count",
+        "regression_release_blocker_count",
+        "contention_actionable_bridge_count",
+        "deliberation_archive_current_total",
+        "specification_current_total"
+      ].includes(def.key));
+      document.getElementById("metricTiles").innerHTML = selected.map((def) => {{
+        const trend = deltaFor(def);
+        const status = statusFor(def, trend.delta);
+        return `
+          <section class="metric-tile ${{status}}">
+            <span class="tile-label">${{def.label}}</span>
+            <div class="tile-value">${{trend.last ?? "n/a"}}</div>
+            <div class="tile-delta">${{formatDelta(trend.delta)}}</div>
+          </section>
+        `;
+      }}).join("");
+    }}
+
+    function renderSignals() {{
+      const changed = metrics
+        .map((def) => ({{ def, ...deltaFor(def) }}))
+        .filter((item) => item.values.length && item.delta !== 0)
+        .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      const flatPressure = metrics
+        .map((def) => ({{ def, ...deltaFor(def) }}))
+        .filter((item) => item.values.length && item.delta === 0 && item.def.group === "pressure");
+      const signals = [];
+      changed.slice(0, 4).forEach((item) => {{
+        const status = statusFor(item.def, item.delta) === "watch" ? "Watch" : "Movement";
+        signals.push(`<li><span class="signal-kicker">${{status}}</span><span class="signal-text">${{item.def.label}} moved from ${{item.first}} to ${{item.last}} (${{formatDelta(item.delta)}}).</span></li>`);
+      }});
+      flatPressure.forEach((item) => {{
+        signals.push(`<li><span class="signal-kicker">Plateau</span><span class="signal-text">${{item.def.label}} stayed at ${{item.last}} across the sampled window.</span></li>`);
+      }});
+      if (!signals.length) {{
+        signals.push(`<li><span class="signal-kicker">Stable</span><span class="signal-text">No numeric KPI movement was detected in the sampled window.</span></li>`);
+      }}
+      document.getElementById("signalList").innerHTML = signals.join("");
+    }}
+
+    function renderSparklines() {{
+      const chartGrid = document.getElementById("chartGrid");
+      chartGrid.innerHTML = metrics.map((def) => {{
+        const trend = deltaFor(def);
+        const values = trend.values.length ? trend.values : [0];
+        const points = pointsFor(values, 280, 110, 12);
+        const status = statusFor(def, trend.delta);
+        return `
+          <section class="chart-panel">
+            <h3>${{def.label}}</h3>
+            <p class="chart-subtitle">${{formatDelta(trend.delta)}}. Latest value: ${{trend.last ?? "n/a"}}.</p>
+            <svg class="sparkline" viewBox="0 0 280 110" role="img" aria-label="${{def.label}} trend">
+              <line x1="12" y1="88" x2="268" y2="88" stroke="#d8dde3" stroke-width="1"></line>
+              <polyline fill="none" stroke="${{def.color}}" stroke-width="3" points="${{points}}"></polyline>
+              <circle cx="${{points.split(" ").at(-1).split(",")[0]}}" cy="${{points.split(" ").at(-1).split(",")[1]}}" r="4" fill="${{def.color}}"></circle>
+            </svg>
+            <div class="chart-legend"><span>${{status === "watch" ? "Needs attention" : status === "growth" ? "Improving/growing" : "Flat"}}</span></div>
+          </section>
+        `;
+      }}).join("");
+    }}
+
+    function normalizedComposite(group) {{
+      const defs = metrics.filter((def) => def.group === group);
+      const rows = activeHistory();
+      return rows.map((_, index) => {{
+        const values = defs.map((def) => {{
+          const series = numericSeries(def.key);
+          const min = Math.min(...series);
+          const max = Math.max(...series);
+          const span = max - min || 1;
+          const value = Number(rows[index][def.key]);
+          if (!Number.isFinite(value)) return 0;
+          return (value - min) / span;
+        }});
+        return values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1);
+      }});
+    }}
+
+    function renderCompositeChart() {{
+      const svg = document.getElementById("pressureKnowledgeChart");
+      const pressure = normalizedComposite("pressure");
+      const knowledge = normalizedComposite("knowledge");
+      const pressurePoints = pointsFor(pressure, 640, 180, 18);
+      const knowledgePoints = pointsFor(knowledge, 640, 180, 18);
+      svg.innerHTML = `
+        <line x1="18" y1="144" x2="622" y2="144" stroke="#d8dde3" stroke-width="1"></line>
+        <polyline fill="none" stroke="#b42318" stroke-width="4" points="${{pressurePoints}}"></polyline>
+        <polyline fill="none" stroke="#2f6b2f" stroke-width="4" points="${{knowledgePoints}}"></polyline>
+      `;
+    }}
+
+    function renderHeatmap() {{
+      const heatmap = document.getElementById("changeHeatmap");
+      const activeRows = activeHistory();
+      const visibleRows = activeRows.slice(-20);
+      heatmap.style.setProperty("--cols", visibleRows.length || 1);
+      const heatmapRows = metrics.map((def) => {{
+        const series = numericSeries(def.key);
+        const min = Math.min(...series);
+        const max = Math.max(...series);
+        const span = max - min || 1;
+        const cells = visibleRows.map((row) => {{
+          const value = Number(row[def.key]);
+          const scaled = Number.isFinite(value) ? (value - min) / span : 0;
+          const alpha = 0.15 + scaled * 0.7;
+          return `<span class="heatmap-cell" title="${{def.label}} on ${{row.generated_at}}: ${{value}}" style="background: rgba(180, 83, 9, ${{alpha.toFixed(2)}});"></span>`;
+        }}).join("");
+        return `<span class="heatmap-label">${{def.label}}</span>${{cells}}`;
+      }}).join("");
+      heatmap.innerHTML = heatmapRows;
+    }}
+
+    function updateIncrementSummary() {{
+      const rows = activeHistory();
+      const modeText = selectedIncrement === "calendar-days"
+        ? "Showing the latest dashboard snapshot for each calendar day."
+        : "Showing one point per dashboard snapshot.";
+      document.getElementById("incrementSummary").textContent = `${{modeText}} Points: ${{rows.length}}.`;
+    }}
+
+    function renderAll() {{
+      updateIncrementSummary();
+      renderMetricTiles();
+      renderSignals();
+      renderSparklines();
+      renderCompositeChart();
+      renderHeatmap();
+    }}
+
+    document.getElementById("timeIncrement").addEventListener("change", (event) => {{
+      selectedIncrement = event.target.value;
+      renderAll();
+    }});
+
+    document.getElementById("exportDashboard").addEventListener("click", () => {{
+      window.open("{PDF_EXPORT_FILENAME}", "_blank");
+    }});
+
+    renderAll();
+  </script>
+</main>
+</body>
+</html>
+"""
+
+
+def _write_dashboard_pdf(dashboard_path: Path, pdf_path: Path) -> dict[str, Any]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:  # pragma: no cover - depends on local optional runtime.
+        return {"available": False, "path": str(pdf_path), "error": str(exc)}
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1440, "height": 1600})
+            page.goto(dashboard_path.resolve().as_uri(), wait_until="networkidle")
+            page.emulate_media(media="print")
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            page.pdf(path=str(pdf_path), format="Letter", print_background=True, margin={"top": "0.45in", "right": "0.35in", "bottom": "0.45in", "left": "0.35in"})
+            browser.close()
+    except Exception as exc:
+        return {"available": False, "path": str(pdf_path), "error": str(exc)}
+    return {"available": True, "path": str(pdf_path), "error": None}
+
+
+def write_dashboard_and_report(
+    project_root: Path = PROJECT_ROOT,
+    dashboard_dir: Path = DEFAULT_DASHBOARD_DIR,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+    generate_pdf: bool = True,
+    seed_historical_backfill: bool = True,
+    startup_bridge_maintenance: dict[str, Any] | None = None,
+    startup_pruning: dict[str, Any] | None = None,
+    role_profile: str = "prime-builder",
+) -> dict[str, Any]:
+    model = build_startup_model(project_root, role_profile=role_profile)
+    if startup_bridge_maintenance is not None:
+        model["startup_bridge_maintenance"] = startup_bridge_maintenance
+    if startup_pruning is not None:
+        model["startup_pruning"] = startup_pruning
+    dashboard_dir.mkdir(parents=True, exist_ok=True)
+
+    snapshot = _snapshot_from_model(model)
+    snapshot_day = str(snapshot.get("generated_at", ""))[:10]
+    backfill_history = (
+        [
+            row
+            for row in _historical_agent_red_backfill(project_root)
+            if str(row.get("generated_at", ""))[:10] < snapshot_day
+        ]
+        if seed_historical_backfill
+        else []
+    )
+    history = _write_history(history_path, snapshot, seed_history=backfill_history)
+
+    data_path = dashboard_dir / "dashboard-data.json"
+    dashboard_path = dashboard_dir / "index.html"
+    pdf_path = dashboard_dir / PDF_EXPORT_FILENAME
+    report_path = dashboard_dir / "session-startup-report.md"
+    wrapup_path = dashboard_dir / "session-wrapup-report.md"
+    data = {"model": model, "history": history}
+    data_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    dashboard_path.write_text(render_dashboard(model, history), encoding="utf-8")
+    dashboard_uri = dashboard_path.resolve().as_uri()
+    report_path.write_text(render_report(model, dashboard_uri), encoding="utf-8")
+    wrapup_path.write_text(render_wrapup_notice(model, dashboard_uri), encoding="utf-8")
+    pdf_export = (
+        _write_dashboard_pdf(dashboard_path, pdf_path)
+        if generate_pdf
+        else {"available": False, "path": str(pdf_path), "error": "PDF export generation skipped by caller."}
+    )
+
+    return {
+        "model": model,
+        "history": history,
+        "dashboard_path": dashboard_path,
+        "pdf_path": pdf_path,
+        "pdf_export": pdf_export,
+        "data_path": data_path,
+        "report_path": report_path,
+        "wrapup_path": wrapup_path,
+    }
+
+
+def _emit_hook_context(text: str) -> None:
+    print(json.dumps({"additionalContext": text}, ensure_ascii=False))
+
+
+def _emit_no_hook_context() -> None:
+    print("{}")
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _default_lifecycle_guard_path(project_root: Path) -> Path:
+    return project_root / LIFECYCLE_GUARD_RELATIVE_PATH
+
+
+def _read_lifecycle_guard(path: Path) -> dict[str, Any]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _write_lifecycle_guard(path: Path, state: dict[str, Any]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _startup_guard_id() -> str:
+    return os.environ.get("GTKB_STARTUP_GUARD_ID") or _utc_now_iso()
+
+
+def _arm_startup_wrapup_guard(path: Path, guard_id: str) -> None:
+    state = _read_lifecycle_guard(path)
+    if (
+        state.get("startup_guard_id") == guard_id
+        and state.get("first_wrapup_suppressed") is True
+        and state.get("suppress_next_wrapup") is False
+    ):
+        return
+
+    state.update(
+        {
+            "armed_at": _utc_now_iso(),
+            "armed_reason": "startup_focus_input_pending",
+            "first_wrapup_suppressed": False,
+            "startup_guard_id": guard_id,
+            "suppress_next_wrapup": True,
+        }
+    )
+    _write_lifecycle_guard(path, state)
+
+
+def _consume_startup_wrapup_guard(path: Path) -> bool:
+    state = _read_lifecycle_guard(path)
+    if state.get("suppress_next_wrapup") is not True:
+        return False
+
+    state.update(
+        {
+            "first_wrapup_suppressed": True,
+            "last_suppressed_at": _utc_now_iso(),
+            "last_suppressed_reason": "startup_focus_input_pending",
+            "suppress_next_wrapup": False,
+            "suppressed_count": int(state.get("suppressed_count", 0) or 0) + 1,
+        }
+    )
+    _write_lifecycle_guard(path, state)
+    return True
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
+    parser.add_argument("--dashboard-dir", type=Path, default=DEFAULT_DASHBOARD_DIR)
+    parser.add_argument("--history-path", type=Path, default=DEFAULT_HISTORY_PATH)
+    parser.add_argument("--emit-report", action="store_true", help="Print the startup report after writing it.")
+    parser.add_argument("--emit-wrapup", action="store_true", help="Print the proactive wrap-up report after writing it.")
+    parser.add_argument(
+        "--force-wrapup",
+        action="store_true",
+        help="Bypass the startup focus guard and emit the wrap-up report immediately.",
+    )
+    parser.add_argument(
+        "--lifecycle-guard-path",
+        type=Path,
+        default=None,
+        help="Override the lifecycle guard state path for tests or alternate harnesses.",
+    )
+    parser.add_argument("--json", action="store_true", help="Print machine-readable output paths and current model.")
+    parser.add_argument(
+        "--role-profile",
+        choices=sorted(ROLE_PROFILES),
+        default="prime-builder",
+        help="Select the role mapping to display in startup and wrap-up context.",
+    )
+    parser.add_argument(
+        "--fast-hook",
+        action="store_true",
+        help=(
+            "Use the lifecycle-hook budget path: skip historical backfill, PDF export, "
+            "and startup bridge maintenance."
+        ),
+    )
+    parser.add_argument(
+        "--skip-bridge-maintenance",
+        action="store_true",
+        help="Skip startup archival/pruning of VERIFIED bridge index entries.",
+    )
+    args = parser.parse_args(argv)
+    project_root = args.project_root.resolve()
+    lifecycle_guard_path = (
+        args.lifecycle_guard_path.resolve()
+        if args.lifecycle_guard_path is not None
+        else _default_lifecycle_guard_path(project_root)
+    )
+
+    if args.emit_report:
+        _arm_startup_wrapup_guard(lifecycle_guard_path, _startup_guard_id())
+
+    if args.emit_wrapup and not args.force_wrapup and _consume_startup_wrapup_guard(lifecycle_guard_path):
+        _emit_no_hook_context()
+        return 0
+
+    bridge_maintenance = None
+    if args.emit_report and not args.skip_bridge_maintenance and not args.fast_hook:
+        bridge_maintenance = _run_verified_bridge_startup_maintenance(project_root)
+    startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if args.emit_report else None
+
+    result = write_dashboard_and_report(
+        project_root=project_root,
+        dashboard_dir=args.dashboard_dir.resolve(),
+        history_path=args.history_path.resolve(),
+        generate_pdf=not args.fast_hook,
+        seed_historical_backfill=not args.fast_hook,
+        startup_bridge_maintenance=bridge_maintenance,
+        startup_pruning=startup_pruning,
+        role_profile=args.role_profile,
+    )
+    if args.json:
+        printable = {
+            "dashboard_path": str(result["dashboard_path"]),
+            "data_path": str(result["data_path"]),
+            "pdf_path": str(result["pdf_path"]),
+            "pdf_export": result["pdf_export"],
+            "report_path": str(result["report_path"]),
+            "wrapup_path": str(result["wrapup_path"]),
+            "model": result["model"],
+        }
+        print(json.dumps(printable, indent=2, sort_keys=True))
+    elif args.emit_report:
+        _emit_hook_context(Path(result["report_path"]).read_text(encoding="utf-8"))
+    elif args.emit_wrapup:
+        _emit_hook_context(Path(result["wrapup_path"]).read_text(encoding="utf-8"))
+    else:
+        print(f"Dashboard: {result['dashboard_path']}")
+        print(f"PDF export: {result['pdf_path']} ({'available' if result['pdf_export']['available'] else 'not generated'})")
+        print(f"Startup report: {result['report_path']}")
+        print(f"Wrap-up report: {result['wrapup_path']}")
+        print("Session focus options:")
+        for index, option in enumerate(_session_focus_options(result["model"]), start=1):
+            print(f"{index}. {option['label']}: {option['prompt']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

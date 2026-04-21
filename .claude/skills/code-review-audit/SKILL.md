@@ -1,0 +1,47 @@
+﻿---
+name: code-review-audit
+description: Review code and tests for bugs, regressions, unsafe assumptions, missing verification, and configuration drift. Use for PR review, change audit, and remediation re-audit.
+argument-hint: [target]
+allowed-tools: Bash, Read, Grep, Glob, Agent
+license: "Proprietary - Remaker Digital"
+compatibility:
+  - claude-code >= 1.0
+metadata:
+  project: agent-red-customer-experience
+  category: review
+---
+
+# Code Review Audit
+
+Review code with a bug-finding and regression-finding mindset.
+
+## Default Deliverable
+
+Use `independent-progress-assessments/TEMPLATE-CODE-REVIEW.md` unless the owner asks for inline comments or a shorter note.
+
+## Required Review Order
+
+1. correctness and behavioral regressions
+2. security, tenancy, and safety controls
+3. test strength and missing coverage
+4. config, docs, and KB drift
+5. lower-priority hygiene issues
+
+## Output Rules
+
+- Findings first.
+- Order findings by severity.
+- Prefer line-referenced evidence.
+- Do not dilute real defects with a long tail of style commentary.
+- If no findings are identified, state that explicitly and name residual risks or unverified areas.
+
+## Test Review Standard
+
+- Prefer behavioral assertions over existence or shape-only assertions.
+- Call out synthetic green states such as `WARN` or `SKIP` counted as success where relevant.
+- Name verification gaps clearly when tests were not run or cannot prove the reviewed claim.
+
+---
+
+Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+

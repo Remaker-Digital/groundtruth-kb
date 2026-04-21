@@ -32,6 +32,16 @@ Agent Red is an AI-powered customer service platform that automates support conv
 - **[Billing](/docs/billing/billable-conversation-spec)** — How conversations are metered and billed.
 - **[Changelog](/docs/changelog)** — What's new in each release.
 
+## Project dashboard and session startup
+
+Agent Red uses GT-KB as project governance and delivery infrastructure. The project dashboard highlights delivery history, release posture, tool integration health, risks, backlog pressure, and stakeholder-ready PDF export.
+
+<img src="/img/gtkb-dashboard/dashboard-top.png" alt="Agent Red GT-KB dashboard top section" style={{width: '100%', border: '1px solid #d8e2ee', borderRadius: '8px'}} />
+
+Every new work session starts from dashboard-derived choices in the AI/user chat stream. The focus list turns current evidence into action: release blockers, failing integrations, known risks, stage/test readiness, internal review cleanup, backlog selection, or a custom focus.
+
+<img src="/img/gtkb-dashboard/session-focus-options.png" alt="Session startup focus choices derived from the dashboard" style={{width: '100%', border: '1px solid #d8e2ee', borderRadius: '8px'}} />
+
 ## Key capabilities
 
 | Capability | Description |

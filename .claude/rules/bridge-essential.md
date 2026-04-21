@@ -7,11 +7,12 @@ This rule auto-loads via `.claude/rules/` convention and is TRACKED in git
 
 **Bridge uptime is the top-priority task. Always.**
 
-The Prime↔Codex bridge is how GroundTruth-KB coordinates implementation
-proposals, reviews, and verification. GroundTruth-KB is non-functional when
-the bridge stops working. Therefore: keeping the bridge alive and visible is
-the first duty of every Prime Builder session, ahead of feature work,
-backlog progress, test runs, deployments, and documentation updates.
+The Prime Builder / Loyal Opposition bridge is how GroundTruth-KB coordinates
+implementation proposals, reviews, and verification. GroundTruth-KB is
+non-functional when the bridge stops working. Therefore: keeping the bridge
+alive and visible is the first duty of every Prime Builder session when
+counterpart review is active, ahead of feature work, backlog progress, test
+runs, deployments, and documentation updates.
 
 There is no scenario in which the owner wants bridge monitoring to cease.
 Any proposal, refactor, or cleanup that would remove, disable, or weaken the
@@ -25,7 +26,7 @@ produced by the `poller-freshness.py` UserPromptSubmit hook:
 ```
 POLLER OK @ HH:MM:SSZ
   claude=OK <age> ago (<state>) <message>
-  codex=OK <age> ago (<state>) <message>
+  loyal-opposition=OK <age> ago (<state>) <message>
 ```
 
 - `OK` means the scan-status file was updated less than 4 minutes ago.
@@ -45,8 +46,8 @@ mechanical rather than procedural:
 
 1. **`.claude/hooks/poller-freshness.py`** — a `UserPromptSubmit` hook that
    reads the two scan-status files, computes freshness against thresholds,
-   and emits a `systemMessage` instructing Claude to prepend the POLLER
-   block. The hook is worktree-safe (resolves repo root via
+   and emits a `systemMessage` instructing the active harness to prepend the
+   POLLER block. The hook is worktree-safe (resolves repo root via
    `git rev-parse --git-common-dir`) and fail-loud (emits ALARM rather than
    silently returning on any error path).
 

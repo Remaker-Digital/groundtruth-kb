@@ -71,6 +71,7 @@ class TestAssertionCheckHook:
 sys.path.insert(0, str(HOOKS_DIR))
 from scheduler import (  # noqa: E402
     _FileLock,
+    _keyword_matches,
     load_state,
     mark_done,
     parse_groups,
@@ -176,6 +177,10 @@ trigger: after:5
 
 class TestShouldTrigger:
     """Test should_trigger function from scheduler.py."""
+
+    def test_keyword_matches_exact_phrase_boundary(self):
+        assert _keyword_matches("Let's wrap up the session.", "wrap up") is True
+        assert _keyword_matches("The done-state check is unrelated.", "done") is False
 
     def test_always_trigger_returns_true(self):
         group = {"trigger": "always", "keywords": [], "count": 0}

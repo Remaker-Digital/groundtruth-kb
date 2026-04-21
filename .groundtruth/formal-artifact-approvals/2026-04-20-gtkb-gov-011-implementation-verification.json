@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "GTKB-GOV-011-IMPLEMENTATION-VERIFICATION-2026-04-20",
+  "action": "insert-update-and-link-batch",
+  "source_ref": "owner_conversation:2026-04-20-gtkb-gov-011-proceed",
+  "full_content": "Implementation verification: GTKB-GOV-011 session self-initialization dashboard, startup disclosure, and proactive wrap-up engagement.\n\nOwner authorization:\n- Owner asked to proceed with GTKB-GOV-011.\n- Owner added a guiding principle that the user should not have to explicitly instruct GT-KB to perform session wrap-up procedures, and sessions should actively inform and engage the user about project priorities while simplifying input through suggested actions.\n\nImplementation artifacts:\n- scripts/session_self_initialization.py generates the startup model, dashboard HTML, dashboard JSON, startup report, wrap-up report, and time-series dashboard history.\n- docs/gtkb-dashboard/index.html is the live local dashboard link.\n- docs/gtkb-dashboard/dashboard-data.json records the current dashboard model and time-series history.\n- docs/gtkb-dashboard/session-startup-report.md records the latest startup disclosure.\n- docs/gtkb-dashboard/session-wrapup-report.md records proactive wrap-up guidance.\n- memory/gtkb-dashboard-history.json stores bounded time-series KPI snapshots.\n- .claude/settings.json registers SessionStart and Stop lifecycle hooks.\n- .codex/hooks.json registers corresponding Codex hook intent.\n- scripts/check_codex_hook_parity.py verifies hook parity and the Windows-aware fallback contract.\n- tests/scripts/test_session_self_initialization.py, tests/scripts/test_codex_hook_parity.py, tests/scripts/test_release_candidate_gate.py, and tests/scripts/test_groundtruth_governance_adoption.py verify implementation visibility and release-gate wiring.\n\nFormal record updates:\n- Add DELIB-0841 and lifecycle engagement records.\n- Promote SPEC-PROJECT-DASHBOARD-KPI-LINK-001 to verified.\n- Promote DCL-SESSION-STARTUP-TOKEN-BUDGET-001 to verified.\n- Add DELIB-0842 implementation evidence and link it to the session lifecycle records.\n- Mark GTKB-GOV-011 complete in the standing backlog.\n",
+  "full_content_sha256": "6fd6637858fe4edeaf88865670a2399ff1a433aee654a818ff5c8f2ad83a39b2",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner said: Please proceed with GTKB-GOV-011. Owner also added the proactive session wrap-up and priority engagement guiding principle.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Verify GTKB-GOV-011 implementation and promote implemented session lifecycle records.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

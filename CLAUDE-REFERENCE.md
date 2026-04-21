@@ -189,12 +189,12 @@ No competitor has confirmed implementing per-customer vector RAG over historical
 
 | Attribute | Value |
 |-----------|-------|
-| **Account** | mike-remakerdigital |
-| **Repository** | [agent-red](https://github.com/mike-remakerdigital/agent-red) |
+| **Account** | Remaker-Digital |
+| **Repository** | [agent-red-customer-engagement](https://github.com/Remaker-Digital/agent-red-customer-engagement) |
 | **Plan** | Professional |
 | **Branch Protection** | main (require PR, require reviews) |
 
-**Association Rule:** The repository `mike-remakerdigital/agent-red` is the canonical home for this project.
+**Association Rule:** The repository `Remaker-Digital/agent-red-customer-engagement` is the canonical home for this project.
 
 ---
 

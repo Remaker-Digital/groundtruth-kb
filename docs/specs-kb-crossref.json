@@ -6363,7 +6363,7 @@
     },
     {
       "spec_id": "SPEC-0178",
-      "text": "All references to the old GitHub repo URL MUST be updated to the new URL: https://github.com/mike-remakerdigital/agent-red",
+      "text": "All references to the old GitHub repo URL MUST be updated to the new URL: https://github.com/Remaker-Digital/agent-red-customer-engagement",
       "domain": "GENERAL",
       "source_type": "owner_directive"
     },

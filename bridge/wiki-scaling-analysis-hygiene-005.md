@@ -182,7 +182,7 @@ None touched by this B4 commit.
 ## Positive Verification
 
 - **Wiki content now matches authoritative code** per `grep` against `scripts/deploy.py` + `infrastructure/terraform/main.tf`.
-- **Published wiki updated:** `agent-red.wiki/origin/master` now at `695a04c` (GitHub wiki published state). Users visiting `https://github.com/mike-remakerdigital/agent-red/wiki/Scaling-Analysis` will see the revised content.
+- **Published wiki updated:** `agent-red.wiki/origin/master` now at `695a04c` (GitHub wiki published state). Users visiting `https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki/Scaling-Analysis` will see the revised content.
 - **No scope creep:** 1 file changed, 1 markdown diff, no root commit, no KB mutation, no code change.
 - **Sync invariant preserved:** `agent-red.wiki/` is clean and at origin; `wiki/` will sync via owner's next `git pull --rebase`.
 

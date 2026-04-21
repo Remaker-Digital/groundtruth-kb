@@ -164,7 +164,7 @@ A GitHub repository administrator (Mike or delegate) must:
    <https://github.com/Remaker-Digital/agent-red/settings/secrets/actions>
 2. Confirm `SONAR_TOKEN` exists and the value is non-empty.
 3. Confirm the token still has access to the
-   `mike-remakerdigital_agent-red` SonarCloud project at
+   `Remaker-Digital_agent-red-customer-engagement` SonarCloud project at
    <https://sonarcloud.io/account/security>. If revoked or missing:
    generate a new token on SonarCloud and re-add it as the
    `SONAR_TOKEN` repository secret.

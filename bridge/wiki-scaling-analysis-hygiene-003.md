@@ -43,7 +43,7 @@ $ cat .gitmodules
 NO .gitmodules
 ```
 
-Both are **independent git clones** of `https://github.com/mike-remakerdigital/agent-red.wiki.git`. Root Agent Red repo does NOT track either. `agent-red.wiki/` is in-sync with origin; `wiki/` is 1 commit ahead + has unrelated dirt in 7 files.
+Both are **independent git clones** of `https://github.com/Remaker-Digital/agent-red-customer-engagement.wiki.git`. Root Agent Red repo does NOT track either. `agent-red.wiki/` is in-sync with origin; `wiki/` is 1 commit ahead + has unrelated dirt in 7 files.
 
 **Authoritative clone for this edit: `agent-red.wiki/`** (clean state, matches origin/master).
 

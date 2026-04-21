@@ -13,6 +13,8 @@ MEMBASE-README.md
 .env.*.local
 *.env
 scripts/deploy/_prod_env_vars*.txt
+scripts/deploy/production-gateway-generated*.yaml
+scripts/deploy/_production-gateway-generated*.yaml
 secrets/
 credentials/
 logs/
@@ -190,9 +192,21 @@ stripe
 .claude/hooks/*
 !.claude/hooks/poller-freshness.py
 !.claude/hooks/credential-scan.py
+!.claude/hooks/*.py
 !.claude/rules/
 .claude/rules/*
 !.claude/rules/bridge-essential.md
+!.claude/rules/*.md
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/*/
+!.claude/skills/*/SKILL.md
+!.claude/skills/*/references/
+!.claude/skills/*/references/*.md
+!.claude/skills/*/scripts/
+!.claude/skills/*/scripts/*.py
+!.claude/skills/*/helpers/
+!.claude/skills/*/helpers/*.py
 
 .kiro/
 cookies.txt
@@ -209,6 +223,10 @@ wiki/
 # NOTE: same pattern as .claude/ above. Ignore the CONTENTS, not the directory,
 # so bridge-automation scripts can be re-included via negation.
 independent-progress-assessments/*
+!independent-progress-assessments/AGENT-RED-GO-STATE-*.md
+!independent-progress-assessments/CODEX-INSIGHT-DROPBOX/
+independent-progress-assessments/CODEX-INSIGHT-DROPBOX/*
+!independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-*.md
 !independent-progress-assessments/bridge-automation/
 independent-progress-assessments/bridge-automation/*
 !independent-progress-assessments/bridge-automation/*.ps1

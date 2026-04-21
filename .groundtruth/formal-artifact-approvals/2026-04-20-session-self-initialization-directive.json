@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "SESSION-SELF-INITIALIZATION-BATCH-2026-04-20",
+  "action": "insert-and-link-batch",
+  "source_ref": "owner_conversation:2026-04-20-session-self-initialization-directive",
+  "full_content": "Batch formalization: Fresh sessions must self-initialize with role disclosure, dashboard linkage, top priorities, and token-budget options.\n\nOwner directive:\n- Fresh session self-initialization must present the user with information on the role being assumed, including a listing of skills, plug-ins, directives, and governance stance for the session.\n- Fresh session self-initialization must display a live link to the project dashboard showing time-series KPI for GT-KB artifacts and subsystems, including backlog, MemBase, Deliberation Archive, tests, templates, specifications, drift, regression, contention, and tokens consumed at session start before user input.\n- Fresh session self-initialization must propose the three top priority actions for the user to initiate, such as backlog work, hygiene, remediation, state investigation, or release-blocker itemization.\n- Fresh session self-initialization must suggest options for reducing token consumption during startup and ongoing project work, processes, artifacts, or governance.\n\nArtifacts to create:\n- DELIB-0840: owner decision establishing the fresh-session self-initialization requirement.\n- GOV-SESSION-SELF-INITIALIZATION-001: governance requirement for session startup disclosure and action options.\n- PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001: protected behavior preventing sessions from treating role/governance context as implicit.\n- SPEC-PROJECT-DASHBOARD-KPI-LINK-001: requirement for a live project dashboard link with GT-KB subsystem time-series KPI.\n- DCL-SESSION-STARTUP-TOKEN-BUDGET-001: design constraint requiring visible token-cost awareness and reduction options during startup.\n- GTKB-GOV-011: standing backlog implementation item for startup self-initialization dashboard and disclosure mechanics.\n\nImplementation status:\n- Formal records, rule text, standing backlog visibility, and regression tests are created now.\n- Full live dashboard implementation may remain implementation-gated until GTKB-GOV-011 is completed; the gap must remain visible in the standing backlog and release-gate tests.\n",
+  "full_content_sha256": "970c3363a446679d9d8628937d885ff9e7be92bcd8f2a8f06be7c93934a96746",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner said fresh session self-initialization should disclose role, skills, plug-ins, directives, governance stance, dashboard link, top three priority actions, and token-reduction options.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Formalize fresh-session self-initialization startup requirements and implementation backlog visibility.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

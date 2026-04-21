@@ -4,8 +4,8 @@
 >
 > Commercial SaaS product by [Remaker Digital](https://remakerdigital.com)
 
-[![Python Tests](https://github.com/mike-remakerdigital/agent-red/actions/workflows/python-tests.yml/badge.svg?branch=develop)](https://github.com/mike-remakerdigital/agent-red/actions/workflows/python-tests.yml)
-[![Lint](https://github.com/mike-remakerdigital/agent-red/actions/workflows/lint.yml/badge.svg?branch=develop)](https://github.com/mike-remakerdigital/agent-red/actions/workflows/lint.yml)
+[![Python Tests](https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/workflows/python-tests.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/workflows/python-tests.yml)
+[![Lint](https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/workflows/lint.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/workflows/lint.yml)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-proprietary-red)
 
@@ -16,9 +16,26 @@
 | Resource | Link |
 |----------|------|
 | **Docs Site** | [agentredcx.com](https://agentredcx.com) |
-| **Wiki** | [Project Wiki](https://github.com/mike-remakerdigital/agent-red/wiki) |
-| **Issues** | [Issue Tracker](https://github.com/mike-remakerdigital/agent-red/issues) |
+| **Wiki** | [Project Wiki](https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki) |
+| **Issues** | [Issue Tracker](https://github.com/Remaker-Digital/agent-red-customer-engagement/issues) |
 | **AI Assistant Guide** | [`CLAUDE.md`](CLAUDE.md) |
+| **GT-KB Dashboard** | [`docs/gtkb-dashboard/index.html`](docs/gtkb-dashboard/index.html) |
+| **Dashboard PDF Export** | [`docs/gtkb-dashboard/agent-red-project-dashboard.pdf`](docs/gtkb-dashboard/agent-red-project-dashboard.pdf) |
+| **Session Startup Guide** | [`docs/operations/gtkb-session-startup-dashboard.md`](docs/operations/gtkb-session-startup-dashboard.md) |
+
+---
+
+## GT-KB Dashboard and Session Startup
+
+Agent Red is governed with GT-KB as pre-existing implementation infrastructure. The dashboard is the project control surface: it summarizes delivery timeline, release blockers, current risks, tool integration health, backlog pressure, GT-KB version posture, and PDF-ready stakeholder reporting. Session startup uses the same dashboard model to present directly actionable focus choices in the AI/user chat stream.
+
+![Agent Red GT-KB dashboard top section](docs/assets/gtkb-dashboard/dashboard-top.png)
+
+At the start of a fresh session, choose the highest-value work directly from the generated focus list. The choices are derived from current evidence, not a static menu: release blockers, failing integrations, known risks, stage/test readiness, backlog, and the previous session all affect the ordering and prompt text.
+
+![Session startup focus choices](docs/assets/gtkb-dashboard/session-focus-options.png)
+
+Use [`docs/operations/gtkb-session-startup-dashboard.md`](docs/operations/gtkb-session-startup-dashboard.md) for the operating guide, screenshots, and stakeholder export workflow.
 
 ---
 
@@ -197,8 +214,8 @@ Deployed on Azure (East US 2) with 9 independently scaled containers:
 
 ```bash
 # Clone the repository
-git clone https://github.com/mike-remakerdigital/agent-red.git
-cd agent-red
+git clone https://github.com/Remaker-Digital/agent-red-customer-engagement.git
+cd agent-red-customer-engagement
 
 # Copy environment template
 cp .env.example .env.local

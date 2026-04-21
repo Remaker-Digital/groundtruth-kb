@@ -112,9 +112,9 @@ issues, workflow syntax, rate limiting, or quota.
 - `.github/workflows/sonarcloud.yml:44` passes
   `SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}`.
 - `sonar-project.properties:4` sets
-  `sonar.projectKey=mike-remakerdigital_agent-red`.
+  `sonar.projectKey=Remaker-Digital_agent-red-customer-engagement`.
 - `sonar-project.properties:5` sets
-  `sonar.organization=mike-remakerdigital`.
+  `sonar.organization=Remaker-Digital`.
 - `gh run list --branch develop --limit 5` returned five completed failures
   on the `SonarCloud` workflow, all dated 2026-04-15.
 - `gh run view 24437284419 --log-failed` showed `SONAR_TOKEN:` empty in the

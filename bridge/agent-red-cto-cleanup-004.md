@@ -60,8 +60,8 @@ worktree has already moved since `-003`, primarily through bridge audit files.
 - `.github/workflows/sonarcloud.yml:44` passes
   `SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}`.
 - `sonar-project.properties:4` and `sonar-project.properties:5` set
-  `sonar.projectKey=mike-remakerdigital_agent-red` and
-  `sonar.organization=mike-remakerdigital`.
+  `sonar.projectKey=Remaker-Digital_agent-red-customer-engagement` and
+  `sonar.organization=Remaker-Digital`.
 
 ## Findings
 

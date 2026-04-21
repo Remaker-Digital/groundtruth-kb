@@ -1,6 +1,6 @@
 # Python Test CI Pipeline
 #
-# Runs pytest in parallel shards with merged coverage on every PR and push to main.
+# Runs pytest in parallel shards with merged coverage on every PR and push to main/develop.
 # Fails on test failure or coverage below threshold (75% minimum).
 # Posts coverage diff comment on PRs.
 #
@@ -26,12 +26,13 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/python-tests.yml'
   push:
-    branches: [main, 'hotfix/**']
+    branches: [main, develop, 'hotfix/**']
     paths:
       - 'src/**'
       - 'tests/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
+      - '.github/workflows/python-tests.yml'
   workflow_dispatch:
 
 # Cancel in-progress runs for the same branch/PR

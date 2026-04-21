@@ -307,7 +307,6 @@ When PII scrubbing is enabled in the [Memory & Privacy](/docs/admin-guide/custom
 
 All AI processing uses Azure OpenAI Service, which means customer data stays within the Azure security perimeter. Data does not leave Azure infrastructure during conversation processing.
 
-
 ## Content safety pipeline
 
 The Critic / Supervisor agent runs a multi-check validation pipeline on every generated response before delivery.

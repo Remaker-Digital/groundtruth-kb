@@ -1,0 +1,20 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "GOV-ARTIFACT-APPROVAL-001",
+  "related_artifact_ids": [
+    "PB-ARTIFACT-APPROVAL-001",
+    "ADR-ARTIFACT-FORMALIZATION-GATE-001",
+    "DCL-ARTIFACT-APPROVAL-HOOK-001"
+  ],
+  "action": "promote-to-verified",
+  "source_ref": "conversation:2026-04-20-resolve-strict-gov-enforcement-limitation",
+  "full_content": "Promote GOV-ARTIFACT-APPROVAL-001, PB-ARTIFACT-APPROVAL-001, ADR-ARTIFACT-FORMALIZATION-GATE-001, and DCL-ARTIFACT-APPROVAL-HOOK-001 to verified after implementing the local PreToolUse formal artifact approval gate, registering it in .claude/settings.json, adding hook regression tests, and wiring those tests into the release-candidate gate.",
+  "full_content_sha256": "3dd65a66b7e3a60ddd4286d9e9e792790fb34168572150e17b6f368216117f25",
+  "approval_mode": "approve",
+  "approved_by": "Mike",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Please resolve this limitation and make strinct GOV enforcement mechanically active.",
+  "changed_by": "acting-prime-builder/codex",
+  "change_reason": "Owner requested strict GOV enforcement become mechanically active; implementation and regression tests completed."
+}

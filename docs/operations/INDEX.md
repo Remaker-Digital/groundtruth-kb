@@ -16,6 +16,7 @@ Comprehensive index of all operational documents.
 | [conversation-quality-test-procedure.md](conversation-quality-test-procedure.md) | Active | Conversation quality testing |
 | [data-integrity-test-procedure.md](data-integrity-test-procedure.md) | Active | Data integrity verification |
 | [external-url-reachability-procedure.md](external-url-reachability-procedure.md) | Active | External URL health checks |
+| [gtkb-session-startup-dashboard.md](gtkb-session-startup-dashboard.md) | Active | GT-KB dashboard, session startup, screenshots, and stakeholder export workflow |
 | [initialization-procedure.md](initialization-procedure.md) | Active | System initialization procedure |
 | [knowledge-automation-procedure.md](knowledge-automation-procedure.md) | Active | Knowledge base automation |
 | [LAUNCH-CHECKLIST.md](LAUNCH-CHECKLIST.md) | Active | Pre-launch verification checklist |
@@ -46,5 +47,5 @@ Comprehensive index of all operational documents.
 
 ---
 
-**Total:** 29 active documents, 1 archived.
-*Last Updated: 2026-03-09*
+**Total:** 30 active documents, 1 archived.
+*Last Updated: 2026-04-20*

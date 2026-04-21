@@ -1,6 +1,6 @@
 # Python Lint Pipeline
 #
-# Runs ruff (linting + formatting check) on every PR and push to main.
+# Runs ruff (linting + formatting check) on every PR and push to main/develop.
 # Ruff replaces flake8 + isort + pyupgrade in a single fast tool.
 #
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -20,6 +20,10 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
+      - 'scripts/**'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/lint.yml'
   workflow_dispatch:
 
 concurrency:

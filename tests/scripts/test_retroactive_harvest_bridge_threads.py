@@ -356,3 +356,154 @@ class TestIdempotence:
         # Exactly one canonical wildcard row in the stub DB
         canonical = [r for r in stub.rows if "*" in r["source_ref"]]
         assert len(canonical) == 1
+
+
+# ---------------------------------------------------------------------------
+# Verified-thread startup archival + INDEX pruning
+# ---------------------------------------------------------------------------
+
+
+class TestVerifiedArchiveAndPrune:
+    def test_archives_and_prunes_only_verified_entries(self, tmp_path: Path, monkeypatch) -> None:
+        bridge_dir = tmp_path / "bridge"
+        bridge_dir.mkdir()
+        (bridge_dir / "alpha-001.md").write_text("# Alpha\n\nProposal.\n", encoding="utf-8")
+        (bridge_dir / "alpha-002.md").write_text("# Alpha\n\nVerified.\n", encoding="utf-8")
+        (bridge_dir / "beta-001.md").write_text("# Beta\n\nProposal.\n", encoding="utf-8")
+        (bridge_dir / "beta-002.md").write_text("# Beta\n\nGO.\n", encoding="utf-8")
+        index = bridge_dir / "INDEX.md"
+        index.write_text(
+            """# Bridge Index
+
+Document: alpha
+VERIFIED: bridge/alpha-002.md
+NEW: bridge/alpha-001.md
+
+Document: beta
+GO: bridge/beta-002.md
+NEW: bridge/beta-001.md
+""",
+            encoding="utf-8",
+        )
+        stub = _StubDB()
+        monkeypatch.setattr(rhbt, "_load_db", lambda _kb_path: stub)
+
+        report = rhbt.archive_verified_threads_and_prune_index(
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
+        )
+
+        assert report["verified_threads_seen"] == 1
+        assert report["inserted"] == 1
+        assert report["pruned_from_index"] == 1
+        assert report["failed_count"] == 0
+        assert [row["source_ref"] for row in stub.rows] == ["bridge/alpha-*.md"]
+
+        index_text = index.read_text(encoding="utf-8")
+        assert "Document: alpha" not in index_text
+        assert "VERIFIED: bridge/alpha-002.md" not in index_text
+        assert "Document: beta" in index_text
+        assert "GO: bridge/beta-002.md" in index_text
+
+    def test_keeps_verified_entry_when_archive_insert_fails(self, tmp_path: Path, monkeypatch) -> None:
+        bridge_dir = tmp_path / "bridge"
+        bridge_dir.mkdir()
+        (bridge_dir / "alpha-001.md").write_text("# Alpha\n\nVerified.\n", encoding="utf-8")
+        index = bridge_dir / "INDEX.md"
+        index.write_text(
+            "Document: alpha\nVERIFIED: bridge/alpha-001.md\n",
+            encoding="utf-8",
+        )
+
+        class FailingDB(_StubDB):
+            def upsert_deliberation_source(self, **kwargs):
+                raise RuntimeError("db unavailable")
+
+        monkeypatch.setattr(rhbt, "_load_db", lambda _kb_path: FailingDB())
+
+        report = rhbt.archive_verified_threads_and_prune_index(
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
+        )
+
+        assert report["failed_count"] == 1
+        assert report["pruned_from_index"] == 0
+        assert "Document: alpha" in index.read_text(encoding="utf-8")
+
+    def test_existing_exact_archive_prunes_without_reinserting(self, tmp_path: Path, monkeypatch) -> None:
+        bridge_dir = tmp_path / "bridge"
+        bridge_dir.mkdir()
+        (bridge_dir / "alpha-001.md").write_text("# Alpha\n\nVerified.\n", encoding="utf-8")
+        index = bridge_dir / "INDEX.md"
+        index.write_text(
+            "Document: alpha\nVERIFIED: bridge/alpha-001.md\n",
+            encoding="utf-8",
+        )
+        record = rhbt.collect_compressed_bridge_threads(index, bridge_dir)[0]
+        _, _, content = rhbt.build_thread_summary(record)
+        content_hash = __import__("hashlib").sha256(content.encode()).hexdigest()
+
+        stub = _StubDB()
+        stub.rows.append({
+            "source_type": "bridge_thread",
+            "source_ref": "bridge/alpha-*.md",
+            "content_hash": content_hash,
+        })
+        monkeypatch.setattr(rhbt, "_load_db", lambda _kb_path: stub)
+
+        report = rhbt.archive_verified_threads_and_prune_index(
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
+        )
+
+        assert report["already_archived"] == 1
+        assert report["inserted"] == 0
+        assert report["pruned_from_index"] == 1
+        assert len(stub.rows) == 1
+
+    def test_oversized_index_comments_are_archived_and_compacted(self, tmp_path: Path, monkeypatch) -> None:
+        bridge_dir = tmp_path / "bridge"
+        bridge_dir.mkdir()
+        (bridge_dir / "active-001.md").write_text("# Active\n\nBody.\n", encoding="utf-8")
+        repeated = "\n".join(
+            f"<!--   - Retirement ack #{i}: verbose obsolete dispatcher fire details {'x' * 500} -->"
+            for i in range(30)
+        )
+        index = bridge_dir / "INDEX.md"
+        index.write_text(
+            f"""# Bridge Index
+
+<!-- Prime inserts new document entries at the top of the list below. -->
+<!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
+
+{repeated}
+
+Document: active
+GO: bridge/active-001.md
+""",
+            encoding="utf-8",
+        )
+        stub = _StubDB()
+        monkeypatch.setattr(rhbt, "_load_db", lambda _kb_path: stub)
+
+        report = rhbt.archive_verified_threads_and_prune_index(
+            index_path=index,
+            bridge_dir=bridge_dir,
+            kb_path=None,
+        )
+
+        compaction = report["comment_compaction"]
+        assert compaction["removed_comment_lines"] >= 30
+        assert compaction["removed_bytes"] > 8_000
+        assert compaction["archive_id"] == "DELIB-0000"
+        assert len(stub.rows) == 1
+        assert "Retirement ack #29" in stub.rows[0]["content"]
+
+        text = index.read_text(encoding="utf-8")
+        assert "STARTUP-PRUNED HISTORICAL PREAMBLE" in text
+        assert "Retirement ack #29" not in text
+        assert "Document: active" in text
+        assert "GO: bridge/active-001.md" in text

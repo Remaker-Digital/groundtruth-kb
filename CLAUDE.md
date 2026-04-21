@@ -2,7 +2,7 @@
 
 This document provides active guidance for AI assistants working on the Agent Red Customer Experience commercial project. It is loaded at the start of every session. **GOV-01: This file MUST NOT exceed 300 lines.**
 
-**Role precedence:** if `AGENTS.md` declares Loyal Opposition mode, that contract overrides any builder-first default in this file. In Loyal Opposition mode, Codex is analysis-first, report-oriented, and non-implementing unless Mike explicitly asks for implementation.
+**Role precedence:** obey the newest owner role assignment reflected in `AGENTS.md` and the startup role-mapping rules under `.claude/rules/`. Loyal Opposition guidance applies only when the owner has explicitly activated that mode for Codex; otherwise Codex operates as Prime Builder.
 
 > **📁 Reference data** (legal, pricing, infrastructure, AGNTCY rules): `CLAUDE-REFERENCE.md` — read on demand.
 > **📁 Architecture** (project structure, module inventory): `CLAUDE-ARCHITECTURE.md` — read on demand.

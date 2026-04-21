@@ -1,0 +1,135 @@
+"""Tests for the non-deploying release candidate gate script."""
+
+from __future__ import annotations
+
+import importlib.util
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "release_candidate_gate.py"
+
+
+def _load_gate_module():
+    spec = importlib.util.spec_from_file_location("release_candidate_gate", SCRIPT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["release_candidate_gate"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_secret_manifest_check_fails_when_generated_manifest_exists(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    unsafe = tmp_path / "scripts" / "deploy" / "production-gateway-generated.yaml"
+    unsafe.parent.mkdir(parents=True)
+    unsafe.write_text("secret: should-not-exist\n", encoding="utf-8")
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(gate.GateFailure, match="Unsafe generated production manifest"):
+        gate._check_secret_manifest_removed()
+
+
+def test_secret_manifest_check_allows_pending_git_deletion(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    def fake_run(command, **_kwargs):
+        if command[:2] == ["git", "ls-files"]:
+            return subprocess.CompletedProcess(command, 0, stdout="scripts/deploy/production-gateway-generated.yaml\n")
+        if command[:3] == ["git", "status", "--short"]:
+            return subprocess.CompletedProcess(command, 0, stdout="D  scripts/deploy/production-gateway-generated.yaml\n")
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    gate._check_secret_manifest_removed()
+
+
+def test_secret_manifest_check_fails_when_still_tracked_without_deletion(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    def fake_run(command, **_kwargs):
+        if command[:2] == ["git", "ls-files"]:
+            return subprocess.CompletedProcess(command, 0, stdout="scripts/deploy/production-gateway-generated.yaml\n")
+        if command[:3] == ["git", "status", "--short"]:
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    with pytest.raises(gate.GateFailure, match="still tracked"):
+        gate._check_secret_manifest_removed()
+
+
+def test_python_version_gate_requires_exact_minor():
+    gate = _load_gate_module()
+    actual = f"{sys.version_info.major}.{sys.version_info.minor}"
+    impossible = "0.0" if actual != "0.0" else "9.9"
+
+    with pytest.raises(gate.GateFailure, match="required"):
+        gate._check_python_version(impossible)
+
+
+def test_frontend_gate_fails_when_npm_is_missing(monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate.shutil, "which", lambda _name: None)
+
+    with pytest.raises(gate.GateFailure, match="npm executable"):
+        gate._frontend_gates()
+
+
+def test_frontend_gate_syncs_admin_env_once_and_disables_admin_lifecycle(monkeypatch):
+    gate = _load_gate_module()
+    commands = []
+    envs = []
+
+    def fake_which(name):
+        if name in {"npm.cmd", "npm"}:
+            return "npm"
+        if name in {"powershell.exe", "powershell", "pwsh"}:
+            return "powershell"
+        return None
+
+    def fake_run(command, *, timeout=300, env=None):
+        commands.append(command)
+        envs.append(env)
+
+    monkeypatch.setattr(gate.shutil, "which", fake_which)
+    monkeypatch.setattr(gate, "_run", fake_run)
+
+    gate._frontend_gates()
+
+    sync_commands = [cmd for cmd in commands if cmd[:4] == ["powershell", "-ExecutionPolicy", "Bypass", "-File"]]
+    admin_build_envs = [
+        env for cmd, env in zip(commands, envs)
+        if cmd[:3] == ["npm", "--prefix", os.path.join("admin", "standalone")]
+        or cmd[:3] == ["npm", "--prefix", os.path.join("admin", "provider")]
+        or cmd[:3] == ["npm", "--prefix", os.path.join("admin", "shopify")]
+    ]
+    assert len(sync_commands) == 1
+    assert len(admin_build_envs) == 3
+    assert all(env and env.get("npm_config_ignore_scripts") == "true" for env in admin_build_envs)
+
+
+def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
+    gate = _load_gate_module()
+    commands = []
+
+    def fake_run(command, *, timeout=300, env=None):
+        commands.append(command)
+
+    monkeypatch.setattr(gate, "_run", fake_run)
+
+    gate._python_gates()
+
+    parity_index = commands.index([sys.executable, "scripts/check_codex_hook_parity.py"])
+    pytest_index = next(index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"])
+    assert parity_index < pytest_index
+    assert "tests/scripts/test_codex_hook_parity.py" in commands[pytest_index]
+    assert "tests/scripts/test_standing_backlog_harvest.py" in commands[pytest_index]
+    assert "tests/scripts/test_session_self_initialization.py" in commands[pytest_index]

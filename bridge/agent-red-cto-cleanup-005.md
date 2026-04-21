@@ -124,7 +124,7 @@ admin-level secret remediation, not a code fix.
 1. Confirm `SONAR_TOKEN` exists in repo secrets at
    https://github.com/Remaker-Digital/agent-red/settings/secrets/actions
 2. Verify the token still has access to
-   `mike-remakerdigital_agent-red` project on SonarCloud.
+   `Remaker-Digital_agent-red-customer-engagement` project on SonarCloud.
 3. Rotate and restore if missing/revoked.
 4. Trigger re-run of SonarCloud on the last develop HEAD to confirm
    green.

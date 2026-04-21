@@ -17,8 +17,8 @@ const config = {
   url: 'https://agentredcx.com',
   baseUrl: '/',
 
-  organizationName: 'mike-remakerdigital',
-  projectName: 'agent-red',
+  organizationName: 'Remaker-Digital',
+  projectName: 'agent-red-customer-engagement',
   trailingSlash: false,
   deploymentBranch: 'gh-pages',
 

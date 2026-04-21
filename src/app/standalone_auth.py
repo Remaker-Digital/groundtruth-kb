@@ -40,6 +40,7 @@ _ADMIN_RESET_EMAIL = os.environ.get("ADMIN_RESET_EMAIL", "").strip().lower()
 _ADMIN_COOKIE_NAME = "agentred_admin"
 _CSRF_COOKIE_NAME = "agentred_csrf"
 _MIN_PASSWORD_LENGTH = 12
+_DEPLOYED_ENVIRONMENTS = {"staging", "production"}
 
 # Argon2id password hashing (SPEC-1688)
 _ph = argon2.PasswordHasher(type=argon2.Type.ID)
@@ -106,6 +107,11 @@ def _validate_session_token(token: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _is_deployed_environment() -> bool:
+    """Return True for environments that must never expose passwordless admin."""
+    return os.environ.get("ENVIRONMENT", "development").lower().strip() in _DEPLOYED_ENVIRONMENTS
 
 
 def _generate_csrf_token() -> str:
@@ -700,6 +706,9 @@ def mount_standalone_admin(app: FastAPI) -> None:
         def _check_admin_cookie(request: Request) -> bool:
             """Return True if the request has a valid admin session cookie."""
             if not _admin_password_hash:
+                if _is_deployed_environment():
+                    logger.error("Standalone admin password is missing; denying deployed admin access")
+                    return False
                 # No password configured — allow all access
                 return True
             cookie = request.cookies.get(_ADMIN_COOKIE_NAME, "")

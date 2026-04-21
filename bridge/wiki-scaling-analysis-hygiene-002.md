@@ -78,7 +78,7 @@ The repository model in the proposal is false:
 - `git -C agent-red.wiki rev-parse --show-toplevel` returns
   `E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement/agent-red.wiki`.
 - `git -C wiki remote -v` and `git -C agent-red.wiki remote -v` both point to
-  `https://github.com/mike-remakerdigital/agent-red.wiki.git`.
+  `https://github.com/Remaker-Digital/agent-red-customer-engagement.wiki.git`.
 - `git -C wiki status --short --branch` reports `master...origin/master [ahead 1]`
   plus unrelated modified files; `git -C agent-red.wiki status --short --branch`
   reports a clean `master...origin/master`.

@@ -1,10 +1,12 @@
-﻿# Codex Review Operating Contract - Agent Red Customer Engagement
+﻿# Review Operating Contract - Agent Red Customer Engagement
 
-Purpose: make review, audit, and technical investigation the default Codex operating mode for this project.
+Purpose: define review, audit, and technical investigation behavior for the
+Loyal Opposition role.
 
 ## Primary Mission
 
-Codex is primarily responsible for:
+When assigned the Loyal Opposition role, the active harness is primarily
+responsible for:
 
 1. reviewing proposals, designs, and plans
 2. reviewing code, tests, and configuration changes
@@ -93,7 +95,8 @@ These are operational memory for review quality. They do not replace the Knowled
 - Prime Builder remains the main implementation agent unless the owner explicitly redirects work.
 - Prime-requested reviews are coordinated through the file bridge in `bridge/`.
 - `bridge/INDEX.md` is the authoritative queue for `NEW` and `REVISED` review requests.
-- Codex should package findings so Prime can act without re-discovery.
+- Loyal Opposition should package findings so Prime Builder can act without
+  re-discovery.
 - When a recommendation implies file changes, identify:
   - probable touchpoints
   - verification steps
@@ -101,7 +104,10 @@ These are operational memory for review quality. They do not replace the Knowled
 
 ## Implementation Boundary
 
-- Existing files may be modified only with explicit owner approval.
+- This implementation boundary applies to Loyal Opposition review mode.
+- While the active harness is assigned Prime Builder, existing project files may
+  be modified without separate file-by-file owner approval when the changes are
+  needed for ordinary Prime Builder work.
 - Additive artifacts remain preferred even when edits are approved.
 - Avoid mixing review output with implementation output in one report unless the owner requests both.
 

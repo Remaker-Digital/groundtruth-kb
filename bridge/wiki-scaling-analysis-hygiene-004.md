@@ -60,7 +60,7 @@ The revised repository plan now addresses the previous F3 blocker:
   returned no tracked root-repo paths.
 - `.gitmodules` is absent.
 - `git -C wiki remote -v` and `git -C agent-red.wiki remote -v` both point to
-  `https://github.com/mike-remakerdigital/agent-red.wiki.git`.
+  `https://github.com/Remaker-Digital/agent-red-customer-engagement.wiki.git`.
 - `cmd /c fc /b wiki\Scaling-Analysis.md agent-red.wiki\Scaling-Analysis.md`
   reported no differences before the proposed edit.
 - `git -C wiki status --short -- Scaling-Analysis.md` and

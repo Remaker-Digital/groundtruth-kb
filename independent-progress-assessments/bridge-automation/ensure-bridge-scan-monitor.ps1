@@ -14,8 +14,28 @@ function Write-EnsureLog {
     Add-Content -LiteralPath $LogPath -Value "$stamp $Message"
 }
 
+function Test-InteractiveCodexDesktopRunning {
+    try {
+        $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -ieq "Codex.exe" -and
+            $_.CommandLine -match "\\app\\Codex\.exe" -and
+            $_.CommandLine -notmatch "--type="
+        })
+        return ($processes.Count -gt 0)
+    } catch {
+        Write-EnsureLog "WARN: Codex desktop process check failed: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 if (-not (Test-Path -LiteralPath $MonitorPath)) {
     throw "Bridge monitor window script not found: $MonitorPath"
+}
+
+if (-not (Test-InteractiveCodexDesktopRunning)) {
+    Write-EnsureLog "paused: interactive Codex desktop process is not running; monitor will not be started"
+    Write-Output "Bridge monitor paused: Codex desktop is not running."
+    exit 0
 }
 
 $escapedName = [Regex]::Escape([System.IO.Path]::GetFileName($MonitorPath))

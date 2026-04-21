@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0839",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-04-20-standing-backlog-harvest",
+  "full_content": "Standing backlog harvest snapshot: pre-existing artifacts were inventoried and the standing backlog was populated with explicit reconciliation items for currently discovered actionable sources.\n\nMapped sources:\n- bridge/INDEX.md latest actionable entries: 2 GO and 4 NO-GO.\n- groundtruth.db work_items non-terminal counts: 1994 open, 14 new, 4 in_progress, 8 unresolved, 1 blocked, 17 specified, 1 created, and 1 deferred.\n- memory/release-readiness.md remaining blocker list: credential rotation, git history purge decision, SonarCloud pass, security scan pass, branch provenance reconciliation, exact-candidate Python 3.12 CI, and commercial durability launch-scope decision.\n- independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md records the snapshot.\n\nBacklog updates:\n- GTKB-GOV-004 through GTKB-GOV-010 added to memory/work_list.md.\n- scripts/audit_standing_backlog_sources.py added as repeatable source audit.\n- tests/scripts/test_standing_backlog_harvest.py added and wired into the release-candidate gate.\n\nResidual conclusion: the standing backlog now includes explicit reconciliation items for discovered pre-existing source populations, but MemBase work_items require structured grouping rather than one markdown row per work item.\n",
+  "full_content_sha256": "b1d89bb4eeb2666d303db8c0f55ee6e7480f906daae971d30bfca1ed78c187a7",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner said: Please proceed.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Harvest pre-existing standing backlog sources and record durable reconciliation obligations.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

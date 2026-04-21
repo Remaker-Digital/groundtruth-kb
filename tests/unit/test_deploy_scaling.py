@@ -35,8 +35,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SCRIPT = PROJECT_ROOT / "scripts" / "deploy.py"
 TERRAFORM_MAIN = PROJECT_ROOT / "infrastructure" / "terraform" / "main.tf"

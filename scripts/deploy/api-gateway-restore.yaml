@@ -24,6 +24,14 @@ properties:
         value: PLACEHOLDER_SHOPIFY_SECRET
       - name: admin-preview-password
         value: PLACEHOLDER_ADMIN_PASSWORD
+      - name: admin-session-secret
+        value: PLACEHOLDER_ADMIN_SESSION_SECRET
+      - name: magic-link-jwt-secret
+        value: PLACEHOLDER_MAGIC_LINK_JWT_SECRET
+      - name: mfa-jwt-secret
+        value: PLACEHOLDER_MFA_JWT_SECRET
+      - name: customer-token-secret
+        value: PLACEHOLDER_CUSTOMER_TOKEN_SECRET
   template:
     containers:
       - name: api-gateway
@@ -68,6 +76,18 @@ properties:
             secretRef: shopify-api-secret
           - name: ADMIN_PREVIEW_PASSWORD
             secretRef: admin-preview-password
+          - name: ADMIN_SESSION_SECRET
+            secretRef: admin-session-secret
+          - name: MAGIC_LINK_JWT_SECRET
+            secretRef: magic-link-jwt-secret
+          - name: MFA_JWT_SECRET
+            secretRef: mfa-jwt-secret
+          - name: CUSTOMER_TOKEN_SECRET
+            secretRef: customer-token-secret
+          - name: APP_BASE_URL
+            value: https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
+          - name: APP_CORS_ORIGINS
+            value: https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
         probes:
           - type: liveness
             httpGet:

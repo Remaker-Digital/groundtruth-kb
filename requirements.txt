@@ -9,6 +9,7 @@ agntcy-app-sdk>=0.4.7,<1.0
 # builds include all transport backends (SPEC-1802 / WI-1314)
 slim-bindings>=1.0.0
 a2a-sdk>=0.3.0
+pyOpenSSL>=26.0.0
 
 # MCP SDK — Model Context Protocol client for external tool integrations (SPEC-1526)
 mcp>=1.0.0,<2.0

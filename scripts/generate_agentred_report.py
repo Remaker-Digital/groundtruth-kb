@@ -698,7 +698,7 @@ def build_report():
     table = doc.add_table(rows=11, cols=2)
     table.style = 'Light Shading Accent 1'
     facts = [
-        ('Repository', 'github.com/mike-remakerdigital/agent-red'),
+        ('Repository', 'github.com/Remaker-Digital/agent-red-customer-engagement'),
         ('Description', 'AI-powered customer service SaaS — multi-agent pipeline, admin dashboards, AGNTCY platform'),
         ('Primary Language', 'Python 3.12 (backend), TypeScript (frontend)'),
         ('Project Age', '~6 months (since October 2025)'),

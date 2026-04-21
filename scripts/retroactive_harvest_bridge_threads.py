@@ -41,6 +41,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+from datetime import UTC, datetime
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_DIR = REPO_ROOT / "bridge"
@@ -50,6 +51,15 @@ KB_PATH = REPO_ROOT / "groundtruth.db"
 FILENAME_VERSION_RE = re.compile(r"^(.+)-(\d{3})\.md$")
 _DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
 _STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+bridge/(.+\.md)$")
+_HEADER_COMMENT_KEEPERS = (
+    "Prime inserts new document entries",
+    "Codex scans for NEW/REVISED",
+    "Statuses:",
+    "When this file exceeds",
+    "STARTUP-PRUNED",
+)
+_COMMENT_COMPACTION_THRESHOLD_BYTES = 8_000
+_COMMENT_COMPACTION_THRESHOLD_LINES = 12
 
 
 # ---------------------------------------------------------------------------
@@ -296,6 +306,294 @@ def compute_active_bridge_thread_coverage(
 
 
 # ---------------------------------------------------------------------------
+# Verified-thread archival + INDEX pruning
+# ---------------------------------------------------------------------------
+
+
+def _write_pruned_index(index_path: Path, archived_thread_names: set[str]) -> int:
+    """Remove archived VERIFIED document entries from bridge/INDEX.md.
+
+    Bridge files are never deleted. Only the active coordination entry is
+    removed after the corresponding compressed thread row exists in the
+    Deliberation Archive.
+    """
+    if not archived_thread_names or not index_path.exists():
+        return 0
+
+    lines = index_path.read_text(encoding="utf-8").splitlines()
+    kept: list[str] = []
+    removed = 0
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        doc_match = _DOC_LINE_RE.match(line.strip())
+        if not doc_match:
+            kept.append(line)
+            i += 1
+            continue
+
+        doc_name = doc_match.group(1).strip()
+        block: list[str] = [line]
+        i += 1
+        while i < len(lines) and not _DOC_LINE_RE.match(lines[i].strip()):
+            block.append(lines[i])
+            i += 1
+
+        if doc_name in archived_thread_names:
+            removed += 1
+            continue
+        kept.extend(block)
+
+    if removed:
+        # Collapse excessive blank runs left by removed blocks while preserving
+        # the header/comment structure.
+        compact: list[str] = []
+        blank_run = 0
+        for line in kept:
+            if line.strip():
+                blank_run = 0
+                compact.append(line)
+            else:
+                blank_run += 1
+                if blank_run <= 2:
+                    compact.append(line)
+        index_path.write_text("\n".join(compact).rstrip() + "\n", encoding="utf-8")
+    return removed
+
+
+def _comment_marker(block_text: str) -> str:
+    upper = block_text.upper()
+    if "RETIRED" in upper:
+        return "RETIRED"
+    if "PAUSED" in upper:
+        return "PAUSED"
+    if "DEFERRAL" in upper or "DEFERRED" in upper:
+        return "DEFERRED"
+    if "PARKED" in upper:
+        return "PARKED"
+    return "HISTORICAL"
+
+
+def _compact_comment_block(block: list[str]) -> tuple[list[str], int, int]:
+    comment_lines = [line for line in block if line.strip().startswith("<!--")]
+    block_bytes = sum(len((line + "\n").encode("utf-8")) for line in block)
+    if (
+        len(comment_lines) <= _COMMENT_COMPACTION_THRESHOLD_LINES
+        and block_bytes <= _COMMENT_COMPACTION_THRESHOLD_BYTES
+    ):
+        return block, 0, 0
+
+    marker = _comment_marker("\n".join(block))
+    compact = [
+        (
+            f"<!-- STARTUP-PRUNED {marker} COMMENT BLOCK: removed "
+            f"{len(comment_lines)} comment lines / {block_bytes} bytes from active bridge/INDEX.md. "
+            "Original text was archived to the Deliberation Archive before compaction; "
+            "bridge files remain on disk. Preserve this marker's pause/retirement meaning. -->"
+        ),
+        "",
+    ]
+    return compact, len(comment_lines), block_bytes
+
+
+def _compact_index_comments(index_path: Path, db) -> dict:
+    """Archive then compact oversized INDEX comments that bloat startup context."""
+    if not index_path.exists():
+        return {"compacted_blocks": 0, "removed_comment_lines": 0, "removed_bytes": 0, "archive_id": None}
+
+    original = index_path.read_text(encoding="utf-8")
+    lines = original.splitlines()
+    kept: list[str] = []
+    removed_lines = 0
+    removed_bytes = 0
+    compacted_blocks = 0
+    pre_document = True
+    preamble_pruned = False
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("Document: "):
+            pre_document = False
+            kept.append(line)
+            i += 1
+            continue
+
+        if line.strip().startswith("<!--") or (not line.strip() and i + 1 < len(lines) and lines[i + 1].strip().startswith("<!--")):
+            block: list[str] = []
+            while i < len(lines) and (lines[i].strip().startswith("<!--") or not lines[i].strip()):
+                block.append(lines[i])
+                i += 1
+
+            if pre_document:
+                keep_block = [
+                    item for item in block
+                    if (
+                        not item.strip()
+                        or item.startswith("#")
+                        or any(keeper in item for keeper in _HEADER_COMMENT_KEEPERS)
+                    )
+                ]
+                dropped = [item for item in block if item not in keep_block and item.strip().startswith("<!--")]
+                if dropped:
+                    preamble_pruned = True
+                    removed_lines += len(dropped)
+                    removed_bytes += sum(len((item + "\n").encode("utf-8")) for item in dropped)
+                kept.extend(keep_block)
+                continue
+
+            compacted, block_removed_lines, block_removed_bytes = _compact_comment_block(block)
+            if block_removed_lines:
+                compacted_blocks += 1
+                removed_lines += block_removed_lines
+                removed_bytes += block_removed_bytes
+            kept.extend(compacted)
+            continue
+
+        kept.append(line)
+        i += 1
+
+    if preamble_pruned:
+        insert_at = 0
+        while insert_at < len(kept) and (kept[insert_at].startswith("#") or not kept[insert_at].strip() or kept[insert_at].strip().startswith("<!--")):
+            insert_at += 1
+        kept.insert(
+            insert_at,
+            "<!-- STARTUP-PRUNED HISTORICAL PREAMBLE: retired maintenance comments removed from active bridge/INDEX.md after DA archival. -->",
+        )
+        compacted_blocks += 1
+
+    compact_lines: list[str] = []
+    blank_run = 0
+    for line in kept:
+        if line.strip():
+            blank_run = 0
+            compact_lines.append(line)
+        else:
+            blank_run += 1
+            if blank_run <= 2:
+                compact_lines.append(line)
+    compacted_text = "\n".join(compact_lines).rstrip() + "\n"
+
+    if not removed_lines:
+        if compacted_text != original:
+            index_path.write_text(compacted_text, encoding="utf-8")
+        return {"compacted_blocks": 0, "removed_comment_lines": 0, "removed_bytes": 0, "archive_id": None}
+
+    timestamp = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    archive = db.upsert_deliberation_source(
+        source_type="bridge_thread",
+        source_ref="bridge/INDEX.md#startup-comment-prune",
+        content=original,
+        title=f"Bridge INDEX startup comment compaction snapshot {timestamp}",
+        summary=(
+            f"Pre-compaction bridge/INDEX.md snapshot archived before removing "
+            f"{removed_lines} historical comment line(s) from startup context."
+        ),
+        outcome="informational",
+        origin_project="agent-red",
+        origin_repo="Remaker-Digital/agent-red-customer-engagement",
+        changed_by="retroactive_harvest_bridge_threads.py",
+        change_reason="Owner-authorized startup pruning of oversized bridge/INDEX.md comment history",
+    )
+    archive_id = archive.get("id") if isinstance(archive, dict) else None
+    index_path.write_text(compacted_text, encoding="utf-8")
+    return {
+        "compacted_blocks": compacted_blocks,
+        "removed_comment_lines": removed_lines,
+        "removed_bytes": removed_bytes,
+        "archive_id": archive_id,
+    }
+
+
+def archive_verified_threads_and_prune_index(
+    *,
+    index_path: Path = BRIDGE_INDEX,
+    bridge_dir: Path = BRIDGE_DIR,
+    kb_path: str | None = None,
+) -> dict:
+    """Archive active VERIFIED bridge threads, then remove them from INDEX.
+
+    This is intentionally stricter than ``run_sweep(execute=True)``: it only
+    touches active INDEX entries whose latest status is VERIFIED. GO, NO-GO,
+    NEW, REVISED, and orphan bridge files are left alone.
+    """
+    records = collect_compressed_bridge_threads(index_path, bridge_dir)
+    verified_records = [r for r in records if r.active and r.latest_status == "VERIFIED"]
+    db = _load_db(kb_path)
+    existing_rows = db.list_deliberations(source_type="bridge_thread")
+
+    archived_thread_names: set[str] = set()
+    inserted = 0
+    already_archived = 0
+    failed: list[str] = []
+
+    for rec in verified_records:
+        if not rec.versions:
+            failed.append(f"{rec.thread_name}: no readable bridge versions")
+            continue
+
+        title, summary, content = build_thread_summary(rec)
+        content_hash = hashlib.sha256(content.encode()).hexdigest()
+        exact_existing = [
+            row for row in existing_rows
+            if row.get("source_ref") == rec.source_ref and row.get("content_hash") == content_hash
+        ]
+        if exact_existing:
+            already_archived += 1
+            archived_thread_names.add(rec.thread_name)
+            continue
+
+        try:
+            row = db.upsert_deliberation_source(
+                source_type="bridge_thread",
+                source_ref=rec.source_ref,
+                content=content,
+                title=title,
+                summary=summary,
+                outcome="go",
+                origin_project="agent-red",
+                origin_repo="Remaker-Digital/agent-red-customer-engagement",
+                changed_by="retroactive_harvest_bridge_threads.py",
+                change_reason=(
+                    "Owner-authorized startup maintenance: archive VERIFIED "
+                    "bridge thread before removing it from bridge/INDEX.md"
+                ),
+            )
+            inserted += 1
+            existing_rows.append({
+                "source_type": "bridge_thread",
+                "source_ref": rec.source_ref,
+                "content_hash": row.get("content_hash", content_hash) if isinstance(row, dict) else content_hash,
+            })
+            archived_thread_names.add(rec.thread_name)
+        except Exception as exc:  # noqa: BLE001 - keep unarchived entries visible
+            failed.append(f"{rec.thread_name}: {exc}")
+
+    pruned = _write_pruned_index(index_path, archived_thread_names)
+    try:
+        comment_compaction = _compact_index_comments(index_path, db)
+    except Exception as exc:  # noqa: BLE001 - index comments remain if archival/compaction fails
+        comment_compaction = {
+            "compacted_blocks": 0,
+            "removed_comment_lines": 0,
+            "removed_bytes": 0,
+            "archive_id": None,
+            "error": str(exc),
+        }
+    return {
+        "verified_threads_seen": len(verified_records),
+        "already_archived": already_archived,
+        "inserted": inserted,
+        "pruned_from_index": pruned,
+        "comment_compaction": comment_compaction,
+        "failed_count": len(failed),
+        "failed": failed,
+        "kept_unarchived": len(verified_records) - len(archived_thread_names),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main sweep
 # ---------------------------------------------------------------------------
 
@@ -445,6 +743,11 @@ def main() -> int:
     )
     parser.add_argument("--execute", action="store_true", help="Apply inserts (default: dry-run)")
     parser.add_argument(
+        "--archive-and-prune-verified",
+        action="store_true",
+        help="Archive active VERIFIED threads and remove those entries from bridge/INDEX.md.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Explicit dry-run (default behavior; opposite of --execute). "
@@ -457,6 +760,16 @@ def main() -> int:
 
     if args.dry_run and args.execute:
         parser.error("--dry-run and --execute are mutually exclusive")
+    if args.archive_and_prune_verified and (args.execute or args.dry_run):
+        parser.error("--archive-and-prune-verified cannot be combined with --execute or --dry-run")
+
+    if args.archive_and_prune_verified:
+        report = archive_verified_threads_and_prune_index(kb_path=args.kb_path)
+        json_output = json.dumps(report, indent=2, sort_keys=True)
+        print(json_output)
+        if args.output:
+            Path(args.output).write_text(json_output, encoding="utf-8")
+        return 1 if report["failed_count"] else 0
 
     report = run_sweep(
         execute=args.execute,

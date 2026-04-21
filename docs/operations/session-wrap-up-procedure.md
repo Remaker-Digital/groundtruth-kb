@@ -17,9 +17,9 @@
 | `CLAUDE_MD` | `CLAUDE.md` |
 | `SCHEDULE_FILE` | `.claude/SCHEDULE.md` |
 | `DOCS_SITE` | `docs-site/` (agentredcx.com) |
-| `GITHUB_REPO` | `https://github.com/mike-remakerdigital/agent-red` |
+| `GITHUB_REPO` | `https://github.com/Remaker-Digital/agent-red-customer-engagement` |
 | `GITHUB_PROJECT` | `https://github.com/users/mike-remakerdigital/projects/1` |
-| `GITHUB_WIKI` | `https://github.com/mike-remakerdigital/agent-red/wiki` |
+| `GITHUB_WIKI` | `https://github.com/Remaker-Digital/agent-red-customer-engagement/wiki` |
 | `STAGING_ENV` | `agent-red-staging` Container App |
 
 ---

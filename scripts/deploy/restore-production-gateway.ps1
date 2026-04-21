@@ -20,7 +20,7 @@
     that has write access to the Agent-Red resource group.
 
 .PARAMETER ImageTag
-    Image tag to deploy (default: v1.98.73 - last known production)
+    Image tag to deploy (default: v1.98.92 - current PRODUCT_VERSION at last script review)
 
 .PARAMETER DryRun
     Show what would be done without making changes
@@ -30,7 +30,7 @@
 #>
 
 param(
-    [string]$ImageTag = "v1.98.73",
+    [string]$ImageTag = "v1.98.92",
     [switch]$DryRun
 )
 
@@ -107,9 +107,10 @@ Write-Host "  api-gateway:$ImageTag found in ACR" -ForegroundColor Green
 # Step 4: Export staging YAML and adapt for production
 # -----------------------------------------------------------------------
 Write-Host "`n[4/7] Exporting staging config as base..." -ForegroundColor Yellow
-$yamlPath = "$PSScriptRoot\production-gateway-generated.yaml"
+$yamlPath = "$PSScriptRoot\_production-gateway-generated.local.yaml"
 az containerapp show -n $STAGING_APP_NAME -g $RESOURCE_GROUP -o yaml > $yamlPath
 Write-Host "  Exported to $yamlPath" -ForegroundColor Green
+Write-Host "  Generated production YAML is intentionally local/ignored because it may contain secrets." -ForegroundColor Yellow
 
 Write-Host "  You must manually edit this YAML before creating:" -ForegroundColor Yellow
 Write-Host "    - Change name: agent-red-staging -> agent-red-api-gateway" -ForegroundColor Yellow
@@ -119,7 +120,9 @@ Write-Host "    - Change KEY_VAULT_URL: kv-agentred-staging -> kv-agentred-eastu
 Write-Host "    - Change image tag: v1.98.75 -> $ImageTag" -ForegroundColor Yellow
 Write-Host "    - Change minReplicas: 0 -> 2" -ForegroundColor Yellow
 Write-Host "    - Change maxReplicas: 3 -> 8" -ForegroundColor Yellow
+Write-Host "    - Set APP_BASE_URL to the production HTTPS gateway URL" -ForegroundColor Yellow
 Write-Host "    - Update APP_CORS_ORIGINS for production domains" -ForegroundColor Yellow
+Write-Host "    - Ensure ADMIN_SESSION_SECRET, MAGIC_LINK_JWT_SECRET, MFA_JWT_SECRET, and CUSTOMER_TOKEN_SECRET use production secretRefs" -ForegroundColor Yellow
 Write-Host "    - Remove staging-specific vars: DISABLE_RATE_LIMITING, PRE_AUTH_RATE_LIMIT_EXEMPT_IPS" -ForegroundColor Yellow
 
 if ($DryRun) {

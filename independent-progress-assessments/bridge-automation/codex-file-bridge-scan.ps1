@@ -95,6 +95,20 @@ function Show-PollerToast {
     }
 }
 
+function Test-InteractiveCodexDesktopRunning {
+    try {
+        $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -ieq "Codex.exe" -and
+            $_.CommandLine -match "\\app\\Codex\.exe" -and
+            $_.CommandLine -notmatch "--type="
+        })
+        return ($processes.Count -gt 0)
+    } catch {
+        Write-ScanLog "WARN: Codex desktop process check failed: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Get-BridgeEntries {
     param([string[]]$Lines)
 
@@ -314,6 +328,13 @@ try {
 }
 
 try {
+    if (-not $NoExec -and -not (Test-InteractiveCodexDesktopRunning)) {
+        $pausedMessage = "paused: interactive Codex desktop process is not running; scheduled scan will not spawn codex exec"
+        Write-ScanLog $pausedMessage
+        Write-ScanStatus -State "paused" -Message $pausedMessage
+        exit 0
+    }
+
     $attention = @(Get-AttentionEntries)
     if ($attention.Count -eq 0) {
         Write-ScanLog "Bridge scan: clear."
