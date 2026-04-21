@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-21T05:42:36Z
+Generated: 2026-04-21T05:57:36Z
 
 ## Startup Disclosure
 
@@ -58,7 +58,7 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Focus this session on clearing release blockers. Start with Production credentials exposed in the deleted generated manifest must be rotated. Verify the result with scripts/release_candidate_gate.py and update governed evidence.
 
 4. **Repair Testing/Tool Integrations**
-   Current signal: 4 failing and 10 unknown integration(s) are visible.
+   Current signal: 4 failing and 3 unknown integration(s) are visible.
    Prompt details: Focus this session on restoring testing service/tool integration health. Start with GitHub Actions: Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions. Preserve GT-KB as infrastructure evidence.
 
 5. **Remediate Known Risks**
