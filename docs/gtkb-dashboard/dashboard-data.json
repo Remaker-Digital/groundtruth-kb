@@ -5,23 +5,6 @@
       "contention_actionable_bridge_count": 0,
       "deliberation_archive_current_total": 324,
       "drift_changed_path_count": 11,
-      "generated_at": "2026-04-20T23:34:34Z",
-      "membase_open_work_items": 29,
-      "pytest_file_count": 338,
-      "regression_release_blocker_count": 7,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 40,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 4,
-      "contention_actionable_bridge_count": 0,
-      "deliberation_archive_current_total": 324,
-      "drift_changed_path_count": 11,
       "generated_at": "2026-04-20T23:35:58Z",
       "membase_open_work_items": 29,
       "pytest_file_count": 338,
@@ -3399,6 +3382,23 @@
       "specification_current_total": 1847,
       "token_measurement_status": "not_exposed_by_current_harness",
       "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 3,
+      "contention_actionable_bridge_count": 0,
+      "deliberation_archive_current_total": 324,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-21T05:39:35Z",
+      "membase_open_work_items": 29,
+      "pytest_file_count": 338,
+      "regression_release_blocker_count": 7,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 40,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
     }
   ],
   "model": {
@@ -3562,12 +3562,12 @@
         }
       ],
       "data_freshness": {
-        "generated_at": "2026-04-21T05:18:35Z",
-        "groundtruth_db_modified_at": "2026-04-21T05:18:40.762209Z",
-        "last_commit": "2026-04-18T22:35:05-07:00\nbridge: B4 wiki/Scaling-Analysis.md hygiene \u2014 proposal \u2192 GO \u2192 impl \u2192 VERIFIED",
-        "repo_branch": "develop",
-        "repo_sha": "99bc114b910a434c0720ef190213bff15a56df24",
-        "repo_short_sha": "99bc114b",
+        "generated_at": "2026-04-21T05:39:35Z",
+        "groundtruth_db_modified_at": "2026-04-21T05:39:41.770023Z",
+        "last_commit": "2026-04-20T22:37:55-07:00\nmerge: develop into main for Agent Red artifact publish",
+        "repo_branch": "main",
+        "repo_sha": "847aae45dfdcce57c0e645471d471db5f35270ea",
+        "repo_short_sha": "847aae45",
         "scope_version": "agent_red_v1",
         "sources": [
           "groundtruth.db",
@@ -3673,14 +3673,6 @@
           "remediation": "Review `gt project upgrade --dry-run` and apply only after owner approval.",
           "risk": "GT-KB scaffold drift",
           "severity": "yellow"
-        },
-        {
-          "evidence": "11 Agent Red changed path(s).",
-          "impact": "Dashboard evidence may include uncommitted local state.",
-          "owner": "Prime Builder",
-          "remediation": "Review drift and stage/commit or explicitly defer it.",
-          "risk": "Working tree drift",
-          "severity": "yellow"
         }
       ],
       "shortcuts": [
@@ -3767,7 +3759,7 @@
         "report-depth-prime-builder-context.md"
       ]
     },
-    "generated_at": "2026-04-21T05:18:35Z",
+    "generated_at": "2026-04-21T05:39:35Z",
     "governance_stance": [
       "Strict GOV enforcement where mechanically available",
       "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
@@ -3784,7 +3776,7 @@
             "count": 12,
             "label": "Commit",
             "latest_result": "recorded",
-            "latest_version": "v1.98.18-429-g99bc114b",
+            "latest_version": "v1.98.92-114-g847aae45",
             "stage": "commit",
             "status": "green"
           },
@@ -3833,9 +3825,39 @@
             "stage": "production_deployment",
             "stage_label": "Production Deployment",
             "test_results": "Deployment script/manifest evidence only; live environment revision was not queried.",
-            "timestamp": "2026-04-20T03:45:34.735940Z",
+            "timestamp": "2026-04-21T05:37:57.091791Z",
             "url": "",
             "version": "v1.14.0"
+          },
+          {
+            "branch": "",
+            "commit": "847aae45",
+            "event": "merge: develop into main for Agent Red artifact publish",
+            "notes": "Remaker Digital",
+            "result": "recorded",
+            "result_color": "green",
+            "source": "git log",
+            "stage": "commit",
+            "stage_label": "Commit",
+            "test_results": "Correlate with workflow rows sharing this commit.",
+            "timestamp": "2026-04-20T22:37:55-07:00",
+            "url": "",
+            "version": "v1.98.92-114-g847aae45"
+          },
+          {
+            "branch": "",
+            "commit": "c819a37b",
+            "event": "chore: publish Agent Red governance and release artifacts",
+            "notes": "Remaker Digital",
+            "result": "recorded",
+            "result_color": "green",
+            "source": "git log",
+            "stage": "commit",
+            "stage_label": "Commit",
+            "test_results": "Correlate with workflow rows sharing this commit.",
+            "timestamp": "2026-04-20T22:37:29-07:00",
+            "url": "",
+            "version": "v1.98.18-430-gc819a37b"
           },
           {
             "branch": "main",
@@ -4001,36 +4023,6 @@
             "timestamp": "2026-04-18T07:50:33-07:00",
             "url": "",
             "version": "v1.98.18-420-g45c03509"
-          },
-          {
-            "branch": "",
-            "commit": "0e75d0d0",
-            "event": "memory: E1 Prepare VERIFIED entry + Codex -008 artifact",
-            "notes": "Remaker Digital",
-            "result": "recorded",
-            "result_color": "green",
-            "source": "git log",
-            "stage": "commit",
-            "stage_label": "Commit",
-            "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-18T07:04:34-07:00",
-            "url": "",
-            "version": "v1.98.18-419-g0e75d0d0"
-          },
-          {
-            "branch": "",
-            "commit": "049396d9",
-            "event": "bridge: E1 Prepare post-impl report (NEW -007) with full reconciliation table",
-            "notes": "Remaker Digital",
-            "result": "recorded",
-            "result_color": "green",
-            "source": "git log",
-            "stage": "commit",
-            "stage_label": "Commit",
-            "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-18T06:59:05-07:00",
-            "url": "",
-            "version": "v1.98.18-418-g049396d9"
           },
           {
             "branch": "main",
@@ -5441,9 +5433,9 @@
       },
       "drift": {
         "available": true,
-        "changed_path_count": 11,
-        "deleted_path_count": 1,
-        "raw_changed_path_count": 376,
+        "changed_path_count": 0,
+        "deleted_path_count": 0,
+        "raw_changed_path_count": 0,
         "scope_confidence": "agent_red_current_heuristic",
         "untracked_path_count": 0
       },
@@ -5611,49 +5603,49 @@
         },
         {
           "available": true,
-          "bytes": 17700,
+          "bytes": 17701,
           "lines": 268,
           "path": "CLAUDE.md"
         },
         {
           "available": true,
-          "bytes": 16042,
+          "bytes": 16066,
           "lines": 135,
           "path": "independent-progress-assessments/LOYAL-OPPOSITION-LOG.md"
         },
         {
           "available": true,
-          "bytes": 7028,
+          "bytes": 7102,
           "lines": 125,
           "path": "AGENTS.md"
         },
         {
           "available": true,
-          "bytes": 5140,
+          "bytes": 5155,
           "lines": 137,
           "path": "independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md"
         },
         {
           "available": true,
-          "bytes": 4264,
-          "lines": 80,
-          "path": "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/RELEASE-RISK-REGISTER-2026-04-20.md"
-        },
-        {
-          "available": true,
-          "bytes": 4048,
+          "bytes": 4079,
           "lines": 95,
           "path": "independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md"
         },
         {
           "available": true,
-          "bytes": 3079,
+          "bytes": 3150,
           "lines": 72,
           "path": ".claude/rules/deliberation-protocol.md"
+        },
+        {
+          "available": true,
+          "bytes": 2880,
+          "lines": 84,
+          "path": "independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md"
         }
       ],
       "scope": "startup_loaded_files_and_coordination_state",
-      "total_bytes": 207198
+      "total_bytes": 205931
     },
     "token_reduction_options": [
       "Use the dashboard link before loading large artifacts into context.",
