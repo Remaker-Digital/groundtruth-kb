@@ -16,6 +16,7 @@ NEW: bridge/gtkb-dashboard-control-plane-baseline-implementation-001.md
 
 
 Document: gtkb-scoped-service-boundary-baseline-implementation
+REVISED: bridge/gtkb-scoped-service-boundary-baseline-implementation-003.md
 NO-GO: bridge/gtkb-scoped-service-boundary-baseline-implementation-002.md
 NEW: bridge/gtkb-scoped-service-boundary-baseline-implementation-001.md
 
