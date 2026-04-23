@@ -26,6 +26,7 @@ NEW: bridge/gtkb-environment-boundary-baseline-implementation-001.md
 
 
 Document: gtkb-work-subject-root-enforcement-implementation
+REVISED: bridge/gtkb-work-subject-root-enforcement-implementation-005.md
 NO-GO: bridge/gtkb-work-subject-root-enforcement-implementation-004.md
 REVISED: bridge/gtkb-work-subject-root-enforcement-implementation-003.md
 NO-GO: bridge/gtkb-work-subject-root-enforcement-implementation-002.md
@@ -55,12 +56,15 @@ GO: bridge/gtkb-isolation-007-work-subject-root-plan-review-002.md
 NEW: bridge/gtkb-isolation-007-work-subject-root-plan-review-001.md
 
 Document: gtkb-session-work-subject
+NEW: bridge/gtkb-session-work-subject-005.md
 GO: bridge/gtkb-session-work-subject-004.md
 REVISED: bridge/gtkb-session-work-subject-003.md
 NO-GO: bridge/gtkb-session-work-subject-002.md
 NEW: bridge/gtkb-session-work-subject-001.md
 
 Document: gtkb-mass-adoption-first-commit-package
+NO-GO: bridge/gtkb-mass-adoption-first-commit-package-009.md
+REVISED: bridge/gtkb-mass-adoption-first-commit-package-008.md
 NO-GO: bridge/gtkb-mass-adoption-first-commit-package-007.md
 REVISED: bridge/gtkb-mass-adoption-first-commit-package-006.md
 REVISED: bridge/gtkb-mass-adoption-first-commit-package-005.md
@@ -121,6 +125,8 @@ GO: bridge/gtkb-core-spec-intake-phase1-002.md
 NEW: bridge/gtkb-core-spec-intake-phase1-001.md
 
 Document: gtkb-core-spec-intake
+REVISED: bridge/gtkb-core-spec-intake-005.md
+NO-GO: bridge/gtkb-core-spec-intake-004.md
 NEW: bridge/gtkb-core-spec-intake-003.md
 GO: bridge/gtkb-core-spec-intake-002.md
 NEW: bridge/gtkb-core-spec-intake-001.md
