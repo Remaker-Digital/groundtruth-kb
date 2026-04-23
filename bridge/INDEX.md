@@ -64,6 +64,9 @@ NO-GO: bridge/gtkb-session-work-subject-002.md
 NEW: bridge/gtkb-session-work-subject-001.md
 
 Document: gtkb-mass-adoption-first-commit-package
+REVISED: bridge/gtkb-mass-adoption-first-commit-package-012.md
+NO-GO: bridge/gtkb-mass-adoption-first-commit-package-011.md
+REVISED: bridge/gtkb-mass-adoption-first-commit-package-010.md
 NO-GO: bridge/gtkb-mass-adoption-first-commit-package-009.md
 REVISED: bridge/gtkb-mass-adoption-first-commit-package-008.md
 NO-GO: bridge/gtkb-mass-adoption-first-commit-package-007.md
@@ -126,6 +129,9 @@ GO: bridge/gtkb-core-spec-intake-phase1-002.md
 NEW: bridge/gtkb-core-spec-intake-phase1-001.md
 
 Document: gtkb-core-spec-intake
+VERIFIED: bridge/gtkb-core-spec-intake-008.md
+NEW: bridge/gtkb-core-spec-intake-007.md
+GO: bridge/gtkb-core-spec-intake-006.md
 REVISED: bridge/gtkb-core-spec-intake-005.md
 NO-GO: bridge/gtkb-core-spec-intake-004.md
 NEW: bridge/gtkb-core-spec-intake-003.md
