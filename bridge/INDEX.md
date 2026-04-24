@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-app-boundary-mechanism-audit
+REVISED: bridge/gtkb-app-boundary-mechanism-audit-003.md
+NO-GO: bridge/gtkb-app-boundary-mechanism-audit-002.md
 NEW: bridge/gtkb-app-boundary-mechanism-audit-001.md
 
 Document: gtkb-membase-effective-use-umbrella
