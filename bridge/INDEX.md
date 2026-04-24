@@ -12,6 +12,8 @@ Document: gtkb-isolation-015-slice2-work-subject-set
 NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-001.md
 
 Document: gtkb-gov-proposal-standards-slice1
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-009.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-008.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-007.md
 NO-GO: bridge/gtkb-gov-proposal-standards-slice1-006.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-005.md
