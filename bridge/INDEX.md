@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-015-phase7-full-integration
+NEW: bridge/gtkb-isolation-015-phase7-full-integration-001.md
+
 Document: gtkb-isolation-009-adopter-packaging-plan-review
 VERIFIED: bridge/gtkb-isolation-009-adopter-packaging-plan-review-004.md
 NEW: bridge/gtkb-isolation-009-adopter-packaging-plan-review-003.md
