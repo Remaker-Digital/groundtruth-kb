@@ -14,6 +14,7 @@ NO-GO: bridge/gtkb-gov-da-enforcement-slice1-002.md
 NEW: bridge/gtkb-gov-da-enforcement-slice1-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice1
+GO: bridge/gtkb-dashboard-industry-alignment-slice1-006.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice1-005.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice1-004.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice1-003.md
@@ -21,6 +22,8 @@ NO-GO: bridge/gtkb-dashboard-industry-alignment-slice1-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice1-001.md
 
 Document: gtkb-isolation-015-phase7-full-integration
+NEW: bridge/gtkb-isolation-015-phase7-full-integration-015.md
+NO-GO: bridge/gtkb-isolation-015-phase7-full-integration-014.md
 NEW: bridge/gtkb-isolation-015-phase7-full-integration-013.md
 NO-GO: bridge/gtkb-isolation-015-phase7-full-integration-012.md
 NEW: bridge/gtkb-isolation-015-phase7-full-integration-011.md

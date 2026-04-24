@@ -811,12 +811,24 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
                     "Treat bridge message authority per operating-role.md."
                 )
 
+    # Read OUR subject from our own per-harness lifecycle-guard so divergence
+    # detection is symmetric across harnesses (per bridge -014 P1). The shared
+    # canonical work-subject file cannot represent multi-harness divergence;
+    # reading it for the active-harness side of the comparison would let one
+    # harness silently miss a split that the other harness correctly warns on.
+    # Falls back to the canonical state only when the local guard has no
+    # current_subject recorded (e.g., pre-upgrade session where the writer
+    # hadn't yet been extended).
     subject_mismatch = False
     our_subject: str | None = None
-    try:
-        our_subject = str(load_state(project_root).get("current_subject") or "") or None
-    except Exception:
-        our_subject = None
+    our_guard_path = HARNESS_LIFECYCLE_GUARDS.get(current_harness) if current_harness else None
+    if our_guard_path is not None:
+        our_subject = _read_counterpart_subject(our_guard_path)
+    if our_subject is None:
+        try:
+            our_subject = str(load_state(project_root).get("current_subject") or "") or None
+        except Exception:
+            our_subject = None
     for harness, guard_path in HARNESS_LIFECYCLE_GUARDS.items():
         if harness == current_harness:
             continue

@@ -628,6 +628,72 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
     )
 
 
+def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
+    tmp_path, monkeypatch
+) -> None:
+    """Symmetric §E regression (bridge -014 P1).
+
+    Reproduces the live asymmetry Codex demonstrated: Codex on
+    gtkb_infrastructure, Claude on application, shared canonical set to
+    application. Before -014's fix, detect_counterpart_state() with
+    GTKB_HARNESS_NAME=codex read our_subject from the shared canonical
+    (application), compared against counterpart Claude guard (application),
+    and returned subject_mismatch=False — silently missing the split.
+
+    After the fix, our_subject is read from our own harness guard first, so
+    Codex sees our_subject=gtkb_infrastructure and correctly warns.
+    """
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+
+    codex_record = tmp_path / ".codex" / "operating-role.md"
+    claude_record = tmp_path / ".claude" / "operating-role.md"
+    for record, role in (
+        (codex_record, "prime-builder"),
+        (claude_record, "loyal-opposition"),
+    ):
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(f"active_role: {role}\n", encoding="utf-8")
+    codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
+    claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    # Codex harness's own guard says gtkb_infrastructure.
+    codex_guard.write_text(
+        json.dumps({"current_subject": module.FOCUS_GTKB_INFRASTRUCTURE}) + "\n",
+        encoding="utf-8",
+    )
+    # Claude's guard says application — matches shared canonical.
+    claude_guard.write_text(
+        json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {"codex": codex_record, "claude": claude_record},
+    )
+    monkeypatch.setattr(
+        module,
+        "HARNESS_LIFECYCLE_GUARDS",
+        {"codex": codex_guard, "claude": claude_guard},
+    )
+    # Shared canonical is application (what Claude last wrote). If the old
+    # implementation read our_subject from this file, it would compare
+    # application (ours) against application (claude's guard) and miss.
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
+
+    result = module.detect_counterpart_state(REPO_ROOT)
+    assert result["subject_mismatch"] is True, (
+        "Codex-side must detect subject divergence against Claude's guard; "
+        "pre-fix behavior silently missed this because our_subject came from "
+        "the shared canonical instead of codex's own guard."
+    )
+    assert any(
+        module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg
+        for msg in result["warnings"]
+    )
+
+
 def test_detect_counterpart_state_subject_match_no_warning(tmp_path, monkeypatch) -> None:
     module = _load_module()
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
