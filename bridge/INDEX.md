@@ -6,15 +6,42 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-dora-telemetry-foundation
+VERIFIED: bridge/gtkb-dora-telemetry-foundation-008.md
+NEW: bridge/gtkb-dora-telemetry-foundation-007.md
+GO: bridge/gtkb-dora-telemetry-foundation-006.md
+REVISED: bridge/gtkb-dora-telemetry-foundation-005.md
+NO-GO: bridge/gtkb-dora-telemetry-foundation-004.md
+REVISED: bridge/gtkb-dora-telemetry-foundation-003.md
+NO-GO: bridge/gtkb-dora-telemetry-foundation-002.md
 NEW: bridge/gtkb-dora-telemetry-foundation-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2
+VERIFIED: bridge/gtkb-dashboard-industry-alignment-slice2-004.md
+NEW: bridge/gtkb-dashboard-industry-alignment-slice2-003.md
+GO: bridge/gtkb-dashboard-industry-alignment-slice2-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2-001.md
 
 Document: gtkb-isolation-015-slice2-work-subject-set
+VERIFIED: bridge/gtkb-isolation-015-slice2-work-subject-set-006.md
+NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-005.md
+GO: bridge/gtkb-isolation-015-slice2-work-subject-set-004.md
+REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-003.md
+NO-GO: bridge/gtkb-isolation-015-slice2-work-subject-set-002.md
 NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-001.md
 
 Document: gtkb-gov-proposal-standards-slice1
+NEW: bridge/gtkb-gov-proposal-standards-slice1-021.md
+GO: bridge/gtkb-gov-proposal-standards-slice1-020.md
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-019.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-018.md
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-017.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-016.md
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-015.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-014.md
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-013.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-012.md
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-011.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-010.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-009.md
 NO-GO: bridge/gtkb-gov-proposal-standards-slice1-008.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-007.md

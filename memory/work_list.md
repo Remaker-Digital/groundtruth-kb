@@ -13,11 +13,14 @@ Updated: 2026-04-24 (S306).
 
 | # | ID | Status | Blocks / blocked by | Next step |
 |---|---|---|---|---|
-| 1 | `GTKB-ISOLATION-015` **Slice 2** | in-flight | Blocks `GTKB-ISOLATION-016`. Slice 1 VERIFIED. | Draft typed `work_subject.set` control-plane handler proposal. |
-| 2 | `GTKB-DASHBOARD-002` | ready | Slice 1 VERIFIED 2026-04-24. | File Slice 2 proposal (swimlane, subject selector, coverage/security/CI, notifier). |
-| 3 | `GTKB-DORA-001` | ready | Blocks `GTKB-DORA-002` and `GTKB-DASHBOARD-003`. | File DORA telemetry foundation proposal. |
-| 4 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | awaiting Codex review | Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Codex reviewing `-001`; no Prime action. |
-| 5 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
+| 1 | `GTKB-ISOLATION-015` **Slice 2** | awaiting Codex VERIFIED | Blocks `GTKB-ISOLATION-016`. Slice 1 VERIFIED 2026-04-24. Slice 2 implemented 2026-04-24 at `bridge/gtkb-isolation-015-slice2-work-subject-set-004.md` GO. | Codex reviewing post-impl report. |
+| 2 | `GTKB-DASHBOARD-002` Slice 2.1 (visibility) | ready | Depends on `GTKB-DASHBOARD-002` scoping VERIFIED (GO 2026-04-24 at `slice2-002.md`). No new data ingest. | File `gtkb-dashboard-industry-alignment-slice2a-visibility` implementation bridge (swimlane generator + work-subject selector). |
+| 3 | `GTKB-DASHBOARD-002` Slice 2.2 (metrics) | ready | Parallel to 2.1; independent schema change. GO condition from `slice2-002.md` F2: pin authoritative coverage/security sources (Dependabot vs pip-audit; Docker Scout scope). | File `gtkb-dashboard-industry-alignment-slice2b-metrics` implementation bridge with pinned source contract. |
+| 4 | `GTKB-DASHBOARD-002` Slice 2.3 (integration) | blocked | Blocked on owner notifier-default choice (email / Slack / Teams / none). GO condition from `slice2-002.md` F2: justify any new `ci_runs` persistence against existing `testing_service_integrations`. | File `gtkb-dashboard-industry-alignment-slice2c-integration` after owner decides §5.5 notifier default. |
+| 5 | `GTKB-DORA-001` | awaiting Codex VERIFIED | Blocks `GTKB-DORA-001b` and `GTKB-DORA-002`. Implemented 2026-04-24 at `bridge/gtkb-dora-telemetry-foundation-006.md` GO; post-impl report at `-007`. | Codex reviewing post-impl report. |
+| 5a | `GTKB-DORA-001b` | blocked | Prerequisite for `GTKB-DORA-002`. Depends on `GTKB-DORA-001` VERIFIED. | File authoritative-deployment-source proposal after `-001` VERIFIED. |
+| 6 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | GO (upstream impl underway) | REVISED-9 GO'd at `bridge/gtkb-gov-proposal-standards-slice1-020.md` on 2026-04-24. Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Upstream implementation in `groundtruth-kb/`; Agent Red adopts via `gt project upgrade` after upstream VERIFIED. |
+| 7 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
 
 Standing governance items (`GTKB-GOV-001` through `GTKB-GOV-010`, minus
 `-007` PAUSED and `-009` VERIFIED) and `GTKB-CORE-001` / `GTKB-MASS-001`
@@ -263,10 +266,11 @@ and unable to copy credentials or raw `groundtruth.db` into session context.
 ### GTKB-ISOLATION-015 - Complete full Phase 7 work-subject/root enforcement (Slice 1 VERIFIED; Slice 2 remaining)
 
 **Status:** **Slice 1 VERIFIED** 2026-04-24 (S306) at
-`bridge/gtkb-isolation-015-phase7-full-integration-016.md`. Slice 2 (typed
-`work_subject.set` control-plane handler) **remaining** — will be filed as
-a separate bridge under this same WI. `GTKB-ISOLATION-015` closes when
-Slice 2 VERIFIED.
+`bridge/gtkb-isolation-015-phase7-full-integration-016.md`. **Slice 2
+implemented 2026-04-24 (S307)** via
+`bridge/gtkb-isolation-015-slice2-work-subject-set-004.md` (GO); post-impl
+report filed as a new version on that thread. `GTKB-ISOLATION-015` closes
+when Slice 2 VERIFIED.
 
 **Priority:** **TOP NEXT on the isolation chain** (after Phases 3-6 + Phase
 7 foundation + Phase 7 Slice 1 all VERIFIED). Unblocks `GTKB-ISOLATION-016`
@@ -407,22 +411,50 @@ wiring (Slice 2); SLO/error-budget, flow metrics, PR/branch health,
 incident/MTTR (pending `gtkb-dora-telemetry-foundation`), remote
 exposure, WCAG audit (Slice 3).
 
-### GTKB-DASHBOARD-002 - Dashboard industry-alignment Slice 2 (bridge swimlane, subject selector, coverage/security/CI, alert notifier)
+### GTKB-DASHBOARD-002 - Dashboard industry-alignment Slice 2 (scoped into 2.1 / 2.2 / 2.3)
 
-**Priority:** after `GTKB-DASHBOARD-001` VERIFIED. Filed as follow-on in the
-Slice 1 GO `-006` review.
+**Priority:** after `GTKB-DASHBOARD-001` VERIFIED. Scoping proposal
+`bridge/gtkb-dashboard-industry-alignment-slice2-001.md` GO'd at `-002.md`
+on 2026-04-24. Sub-slice breakdown below is the approved scope; each
+sub-slice ships as its own implementation bridge.
 
-**Required outcome:** bridge-state swimlane panel showing every open thread's
-latest status + age-in-state; work-subject selector (toggle application vs
-GT-KB scope); coverage trend panel (line + branch, over time);
-security-posture panel (open CVEs, Dependabot, pip-audit, Scout); GitHub
-Actions workflow embed; alert-routing notifier wiring (email / Slack / Teams)
-for the stubs filed in Slice 1.
+**Approved sub-slice breakdown (from `slice2-001.md` §2, GO'd at `slice2-002.md`):**
 
-**Regression visibility:** each new panel extends
-`tests/scripts/test_gtkb_dashboard_grafana.py` with pinned assertions;
-notifier wiring covered by contract tests against the Grafana alerting API
-fixtures.
+- **Slice 2.1 — Visibility (no new data ingest).** Thread:
+  `gtkb-dashboard-industry-alignment-slice2a-visibility`. Deliverables:
+  bridge-state swimlane panel (per-thread latest status + age-in-state)
+  and work-subject selector (Application vs GT-KB scope toggle). Status:
+  **ready** — no external dependencies, reuses Slice 1 refresh pipeline.
+- **Slice 2.2 — Metrics ingest (new data sources).** Thread:
+  `gtkb-dashboard-industry-alignment-slice2b-metrics`. Deliverables:
+  coverage trend panel (line + branch, over time) and security posture
+  panel (open CVEs via Dependabot / pip-audit / Docker Scout). Status:
+  **ready** — parallel to 2.1, independent schema change. GO condition
+  from `slice2-002.md` Finding 2: implementation bridge must pin
+  authoritative fetch/persist paths (no assumption of local `.coverage`
+  or `coverage.xml`; explicit Dependabot-vs-pip-audit authority; Scout
+  auth/source or deferred).
+- **Slice 2.3 — External integration.** Thread:
+  `gtkb-dashboard-industry-alignment-slice2c-integration`. Deliverables:
+  CI workflow embed (GitHub Actions latest-runs) and alert-routing
+  notifier wiring (email / Slack / Teams). Status: **blocked on owner
+  notifier-default decision** (`slice2-001.md` §5.5). GO condition from
+  `slice2-002.md` Finding 2: implementation bridge must justify any new
+  `ci_runs` persistence against the existing `testing_service_integrations`
+  / GitHub-run model already persisted by
+  `scripts/session_self_initialization.py:1786-2053` and
+  `scripts/gtkb_dashboard/refresh_dashboard_db.py:519-568`.
+
+**Sequencing:** 2.1 and 2.2 can ship in either order or in parallel. 2.3
+waits on owner notifier choice; 2.3 does not block 2.1 or 2.2.
+
+**Regression visibility (per sub-slice bridge):** each extends
+`tests/scripts/test_gtkb_dashboard_grafana.py` and
+`tests/scripts/test_gtkb_dashboard_alerting.py` with pinned assertions
+against authoritative pipeline outputs; 2.2 carries a schema-migration
+non-regression test; 2.3 carries contract tests against the Grafana
+alerting API fixtures. Each sub-slice bridge declares its own full
+verification matrix at filing time.
 
 ### GTKB-DASHBOARD-003 - Dashboard industry-alignment Slice 3 (SLO, flow metrics, PR health, incident/MTTR, remote exposure, WCAG)
 
@@ -608,15 +640,52 @@ upstream in `groundtruth-kb` as a new managed artifact
 hook file; it receives enforcement through `gt project upgrade` when
 upstream VERIFIED.
 
-**Required outcome (upstream):** new managed hook running on
-`UserPromptSubmit` + `PreToolUse(Write,Edit)` that inspects
-`bridge/<slug>-NNN.md` writes, validates required-section presence
-(Verification Matrix with non-TBD rows; Files Touched with New +
-Modified + Not-touched subsections; Out-of-Scope non-empty; Decision
-Needed From Owner present; Cross-NO-GO Discipline on REVISED; Test
-Evidence fenced pytest block on post-impl reports), and emits a soft
-checkpoint when sections are missing. Windows `.codex`-adapter fallback
-verifier per ADR-CODEX-HOOK-PARITY-FALLBACK-001.
+**Adoption contract (REVISED-9 GO'd at
+`bridge/gtkb-gov-proposal-standards-slice1-020.md` on 2026-04-24):**
+
+- **Event model:** two separate managed-hook registrations — (1)
+  `PreToolUse` on `Write` as the authoritative pre-block for new-file
+  authoring, validating `tool_input.content` directly; (2) `PostToolUse`
+  on `Edit` as the authoritative final-state gate for edits, reading
+  post-edit disk content via `_resolve_edit_path(file_path, cwd)` which
+  resolves relative `tool_input.file_path` against payload `cwd`
+  (mirrors `templates/hooks/delib-search-tracker.py:215,330`). Absolute
+  paths pass through unchanged. Advisory `UserPromptSubmit` hook is a
+  separate non-authoritative file.
+- **Body-status-token rule:** forward-looking MUST in
+  `templates/rules/file-bridge-protocol.md` — newly authored
+  `bridge/<slug>-NNN.md` files begin their body with exactly one of
+  `NEW`/`REVISED`/`GO`/`NO-GO`/`VERIFIED`. Files whose current first
+  body line is non-canonical are grandfathered (hook `emit_pass` with
+  diagnostic); heading-first or blank-first-line new-file writes BLOCK.
+- **Post-impl discriminator:** metadata-driven via
+  `parse_bridge_metadata(content).bridge_kind == "implementation_report"`
+  → requires `## Test Evidence` section containing a fenced pytest
+  block matching `\d+\s+passed`. Closes the -014 F1 loophole where a
+  later `Edit` could add `bridge_kind: implementation_report` without
+  adding the evidence section.
+- **Output-builder addition:** new `emit_block_post(reason: str) -> None`
+  helper in `src/groundtruth_kb/governance/output.py` emitting
+  `{"decision": "block", "reason": ...}` (PostToolUse structured block
+  shape, distinct from `emit_deny`'s PreToolUse
+  `hookSpecificOutput.permissionDecision="deny"` shape). Preserves the
+  canonical "no hook constructs raw JSON dicts directly" rule.
+- **Bypass:** env var `GTKB_PROPOSAL_STANDARDS_BYPASS=<reason>` OR
+  content marker `<!-- bridge-standards-exempt: <reason> -->` in the
+  first 100 lines; audit log at
+  `.claude/audit/proposal-standards-bypass.log`. Applies to both Write
+  and PostToolUse(Edit) block paths.
+- **Windows `.codex` fallback parity:** standalone
+  `scripts/check_bridge_proposal_standards.py` accepting
+  `--event write --path <target>` or
+  `--event edit --path <target> [--cwd <cwd>]`; shares the
+  `_resolve_edit_path` helper with the hook. 22-fixture parity test
+  (16 Write + 6 PostToolUse(Edit), including the two new
+  `cwd`-resolution fixtures added in REVISED-9 per -018 F2).
+- **Zero shared-parser drift:** the hook consumes `parse_bridge_metadata`,
+  `BRIDGE_KINDS`, `_blocking_metadata_violations` read-only; only
+  `governance/output.py` is mutated upstream, and only additively
+  (new function, no signature change to existing helpers).
 
 **Follow-on slices (filed after Slice 1 VERIFIED):**
 
