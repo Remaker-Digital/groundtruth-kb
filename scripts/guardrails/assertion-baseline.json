@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 22680,
-    "total_files": 498
+    "total_assertions": 22943,
+    "total_files": 499
   },
   "baselines": {
     "tests/agents/plugins/test_agent_extensibility_phase0.py": 71,
@@ -127,6 +127,7 @@
     "tests/fuzzing/test_api_fuzz.py": 2,
     "tests/hooks/test_credential_scan.py": 36,
     "tests/hooks/test_formal_artifact_approval_gate.py": 10,
+    "tests/hooks/test_workstream_focus.py": 44,
     "tests/integration/test_agent_containers.py": 24,
     "tests/integration/test_azure_services.py": 45,
     "tests/integration/test_integration_real_services.py": 78,
@@ -404,13 +405,13 @@
     "tests/regression/test_migration_compat.py": 64,
     "tests/regression/test_upgrade_regression.py": 89,
     "tests/scripts/test_archive_claude_design_handoff.py": 27,
-    "tests/scripts/test_codex_hook_parity.py": 68,
-    "tests/scripts/test_groundtruth_governance_adoption.py": 266,
+    "tests/scripts/test_codex_hook_parity.py": 69,
+    "tests/scripts/test_groundtruth_governance_adoption.py": 357,
     "tests/scripts/test_harvest_loud_wrap.py": 23,
     "tests/scripts/test_harvest_session_thread_level.py": 32,
     "tests/scripts/test_release_candidate_gate.py": 12,
     "tests/scripts/test_retroactive_harvest_bridge_threads.py": 68,
-    "tests/scripts/test_session_self_initialization.py": 293,
+    "tests/scripts/test_session_self_initialization.py": 420,
     "tests/scripts/test_standing_backlog_harvest.py": 32,
     "tests/security/test_adversarial.py": 86,
     "tests/security/test_ci_tooling.py": 18,

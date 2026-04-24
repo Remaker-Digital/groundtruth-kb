@@ -20,6 +20,10 @@ def _load_toml(path: str) -> dict:
     return tomllib.loads(_read(path))
 
 
+def _one_line(text: str) -> str:
+    return " ".join(text.split())
+
+
 def _assert_not_git_ignored(paths: list[str]) -> None:
     ignored: list[str] = []
     for path in paths:
@@ -27,8 +31,7 @@ def _assert_not_git_ignored(paths: list[str]) -> None:
             ["git", "check-ignore", "-q", path],
             cwd=REPO_ROOT,
             check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
         )
         if result.returncode == 0:
@@ -72,6 +75,9 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         ".groundtruth/formal-artifact-approvals/2026-04-20-session-self-initialization-directive.json",
         ".groundtruth/formal-artifact-approvals/2026-04-20-session-lifecycle-engagement-principle.json",
         ".groundtruth/formal-artifact-approvals/2026-04-20-gtkb-gov-011-implementation-verification.json",
+        ".groundtruth/formal-artifact-approvals/2026-04-22-artifact-oriented-governance.json",
+        ".groundtruth/formal-artifact-approvals/2026-04-22-core-spec-intake-phase0.json",
+        ".groundtruth/formal-artifact-approvals/2026-04-23-bridge-authority.json",
         ".codex/config.toml",
         ".codex/hooks.json",
         ".claude/settings.json",
@@ -116,6 +122,7 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         ".claude/skills/spec-intake/helpers/spec_intake.py",
         "scripts/check_codex_hook_parity.py",
         "scripts/session_self_initialization.py",
+        "scripts/workstream_focus.py",
         "docs/gtkb-dashboard/index.html",
         "docs/gtkb-dashboard/dashboard-data.json",
         "docs/gtkb-dashboard/session-startup-report.md",
@@ -125,6 +132,7 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         "tests/scripts/test_codex_hook_parity.py",
         "tests/scripts/test_session_self_initialization.py",
         "tests/scripts/test_standing_backlog_harvest.py",
+        "tests/hooks/test_workstream_focus.py",
         "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md",
     ]
 
@@ -196,6 +204,17 @@ def test_codex_config_registers_formal_artifact_approval_hook_intent() -> None:
         for group in hooks["hooks"]["UserPromptSubmit"]
         for hook in group["hooks"]
     )
+    assert any(
+        "agent-red-hooks" in hook["command"]
+        and "workstream-focus.cmd" in hook["command"]
+        for group in hooks["hooks"]["UserPromptSubmit"]
+        for hook in group["hooks"]
+    )
+    assert any(
+        group.get("matcher") == "Bash"
+        and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
+        for group in pre_tool_groups
+    )
     assert "Stop" not in hooks["hooks"]
 
 
@@ -207,6 +226,7 @@ def test_release_candidate_gate_runs_governance_adoption_tests() -> None:
     assert "tests/scripts/test_codex_hook_parity.py" in gate
     assert "tests/scripts/test_standing_backlog_harvest.py" in gate
     assert "tests/hooks/test_formal_artifact_approval_gate.py" in gate
+    assert "tests/hooks/test_workstream_focus.py" in gate
     assert "scripts/check_codex_hook_parity.py" in gate
 
 
@@ -507,8 +527,9 @@ def test_session_self_initialization_records_are_in_membase() -> None:
             assert "DELIB-0840" in (spec["affected_by"] or "")
 
         gov = db.get_spec("GOV-SESSION-SELF-INITIALIZATION-001")
-        assert "role being assumed" in gov["description"]
-        assert "three top priority actions" in gov["description"]
+        gov_desc = _one_line(gov["description"])
+        assert "role being assumed" in gov_desc
+        assert "three top priority actions" in gov_desc
 
         pb = db.get_spec("PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001")
         assert "must not proceed as if governance context is implicit" in pb["description"]
@@ -591,6 +612,182 @@ def test_session_lifecycle_engagement_decisions_are_archived() -> None:
         db.close()
 
 
+def test_artifact_oriented_governance_records_are_in_membase() -> None:
+    expected = {
+        "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001": "governance",
+        "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001": "architecture_decision",
+        "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001": "design_constraint",
+    }
+
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        for spec_id, spec_type in expected.items():
+            spec = db.get_spec(spec_id)
+            assert spec is not None, f"{spec_id} must exist in MemBase"
+            assert spec["type"] == spec_type
+            assert spec["status"] == "verified"
+            assert spec["authority"] == "stated"
+            assert spec["testability"] == "structural"
+            assert "DELIB-0874" in (spec["affected_by"] or "")
+            assert "CODEX-STANDING-PRIORITIES.md" in (spec["source_paths"] or "")
+
+        gov = db.get_spec("GOV-ARTIFACT-ORIENTED-GOVERNANCE-001")
+        assert "network of durable artifacts" in gov["description"]
+        assert "capture thresholds" in gov["description"]
+
+        adr = db.get_spec("ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001")
+        assert "durable artifact graph" in adr["description"]
+        assert "transient conversation" in adr["description"]
+
+        dcl = db.get_spec("DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001")
+        assert "candidate" in dcl["description"]
+        assert "non-intrusive confirmation" in dcl["description"]
+    finally:
+        db.close()
+
+
+def test_artifact_oriented_governance_decision_is_archived() -> None:
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        decision = db.get_deliberation("DELIB-0874")
+        assert decision is not None
+        assert decision["outcome"] == "owner_decision"
+        assert "default behavior of the system should be oriented toward artifacts and plans" in decision["content"]
+        assert "clear decision triggers for CRUD operations" in decision["content"]
+        assert "reduces knowledge and memory loss" in decision["content"]
+    finally:
+        db.close()
+
+
+def test_core_spec_intake_phase0_records_are_in_membase() -> None:
+    expected = {
+        "SPEC-CORE-INTAKE-001": "requirement",
+        "SPEC-CORE-INTAKE-002": "requirement",
+        "ADR-CORE-INTAKE-001": "architecture_decision",
+        "DCL-CORE-INTAKE-001": "design_constraint",
+    }
+
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        for spec_id, spec_type in expected.items():
+            spec = db.get_spec(spec_id)
+            assert spec is not None, f"{spec_id} must exist in MemBase"
+            assert spec["type"] == spec_type
+            assert spec["status"] == "specified"
+            assert spec["authority"] == "stated"
+            assert spec["testability"] == "structural"
+            assert "DELIB-0875" in (spec["affected_by"] or "")
+            assert "gtkb-core-spec-intake-001.md" in (spec["source_paths"] or "")
+
+        prompt_spec = db.get_spec("SPEC-CORE-INTAKE-001")
+        prompt_desc = _one_line(prompt_spec["description"])
+        assert "newly initialized projects" in prompt_desc
+        assert "exactly one deterministic question" in prompt_desc
+
+        stop_spec = db.get_spec("SPEC-CORE-INTAKE-002")
+        stop_desc = _one_line(stop_spec["description"])
+        assert "missing, inferred, or needs clarity" in stop_desc
+        assert "not applicable" in stop_desc
+
+        adr = db.get_spec("ADR-CORE-INTAKE-001")
+        adr_desc = _one_line(adr["description"])
+        assert "persisted MemBase evidence" in adr_desc
+        assert "conversation memory" in adr_desc
+
+        dcl = db.get_spec("DCL-CORE-INTAKE-001")
+        dcl_desc = _one_line(dcl["description"])
+        assert "minimal and full spec scaffold behavior" in dcl_desc
+        assert "Non-interactive and JSON-safe command paths" in dcl_desc
+    finally:
+        db.close()
+
+
+def test_core_spec_intake_phase0_decision_is_archived() -> None:
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        decision = db.get_deliberation("DELIB-0875")
+        assert decision is not None
+        assert decision["outcome"] == "owner_decision"
+        decision_content = _one_line(decision["content"])
+        assert "enrolled by default" in decision_content
+        assert "explicit opt-out" in decision_content
+        assert "persisted MemBase evidence" in decision_content
+    finally:
+        db.close()
+
+
+def test_bridge_authority_governance_records_are_in_membase() -> None:
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        gov = db.get_spec("GOV-FILE-BRIDGE-AUTHORITY-001")
+        assert gov is not None
+        assert gov["type"] == "governance"
+        assert gov["status"] == "verified"
+        assert gov["authority"] == "stated"
+        assert gov["testability"] == "structural"
+        assert "DELIB-0880" in (gov["affected_by"] or "")
+        assert "bridge/INDEX.md" in (gov["source_paths"] or "")
+        gov_desc = _one_line(gov["description"])
+        assert "sole authoritative source for bridge queue state" in gov_desc
+        assert "Startup reports, dashboard fields, cached scan counts" in gov_desc
+        assert "permanent owner authority" in gov_desc
+        assert "downstream bridge-dependent artifacts" in gov_desc
+
+        startup = db.get_spec("GOV-SESSION-SELF-INITIALIZATION-001")
+        assert startup is not None
+        startup_desc = _one_line(startup["description"])
+        assert "executing startup obligations from live project sources" in startup_desc
+        assert "generated startup reports, dashboard fields, cached summaries" in startup_desc
+        assert "bridge/INDEX.md" in startup_desc
+        assert "DELIB-0880" in (startup["affected_by"] or "")
+    finally:
+        db.close()
+
+
+def test_bridge_authority_decision_is_archived() -> None:
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        decision = db.get_deliberation("DELIB-0880")
+        assert decision is not None
+        assert decision["outcome"] == "owner_decision"
+        decision_content = _one_line(decision["content"])
+        assert "content of bridge/INDEX.md is authoritative" in decision_content
+        assert "Copies, cached versions, summaries" in decision_content
+        assert "All project-level restrictions are lifted" in decision_content
+        assert "permanent permission to diagnose and repair the bridge" in decision_content
+    finally:
+        db.close()
+
+
+def test_bridge_authority_is_loaded_by_startup_rules() -> None:
+    agents = _read("AGENTS.md")
+    protocol = _read(".claude/rules/file-bridge-protocol.md")
+    loyal = _read(".claude/rules/loyal-opposition.md")
+    bootstrap = _read("independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md")
+    way = _read("independent-progress-assessments/CODEX-WAY-OF-WORKING.md")
+
+    for text in [agents, protocol, loyal, bootstrap, way]:
+        normalized = _one_line(text)
+        assert "bridge/INDEX.md" in normalized
+        assert "Startup reports" in normalized or "startup reports" in normalized
+        assert "cached" in normalized
+        assert "downstream" in normalized
+        assert "permanent" in normalized or "standing owner authority" in normalized
+
+
+def test_standing_priorities_load_artifact_oriented_governance_directive() -> None:
+    priorities = _read("AGENTS.md")
+
+    assert "artifact-oriented governance as a default interpretation stance" in priorities
+    assert "durable artifacts" in priorities
+    assert "standing-backlog addition" in priorities
+    assert "explicit lifecycle states" in priorities
+    assert "non-intrusive confirmation flows" in priorities
+    assert "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001" in priorities
+    assert "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001" in priorities
+    assert "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001" in priorities
+
+
 def test_work_queue_prioritizes_candidate_skill_and_doctor_items() -> None:
     work_list = _read("memory/work_list.md")
 
@@ -623,6 +820,21 @@ def test_work_queue_prioritizes_candidate_skill_and_doctor_items() -> None:
     assert "DCL-STANDING-BACKLOG-SCHEMA-001" in work_list
     assert "Individual backlog entries remain queue/work items" in work_list
     assert "2026-04-20-standing-backlog-formalization.json" in work_list
+    assert "GTKB-GOV-000D" in work_list
+    assert "DELIB-0874" in work_list
+    assert "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001" in work_list
+    assert "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001" in work_list
+    assert "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001" in work_list
+    assert "Artifact-Oriented Governance directive" in work_list
+    assert "2026-04-22-artifact-oriented-governance.json" in work_list
+    assert "GTKB-CORE-001" in work_list
+    assert "DELIB-0875" in work_list
+    assert "SPEC-CORE-INTAKE-001" in work_list
+    assert "SPEC-CORE-INTAKE-002" in work_list
+    assert "ADR-CORE-INTAKE-001" in work_list
+    assert "DCL-CORE-INTAKE-001" in work_list
+    assert "2026-04-22-core-spec-intake-phase0.json" in work_list
+    assert "Current formal status is `specified`" in work_list
     assert "GTKB-GOV-011" in work_list
     assert "DONE" in work_list[work_list.index("GTKB-GOV-011"):work_list.index("GTKB-GOV-001")]
     assert "DELIB-0840" in work_list

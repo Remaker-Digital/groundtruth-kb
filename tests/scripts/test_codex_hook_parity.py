@@ -40,22 +40,30 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     codex_hooks = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
     claude_settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     assert any(
-        "agent-red-hooks" in hook["command"]
-        and "session_start_dispatch.py" in hook["command"]
+        "agent-red-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
         for group in codex_hooks["hooks"]["SessionStart"]
         for hook in group["hooks"]
     )
     assert any(
-        "agent-red-hooks" in hook["command"]
-        and "session_wrapup_trigger_dispatch.py" in hook["command"]
+        "agent-red-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
         for group in codex_hooks["hooks"]["UserPromptSubmit"]
         for hook in group["hooks"]
+    )
+    assert any(
+        "agent-red-hooks" in hook["command"] and "workstream-focus.cmd" in hook["command"]
+        for group in codex_hooks["hooks"]["UserPromptSubmit"]
+        for hook in group["hooks"]
+    )
+    assert any(
+        group.get("matcher") == "Bash" and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
+        for group in codex_hooks["hooks"]["PreToolUse"]
     )
     assert "Stop" not in codex_hooks["hooks"]
     assert any(
         "session_self_initialization.py" in hook["command"]
         and "--emit-report" in hook["command"]
         and "--fast-hook" in hook["command"]
+        and "--role-profile" not in hook["command"]
         for group in claude_settings["hooks"]["SessionStart"]
         for hook in group["hooks"]
     )
@@ -63,6 +71,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         "session_self_initialization.py" in hook["command"]
         and "--emit-wrapup" in hook["command"]
         and "--fast-hook" in hook["command"]
+        and "--role-profile" not in hook["command"]
         for group in claude_settings["hooks"]["Stop"]
         for hook in group["hooks"]
     )
@@ -71,24 +80,23 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
 def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None:
     codex_hooks = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
     commands = [
-        hook["command"]
-        for groups in codex_hooks["hooks"].values()
-        for group in groups
-        for hook in group["hooks"]
+        hook["command"] for groups in codex_hooks["hooks"].values() for group in groups for hook in group["hooks"]
     ]
 
     assert commands
     assert all("$(" not in command for command in commands)
     assert any(
-        "agent-red-hooks" in command
-        and "session_start_dispatch.py" in command
-        and command.startswith("python ")
+        "agent-red-hooks" in command and "session_start_dispatch.py" in command and command.startswith("python ")
         for command in commands
     )
     assert any(
         "agent-red-hooks" in command
         and "session_wrapup_trigger_dispatch.py" in command
         and command.startswith("python ")
+        for command in commands
+    )
+    assert any(
+        "agent-red-hooks" in command and "workstream-focus.cmd" in command and command.startswith("cmd /d /s /c ")
         for command in commands
     )
 
@@ -98,28 +106,19 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
         return
 
     start_text = start_dispatcher.read_text(encoding="utf-8")
-    assert "--emit-report" in start_text
-    assert "prime-builder" in start_text
-    assert "codex-loyal-opposition" not in start_text
-    assert "Role: Prime Builder" in start_text
-    assert "Role mapping source" in start_text
-    assert "subprocess.Popen" in start_text
-    assert "session-startup-report.md" in start_text
-    assert "Startup First-Response Directive" in start_text
-    assert "The startup disclosure must be the only assistant message for that turn" in start_text
-    assert "Do not send a separate wrap-up, completion, status, or summary message" in start_text
-    assert "stop and wait for Mike's next input" in start_text
-    assert "Preserve the Wrap-Up Trigger Commands section" in start_text
-    assert "Do not reduce it to a pass/fail summary" in start_text
-    assert "Startup Disclosure first" in start_text
-    assert "Each session focus option must include its specific prompt details" in start_text
-    assert "Session Focus Choices second and last" in start_text
-    assert "collect or confirm Mike's session focus" in start_text
-    assert "choose the number shown" in start_text
-    assert "provide a prompt for something else" in start_text
-    assert ".session-lifecycle-guard.json" in start_text
-    assert "GTKB_STARTUP_GUARD_ID" in start_text
-    assert "suppress_next_wrapup" in start_text
+    assert "--emit-startup-service-payload" in start_text
+    assert "--role-profile" not in start_text
+    assert "STARTUP_SERVICE" in start_text
+    assert "STARTUP_FRESHNESS_CONTRACT_VERSION" in start_text
+    assert "Programmatic Startup Payload" in start_text
+    assert "_valid_session_start_payload" in start_text
+    assert "_purge_previous_diagnostics" in start_text
+    assert "GTKB_STARTUP_REQUESTED_AT" in start_text
+    assert "subprocess.run" in start_text
+    assert "Startup First-Response Directive" not in start_text
+    assert "_live_bridge_index_context" not in start_text
+    assert "Mandatory Direct Live Bridge Index Read" not in start_text
+    assert "SHA-256" not in start_text
     assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in start_text
     assert "Would you like to proceed with established priority actions? (Y/N)" not in start_text
     assert "Token Consumption Reduction Options second" not in start_text
@@ -128,6 +127,10 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "hookEventName" in start_text
     assert "SessionStart" in start_text
     assert "additionalContext" in start_text
+    assert "startupFreshness" in start_text
+    assert "request_started_at" in start_text
+    assert "report_origin" in start_text
+    assert "startup_payload_fresh" in start_text
     assert "last-session-start.json" in start_text
     assert "last-session-start.err" in start_text
 
@@ -135,11 +138,13 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     wrapup_text = wrapup_dispatcher.read_text(encoding="utf-8")
     assert "--emit-wrapup" in wrapup_text
     assert "--force-wrapup" in wrapup_text
-    assert "prime-builder" in wrapup_text
-    assert "codex-loyal-opposition" not in wrapup_text
+    assert "--role-profile" not in wrapup_text
     assert "UserPromptSubmit" in wrapup_text
     assert "ACCEPTED_TRIGGER_PHRASES" in wrapup_text
     assert "_is_wrapup_trigger" in wrapup_text
+    assert "_startup_input_gate_active" in wrapup_text
+    assert "discard_next_user_prompt" in wrapup_text
+    assert "startup_response_pending" in wrapup_text
     assert "please$" in wrapup_text
     assert "wrap up this session" in wrapup_text
     assert "start a new session" in wrapup_text
@@ -152,6 +157,10 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "last-wrapup-trigger.json" in wrapup_text
     assert "last-wrapup-trigger.err" in wrapup_text
     assert "last-wrapup-trigger-input.json" in wrapup_text
+
+    workstream_wrapper = Path.home() / ".codex" / "agent-red-hooks" / "workstream-focus.cmd"
+    workstream_text = workstream_wrapper.read_text(encoding="utf-8")
+    assert "workstream-focus.py" in workstream_text
 
 
 def test_codex_hook_parity_reports_missing_codex_hooks(tmp_path) -> None:
@@ -193,8 +202,13 @@ def test_codex_hook_parity_requires_bash_matcher(tmp_path) -> None:
     module = _load_module()
     (tmp_path / ".codex").mkdir()
     (tmp_path / ".claude" / "hooks").mkdir(parents=True)
+    (tmp_path / ".claude" / "rules").mkdir()
     (tmp_path / "scripts").mkdir()
     (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
+    (tmp_path / ".claude" / "rules" / "operating-role.md").write_text(
+        "active_role: loyal-opposition\n",
+        encoding="utf-8",
+    )
     (tmp_path / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text(
         "print('{}')\n",
         encoding="utf-8",
@@ -233,8 +247,8 @@ def test_codex_hook_parity_requires_bash_matcher(tmp_path) -> None:
                                 {
                                     "type": "command",
                                     "command": (
-                                        "python \"$(git rev-parse --show-toplevel)/"
-                                        ".claude/hooks/formal-artifact-approval-gate.py\""
+                                        'python "$(git rev-parse --show-toplevel)/'
+                                        '.claude/hooks/formal-artifact-approval-gate.py"'
                                     ),
                                     "timeout": 5,
                                 }

@@ -20,21 +20,84 @@ def _load_module():
     return module
 
 
-def test_startup_model_contains_role_governance_and_kpi_inventory() -> None:
-    module = _load_module()
+def _panel_titles(panels: list[dict]) -> list[str]:
+    titles: list[str] = []
+    for panel in panels:
+        titles.append(panel["title"])
+        titles.extend(_panel_titles(panel.get("panels", [])))
+    return titles
 
-    model = module.build_startup_model(REPO_ROOT)
+
+def test_user_local_preference_controls_startup_dashboard_open(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    preference_path = tmp_path / "session-startup-preferences.json"
+    opened: list[str] = []
+    dashboard_url = "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
+
+    monkeypatch.setenv("GTKB_STARTUP_PREFERENCES_PATH", str(preference_path))
+    monkeypatch.delenv("GTKB_OPEN_DASHBOARD_ON_SESSION_START", raising=False)
+    monkeypatch.delenv("GTKB_DASHBOARD_OPEN_MODE", raising=False)
+    monkeypatch.setattr(module, "_open_dashboard_url_in_system_browser", lambda url: opened.append(url) or True)
+
+    assert module._maybe_open_dashboard_on_session_start(dashboard_url) is False
+    assert opened == []
+
+    preference_path.write_text(
+        json.dumps({"open_dashboard_on_session_start": True}) + "\n",
+        encoding="utf-8",
+    )
+
+    assert module._maybe_open_dashboard_on_session_start(dashboard_url) is True
+    assert opened == []
+
+    preference_path.write_text(
+        json.dumps({"open_dashboard_on_session_start": False}) + "\n",
+        encoding="utf-8",
+    )
+
+    assert module._maybe_open_dashboard_on_session_start(dashboard_url) is False
+    assert opened == []
+
+    preference_path.write_text(
+        json.dumps(
+            {
+                "open_dashboard_on_session_start": True,
+                "dashboard_open_mode": "system_default_browser",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert module._maybe_open_dashboard_on_session_start(dashboard_url) is True
+    assert opened == [dashboard_url]
+
+
+def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
 
     assert model["role"]["assumed_role"] == "Prime Builder"
-    assert model["role"]["role_assignment"] == "active AI harness assigned by owner until further notice"
+    assert (
+        model["role"]["role_assignment"] == "active AI harness assigned by owner through durable operating-role record"
+    )
+    assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
+    assert "separate harnesses" in model["role"]["poller"]
     assert "Strict GOV enforcement" in model["governance_stance"][0]
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
     assert model["skills"]["count"] > 0
-    assert "prime-builder-role.md" in model["role"]["role_mapping_source"]
+    assert "operating-role.md" in model["role"]["role_mapping_source"]
     assert "formal-artifact-approval-gate.py" in model["directives"]["hook_files"]
+    assert model["workstream_focus"]["default_label"] == "Application Focus"
+    assert model["workstream_focus"]["current_label"] == "Application Focus"
+    assert model["workstream_focus"]["application_label"] == "Agent Red"
     assert model["dashboard_requirements"]["scope_version"] == "agent_red_v1"
-    assert "GT-KB is treated as pre-existing" in model["dashboard_requirements"]["scope_note"]
-    assert model["metrics"]["specifications"]["raw_current_total"] >= model["metrics"]["specifications"]["current_total"]
+    assert model["dashboard_requirements"]["scope_note"] == "Agent Red product/project dashboard."
+    assert (
+        model["metrics"]["specifications"]["raw_current_total"] >= model["metrics"]["specifications"]["current_total"]
+    )
     assert "gtkb_framework" in model["metrics"]["specifications"]["scope_counts"]
     posture = model["infrastructure"]["gtkb_upgrade_posture"]
     assert posture["scope"] == "implementation_infrastructure"
@@ -91,6 +154,7 @@ def test_startup_model_contains_role_governance_and_kpi_inventory() -> None:
     assert "release_readiness" in intelligence
     assert "quality_rollup" in intelligence
     assert "data_freshness" in intelligence
+    assert intelligence["data_freshness"]["generated_at"] == model["generated_at"]
     assert "shortcuts" in intelligence
     assert any(item["label"] == "GT-KB" for item in intelligence["health"])
     focus_options = module._session_focus_options(model)
@@ -101,12 +165,21 @@ def test_startup_model_contains_role_governance_and_kpi_inventory() -> None:
         "Repair Testing/Tool Integrations",
         "Remediate Known Risks",
         "Clear Stage/Test Release Path",
-        "Continue Last Session",
         "Clean For Internal Review",
         "Pick From Standing Backlog",
+        "Commit and push to GitHub",
+        "Merge to main, build and push to the staging environment",
+        "Execute end-to-end tests in the staging environment",
+        "Push staged-and-tested build to production, then smoke test",
+        "Continue Last Session",
     ]
     assert all(option["prompt"] for option in focus_options)
-    assert "backlog" in focus_options[8]["prompt"].lower()
+    assert "GO/NO-GO bridge" in focus_options[12]["prompt"]
+    assert "backlog" in focus_options[7]["prompt"].lower()
+    assert "push" in focus_options[8]["prompt"].lower()
+    assert "staging" in focus_options[9]["prompt"].lower()
+    assert "end-to-end" in focus_options[10]["label"].lower()
+    assert "production" in focus_options[11]["prompt"].lower()
 
     subsystems = set(model["dashboard_requirements"]["subsystems"])
     assert {
@@ -123,15 +196,217 @@ def test_startup_model_contains_role_governance_and_kpi_inventory() -> None:
     } <= subsystems
 
 
+def test_startup_model_discovers_durable_operating_role() -> None:
+    module = _load_module()
+    discovered_role = module.discover_role_profile(REPO_ROOT)
+
+    assert discovered_role in module.ROLE_PROFILES
+
+    model = module.build_startup_model(REPO_ROOT)
+    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard")
+
+    assert model["role_profile"] == discovered_role
+    assert model["role"]["assumed_role"] == module.ROLE_PROFILES[discovered_role]["assumed_role"]
+    assert "operating-role.md" in model["role"]["role_mapping_source"]
+    if discovered_role == "loyal-opposition":
+        assert "## Loyal Opposition Startup Task" in report
+        assert "## Choose This Session's Focus" not in report
+    else:
+        assert "## Loyal Opposition Startup Task" not in report
+        assert "## Choose This Session's Focus" in report
+        assert "13. **Continue Last Session**" in report
+
+
+def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -> None:
+    module = _load_module()
+
+    prime_model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+    prime_report = module.render_report(
+        prime_model,
+        "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard",
+    )
+
+    assert "### Fresh-Session Input Semantics" in prime_report
+    assert "The first owner message in a fresh session is a session-start stimulus only" in prime_report
+    assert "do not interpret it as a focus choice, task prompt, approval, answer" in prime_report
+    assert "wait for Mike's next message before choosing or mapping session work" in prime_report
+    assert prime_report.index("### Fresh-Session Input Semantics") < prime_report.index(
+        "## Choose This Session's Focus"
+    )
+
+    loyal_model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
+    loyal_report = module.render_report(
+        loyal_model,
+        "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard",
+    )
+
+    assert "### Fresh-Session Input Semantics" in loyal_report
+    assert "The first owner message in a fresh session is a session-start stimulus only" in loyal_report
+    assert "wait for Mike's next message before choosing or mapping session work" in loyal_report
+
+
+def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(
+    tmp_path, monkeypatch
+) -> None:
+    module = _load_module()
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+
+    overlay = model["session_overlay"]
+    assert overlay["authoritative"] is False
+    assert "overlay_root" in overlay
+    # The live repo has no overlay unless a prior run created one; either
+    # shape is acceptable, but the non-authoritative contract must hold.
+    assert isinstance(overlay.get("is_stale"), bool)
+    assert isinstance(overlay.get("entries_total"), int)
+    assert isinstance(overlay.get("notes"), list)
+    assert any("non-authoritative" in note or "no current session overlay" in note for note in overlay["notes"])
+
+    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard")
+    assert "### Session Overlay Status (Non-Authoritative)" in report
+    assert "non-authoritative by construction" in report
+    # The overlay section must appear before the input-semantics section so
+    # startup readers see the overlay disclaimer before any focus-choice wording.
+    assert report.index("### Session Overlay Status (Non-Authoritative)") < report.index(
+        "### Fresh-Session Input Semantics"
+    )
+
+
+def test_workflow_run_can_prefer_release_branch_over_newer_pr_run() -> None:
+    module = _load_module()
+    workflows = {"docs-quality.yml": {"name": "Docs Quality"}}
+    runs = {
+        "runs": [
+            {
+                "workflowName": "Docs Quality",
+                "headBranch": "dependabot/github_actions/actions/setup-node-6",
+                "conclusion": "failure",
+            },
+            {"workflowName": "Docs Quality", "headBranch": "main", "conclusion": "success"},
+        ],
+        "runs_by_workflow": {
+            "Docs Quality": {
+                "workflowName": "Docs Quality",
+                "headBranch": "dependabot/github_actions/actions/setup-node-6",
+                "conclusion": "failure",
+            }
+        },
+    }
+
+    assert module._workflow_run(runs, workflows, "docs-quality.yml")["conclusion"] == "failure"
+    release_run = module._workflow_run(runs, workflows, "docs-quality.yml", branch="main")
+
+    assert release_run["headBranch"] == "main"
+    assert release_run["conclusion"] == "success"
+
+
 def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     module = _load_module()
 
     model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
+    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard")
 
     assert model["role"]["assumed_role"] == "Loyal Opposition"
     assert model["role"]["role_assignment"] == "active AI harness assigned by owner for counterpart review"
-    assert "bridge/INDEX.md" in model["role"]["bridge"]
-    assert model["role"]["role_mapping_source"] == "AGENTS.md"
+    assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
+    assert "separate harnesses" in model["role"]["poller"]
+    assert model["role"]["role_mapping_source"] == ".claude/rules/operating-role.md"
+    assert "## Loyal Opposition Startup Task" in report
+    assert "## Choose This Session's Focus" not in report
+    assert "Commit and push to GitHub" not in report
+    assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." in report
+    assert "Session-focus menu: not presented in Loyal Opposition mode" in report
+    assert "Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism" in report
+    assert "Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup." in report
+    assert "current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`" in report
+    assert (
+        "Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly"
+        in report
+    )
+    assert (
+        "startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries"
+        in report
+    )
+    assert "do not display this checklist as a substitute for performing the verification" in report
+    assert "Poller startup rule: activate a poller only when the roles are running in separate harnesses" in report
+    assert "First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning." in report
+    assert "permanent owner permission to diagnose and repair bridge function/use" in report
+    assert "report the live scan result and ask Mike whether to begin processing reviews and verifications" in report
+    assert "yes` to begin processing the bridge queue" in report
+
+
+def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> None:
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "INDEX.md").write_text(
+        "\n".join(
+            [
+                "# Bridge Index",
+                "",
+                "Document: gtkb-tier-a-current-main-integration",
+                "NEW: bridge/gtkb-tier-a-current-main-integration-001.md",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (bridge_dir / "gtkb-tier-a-current-main-integration-001.md").write_text(
+        "# GT-KB Current Main Integration\n\nGroundTruth-KB bridge proposal.",
+        encoding="utf-8",
+    )
+
+    contention = module._bridge_metrics(tmp_path)
+
+    assert contention["latest_status_counts"] == {}
+    assert contention["actionable_count"] == 0
+    assert contention["raw_latest_status_counts"] == {"NEW": 1}
+    assert contention["raw_review_queue_count"] == 1
+    assert contention["source"] == "bridge/INDEX.md"
+    assert contention["source_read_mode"] == "direct_file_read"
+    assert contention["derived_artifacts_authoritative"] is False
+    assert contention["live_index_available"] is True
+    assert (
+        module._render_file_bridge_scan({"metrics": {"contention": contention}})
+        == "- Generated-time file bridge scan, non-authoritative after report generation: 1 latest NEW/REVISED entry identified."
+    )
+
+
+def test_bridge_metrics_ignore_cached_startup_report_counts(tmp_path) -> None:
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    dashboard_dir = tmp_path / "docs" / "gtkb-dashboard"
+    bridge_dir.mkdir(parents=True)
+    dashboard_dir.mkdir(parents=True)
+    (bridge_dir / "INDEX.md").write_text(
+        "\n".join(
+            [
+                "# Bridge Index",
+                "",
+                "Document: cached-report-must-not-win",
+                "GO: bridge/cached-report-must-not-win-002.md",
+                "NEW: bridge/cached-report-must-not-win-001.md",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (bridge_dir / "cached-report-must-not-win-002.md").write_text("Approved.", encoding="utf-8")
+    (dashboard_dir / "session-startup-report.md").write_text(
+        "- Generated-time file bridge scan, non-authoritative after report generation: 99 latest NEW/REVISED entries identified.\n",
+        encoding="utf-8",
+    )
+    (dashboard_dir / "dashboard-data.json").write_text(
+        json.dumps({"model": {"metrics": {"contention": {"raw_review_queue_count": 99}}}}),
+        encoding="utf-8",
+    )
+
+    contention = module._bridge_metrics(tmp_path)
+
+    assert contention["raw_latest_status_counts"] == {"GO": 1}
+    assert contention["raw_review_queue_count"] == 0
+    assert contention["source_read_mode"] == "direct_file_read"
 
 
 def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None:
@@ -139,110 +414,123 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     dashboard_dir = tmp_path / "dashboard"
     history_path = tmp_path / "history.json"
 
-    result = module.write_dashboard_and_report(REPO_ROOT, dashboard_dir, history_path, generate_pdf=False)
+    result = module.write_dashboard_and_report(
+        REPO_ROOT,
+        dashboard_dir,
+        history_path,
+        generate_pdf=False,
+        role_profile="prime-builder",
+    )
 
     dashboard = Path(result["dashboard_path"])
     data = Path(result["data_path"])
     report = Path(result["report_path"])
     wrapup = Path(result["wrapup_path"])
     pdf = Path(result["pdf_path"])
+    legacy_static_dashboard = dashboard_dir / "index.html"
+    assert dashboard.name == "gtkb-dashboard.json"
     assert dashboard.is_file()
+    assert result["dashboard_url"] == "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
+    assert not legacy_static_dashboard.exists()
     assert data.is_file()
     assert report.is_file()
     assert wrapup.is_file()
     assert history_path.is_file()
     assert pdf.name == "agent-red-project-dashboard.pdf"
     assert result["pdf_export"]["available"] is False
+    assert result["pdf_export"]["error"] == "Static dashboard PDF export is disabled."
 
-    dashboard_text = dashboard.read_text(encoding="utf-8")
+    dashboard_json = json.loads(dashboard.read_text(encoding="utf-8"))
     report_text = report.read_text(encoding="utf-8")
     wrapup_text = wrapup.read_text(encoding="utf-8")
     dashboard_data = json.loads(data.read_text(encoding="utf-8"))
     history = json.loads(history_path.read_text(encoding="utf-8"))
 
-    assert "<title>Agent Red Project Dashboard</title>" in dashboard_text
-    assert "<h1>Agent Red Project Dashboard</h1>" in dashboard_text
-    assert "dashboard-hero" in dashboard_text
-    assert "health-strip" in dashboard_text
-    assert "Export PDF" in dashboard_text
-    assert "agent-red-project-dashboard.pdf" in dashboard_text
-    assert "Action Center" in dashboard_text
-    assert "Shortcuts" in dashboard_text
-    assert "Delivery Timeline" in dashboard_text
-    assert 'id="deliveryTimeline"' in dashboard_text
-    assert 'class="timeline-rail"' in dashboard_text
-    assert 'class="timeline-event"' in dashboard_text
-    assert 'class="timeline-detail"' in dashboard_text
-    assert 'class="timeline-date-badge"' in dashboard_text
-    assert "Calendar Date" in dashboard_text
-    assert "Version / Build" in dashboard_text
-    assert "Test Results" in dashboard_text
-    assert "Staging Deployment" in dashboard_text
-    assert "Production Deployment" in dashboard_text
-    assert "scripts/deploy/build-and-deploy-staging.ps1" in dashboard_text
-    assert "scripts/deploy/api-gateway-restore.yaml" in dashboard_text
-    assert "Choose This Session's Focus" not in dashboard_text
-    assert '<details class="drilldown" id="currentSnapshot">' in dashboard_text
-    assert '<summary>Current Snapshot' in dashboard_text
-    assert '<details class="drilldown" id="timeSeriesHistory">' in dashboard_text
-    assert '<summary>Time-Series KPI History' in dashboard_text
-    assert "Time-Series KPI History" in dashboard_text
-    assert "Executive Signals" in dashboard_text
-    assert "Change increment" in dashboard_text
-    assert "Calendar days" in dashboard_text
-    assert 'id="timeIncrement"' in dashboard_text
-    assert "aggregateByCalendarDay" in dashboard_text
-    assert "selectedIncrement" in dashboard_text
-    assert "Trend Signals" in dashboard_text
-    assert "KPI Movement" in dashboard_text
-    assert "Divergence And Convergence" in dashboard_text
-    assert "Work Pressure vs Knowledge Surface" in dashboard_text
-    assert "Change Heatmap" in dashboard_text
-    assert "Release Readiness" in dashboard_text
-    assert "Quality / Security / Testing Rollup" in dashboard_text
-    assert "Risk Register" in dashboard_text
-    assert "Implementation Infrastructure" in dashboard_text
-    assert "GT-KB is reported here only as project instrumentation" in dashboard_text
-    assert "GT-KB Version / Upgrade Posture" in dashboard_text
-    assert "Dry-Run Plan Command" in dashboard_text
-    assert "Apply Gate" in dashboard_text
-    assert "GT-KB Upgrade Plan Sample" in dashboard_text
-    assert "https://github.com/Remaker-Digital/groundtruth-kb" in dashboard_text
-    assert "Testing Service / Tool Integrations" in dashboard_text
-    assert 'id="testingServiceIntegrations"' in dashboard_text
-    assert 'class="integration-drilldown"' in dashboard_text
-    assert 'class="status-dot ' in dashboard_text
-    assert ".status-dot.red" in dashboard_text
-    assert ".status-dot.yellow" in dashboard_text
-    assert ".status-dot.green" in dashboard_text
-    assert "Suggested Remediation" in dashboard_text
-    assert "Open the latest failing required workflow runs" in dashboard_text
-    assert "Verify the `SONAR_TOKEN` secret" in dashboard_text
-    assert "Run the Ruff blocking and format checks locally" in dashboard_text
-    assert "GitHub" in dashboard_text
-    assert "SonarCloud" in dashboard_text
-    assert "Semgrep SAST" in dashboard_text
-    assert "Docker Scout" in dashboard_text
-    assert "axe-core Accessibility" in dashboard_text
-    assert "Chromatic" in dashboard_text
-    assert "OpenAPI Compatibility" in dashboard_text
-    assert "Locust Performance" in dashboard_text
-    assert "Mutation Testing" in dashboard_text
-    assert "release gate: yes" in dashboard_text
-    assert "Data Freshness / Provenance" in dashboard_text
-    assert 'id="dataFreshness"' in dashboard_text
-    assert 'id="dashboardData"' in dashboard_text
-    assert "renderSparklines" in dashboard_text
-    assert "Backlog" in dashboard_text
-    assert "MemBase Open WI" in dashboard_text
-    assert "Tokens" in dashboard_text
+    panel_titles = set(_panel_titles(dashboard_json["panels"]))
+    assert dashboard_json["title"] == "Agent Red GT-KB Dashboard"
+    assert "Shortcuts" in panel_titles
+    assert "Health Signals" in panel_titles
+    assert [panel["title"] for panel in dashboard_json["panels"][:10]] == [
+        "GT-KB Dashboard",
+        "Project Health Issues",
+        "Release Blockers",
+        "CI / Testing Failing",
+        "Governance Bridge Items",
+        "Refresh Age",
+        "Documented Setup Steps",
+        "Health Signals",
+        "Action Severity Mix",
+        "Delivery Events By Stage",
+    ]
+    assert [panel["type"] for panel in dashboard_json["panels"][1:13]] == [
+        "stat",
+        "stat",
+        "stat",
+        "stat",
+        "stat",
+        "stat",
+        "bargauge",
+        "piechart",
+        "bargauge",
+        "bargauge",
+        "bargauge",
+        "timeseries",
+    ]
+    assert "GT-KB Install and Setup" in panel_titles
+    assert "Step-by-Step Setup" in panel_titles
+    assert "Required Tools, CLIs, and SDKs" in panel_titles
+    assert "Third-Party Test Services" in panel_titles
+    assert "Action Center" in panel_titles
+    assert "Delivery Timeline" in panel_titles
+    assert "Delivery Timeline Details" in panel_titles
+    assert "Release Readiness" in panel_titles
+    assert "KPI History Details" in panel_titles
+    assert "Integration Status Details" in panel_titles
+    assert "Data Freshness" in panel_titles
+    assert all(
+        panel.get("collapsed") is True
+        for panel in dashboard_json["panels"]
+        if panel["title"]
+        in {
+            "Setup Details",
+            "Action Center Details",
+            "Delivery Timeline Details",
+            "KPI History Details",
+            "Integration Status Details",
+            "Data Freshness Details",
+        }
+    )
+    all_panels = list(dashboard_json["panels"])
+    for panel in dashboard_json["panels"]:
+        all_panels.extend(panel.get("panels", []))
+    assert any(
+        "setup_steps" in target.get("queryText", "") for panel in all_panels for target in panel.get("targets", [])
+    )
+    assert any(
+        "third_party_services" in target.get("queryText", "")
+        for panel in all_panels
+        for target in panel.get("targets", [])
+    )
     assert "Role being assumed: Prime Builder" in report_text
+    assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in report_text
+    assert "Poller: activate only when Prime Builder and Loyal Opposition run in separate harnesses" in report_text
     assert "Startup Disclosure" in report_text
     assert "Agent Red Project Dashboard" in report_text
+    assert "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard" in report_text
+    assert "Browser opening: use the harness-controlled browser" in report_text
+    assert "system_default_browser" in report_text
+    assert "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard" in wrapup_text
+    assert str(dashboard.resolve()) not in report_text
+    assert "file:///" not in report_text
+    assert "file:///" not in wrapup_text
     assert "Dashboard scope:" in report_text
     assert "Current Project State" in report_text
     assert "Release blockers:" in report_text
     assert "Testing/tool rollup:" in report_text
+    assert "Active Workstream Focus" in report_text
+    assert "Default focus: Application Focus" in report_text
+    assert "Application focus commands:" in report_text
+    assert "`GT-KB mode`" in report_text
     assert "Wrap-Up Trigger Commands" in report_text
     assert "Accepted wrap-up commands:" in report_text
     assert "`wrap up`" in report_text
@@ -261,9 +549,9 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Use this reduction set:" in report_text
     assert "Use the dashboard link before loading large artifacts into context" in report_text
     assert "Top Priority Actions" in report_text
-    assert "GTKB-GOV-006" in report_text
-    assert "GTKB-GOV-006" in report_text
-    assert "GTKB-GOV-007" in report_text
+    assert "GTKB-GOV-006" not in report_text
+    assert "GTKB-GOV-007" not in report_text
+    assert "GTKB-GOV-010" in report_text
     assert "Current signal:" in report_text
     assert "Prompt details:" in report_text
     assert "Resolve Release Blockers" in report_text
@@ -273,6 +561,11 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Continue Last Session" in report_text
     assert "Clean For Internal Review" in report_text
     assert "Pick From Standing Backlog" in report_text
+    assert "9. **Commit and push to GitHub**" in report_text
+    assert "10. **Merge to main, build and push to the staging environment**" in report_text
+    assert "11. **Execute end-to-end tests in the staging environment**" in report_text
+    assert "12. **Push staged-and-tested build to production, then smoke test**" in report_text
+    assert "13. **Continue Last Session**" in report_text
     assert "Or provide a prompt for something else." in report_text
     assert "Startup Focus Input Gate" not in report_text
     assert "Skills, Plug-ins, Directives, And Hooks" not in report_text
@@ -347,6 +640,7 @@ def test_startup_pruning_scan_reports_large_inputs(tmp_path) -> None:
 
 def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -378,8 +672,13 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "## Startup Disclosure" in context
     assert "### Live Project Dashboard" in context
     assert "Agent Red Project Dashboard" in context
+    assert "Browser opening: use the harness-controlled browser" in context
     assert "### Current Project State" in context
     assert "Release blockers:" in context
+    assert "### Active Workstream Focus" in context
+    assert "Default focus: Application Focus" in context
+    assert "`application mode`" in context
+    assert "`GT-KB mode`" in context
     assert "### Wrap-Up Trigger Commands" in context
     assert "Accepted wrap-up commands:" in context
     assert "`wrap up`" in context
@@ -395,15 +694,274 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "Use this reduction set:" in context
     assert "Use the dashboard link before loading large artifacts into context" in context
     assert "Top Priority Actions" in context
-    assert "GTKB-GOV-006" in context
+    assert "GTKB-GOV-006" not in context
+    assert "GTKB-GOV-007" not in context
     assert "Current signal:" in context
     assert "Prompt details:" in context
     assert "Resolve Release Blockers" in context
     assert "Continue Last Session" in context
+    assert "9. **Commit and push to GitHub**" in context
+    assert "12. **Push staged-and-tested build to production, then smoke test**" in context
+    assert "13. **Continue Last Session**" in context
     assert "Or provide a prompt for something else." in context
     assert "## Startup Focus Input Gate" not in context
     assert "## Skills, Plug-ins, Directives, And Hooks" not in context
     assert context.index("## Startup Disclosure") < context.index("## Choose This Session's Focus")
+
+
+def test_emit_startup_service_payload_returns_full_codex_session_start_contract(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setenv("GTKB_STARTUP_REQUESTED_AT", "2026-04-23T13:20:00Z")
+    monkeypatch.setattr(
+        module,
+        "_write_dashboard_pdf",
+        lambda dashboard_path, pdf_path: {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "PDF export skipped by test.",
+        },
+    )
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-startup-service-payload",
+            "--fast-hook",
+            "--skip-bridge-maintenance",
+            "--lifecycle-guard-path",
+            str(tmp_path / "guard.json"),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    hook_output = payload["hookSpecificOutput"]
+    context = hook_output["additionalContext"]
+    freshness = hook_output["startupFreshness"]
+    assert hook_output["hookEventName"] == "SessionStart"
+    assert "Programmatic Startup Payload" in context
+    assert "agent-red-startup-service-v2" in context
+    assert "User-visible startup content below was generated programmatically by the startup service." in context
+    assert "relay the generated startup message verbatim as the first durable assistant answer" in context
+    assert "Do not summarize, paraphrase, shorten, reorder, or omit any startup section" in context
+    assert "Preserve every generated heading, bullet, numbered item, `Current signal`, and `Prompt details` line" in context
+    assert "all 13 numbered options must remain present in order with their per-option summaries intact" in context
+    assert "The first durable assistant answer should be the startup disclosure itself" in context
+    assert "The first owner message after SessionStart is discarded startup stimulus only" in context
+    assert "Never map the first owner message to `Continue Last Session` or any other focus option." in context
+    assert "Codex Desktop durability rule" in context
+    assert "first durable assistant answer" in context
+    assert "not in transient progress/intermediary output" in context
+    assert "Do not replace the startup message with a shorter final answer" in context
+    assert "The AI harness is not responsible for composing role, mode, bridge, process, or focus content" in context
+    assert "## User-Visible Startup Message" in context
+    assert "## Startup Disclosure" in context
+    assert "## Choose This Session's Focus" in context
+    assert "13. **Continue Last Session**" in context
+    assert "Startup First-Response Directive" not in context
+    assert "Mandatory Direct Live Bridge Index Read" not in context
+    assert "SHA-256:" not in context
+    assert freshness["contract_version"] == "agent-red-startup-freshness-v1"
+    assert freshness["request_started_at"] == "2026-04-23T13:20:00Z"
+    assert freshness["report_origin"] == "in_memory_model_render"
+    assert freshness["validation"]["startup_payload_fresh"] is True
+    assert freshness["validation"]["status"] in {"fresh", "fresh_with_gaps"}
+    assert freshness["required_local_sources"]
+    assert any(item["source"] == "bridge/INDEX.md" for item in freshness["required_local_sources"])
+    assert any(item["source"] == "GitHub Actions via gh" for item in freshness["live_probes"])
+    assert freshness["repo"]["sha"]
+
+
+def test_emit_report_arms_first_prompt_discard_gate(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(
+        module,
+        "_write_dashboard_pdf",
+        lambda dashboard_path, pdf_path: {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "PDF export skipped by test.",
+        },
+    )
+
+    assert (
+        module.main(
+            [
+                "--project-root",
+                str(REPO_ROOT),
+                "--dashboard-dir",
+                str(tmp_path / "dashboard"),
+                "--history-path",
+                str(tmp_path / "history.json"),
+                "--emit-report",
+                "--fast-hook",
+                "--skip-bridge-maintenance",
+                "--lifecycle-guard-path",
+                str(guard_path),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["discard_next_user_prompt"] is True
+    assert guard_state["startup_prompt_discarded"] is False
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["suppress_next_wrapup"] is True
+
+
+def test_loyal_opposition_startup_arms_first_prompt_discard_without_wrapup_suppression(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "loyal-opposition")
+    monkeypatch.setattr(
+        module,
+        "_write_dashboard_pdf",
+        lambda dashboard_path, pdf_path: {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "PDF export skipped by test.",
+        },
+    )
+
+    assert (
+        module.main(
+            [
+                "--project-root",
+                str(REPO_ROOT),
+                "--dashboard-dir",
+                str(tmp_path / "dashboard"),
+                "--history-path",
+                str(tmp_path / "history.json"),
+                "--emit-report",
+                "--fast-hook",
+                "--skip-bridge-maintenance",
+                "--lifecycle-guard-path",
+                str(guard_path),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["discard_next_user_prompt"] is True
+    assert guard_state["startup_prompt_discarded"] is False
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["suppress_next_wrapup"] is False
+
+
+def test_emit_report_ignores_forced_role_profile_and_uses_durable_toggle(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(
+        module,
+        "_write_dashboard_pdf",
+        lambda dashboard_path, pdf_path: {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "PDF export skipped by test.",
+        },
+    )
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-report",
+            "--fast-hook",
+            "--skip-bridge-maintenance",
+            "--role-profile",
+            "loyal-opposition",
+            "--lifecycle-guard-path",
+            str(tmp_path / "guard.json"),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    context = payload["additionalContext"]
+    assert "Role being assumed: Prime Builder" in context
+    assert "## Choose This Session's Focus" in context
+    assert "## Loyal Opposition Startup Task" not in context
+
+
+def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    discovered_role = module.discover_role_profile(REPO_ROOT)
+    monkeypatch.setattr(
+        module,
+        "_write_dashboard_pdf",
+        lambda dashboard_path, pdf_path: {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "PDF export skipped by test.",
+        },
+    )
+    claude_settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    session_commands = [
+        hook["command"] for group in claude_settings["hooks"]["SessionStart"] for hook in group["hooks"]
+    ]
+    stop_commands = [hook["command"] for group in claude_settings["hooks"]["Stop"] for hook in group["hooks"]]
+    assert any("session_self_initialization.py" in command for command in session_commands)
+    assert all("--role-profile" not in command for command in session_commands + stop_commands)
+
+    guard_path = tmp_path / "guard.json"
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-report",
+            "--fast-hook",
+            "--skip-bridge-maintenance",
+            "--lifecycle-guard-path",
+            str(guard_path),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    context = payload["additionalContext"]
+    assert f"Role being assumed: {module.ROLE_PROFILES[discovered_role]['assumed_role']}" in context
+    assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in context
+    assert "Poller: activate only when Prime Builder and Loyal Opposition run in separate harnesses" in context
+    assert "Role mapping source: .claude/rules/operating-role.md" in context
+    if discovered_role == "loyal-opposition":
+        assert "## Loyal Opposition Startup Task" in context
+        assert "## Choose This Session's Focus" not in context
+        assert "Commit and push to GitHub" not in context
+        assert guard_path.exists()
+        guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+        assert guard_state["discard_next_user_prompt"] is True
+        assert guard_state["suppress_next_wrapup"] is False
+    else:
+        assert "## Loyal Opposition Startup Task" not in context
+        assert "## Choose This Session's Focus" in context
+        assert "9. **Commit and push to GitHub**" in context
+        assert "13. **Continue Last Session**" in context
+        assert guard_path.exists()
+        guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+        assert guard_state["discard_next_user_prompt"] is True
+        assert guard_state["suppress_next_wrapup"] is True
 
 
 def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monkeypatch) -> None:
@@ -443,6 +1001,7 @@ def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monk
 
 def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -454,36 +1013,44 @@ def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, ca
     )
     guard_path = tmp_path / "guard.json"
 
-    assert module.main(
-        [
-            "--project-root",
-            str(REPO_ROOT),
-            "--dashboard-dir",
-            str(tmp_path / "dashboard"),
-            "--history-path",
-            str(tmp_path / "history.json"),
-            "--emit-report",
-            "--fast-hook",
-            "--lifecycle-guard-path",
-            str(guard_path),
-        ]
-    ) == 0
+    assert (
+        module.main(
+            [
+                "--project-root",
+                str(REPO_ROOT),
+                "--dashboard-dir",
+                str(tmp_path / "dashboard"),
+                "--history-path",
+                str(tmp_path / "history.json"),
+                "--emit-report",
+                "--fast-hook",
+                "--lifecycle-guard-path",
+                str(guard_path),
+            ]
+        )
+        == 0
+    )
     capsys.readouterr()
 
-    assert module.main(
-        [
-            "--project-root",
-            str(REPO_ROOT),
-            "--dashboard-dir",
-            str(tmp_path / "dashboard"),
-            "--history-path",
-            str(tmp_path / "history.json"),
-            "--emit-wrapup",
-            "--fast-hook",
-            "--lifecycle-guard-path",
-            str(guard_path),
-        ]
-    ) == 0
+    assert (
+        module.main(
+            [
+                "--project-root",
+                str(REPO_ROOT),
+                "--dashboard-dir",
+                str(tmp_path / "dashboard"),
+                "--history-path",
+                str(tmp_path / "history.json"),
+                "--emit-wrapup",
+                "--fast-hook",
+                "--role-profile",
+                "prime-builder",
+                "--lifecycle-guard-path",
+                str(guard_path),
+            ]
+        )
+        == 0
+    )
 
     assert json.loads(capsys.readouterr().out) == {}
     guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
@@ -491,20 +1058,25 @@ def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, ca
     assert guard_state["last_suppressed_reason"] == "startup_focus_input_pending"
     assert guard_state["suppress_next_wrapup"] is False
 
-    assert module.main(
-        [
-            "--project-root",
-            str(REPO_ROOT),
-            "--dashboard-dir",
-            str(tmp_path / "dashboard"),
-            "--history-path",
-            str(tmp_path / "history.json"),
-            "--emit-wrapup",
-            "--fast-hook",
-            "--lifecycle-guard-path",
-            str(guard_path),
-        ]
-    ) == 0
+    assert (
+        module.main(
+            [
+                "--project-root",
+                str(REPO_ROOT),
+                "--dashboard-dir",
+                str(tmp_path / "dashboard"),
+                "--history-path",
+                str(tmp_path / "history.json"),
+                "--emit-wrapup",
+                "--fast-hook",
+                "--role-profile",
+                "prime-builder",
+                "--lifecycle-guard-path",
+                str(guard_path),
+            ]
+        )
+        == 0
+    )
 
     payload = json.loads(capsys.readouterr().out)
     assert "Proactive Session Wrap-Up" in payload["additionalContext"]
@@ -512,6 +1084,7 @@ def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, ca
 
 def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
 
     def fail_historical_backfill(project_root):
         raise AssertionError("fast hook must not recompute historical backfill")
@@ -541,6 +1114,8 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
     assert "## Startup Disclosure" in context
+    assert "### Active Workstream Focus" in context
+    assert "Default focus: Application Focus" in context
     assert "### Wrap-Up Trigger Commands" in context
     assert "Accepted wrap-up commands:" in context
     assert "### File Bridge Scan" not in context
@@ -553,10 +1128,14 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     assert "Use this reduction set:" in context
     assert "Use the dashboard link before loading large artifacts into context" in context
     assert "Top Priority Actions" in context
-    assert "GTKB-GOV-006" in context
+    assert "GTKB-GOV-006" not in context
+    assert "GTKB-GOV-007" not in context
     assert "Current signal:" in context
     assert "Prompt details:" in context
     assert "Continue Last Session" in context
+    assert "9. **Commit and push to GitHub**" in context
+    assert "12. **Push staged-and-tested build to production, then smoke test**" in context
+    assert "13. **Continue Last Session**" in context
     assert "Or provide a prompt for something else." in context
     assert "## Startup Focus Input Gate" not in context
     assert "## Skills, Plug-ins, Directives, And Hooks" not in context
@@ -569,10 +1148,13 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
 def test_top_priority_actions_come_from_standing_backlog() -> None:
     module = _load_module()
 
-    model = module.build_startup_model(REPO_ROOT)
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
     action_ids = [item["id"] for item in model["top_priority_actions"]]
 
-    assert len(action_ids) == 3
-    assert action_ids[0] == "GTKB-GOV-006"
+    assert action_ids == ["GTKB-GOV-010"]
+    assert "GTKB-ISOLATION-007" not in action_ids
+    assert "GTKB-GOV-012" not in action_ids
+    assert "GTKB-GOV-007" not in action_ids
     assert "GTKB-GOV-002" not in action_ids
-    assert "GTKB-GOV-006" in action_ids
+    assert "GTKB-GOV-006" not in action_ids
+    assert "GTKB-GOV-010" in action_ids

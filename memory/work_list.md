@@ -49,7 +49,19 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 **Approval packet:** `.groundtruth/formal-artifact-approvals/2026-04-20-standing-backlog-formalization.json`.
 
-### GTKB-GOV-011 — DONE — Implement session self-initialization dashboard, startup disclosure, and proactive wrap-up
+### GTKB-GOV-000D - DONE - Formalize artifact-oriented development governance
+
+**Priority:** TOP follow-on to owner approval. Owner directive 2026-04-22: default system behavior should be oriented toward artifacts and plans, with the AI biased toward capturing deliberations, adding planned work to the standing backlog, treating agreed plans as artifacts, and starting sessions by examining artifact state.
+
+**Outcome:** added `DELIB-0874` and MemBase records `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`. Updated `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md` with a session-loaded Artifact-Oriented Governance directive covering capture thresholds, lifecycle states, and non-intrusive confirmation flows.
+
+**Clarification:** artifact-oriented governance is a default interpretation stance, not permission to mutate formal artifacts without approval. Brainstorming remains lightweight until it becomes a decision, plan, requirement, risk, procedure, review finding, or accepted future work. Formal GOV, SPEC, PB, ADR, DCL, and Deliberation Archive mutations still require applicable approval evidence.
+
+**Regression visibility:** `tests/scripts/test_groundtruth_governance_adoption.py` verifies the new MemBase records, `DELIB-0874`, the approval packet, the standing-priorities directive, and this work-list continuity evidence.
+
+**Approval packet:** `.groundtruth/formal-artifact-approvals/2026-04-22-artifact-oriented-governance.json`.
+
+### GTKB-GOV-011 - DONE - Implement session self-initialization dashboard, startup disclosure, and proactive wrap-up
 
 **Priority:** TOP. Owner directive `DELIB-0840` and records `GOV-SESSION-SELF-INITIALIZATION-001`, `PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001`, `SPEC-PROJECT-DASHBOARD-KPI-LINK-001`, and `DCL-SESSION-STARTUP-TOKEN-BUDGET-001` required fresh sessions to self-initialize with explicit role, governance, dashboard, priority, and token-budget context. Owner directive `DELIB-0841` and records `GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001`, `PB-SESSION-WRAP-UP-PROACTIVE-001`, and `DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001` added proactive session wrap-up guidance and priority engagement.
 
@@ -88,11 +100,319 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 **Regression visibility:** `scripts/audit_standing_backlog_sources.py` still reports the live bridge entries by design; child backlog items `GTKB-GOV-007`, `GTKB-GOV-008`, and `GTKB-GOV-009` preserve actionability until the underlying bridge threads are revised, executed, deferred, or superseded.
 
+### GTKB-GOV-006 - DONE - Close Agent Red release-readiness blocker list
+
+**Priority:** TOP. `memory/release-readiness.md` listed governed release blockers that had to be closed, explicitly deferred with owner approval, or superseded before a production GO.
+
+**Outcome:** owner-disposition blockers for credential lifecycle, secret-history purge, and release-branch provenance were closed. The commercial durability scope question was resolved as in-scope, then implemented with durable commercial-state persistence and secure tenant backup/restore support for Shopify, Stripe, integration framework state, and action-executor HITL state.
+
+**Regression visibility:** `scripts/release_candidate_gate.py` now includes the commercial durability tests. Local non-deploying release gate passed with frontend skipped: `python scripts/release_candidate_gate.py --skip-frontend`.
+
+### GTKB-GOV-012 - DONE - Enforce Prime Builder / Loyal Opposition proposal and verification gates across GT-KB applications
+
+**Priority:** TOP for the 2026-04-22 Prime Builder session. Owner directive 2026-04-22 required the established Prime Builder / Loyal Opposition development pattern to be mechanically enforced or strongly encouraged for all applications developed with GT-KB.
+
+**Outcome:** the portable file-bridge proposal/gate slice completed the governed bridge lifecycle: proposal `bridge/gtkb-proposal-verification-gates-001.md`, Loyal Opposition `GO` in `bridge/gtkb-proposal-verification-gates-002.md`, post-implementation reports in `bridge/gtkb-proposal-verification-gates-003.md` and `bridge/gtkb-proposal-verification-gates-005.md`, a `NO-GO` in `bridge/gtkb-proposal-verification-gates-004.md`, and final `VERIFIED` in `bridge/gtkb-proposal-verification-gates-006.md`.
+
+**Post-verification spec-status review:** `gt bridge spec-review --scope protocol` now surfaces the affected governance records `GOV-GTKB-ADOPTION-ENFORCEMENT-001`, `GOV-HARNESS-ROLE-PORTABILITY-001`, `GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001`, and `GOV-AGENT-RED-GTKB-CONFORMANCE-001`. Existing MemBase and regression-test evidence show those records are already `verified`; no formal GOV/SPEC mutation was made in this backlog cleanup pass.
+
+**Evidence report:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-GOV-012-POST-VERIFIED-STATUS-REVIEW-2026-04-22.md`.
+
+**Residual gate visibility:** `gt bridge gate --require-verified --scope protocol --json` still fails on older protocol entries with latest non-verified states. Current notable continuation items include `gtkb-mass-adoption-first-commit-package` awaiting renewed Loyal Opposition review and `gtkb-core-spec-intake` at scope GO. `gtkb-azure-cicd-gates` is now `VERIFIED` at `bridge/gtkb-azure-cicd-gates-010.md`, and `gtkb-core-spec-intake-phase3b-answer` is also `VERIFIED`. These are not regressions in `GTKB-GOV-012`; the remaining non-verified entries are bridge-continuation work items for `GTKB-MASS-001` and `GTKB-CORE-001`.
+
 ## Active Items
+
+**Owner directive 2026-04-23:** treat the overall application/GT-KB isolation
+program as the current standing-backlog priority. Until `GTKB-ISOLATION-019`
+is complete or the owner explicitly pauses or reprioritizes the program,
+non-isolation items below are deferred except for bridge or governance work
+that directly unblocks the isolation program.
+
+### GTKB-ISOLATION-010 - Execute Phase 7 foundation slice: work-subject state and resolved-root guardrails
+
+**Priority:** TOP. This is the first concrete execution slice already entered on
+the live bridge in `bridge/gtkb-work-subject-root-enforcement-implementation-001.md`,
+and it should lead the queue because later environment, service, control-plane,
+overlay, and migration work need stable work-subject state, root
+classification, and startup/hook language first.
+
+**Required outcome:** obtain bridge GO, implement, verify, and Loyal
+Opposition-verify the narrow Phase 7 foundation slice: canonical
+`.claude/session/work-subject.json` state, one-window legacy migration and
+alias support, resolved-root classification for application/current-repo
+bridge-governance/GT-KB product targets, subject-aware mutation guardrails, and
+startup/hook/report language changes from `focus` to `work subject`.
+
+**Regression visibility:** targeted checks in
+`tests/hooks/test_workstream_focus.py`,
+`tests/scripts/test_session_self_initialization.py`, and
+`tests/scripts/test_codex_hook_parity.py`, followed by broader `tests/hooks/`
+and `tests/scripts/` lanes once the focused slice is green.
+
+### GTKB-ISOLATION-011 - Implement Phase 3 environment boundary baseline
+
+**Priority:** TOP after `GTKB-ISOLATION-010`.
+
+**Bridge status:** proposal filed in
+`bridge/gtkb-environment-boundary-baseline-implementation-001.md`; awaiting
+Loyal Opposition review.
+
+**Required outcome:** submit, obtain GO for, and land the first Phase 3
+execution slice: static environment policy checker, root identity probe, safe
+devcontainer/Codespaces defaults, Docker context hardening, CI subject-scope
+audit, dependency-mode reporting, and bounded escape-hatch schema.
+
+**Regression visibility:** tests must reject broad mounts, Docker socket usage,
+privileged containers, GT-KB product credentials in app lanes, root-escape
+writes, and unlabeled product-release claims from app CI.
+
+### GTKB-ISOLATION-012 - Implement Phase 4 scoped GT-KB service boundary baseline
+
+**Priority:** TOP after `GTKB-ISOLATION-011`.
+
+**Bridge status:** proposal filed in
+`bridge/gtkb-scoped-service-boundary-baseline-implementation-001.md`; awaiting
+Loyal Opposition review.
+
+**Required outcome:** submit, obtain GO for, and land the first Phase 4
+execution slice: scoped operation schema, app-scoped GT-KB client,
+service-side GOV guard reuse, read-only dashboard summary path, DA/MemBase
+app-scope layer, governed release/deployment request flow, offline/stale
+protocol, and doctor/preflight checks that remove raw GT-KB DB/root access from
+ordinary app flows.
+
+**Regression visibility:** tests must prove app-subject sessions cannot perform
+product-scope writes, cannot emit combined app/product green claims, and cannot
+fall back silently to raw DB/root authority.
+
+### GTKB-ISOLATION-013 - Implement Phase 5 control-plane registry and safe projection baseline
+
+**Priority:** TOP after `GTKB-ISOLATION-012`.
+
+**Bridge status:** proposal filed in
+`bridge/gtkb-dashboard-control-plane-baseline-implementation-001.md`; awaiting
+Loyal Opposition review.
+
+**Required outcome:** submit, obtain GO for, and land the first Phase 5
+execution slice: typed operation registry, dry-run/diff/audit/rollback
+foundation, app-root allowlisted `dashboard.refresh`, bounded Markdown
+operations, projection preview/apply staging, harness topology registry,
+role-slot-aware bridge/control records, and pause/resume/restart request
+records.
+
+**Regression visibility:** tests must reject arbitrary path/script execution,
+path traversal, unmanaged projection changes, stale counterpart topology, and
+bridge writes from the wrong role slot.
+
+### GTKB-ISOLATION-014 - Implement Phase 6 overlay and snapshot baseline
+
+**Priority:** TOP after `GTKB-ISOLATION-013`.
+
+**Bridge status:** proposal filed in
+`bridge/gtkb-session-overlay-baseline-implementation-001.md`; awaiting Loyal
+Opposition review.
+
+**Required outcome:** submit, obtain GO for, and land the first Phase 6
+execution slice: overlay manifest library, overlay builder, startup/dashboard
+visibility, scanner exclusions, projection preview overlay integration,
+promotion dry-run/apply through the typed registry, and retention cleanup
+confined to validated overlay roots.
+
+**Regression visibility:** tests must prove overlays are non-authoritative,
+source-hashed, stale-detecting, excluded from canonical scanners by default,
+and unable to copy credentials or raw `groundtruth.db` into session context.
+
+### GTKB-ISOLATION-015 - Complete full Phase 7 work-subject/root enforcement
+
+**Priority:** TOP after `GTKB-ISOLATION-014`.
+
+**Required outcome:** after the Phase 3 through Phase 6 execution slices land,
+submit and execute the remaining Phase 7 integration work: subject-labeled
+startup/dashboard/readiness/test outputs, typed control-plane
+subject/mode/session controls, overlay-aware but non-authoritative context
+handling, bridge live-state writer/validator safety, Codex/Claude parity
+checks, and upstream GT-KB delivery requirements for clean adopters.
+
+**Regression visibility:** tests must prove subject-labeled outputs, live
+`bridge/INDEX.md` fresh-read authority, invalid transition rejection, stale
+counterpart detection, and split application vs GT-KB verification lanes.
+
+**Execution note:** the completed Phase 1 through Phase 7 planning records
+remain below as the governing design baseline for the execution queue above.
+
+### GTKB-ISOLATION-001 - DONE - Create detailed Phase 1 plan: artifact authority and dependency matrix
+
+**Priority:** TOP. Owner directive 2026-04-22: application-subject sessions must be unable by default to alter GT-KB product artifacts, while GT-KB-subject sessions may retain broader access where needed. This is the first planning phase in the application/GT-KB isolation program.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md`. Deliberation capture: `DELIB-0878`.
+
+**Outcome:** completed the detailed Phase 1 authority matrix plan. The plan defines the durable matrix schema, conventional and GT-KB authority categories, a preliminary Agent Red authority matrix, owner-decision-pending rows, implementation steps, verification mapping, risk mitigations, and dependencies into Phases 2-9.
+
+**Required outcome:** create a detailed implementation plan for the authority matrix that classifies each GT-KB/App dependency as parent GT-KB product artifact, scoped GT-KB service, application-local governed state, session overlay, dashboard/control-plane operation, or host/container/development-environment boundary. The plan must include path/capability ownership, subject labels, owner-decision-pending legacy exceptions, and recommended authority for bridge, backlog, release-readiness, tests, DA, MemBase, hooks, rules, skills, dashboard, overlays, containers, dev environments, and CI. Apply the industry-alignment critique in the plan source: prefer conventional names, least privilege, workspace trust, generated configuration, controller reconciliation, provenance, and subject-scoped CI over novel GT-KB-only terminology.
+
+**Regression visibility:** evidence gathered from upstream GT-KB ownership resolver/classify-tree output, `groundtruth.toml`, `tools/knowledge-db/groundtruth.toml`, `.claude/settings.json`, `.codex/hooks.json`, `.env.example`, `docker-compose.yml`, `.github/workflows/*`, `requirements-local.txt`, `requirements-test.txt`, `scripts/workstream_focus.py`, `scripts/session_self_initialization.py`, `tests/hooks/test_workstream_focus.py`, and `tests/scripts/test_groundtruth_governance_adoption.py`. This phase was planning only and did not move application or GT-KB files.
+
+### GTKB-ISOLATION-002 - DONE - Create detailed Phase 2 plan: project root and repository topology
+
+**Priority:** TOP after `GTKB-ISOLATION-001`. Owner proposed GT-KB root `E:\Development\GroundTruth-KB\` and application root `E:\Development\GroundTruth-KB\Applications\Agent_Red\`, with ordinary downstream users opening only the application project.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-002-PHASE2-ROOT-TOPOLOGY-PLAN-2026-04-22.md`. Deliberation capture: `DELIB-0879`.
+
+**Outcome:** completed the detailed Phase 2 topology plan. The plan recommends separate GT-KB and application repositories with package/service consumption, permits a common parent folder only as a workspace container, rejects monorepo/submodule defaults, defines Codex/Claude/VS Code/CI/git/worktree policy, specifies root-boundary verification tests, and defines the non-destructive Agent Red migration rehearsal shape.
+
+**Required outcome:** create a detailed implementation plan comparing parent-plus-subdirectory, separate repositories, monorepo-with-root-enforcement, and package-only GT-KB consumption. The plan must specify Codex/Claude project configuration, git/worktree/submodule policy, hard-boundary verification, migration staging, and rollback.
+
+**Regression visibility:** evidence confirms Agent Red and GT-KB are already separate Git repositories, while Agent Red still contains GT-KB governed/runtime surfaces. The plan explicitly states that Codex/Claude project selection is not a security sandbox and later phases must test local harness, path traversal, dependency mode, git boundary, and CI boundary behavior.
+
+### GTKB-ISOLATION-003 - DONE - Create detailed Phase 3 plan: host, container, and development environment isolation
+
+**Priority:** TOP after `GTKB-ISOLATION-002`.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-003-PHASE3-ENVIRONMENT-ISOLATION-PLAN-2026-04-23.md`.
+
+**Outcome:** completed the detailed Phase 3 environment isolation plan. The plan defines application-subject, GT-KB-subject, and migration-rehearsal environment authority profiles; covers local harnesses, IDE/workspace trust, devcontainers, Codespaces, Docker/Compose, CI, deployment tooling, secrets, dependency mode, and owner-approved escape hatches; identifies current Agent Red evidence and risk points; and defines a verification matrix for local harness, devcontainer, Docker/Compose, and CI boundaries.
+
+**Required outcome:** create a detailed implementation plan for isolating application-subject development environments from GT-KB product artifacts across local harnesses, dev containers, remote development environments, Docker/Compose, CI, and deployment tooling. Cover filesystem read/write boundaries, application-only project roots, devcontainer/Codespaces lifecycle commands and mounts, workspace trust, container hardening, app-scoped secrets, CI working directories, read-only dependency mounts, and explicit owner-approved escape hatches.
+
+**Regression visibility:** application-subject environments must not receive parent GT-KB write access by default. The plan must explicitly test local harness, dev container, Docker/Compose, and CI boundaries, and must forbid privileged containers, Docker socket mounts, broad host bind mounts, and GT-KB product/admin secrets unless a later owner decision grants a scoped exception.
+
+### GTKB-ISOLATION-004 - DONE - Create detailed Phase 4 plan: scoped GT-KB service boundary
+
+**Priority:** TOP after `GTKB-ISOLATION-003`.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-004-PHASE4-SCOPED-SERVICE-BOUNDARY-PLAN-2026-04-23.md`.
+
+**Outcome:** completed the detailed Phase 4 scoped service boundary plan. The plan rejects raw all-powerful database/root authority for ordinary application sessions; defines typed scoped operations for dashboard reads, Deliberation Archive, MemBase, bridge, release/deployment requests, credentials, upgrade/scaffold requests, and offline/degraded mode; requires service-side GOV enforcement independent of harness hooks; and defines a verification matrix proving application sessions cannot mutate product records or combine application and GT-KB product readiness claims.
+
+**Required outcome:** create a detailed implementation plan for scoped GT-KB services that application sessions can use without broad parent-root or raw database authority. Cover dashboard reads, app-scoped Deliberation Archive append/query, app-scoped MemBase operations, release/deployment requests, credential scope, offline/degraded mode, and service-side GOV enforcement.
+
+**Regression visibility:** the plan must reject raw all-powerful database connection strings for ordinary app sessions unless a later owner decision explicitly accepts that risk.
+
+### GTKB-ISOLATION-005 - DONE - Create detailed Phase 5 plan: dashboard control plane and programmatic operations
+
+**Priority:** TOP after `GTKB-ISOLATION-004`.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-005-PHASE5-DASHBOARD-CONTROL-PLANE-PLAN-2026-04-23.md`.
+
+**Outcome:** completed the detailed Phase 5 dashboard control-plane plan. The plan defines a typed operation registry, app-root path and capability allowlists, scoped Markdown operations, deterministic projection of behavior-defining Markdown into subject-specific AI-facing files, durable mode and work-subject flows, harness topology and bridge role-slot requirements, session pause/resume/restart-request controls, dry-run/diff/audit/rollback behavior, authentication and authorization scopes, and GOV/formal-approval boundaries.
+
+**Required outcome:** create a detailed implementation plan for GT-KB dashboard/web control-plane operations that can act on application-local files without granting ordinary application sessions broad GT-KB product authority. Cover typed operation registry, app-root path allowlists, selected Markdown add/remove/scan/normalize tools, minimal executable projection of behavior-defining Markdown into subject-specific AI-facing startup files, durable mode toggle flow, harness topology registry, Prime Builder/Loyal Opposition bridge role slots, work-subject toggles, pause/resume/restart AI session controls, dry-run/diff preview, audit logs, rollback records, authentication, and GOV/formal-approval boundaries.
+
+**Regression visibility:** application-subject sessions must not be able to use the dashboard/control plane to mutate GT-KB product artifacts. Arbitrary path inputs and arbitrary script execution must be denied by default; mode and session-control changes must declare whether they apply immediately or only to the next session. Projection scripts must be product-controlled, reproducible from canonical policy sources, source-hashed, audited, and tested to reduce startup conditional context without deleting mandatory subject/root/GOV enforcement text. The plan must explicitly avoid using projection to remove ordinary AI judgment from application work. Mode/projection operations must not proceed until the target harness, project root, bridge role slot, and single-harness versus dual-harness topology are resolved.
+
+### GTKB-ISOLATION-006 - DONE - Create detailed Phase 6 plan: session overlay and snapshot mechanism
+
+**Priority:** TOP after `GTKB-ISOLATION-005`.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-006-PHASE6-SESSION-OVERLAY-SNAPSHOT-PLAN-2026-04-23.md`.
+
+**Outcome:** completed the detailed Phase 6 session overlay and snapshot plan. The plan defines copy-only non-authoritative overlays, an app-local overlay root and manifest schema, copy eligibility and denied sources, refresh and stale-detection semantics, promotion-only writeback, generated-projection relationships, canonical-versus-overlay scanner behavior, retention cleanup, implementation slices, and tests proving overlays are non-authoritative and cannot be mistaken for canonical GT-KB product records.
+
+**Required outcome:** create a detailed implementation plan for copy-only session overlays. The plan must define which artifacts may be copied, where overlays live, when refresh occurs, how source hashes and authority metadata are recorded, how stale overlays are detected, and how proposed changes are promoted instead of silently written back to GT-KB.
+
+**Regression visibility:** include tests proving overlays are non-authoritative, no parent artifact is moved, stale snapshots are flagged, and copied artifacts cannot be mistaken for canonical GT-KB product records.
+
+### GTKB-ISOLATION-007 - DONE - Create detailed Phase 7 plan: work subject and root enforcement
+
+**Priority:** TOP after `GTKB-ISOLATION-006`.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`, proposal `bridge/gtkb-session-work-subject-001.md`, revised planning bridge `bridge/gtkb-session-work-subject-003.md`, and Loyal Opposition GO `bridge/gtkb-session-work-subject-004.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-007-PHASE7-WORK-SUBJECT-ROOT-ENFORCEMENT-PLAN-2026-04-23.md`.
+
+**Outcome:** completed the detailed Phase 7 work-subject and root-enforcement plan after Phases 3 through 6 were completed. The plan separates operating role, work subject, root, and bridge role slot; defines durable app-local subject state and command precedence; integrates resolved-root mutation guardrails, startup/dashboard scoping, readiness/test scoping, hook parity, Phase 5 control-plane operations, Phase 6 overlay status, multi-harness role awareness, and upstream GT-KB packaging requirements. It remains planning only; implementation still requires a later concrete bridge-approved implementation proposal or explicit owner supersession.
+
+**Required outcome:** create a detailed implementation plan integrating `work subject application` and `work subject GT-KB` with root-boundary checks, startup priority scoping, release-readiness scoping, test scoping, mutation guardrails, hook parity, dashboard/control-plane session controls, durable mode projection, multi-harness role awareness, generated subject-specific AI-facing startup instruction files, and deterministic bridge index handling. The bridge portion must include a scripted writer/validator that fresh-reads live `bridge/INDEX.md`, rejects cached or stale bridge state, validates role/status transitions, computes the next bridge file number from live index plus disk, writes the response file before inserting the status line, preserves the audit trail, and verifies post-write live state. The plan may revise the existing work-subject bridge proposal after root/service/control-plane/overlay requirements are clear.
+
+**Regression visibility:** application-subject sessions must block or warn before mutating GT-KB product paths; readiness and test reports must label the active subject and must not combine application and GT-KB green claims. Bridge implementation tests must cover stale index rejection, next-number calculation, invalid transition rejection, existing-file collision, concurrent index change, and post-write live-state verification.
+
+### GTKB-ISOLATION-008 - Create detailed Phase 8 plan: Agent Red migration rehearsal
+
+**Priority:** TOP after `GTKB-ISOLATION-015`.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`.
+
+**Required outcome:** create a detailed implementation plan for a non-destructive Agent Red extraction/migration rehearsal from the legacy mixed root into the selected application root. Include path rewrites, imports, CI/test command updates, dashboard/DB path handling, bridge/backlog split, production deployment effects, and rollback.
+
+**Regression visibility:** require dry-run inventory and verification before any move. No destructive cleanup or production-affecting change is authorized by this planning item.
+
+### GTKB-ISOLATION-009 - Create detailed Phase 9 plan: downstream adopter packaging and validation
+
+**Priority:** TOP after `GTKB-ISOLATION-008`.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`.
+
+**Required outcome:** create a detailed implementation plan for making the isolation model a GT-KB product capability. Cover `gt project init`, `gt project upgrade`, managed artifact registry changes, `gt project doctor`/preflight checks, clean-adopter tests, application-only project-root documentation, and examples.
+
+**Regression visibility:** clean adopters must default to application subject, must not expose GT-KB product artifacts for mutation from app-only roots, and must retain functioning app-local governance state.
+
+### GTKB-ISOLATION-016 - Execute non-destructive Agent Red migration rehearsal
+
+**Priority:** TOP after `GTKB-ISOLATION-009`.
+
+**Required outcome:** after the Phase 8 and Phase 9 plans are complete, run the
+approved non-destructive rehearsal from the legacy mixed root into the selected
+child application root, emit dry-run inventory and path rewrites, prove split
+bridge/backlog/dashboard/DB handling, preserve rollback/removal records, and
+verify Agent Red behavior from the child directory without mutating GT-KB
+product root or production environments.
+
+**Regression visibility:** rehearsal stays zero-destructive by default. Verify
+application-only CI/test/startup/dashboard lanes separately from GT-KB product
+lanes and capture exact pre/post path maps.
+
+### GTKB-ISOLATION-017 - Implement downstream adopter packaging and clean-adopter validation
+
+**Priority:** TOP after `GTKB-ISOLATION-016`.
+
+**Required outcome:** land the Phase 9 productization work: `gt project init`
+and `gt project upgrade` defaults for application subject, managed artifact
+registry updates, doctor/preflight isolation checks, clean-adopter fixtures,
+application-only project-root documentation, and examples that preserve
+app-local governance state while denying GT-KB product mutations from app-only
+roots.
+
+**Regression visibility:** clean-adopter tests must prove safe defaults,
+functioning app-local governed state, isolated bridge/readiness/test labeling,
+and upgrade/rollback behavior from a clean project root.
+
+### GTKB-ISOLATION-018 - Execute Agent Red child-directory cutover
+
+**Priority:** TOP after `GTKB-ISOLATION-017`.
+
+**Required outcome:** after successful rehearsal evidence and the required owner
+approval for the migration window, perform the actual Agent Red extraction into
+the selected child application root, rewrite runtime/config/test/CI/deployment
+paths, split mixed-root bridge/backlog/state surfaces appropriately, preserve
+rollback, and leave the legacy mixed-root path either frozen or clearly
+decommissioned.
+
+**Regression visibility:** final cutover evidence must show the app root
+operates without default GT-KB product write authority, the GT-KB product root
+remains independently runnable, and no production deployment effect occurs
+without separate approval.
+
+### GTKB-ISOLATION-019 - Close the isolation program with final verification and backlog cleanup
+
+**Priority:** TOP after `GTKB-ISOLATION-018`.
+
+**Required outcome:** prove the program complete end to end: application-only
+sessions default to the child root and application subject, GT-KB product
+artifacts remain outside ordinary app mutation scope, clean-adopter packaging
+works, remaining mixed-root debts are either removed or explicitly deferred, and
+non-isolation backlog items can resume with the new root/service/control-plane/
+overlay defaults in place.
+
+**Regression visibility:** run and record separated application and GT-KB
+verification lanes, clean-adopter validation, cutover smoke checks, and a
+standing-backlog audit that confirms no missing isolation follow-on items
+remain.
 
 ### GTKB-MASS-001 - Execute GT-KB mass-adoption readiness plan
 
-**Priority:** TOP. Owner directive 2026-04-20: prepare GT-KB for commit, merge, push, and mass adoption as soon as possible, while preserving evidence-based release discipline. This item supersedes the current active queue ordering until it is complete or explicitly paused by owner decision.
+**Priority:** deferred behind the isolation-program queue by owner directive
+2026-04-23. Owner directive 2026-04-20 still stands for GT-KB mass adoption,
+but the later owner directive makes completion of the overall application/GT-KB
+isolation program the standing priority until `GTKB-ISOLATION-019` is complete
+or the owner explicitly reprioritizes this item.
 
 **Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-MASS-ADOPTION-READINESS-PLAN-2026-04-20.md`.
 
@@ -110,6 +430,31 @@ Do not wait for owner approval between items. Continue unsupervised.
 **Next-session acceptance gate:** test session startup first. A fresh session must present role/governance context, a usable dashboard link, directly actionable session-focus choices, Agent Red dashboard scope with GT-KB as infrastructure, top-of-page dated delivery timeline, and tool-integration remediation guidance before substantive work begins. The startup must not present the invalid `app://-/index.html?hostId=local` dashboard link.
 
 **Regression visibility:** use `tests/scripts/test_session_self_initialization.py`, `tests/scripts/test_groundtruth_governance_adoption.py`, `tests/scripts/test_release_candidate_gate.py`, `scripts/release_candidate_gate.py`, browser verification of `docs/gtkb-dashboard/index.html`, and the clean-adopter test matrix described in the plan report. Keep this item at the top until the plan report's commit/merge/push and mass-adoption criteria are satisfied or explicitly superseded.
+
+### GTKB-CORE-001 - Make core application specification intake default GT-KB behavior
+
+**Priority:** TOP. Owner directive 2026-04-22: use Agent Red specifications as the worked example for a reusable baseline set of requirements that should exist for any similar application, then ensure GT-KB repeatedly prompts for missing input and clarity after initialization until those core specifications are created. Once the core specifications are complete, prompting must cease.
+
+**Current default confirmation:** this is **not mechanically the current GT-KB default behavior yet**. Current GT-KB `gt project init` accepts scaffold options but does not ask the core application specification questions by default; `ScaffoldOptions.spec_scaffold` defaults to `None`; `scaffold_project()` only inserts generated specs when an explicit spec scaffold config is supplied. This backlog item records the approved target behavior, not an already-shipped default.
+
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-BASELINE-EVALUATION-2026-04-22.md` and `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-INTAKE-IMPLEMENTATION-PLAN-2026-04-22.md`.
+
+**Phase 0 approval evidence:** Owner approved proceeding on 2026-04-22 after the Phase 0 bridge proposal `bridge/gtkb-core-spec-intake-001.md` was filed. Approval packet: `.groundtruth/formal-artifact-approvals/2026-04-22-core-spec-intake-phase0.json`. MemBase formalization: `DELIB-0875`, `SPEC-CORE-INTAKE-001`, `SPEC-CORE-INTAKE-002`, `ADR-CORE-INTAKE-001`, and `DCL-CORE-INTAKE-001`. Current formal status is `specified`; this records the approved target and compatibility policy, not completed implementation.
+
+**Required outcome:** GT-KB provides a persisted core application specification intake loop that is active for newly initialized projects by default, with an explicit opt-out for automation or unusual cases. The loop must ask one missing core-spec question at a time, capture answers with owner-stated provenance or confirmation-needed status, continue across sessions while required slots remain missing/inferred/unclear, and stop once every required slot is owner-stated or explicitly not applicable.
+
+**Baseline slots:** product identity, application type, tenancy/provider administration, user/role model, data classification, compliance obligations, security posture, reliability/SLO posture, external integrations, AI usage, operational/release path, and explicit non-goals.
+
+**Multi-session execution plan:**
+
+1. Phase 0 - Governance and compatibility: propose/approve formal SPEC/ADR/DCL records, settle default-vs-opt-in policy, and preserve backward-compatibility constraints.
+2. Phase 1 - Core slot catalog: add stable package-level slot definitions, handles, prompt text, required fields, and not-applicable semantics.
+3. Phase 2 - Completion evaluator: inspect persisted MemBase evidence and return each slot as `missing`, `inferred`, `needs_clarity`, `stated`, or `not_applicable`.
+4. Phase 3 - CLI surface: add deterministic `gt core-specs status`, `gt core-specs next-question`, and answer/intake flow suitable for tests and hooks.
+5. Phase 4 - Integration: wire `gt project init`, `gt project doctor`, session-start hooks, and dashboard/startup reports to surface the next missing core-spec question without blocking concrete owner tasks.
+6. Phase 5 - Documentation and adoption evidence: update CLI/bootstrap/user-journey docs, run clean-adopter tests, preserve existing scaffold tests, and record final default-behavior evidence.
+
+**Regression visibility:** upstream GT-KB tests must prove fresh projects start incomplete, owner-stated answers stop prompting per slot, explicit not-applicable stops prompting per slot, inferred candidates do not stop prompting, all-complete state suppresses prompting, existing minimal/full scaffold behavior is not accidentally broken, and non-interactive automation has a no-prompt path. Agent Red release-gate visibility should include a standing backlog/dashboard signal until GT-KB upstream implementation and clean-adopter verification are complete.
 
 ### GTKB-GOV-001 — Complete Agent Red Tier A managed-skill adoption apply
 
@@ -143,17 +488,9 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 **Regression visibility:** keep `scripts/audit_standing_backlog_sources.py` and `tests/scripts/test_standing_backlog_harvest.py` in the release-candidate gate until an upstream GT-KB doctor/check replaces them.
 
-### GTKB-GOV-006 — Close Agent Red release-readiness blocker list
+### GTKB-GOV-007 - PAUSED - Revise commercial readiness NO-GO tracks for SPEC-1831, SPEC-1832, and SPEC-1833
 
-**Priority:** TOP. `memory/release-readiness.md` still lists release blockers that must be closed or explicitly deferred before a production GO: credential rotation, git history purge decision, SonarCloud pass, security scan pass, main/develop provenance reconciliation, exact-candidate Python 3.12 CI, and commercial durability launch-scope decision.
-
-**Required outcome:** update release-readiness evidence with current GitHub/CI proof, owner decisions, credential-rotation evidence, and branch provenance. Do not recommend production GO until every listed blocker is resolved, explicitly deferred with owner approval, or superseded.
-
-**Regression visibility:** release-candidate gate remains required; backlog harvest tests assert the release blocker list is still visible.
-
-### GTKB-GOV-007 — Revise commercial readiness NO-GO tracks for SPEC-1831, SPEC-1832, and SPEC-1833
-
-**Priority:** TOP. Live commercial readiness NO-GO entries require revised proposals before implementation: SPEC-1831 default alert startup must seed the engine/provider-admin rule store, SPEC-1832 API-key usage audit and retention must cover post-auth middleware 403 and SPEC-1837 archival semantics, and SPEC-1833 `/ready` Cosmos failure propagation must return HTTP 503 and avoid premature verified promotion while concurrency remains unresolved.
+**Priority:** PAUSED by the bridge index note dated 2026-04-18. Live commercial readiness NO-GO entries require revised proposals before implementation, but the three commercial-readiness sub-track threads are paused indefinitely until the owner explicitly unpauses them.
 
 **Required outcome:** file or obtain revised bridge proposals that satisfy the latest NO-GO findings, then implement only after GO. Preserve owner-decision and KB-promotion discipline.
 
@@ -167,13 +504,13 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 **Regression visibility:** PowerShell bridge-automation tests must prove muted/deferred entries suppress dispatch for `NEW`, `REVISED`, `GO`, and `NO-GO` snapshots without suppressing unrelated entries.
 
-### GTKB-GOV-009 — Execute or supersede GT-KB Azure CI/CD gates GO
+### GTKB-GOV-009 — Await GT-KB Azure CI/CD gates verification
 
-**Priority:** TOP. `gtkb-azure-cicd-gates` is latest GO for D4 scaffold-only Azure CI/CD templates with seven binding GO conditions, including no managed-artifact registry path, no overwrite mode, exact 12-path inventory, OIDC contract, environment declaration, actionlint evidence, and pytest/mypy/ruff verification.
+**Priority:** TOP. `gtkb-azure-cicd-gates` is latest `VERIFIED` at `bridge/gtkb-azure-cicd-gates-010.md` after Prime Builder fixed the D4 scaffold-only Azure CI/CD generated-doc defect. The generated federated-identity setup guide now instructs environment-subject credentials for `staging-plan`, `staging`, `production-plan`, and `production`, and the regression test proves `refs/tags/v*` is absent from the explicit credential guide.
 
-**Required outcome:** implement the GO in the `groundtruth-kb` checkout or explicitly supersede/defer it with owner approval. Preserve actionlint evidence using a supported invocation.
+**Required outcome:** the D4 Azure CI/CD bridge thread is now verified at `bridge/gtkb-azure-cicd-gates-010.md`. Ordinary staging of the broader first-commit package remains gated on fresh Loyal Opposition review of the latest `gtkb-mass-adoption-first-commit-package` package artifact; do not stage upstream Azure CI/CD changes as a standalone package outside that coordinated review.
 
-**Regression visibility:** upstream GT-KB tests must cover template path equality, no-overwrite behavior, OIDC input/env contract, environment usage, and actionlint workflow validation.
+**Regression visibility:** upstream GT-KB tests now cover template path equality, no-overwrite behavior, OIDC input/env contract, environment usage, production environment-subject federated-identity guidance, absence of `refs/tags/v*` in the explicit credential guide, and actionlint workflow validation.
 
 ### GTKB-GOV-010 — Maintain standing backlog harvest audit as release-gate input
 

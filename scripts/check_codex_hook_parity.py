@@ -13,12 +13,15 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FORMAL_APPROVAL_HOOK = ".claude/hooks/formal-artifact-approval-gate.py"
+WORKSTREAM_FOCUS_HOOK = ".claude/hooks/workstream-focus.py"
 SESSION_SELF_INITIALIZATION_SCRIPT = "scripts/session_self_initialization.py"
+OPERATING_ROLE_RECORD = ".claude/rules/operating-role.md"
 CODEX_CONFIG = ".codex/config.toml"
 CODEX_HOOKS = ".codex/hooks.json"
 CLAUDE_SETTINGS = ".claude/settings.json"
 CODEX_WRAPPER_DIR = Path.home() / ".codex" / "agent-red-hooks"
 CODEX_FORMAL_APPROVAL_WRAPPER = CODEX_WRAPPER_DIR / "formal-artifact-approval.cmd"
+CODEX_WORKSTREAM_FOCUS_WRAPPER = CODEX_WRAPPER_DIR / "workstream-focus.cmd"
 CODEX_SESSION_START_WRAPPER = CODEX_WRAPPER_DIR / "session-start.cmd"
 CODEX_SESSION_START_DISPATCHER = CODEX_WRAPPER_DIR / "session_start_dispatch.py"
 CODEX_SESSION_STOP_DISPATCHER = CODEX_WRAPPER_DIR / "session_stop_dispatch.py"
@@ -94,10 +97,12 @@ def _wrapup_trigger_errors(wrapper_path: Path) -> list[str]:
             "--emit-wrapup",
             "--force-wrapup",
             "--fast-hook",
-            "prime-builder",
             "UserPromptSubmit",
             "ACCEPTED_TRIGGER_PHRASES",
             "_is_wrapup_trigger",
+            "_startup_input_gate_active",
+            "discard_next_user_prompt",
+            "startup_response_pending",
             "wrap up this session",
             "start a new session",
             "begin fresh",
@@ -111,8 +116,8 @@ def _wrapup_trigger_errors(wrapper_path: Path) -> list[str]:
     for term in ("last-wrapup-trigger.json", "last-wrapup-trigger.err", "last-wrapup-trigger-input.json"):
         if term not in text:
             errors.append(f"Codex wrap-up trigger dispatcher {dispatcher_path.name} must capture diagnostics")
-    if "codex-loyal-opposition" in text:
-        errors.append("Codex wrap-up trigger dispatcher must not force the Loyal Opposition role profile")
+    if "--role-profile" in text:
+        errors.append("Codex wrap-up trigger dispatcher must discover the role profile instead of forcing one")
     return errors
 
 
@@ -127,27 +132,25 @@ def _start_wrapper_errors(wrapper_path: Path) -> list[str]:
         dispatcher_path,
         [
             "session_self_initialization.py",
-            "--emit-report",
+            "--emit-startup-service-payload",
             "--fast-hook",
-            "prime-builder",
-            "subprocess.Popen",
-            "session-startup-report.md",
-            "Startup First-Response Directive",
-            "The startup disclosure must be the only assistant message for that turn",
-            "Do not send a separate wrap-up, completion, status, or summary message",
-            "stop and wait for Mike's next input",
-            "Preserve the Wrap-Up Trigger Commands section",
-            "collect or confirm Mike's session focus",
-            "Each session focus option must include its specific prompt details",
-            "choose the number shown",
-            "provide a prompt for something else",
-            ".session-lifecycle-guard.json",
-            "GTKB_STARTUP_GUARD_ID",
-            "suppress_next_wrapup",
+            "STARTUP_SERVICE",
+            "STARTUP_FRESHNESS_CONTRACT_VERSION",
+            "Programmatic Startup Payload",
+            "_valid_session_start_payload",
+            "_purge_previous_diagnostics",
+            "GTKB_STARTUP_REQUESTED_AT",
+            "subprocess.run",
             "hookSpecificOutput",
             "hookEventName",
             "SessionStart",
             "additionalContext",
+            "startupFreshness",
+            "request_started_at",
+            "report_origin",
+            "startup_payload_fresh",
+            "last-session-start.json",
+            "last-session-start.err",
         ],
     )
     for forbidden_term in (
@@ -162,23 +165,38 @@ def _start_wrapper_errors(wrapper_path: Path) -> list[str]:
             )
     for term in ("last-session-start.json", "last-session-start.err"):
         if term not in text:
-            errors.append(f"Codex SessionStart hook dispatcher {dispatcher_path.name} must capture stdout/stderr diagnostics")
-    if "codex-loyal-opposition" in text:
-        errors.append("Codex SessionStart hook dispatcher must not force the Loyal Opposition role profile")
+            errors.append(
+                f"Codex SessionStart hook dispatcher {dispatcher_path.name} must capture stdout/stderr diagnostics"
+            )
+    if "--role-profile" in text:
+        errors.append("Codex SessionStart hook dispatcher must discover the role profile instead of forcing one")
+    if "Startup First-Response Directive" in text or "_live_bridge_index_context" in text:
+        errors.append("Codex SessionStart hook dispatcher must not assemble startup content in the adapter")
+    if "SHA-256" in text or "Mandatory Direct Live Bridge Index Read" in text:
+        errors.append("Codex SessionStart hook dispatcher must not embed bridge excerpts or hashes")
     return errors
 
 
 def _codex_formal_hook_groups(codex_hooks: dict[str, Any]) -> list[dict[str, Any]]:
     groups: list[dict[str, Any]] = []
     for group in codex_hooks.get("hooks", {}).get("PreToolUse", []):
-        commands = [
-            hook.get("command", "")
-            for hook in group.get("hooks", [])
-            if isinstance(hook.get("command"), str)
-        ]
+        commands = [hook.get("command", "") for hook in group.get("hooks", []) if isinstance(hook.get("command"), str)]
         if any(
             _contains_hook_path(command, FORMAL_APPROVAL_HOOK)
             or _contains_hook_wrapper(command, CODEX_FORMAL_APPROVAL_WRAPPER)
+            for command in commands
+        ):
+            groups.append(group)
+    return groups
+
+
+def _codex_workstream_hook_groups(codex_hooks: dict[str, Any], event_name: str) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for group in codex_hooks.get("hooks", {}).get(event_name, []):
+        commands = [hook.get("command", "") for hook in group.get("hooks", []) if isinstance(hook.get("command"), str)]
+        if any(
+            _contains_hook_path(command, WORKSTREAM_FOCUS_HOOK)
+            or _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER)
             for command in commands
         ):
             groups.append(group)
@@ -194,8 +212,16 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     claude_settings_path = project_root / CLAUDE_SETTINGS
     formal_hook_path = project_root / FORMAL_APPROVAL_HOOK
     session_startup_path = project_root / SESSION_SELF_INITIALIZATION_SCRIPT
+    operating_role_path = project_root / OPERATING_ROLE_RECORD
 
-    for path in (codex_config_path, codex_hooks_path, claude_settings_path, formal_hook_path, session_startup_path):
+    for path in (
+        codex_config_path,
+        codex_hooks_path,
+        claude_settings_path,
+        formal_hook_path,
+        session_startup_path,
+        operating_role_path,
+    ):
         if not path.is_file():
             errors.append(f"missing required file: {path.relative_to(project_root).as_posix()}")
 
@@ -220,6 +246,8 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude SessionStart hook must emit the startup report")
     if not any("--fast-hook" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must use the fast lifecycle hook path")
+    if any("--role-profile" in command for command in claude_session_commands):
+        errors.append("Claude SessionStart hook must discover the role profile instead of forcing one")
 
     claude_stop_commands = _commands_for_event(claude_settings, "Stop")
     if not any(_contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT) for command in claude_stop_commands):
@@ -228,6 +256,8 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude Stop hook must emit the proactive wrap-up report")
     if not any("--fast-hook" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must use the fast lifecycle hook path")
+    if any("--role-profile" in command for command in claude_stop_commands):
+        errors.append("Claude Stop hook must discover the role profile instead of forcing one")
 
     formal_groups = _codex_formal_hook_groups(codex_hooks)
     if not formal_groups:
@@ -253,6 +283,52 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
                 errors.append("Codex formal artifact hook timeout must be an integer no greater than 10 seconds")
 
     errors.extend(_wrapper_errors(CODEX_FORMAL_APPROVAL_WRAPPER, [FORMAL_APPROVAL_HOOK.replace("/", "\\")]))
+
+    workstream_pre_tool_groups = _codex_workstream_hook_groups(codex_hooks, "PreToolUse")
+    if not workstream_pre_tool_groups:
+        errors.append(".codex/hooks.json does not register the workstream focus PreToolUse hook")
+    for group in workstream_pre_tool_groups:
+        if group.get("matcher") != "Bash":
+            errors.append("Codex workstream focus PreToolUse hook must use matcher = 'Bash'")
+        for hook in group.get("hooks", []):
+            command = hook.get("command", "")
+            if not isinstance(command, str) or not (
+                _contains_hook_path(command, WORKSTREAM_FOCUS_HOOK)
+                or _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER)
+            ):
+                continue
+            if hook.get("type") != "command":
+                errors.append("Codex workstream focus hook must be a command hook")
+            if _uses_shell_command_substitution(command):
+                errors.append("Codex workstream focus hook command must avoid shell command substitution")
+            if not _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER):
+                errors.append("Codex workstream focus hook command must call the no-space wrapper")
+            timeout = hook.get("timeout")
+            if not isinstance(timeout, int) or timeout > 10:
+                errors.append("Codex workstream focus hook timeout must be an integer no greater than 10 seconds")
+
+    workstream_prompt_groups = _codex_workstream_hook_groups(codex_hooks, "UserPromptSubmit")
+    if not workstream_prompt_groups:
+        errors.append(".codex/hooks.json does not register the workstream focus UserPromptSubmit hook")
+    for group in workstream_prompt_groups:
+        for hook in group.get("hooks", []):
+            command = hook.get("command", "")
+            if not isinstance(command, str) or not (
+                _contains_hook_path(command, WORKSTREAM_FOCUS_HOOK)
+                or _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER)
+            ):
+                continue
+            if hook.get("type") != "command":
+                errors.append("Codex workstream focus UserPromptSubmit hook must be a command hook")
+            if _uses_shell_command_substitution(command):
+                errors.append("Codex workstream focus UserPromptSubmit command must avoid shell command substitution")
+            if not _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER):
+                errors.append("Codex workstream focus UserPromptSubmit command must call the no-space wrapper")
+            timeout = hook.get("timeout")
+            if not isinstance(timeout, int) or timeout > 10:
+                errors.append("Codex workstream focus UserPromptSubmit timeout must be no greater than 10 seconds")
+
+    errors.extend(_wrapper_errors(CODEX_WORKSTREAM_FOCUS_WRAPPER, [WORKSTREAM_FOCUS_HOOK.replace("/", "\\")]))
     stop_commands = _commands_for_event(codex_hooks, "Stop")
     if any(
         _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
@@ -270,7 +346,13 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     }
 
     for event_name, (wrapper_path, _required_flag) in lifecycle_wrappers.items():
-        commands = _commands_for_event(codex_hooks, event_name)
+        hook_entries = [
+            hook
+            for group in codex_hooks.get("hooks", {}).get(event_name, [])
+            for hook in group.get("hooks", [])
+            if isinstance(hook.get("command"), str)
+        ]
+        commands = [hook["command"] for hook in hook_entries]
         matching_commands = [
             command
             for command in commands
@@ -284,6 +366,17 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
                 errors.append(f"Codex {event_name} hook command must avoid shell command substitution")
             if not _contains_hook_wrapper(command, wrapper_path):
                 errors.append(f"Codex {event_name} hook command must call the no-space wrapper")
+        if event_name == "SessionStart":
+            for hook in hook_entries:
+                command = hook["command"]
+                if not (
+                    _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
+                    or _contains_hook_wrapper(command, wrapper_path)
+                ):
+                    continue
+                timeout = hook.get("timeout")
+                if not isinstance(timeout, int) or timeout < 12:
+                    errors.append("Codex SessionStart hook timeout must allow purge-first fresh startup generation")
         if event_name == "UserPromptSubmit":
             errors.extend(_wrapup_trigger_errors(wrapper_path))
         else:
