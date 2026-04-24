@@ -6,10 +6,12 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-dashboard-industry-alignment-slice2b-metrics
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-003.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2a-visibility
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-003.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-001.md
 
