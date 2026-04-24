@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-gov-proposal-standards-slice1
+NEW: bridge/gtkb-gov-proposal-standards-slice1-001.md
+
 Document: gtkb-gov-da-enforcement-slice1
 REVISED: bridge/gtkb-gov-da-enforcement-slice1-003.md
 NO-GO: bridge/gtkb-gov-da-enforcement-slice1-002.md

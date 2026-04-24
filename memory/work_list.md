@@ -317,6 +317,64 @@ tests already assert the hook presence. Post-upgrade Agent Red sessions
 will see DELIB search/citation enforcement on `UserPromptSubmit` and
 owner-decision archival on `PostToolUse`.
 
+### GTKB-GOV-PROPOSAL-STANDARDS - Mechanical enforcement of proposal structure (upstream-routed)
+
+**Priority:** parallel to upstream
+`gtkb-da-governance-completeness-implementation`; adoption follows next
+`gt project upgrade` after upstream VERIFIED. Filed 2026-04-24 after
+applying the routing lesson from the withdrawn `GTKB-GOV-DA-ENFORCEMENT`
+slice.
+
+**Problem statement:** 11 of 14 NO-GO findings this S306 session would
+have been caught by mechanical checks on proposal structure — missing
+scope boundaries, TBD cells in Verification Matrix, unverified test
+claims, wrong follow-on WI IDs, non-existent path names, forked
+enforcement families. None of `.claude/rules/file-bridge-protocol.md` or
+the observed structure (Verification Matrix / Files Touched /
+Out-of-Scope / Decision-Needed / Cross-NO-GO Discipline / Test Evidence)
+is mechanically enforced. A documentation-only rule does not survive
+high-velocity proposal drafting.
+
+**Routing decision (2026-04-24, filed bridge
+`gtkb-gov-proposal-standards-slice1-001`):** implementation owned
+upstream in `groundtruth-kb` as a new managed artifact
+`hook.bridge-proposal-standards`, paralleling the existing
+`hook.bridge-compliance-gate`, `hook.delib-preflight-gate`, and
+`hook.owner-decision-capture` family. Agent Red does not own any new
+hook file; it receives enforcement through `gt project upgrade` when
+upstream VERIFIED.
+
+**Required outcome (upstream):** new managed hook running on
+`UserPromptSubmit` + `PreToolUse(Write,Edit)` that inspects
+`bridge/<slug>-NNN.md` writes, validates required-section presence
+(Verification Matrix with non-TBD rows; Files Touched with New +
+Modified + Not-touched subsections; Out-of-Scope non-empty; Decision
+Needed From Owner present; Cross-NO-GO Discipline on REVISED; Test
+Evidence fenced pytest block on post-impl reports), and emits a soft
+checkpoint when sections are missing. Windows `.codex`-adapter fallback
+verifier per ADR-CODEX-HOOK-PARITY-FALLBACK-001.
+
+**Follow-on slices (filed after Slice 1 VERIFIED):**
+
+- `gtkb-gov-proposal-standards-slice2` — test-claim re-run verifier
+  (parses claimed pytest output blocks in post-impl reports and re-runs
+  the same commands, failing when real output diverges).
+- `gtkb-gov-proposal-standards-slice3` — work-item-ID collision gate
+  (cross-references proposed follow-on WI IDs against `work_list.md` to
+  prevent routing to an already-assigned slot, e.g. Phase 7 `-006`
+  caught routing §D to -016 which was already Phase 8).
+- `gtkb-gov-proposal-standards-slice4` — `/gtkb-propose` skill that
+  scaffolds a compliant proposal from a slug + scope dimensions,
+  running `search_deliberations()` and injecting DELIB-IDs before the
+  author writes any prose.
+
+**Tracking:** awaiting upstream `groundtruth-kb` bridge filing + GO /
+VERIFIED on the new hook artifact.
+
+**Regression visibility (deferred to upstream):** upstream scaffold
+tests will assert hook presence; upstream hook tests will cover the
+section-requirement table enumerated in the Slice 1 proposal.
+
 ### GTKB-ISOLATION-001 - DONE - Create detailed Phase 1 plan: artifact authority and dependency matrix
 
 **Priority:** TOP. Owner directive 2026-04-22: application-subject sessions must be unable by default to alter GT-KB product artifacts, while GT-KB-subject sessions may retain broader access where needed. This is the first planning phase in the application/GT-KB isolation program.
