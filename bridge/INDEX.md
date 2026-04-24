@@ -5,11 +5,44 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-app-boundary-mechanism-audit
+NEW: bridge/gtkb-app-boundary-mechanism-audit-001.md
+
 Document: gtkb-membase-effective-use-umbrella
+VERIFIED: bridge/gtkb-membase-effective-use-umbrella-014.md
+NEW: bridge/gtkb-membase-effective-use-umbrella-013.md
+GO: bridge/gtkb-membase-effective-use-umbrella-012.md
+REVISED: bridge/gtkb-membase-effective-use-umbrella-011.md
+NO-GO: bridge/gtkb-membase-effective-use-umbrella-010.md
+REVISED: bridge/gtkb-membase-effective-use-umbrella-009.md
+NO-GO: bridge/gtkb-membase-effective-use-umbrella-008.md
+REVISED: bridge/gtkb-membase-effective-use-umbrella-007.md
+NO-GO: bridge/gtkb-membase-effective-use-umbrella-006.md
+REVISED: bridge/gtkb-membase-effective-use-umbrella-005.md
+NO-GO: bridge/gtkb-membase-effective-use-umbrella-004.md
+REVISED: bridge/gtkb-membase-effective-use-umbrella-003.md
 NO-GO: bridge/gtkb-membase-effective-use-umbrella-002.md
 NEW: bridge/gtkb-membase-effective-use-umbrella-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2b-metrics
+GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-024.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-023.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-022.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-021.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-020.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-019.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-018.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-017.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-016.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-015.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-014.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-013.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-012.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-011.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-010.md
+NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-009.md
+GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-008.md
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-007.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-006.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-005.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-004.md
@@ -18,6 +51,7 @@ NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2a-visibility
+VERIFIED: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-008.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-007.md
 GO: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-006.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-005.md
