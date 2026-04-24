@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-report --fast-hook",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-report --fast-hook --harness-name claude",
             "timeout": 15
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook --harness-name claude",
             "timeout": 15
           }
         ]

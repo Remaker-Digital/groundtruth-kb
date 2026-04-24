@@ -25,17 +25,17 @@ def test_standing_backlog_audit_finds_current_actionable_bridge_entries() -> Non
     module = _load_module()
 
     audit = module.build_audit(REPO_ROOT)
-    actionable = {
-        (entry["document"], entry["status"])
-        for entry in audit["bridge"]["actionable"]
-    }
+    actionable = {(entry["document"], entry["status"]) for entry in audit["bridge"]["actionable"]}
 
-    assert ("gtkb-azure-cicd-gates", "GO") in actionable
-    assert ("agent-red-bridge-dispatcher-deferral-enforcement", "GO") in actionable
-    assert ("commercial-readiness-spec-1833-ready-propagation", "NO-GO") in actionable
-    assert ("commercial-readiness-spec-1831-startup-wiring", "NO-GO") in actionable
-    assert ("commercial-readiness-spec-verification", "NO-GO") in actionable
-    assert ("agent-red-bridge-dispatcher-deferral-enforcement-implementation", "NO-GO") in actionable
+    actionable_documents = {doc for doc, _ in actionable}
+    assert ("gtkb-work-subject-root-enforcement-implementation", "NO-GO") in actionable
+    assert ("gtkb-scoped-service-boundary-baseline-implementation", "NO-GO") in actionable
+    assert "gtkb-mass-adoption-first-commit-package" in actionable_documents
+    assert ("gtkb-session-work-subject", "GO") in actionable
+    assert ("gtkb-isolation-007-work-subject-root-plan-review", "GO") in actionable
+    assert "gtkb-core-spec-intake" in actionable_documents
+    assert ("gtkb-azure-cicd-gates", "VERIFIED") not in actionable
+    assert not any(doc == "gtkb-azure-cicd-gates" for doc, _ in actionable)
 
 
 def test_standing_backlog_audit_summarizes_membase_work_items_and_release_blockers() -> None:
@@ -46,12 +46,12 @@ def test_standing_backlog_audit_summarizes_membase_work_items_and_release_blocke
     assert audit["work_items"]["status_counts"]["open"] >= 1900
     assert audit["work_items"]["status_counts"]["blocked"] >= 1
     assert any(item["priority"] == "P0" for item in audit["work_items"]["top_non_terminal"])
-    assert "Production credentials exposed in the deleted generated manifest must be rotated." in audit["release_blockers"]
+    assert not any("Credential lifecycle" in blocker for blocker in audit["release_blockers"])
+    assert not any("secret purging" in blocker for blocker in audit["release_blockers"])
+    assert not any("release-branch provenance" in blocker for blocker in audit["release_blockers"])
     assert not any("required CI evidence must be obtained" in blocker for blocker in audit["release_blockers"])
-    assert (
-        "Owner/project must decide the release-branch provenance policy for "
-        "`main`/`develop`."
-    ) in audit["release_blockers"]
+    assert not any("Commercial integration state" in blocker for blocker in audit["release_blockers"])
+    assert audit["release_blockers"] == []
 
 
 def test_standing_backlog_contains_harvested_source_items() -> None:
@@ -61,6 +61,12 @@ def test_standing_backlog_contains_harvested_source_items() -> None:
         / "independent-progress-assessments"
         / "CODEX-INSIGHT-DROPBOX"
         / "STANDING-BACKLOG-BRIDGE-DISPOSITIONS-2026-04-20.md"
+    ).read_text(encoding="utf-8")
+    current_harvest_report = (
+        REPO_ROOT
+        / "independent-progress-assessments"
+        / "CODEX-INSIGHT-DROPBOX"
+        / "STANDING-BACKLOG-HARVEST-2026-04-23-AZURE-VERIFIED.md"
     ).read_text(encoding="utf-8")
 
     for item_id in (
@@ -81,6 +87,8 @@ def test_standing_backlog_contains_harvested_source_items() -> None:
     assert "gtkb-azure-cicd-gates" in work_list
     assert "commercial-readiness-spec-1833-ready-propagation" in work_list
     assert "`gtkb-azure-cicd-gates` `GO`" in disposition_report
+    assert "`gtkb-azure-cicd-gates` at `VERIFIED`" in current_harvest_report
+    assert "bridge/gtkb-azure-cicd-gates-010.md" in current_harvest_report
     assert "It is assigned to `GTKB-GOV-009`" in disposition_report
     assert "`agent-red-bridge-dispatcher-deferral-enforcement-implementation` `NO-GO`" in disposition_report
     assert "`commercial-readiness-spec-1831-startup-wiring` `NO-GO`" in disposition_report

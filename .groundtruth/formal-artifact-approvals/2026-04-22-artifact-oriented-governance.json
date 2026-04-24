@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "ARTIFACT-ORIENTED-GOVERNANCE-BATCH-2026-04-22",
+  "action": "insert-and-link-batch",
+  "source_ref": "owner_conversation:2026-04-22-artifact-oriented-governance",
+  "full_content": "Batch formalization: Artifact-oriented development governance as a default GT-KB interpretation stance.\n\nOwner directive:\n- The default behavior of the system should be oriented toward artifacts and plans.\n- GT-KB should be biased toward capturing deliberations, adding planned work to the standing backlog, treating agreed plans as artifacts, and starting sessions by examining artifact state.\n- The AI should impose this view of a development project so user inputs can trigger clear CRUD decisions for project artifacts.\n- The purpose is to lose less knowledge and memory from session to session.\n- The owner approved adding this principle to the system if useful, specifically to encourage bias toward design options and interpretation of user inputs.\n\nArtifacts to create:\n- DELIB-0874: owner decision establishing artifact-oriented development governance.\n- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001: governance principle that GT-KB interprets concrete project input through artifact lifecycle opportunities by default.\n- ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001: architecture decision to model project memory as a durable artifact graph rather than transient conversation.\n- DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001: design constraint requiring artifact lifecycle trigger classification, capture thresholds, explicit lifecycle states, and non-intrusive confirmation flows.\n\nImplementation hooks in this change:\n- Add a cross-cutting directive to CODEX-STANDING-PRIORITIES.md so future sessions load the principle at startup.\n- Add a standing backlog completion record and regression visibility.\n- Add regression tests that verify MemBase records and the startup-loaded directive exist.\n\nThresholds and limits:\n- Not every thought becomes an artifact.\n- Brainstorming stays lightweight until it becomes a decision, plan, requirement, risk, procedure, review finding, or accepted future work.\n- Formal artifact mutations still require the applicable approval gate.\n- The system should propose or capture candidates non-intrusively and avoid interrupting concrete work unnecessarily.\n",
+  "full_content_sha256": "1de2b6fc138c56fa13ce886a6086ddecb07b7226309fffb6af6b27c27186149c",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner stated that default system behavior should be oriented toward artifacts and plans, then said: If there is a useful way to add this to the system, in order to encourage bias toward design options and interpretation of user inputs, please do so.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Formalize artifact-oriented development governance as a default interpretation stance.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

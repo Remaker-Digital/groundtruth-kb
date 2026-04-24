@@ -9,3 +9,20 @@ copyright_notice = "© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. 
 cloud_provider = "azure"
 scaffold_version = "0.6.1"
 created_at = "2026-04-18T00:00:00Z"
+
+# Phase 4 scoped GT-KB service boundary baseline (GTKB-ISOLATION-012).
+# First-slice contract: single read operation fully owns its live
+# startup/dashboard summary surface. Additional read/request operations are
+# deferred to later Phase 4 sub-slices.
+[scoped_service]
+default_subject = "application"
+application_id = "agent-red"
+project_root = "."
+allowed_read_operations = [
+  "dashboard.summary.read",
+]
+# Intentionally omitted in this slice (added by later Phase 4 sub-slices):
+#   - "dashboard.history.read"
+#   - allowed_request_operations
+runtime_root = "memory"
+dashboard_db = "memory/gtkb-dashboard.sqlite"

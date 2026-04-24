@@ -134,6 +134,64 @@ Purpose: persistent record of owner decisions and standing operating choices tha
 - status:
   Active
 
+### 2026-04-21 - Owner input is requested one item at a time
+
+- source:
+  Owner request in session on 2026-04-21 to make owner-input prompts durable
+  across future sessions.
+- decision:
+  When owner input is required, Codex must present one decision, question,
+  approval, credential action, or manual action at a time. The request must use
+  a visually distinct `OWNER ACTION REQUIRED` Markdown block that describes the
+  current decision/question, why it matters, practical options, and the expected
+  reply shape. The block must be the only substantive user-facing content in
+  that response. Codex must stop after the block and wait for Mike's answer; it
+  must not continue with other work, progress updates, summaries, or unrelated
+  evidence because that can push the request out of the visible chat area.
+  Additional owner inputs should be queued internally for later instead of
+  being displayed or asked all at once. A necessary owner decision is one that
+  blocks work Mike has requested; optional preferences, nice-to-have direction,
+  and non-blocking status choices are not necessary decisions unless they block
+  the requested work.
+- impact:
+  Future sessions should avoid bundled owner-question lists and should make the
+  single currently requested owner response immediately visible in chat. Prime
+  Builder and Loyal Opposition must both pause at owner-input gates unless Mike
+  explicitly authorizes parallel work.
+- status:
+  Active
+
+### 2026-04-21 - Startup focus menu is Prime Builder-only
+
+- source:
+  Owner directive in session on 2026-04-21.
+- decision:
+  The GT-KB numbered "Choose This Session's Focus" startup menu is presented to
+  the owner only by Prime Builder. Loyal Opposition does not present the
+  numbered focus options.
+- impact:
+  Prime Builder startup can continue to offer owner-facing release, staging,
+  production, and backlog focus choices. Loyal Opposition startup must instead
+  begin prepared to review and verify Prime Builder work.
+- status:
+  Active
+
+### 2026-04-21 - Loyal Opposition startup begins with bridge verification
+
+- source:
+  Owner directive in session on 2026-04-21.
+- decision:
+  When Loyal Opposition starts a fresh session, its first task is to verify that
+  the Prime Builder / Loyal Opposition bridge is functioning. If the bridge is
+  not functioning, Loyal Opposition must diagnose and repair it before ordinary
+  review work.
+- impact:
+  Loyal Opposition has owner pre-approval to make any file and configuration
+  changes required to restore bridge function. Bridge restoration outranks
+  ordinary review startup when the bridge is broken.
+- status:
+  Active
+
 ---
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

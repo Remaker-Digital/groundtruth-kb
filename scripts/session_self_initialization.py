@@ -32,6 +32,21 @@ except ImportError:  # pragma: no cover - direct script execution path
     # ImportError covers both the "package missing" and "name missing" cases.
     import gtkb_overlay as _gtkb_overlay  # type: ignore[no-redef]
 
+try:
+    from scripts.gtkb_scoped_client import (
+        DASHBOARD_SUMMARY_READ,
+        GtkbScopedClient,
+        ScopedOperationError,
+        ScopedServiceConfigError,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from gtkb_scoped_client import (  # type: ignore[no-redef]
+        DASHBOARD_SUMMARY_READ,
+        GtkbScopedClient,
+        ScopedOperationError,
+        ScopedServiceConfigError,
+    )
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DASHBOARD_DIR = PROJECT_ROOT / "docs" / "gtkb-dashboard"
 DEFAULT_HISTORY_PATH = PROJECT_ROOT / "memory" / "gtkb-dashboard-history.json"
@@ -47,6 +62,14 @@ DEFAULT_RELEASE_BRANCH = "main"
 STARTUP_SERVICE_CONTRACT_VERSION = "agent-red-startup-service-v2"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "agent-red-startup-freshness-v1"
 OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
+HARNESS_ROLE_RECORDS = {
+    "codex": Path.home() / ".codex" / "agent-red-hooks" / "operating-role.md",
+    "claude": Path.home() / ".claude" / "agent-red-hooks" / "operating-role.md",
+}
+HARNESS_LIFECYCLE_GUARDS = {
+    "codex": Path.home() / ".codex" / "agent-red-hooks" / "session-lifecycle-guard.json",
+    "claude": Path.home() / ".claude" / "agent-red-hooks" / "session-lifecycle-guard.json",
+}
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
@@ -71,6 +94,85 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
     },
 }
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
+
+
+def _normalized_path(path: Path) -> Path:
+    return path.expanduser().resolve()
+
+
+def _normalize_harness_name(value: str | None) -> str | None:
+    normalized = str(value or "").strip().lower().replace("_", "-")
+    if normalized in HARNESS_ROLE_RECORDS:
+        return normalized
+    return None
+
+
+def _resolved_harness_name(explicit: str | None = None) -> str | None:
+    return _normalize_harness_name(explicit) or _normalize_harness_name(os.environ.get("GTKB_HARNESS_NAME"))
+
+
+def _repo_operating_role_path(project_root: Path = PROJECT_ROOT) -> Path:
+    return project_root / OPERATING_ROLE_RELATIVE_PATH
+
+
+def operating_role_path(
+    project_root: Path = PROJECT_ROOT,
+    *,
+    harness_name: str | None = None,
+    role_record_path: Path | None = None,
+    prefer_local: bool = True,
+) -> Path:
+    if role_record_path is not None:
+        return _normalized_path(role_record_path)
+    override = os.environ.get("GTKB_OPERATING_ROLE_PATH")
+    if override:
+        return _normalized_path(Path(override))
+    resolved_harness_name = _resolved_harness_name(harness_name)
+    if resolved_harness_name:
+        local_path = _normalized_path(HARNESS_ROLE_RECORDS[resolved_harness_name])
+        if prefer_local or local_path.is_file():
+            return local_path
+    return _repo_operating_role_path(project_root)
+
+
+def _display_role_mapping_source(
+    project_root: Path = PROJECT_ROOT,
+    *,
+    harness_name: str | None = None,
+    role_record_path: Path | None = None,
+) -> str:
+    path = operating_role_path(
+        project_root,
+        harness_name=harness_name,
+        role_record_path=role_record_path,
+        prefer_local=False,
+    )
+    try:
+        return path.relative_to(project_root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _role_metadata(
+    role_profile: str,
+    project_root: Path = PROJECT_ROOT,
+    *,
+    harness_name: str | None = None,
+    role_record_path: Path | None = None,
+) -> dict[str, str]:
+    metadata = dict(ROLE_PROFILES[role_profile])
+    mapping_source = _display_role_mapping_source(
+        project_root,
+        harness_name=harness_name,
+        role_record_path=role_record_path,
+    )
+    metadata["role_mapping_source"] = mapping_source
+    if role_profile in {"prime-builder", "loyal-opposition"} and mapping_source != OPERATING_ROLE_RELATIVE_PATH.as_posix():
+        metadata["role_assignment"] = metadata["role_assignment"].replace(
+            "durable operating-role record",
+            "durable harness-local operating-role record",
+        )
+    return metadata
 
 
 def _truthy_preference(value: Any) -> bool:
@@ -635,82 +737,93 @@ def _is_agent_red_scope(row: dict[str, Any] | sqlite3.Row, *, primary_only: bool
     return classify_dashboard_scope(row) in included
 
 
-def _sqlite_count(connection: sqlite3.Connection, table_or_view: str) -> int:
-    return int(connection.execute(f"SELECT COUNT(*) FROM {table_or_view}").fetchone()[0])
-
-
-def _sqlite_group_count(connection: sqlite3.Connection, table_or_view: str, column: str) -> dict[str, int]:
-    rows = connection.execute(
-        f"SELECT {column}, COUNT(*) AS count FROM {table_or_view} GROUP BY {column} ORDER BY {column}"
-    )
-    return {str(row[0] or "none"): int(row[1]) for row in rows}
-
-
 def _database_metrics(project_root: Path) -> dict[str, Any]:
-    db_path = project_root / "groundtruth.db"
-    if not db_path.is_file():
-        return {"available": False, "error": f"missing {db_path.name}"}
-
-    connection = sqlite3.connect(db_path)
-    connection.row_factory = sqlite3.Row
+    # GTKB-ISOLATION-012 Phase 4 baseline: the Agent Red startup summary path
+    # reads groundtruth.db only through the scoped-service client. The
+    # `check_scoped_service_boundary.py` guard fails the release gate if a
+    # direct sqlite3.connect(...groundtruth.db...) call reappears in this
+    # function body.
     try:
-        specifications = [dict(row) for row in connection.execute("SELECT * FROM current_specifications")]
-        work_items = [dict(row) for row in connection.execute("SELECT * FROM current_work_items")]
-        tests = [dict(row) for row in connection.execute("SELECT * FROM current_tests")]
-        deliberations = [dict(row) for row in connection.execute("SELECT * FROM current_deliberations")]
-        agent_red_specs = [row for row in specifications if _is_agent_red_scope(row)]
-        agent_red_work_items = [row for row in work_items if _is_agent_red_scope(row)]
-        agent_red_tests = [row for row in tests if _is_agent_red_scope(row)]
-        agent_red_deliberations = [row for row in deliberations if _is_agent_red_scope(row)]
-        open_work_items = [
-            row
-            for row in agent_red_work_items
-            if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
-        ]
+        client = GtkbScopedClient.from_project_root(project_root)
+        envelope = client.invoke(DASHBOARD_SUMMARY_READ, project_root=project_root)
+    except (ScopedServiceConfigError, ScopedOperationError) as exc:
+        return {"available": False, "error": f"scoped-client error: {exc}"}
+
+    source_metadata = {
+        "source": envelope.get("source"),
+        "source_path": envelope.get("source_path"),
+        "freshness": envelope.get("freshness"),
+        "subject": envelope.get("subject"),
+        "operation": envelope.get("operation"),
+        "application_id": envelope.get("application_id"),
+    }
+
+    if not envelope.get("available"):
         return {
-            "available": True,
-            "specifications": {
-                "current_total": len(agent_red_specs),
-                "raw_current_total": len(specifications),
-                "status_counts": dict(
-                    sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())
-                ),
-                "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in agent_red_specs).items())),
-                "scope_counts": _scope_counts(specifications),
-                "scope_confidence": "agent_red_current_heuristic",
-            },
-            "membase": {
-                "work_item_status_counts": dict(
-                    sorted(Counter(str(row.get("resolution_status") or "none") for row in agent_red_work_items).items())
-                ),
-                "open_work_items": len(open_work_items),
-                "raw_open_work_items": sum(
-                    1
-                    for row in work_items
-                    if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
-                ),
-                "test_records": len(agent_red_tests),
-                "test_procedure_records": _sqlite_count(connection, "test_procedures"),
-                "scope_counts": _scope_counts(work_items),
-                "scope_confidence": "agent_red_current_heuristic",
-            },
-            "deliberation_archive": {
-                "current_total": len(agent_red_deliberations),
-                "raw_current_total": len(deliberations),
-                "outcome_counts": dict(
-                    sorted(Counter(str(row.get("outcome") or "none") for row in agent_red_deliberations).items())
-                ),
-                "scope_counts": _scope_counts(deliberations),
-                "scope_confidence": "agent_red_current_heuristic",
-            },
-            "scope": {
-                "version": DASHBOARD_SCOPE_VERSION,
-                "note": DASHBOARD_SCOPE_NOTE,
-                "excluded_scopes": sorted(GTKB_SCOPE_EXCLUDED),
-            },
+            "available": False,
+            "error": envelope.get("error", "scoped-client unavailable"),
+            "source_metadata": source_metadata,
         }
-    finally:
-        connection.close()
+
+    payload = envelope.get("payload") or {}
+    specifications = list(payload.get("specifications", []))
+    work_items = list(payload.get("work_items", []))
+    tests = list(payload.get("tests", []))
+    deliberations = list(payload.get("deliberations", []))
+    test_procedures_count = int(payload.get("test_procedures_count", 0))
+
+    agent_red_specs = [row for row in specifications if _is_agent_red_scope(row)]
+    agent_red_work_items = [row for row in work_items if _is_agent_red_scope(row)]
+    agent_red_tests = [row for row in tests if _is_agent_red_scope(row)]
+    agent_red_deliberations = [row for row in deliberations if _is_agent_red_scope(row)]
+    open_work_items = [
+        row
+        for row in agent_red_work_items
+        if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
+    ]
+    return {
+        "available": True,
+        "source_metadata": source_metadata,
+        "specifications": {
+            "current_total": len(agent_red_specs),
+            "raw_current_total": len(specifications),
+            "status_counts": dict(
+                sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())
+            ),
+            "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in agent_red_specs).items())),
+            "scope_counts": _scope_counts(specifications),
+            "scope_confidence": "agent_red_current_heuristic",
+        },
+        "membase": {
+            "work_item_status_counts": dict(
+                sorted(Counter(str(row.get("resolution_status") or "none") for row in agent_red_work_items).items())
+            ),
+            "open_work_items": len(open_work_items),
+            "raw_open_work_items": sum(
+                1
+                for row in work_items
+                if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
+            ),
+            "test_records": len(agent_red_tests),
+            "test_procedure_records": test_procedures_count,
+            "scope_counts": _scope_counts(work_items),
+            "scope_confidence": "agent_red_current_heuristic",
+        },
+        "deliberation_archive": {
+            "current_total": len(agent_red_deliberations),
+            "raw_current_total": len(deliberations),
+            "outcome_counts": dict(
+                sorted(Counter(str(row.get("outcome") or "none") for row in agent_red_deliberations).items())
+            ),
+            "scope_counts": _scope_counts(deliberations),
+            "scope_confidence": "agent_red_current_heuristic",
+        },
+        "scope": {
+            "version": DASHBOARD_SCOPE_VERSION,
+            "note": DASHBOARD_SCOPE_NOTE,
+            "excluded_scopes": sorted(GTKB_SCOPE_EXCLUDED),
+        },
+    }
 
 
 def _parse_active_work_items(work_list_text: str) -> list[dict[str, str]]:
@@ -2329,18 +2442,31 @@ def _dashboard_intelligence(
     }
 
 
-def operating_role_path(project_root: Path = PROJECT_ROOT) -> Path:
-    return project_root / OPERATING_ROLE_RELATIVE_PATH
-
-
-def discover_role_profile(project_root: Path = PROJECT_ROOT) -> str:
+def discover_role_profile(
+    project_root: Path = PROJECT_ROOT,
+    *,
+    harness_name: str | None = None,
+    role_record_path: Path | None = None,
+) -> str:
     """Read the durable role assignment for fresh-session startup."""
 
-    path = operating_role_path(project_root)
+    path = operating_role_path(
+        project_root,
+        harness_name=harness_name,
+        role_record_path=role_record_path,
+        prefer_local=False,
+    )
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
-        return "prime-builder"
+        repo_path = _repo_operating_role_path(project_root)
+        if path != repo_path:
+            try:
+                text = repo_path.read_text(encoding="utf-8")
+            except OSError:
+                return "prime-builder"
+        else:
+            return "prime-builder"
 
     match = re.search(r"(?im)^\s*active_role\s*:\s*`?([a-z][a-z0-9-]*)`?\s*$", text)
     if not match:
@@ -2350,16 +2476,37 @@ def discover_role_profile(project_root: Path = PROJECT_ROOT) -> str:
     return role_profile if role_profile in ROLE_PROFILES else "prime-builder"
 
 
-def _role_profile_or_discovered(project_root: Path, role_profile: str | None = None) -> str:
+def _role_profile_or_discovered(
+    project_root: Path,
+    role_profile: str | None = None,
+    *,
+    harness_name: str | None = None,
+    role_record_path: Path | None = None,
+) -> str:
     if role_profile:
         return role_profile if role_profile in ROLE_PROFILES else "prime-builder"
-    return discover_role_profile(project_root)
+    return discover_role_profile(
+        project_root,
+        harness_name=harness_name,
+        role_record_path=role_record_path,
+    )
 
 
-def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str | None = None) -> dict[str, Any]:
+def build_startup_model(
+    project_root: Path = PROJECT_ROOT,
+    role_profile: str | None = None,
+    *,
+    harness_name: str | None = None,
+    role_record_path: Path | None = None,
+) -> dict[str, Any]:
     """Collect the complete startup disclosure model without writing files."""
 
-    resolved_role_profile = _role_profile_or_discovered(project_root, role_profile)
+    resolved_role_profile = _role_profile_or_discovered(
+        project_root,
+        role_profile,
+        harness_name=harness_name,
+        role_record_path=role_record_path,
+    )
     generated_at = _now_iso()
     database = _database_metrics(project_root)
     backlog, top_actions = _backlog_metrics(project_root)
@@ -2423,7 +2570,12 @@ def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str | N
 
     return {
         "generated_at": generated_at,
-        "role": ROLE_PROFILES[resolved_role_profile],
+        "role": _role_metadata(
+            resolved_role_profile,
+            project_root,
+            harness_name=harness_name,
+            role_record_path=role_record_path,
+        ),
         "role_profile": resolved_role_profile,
         "dashboard_opening": _dashboard_opening_state(),
         "governance_stance": [
@@ -4427,8 +4579,15 @@ def write_dashboard_and_report(
     startup_bridge_maintenance: dict[str, Any] | None = None,
     startup_pruning: dict[str, Any] | None = None,
     role_profile: str | None = None,
+    harness_name: str | None = None,
+    role_record_path: Path | None = None,
 ) -> dict[str, Any]:
-    model = build_startup_model(project_root, role_profile=role_profile)
+    model = build_startup_model(
+        project_root,
+        role_profile=role_profile,
+        harness_name=harness_name,
+        role_record_path=role_record_path,
+    )
     if startup_bridge_maintenance is not None:
         model["startup_bridge_maintenance"] = startup_bridge_maintenance
     if startup_pruning is not None:
@@ -4696,7 +4855,13 @@ def _utc_now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _default_lifecycle_guard_path(project_root: Path) -> Path:
+def _default_lifecycle_guard_path(project_root: Path, *, harness_name: str | None = None) -> Path:
+    override = os.environ.get("GTKB_LIFECYCLE_GUARD_PATH")
+    if override:
+        return _normalized_path(Path(override))
+    resolved_harness_name = _resolved_harness_name(harness_name)
+    if resolved_harness_name:
+        return _normalized_path(HARNESS_LIFECYCLE_GUARDS[resolved_harness_name])
     return project_root / LIFECYCLE_GUARD_RELATIVE_PATH
 
 
@@ -4788,6 +4953,18 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Override the lifecycle guard state path for tests or alternate harnesses.",
     )
+    parser.add_argument(
+        "--role-record-path",
+        type=Path,
+        default=None,
+        help="Override the durable operating-role record path for this harness.",
+    )
+    parser.add_argument(
+        "--harness-name",
+        choices=sorted(HARNESS_ROLE_RECORDS),
+        default=None,
+        help="Select harness-local durable role and lifecycle state paths.",
+    )
     parser.add_argument("--json", action="store_true", help="Print machine-readable output paths and current model.")
     parser.add_argument(
         "--role-profile",
@@ -4795,7 +4972,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=(
             "Diagnostic role mapping override for non-startup output. "
-            "--emit-report always discovers the startup role from .claude/rules/operating-role.md."
+            "--emit-report always discovers the startup role from the resolved durable operating-role record."
         ),
     )
     parser.add_argument(
@@ -4816,15 +4993,25 @@ def main(argv: list[str] | None = None) -> int:
     startup_requested_at = os.environ.get("GTKB_STARTUP_REQUESTED_AT") if args.emit_startup_service_payload else None
     if _parse_iso8601(startup_requested_at) is None:
         startup_requested_at = _utc_now_iso()
+    role_record_path = args.role_record_path.resolve() if args.role_record_path is not None else None
     role_profile = (
-        discover_role_profile(project_root)
+        discover_role_profile(
+            project_root,
+            harness_name=args.harness_name,
+            role_record_path=role_record_path,
+        )
         if startup_emit_requested
-        else _role_profile_or_discovered(project_root, args.role_profile)
+        else _role_profile_or_discovered(
+            project_root,
+            args.role_profile,
+            harness_name=args.harness_name,
+            role_record_path=role_record_path,
+        )
     )
     lifecycle_guard_path = (
         args.lifecycle_guard_path.resolve()
         if args.lifecycle_guard_path is not None
-        else _default_lifecycle_guard_path(project_root)
+        else _default_lifecycle_guard_path(project_root, harness_name=args.harness_name)
     )
 
     if startup_emit_requested:
@@ -4852,6 +5039,8 @@ def main(argv: list[str] | None = None) -> int:
         startup_bridge_maintenance=bridge_maintenance,
         startup_pruning=startup_pruning,
         role_profile=role_profile,
+        harness_name=args.harness_name,
+        role_record_path=role_record_path,
     )
     if startup_emit_requested:
         _maybe_open_dashboard_on_session_start(result["dashboard_url"])

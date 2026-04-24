@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0878",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-isolation-001-authority-matrix-plan",
+  "full_content": "Deliberation Archive record DELIB-0878: GTKB-ISOLATION-001 completed the detailed Phase 1 authority matrix plan for GT-KB/application separation. The plan defines the required matrix schema, conventional and GT-KB authority categories, a preliminary Agent Red authority matrix across product artifacts, app-local governed state, scoped services, generated projections, overlays, control-plane operations, environment boundaries, and legacy exceptions, plus owner-decision-pending rows, implementation steps, verification mapping, risks, and dependencies into phases 2 through 9.",
+  "full_content_sha256": "47bf37e8fe46c2c0d2cc9fd360b1a4cc763928fbf93dc1c806ef8da69f35e78c",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner approved proceeding with the proposed next work item, GTKB-ISOLATION-001, to take advantage of the current session context and create the detailed Phase 1 authority matrix plan.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Archive the completed GTKB-ISOLATION-001 authority matrix planning deliverable and supporting evidence.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0877",
+  "action": "update",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-app-isolation-control-plane-update",
+  "full_content": "Deliberation Archive record DELIB-0877 version 2: owner added a dashboard/web control-plane mechanism to the GT-KB/application isolation planning program. The updated planning record classifies this as Approach E, adds control-plane interdependencies and risks, and expands the priority backlog from GTKB-ISOLATION-001 through GTKB-ISOLATION-008 with a new Phase 4 plan for dashboard control plane and programmatic operations.",
+  "full_content_sha256": "f95e8e30a1a33deca8e36bfbf12737e53775361a3a1f5facdf440c64ca4d8991",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner stated that an additional mechanism should be considered: programmatic tasks exposed through web applications outside the app directory but able to act on app-local files, including Markdown document operations and dashboard controls for mode/session behavior.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Update the GT-KB/application isolation phased planning record to include dashboard control-plane operations as a distinct planning mechanism and backlog phase.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

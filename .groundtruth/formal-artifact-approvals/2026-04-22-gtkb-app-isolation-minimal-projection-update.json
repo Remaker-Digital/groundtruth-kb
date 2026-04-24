@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0877",
+  "action": "update",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-app-isolation-minimal-projection-update",
+  "full_content": "Deliberation Archive record DELIB-0877 version 4: owner constrained executable policy projection to a minimalist startup-risk intervention rather than a general removal of AI choice. The updated planning record identifies durable operating mode and work-subject startup controls as the leading projection candidates: the application may call a control-plane service to set future-session mode and receive confirmation, while an external service updates the app-session-facing mode/projection file before the next session so the AI reads one active mode instead of detecting and applying conditional mode logic.",
+  "full_content_sha256": "14499e7068aa18bba055069e27fa9ac96dd7d209f00d92f03b44c426f29355f5",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner clarified that executable policy projection should not be overused or eliminate all AI choice inside application sessions. It should be a minimalist intervention primarily for reducing startup error risk and token consumption, with durable mode toggle as a likely first use.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Update the GT-KB/application isolation phased planning record to constrain executable policy projection to minimal startup-risk controls and capture the durable mode toggle service example.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

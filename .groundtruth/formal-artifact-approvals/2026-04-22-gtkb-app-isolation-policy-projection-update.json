@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0877",
+  "action": "update",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-app-isolation-policy-projection-update",
+  "full_content": "Deliberation Archive record DELIB-0877 version 3: owner refined the dashboard control-plane concept with executable policy projection. The updated planning record states that conditional behavior-defining Markdown should be reduced by product-controlled scripts that generate narrow subject-specific AI-facing files from canonical GT-KB policy records, with source hashes, authority metadata, audit logs, reversibility, and tests proving mandatory subject/root/GOV enforcement text is retained.",
+  "full_content_sha256": "2512a816f7c74717fc56151a47312257d542b01c1924182da806b0a07bf5ae3c",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner observed that behavior-defining Markdown forces the AI to choose among conditional instructions and increases context overhead, and proposed executable scripts outside application-session control to add or remove content for stronger enforcement and lower token use.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Update the GT-KB/application isolation phased planning record to include executable projection of behavior-defining Markdown as part of the dashboard/control-plane phase and work-subject enforcement plan.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

@@ -201,6 +201,24 @@ def test_prompt_hook_sets_explicit_next_session_role(tmp_path, monkeypatch) -> N
     assert role_path.read_text(encoding="utf-8") == "active_role: prime-builder\n"
 
 
+def test_prompt_hook_uses_harness_local_role_record_when_named(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    codex_dir = tmp_path / ".codex" / "agent-red-hooks"
+    codex_dir.mkdir(parents=True)
+    role_path = codex_dir / "operating-role.md"
+    role_path.write_text("active_role: loyal-opposition\n", encoding="utf-8")
+    monkeypatch.setitem(module.HARNESS_ROLE_RECORDS, "codex", role_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_OPERATING_ROLE_PATH", raising=False)
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+
+    response = module.handle_user_prompt("switch mode next session", REPO_ROOT)
+
+    assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
+    assert str(role_path) in response["systemMessage"]
+    assert role_path.read_text(encoding="utf-8").startswith("active_role: prime-builder")
+
+
 def test_prompt_hook_toggles_dashboard_auto_launch(tmp_path, monkeypatch) -> None:
     module = _load_module()
     preferences_path = tmp_path / "session-startup-preferences.json"

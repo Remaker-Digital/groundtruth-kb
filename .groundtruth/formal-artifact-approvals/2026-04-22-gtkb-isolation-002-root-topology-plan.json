@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0879",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-isolation-002-root-topology-plan",
+  "full_content": "Deliberation Archive record DELIB-0879: GTKB-ISOLATION-002 completed the detailed Phase 2 project root and repository topology plan for GT-KB/application separation. The plan compares parent workspace, sibling repositories, common workspace with separate repositories, monorepo, submodule/subtree, and package-only options; recommends separate GT-KB and application repositories with package/service consumption and an optional common workspace folder only as a human organization container; defines Codex, Claude Code, VS Code, CI, git, worktree, and submodule policies; specifies root-boundary verification tests; and defines the non-destructive Agent Red migration rehearsal shape.",
+  "full_content_sha256": "7d7fd0f4d8692f05341926b6e28fb9373c9605cbf4a0455005eea2baa4fefb58",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner approved proceeding with GTKB-ISOLATION-002 after completion of the Phase 1 authority matrix plan, to take advantage of current session context and define the project root and repository topology plan.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Archive the completed GTKB-ISOLATION-002 project root and repository topology planning deliverable.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

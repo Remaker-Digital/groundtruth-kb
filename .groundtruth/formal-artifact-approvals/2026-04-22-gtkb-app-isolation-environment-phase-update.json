@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0877",
+  "action": "update",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-app-isolation-environment-phase-update",
+  "full_content": "Deliberation Archive record DELIB-0877 version 6: owner agreed that the control-plane review did not cover the full separation problem and approved adding a distinct host, container, and development environment isolation phase. The updated planning record inserts GTKB-ISOLATION-003 as Phase 3, shifts later phases to GTKB-ISOLATION-004 through GTKB-ISOLATION-009, and requires boundary planning for local harnesses, dev containers, remote development environments, Docker/Compose, CI, deployment tooling, mounts, secrets, workspace trust, and privileged execution.",
+  "full_content_sha256": "3052da5b3b7134b3ee40e960660f2112a9433c72f5d35b8fb856776a8b34eabb",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner agreed that the broader problem includes separation of applications from host development environments and containers, and that the control-plane idea is only one part of that larger problem space.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Update the GT-KB/application isolation phased planning record and top priority backlog to add a distinct host/container/development-environment isolation phase.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

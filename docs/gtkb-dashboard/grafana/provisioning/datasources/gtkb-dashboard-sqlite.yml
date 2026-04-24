@@ -1,0 +1,11 @@
+apiVersion: 1
+
+datasources:
+  - name: GT-KB Dashboard SQLite
+    uid: gtkb-dashboard-sqlite
+    type: frser-sqlite-datasource
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      path: $GTKB_DASHBOARD_SQLITE_PATH

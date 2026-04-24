@@ -43,6 +43,14 @@ STARTUP_REPORT_RELATIVE_PATH = Path("docs") / "gtkb-dashboard" / "session-startu
 DEFAULT_DASHBOARD_PREFERENCES_PATH = (
     Path.home() / ".codex" / "agent-red-hooks" / "session-startup-preferences.json"
 )
+HARNESS_ROLE_RECORDS = {
+    "codex": Path.home() / ".codex" / "agent-red-hooks" / "operating-role.md",
+    "claude": Path.home() / ".claude" / "agent-red-hooks" / "operating-role.md",
+}
+HARNESS_LIFECYCLE_GUARDS = {
+    "codex": Path.home() / ".codex" / "agent-red-hooks" / "session-lifecycle-guard.json",
+    "claude": Path.home() / ".claude" / "agent-red-hooks" / "session-lifecycle-guard.json",
+}
 
 # ---- Role profiles (unchanged from prior module) -----------------------
 ROLE_PRIME_BUILDER = "prime-builder"
@@ -201,6 +209,17 @@ def _project_root_from_env() -> Path:
     return Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
 
 
+def _normalize_harness_name(value: str | None) -> str | None:
+    normalized = str(value or "").strip().lower().replace("_", "-")
+    if normalized in HARNESS_ROLE_RECORDS:
+        return normalized
+    return None
+
+
+def _resolved_harness_name() -> str | None:
+    return _normalize_harness_name(os.environ.get("GTKB_HARNESS_NAME"))
+
+
 def state_path(project_root: Path | None = None) -> Path:
     """Return the canonical work-subject state file path (new Phase 7 location)."""
 
@@ -225,6 +244,9 @@ def operating_role_path(project_root: Path | None = None) -> Path:
     override = os.environ.get("GTKB_OPERATING_ROLE_PATH")
     if override:
         return Path(override).expanduser().resolve()
+    harness_name = _resolved_harness_name()
+    if harness_name:
+        return HARNESS_ROLE_RECORDS[harness_name].expanduser().resolve()
     root = (project_root or _project_root_from_env()).resolve()
     return root / OPERATING_ROLE_RELATIVE_PATH
 
@@ -240,6 +262,9 @@ def lifecycle_guard_path(project_root: Path | None = None) -> Path:
     override = os.environ.get("GTKB_LIFECYCLE_GUARD_PATH")
     if override:
         return Path(override).expanduser().resolve()
+    harness_name = _resolved_harness_name()
+    if harness_name:
+        return HARNESS_LIFECYCLE_GUARDS[harness_name].expanduser().resolve()
     root = (project_root or _project_root_from_env()).resolve()
     return root / LIFECYCLE_GUARD_RELATIVE_PATH
 
@@ -491,7 +516,14 @@ def _read_active_role(project_root: Path | None = None) -> str:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
-        return ROLE_PRIME_BUILDER
+        fallback_path = ((project_root or _project_root_from_env()).resolve()) / OPERATING_ROLE_RELATIVE_PATH
+        if path != fallback_path:
+            try:
+                text = fallback_path.read_text(encoding="utf-8")
+            except OSError:
+                return ROLE_PRIME_BUILDER
+        else:
+            return ROLE_PRIME_BUILDER
     match = re.search(r"(?im)^\s*active_role\s*:\s*`?([a-z][a-z0-9-]*)`?\s*$", text)
     if not match:
         return ROLE_PRIME_BUILDER
@@ -511,7 +543,11 @@ def set_next_session_role(role: str, project_root: Path | None = None) -> str:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
-        text = "# Durable Operating Role Assignment\n\nactive_role: prime-builder\n"
+        fallback_path = ((project_root or _project_root_from_env()).resolve()) / OPERATING_ROLE_RELATIVE_PATH
+        try:
+            text = fallback_path.read_text(encoding="utf-8")
+        except OSError:
+            text = "# Durable Operating Role Assignment\n\nactive_role: prime-builder\n"
 
     if re.search(r"(?im)^\s*active_role\s*:", text):
         text = re.sub(r"(?im)^(\s*active_role\s*:\s*)`?[a-z][a-z0-9-]*`?(\s*)$", rf"\1{role}\2", text)
@@ -530,10 +566,15 @@ def handle_role_command(prompt: str, project_root: Path | None = None) -> dict[s
     current_role = _read_active_role(project_root)
     next_role = _next_toggled_role(current_role) if requested == "toggle" else requested
     set_next_session_role(next_role, project_root)
+    role_path = operating_role_path(project_root)
+    try:
+        role_path_display = role_path.relative_to((project_root or _project_root_from_env()).resolve()).as_posix()
+    except ValueError:
+        role_path_display = str(role_path)
     return {
         "systemMessage": (
             f"Next fresh-session operating mode set to {_role_label(next_role)}. "
-            "This updates `.claude/rules/operating-role.md`; the current session role is unchanged."
+            f"This updates `{role_path_display}`; the current session role is unchanged."
         )
     }
 

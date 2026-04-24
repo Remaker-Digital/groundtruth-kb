@@ -97,6 +97,7 @@ def _wrapup_trigger_errors(wrapper_path: Path) -> list[str]:
             "--emit-wrapup",
             "--force-wrapup",
             "--fast-hook",
+            "--harness-name",
             "UserPromptSubmit",
             "ACCEPTED_TRIGGER_PHRASES",
             "_is_wrapup_trigger",
@@ -134,6 +135,7 @@ def _start_wrapper_errors(wrapper_path: Path) -> list[str]:
             "session_self_initialization.py",
             "--emit-startup-service-payload",
             "--fast-hook",
+            "--harness-name",
             "STARTUP_SERVICE",
             "STARTUP_FRESHNESS_CONTRACT_VERSION",
             "Programmatic Startup Payload",
@@ -211,6 +213,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     codex_hooks_path = project_root / CODEX_HOOKS
     claude_settings_path = project_root / CLAUDE_SETTINGS
     formal_hook_path = project_root / FORMAL_APPROVAL_HOOK
+    workstream_hook_path = project_root / WORKSTREAM_FOCUS_HOOK
     session_startup_path = project_root / SESSION_SELF_INITIALIZATION_SCRIPT
     operating_role_path = project_root / OPERATING_ROLE_RECORD
 
@@ -219,6 +222,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         codex_hooks_path,
         claude_settings_path,
         formal_hook_path,
+        workstream_hook_path,
         session_startup_path,
         operating_role_path,
     ):
@@ -246,6 +250,8 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude SessionStart hook must emit the startup report")
     if not any("--fast-hook" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must use the fast lifecycle hook path")
+    if not any("--harness-name claude" in command for command in claude_session_commands):
+        errors.append("Claude SessionStart hook must resolve the Claude harness-local role state")
     if any("--role-profile" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must discover the role profile instead of forcing one")
 
@@ -256,6 +262,8 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude Stop hook must emit the proactive wrap-up report")
     if not any("--fast-hook" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must use the fast lifecycle hook path")
+    if not any("--harness-name claude" in command for command in claude_stop_commands):
+        errors.append("Claude Stop hook must resolve the Claude harness-local lifecycle state")
     if any("--role-profile" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must discover the role profile instead of forcing one")
 
@@ -329,6 +337,7 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
                 errors.append("Codex workstream focus UserPromptSubmit timeout must be no greater than 10 seconds")
 
     errors.extend(_wrapper_errors(CODEX_WORKSTREAM_FOCUS_WRAPPER, [WORKSTREAM_FOCUS_HOOK.replace("/", "\\")]))
+    errors.extend(_wrapper_errors(CODEX_WORKSTREAM_FOCUS_WRAPPER, ["GTKB_HARNESS_NAME=codex"]))
     stop_commands = _commands_for_event(codex_hooks, "Stop")
     if any(
         _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)

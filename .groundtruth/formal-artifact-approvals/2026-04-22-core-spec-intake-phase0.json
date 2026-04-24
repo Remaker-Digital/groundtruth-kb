@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "CORE-SPEC-INTAKE-PHASE0-BATCH-2026-04-22",
+  "action": "insert-and-link-batch",
+  "source_ref": "owner_conversation:2026-04-22-core-spec-intake-approved",
+  "full_content": "Batch formalization: GT-KB core application specification intake Phase 0.\n\nOwner approval:\n- Mike approved continuing the GTKB-CORE-001 workstream after reviewing the standing backlog continuation.\n- Mike approved proceeding from the Phase 0 governance and compatibility proposal in bridge/gtkb-core-spec-intake-001.md.\n\nArtifacts to create:\n- DELIB-0875: owner decision approving the core specification intake workstream and default-on/opt-out direction.\n- SPEC-CORE-INTAKE-001: GT-KB prompts for missing core application specifications after project initialization.\n- SPEC-CORE-INTAKE-002: Core specification prompting ceases once all required core slots are owner-stated or explicitly not applicable.\n- ADR-CORE-INTAKE-001: Core spec completion is derived from persisted MemBase evidence, not session memory.\n- DCL-CORE-INTAKE-001: Existing scaffold profile behavior and non-interactive workflows remain backward-compatible while core intake becomes default-on with an explicit opt-out.\n\nApproved compatibility policy:\n- New projects should be enrolled in core-spec prompting by default.\n- Automation and unusual projects require an explicit opt-out path.\n- Non-interactive and JSON-safe command paths must not emit interactive prompts.\n- Existing minimal/full scaffold semantics must remain backward-compatible unless separately approved.\n- Inferred candidates do not count as complete until owner-confirmed or marked not applicable.\n\nImplementation boundary:\n- This approval authorizes Phase 0 formalization and the next implementation proposal.\n- It does not itself implement GT-KB package code.\n- Later package changes still require review, tests, and post-implementation verification.\n",
+  "full_content_sha256": "e325898fdb7f0e04f1c785ad3509ccad14e100f32aef5bdb53c6b55898ced7c0",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner said: Approved. Please proceed.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Formalize GT-KB core application specification intake Phase 0 governance and compatibility policy.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

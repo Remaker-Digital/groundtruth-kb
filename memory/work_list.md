@@ -324,21 +324,29 @@ remain below as the governing design baseline for the execution queue above.
 
 **Regression visibility:** application-subject sessions must block or warn before mutating GT-KB product paths; readiness and test reports must label the active subject and must not combine application and GT-KB green claims. Bridge implementation tests must cover stale index rejection, next-number calculation, invalid transition rejection, existing-file collision, concurrent index change, and post-write live-state verification.
 
-### GTKB-ISOLATION-008 - Create detailed Phase 8 plan: Agent Red migration rehearsal
+### GTKB-ISOLATION-008 - DONE - Create detailed Phase 8 plan: Agent Red migration rehearsal
 
 **Priority:** TOP after `GTKB-ISOLATION-015`.
 
-**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`.
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-008-PHASE8-AGENT-RED-MIGRATION-REHEARSAL-PLAN-2026-04-23.md`.
+
+**Authorization:** `bridge/gtkb-isolation-phases-8-9-planning-scope-004.md` (GO).
+
+**Outcome:** completed the detailed Phase 8 Agent Red migration rehearsal plan. The plan defines a zero-destructive rehearsal that emits preview artifacts (dry-run inventory, path-rewrite map, CI command inventory, bridge/backlog/release-readiness split previews, production-effects map, rollback manifest) into the target child root without mutating the legacy mixed root, production deployments, or the GT-KB product root. It treats every one of the 16 mixed-state surfaces from the inventory Interdependency Classification table with a named action (move, copy, split, stay, regenerate, deprecate), Phase 1 authority classification, transformation recipe, rollback behavior, and post-migration verification. Surface 11 (`.claude/hooks/workstream-focus.py`) is recorded as already retired/absent per the GO informational note. The plan binds all seven inventory-required coverage items and the four inventory-required exit criteria to concrete rehearsal artifacts and acceptance checks. It remains planning only; actual rehearsal execution is `GTKB-ISOLATION-016` and requires its own implementation bridge.
 
 **Required outcome:** create a detailed implementation plan for a non-destructive Agent Red extraction/migration rehearsal from the legacy mixed root into the selected application root. Include path rewrites, imports, CI/test command updates, dashboard/DB path handling, bridge/backlog split, production deployment effects, and rollback.
 
 **Regression visibility:** require dry-run inventory and verification before any move. No destructive cleanup or production-affecting change is authorized by this planning item.
 
-### GTKB-ISOLATION-009 - Create detailed Phase 9 plan: downstream adopter packaging and validation
+### GTKB-ISOLATION-009 - DONE - Create detailed Phase 9 plan: downstream adopter packaging and validation
 
 **Priority:** TOP after `GTKB-ISOLATION-008`.
 
-**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`.
+**Plan source:** `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-APPLICATION-ISOLATION-INVENTORY-AND-PHASE-PLAN-2026-04-22.md`. Completed plan: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-009-PHASE9-ADOPTER-PACKAGING-AND-VALIDATION-PLAN-2026-04-23.md`.
+
+**Authorization:** `bridge/gtkb-isolation-phases-8-9-planning-scope-004.md` (GO).
+
+**Outcome:** completed the detailed Phase 9 downstream adopter packaging and validation plan. The plan binds adopter tooling to the approved entrypoints `gt project init` and `gt project upgrade` (no standalone `gt application scaffold` entrypoint), centers the managed artifact registry as the declarative source of truth for adopter-owned vs product-owned artifacts, expands `gt project doctor`/preflight checks to detect isolation violations (including a negative-presence check for the retired `.claude/hooks/workstream-focus.py`), specifies a clean-adopter test suite under GT-KB `tests/adopter/` with outside-in assertions driven by the registry, specifies documentation and example projects under GT-KB `docs/` and `examples/`, and binds every inventory-required coverage and exit criterion to a concrete deliverable and acceptance check. Open decisions for the implementation bridge include mandatory-vs-opt-in isolation for existing adopters, which GT-KB release ships the tooling, and whether Agent Red becomes a minimized Phase 9 example. It remains planning only; actual productization is `GTKB-ISOLATION-017` and requires its own implementation bridge.
 
 **Required outcome:** create a detailed implementation plan for making the isolation model a GT-KB product capability. Cover `gt project init`, `gt project upgrade`, managed artifact registry changes, `gt project doctor`/preflight checks, clean-adopter tests, application-only project-root documentation, and examples.
 

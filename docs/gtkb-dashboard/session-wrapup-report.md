@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Proactive Session Wrap-Up
 
-Generated: 2026-04-21T07:27:36Z
+Generated: 2026-04-24T04:30:36Z
 
 ## Governance Principle
 
@@ -11,23 +11,21 @@ Generated: 2026-04-21T07:27:36Z
 ## Wrap-Up Procedure Entry Point
 
 - Procedure skill: `.claude/skills/kb-session-wrap/SKILL.md`
-- Dashboard: [Agent Red Project Dashboard](file:///E:/Claude-Playground/CLAUDE-PROJECTS/Agent%20Red%20Customer%20Engagement/docs/gtkb-dashboard/index.html)
+- Dashboard: Agent Red Project Dashboard: [http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard](http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard)
 - Safe automatic action: this report is generated without mutating MemBase, git history, or external infrastructure.
 - Mutating wrap-up actions still require the applicable approval, acknowledgement, or owner-authorized automation scope.
 
 ## Current Priority Signals
 
-- Active backlog items: 3
+- Active backlog items: 1
 - Open MemBase work items: 29
-- Release blockers: 7
-- Actionable bridge/contention entries: 0
-- Drift changed paths: 0
+- Release blockers: 0
+- Actionable bridge/contention entries: 1
+- Drift changed paths: 8
 
 ## Suggested Next User Actions
 
-1. GTKB-GOV-006: Close Agent Red release-readiness blocker list
-2. GTKB-GOV-007: Revise commercial readiness NO-GO tracks for SPEC-1831, SPEC-1832, and SPEC-1833
-3. GTKB-GOV-010: Maintain standing backlog harvest audit as release-gate input
+1. GTKB-GOV-010: Maintain standing backlog harvest audit as release-gate input
 
 ## Suggested Wrap-Up Actions
 

@@ -1,0 +1,2614 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "GT-KB Dashboard",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "# Agent Red GT-KB Dashboard\n\nSQLite-backed project health, setup, delivery, and operations view.\n[Manual refresh](http://127.0.0.1:8766/) | `memory/gtkb-dashboard.sqlite` | `scripts\\gtkb_dashboard\\start_local_dashboard.ps1`"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Project Health Issues",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'project_health_issues';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'project_health_issues';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Release Blockers",
+      "gridPos": {
+        "x": 4,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'release_blockers';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'release_blockers';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "CI / Testing Failing",
+      "gridPos": {
+        "x": 8,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'ci_testing_failing';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'ci_testing_failing';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Governance Bridge Items",
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'governance_bridge_items';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'governance_bridge_items';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Refresh Age",
+      "gridPos": {
+        "x": 16,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT COALESCE(\n                    CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER),\n                    9999\n                ) AS value\n                FROM refresh_runs;",
+          "queryType": "table",
+          "rawQueryText": "SELECT COALESCE(\n                    CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER),\n                    9999\n                ) AS value\n                FROM refresh_runs;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 65
+              },
+              {
+                "color": "red",
+                "value": 180
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Documented Setup Steps",
+      "gridPos": {
+        "x": 20,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT COUNT(*) AS value FROM setup_steps;",
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS value FROM setup_steps;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Health Signals",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT label AS metric,\n                       CASE lower(status)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM health_cards\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT label AS metric,\n                       CASE lower(status)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM health_cards\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short",
+          "max": 2,
+          "min": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "text": "Watch",
+                  "color": "yellow"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "2": {
+                  "text": "Act",
+                  "color": "red"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "piechart",
+      "title": "Action Severity Mix",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT upper(COALESCE(NULLIF(severity, ''), 'unknown')) AS severity,\n                       COUNT(*) AS value\n                FROM action_center\n                GROUP BY severity\n                ORDER BY value DESC, severity;",
+          "queryType": "table",
+          "rawQueryText": "SELECT upper(COALESCE(NULLIF(severity, ''), 'unknown')) AS severity,\n                       COUNT(*) AS value\n                FROM action_center\n                GROUP BY severity\n                ORDER BY value DESC, severity;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayLabels": [
+          "name",
+          "value"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "bargauge",
+      "title": "Delivery Events By Stage",
+      "gridPos": {
+        "x": 18,
+        "y": 7,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT label AS metric, event_count AS value\n                FROM delivery_timeline_summary\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT label AS metric, event_count AS value\n                FROM delivery_timeline_summary\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Quality Rollup",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT label AS metric, value\n                FROM quality_rollup\n                WHERE label <> 'Total'\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT label AS metric, value\n                FROM quality_rollup\n                WHERE label <> 'Total'\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "bargauge",
+      "title": "Integration Health",
+      "gridPos": {
+        "x": 8,
+        "y": 15,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT display_name AS metric,\n                       CASE lower(health)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           WHEN 'failing' THEN 2\n                           WHEN 'manual' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM integration_status\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT display_name AS metric,\n                       CASE lower(health)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           WHEN 'failing' THEN 2\n                           WHEN 'manual' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM integration_status\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short",
+          "max": 2,
+          "min": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "text": "Watch",
+                  "color": "yellow"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "2": {
+                  "text": "Act",
+                  "color": "red"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "KPI Trend",
+      "gridPos": {
+        "x": 16,
+        "y": 15,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "time_series",
+          "queryText": "SELECT generated_at AS time, metric_label AS metric, value\n                FROM kpi_snapshots\n                WHERE value IS NOT NULL\n                ORDER BY generated_at, metric_label;",
+          "queryType": "table",
+          "rawQueryText": "SELECT generated_at AS time, metric_label AS metric, value\n                FROM kpi_snapshots\n                WHERE value IS NOT NULL\n                ORDER BY generated_at, metric_label;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Action Center",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "table",
+      "title": "Top Actions",
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT sort_order,\n                   upper(severity) AS severity,\n                   action,\n                   owner_lane AS lane,\n                   shortcut_target\n            FROM action_center\n            ORDER BY sort_order\n            LIMIT 5;",
+          "queryType": "table",
+          "rawQueryText": "SELECT sort_order,\n                   upper(severity) AS severity,\n                   action,\n                   owner_lane AS lane,\n                   shortcut_target\n            FROM action_center\n            ORDER BY sort_order\n            LIMIT 5;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "sort_order",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sort_order"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "shortcut_target"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open",
+                    "url": "${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "Shortcuts",
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT sort_order, label, target, kind\n            FROM shortcuts\n            ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT sort_order, label, target, kind\n            FROM shortcuts\n            ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "sort_order",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sort_order"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "target"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open",
+                    "url": "${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "type": "row",
+      "title": "GT-KB Install and Setup",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "bargauge",
+      "title": "Setup Coverage",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT section AS metric, COUNT(*) AS value\n                FROM setup_steps\n                GROUP BY section\n                ORDER BY MIN(sort_order);",
+          "queryType": "table",
+          "rawQueryText": "SELECT section AS metric, COUNT(*) AS value\n                FROM setup_steps\n                GROUP BY section\n                ORDER BY MIN(sort_order);",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 19,
+      "type": "bargauge",
+      "title": "Required Tool Categories",
+      "gridPos": {
+        "x": 8,
+        "y": 30,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT category AS metric, COUNT(*) AS value\n                FROM required_tools\n                GROUP BY category\n                ORDER BY COUNT(*) DESC, category;",
+          "queryType": "table",
+          "rawQueryText": "SELECT category AS metric, COUNT(*) AS value\n                FROM required_tools\n                GROUP BY category\n                ORDER BY COUNT(*) DESC, category;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 20,
+      "type": "bargauge",
+      "title": "Third-Party Service Categories",
+      "gridPos": {
+        "x": 16,
+        "y": 30,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT category AS metric, COUNT(*) AS value\n                FROM third_party_services\n                GROUP BY category\n                ORDER BY COUNT(*) DESC, category;",
+          "queryType": "table",
+          "rawQueryText": "SELECT category AS metric, COUNT(*) AS value\n                FROM third_party_services\n                GROUP BY category\n                ORDER BY COUNT(*) DESC, category;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "Delivery Timeline",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "type": "bargauge",
+      "title": "Delivery Timeline Summary",
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT label || ' - ' || latest_result AS metric,\n                   event_count AS value\n            FROM delivery_timeline_summary\n            ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT label || ' - ' || latest_result AS metric,\n                   event_count AS value\n            FROM delivery_timeline_summary\n            ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 23,
+      "type": "row",
+      "title": "Release Readiness",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 24,
+      "type": "table",
+      "title": "Release Blockers",
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 12,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT sort_order, blocker FROM release_blockers ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT sort_order, blocker FROM release_blockers ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "sort_order",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sort_order"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "type": "piechart",
+      "title": "Risk Severity Mix",
+      "gridPos": {
+        "x": 12,
+        "y": 45,
+        "w": 6,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT upper(COALESCE(NULLIF(severity, ''), 'unknown')) AS severity,\n                       COUNT(*) AS value\n                FROM risk_register\n                GROUP BY severity\n                ORDER BY value DESC, severity;",
+          "queryType": "table",
+          "rawQueryText": "SELECT upper(COALESCE(NULLIF(severity, ''), 'unknown')) AS severity,\n                       COUNT(*) AS value\n                FROM risk_register\n                GROUP BY severity\n                ORDER BY value DESC, severity;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayLabels": [
+          "name",
+          "value"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 26,
+      "type": "piechart",
+      "title": "Integration Status Mix",
+      "gridPos": {
+        "x": 18,
+        "y": 45,
+        "w": 6,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT upper(COALESCE(NULLIF(health, ''), 'unknown')) AS health,\n                       COUNT(*) AS value\n                FROM integration_status\n                GROUP BY health\n                ORDER BY value DESC, health;",
+          "queryType": "table",
+          "rawQueryText": "SELECT upper(COALESCE(NULLIF(health, ''), 'unknown')) AS health,\n                       COUNT(*) AS value\n                FROM integration_status\n                GROUP BY health\n                ORDER BY value DESC, health;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayLabels": [
+          "name",
+          "value"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Setup Details",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 51,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 27,
+          "type": "table",
+          "title": "Step-by-Step Setup",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 8
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT sort_order, section, title, instruction, command, link_label, link_url FROM setup_steps ORDER BY sort_order;",
+              "queryType": "table",
+              "rawQueryText": "SELECT sort_order, section, title, instruction, command, link_label, link_url FROM setup_steps ORDER BY sort_order;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sort_order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "link_url"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open",
+                        "url": "${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": 28,
+          "type": "table",
+          "title": "Required Tools, CLIs, and SDKs",
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 24,
+            "h": 8
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT sort_order, name, category, purpose, check_command, install_reference, status\n            FROM required_tools\n            ORDER BY sort_order;",
+              "queryType": "table",
+              "rawQueryText": "SELECT sort_order, name, category, purpose, check_command, install_reference, status\n            FROM required_tools\n            ORDER BY sort_order;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sort_order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "install_reference"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open",
+                        "url": "${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": 29,
+          "type": "table",
+          "title": "Third-Party Test Services",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 24,
+            "h": 8
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT sort_order, name, category, purpose, required_env_vars, setup_summary, console_url, health_signal\n            FROM third_party_services\n            ORDER BY sort_order;",
+              "queryType": "table",
+              "rawQueryText": "SELECT sort_order, name, category, purpose, required_env_vars, setup_summary, console_url, health_signal\n            FROM third_party_services\n            ORDER BY sort_order;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sort_order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "console_url"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open",
+                        "url": "${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "row",
+      "title": "Action Center Details",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 31,
+          "type": "table",
+          "title": "All Actions",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT sort_order, action, owner_lane, why, remediation, shortcut_label, shortcut_target, source, severity\n            FROM action_center\n            ORDER BY sort_order;",
+              "queryType": "table",
+              "rawQueryText": "SELECT sort_order, action, owner_lane, why, remediation, shortcut_label, shortcut_target, source, severity\n            FROM action_center\n            ORDER BY sort_order;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sort_order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "shortcut_target"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open",
+                        "url": "${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "type": "row",
+      "title": "Delivery Timeline Details",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 33,
+          "type": "table",
+          "title": "Delivery Timeline Details",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 10
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT sort_order, date_label, stage_label, event, version, commit_sha, branch, result, test_results, source, url\n            FROM delivery_timeline_events\n            ORDER BY sort_order;",
+              "queryType": "table",
+              "rawQueryText": "SELECT sort_order, date_label, stage_label, event, version, commit_sha, branch, result, test_results, source, url\n            FROM delivery_timeline_events\n            ORDER BY sort_order;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sort_order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "url"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open",
+                        "url": "${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "type": "row",
+      "title": "KPI History Details",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 35,
+          "type": "table",
+          "title": "Current Metrics",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 7
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT metric_label AS metric, value, upper(status) AS status, description FROM current_metrics ORDER BY metric_key;",
+              "queryType": "table",
+              "rawQueryText": "SELECT metric_label AS metric, value, upper(status) AS status, description FROM current_metrics ORDER BY metric_key;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 36,
+          "type": "timeseries",
+          "title": "KPI Snapshots",
+          "gridPos": {
+            "x": 0,
+            "y": 7,
+            "w": 24,
+            "h": 9
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "time_series",
+              "queryText": "SELECT generated_at AS time, metric_label AS metric, value\n            FROM kpi_snapshots\n            WHERE value IS NOT NULL\n            ORDER BY generated_at, metric_label;",
+              "queryType": "table",
+              "rawQueryText": "SELECT generated_at AS time, metric_label AS metric, value\n            FROM kpi_snapshots\n            WHERE value IS NOT NULL\n            ORDER BY generated_at, metric_label;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 4,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "type": "row",
+      "title": "Integration Status Details",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 38,
+          "type": "table",
+          "title": "Testing Service Integrations",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT sort_order, display_name, health, status, latest_run_summary, gate_role, remediation\n            FROM integration_status\n            ORDER BY sort_order;",
+              "queryType": "table",
+              "rawQueryText": "SELECT sort_order, display_name, health, status, latest_run_summary, gate_role, remediation\n            FROM integration_status\n            ORDER BY sort_order;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sort_order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "type": "row",
+      "title": "Data Freshness Details",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 40,
+          "type": "table",
+          "title": "Data Freshness",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 6
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT label, value FROM data_freshness ORDER BY key;",
+              "queryType": "table",
+              "rawQueryText": "SELECT label, value FROM data_freshness ORDER BY key;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 41,
+          "type": "table",
+          "title": "Refresh Runs",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 6
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT id, started_at, completed_at, status, error\n            FROM refresh_runs\n            ORDER BY id DESC\n            LIMIT 20;",
+              "queryType": "table",
+              "rawQueryText": "SELECT id, started_at, completed_at, status, error\n            FROM refresh_runs\n            ORDER BY id DESC\n            LIMIT 20;",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "sort_order",
+                "desc": false
+              }
+            ]
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": []
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 41,
+  "tags": [
+    "gt-kb",
+    "agent-red",
+    "sqlite"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Agent Red GT-KB Dashboard",
+  "uid": "agent-red-gtkb",
+  "version": 4,
+  "weekStart": ""
+}

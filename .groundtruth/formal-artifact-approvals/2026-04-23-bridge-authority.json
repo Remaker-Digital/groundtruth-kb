@@ -1,0 +1,16 @@
+{
+  "artifact_type": "governance",
+  "artifact_id": "BRIDGE-AUTHORITY-BATCH-2026-04-23",
+  "action": "insert-and-update-batch",
+  "source_ref": "owner_conversation:2026-04-23-bridge-authority",
+  "full_content": "Batch formalization: permanent bridge authority and live bridge index source of truth.\n\nOwner directives captured on 2026-04-23:\n- The live contents of bridge/INDEX.md are authoritative for bridge state.\n- Copies, cached versions, summaries, startup reports, dashboard fields, or other artifacts derived from bridge/INDEX.md must not be used as the basis for determining bridge state.\n- All project-level restrictions are lifted when Loyal Opposition is working on the correct function and use of the Prime Builder / Loyal Opposition file bridge.\n- Loyal Opposition has permanent permission to diagnose and repair the bridge and to change all downstream artifacts that depend on the bridge when needed to sustain bridge function and ensure the bridge remains properly and fully utilized.\n\nArtifacts to create or update:\n- DELIB-0880: archive the owner directive establishing live bridge-index authority and permanent Loyal Opposition bridge authority.\n- GOV-FILE-BRIDGE-AUTHORITY-001: formalize live bridge/INDEX.md as the sole bridge-state authority and define the permanent bridge-function/use repair authority.\n- GOV-SESSION-SELF-INITIALIZATION-001: update startup governance so startup executes live-source bridge verification and treats generated reports, dashboards, cached scan counts, and copied excerpts as non-authoritative context.\n\nDownstream artifacts authorized for update include AGENTS.md, .claude/rules/file-bridge-protocol.md, .claude/rules/loyal-opposition.md, independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md, independent-progress-assessments/CODEX-WAY-OF-WORKING.md, scripts/session_self_initialization.py, generated startup/dashboard artifacts, and tests that verify this governance behavior.\n",
+  "full_content_sha256": "2748e9f0ab00480f9f426ce90f14258b17e309abf2eeead77a915031dced7023",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner stated that live bridge/INDEX.md is authoritative and that all restrictions are lifted for Loyal Opposition work on correct bridge function and use, including downstream bridge-dependent artifacts.",
+  "changed_by": "loyal-opposition/codex",
+  "change_reason": "Formalize permanent bridge authority and live bridge-index source-of-truth governance.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

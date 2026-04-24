@@ -127,7 +127,14 @@ logs/
 memory/
 
 # Independent assessments
+# Historic misspelled entry retained for defence-in-depth against stale paths.
 independent-progress-assments/
+independent-progress-assessments/
+
+# GT-KB governance / runtime surfaces (GTKB-ISOLATION-003 Phase 3 baseline)
+.codex/
+.groundtruth/
+bridge/
 
 # Wiki
 agent-red.wiki/

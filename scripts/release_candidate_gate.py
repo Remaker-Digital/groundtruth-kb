@@ -87,6 +87,9 @@ def _python_gates() -> None:
     _run([sys.executable, "-m", "bandit", "-r", "src/", "-ll", "-c", "pyproject.toml"], timeout=180)
     _run([sys.executable, "-m", "pip_audit", "-r", "requirements.txt"], timeout=180)
     _run([sys.executable, "scripts/check_codex_hook_parity.py"], timeout=60)
+    _run([sys.executable, "scripts/check_environment_isolation.py"], timeout=60)
+    _run([sys.executable, "scripts/check_session_overlay_policy.py"], timeout=60)
+    _run([sys.executable, "scripts/check_scoped_service_boundary.py"], timeout=60)
     _run(
         [
             sys.executable,
@@ -98,12 +101,24 @@ def _python_gates() -> None:
             "tests/multi_tenant/test_mfa_totp.py",
             "tests/unit/test_widget_otp_verification.py",
             "tests/unit/test_deploy_scaling.py",
+            "tests/scripts/test_check_environment_isolation.py",
             "tests/scripts/test_release_candidate_gate.py",
+            "tests/scripts/test_gtkb_scoped_client.py",
+            "tests/scripts/test_gtkb_dashboard_control_plane.py",
+            "tests/scripts/test_gtkb_overlay.py",
             "tests/scripts/test_session_self_initialization.py",
             "tests/scripts/test_groundtruth_governance_adoption.py",
             "tests/scripts/test_codex_hook_parity.py",
             "tests/scripts/test_standing_backlog_harvest.py",
+            "tests/integrations/test_commercial_state_store.py",
+            "tests/integrations/test_cosmos_schema_extensions.py",
+            "tests/integrations/test_action_executor.py",
+            "tests/integrations/test_admin_integration_framework_api.py",
+            "tests/integrations/test_usage_consumption.py",
+            "tests/integrations/test_shopify_billing.py",
+            "tests/unit/test_stripe_webhooks.py",
             "tests/hooks/test_formal_artifact_approval_gate.py",
+            "tests/hooks/test_workstream_focus.py",
             "-q",
             "--tb=short",
         ],
@@ -115,11 +130,7 @@ def _frontend_gates() -> None:
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm") or shutil.which("npm")
     if not npm:
         raise GateFailure("npm executable not found on PATH")
-    powershell = (
-        shutil.which("powershell.exe")
-        or shutil.which("powershell")
-        or shutil.which("pwsh")
-    )
+    powershell = shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh")
     if not powershell:
         raise GateFailure("PowerShell executable not found on PATH")
     frontend_projects = [

@@ -7,7 +7,7 @@
             "type": "command",
             "command": "python C:\\Users\\micha\\.codex\\agent-red-hooks\\session_start_dispatch.py",
             "statusMessage": "Preparing GT-KB startup orientation",
-            "timeout": 5
+            "timeout": 15
           }
         ]
       }
@@ -17,14 +17,31 @@
         "hooks": [
           {
             "type": "command",
+            "command": "cmd /d /s /c C:\\Users\\micha\\.codex\\agent-red-hooks\\workstream-focus.cmd",
+            "statusMessage": "Checking active workstream focus",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python C:\\Users\\micha\\.codex\\agent-red-hooks\\session_wrapup_trigger_dispatch.py",
-            "statusMessage": "Checking GT-KB wrap-up trigger",
+            "statusMessage": "Checking session lifecycle command",
             "timeout": 15
           }
         ]
       }
     ],
     "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c C:\\Users\\micha\\.codex\\agent-red-hooks\\workstream-focus.cmd",
+            "statusMessage": "Checking active workstream focus",
+            "timeout": 5
+          }
+        ]
+      },
       {
         "matcher": "Bash",
         "hooks": [

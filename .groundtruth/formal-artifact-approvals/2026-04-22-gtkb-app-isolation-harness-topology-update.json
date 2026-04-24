@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0877",
+  "action": "update",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-app-isolation-harness-topology-update",
+  "full_content": "Deliberation Archive record DELIB-0877 version 5: owner added the requirement that programmatic control-plane mode/projection operations maintain awareness of multiple harnesses and both sides of the Prime Builder/Loyal Opposition bridge. The updated planning record requires a harness topology registry, bridge role slots, target harness/project-root/role/subject fields, and tests for single-harness, dual-harness, missing-counterpart, stale-session, and conflicting future-mode scenarios.",
+  "full_content_sha256": "b0418e25e17cf6563b83e0514af80096eb854cd894bac60e8fddc85ccda1b8bf",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner observed that the programmatic control-plane approach requires GT-KB to maintain awareness of multiple harnesses, because switching or setting operating mode requires knowledge of both sides of the Loyal Opposition/Prime Builder bridge.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Update the GT-KB/application isolation phased planning record to require harness topology awareness and bridge role-slot handling for control-plane mode/projection operations.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

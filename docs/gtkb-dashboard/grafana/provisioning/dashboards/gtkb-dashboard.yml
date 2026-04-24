@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: GT-KB Dashboard
+    orgId: 1
+    folder: GT-KB
+    folderUid: gtkb
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 60
+    options:
+      path: $GTKB_DASHBOARD_DASHBOARDS_PATH

@@ -217,6 +217,51 @@ def test_startup_model_discovers_durable_operating_role() -> None:
         assert "13. **Continue Last Session**" in report
 
 
+def test_harness_local_role_record_overrides_repo_default_for_startup(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    codex_dir = tmp_path / ".codex" / "agent-red-hooks"
+    codex_dir.mkdir(parents=True)
+    role_path = codex_dir / "operating-role.md"
+    guard_path = codex_dir / "session-lifecycle-guard.json"
+    role_path.write_text("active_role: loyal-opposition\n", encoding="utf-8")
+    monkeypatch.setitem(module.HARNESS_ROLE_RECORDS, "codex", role_path)
+    monkeypatch.setitem(module.HARNESS_LIFECYCLE_GUARDS, "codex", guard_path)
+    monkeypatch.delenv("GTKB_OPERATING_ROLE_PATH", raising=False)
+    monkeypatch.delenv("GTKB_LIFECYCLE_GUARD_PATH", raising=False)
+    monkeypatch.setattr(
+        module,
+        "_write_dashboard_pdf",
+        lambda dashboard_path, pdf_path: {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "PDF export skipped by test.",
+        },
+    )
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-report",
+            "--fast-hook",
+            "--skip-bridge-maintenance",
+            "--harness-name",
+            "codex",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    context = payload["additionalContext"]
+    assert "Role being assumed: Loyal Opposition" in context
+    assert f"Role mapping source: {role_path}" in context
+    assert guard_path.exists()
+
+
 def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -> None:
     module = _load_module()
 
@@ -923,6 +968,8 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     ]
     stop_commands = [hook["command"] for group in claude_settings["hooks"]["Stop"] for hook in group["hooks"]]
     assert any("session_self_initialization.py" in command for command in session_commands)
+    assert any("--harness-name claude" in command for command in session_commands)
+    assert any("--harness-name claude" in command for command in stop_commands)
     assert all("--role-profile" not in command for command in session_commands + stop_commands)
 
     guard_path = tmp_path / "guard.json"
@@ -937,6 +984,8 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
             "--emit-report",
             "--fast-hook",
             "--skip-bridge-maintenance",
+            "--harness-name",
+            "claude",
             "--lifecycle-guard-path",
             str(guard_path),
         ]

@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0877",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-app-isolation-phased-planning",
+  "full_content": "Deliberation Archive record DELIB-0877: owner directive and Prime Builder planning program for GT-KB/application isolation. The record captures the detailed inventory of current Agent Red and GT-KB interdependencies, classifies each dependency into parent GT-KB product artifacts, scoped GT-KB services, application-local governed state, or session overlays, identifies errors and inefficiencies in the service/overlay proposal, and seeds the top priority backlog with GTKB-ISOLATION-001 through GTKB-ISOLATION-007 so later sessions can create detailed phase implementation plans.",
+  "full_content_sha256": "ea42fae2b57dc7df7eadd82feacea725c1197e1bd9741551e25d17c330c584df",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner requested a cautious, fine-grained implementation planning session for GT-KB/application isolation, beginning with detailed system inventory, capturing all planning in the Deliberation Archive, and adding all resulting phase-plan items to the top priority backlog.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Archive the GT-KB/application isolation inventory and phased planning program.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

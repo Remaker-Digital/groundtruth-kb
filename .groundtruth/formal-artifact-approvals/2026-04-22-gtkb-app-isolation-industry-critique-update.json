@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0877",
+  "action": "update",
+  "source_ref": "owner_conversation:2026-04-22-gtkb-app-isolation-industry-critique-update",
+  "full_content": "Deliberation Archive record DELIB-0877 version 7: owner requested a careful critique of the full GT-KB/application separation problem space with adoption aligned to industry norms and conventions. The updated planning record adds a Critical Deliberation section that decomposes the problem into artifact authority, workspace/repository boundary, host/container/development-environment boundary, service/API boundary, control-plane reconciliation, and subject-scoped review/release/test boundaries; it identifies risks of over-novel terminology, treating project roots as security boundaries, privileged dashboard shells, canonical Markdown mutation, raw database credentials, over-projection, mixed roots, and CI/container escape hatches; and it recommends least privilege, workspace trust, generated configuration, policy-as-code, controller reconciliation, provenance, CODEOWNERS-style ownership, and subject-scoped CI.",
+  "full_content_sha256": "121661fcde479e9db20c13b9e0cf8db0118826fea35c8b5192036e92206e0475",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner requested a careful critique of the entire GT-KB/application separation problem space, emphasizing alignment with industry norms and conventions and avoiding novelty that would inhibit adoption.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Update the GT-KB/application isolation phased planning record with a critical industry-alignment deliberation and carry that critique into the top priority backlog.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-0876",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-04-22-session-work-subject",
+  "full_content": "Deliberation Archive record DELIB-0876: owner directive and Prime Builder investigation for a durable session work subject toggle. The record captures the problem statement, subject-scope failure cases, prior deliberation evidence, and the handoff to bridge/gtkb-session-work-subject-001.md for Loyal Opposition review before implementation.",
+  "full_content_sha256": "b6247f7164dfc0de763d87623545e9f78a264c64e88b342bdde14bab0d5135be",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner requested: investigate session subject, create a list of incorrect-subject cases, create an implementation proposal, and record the investigation details in the Deliberation Archive.",
+  "changed_by": "prime-builder/codex",
+  "change_reason": "Archive owner directive and investigation for durable session work subject proposal.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

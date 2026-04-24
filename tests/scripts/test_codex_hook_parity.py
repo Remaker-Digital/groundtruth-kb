@@ -63,6 +63,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         "session_self_initialization.py" in hook["command"]
         and "--emit-report" in hook["command"]
         and "--fast-hook" in hook["command"]
+        and "--harness-name claude" in hook["command"]
         and "--role-profile" not in hook["command"]
         for group in claude_settings["hooks"]["SessionStart"]
         for hook in group["hooks"]
@@ -71,6 +72,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         "session_self_initialization.py" in hook["command"]
         and "--emit-wrapup" in hook["command"]
         and "--fast-hook" in hook["command"]
+        and "--harness-name claude" in hook["command"]
         and "--role-profile" not in hook["command"]
         for group in claude_settings["hooks"]["Stop"]
         for hook in group["hooks"]
@@ -107,6 +109,8 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
 
     start_text = start_dispatcher.read_text(encoding="utf-8")
     assert "--emit-startup-service-payload" in start_text
+    assert "--harness-name" in start_text
+    assert "HARNESS_NAME = \"codex\"" in start_text
     assert "--role-profile" not in start_text
     assert "STARTUP_SERVICE" in start_text
     assert "STARTUP_FRESHNESS_CONTRACT_VERSION" in start_text
@@ -138,6 +142,8 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     wrapup_text = wrapup_dispatcher.read_text(encoding="utf-8")
     assert "--emit-wrapup" in wrapup_text
     assert "--force-wrapup" in wrapup_text
+    assert "--harness-name" in wrapup_text
+    assert "HARNESS_NAME = \"codex\"" in wrapup_text
     assert "--role-profile" not in wrapup_text
     assert "UserPromptSubmit" in wrapup_text
     assert "ACCEPTED_TRIGGER_PHRASES" in wrapup_text
@@ -161,6 +167,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     workstream_wrapper = Path.home() / ".codex" / "agent-red-hooks" / "workstream-focus.cmd"
     workstream_text = workstream_wrapper.read_text(encoding="utf-8")
     assert "workstream-focus.py" in workstream_text
+    assert "GTKB_HARNESS_NAME=codex" in workstream_text
 
 
 def test_codex_hook_parity_reports_missing_codex_hooks(tmp_path) -> None:
@@ -210,6 +217,10 @@ def test_codex_hook_parity_requires_bash_matcher(tmp_path) -> None:
         encoding="utf-8",
     )
     (tmp_path / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text(
+        "print('{}')\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".claude" / "hooks" / "workstream-focus.py").write_text(
         "print('{}')\n",
         encoding="utf-8",
     )

@@ -2,11 +2,13 @@
 
 Owner directive date: 2026-04-23
 
-active_role: loyal-opposition
+active_role: prime-builder
 
-This file is the authoritative fresh-session role switch for Agent Red Customer
-Engagement. Session startup must read this file before applying role-specific
-permissions, restrictions, startup text, or hook behavior.
+This file is the tracked default fresh-session role record for Agent Red
+Customer Engagement. Session startup must resolve the active harness's durable
+role record before applying role-specific permissions, restrictions, startup
+text, or hook behavior. When no harness-local durable role record is
+configured or present, startup falls back to this file.
 
 Allowed role profile values:
 
@@ -15,17 +17,26 @@ Allowed role profile values:
 - `acting-prime-builder`
 
 The role assignment attaches to the operating role, not to a specific model,
-vendor, or harness name. While Claude Code is unavailable, Codex may be assigned
-either Prime Builder or Loyal Opposition so the normal Prime Builder / Loyal
-Opposition process can continue instead of being suspended.
+vendor, or harness name. When multiple harnesses share this workspace, each
+harness should keep its own durable next-session role record so one harness's
+mode toggle does not overwrite the other's. Current local defaults:
+
+- Codex: `~/.codex/agent-red-hooks/operating-role.md`
+- Claude Code: `~/.claude/agent-red-hooks/operating-role.md`
+
+While Claude Code is unavailable, Codex may be assigned either Prime Builder or
+Loyal Opposition so the normal Prime Builder / Loyal Opposition process can
+continue instead of being suspended.
 
 To change the next fresh session's operating mode, update only the
-`active_role:` value above unless a broader governance change is intended.
+resolved durable role record's `active_role:` value unless a broader governance
+change is intended.
 Standalone owner prompts `switch mode next session` and `change mode next
-session` toggle the next fresh-session role between Prime Builder and Loyal
-Opposition by updating only this `active_role:` value. Explicit prompts
+session` toggle the current harness's next fresh-session role between Prime
+Builder and Loyal Opposition by updating only that harness-local
+`active_role:` value. Explicit prompts
 `prime builder mode next session` and `loyal opposition mode next session`
-set the next fresh-session role directly.
+set the current harness's next fresh-session role directly.
 
 When `active_role: prime-builder` is set, startup uses the Prime Builder
 profile, checks the file bridge, presents Prime Builder session-focus choices,

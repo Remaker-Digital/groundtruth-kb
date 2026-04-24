@@ -1,16 +1,16 @@
 # Release Readiness Recovery
 
-Last updated: 2026-04-21 08:52 America/Los_Angeles
+Last updated: 2026-04-21 18:25 America/Los_Angeles
 
 ## Current State
 
-Agent Red is in release-readiness recovery after a production-readiness inspection found P0/P1 blockers. The current code candidate is `main@e01e8ac` with green GitHub Actions evidence for Lint, Python Tests, Release Candidate Gate, SonarCloud, and Security Scan.
+Agent Red is in release-readiness recovery after a production-readiness inspection found P0/P1 blockers. The current repository head is `main@c372eef`, a release-evidence documentation commit. The latest full code candidate remains `main@e01e8ac` with green GitHub Actions evidence for Lint, Python Tests, Release Candidate Gate, SonarCloud, and Security Scan; `main@c372eef` also has green SonarCloud evidence and a fresh local non-deploying release-candidate gate pass.
 
 - tracked generated production manifest with plaintext credentials,
 - fail-open standalone admin behavior when deployed without an admin password,
 - static fallback signing secrets reaching production if env vars are absent,
-- owner-gated release provenance and secret-history decisions,
-- in-memory production-facing commercial state requiring a launch-scope decision.
+- commercial integration state durability and secure per-tenant restore have
+  local implementation and non-deploying release-gate evidence.
 
 ## Completed Recovery Work
 
@@ -46,6 +46,7 @@ Observable regression coverage now includes:
 - `tests/scripts/test_groundtruth_governance_adoption.py` for GroundTruth adopter config, KnowledgeDB gate plugin config, governance hook/rule/skill presence, gitignore visibility, release workflow lanes, and work-queue ordering.
 - The governance adoption test now also requires the three upstream GT-KB managed skills and the local acting-Prime role mapping rule.
 - `python scripts\release_candidate_gate.py --skip-frontend` passed locally under Python 3.14 with Ruff E/F, import cycles, Bandit, pip-audit, and 147 targeted tests.
+- `python scripts\release_candidate_gate.py` passed locally under Python 3.14 with secret manifest containment, Ruff E/F, import cycles, Bandit, pip-audit, Codex hook parity, and 186 targeted tests.
 - `tests/test_host/test_build_contract.py::TestConfigurationDriftAcrossLayers::test_production_dockerfile_avoids_curl_healthcheck_dependency` verifies the production Dockerfile does not depend on curl for healthchecks.
 
 ## 2026-04-20 Risk Register Remediation Pass
@@ -115,9 +116,11 @@ Historical evidence from that pass:
 
 Blocker disposition:
 
-- Production credentials exposed in the deleted generated manifest must be
-  rotated: still owner/secret-provider gated. Do not close without credential
-  rotation evidence.
+- Credential lifecycle for values exposed in the deleted generated manifest is
+  owner-managed outside Codex scope. Codex must not ask Mike to rotate keys; when
+  credentials change, Mike will update `env.local`, and Codex may consume,
+  validate, or upload those values only when the task requires it and Mike has
+  authorized that use.
 - Owner must decide whether git history requires secret purging: still
   owner-gated. Do not close without an explicit owner decision.
 - GitHub SonarCloud must pass with valid `SONAR_TOKEN` and project
@@ -138,9 +141,10 @@ Blocker disposition:
 
 Recommended next actions:
 
-- Owner: rotate any production credentials that were exposed in the deleted
-  generated manifest and provide rotation evidence suitable for release
-  readiness.
+- Prime Builder: do not request credential rotation. Treat credential lifecycle
+  as owner-managed outside Codex scope; when Mike updates `env.local`, consume,
+  validate, or upload the updated values only when the task requires it and Mike
+  has authorized that use.
 - Owner: decide whether repository history must be purged for the exposed
   manifest.
 - Prime Builder: keep local remote, dashboard GitHub Actions evidence, and
@@ -155,11 +159,11 @@ Recommended next actions:
 
 ## 2026-04-21 Docker Scout Clearance Pass
 
-Claim: The GitHub Security Scan release blocker is cleared for the current code candidate.
+Claim: The GitHub Security Scan release blocker is cleared for the latest full code candidate.
 
 Current evidence:
 
-- Current code candidate: `main@e01e8ac154675ca29a80a4cdfd0a9056dd00307c`.
+- Latest full code candidate: `main@e01e8ac154675ca29a80a4cdfd0a9056dd00307c`.
 - GitHub Actions on `main@e01e8ac` are green for Lint, Python Tests, Release Candidate Gate, SonarCloud, and Security Scan.
 - Security Scan run `24731909565` completed successfully on `main@e01e8ac` after Docker Scout ACR and Docker Hub credentials were configured.
 - Docker Scout ACR credentials are present as repository secrets `ACR_SCOUT_USERNAME` and `ACR_SCOUT_PASSWORD`.
@@ -174,18 +178,194 @@ Current evidence:
 Blocker disposition:
 
 - GitHub Security Scan must pass with valid Docker Scout credentials: cleared for `main@e01e8ac` by run `24731909565`.
-- Production credentials exposed in the deleted generated manifest must be rotated: still owner/secret-provider gated. Do not close without credential rotation evidence.
+- Credential lifecycle for values exposed in the deleted generated manifest is owner-managed outside Codex scope. Codex must not ask Mike to rotate keys; when credentials change, Mike will update `env.local`, and Codex may consume, validate, or upload those values only when the task requires it and Mike has authorized that use.
 - Owner must decide whether git history requires secret purging: still owner-gated. Do not close without an explicit owner decision.
 - `main` and `develop` release provenance: operational divergence is cleared for the current candidate, but the release-branch policy still needs owner/project disposition.
-- Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths: still owner/product-scope gated.
+- Commercial integration state for Shopify, Stripe, and action-executor paths
+  must be durably persisted per tenancy and recoverable from a durable, secure
+  tenant backup.
+
+## 2026-04-21 GTKB-GOV-006 Evidence Freshness Pass
+
+Claim: The release-readiness blocker list is current as of `main@c372eef`; production GO remains blocked only by owner/project decisions.
+
+Current evidence:
+
+- Current repository head: `main@c372eef04f854b6216afc16ca88eae9485b34ccc`.
+- Commit `c372eef` modifies only `memory/release-readiness.md` relative to its parent and records green Security Scan evidence.
+- GitHub Actions on `main@c372eef` show SonarCloud run `24732405946` completed successfully.
+- GitHub Actions on `main@e01e8ac` show Lint run `24731899661`, Python Tests run `24731899611`, Release Candidate Gate run `24731899768`, SonarCloud run `24731899451`, and Security Scan run `24731909565` completed successfully.
+- Branch divergence from `git rev-list --left-right --count origin/main...origin/develop` is `29 0`: `origin/main` is 29 commits ahead of `origin/develop`; `origin/develop` has no commits ahead of `origin/main`.
+- Standing backlog source audit reports four remaining release blockers, matching the list below.
+- Local non-deploying release-candidate gate passed on the checked-out tree: `python scripts/release_candidate_gate.py --skip-frontend`. The gate completed secret manifest containment, Ruff E/F, import-cycle detection, Bandit, pip-audit, Codex hook parity, and 185 targeted tests.
+
+Blocker disposition:
+
+- Credential lifecycle for values exposed in the deleted generated manifest remains owner-managed outside Codex scope. Codex must not ask Mike to rotate keys.
+- Secret-history purge remains owner-gated. Do not close without an explicit owner decision.
+- Release-branch provenance policy remains owner/project-gated. Operational divergence is known and bounded (`develop` is 0 commits ahead of `main`), but the durable policy decision is still open.
+- Commercial durability launch scope remains owner/product-scope gated for Shopify/Stripe/action-executor in-memory paths.
+
+## 2026-04-21 Option 3 Release Blocker Verification Pass
+
+Claim: The selected release-blocker focus did not uncover a current technical gate failure; production GO remains blocked by the four governed owner/project disposition items below.
+
+Current evidence:
+
+- Checked-out branch: `main`.
+- Current repository head: `main@c372eef04f854b6216afc16ca88eae9485b34ccc`.
+- Branch divergence from `git rev-list --left-right --count origin/main...origin/develop` remains `29 0`: `origin/main` is 29 commits ahead of `origin/develop`; `origin/develop` has no commits ahead of `origin/main`.
+- Local non-deploying release-candidate gate passed on the checked-out tree: `python scripts/release_candidate_gate.py`. The gate completed secret manifest containment, Ruff E/F, import-cycle detection, Bandit medium/high scan, pip-audit, Codex hook parity, and 185 targeted tests.
+- Standing backlog source audit passed and reports exactly four release blockers, matching the remaining blocker list below: `python scripts/audit_standing_backlog_sources.py`.
+- GitHub Actions evidence from `gh run list --repo Remaker-Digital/agent-red-customer-engagement --branch main --limit 10` shows the latest `main` runs still green for SonarCloud on `main@c372eef`, plus Security Scan, Lint, Release Candidate Gate, Python Tests, and SonarCloud on the latest full code candidate `main@e01e8ac`.
+
+Blocker disposition:
+
+- Credential lifecycle for values exposed in the deleted generated manifest remains owner-managed outside Codex scope. Codex must not ask Mike to rotate keys.
+- Secret-history purge remains owner-gated. Do not close without an explicit owner decision.
+- Release-branch provenance policy remains owner/project-gated. Operational divergence is known and bounded (`develop` is 0 commits ahead of `main`), but the durable policy decision is still open.
+- Commercial durability launch scope remains owner/product-scope gated for Shopify/Stripe/action-executor in-memory paths.
+
+## 2026-04-21 Resolve Release Blockers Freshness Pass
+
+Claim: The requested release-blocker resolution pass found no remaining local
+technical gate failure. The remaining blockers are now limited to the governed
+owner/project disposition items below.
+
+Current evidence:
+
+- Checked-out branch: `main`.
+- Current repository head: `main@c372eef04f854b6216afc16ca88eae9485b34ccc`.
+- Branch divergence from `git rev-list --left-right --count origin/main...origin/develop` remains `29 0`: `origin/main` is 29 commits ahead of `origin/develop`; `origin/develop` has no commits ahead of `origin/main`.
+- GitHub Actions evidence from `gh run list --repo Remaker-Digital/agent-red-customer-engagement --branch main --limit 15` remains green for SonarCloud on `main@c372eef`, plus Security Scan, Lint, Release Candidate Gate, Python Tests, and SonarCloud on latest full code candidate `main@e01e8ac`.
+- Local release gate passed: `python scripts/release_candidate_gate.py`. The gate completed secret manifest containment, Ruff E/F, import-cycle detection, Bandit medium/high scan, pip-audit, Codex hook parity, and 186 targeted tests.
+- Standing backlog source audit passed: `python scripts/audit_standing_backlog_sources.py`. It reports four release blockers, matching the remaining blocker list below.
+
+Blocker disposition:
+
+- Credential lifecycle for values exposed in the deleted generated manifest remains owner-managed outside Codex scope. Codex must not ask Mike to rotate keys.
+- Secret-history purge remains owner-gated. Do not close without an explicit owner decision.
+- Release-branch provenance policy remains owner/project-gated. Operational divergence is known and bounded (`develop` is 0 commits ahead of `main`), but the durable policy decision is still open.
+- Commercial durability launch scope remains owner/product-scope gated for Shopify/Stripe/action-executor in-memory paths.
 
 ## Remaining Release Blockers
 
-- Production credentials exposed in the deleted generated manifest must be rotated.
-- Owner must decide whether git history requires secret purging.
-- Owner/project must decide the release-branch provenance policy for
-  `main`/`develop`.
-- Commercial durability launch scope must be decided for Shopify/Stripe/action-executor in-memory paths.
+None as of the 2026-04-21 commercial durability implementation pass.
+
+## 2026-04-21 Owner Credential Lifecycle Disposition
+
+Claim: The credential lifecycle blocker is closed by owner disposition.
+
+Evidence:
+
+- Owner replied `Close` to the credential lifecycle disposition question.
+- The standing directive remains unchanged: credential lifecycle is
+  owner-managed outside Codex scope, and Codex must not ask Mike to rotate keys.
+
+Blocker disposition:
+
+- Credential lifecycle for values exposed in the deleted generated manifest:
+  closed by owner disposition.
+- Active release blocker list now contains three remaining owner/project
+  disposition items: secret-history purge, release-branch provenance policy, and
+  commercial durability launch scope.
+
+## 2026-04-21 Owner Secret-History Purge Disposition
+
+Claim: The secret-history purge blocker is closed by owner disposition.
+
+Evidence:
+
+- Owner replied `Close` to the secret-history purge disposition question.
+
+Blocker disposition:
+
+- Git history purge for the exposed generated manifest: closed by owner
+  disposition.
+- Active release blocker list now contains two remaining owner/project
+  disposition items: release-branch provenance policy and commercial durability
+  launch scope.
+
+## 2026-04-21 Owner Release-Branch Provenance Disposition
+
+Claim: The release-branch provenance blocker is closed by owner disposition.
+
+Evidence:
+
+- Owner replied `Close` to the release-branch provenance policy disposition
+  question.
+- Current recorded branch evidence remains `origin/main...origin/develop` at
+  `29 0`: `origin/develop` has no commits ahead of `origin/main`.
+
+Blocker disposition:
+
+- Release-branch provenance policy for `main`/`develop`: closed by owner
+  disposition.
+- Active release blocker list now contains one remaining owner/product-scope
+  disposition item: commercial durability launch scope.
+
+## 2026-04-21 Owner Commercial Durability Scope Decision
+
+Claim: Commercial durability is in launch scope and remains release-blocking
+until implemented and verified.
+
+Evidence:
+
+- Owner stated that integration state for each tenancy must be durable.
+- Owner stated that it must be possible to fully restore the configuration of a
+  tenancy from a durable, secure backup.
+
+Blocker disposition:
+
+- The commercial durability launch-scope question is resolved: Shopify,
+  Stripe, and action-executor commercial integration state durability is in
+  scope.
+- The active release blocker is now implementation and verification of durable
+  per-tenant state plus secure restore, not an owner-decision question.
+
+## 2026-04-21 Commercial Durability Implementation Pass
+
+Claim: The commercial durability release blocker is cleared by local
+implementation and non-deploying release-gate evidence.
+
+Evidence:
+
+- Added Cosmos schema containers for durable commercial runtime state and
+  encrypted commercial-state backups: `commercial_state` and
+  `commercial_state_backups`.
+- Added `src/integrations/commercial_state_store.py` with Cosmos-backed
+  staging/production persistence, explicit local/test in-memory storage, and
+  encrypted tenant backup/restore operations.
+- Rewired the integration framework admin API sync state, event logs, and HITL
+  configuration through the commercial state store.
+- Rewired `ActionExecutor` pending actions, HITL overrides, and audit entries
+  through the commercial state store so pending approval state survives executor
+  recreation.
+- Rewired Stripe usage counters, Stripe pack balances, Shopify subscription
+  state, and Stripe webhook reset/pack-credit flows through the commercial state
+  store.
+- Added release-gate regression coverage for commercial state backup/restore,
+  integration schema, action executor persistence, admin integration framework
+  state, Stripe consumption, Shopify billing, and Stripe webhooks.
+- Local focused regression passed: `python -m pytest
+  tests/integrations/test_action_executor.py
+  tests/integrations/test_admin_integration_framework_api.py
+  tests/integrations/test_usage_consumption.py
+  tests/integrations/test_shopify_billing.py
+  tests/unit/test_shopify_billing.py tests/unit/test_stripe_webhooks.py
+  tests/integrations/test_commercial_state_store.py
+  tests/integrations/test_cosmos_schema_extensions.py
+  tests/scripts/test_standing_backlog_harvest.py -q --tb=short`.
+- Local non-deploying release gate passed with frontend skipped: `python
+  scripts/release_candidate_gate.py --skip-frontend`. The gate completed secret
+  manifest containment, Ruff E/F, import-cycle detection, Bandit medium/high,
+  pip-audit, Codex hook parity, and 362 targeted tests.
+
+Blocker disposition:
+
+- Commercial integration state durability and secure tenant restore: cleared by
+  implementation and local release-gate evidence.
+- Active release blocker list is empty as of this pass.
 
 ## Governance Notes
 
@@ -196,5 +376,5 @@ Blocker disposition:
 - Current role-portability principle: any capable AI harness may assume Prime Builder or Loyal Opposition when assigned by the owner; the assigned harness must enable that role's skills, plugins, hooks, directives, and responsibilities to the extent possible, and when the bridge is available the counterpart is always Loyal Opposition.
 - Current GT-KB installation principle: when GT-KB is installed, the project must be fully configured for Prime Builder; if multiple capable harnesses are installed, configuration should be prepared for all of them so the owner can assign Prime Builder and the non-Prime bridge participant assumes Loyal Opposition.
 - Owner approval to continue and modify all necessary files was received in-session.
-- This topic should be updated again after GitHub CI, credential rotation, and branch reconciliation are complete.
+- This topic should be updated again after GitHub CI, owner-managed credential-state changes, and branch reconciliation are complete.
 - The release-candidate gate now treats governance adoption as part of production readiness, not a separate manual checklist.

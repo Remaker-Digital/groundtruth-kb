@@ -9,6 +9,12 @@ This document provides active guidance for AI assistants working on the Agent Re
 > **📁 Historical archive** (session logs, technical decisions): `CLAUDE_ARCHIVE.md` — read when investigating historical decisions.
 > **📁 Session memory** (operational patterns, lessons): `memory/MEMORY.md` — loaded automatically via Claude Code's auto-memory system (resolves from `~/.claude/projects/<project-hash>/memory/`, not the repo's `memory/` directory).
 
+### Canonical Terminology (Glossary)
+
+- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared project infrastructure, governance artifacts, and conventions that adopter applications consume. Expanded reference: `docs/gtkb-idp-concept.md`. Full managed glossary (when adopted): `.claude/rules/canonical-terminology.md`.
+- **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
+- **Adopter:** A project that consumes GT-KB (like Agent Red Customer Engagement). Governance flows from GT-KB templates to the adopter via scaffolding and upgrade.
+
 ### CLAUDE.md vs MEMORY.md Boundary
 
 | File | Role | Content | Update frequency |
@@ -166,15 +172,21 @@ At session start, scan `bridge/INDEX.md` for pending work:
 2. **Report** any findings: "Bridge scan: N entries need attention" or "Bridge scan: clear."
 3. **Process** the oldest actionable entry first (GO → implement, NO-GO → revise).
 
-### Session Start: Bridge Poller (Mandatory)
+### Session Start: Bridge Poller (Conditional)
 
-After the initial bridge scan, create a recurring in-session poller:
+The poller is not the bridge. The bridge is the durable handoff/review
+mechanism in `bridge/INDEX.md`; the poller is only a monitoring/activation
+service for separate-harness or asynchronous operation.
+
+After the initial bridge scan, create a recurring in-session poller only when
+Prime Builder and Loyal Opposition are running in separate harnesses or when
+asynchronous monitoring is otherwise needed:
 
 ```
 CronCreate: cron="*/3 * * * *", recurring=true, prompt="Read bridge/INDEX.md. If the latest status on any document is GO or NO-GO that hasn't been actioned, report it and act: GO → implement per work list, NO-GO → read findings and revise. Otherwise report 'Bridge scan: clear.'"
 ```
 
-This ensures Codex responses are detected and processed within 3 minutes throughout the session. The poller is session-scoped and dies when the session ends — this is intentional, since polling is only useful while someone is working. Note: the in-memory scheduler may silently drop jobs during long sessions; if the poller stops firing, recreate it manually.
+When active, this ensures Codex responses are detected and processed within 3 minutes throughout the session. The poller is session-scoped and dies when the session ends - this is intentional, since polling is only useful while someone is working. Note: the in-memory scheduler may silently drop jobs during long sessions; if the poller stops firing, recreate it manually.
 
 ### Session Start: Active Work List (Mandatory)
 
