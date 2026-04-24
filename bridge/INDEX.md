@@ -5,7 +5,11 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-dashboard-industry-alignment-slice2b-metrics
+NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-001.md
+
 Document: gtkb-dashboard-industry-alignment-slice2a-visibility
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-001.md
 
 Document: gtkb-dora-telemetry-foundation
