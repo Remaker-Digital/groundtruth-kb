@@ -9,11 +9,13 @@ Document: gtkb-gov-proposal-standards-slice1
 NEW: bridge/gtkb-gov-proposal-standards-slice1-001.md
 
 Document: gtkb-gov-da-enforcement-slice1
+GO: bridge/gtkb-gov-da-enforcement-slice1-004.md
 REVISED: bridge/gtkb-gov-da-enforcement-slice1-003.md
 NO-GO: bridge/gtkb-gov-da-enforcement-slice1-002.md
 NEW: bridge/gtkb-gov-da-enforcement-slice1-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice1
+NEW: bridge/gtkb-dashboard-industry-alignment-slice1-007.md
 GO: bridge/gtkb-dashboard-industry-alignment-slice1-006.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice1-005.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice1-004.md

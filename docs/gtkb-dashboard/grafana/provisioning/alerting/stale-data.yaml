@@ -1,0 +1,85 @@
+apiVersion: 1
+
+# Authoritative source for this alert rule:
+#   - refresh_runs(started_at, completed_at) per scripts/gtkb_dashboard/schema.sql.
+#   - Same SQL pattern as the Refresh Age stat panel at
+#     scripts/gtkb_dashboard/generate_grafana_dashboard.py (Refresh Age block).
+# Units are minutes. COALESCE(..., 9999) covers the empty refresh_runs case
+# (no refresh has ever completed), which is itself a stale-data condition.
+# Condition: value > 60.
+
+groups:
+  - orgId: 1
+    name: agent-red-data-freshness
+    folder: Agent Red GT-KB
+    interval: 5m
+    rules:
+      - uid: agent-red-stale-data
+        title: Data Freshness (minutes since last refresh)
+        condition: B
+        for: 0s
+        noDataState: Alerting
+        execErrState: Alerting
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: gtkb-dashboard-sqlite
+            model:
+              refId: A
+              datasource:
+                type: frser-sqlite-datasource
+                uid: gtkb-dashboard-sqlite
+              format: table
+              queryType: table
+              rawSql: |
+                SELECT COALESCE(
+                    CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER),
+                    9999
+                ) AS value
+                FROM refresh_runs;
+              rawQueryText: |
+                SELECT COALESCE(
+                    CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER),
+                    9999
+                ) AS value
+                FROM refresh_runs;
+              queryText: |
+                SELECT COALESCE(
+                    CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER),
+                    9999
+                ) AS value
+                FROM refresh_runs;
+              timeColumns: []
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [60]
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    type: last
+                    params: []
+                  type: query
+        annotations:
+          summary: "Agent Red GT-KB dashboard data is more than 60 minutes stale."
+          source_table: refresh_runs
+          threshold_minutes: "60"
+        labels:
+          severity: warning
+          scope: freshness

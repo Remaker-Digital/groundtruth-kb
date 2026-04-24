@@ -94,6 +94,13 @@ def _text_panel(builder: PanelBuilder, title: str, grid: dict[str, int], content
     )
 
 
+FRESHNESS_QUERY = (
+    "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) "
+    "* 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;"
+)
+FRESHNESS_REFID = "F"
+
+
 def _stat_panel(
     builder: PanelBuilder,
     title: str,
@@ -103,13 +110,17 @@ def _stat_panel(
     unit: str = "short",
     decimals: int = 0,
     thresholds: dict[str, Any] | None = None,
+    include_freshness: bool = True,
 ) -> dict[str, Any]:
-    return _panel(
+    targets = [_target(query)]
+    if include_freshness:
+        targets.append(_target(FRESHNESS_QUERY, ref_id=FRESHNESS_REFID))
+    panel = _panel(
         builder,
         title=title,
         panel_type="stat",
         grid=grid,
-        targets=[_target(query)],
+        targets=targets,
         options={
             "colorMode": "background",
             "graphMode": "none",
@@ -134,9 +145,25 @@ def _stat_panel(
                 },
                 "unit": unit,
             },
-            "overrides": [],
+            "overrides": [
+                {
+                    "matcher": {"id": "byFrameRefID", "options": FRESHNESS_REFID},
+                    "properties": [
+                        {"id": "unit", "value": "m"},
+                        {"id": "custom.hidden", "value": False},
+                        {"id": "color", "value": {"mode": "fixed", "fixedColor": "text"}},
+                    ],
+                }
+            ],
         },
     )
+    if include_freshness:
+        panel["description"] = (
+            "Freshness: minutes since the most recent `refresh_runs.completed_at` "
+            "(falls back to `started_at`). Secondary value `Refreshed (m ago)` "
+            "comes from target `F`."
+        )
+    return panel
 
 
 def _bar_gauge_panel(
@@ -354,6 +381,7 @@ def build_dashboard() -> dict[str, Any]:
                         {"color": "red", "value": 180},
                     ],
                 },
+                include_freshness=False,
             ),
             _stat_panel(
                 builder,

@@ -202,6 +202,50 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "Docker Desktop" in package_integration_text
 
 
+def test_stat_panels_surface_per_panel_freshness_secondary_value() -> None:
+    """GTKB-DASHBOARD-001 §C: each value-bearing stat panel must emit a
+    `last_refreshed_at` secondary value (target `F`) sourced from refresh_runs.
+    The Refresh Age panel itself is exempt — its primary value already is the
+    freshness reading, so a second freshness target would be redundant."""
+    dashboard = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
+    dashboard_json = json.loads(dashboard.read_text(encoding="utf-8"))
+
+    def _all_panels(panels: list[dict]) -> list[dict]:
+        out: list[dict] = []
+        for p in panels:
+            out.append(p)
+            out.extend(_all_panels(p.get("panels", [])))
+        return out
+
+    stat_panels = [p for p in _all_panels(dashboard_json["panels"]) if p.get("type") == "stat"]
+    assert stat_panels, "generator must produce at least one stat panel"
+
+    freshness_sql_marker = "FROM refresh_runs"
+    freshness_refid = "F"
+
+    for panel in stat_panels:
+        title = panel["title"]
+        targets = panel.get("targets", [])
+        if title == "Refresh Age":
+            # Refresh Age exemption: primary value already IS the freshness reading.
+            assert all(t.get("refId") != freshness_refid for t in targets), (
+                f"Refresh Age panel must not carry a secondary F target; primary is already the freshness value"
+            )
+            continue
+        freshness_targets = [t for t in targets if t.get("refId") == freshness_refid]
+        assert freshness_targets, f"stat panel {title!r} is missing a freshness secondary target"
+        ft = freshness_targets[0]
+        assert freshness_sql_marker in ft["rawQueryText"], (
+            f"stat panel {title!r} freshness target must query refresh_runs, got: {ft['rawQueryText']!r}"
+        )
+        # Panel must also expose a description explaining the freshness anchor so
+        # reviewers can see where the timestamp comes from without reading JSON.
+        description = panel.get("description", "")
+        assert "refresh_runs" in description and "Freshness" in description, (
+            f"stat panel {title!r} must describe its freshness anchor in `description`; got: {description!r}"
+        )
+
+
 def test_dashboard_launch_path_does_not_require_docker_desktop() -> None:
     compose_text = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     index_text = (REPO_ROOT / "docs" / "gtkb-dashboard" / "index.html").read_text(encoding="utf-8")

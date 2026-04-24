@@ -317,6 +317,38 @@ tests already assert the hook presence. Post-upgrade Agent Red sessions
 will see DELIB search/citation enforcement on `UserPromptSubmit` and
 owner-decision archival on `PostToolUse`.
 
+### GTKB-DASHBOARD-001 - Dashboard industry-alignment Slice 1 (in flight)
+
+**Priority:** filed + implemented 2026-04-24 on owner direction after the
+S306 dashboard review. Post-impl awaiting Loyal Opposition VERIFIED.
+
+**Required outcome:** three-item slice delivered per bridge
+`gtkb-dashboard-industry-alignment-slice1-006` GO:
+
+1. Progressive-enhancement landing page at `docs/gtkb-dashboard/index.html`
+   with fetch-driven KPI snapshot + age badge + explicit open-live button;
+   no auto-redirect. Dark-mode fallback via `prefers-color-scheme`.
+2. Per-panel freshness secondary value (target `F`) on every stat panel
+   except "Refresh Age" itself, sourced from the existing
+   `SELECT ... FROM refresh_runs` pattern already used by the generator.
+3. Alert-rule skeleton under
+   `docs/gtkb-dashboard/grafana/provisioning/alerting/` anchored to
+   authoritative `current_metrics` keys (`release_blockers`,
+   `ci_testing_failing`) and the `refresh_runs` freshness SQL. Validator
+   test asserts exact literals and runs a live refresh fixture to prove
+   the keys are actually emitted by the pipeline.
+
+**Regression visibility:** `tests/scripts/test_gtkb_dashboard_grafana.py`
+4 panel tests; `tests/scripts/test_gtkb_dashboard_alerting.py` 7 tests
+covering structure, exact-literal anchoring, schema-anchored SQL, and
+live-emission proof.
+
+**Slice 2/3 follow-ons:** filed if approved — bridge swimlane panel,
+work-subject selector, coverage/security/CI panels, alert-notifier
+wiring (Slice 2); SLO/error-budget, flow metrics, PR/branch health,
+incident/MTTR (pending `gtkb-dora-telemetry-foundation`), remote
+exposure, WCAG audit (Slice 3).
+
 ### GTKB-GOV-PROPOSAL-STANDARDS - Mechanical enforcement of proposal structure (upstream-routed)
 
 **Priority:** parallel to upstream

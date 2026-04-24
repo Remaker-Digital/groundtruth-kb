@@ -3,59 +3,241 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0; url=http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard">
   <title>Agent Red GT-KB Dashboard</title>
   <style>
+    :root {
+      --bg: #f6f8fa;
+      --surface: #fff;
+      --border: #d5dde3;
+      --fg: #102027;
+      --accent: #006b61;
+      --accent-bg: #103f3a;
+      --muted: #54636d;
+      --badge-fresh: #1a7f37;
+      --badge-stale: #9a6700;
+      --badge-expired: #b42318;
+      --code-bg: #edf1f4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --fg: #c9d1d9;
+        --accent: #2ea1a0;
+        --accent-bg: #0c2826;
+        --muted: #8b949e;
+        --badge-fresh: #3fb950;
+        --badge-stale: #d29922;
+        --badge-expired: #f85149;
+        --code-bg: #1c2128;
+      }
+    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #102027;
-      background: #f6f8fa;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.5;
     }
-
     header {
-      background: #103f3a;
+      background: var(--accent-bg);
       color: #fff;
-      padding: 28px 32px;
+      padding: 24px 32px;
     }
-
+    header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+    header p { margin: 0; opacity: 0.85; }
     main {
-      max-width: 880px;
-      margin: 42px auto;
-      padding: 0 24px;
+      max-width: 960px;
+      margin: 28px auto;
+      padding: 0 20px;
+      display: grid;
+      gap: 20px;
     }
-
     section {
-      background: #fff;
-      border: 1px solid #d5dde3;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+    }
+    section h2 { margin: 0 0 12px; font-size: 1.1rem; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .kpi-grid li {
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 24px;
     }
-
-    a {
-      color: #006b61;
-      font-weight: 650;
+    .kpi-grid .label { font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+    .kpi-grid .value { font-size: 1.4rem; font-weight: 650; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
     }
-
+    .btn {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      background: transparent;
+    }
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn:hover { opacity: 0.9; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+      vertical-align: middle;
+    }
+    .badge.fresh { background: var(--badge-fresh); }
+    .badge.stale { background: var(--badge-stale); }
+    .badge.expired { background: var(--badge-expired); }
     code {
-      background: #edf1f4;
+      background: var(--code-bg);
       border-radius: 4px;
       padding: 2px 6px;
+      font-size: 0.9em;
     }
+    #fallback, #snapshot-meta { color: var(--muted); font-size: 0.9rem; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <header>
     <h1>Agent Red GT-KB Dashboard</h1>
-    <p>The static dashboard has been replaced by the SQLite-backed Grafana dashboard.</p>
+    <p>Static landing. The live Grafana dashboard is available locally when the refresh stack is running.</p>
   </header>
   <main>
-    <section>
-      <p>Open the live dashboard at <a href="http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard">http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard</a>.</p>
-      <p>Install Grafana locally with <code>.\scripts\gtkb_dashboard\install_local_grafana.ps1</code>.</p>
-      <p>Start it from the project root with <code>.\scripts\gtkb_dashboard\start_local_dashboard.ps1</code>.</p>
-      <p>The manual refresh control is available at <a href="http://127.0.0.1:8766/">http://127.0.0.1:8766/</a>.</p>
+    <section aria-labelledby="snapshot-heading">
+      <h2 id="snapshot-heading">Most Recent KPI Snapshot <span id="age-badge" class="badge hidden" aria-live="polite"></span></h2>
+      <p id="snapshot-meta">Loading <code>dashboard-data.json</code>&hellip;</p>
+      <ul id="kpi-grid" class="kpi-grid" aria-live="polite"></ul>
+      <p id="fallback" class="hidden">No snapshot data available. Start the refresh service and local dashboard to populate live KPIs.</p>
+    </section>
+    <section aria-labelledby="live-heading">
+      <h2 id="live-heading">Open Live Dashboard</h2>
+      <p>The live Grafana dashboard provides full panel rendering, alerting, and drill-downs. It runs locally on <code>127.0.0.1:3000</code>.</p>
+      <div class="actions">
+        <a class="btn primary" href="http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard">Open live dashboard</a>
+        <a class="btn" href="http://127.0.0.1:8766/">Open refresh control</a>
+      </div>
+    </section>
+    <section aria-labelledby="setup-heading">
+      <h2 id="setup-heading">Local Setup</h2>
+      <p>First-time setup (PowerShell):</p>
+      <pre><code>.\scripts\gtkb_dashboard\install_local_grafana.ps1</code></pre>
+      <p>Start the dashboard:</p>
+      <pre><code>.\scripts\gtkb_dashboard\start_local_dashboard.ps1</code></pre>
+      <p>Stop the dashboard:</p>
+      <pre><code>.\scripts\gtkb_dashboard\stop_local_dashboard.ps1</code></pre>
     </section>
   </main>
+  <script>
+    (function () {
+      var META_LABELS = {
+        regression_release_blocker_count: "Release Blockers",
+        backlog_active_items: "Active Backlog",
+        membase_open_work_items: "Open WIs",
+        deliberation_archive_current_total: "DELIBs",
+        specification_current_total: "Specifications",
+        drift_changed_path_count: "Drift Paths",
+        pytest_file_count: "Test Files",
+        contention_actionable_bridge_count: "Bridge Attention",
+        skill_template_count: "Skill Templates"
+      };
+
+      function selectLatest(payload) {
+        if (!payload) return null;
+        if (Array.isArray(payload)) return payload.length ? payload[payload.length - 1] : null;
+        if (Array.isArray(payload.history) && payload.history.length) return payload.history[payload.history.length - 1];
+        if (payload.model) return payload.model;
+        return payload;
+      }
+
+      function ageBadge(generatedAt) {
+        if (!generatedAt) return null;
+        var ts = Date.parse(generatedAt);
+        if (isNaN(ts)) return null;
+        var minutes = Math.floor((Date.now() - ts) / 60000);
+        var klass = "fresh";
+        if (minutes >= 60) klass = "expired";
+        else if (minutes >= 15) klass = "stale";
+        return { klass: klass, text: minutes + "m ago" + (klass === "expired" ? " (stale)" : "") };
+      }
+
+      function clearChildren(node) {
+        while (node.firstChild) node.removeChild(node.firstChild);
+      }
+
+      function appendKpi(grid, labelText, valueText) {
+        var li = document.createElement("li");
+        var label = document.createElement("div");
+        label.className = "label";
+        label.textContent = labelText;
+        var value = document.createElement("div");
+        value.className = "value";
+        value.textContent = String(valueText);
+        li.appendChild(label);
+        li.appendChild(value);
+        grid.appendChild(li);
+      }
+
+      function render(snapshot) {
+        var grid = document.getElementById("kpi-grid");
+        var meta = document.getElementById("snapshot-meta");
+        var badge = document.getElementById("age-badge");
+        var fallback = document.getElementById("fallback");
+        clearChildren(grid);
+
+        if (!snapshot) {
+          meta.textContent = "";
+          fallback.classList.remove("hidden");
+          return;
+        }
+
+        var generatedAt = snapshot.generated_at || (snapshot.data_freshness && snapshot.data_freshness.generated_at) || null;
+        meta.textContent = generatedAt ? ("Snapshot generated at " + generatedAt) : "Snapshot loaded (no timestamp).";
+        var badgeInfo = ageBadge(generatedAt);
+        if (badgeInfo) {
+          badge.className = "badge " + badgeInfo.klass;
+          badge.textContent = badgeInfo.text;
+          badge.classList.remove("hidden");
+        }
+
+        var rendered = 0;
+        Object.keys(META_LABELS).forEach(function (key) {
+          if (snapshot[key] === undefined || snapshot[key] === null) return;
+          appendKpi(grid, META_LABELS[key], snapshot[key]);
+          rendered++;
+        });
+        if (rendered === 0) fallback.classList.remove("hidden");
+        else fallback.classList.add("hidden");
+      }
+
+      fetch("dashboard-data.json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (payload) { render(selectLatest(payload)); });
+    })();
+  </script>
 </body>
 </html>
