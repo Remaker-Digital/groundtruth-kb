@@ -349,6 +349,94 @@ wiring (Slice 2); SLO/error-budget, flow metrics, PR/branch health,
 incident/MTTR (pending `gtkb-dora-telemetry-foundation`), remote
 exposure, WCAG audit (Slice 3).
 
+### GTKB-DASHBOARD-002 - Dashboard industry-alignment Slice 2 (bridge swimlane, subject selector, coverage/security/CI, alert notifier)
+
+**Priority:** after `GTKB-DASHBOARD-001` VERIFIED. Filed as follow-on in the
+Slice 1 GO `-006` review.
+
+**Required outcome:** bridge-state swimlane panel showing every open thread's
+latest status + age-in-state; work-subject selector (toggle application vs
+GT-KB scope); coverage trend panel (line + branch, over time);
+security-posture panel (open CVEs, Dependabot, pip-audit, Scout); GitHub
+Actions workflow embed; alert-routing notifier wiring (email / Slack / Teams)
+for the stubs filed in Slice 1.
+
+**Regression visibility:** each new panel extends
+`tests/scripts/test_gtkb_dashboard_grafana.py` with pinned assertions;
+notifier wiring covered by contract tests against the Grafana alerting API
+fixtures.
+
+### GTKB-DASHBOARD-003 - Dashboard industry-alignment Slice 3 (SLO, flow metrics, PR health, incident/MTTR, remote exposure, WCAG)
+
+**Priority:** after `GTKB-DASHBOARD-002` VERIFIED and after
+`GTKB-DORA-001` lands the prerequisite telemetry.
+
+**Required outcome:** SLO / error-budget model with burn-rate alerts; flow
+metrics with WIP aging; branch / PR health panel; incident / on-call /
+MTTA / MTTR panel (depends on `incidents` table from `GTKB-DORA-001`);
+remote read-only dashboard exposure path (snapshot URL or auth gateway);
+WCAG 2.1 AA accessibility audit applying the same bar the app's CI already
+gates.
+
+**Regression visibility:** SLO burn-rate alert fires against fixture data;
+flow metrics recomputed from live refresh history; PR panel reads GitHub
+Actions / GraphQL; incident panel schema + backfill tests;
+`tests/scripts/test_gtkb_dashboard_alerting.py` extended for notifier
+contract; a11y audit reported against declared WCAG 2.1 AA criteria.
+
+### GTKB-DORA-001 - DORA telemetry foundation (deployable_change + rollback/hotfix linkage + incidents table)
+
+**Priority:** blocks any honest DORA panel (`GTKB-DORA-002`). Filed as
+follow-on to the Slice 1 NO-GO `-002` Finding 3 (current
+`delivery_timeline_events` has 3 production rows, 0 with commit linkage,
+no rollback/hotfix linkage, no incidents table — DORA four keys cannot be
+computed without fabricating semantics).
+
+**Required outcome:** extend `scripts/gtkb_dashboard/schema.sql` with a
+`deployable_change` identity column on `delivery_timeline_events` linking
+commits to deployments; add rollback / hotfix linkage columns marking which
+prior deploy a rollback targets; add an `incidents` table with
+detect / mitigate / close timestamps and incident-to-deploy linkage;
+extend `scripts/gtkb_dashboard/refresh_dashboard_db.py` to populate the new
+columns; backfill existing events where possible.
+
+**Regression visibility:** schema migration test; refresh-pipeline test
+emits the new columns for sample events; fixture tests for each of the
+four DORA keys' input shapes (deployment frequency, lead time, change
+failure rate, MTTR) so downstream `GTKB-DORA-002` can compute honestly.
+
+### GTKB-DORA-002 - DORA four-keys panels (consumer of GTKB-DORA-001)
+
+**Priority:** after `GTKB-DORA-001` VERIFIED. Strictly no DORA panels
+before the telemetry foundation lands.
+
+**Required outcome:** four stat panels computing deployment frequency
+(last 30d), lead time for changes (median, last 30 deploys), change
+failure rate (% requiring hotfix or rollback within 24h, last 90d), and
+MTTR (median incident-detect to incident-close, last 90d). Nulls with
+annotations where data is insufficient; no fabrication.
+
+**Regression visibility:** extends `test_gtkb_dashboard_grafana.py` with
+pinned assertions for the four panels; fixture-refresh against a seeded
+telemetry DB confirms each query returns the expected shape.
+
+### GTKB-DASHBOARD-RETENTION - Dashboard history retention policy (contingent)
+
+**Priority:** contingent — only filed if `MAX_HISTORY=200` at
+`scripts/gtkb_dashboard/refresh_dashboard_db.py:346-349` ever proves
+insufficient for a diagnostic or review workflow. Currently bounds history
+to ~10 hours at the 3-minute snapshot cadence, which suffices for all
+observed use cases.
+
+**Required outcome (if triggered):** add env-configurable
+`GTKB_DASHBOARD_HISTORY_MAX_ROWS` and optional time-based
+`GTKB_DASHBOARD_HISTORY_RETENTION_DAYS` expiry in `_append_snapshot`;
+preserve the row cap as the primary bound; document the new env knobs in
+`docs/gtkb-dashboard/grafana/README.md`.
+
+**Regression visibility:** boundary test proves snapshots within the
+retention window are preserved exactly and older ones are removed.
+
 ### GTKB-GOV-PROPOSAL-STANDARDS - Mechanical enforcement of proposal structure (upstream-routed)
 
 **Priority:** parallel to upstream
@@ -406,6 +494,52 @@ VERIFIED on the new hook artifact.
 **Regression visibility (deferred to upstream):** upstream scaffold
 tests will assert hook presence; upstream hook tests will cover the
 section-requirement table enumerated in the Slice 1 proposal.
+
+### GTKB-GOV-PROPOSAL-STANDARDS-SLICE2 - Test-claim re-run verifier
+
+**Priority:** filed after `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 VERIFIED.
+
+**Required outcome:** extend the upstream `hook.bridge-proposal-standards`
+family with a verifier that parses claimed `pytest` output blocks in
+post-implementation reports and re-runs the same commands in a fixture
+environment, failing the pre-commit gate when the real output diverges
+from the claimed output. Would have caught Phase 7 `-009`'s "44 tests
+pass" stale claim (live was "7 failed, 16 passed").
+
+**Regression visibility:** upstream regression that seeds a stale claim
+and asserts the verifier rejects it.
+
+### GTKB-GOV-PROPOSAL-STANDARDS-SLICE3 - Work-item-ID collision gate
+
+**Priority:** filed after `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 VERIFIED.
+
+**Required outcome:** pre-review hook that cross-references any
+`GTKB-ISOLATION-NNN` / `GTKB-DASHBOARD-NNN` / `GTKB-GOV-NNN` mention
+in a proposal against `memory/work_list.md` entries. Flags collisions
+where a proposal routes deferred work to an ID already assigned to a
+different item. Would have caught Phase 7 `-005`'s routing of §D to
+`GTKB-ISOLATION-016` (already Phase 8 execution).
+
+**Regression visibility:** test that a proposal citing an already-assigned
+ID triggers the gate; aligned routing passes.
+
+### GTKB-GOV-PROPOSAL-STANDARDS-SLICE4 - /gtkb-propose scaffolding skill
+
+**Priority:** filed after `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 VERIFIED.
+Lower priority than Slices 2-3 since it is convenience rather than
+enforcement.
+
+**Required outcome:** interactive skill `/gtkb-propose` that walks Prime
+through a compliant proposal scaffold — slug + work-item name + slice
+number + optional scope dimensions. Runs `search_deliberations()` and
+injects relevant DELIB-IDs into a `## Prior Deliberations` stub.
+Pre-populates all required sections with TODO placeholders. Emits a
+self-review checklist before finalizing the file. Adopts upstream via
+GT-KB skill scaffold.
+
+**Regression visibility:** skill invocation test seeded with fixtures;
+output file matches the required-section contract enforced by
+`hook.bridge-proposal-standards`.
 
 ### GTKB-ISOLATION-001 - DONE - Create detailed Phase 1 plan: artifact authority and dependency matrix
 
