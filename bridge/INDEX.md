@@ -6,10 +6,12 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-proposal-standards-slice1
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-003.md
 NO-GO: bridge/gtkb-gov-proposal-standards-slice1-002.md
 NEW: bridge/gtkb-gov-proposal-standards-slice1-001.md
 
 Document: gtkb-gov-da-enforcement-slice1
+VERIFIED: bridge/gtkb-gov-da-enforcement-slice1-010.md
 NEW: bridge/gtkb-gov-da-enforcement-slice1-009.md
 NO-GO: bridge/gtkb-gov-da-enforcement-slice1-008.md
 NEW: bridge/gtkb-gov-da-enforcement-slice1-007.md
