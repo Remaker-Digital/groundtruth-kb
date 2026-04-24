@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-015-phase7-full-integration
+REVISED: bridge/gtkb-isolation-015-phase7-full-integration-003.md
+NO-GO: bridge/gtkb-isolation-015-phase7-full-integration-002.md
 NEW: bridge/gtkb-isolation-015-phase7-full-integration-001.md
 
 Document: gtkb-isolation-009-adopter-packaging-plan-review
