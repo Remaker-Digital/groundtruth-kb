@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-dashboard-industry-alignment-slice1
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice1-003.md
+NO-GO: bridge/gtkb-dashboard-industry-alignment-slice1-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice1-001.md
 
 Document: gtkb-isolation-015-phase7-full-integration
