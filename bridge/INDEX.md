@@ -22,6 +22,11 @@ NEW: bridge/gtkb-scoped-service-boundary-baseline-implementation-001.md
 
 
 Document: gtkb-environment-boundary-baseline-implementation
+REVISED: bridge/gtkb-environment-boundary-baseline-implementation-007.md
+NO-GO: bridge/gtkb-environment-boundary-baseline-implementation-006.md
+NEW: bridge/gtkb-environment-boundary-baseline-implementation-005.md
+NO-GO: bridge/gtkb-environment-boundary-baseline-implementation-004.md
+NEW: bridge/gtkb-environment-boundary-baseline-implementation-003.md
 GO: bridge/gtkb-environment-boundary-baseline-implementation-002.md
 NEW: bridge/gtkb-environment-boundary-baseline-implementation-001.md
 
