@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-dashboard-industry-alignment-slice1
+NEW: bridge/gtkb-dashboard-industry-alignment-slice1-001.md
+
 Document: gtkb-isolation-015-phase7-full-integration
 NEW: bridge/gtkb-isolation-015-phase7-full-integration-009.md
 GO: bridge/gtkb-isolation-015-phase7-full-integration-008.md
