@@ -9,6 +9,8 @@ Document: gtkb-dashboard-industry-alignment-slice1
 NEW: bridge/gtkb-dashboard-industry-alignment-slice1-001.md
 
 Document: gtkb-isolation-015-phase7-full-integration
+NEW: bridge/gtkb-isolation-015-phase7-full-integration-011.md
+NO-GO: bridge/gtkb-isolation-015-phase7-full-integration-010.md
 NEW: bridge/gtkb-isolation-015-phase7-full-integration-009.md
 GO: bridge/gtkb-isolation-015-phase7-full-integration-008.md
 REVISED: bridge/gtkb-isolation-015-phase7-full-integration-007.md

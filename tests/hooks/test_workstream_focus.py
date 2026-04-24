@@ -585,6 +585,86 @@ def test_detect_counterpart_state_different_role_warns(tmp_path, monkeypatch) ->
     assert any("prime-builder" in msg and "loyal-opposition" in msg for msg in result["warnings"])
 
 
+def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+
+    codex_record = tmp_path / ".codex" / "operating-role.md"
+    claude_record = tmp_path / ".claude" / "operating-role.md"
+    for record, role in (
+        (codex_record, "loyal-opposition"),
+        (claude_record, "prime-builder"),
+    ):
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(f"active_role: {role}\n", encoding="utf-8")
+    codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
+    claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_guard.write_text(
+        json.dumps({"current_subject": module.FOCUS_GTKB_INFRASTRUCTURE}) + "\n",
+        encoding="utf-8",
+    )
+    claude_guard.write_text(
+        json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {"codex": codex_record, "claude": claude_record},
+    )
+    monkeypatch.setattr(
+        module,
+        "HARNESS_LIFECYCLE_GUARDS",
+        {"codex": codex_guard, "claude": claude_guard},
+    )
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
+
+    result = module.detect_counterpart_state(REPO_ROOT)
+    assert result["subject_mismatch"] is True
+    assert any(
+        module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg
+        for msg in result["warnings"]
+    )
+
+
+def test_detect_counterpart_state_subject_match_no_warning(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+
+    codex_record = tmp_path / ".codex" / "operating-role.md"
+    claude_record = tmp_path / ".claude" / "operating-role.md"
+    for record, role in (
+        (codex_record, "loyal-opposition"),
+        (claude_record, "prime-builder"),
+    ):
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(f"active_role: {role}\n", encoding="utf-8")
+    codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
+    claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    for guard in (codex_guard, claude_guard):
+        guard.write_text(
+            json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
+            encoding="utf-8",
+        )
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {"codex": codex_record, "claude": claude_record},
+    )
+    monkeypatch.setattr(
+        module,
+        "HARNESS_LIFECYCLE_GUARDS",
+        {"codex": codex_guard, "claude": claude_guard},
+    )
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
+
+    result = module.detect_counterpart_state(REPO_ROOT)
+    assert result["subject_mismatch"] is False
+    assert not any("work subject" in msg for msg in result["warnings"])
+
+
 def test_detect_counterpart_state_missing_counterpart_no_crash(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")

@@ -755,8 +755,25 @@ def _read_active_role_from_file(path: Path) -> str | None:
     return value or None
 
 
+def _read_counterpart_subject(path: Path) -> str | None:
+    """Read a harness's lifecycle-guard JSON and return its recorded subject.
+
+    Returns ``None`` when the file is missing, unreadable, malformed, or does
+    not record a current_subject.
+    """
+
+    try:
+        data = json.loads(path.expanduser().read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    subject = data.get("current_subject")
+    return subject if isinstance(subject, str) and subject else None
+
+
 def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]:
-    """Detect role-slot conflicts with the counterpart harness (§E).
+    """Detect role-slot and subject conflicts with the counterpart harness (§E).
 
     Returns ``{"counterpart_present", "same_role_slot", "subject_mismatch",
     "warnings"}``. Warnings are only emitted when counterpart state files are
@@ -795,6 +812,27 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
                 )
 
     subject_mismatch = False
+    our_subject: str | None = None
+    try:
+        our_subject = str(load_state(project_root).get("current_subject") or "") or None
+    except Exception:
+        our_subject = None
+    for harness, guard_path in HARNESS_LIFECYCLE_GUARDS.items():
+        if harness == current_harness:
+            continue
+        counterpart_subject = _read_counterpart_subject(guard_path)
+        if (
+            counterpart_subject is not None
+            and our_subject is not None
+            and counterpart_subject != our_subject
+        ):
+            subject_mismatch = True
+            warnings.append(
+                f"counterpart `{harness}` records work subject=`{counterpart_subject}` "
+                f"while `{current_harness or 'local'}` is on `{our_subject}` — "
+                "verify both harnesses intend this split."
+            )
+
     return {
         "counterpart_present": counterpart_present,
         "same_role_slot": same_role_slot,
