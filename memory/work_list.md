@@ -258,6 +258,47 @@ counterpart detection, and split application vs GT-KB verification lanes.
 **Execution note:** the completed Phase 1 through Phase 7 planning records
 remain below as the governing design baseline for the execution queue above.
 
+### GTKB-GOV-DA-ENFORCEMENT - Mechanical enforcement of Deliberation Archive citation discipline
+
+**Priority:** queued after `GTKB-ISOLATION-015` Slice 2; ahead of
+`GTKB-ISOLATION-016` Phase 8 execution. Owner-directed 2026-04-24 during
+the S306 DA-effectiveness audit.
+
+**Problem statement:** `.claude/rules/deliberation-protocol.md` mandates
+Prime Builder pre-proposal DELIB search + citation in a `## Prior
+Deliberations` section, pre-review DELIB search by Loyal Opposition, and
+immediate archival of owner decisions as `source_type=owner_conversation`.
+Audit evidence (S306, 2026-04-24): 0 of 7 Prime proposals in this session
+cited DELIBs; only 1 `owner_conversation` DELIB captured despite ≥3 owner
+decisions; only 12% of DELIBs have `work_item_id` linkage and 18% have
+`spec_id` linkage. The protocol lives in a read-on-demand rules file with
+no mechanical enforcement.
+
+**Required outcome:** land mechanical enforcement in three slices so DA
+citation becomes automatic rather than procedural.
+
+- **Slice 1 (`gtkb-gov-da-enforcement-slice1`, filed 2026-04-24):**
+  pre-commit hook `.claude/hooks/require-prior-deliberations.py` that
+  rejects Prime-authored bridge files missing a `## Prior Deliberations`
+  section with at least one `DELIB-` citation or an explicit
+  no-prior-found opt-out. Wired into the existing pre-commit gate chain
+  alongside test-deletion / assertion / architectural / credential / TSX
+  gates. Seven-case regression test.
+- **Slice 2 (follow-on, `gtkb-gov-da-enforcement-slice2`):**
+  `UserPromptSubmit` hook reminding Prime to run `search_deliberations()`
+  when drafting a bridge file; archive-on-AskUserQuestion helper that
+  captures owner decisions as `owner_conversation` DELIBs immediately.
+- **Slice 3 (follow-on, `gtkb-gov-da-enforcement-slice3`):** pre-commit
+  gate for LO review files; retroactive backfill of historical bridge
+  files for implicit DELIB references; dashboard tile showing DELIB
+  capture rate for the last 7 days; `gtkb-gov-da-linkage-uplift`
+  backfill of `work_item_id` / `spec_id` linkage on the 649 `lo_review`
+  DELIBs from the WI-3162 batch.
+
+**Regression visibility:** the Slice 1 hook fails commits that introduce
+Prime bridge files without Prior Deliberations. Post-Slice-1 audit
+should show 100% Prime proposal compliance on all new bridge files.
+
 ### GTKB-ISOLATION-001 - DONE - Create detailed Phase 1 plan: artifact authority and dependency matrix
 
 **Priority:** TOP. Owner directive 2026-04-22: application-subject sessions must be unable by default to alter GT-KB product artifacts, while GT-KB-subject sessions may retain broader access where needed. This is the first planning phase in the application/GT-KB isolation program.
