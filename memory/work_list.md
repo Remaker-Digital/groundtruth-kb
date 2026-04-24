@@ -258,11 +258,11 @@ counterpart detection, and split application vs GT-KB verification lanes.
 **Execution note:** the completed Phase 1 through Phase 7 planning records
 remain below as the governing design baseline for the execution queue above.
 
-### GTKB-GOV-DA-ENFORCEMENT - Mechanical enforcement of Deliberation Archive citation discipline
+### GTKB-GOV-DA-ENFORCEMENT - Mechanical enforcement of Deliberation Archive citation discipline (re-routed to upstream)
 
-**Priority:** queued after `GTKB-ISOLATION-015` Slice 2; ahead of
-`GTKB-ISOLATION-016` Phase 8 execution. Owner-directed 2026-04-24 during
-the S306 DA-effectiveness audit.
+**Priority:** passive tracking behind upstream
+`gtkb-da-governance-completeness-implementation` (in `groundtruth-kb`
+repo). Owner-directed 2026-04-24 during the S306 DA-effectiveness audit.
 
 **Problem statement:** `.claude/rules/deliberation-protocol.md` mandates
 Prime Builder pre-proposal DELIB search + citation in a `## Prior
@@ -274,30 +274,48 @@ decisions; only 12% of DELIBs have `work_item_id` linkage and 18% have
 `spec_id` linkage. The protocol lives in a read-on-demand rules file with
 no mechanical enforcement.
 
-**Required outcome:** land mechanical enforcement in three slices so DA
-citation becomes automatic rather than procedural.
+**Routing decision (2026-04-24, bridge `gtkb-gov-da-enforcement-slice1`
+`-002` NO-GO + `-003` REVISED-1):** the initially proposed Agent
+Red-local pre-commit hook (`.claude/hooks/require-prior-deliberations.py`)
+was withdrawn because:
 
-- **Slice 1 (`gtkb-gov-da-enforcement-slice1`, filed 2026-04-24):**
-  pre-commit hook `.claude/hooks/require-prior-deliberations.py` that
-  rejects Prime-authored bridge files missing a `## Prior Deliberations`
-  section with at least one `DELIB-` citation or an explicit
-  no-prior-found opt-out. Wired into the existing pre-commit gate chain
-  alongside test-deletion / assertion / architectural / credential / TSX
-  gates. Seven-case regression test.
-- **Slice 2 (follow-on, `gtkb-gov-da-enforcement-slice2`):**
-  `UserPromptSubmit` hook reminding Prime to run `search_deliberations()`
-  when drafting a bridge file; archive-on-AskUserQuestion helper that
-  captures owner decisions as `owner_conversation` DELIBs immediately.
-- **Slice 3 (follow-on, `gtkb-gov-da-enforcement-slice3`):** pre-commit
-  gate for LO review files; retroactive backfill of historical bridge
-  files for implicit DELIB references; dashboard tile showing DELIB
-  capture rate for the last 7 days; `gtkb-gov-da-linkage-uplift`
-  backfill of `work_item_id` / `spec_id` linkage on the 649 `lo_review`
-  DELIBs from the WI-3162 batch.
+1. Pre-commit enforcement fires too late — the bridge INDEX entry makes
+   a proposal reviewable BEFORE any commit step, so commit-time gates
+   miss the hot-loop. The correct surface is author-time
+   `UserPromptSubmit`.
+2. GT-KB already has the canonical enforcement artifacts reserved under
+   `gtkb-da-governance-completeness-implementation`: `delib-preflight-gate.py`
+   stub at `templates/hooks/`, registry entries in
+   `templates/managed-artifacts.toml` with settings registrations on
+   `UserPromptSubmit` + `PostToolUse`, scaffold tests in
+   `tests/test_scaffold_settings.py`. Prior bridge decision
+   `agent-red-session-wrap-automation-004.md` rules this work must route
+   through that thread to avoid duplicate authority.
+3. The proposed wiring file (`scripts/pre_commit/run_quality_guardrails.py`)
+   does not exist in either Agent Red or groundtruth-kb.
 
-**Regression visibility:** the Slice 1 hook fails commits that introduce
-Prime bridge files without Prior Deliberations. Post-Slice-1 audit
-should show 100% Prime proposal compliance on all new bridge files.
+**Required outcome:** implementation is owned upstream. Agent Red
+receives the enforcement through GT-KB scaffold + upgrade, not via a
+local hook. When the upstream thread
+`gtkb-da-governance-completeness-implementation` VERIFIED, Agent Red
+runs `gt project upgrade` (or equivalent) to pull the hooks, which then
+fire on this repo's `UserPromptSubmit` / `PostToolUse` events per the
+managed-artifacts.toml registrations.
+
+**Interim Agent Red override:** none planned by default. If the owner
+decides an interim local override is needed before upstream lands, it
+would be filed as a new bridge proposal (candidate approach: extend the
+existing `.claude/hooks/formal-artifact-approval-gate.py` which already
+runs on `UserPromptSubmit`). Not scheduled at time of this entry.
+
+**Tracking:** awaiting
+`gtkb-da-governance-completeness-implementation` GO / VERIFIED in the
+upstream `groundtruth-kb` repo.
+
+**Regression visibility (deferred to upstream):** upstream scaffold
+tests already assert the hook presence. Post-upgrade Agent Red sessions
+will see DELIB search/citation enforcement on `UserPromptSubmit` and
+owner-decision archival on `PostToolUse`.
 
 ### GTKB-ISOLATION-001 - DONE - Create detailed Phase 1 plan: artifact authority and dependency matrix
 

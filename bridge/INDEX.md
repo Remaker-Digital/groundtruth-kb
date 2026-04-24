@@ -6,9 +6,12 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-da-enforcement-slice1
+REVISED: bridge/gtkb-gov-da-enforcement-slice1-003.md
+NO-GO: bridge/gtkb-gov-da-enforcement-slice1-002.md
 NEW: bridge/gtkb-gov-da-enforcement-slice1-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice1
+REVISED: bridge/gtkb-dashboard-industry-alignment-slice1-005.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice1-004.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice1-003.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice1-002.md
