@@ -537,7 +537,7 @@ behavior (existing-ID pass, new-same-commit-ID rejected, exempt tag
 permitted with audit-log side effect) and schema-linter behavior
 (missing field, wrong enum, unresolved `depends_on`, duplicate ID).
 
-### GTKB-GOV-BACKLOG-DISCIPLINE-SLICE2 - Backlog state automation (upstream-routed)
+### GTKB-GOV-BACKLOG-DISCIPLINE-SLICE2 - Backlog state automation + ordering-freshness enforcement (upstream-routed)
 
 **Priority:** file after `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1` VERIFIED.
 
@@ -555,11 +555,31 @@ permitted with audit-log side effect) and schema-linter behavior
 - Dependency-violation warning: when a bridge `NEW` proposal references
   an entry whose `depends_on` is not yet `done`, surface a warning (not
   a block). Prevents silent ordering mistakes.
+- **Ordering-freshness validation (added per owner S306 direction):**
+  - Session-start / pre-commit check flags any entry whose `status` is
+    `in-flight` or `ready` but whose latest referenced bridge thread
+    has since reached `VERIFIED`. Caught the stale "TOP after Phase 3
+    VERIFIED" state for `GTKB-ISOLATION-011` through `-014` and the
+    "in flight" state on `GTKB-DASHBOARD-001` in the S306 audit. Would
+    have prevented ~10 minutes of manual hygiene.
+  - Flags entries whose `priority:` text still says "TOP after X" when
+    X is now `done`. Auto-suggest rewrite (still blocks commit pending
+    human confirm — never silently rewrites priority text).
+  - Flags "TOP" overload: if more than N entries carry priority=`TOP`
+    simultaneously, warn and require the author to resolve sub-ordering
+    before committing.
+  - Regenerates the top-of-file "Next Actionable Items" table on commit
+    (sorted by typed priority + dependency graph). Drift between the
+    table and the structured field blocks fails the commit.
 
 **Regression visibility (deferred to upstream):** upstream regression
 that seeds entries with mis-transitioned states and asserts the
 automation corrects them; dependency-violation warning fires on a
-fixture where a parent is in-flight.
+fixture where a parent is in-flight; ordering-freshness validator fires
+on a fixture where a status=`in-flight` entry's bridge thread has reached
+`VERIFIED`; TOP-overload warning fires when `N+1` entries carry
+`priority=TOP`; next-actions table is regenerated deterministically from
+the structured field blocks.
 
 ### GTKB-GOV-PROPOSAL-STANDARDS - Mechanical enforcement of proposal structure (upstream-routed)
 
