@@ -11,43 +11,153 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tomllib
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.workstream_focus import render_startup_focus_lines, startup_focus_snapshot
+except ModuleNotFoundError:  # pragma: no cover - direct script execution path
+    from workstream_focus import render_startup_focus_lines, startup_focus_snapshot
+
+try:
+    from scripts import gtkb_overlay as _gtkb_overlay
+except ImportError:  # pragma: no cover - direct script execution path
+    # Broader than ModuleNotFoundError: direct `python scripts/session_self_initialization.py`
+    # can raise ImportError("cannot import name 'gtkb_overlay' from 'scripts'") even when
+    # a 'scripts' namespace package is importable without this submodule bound. Catching
+    # ImportError covers both the "package missing" and "name missing" cases.
+    import gtkb_overlay as _gtkb_overlay  # type: ignore[no-redef]
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DASHBOARD_DIR = PROJECT_ROOT / "docs" / "gtkb-dashboard"
 DEFAULT_HISTORY_PATH = PROJECT_ROOT / "memory" / "gtkb-dashboard-history.json"
+DEFAULT_USER_STARTUP_PREFERENCES_PATH = Path.home() / ".codex" / "agent-red-hooks" / "session-startup-preferences.json"
+GRAFANA_DASHBOARD_URL = "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
+DASHBOARD_OPEN_MODE_HARNESS = "harness_browser"
+DASHBOARD_OPEN_MODE_SYSTEM = "system_default_browser"
 PDF_EXPORT_FILENAME = "agent-red-project-dashboard.pdf"
 MAX_HISTORY = 200
 DASHBOARD_SCOPE_VERSION = "agent_red_v1"
-DASHBOARD_SCOPE_NOTE = (
-    "Agent Red product/project dashboard. GT-KB is treated as pre-existing "
-    "implementation infrastructure and is excluded from primary product KPIs."
-)
+DASHBOARD_SCOPE_NOTE = "Agent Red product/project dashboard."
+DEFAULT_RELEASE_BRANCH = "main"
+STARTUP_SERVICE_CONTRACT_VERSION = "agent-red-startup-service-v2"
+STARTUP_FRESHNESS_CONTRACT_VERSION = "agent-red-startup-freshness-v1"
+OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
-        "role_assignment": "active AI harness assigned by owner until further notice",
-        "bridge": "available when the owner requests counterpart review through bridge/INDEX.md",
-        "role_mapping_source": ".claude/rules/prime-builder-role.md",
+        "role_assignment": "active AI harness assigned by owner through durable operating-role record",
+        "bridge": "always available through bridge/INDEX.md and checked at session startup",
+        "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
+        "role_mapping_source": ".claude/rules/operating-role.md",
     },
     "acting-prime-builder": {
         "assumed_role": "Acting Prime Builder",
         "role_assignment": "active AI harness assigned by owner for this session",
-        "bridge": "unavailable for non-standard session unless owner restores it",
+        "bridge": "always available through bridge/INDEX.md and checked at session startup",
+        "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
         "role_mapping_source": ".claude/rules/acting-prime-builder.md",
     },
     "loyal-opposition": {
         "assumed_role": "Loyal Opposition",
         "role_assignment": "active AI harness assigned by owner for counterpart review",
-        "bridge": "available through bridge/INDEX.md for latest NEW or REVISED entries",
-        "role_mapping_source": "AGENTS.md",
+        "bridge": "always available through bridge/INDEX.md and checked at session startup",
+        "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
+        "role_mapping_source": ".claude/rules/operating-role.md",
     },
 }
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
+
+
+def _truthy_preference(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+    return False
+
+
+def _user_startup_preferences_path() -> Path:
+    override = os.environ.get("GTKB_STARTUP_PREFERENCES_PATH")
+    return Path(override).expanduser() if override else DEFAULT_USER_STARTUP_PREFERENCES_PATH
+
+
+def _read_user_startup_preferences(path: Path | None = None) -> dict[str, Any]:
+    preference_path = path or _user_startup_preferences_path()
+    try:
+        if not preference_path.is_file():
+            return {}
+        data = json.loads(preference_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _should_open_dashboard_on_session_start(path: Path | None = None) -> bool:
+    env_override = os.environ.get("GTKB_OPEN_DASHBOARD_ON_SESSION_START")
+    if env_override is not None:
+        return _truthy_preference(env_override)
+    preferences = _read_user_startup_preferences(path)
+    return _truthy_preference(preferences.get("open_dashboard_on_session_start"))
+
+
+def _normalize_dashboard_open_mode(value: Any) -> str:
+    if not isinstance(value, str):
+        return DASHBOARD_OPEN_MODE_HARNESS
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized in {"system", "system_browser", "system_default", "system_default_browser", "os", "os_default"}:
+        return DASHBOARD_OPEN_MODE_SYSTEM
+    return DASHBOARD_OPEN_MODE_HARNESS
+
+
+def _dashboard_open_mode(path: Path | None = None) -> str:
+    env_override = os.environ.get("GTKB_DASHBOARD_OPEN_MODE")
+    if env_override:
+        return _normalize_dashboard_open_mode(env_override)
+    preferences = _read_user_startup_preferences(path)
+    return _normalize_dashboard_open_mode(preferences.get("dashboard_open_mode"))
+
+
+def _dashboard_opening_state(path: Path | None = None) -> dict[str, Any]:
+    mode = _dashboard_open_mode(path)
+    mechanism = (
+        "operating system default browser"
+        if mode == DASHBOARD_OPEN_MODE_SYSTEM
+        else "harness-controlled browser connector"
+    )
+    return {
+        "startup_open_requested": _should_open_dashboard_on_session_start(path),
+        "mode": mode,
+        "mechanism": mechanism,
+        "system_browser_opt_in_required": True,
+    }
+
+
+def _open_dashboard_url_in_system_browser(url: str) -> bool:
+    try:
+        if sys.platform.startswith("win") and hasattr(os, "startfile"):
+            os.startfile(url)  # type: ignore[attr-defined]
+            return True
+        opener = shutil.which("xdg-open") or shutil.which("open")
+        if not opener:
+            return False
+        subprocess.Popen([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except Exception:
+        return False
+
+
+def _maybe_open_dashboard_on_session_start(url: str) -> bool:
+    if not _should_open_dashboard_on_session_start():
+        return False
+    if _dashboard_open_mode() == DASHBOARD_OPEN_MODE_SYSTEM:
+        return _open_dashboard_url_in_system_browser(url)
+    return True
+
 
 NON_TERMINAL_WORK_ITEM_STATUSES = {
     "blocked",
@@ -60,6 +170,7 @@ NON_TERMINAL_WORK_ITEM_STATUSES = {
     "unresolved",
 }
 ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
+REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED"}
 AGENT_RED_SCOPE_INCLUDED = {
     "agent_red_product",
     "agent_red_release",
@@ -292,35 +403,41 @@ def _startup_pruning_scan(
         or bridge_maintenance.get("pruned_from_index")
         or (bridge_maintenance.get("comment_compaction") or {}).get("removed_comment_lines")
     ):
-        candidates.append({
-            "type": "completed",
-            "target": "bridge/INDEX.md",
-            "action": (
-                "Archived terminal bridge state and compacted oversized historical "
-                "comment blocks from the active startup index."
-            ),
-            "evidence": bridge_maintenance,
-        })
+        candidates.append(
+            {
+                "type": "completed",
+                "target": "bridge/INDEX.md",
+                "action": (
+                    "Archived terminal bridge state and compacted oversized historical "
+                    "comment blocks from the active startup index."
+                ),
+                "evidence": bridge_maintenance,
+            }
+        )
 
     for profile in largest:
         if int(profile.get("bytes", 0)) >= STARTUP_PRUNING_LARGE_FILE_BYTES:
-            candidates.append({
-                "type": "candidate",
-                "target": profile["path"],
-                "action": "Review for summarization, archival split, or index-first loading.",
-                "evidence": {
-                    "bytes": profile["bytes"],
-                    "lines": profile["lines"],
-                },
-            })
+            candidates.append(
+                {
+                    "type": "candidate",
+                    "target": profile["path"],
+                    "action": "Review for summarization, archival split, or index-first loading.",
+                    "evidence": {
+                        "bytes": profile["bytes"],
+                        "lines": profile["lines"],
+                    },
+                }
+            )
 
     if total_bytes >= STARTUP_PRUNING_TOTAL_WARN_BYTES:
-        candidates.append({
-            "type": "candidate",
-            "target": "session startup corpus",
-            "action": "Reduce default startup reads to compact indices plus targeted detail files.",
-            "evidence": {"total_bytes": total_bytes, "file_count": len(available_profiles)},
-        })
+        candidates.append(
+            {
+                "type": "candidate",
+                "target": "session startup corpus",
+                "action": "Reduce default startup reads to compact indices plus targeted detail files.",
+                "evidence": {"total_bytes": total_bytes, "file_count": len(available_profiles)},
+            }
+        )
 
     return {
         "scope": "startup_loaded_files_and_coordination_state",
@@ -335,6 +452,34 @@ def _startup_pruning_scan(
 
 def _now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _parse_iso8601(value: str | None) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _iso_is_ordered(earlier: str | None, later: str | None) -> bool:
+    earlier_dt = _parse_iso8601(earlier)
+    later_dt = _parse_iso8601(later)
+    if earlier_dt is None or later_dt is None:
+        return False
+    return earlier_dt <= later_dt
+
+
+def _iso_elapsed_ms(start: str | None, end: str | None) -> int | None:
+    start_dt = _parse_iso8601(start)
+    end_dt = _parse_iso8601(end)
+    if start_dt is None or end_dt is None:
+        return None
+    return int((end_dt - start_dt).total_seconds() * 1000)
 
 
 def _read_text(path: Path) -> str:
@@ -432,6 +577,8 @@ def classify_dashboard_scope(row: dict[str, Any] | sqlite3.Row) -> str:
 
     if identifier.startswith("AR-") or "agent red project dashboard" in text:
         return "agent_red_operations"
+    if "top for the next prime builder session" in text and "agent red" in text:
+        return "agent_red_operations"
     if identifier.startswith("GTKB-") and any(
         term in text
         for term in (
@@ -525,7 +672,9 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
             "specifications": {
                 "current_total": len(agent_red_specs),
                 "raw_current_total": len(specifications),
-                "status_counts": dict(sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())),
+                "status_counts": dict(
+                    sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())
+                ),
                 "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in agent_red_specs).items())),
                 "scope_counts": _scope_counts(specifications),
                 "scope_confidence": "agent_red_current_heuristic",
@@ -586,6 +735,9 @@ def _parse_active_work_items(work_list_text: str) -> list[dict[str, str]]:
                 items.append(current)
             heading = line[4:].strip()
             body_lines = []
+            if re.search(r"\b(DONE|PAUSED|OBSOLETE|RETIRED)\b", heading, re.IGNORECASE):
+                current = None
+                continue
             match = re.match(r"(?P<id>[A-Z0-9-]+)\s+[—-]\s+(?P<title>.+)", heading)
             if match:
                 current = {"id": match.group("id"), "title": match.group("title")}
@@ -619,9 +771,11 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
 
 
 def _bridge_metrics(project_root: Path) -> dict[str, Any]:
+    index_path = project_root / "bridge" / "INDEX.md"
+    index_text = _read_text(index_path)
     entries: list[dict[str, str]] = []
     current_document: str | None = None
-    for line in _read_text(project_root / "bridge" / "INDEX.md").splitlines():
+    for line in index_text.splitlines():
         if line.startswith("Document: "):
             current_document = line.split(": ", 1)[1].strip()
             continue
@@ -647,6 +801,7 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
     visible_entries = [entry for entry in classified if entry["scope"] in AGENT_RED_PRIMARY_SCOPE_INCLUDED]
     counts = Counter(entry["status"] for entry in visible_entries)
     actionable = [entry for entry in visible_entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES]
+    raw_review_queue = [entry for entry in entries if entry["status"] in REVIEW_QUEUE_BRIDGE_STATUSES]
     return {
         "latest_status_counts": dict(sorted(counts.items())),
         "actionable_count": len(actionable),
@@ -654,8 +809,15 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         "oldest_actionable": actionable[:5],
         "raw_latest_status_counts": dict(sorted(Counter(entry["status"] for entry in entries).items())),
         "raw_actionable_count": sum(1 for entry in entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES),
+        "raw_review_queue_count": len(raw_review_queue),
+        "raw_review_queue_by_status": dict(sorted(Counter(entry["status"] for entry in raw_review_queue).items())),
         "scope_counts": dict(sorted(Counter(entry["scope"] for entry in classified).items())),
         "scope_confidence": "agent_red_current_heuristic",
+        "source": "bridge/INDEX.md",
+        "source_read_mode": "direct_file_read",
+        "source_authority": "live bridge/INDEX.md is the sole authoritative bridge queue source",
+        "derived_artifacts_authoritative": False,
+        "live_index_available": index_path.is_file(),
     }
 
 
@@ -905,7 +1067,9 @@ def _git_checkout_info(path: Path) -> dict[str, Any]:
         "sha": sha["stdout"],
         "short_sha": short_sha["stdout"] if short_sha["ok"] else None,
         "remote_url": remote["stdout"] if remote["ok"] else None,
-        "dirty_path_count": len([line for line in status["stdout"].splitlines() if line.strip()]) if status["ok"] else None,
+        "dirty_path_count": len([line for line in status["stdout"].splitlines() if line.strip()])
+        if status["ok"]
+        else None,
         "error": None,
     }
 
@@ -922,12 +1086,9 @@ def _gtkb_upgrade_plan(project_root: Path) -> dict[str, Any]:
         return {"available": False, "error": str(exc), "action_count": None, "action_counts": {}, "sample_actions": []}
 
     action_counts = dict(sorted(Counter(action.action for action in actions).items()))
-    mutating_actions = [
-        action for action in actions if action.action not in {"warning", "informational"}
-    ]
+    mutating_actions = [action for action in actions if action.action not in {"warning", "informational"}]
     sample_actions = [
-        {"action": action.action, "file": action.file, "reason": action.reason}
-        for action in mutating_actions[:12]
+        {"action": action.action, "file": action.file, "reason": action.reason} for action in mutating_actions[:12]
     ]
     return {
         "available": True,
@@ -973,13 +1134,20 @@ def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
     unreleased_upstream_changes = bool(
         latest_main.get("sha") and local_main_sha and latest_main.get("sha") != local_main_sha
     )
-    if latest_main.get("sha") and local_main_sha and latest_main.get("sha") == local_main_sha and latest_release.get("tag"):
+    if (
+        latest_main.get("sha")
+        and local_main_sha
+        and latest_main.get("sha") == local_main_sha
+        and latest_release.get("tag")
+    ):
         count_result = _command_output(
             ["git", "rev-list", "--count", f"{latest_release['tag']}..HEAD"],
             Path(str(checkout_path)),
             timeout=8,
         )
-        unreleased_commit_count = int(count_result["stdout"]) if count_result["ok"] and count_result["stdout"].isdigit() else None
+        unreleased_commit_count = (
+            int(count_result["stdout"]) if count_result["ok"] and count_result["stdout"].isdigit() else None
+        )
     else:
         unreleased_commit_count = None
 
@@ -992,8 +1160,8 @@ def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
     else:
         status = "current_release"
 
-    plan_command = 'gt project upgrade --dry-run --dir .'
-    apply_command = 'gt project upgrade --apply --dir .'
+    plan_command = "gt project upgrade --dry-run --dir ."
+    apply_command = "gt project upgrade --apply --dir ."
     fallback_prefix = 'python -c "from groundtruth_kb.cli import main; main()"'
     return {
         "status": status,
@@ -1014,8 +1182,12 @@ def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
         "unreleased_upstream_changes_available": unreleased_upstream_changes or (unreleased_commit_count or 0) > 0,
         "unreleased_commit_count": unreleased_commit_count,
         "gt_cli_available": _command_available("gt"),
-        "plan_command": plan_command if _command_available("gt") else f"{fallback_prefix} project upgrade --dry-run --dir .",
-        "apply_command": apply_command if _command_available("gt") else f"{fallback_prefix} project upgrade --apply --dir .",
+        "plan_command": plan_command
+        if _command_available("gt")
+        else f"{fallback_prefix} project upgrade --dry-run --dir .",
+        "apply_command": apply_command
+        if _command_available("gt")
+        else f"{fallback_prefix} project upgrade --apply --dir .",
         "apply_enabled": False,
         "apply_gate": "Static dashboard cannot execute local shell. Apply requires owner approval, clean/acknowledged git state, dry-run review, and post-upgrade tests.",
         "upgrade_plan": upgrade_plan,
@@ -1181,8 +1353,15 @@ def _workflow_run(
     workflows: dict[str, dict[str, Any]],
     filename: str,
     fallback_name: str | None = None,
+    branch: str | None = None,
 ) -> dict[str, Any] | None:
     workflow_name = str(workflows.get(filename, {}).get("name") or fallback_name or "")
+    if branch:
+        for run in runs.get("runs", []):
+            run_workflow_name = str(run.get("workflowName") or run.get("name") or "")
+            if run_workflow_name == workflow_name and run.get("headBranch") == branch:
+                return run
+        return None
     return runs.get("runs_by_workflow", {}).get(workflow_name)
 
 
@@ -1235,7 +1414,9 @@ def _recent_git_commits(project_root: Path, limit: int = 12) -> list[dict[str, A
         if len(parts) != 5:
             continue
         sha, short_sha, committed_at, author, subject = parts
-        described = _command_output(["git", "describe", "--tags", "--always", "--abbrev=8", sha], project_root, timeout=4)
+        described = _command_output(
+            ["git", "describe", "--tags", "--always", "--abbrev=8", sha], project_root, timeout=4
+        )
         commits.append(
             {
                 "sha": sha,
@@ -1260,12 +1441,17 @@ def _image_refs_from_file(path: Path) -> list[dict[str, str]]:
 def _workflow_stage(workflow_name: str, run_name: str = "") -> str:
     text = f"{workflow_name} {run_name}".lower()
     if "production" in text or re.search(r"\bprod\b", text):
-        return "production_deployment" if "deploy" in text or "release" in text or "upgrade" in text else "production_test"
+        return (
+            "production_deployment" if "deploy" in text or "release" in text or "upgrade" in text else "production_test"
+        )
     if "staging" in text:
         return "staging_deployment" if "deploy" in text or "release" in text or "upgrade" in text else "staging_test"
     if "build" in text or "container" in text or "docker" in text:
         return "build"
-    if any(term in text for term in ("test", "lint", "security", "sonar", "coverage", "accessibility", "chromatic", "quality")):
+    if any(
+        term in text
+        for term in ("test", "lint", "security", "sonar", "coverage", "accessibility", "chromatic", "quality")
+    ):
         return "test"
     if "deploy" in text or "release" in text or "upgrade" in text:
         return "deployment"
@@ -1388,7 +1574,11 @@ def _delivery_timeline(project_root: Path, infrastructure: dict[str, Any]) -> di
         if not path.is_file():
             continue
         refs = _image_refs_from_file(path)
-        version = ", ".join(sorted({ref["version"] for ref in refs})) or _version_from_text(_read_text(path)) or "parameterized"
+        version = (
+            ", ".join(sorted({ref["version"] for ref in refs}))
+            or _version_from_text(_read_text(path))
+            or "parameterized"
+        )
         rows.append(
             {
                 "timestamp": datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat().replace("+00:00", "Z"),
@@ -1426,11 +1616,6 @@ def _delivery_timeline(project_root: Path, infrastructure: dict[str, Any]) -> di
         "version_manifest": version_manifest,
         "stage_summary": summary,
         "timeline": rows[:160],
-        "source_note": (
-            "Commit evidence comes from local git log; build/test evidence comes from GitHub Actions when gh is "
-            "authenticated; deployment evidence comes from local staging/production scripts and manifests unless a "
-            "deployment workflow/run is available."
-        ),
     }
 
 
@@ -1501,7 +1686,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
         "accessibility.yml",
     ]
     required_runs = [
-        _workflow_run(gh_runs, workflows, filename)
+        _workflow_run(gh_runs, workflows, filename, branch=DEFAULT_RELEASE_BRANCH)
         for filename in required_workflow_files
         if filename in workflow_set
     ]
@@ -1523,10 +1708,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
         and gh_auth_status == "authenticated"
     )
     partially_configured = (
-        remote.get("present")
-        or bool(workflow_names)
-        or github_plugin_detected
-        or _command_available("gh")
+        remote.get("present") or bool(workflow_names) or github_plugin_detected or _command_available("gh")
     )
     integrations = {
         "github": {
@@ -1535,8 +1717,10 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
             "status": "ready" if ready else "partial" if partially_configured else "not_configured",
             "scope": "implementation_infrastructure",
             "health": parent_health if gh_runs.get("available") else "live_state_unavailable",
+            "queried_at": gh_runs.get("queried_at"),
+            "workflow_runs_available": bool(gh_runs.get("available")),
             "latest_run_summary": (
-                f"{len(required_runs)} required workflow runs checked; health={parent_health}"
+                f"{len(required_runs)} required {DEFAULT_RELEASE_BRANCH} workflow runs checked; health={parent_health}"
                 if gh_runs.get("available")
                 else "Latest workflow run state unavailable."
             ),
@@ -1552,6 +1736,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
             "github_plugin_detected": github_plugin_detected,
             "gh_cli_available": _command_available("gh"),
             "gh_auth_status": gh_auth_status,
+            "release_branch": DEFAULT_RELEASE_BRANCH,
             "latest_run_source": "gh run list" if gh_runs.get("available") else gh_runs.get("reason"),
             "latest_run_repository": gh_runs.get("repository"),
             "workflow_runs": gh_runs.get("runs", [])[:100],
@@ -1566,7 +1751,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
                 f"release gate: {'yes' if 'release-candidate-gate.yml' in workflow_set else 'no'}",
             ],
             "artifacts": ["GitHub Actions runs", "uploaded CI artifacts", "PR checks"],
-            "gaps": [] if gh_runs.get("available") else ["Latest workflow run state was not available during generation."],
+            "gaps": []
+            if gh_runs.get("available")
+            else ["Latest workflow run state was not available during generation."],
             "state_source": "AGENT_RED_GITHUB_REPO or local git remote, .github/workflows, local harness plugin cache, gh CLI status, and gh run list when available",
         }
     }
@@ -1601,7 +1788,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["ruff_lint_format"] = _integration(
         order=40,
         display_name="Ruff Lint / Format",
-        status=_status_from_requirements(["lint.yml" in workflow_set, "ruff check" in lint_text, "ruff format" in lint_text]),
+        status=_status_from_requirements(
+            ["lint.yml" in workflow_set, "ruff check" in lint_text, "ruff format" in lint_text]
+        ),
         workflow_file="lint.yml",
         latest_run=_workflow_run(gh_runs, workflows, "lint.yml"),
         gate_role="Static Python correctness and formatting gate.",
@@ -1634,7 +1823,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["bandit"] = _integration(
         order=70,
         display_name="Bandit",
-        status=_status_from_requirements(["security-scan.yml" in workflow_set, "bandit" in security_text, "[tool.bandit]" in pyproject_text]),
+        status=_status_from_requirements(
+            ["security-scan.yml" in workflow_set, "bandit" in security_text, "[tool.bandit]" in pyproject_text]
+        ),
         workflow_file="security-scan.yml",
         latest_run=_workflow_run(gh_runs, workflows, "security-scan.yml"),
         gate_role="Python security linting.",
@@ -1667,7 +1858,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["accessibility_axe"] = _integration(
         order=100,
         display_name="axe-core Accessibility",
-        status=_status_from_requirements(["accessibility.yml" in workflow_set, (project_root / "tests" / "accessibility").is_dir()]),
+        status=_status_from_requirements(
+            ["accessibility.yml" in workflow_set, (project_root / "tests" / "accessibility").is_dir()]
+        ),
         workflow_file="accessibility.yml",
         latest_run=_workflow_run(gh_runs, workflows, "accessibility.yml"),
         gate_role="WCAG 2.1 AA accessibility enforcement.",
@@ -1691,7 +1884,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["visual_regression"] = _integration(
         order=120,
         display_name="Playwright Visual Regression",
-        status=_status_from_requirements(["visual-regression.yml" in workflow_set, (project_root / "tests" / "provider_visual").is_dir()]),
+        status=_status_from_requirements(
+            ["visual-regression.yml" in workflow_set, (project_root / "tests" / "provider_visual").is_dir()]
+        ),
         workflow_file="visual-regression.yml",
         latest_run=_workflow_run(gh_runs, workflows, "visual-regression.yml"),
         gate_role="Provider/admin screenshot baseline generation.",
@@ -1719,7 +1914,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["openapi_compatibility"] = _integration(
         order=140,
         display_name="OpenAPI Compatibility",
-        status=_status_from_requirements(["openapi-compat" in python_tests_text, "@comparest/cli" in python_tests_text]),
+        status=_status_from_requirements(
+            ["openapi-compat" in python_tests_text, "@comparest/cli" in python_tests_text]
+        ),
         workflow_file="python-tests.yml",
         latest_run=_workflow_run(gh_runs, workflows, "python-tests.yml"),
         gate_role="API schema compatibility regression check.",
@@ -1755,7 +1952,10 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
         order=170,
         display_name="Locust Performance",
         status=_status_from_requirements(
-            [(project_root / "tests" / "performance" / "locustfile.py").is_file(), _dependency_declared(project_root, "locust")],
+            [
+                (project_root / "tests" / "performance" / "locustfile.py").is_file(),
+                _dependency_declared(project_root, "locust"),
+            ],
             manual=True,
         ),
         gate_role="Manual/local load and latency testing capability.",
@@ -1766,7 +1966,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["mutation_testing"] = _integration(
         order=180,
         display_name="Mutation Testing",
-        status=_status_from_requirements(["[tool.mutmut]" in pyproject_text, _dependency_declared(project_root, "mutmut")], manual=True),
+        status=_status_from_requirements(
+            ["[tool.mutmut]" in pyproject_text, _dependency_declared(project_root, "mutmut")], manual=True
+        ),
         gate_role="Session-scoped test oracle quality check.",
         remediation="Run mutation testing on changed modules, strengthen assertions for surviving mutants, and record the mutation score in session or release evidence.",
         evidence=["mutmut configured in pyproject.toml", "mutmut dependency declared"],
@@ -1775,7 +1977,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["contract_testing"] = _integration(
         order=190,
         display_name="Pact / Contract Testing",
-        status=_status_from_requirements([_package_has_dependency(widget_package, "@pact-foundation/pact")], manual=True),
+        status=_status_from_requirements(
+            [_package_has_dependency(widget_package, "@pact-foundation/pact")], manual=True
+        ),
         gate_role="Consumer/provider contract testing capability.",
         remediation="Add or run Pact contract verification for widget/provider boundaries and publish pact results or broker status before treating this as an automated gate.",
         evidence=["@pact-foundation/pact dependency present in widget package"],
@@ -1784,7 +1988,9 @@ def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dic
     integrations["property_testing"] = _integration(
         order=200,
         display_name="Hypothesis Property Tests",
-        status=_status_from_requirements([_dependency_declared(project_root, "hypothesis"), "property:" in pyproject_text], manual=True),
+        status=_status_from_requirements(
+            [_dependency_declared(project_root, "hypothesis"), "property:" in pyproject_text], manual=True
+        ),
         gate_role="Property-based test capability through pytest.",
         remediation="Use Hypothesis for changed logic with broad input space, then run the relevant property-marked pytest target and capture failures as regression tests.",
         evidence=["hypothesis dependency declared", "pytest property marker configured"],
@@ -1915,16 +2121,59 @@ def _dashboard_intelligence(
     ci_status = "red" if failing_integrations else "yellow" if unknown_integrations else "green"
     governance_status = "red" if bridge_actions else "yellow" if scaffold_actions else "green"
     drift_status = "red" if drift_count > 25 else "yellow" if drift_count else "green"
-    gtkb_status = "yellow" if scaffold_actions or upgrade_posture.get("unreleased_upstream_changes_available") else "green"
+    gtkb_status = (
+        "yellow" if scaffold_actions or upgrade_posture.get("unreleased_upstream_changes_available") else "green"
+    )
     data_status = "yellow" if unknown_integrations else "green"
     health = [
-        _health_pill("Project Health", "red" if release_blockers or failing_integrations else drift_status, f"{release_blockers + len(failing_integrations)} issues", "Release blockers plus failing integrations."),
-        _health_pill("Release Readiness", release_status, f"{release_blockers} blockers", "Open release-readiness blockers from the governed evidence file."),
-        _health_pill("CI / Testing", ci_status, f"{len(failing_integrations)} failing", "Live GitHub Actions health where available."),
-        _health_pill("Security", "red" if any(item.get("display_name") in {"Semgrep SAST", "Bandit", "pip-audit", "Docker Scout"} and item.get("health") == "failing" for item in integrations.values()) else "green", "scan posture", "Security and supply-chain workflow state."),
-        _health_pill("Governance", governance_status, f"{bridge_actions} bridge items", "Actionable bridge entries and GT-KB scaffold drift."),
-        _health_pill("GT-KB", gtkb_status, str(upgrade_posture.get("status")), "Installed GT-KB package/scaffold and upstream posture."),
-        _health_pill("Data Freshness", data_status, "live probes", "Whether network-backed and local probes returned current evidence."),
+        _health_pill(
+            "Project Health",
+            "red" if release_blockers or failing_integrations else drift_status,
+            f"{release_blockers + len(failing_integrations)} issues",
+            "Release blockers plus failing integrations.",
+        ),
+        _health_pill(
+            "Release Readiness",
+            release_status,
+            f"{release_blockers} blockers",
+            "Open release-readiness blockers from the governed evidence file.",
+        ),
+        _health_pill(
+            "CI / Testing",
+            ci_status,
+            f"{len(failing_integrations)} failing",
+            "Live GitHub Actions health where available.",
+        ),
+        _health_pill(
+            "Security",
+            "red"
+            if any(
+                item.get("display_name") in {"Semgrep SAST", "Bandit", "pip-audit", "Docker Scout"}
+                and item.get("health") == "failing"
+                for item in integrations.values()
+            )
+            else "green",
+            "scan posture",
+            "Security and supply-chain workflow state.",
+        ),
+        _health_pill(
+            "Governance",
+            governance_status,
+            f"{bridge_actions} bridge items",
+            "Actionable bridge entries and GT-KB scaffold drift.",
+        ),
+        _health_pill(
+            "GT-KB",
+            gtkb_status,
+            str(upgrade_posture.get("status")),
+            "Installed GT-KB package/scaffold and upstream posture.",
+        ),
+        _health_pill(
+            "Data Freshness",
+            data_status,
+            "live probes",
+            "Whether network-backed and local probes returned current evidence.",
+        ),
     ]
 
     action_center: list[dict[str, Any]] = []
@@ -1936,7 +2185,11 @@ def _dashboard_intelligence(
                 "action": f"Repair {item.get('display_name')}",
                 "why": item.get("latest_run_summary") or "Integration is failing.",
                 "remediation": item.get("remediation"),
-                "shortcut": _shortcut("Open GitHub Actions", "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions", "web"),
+                "shortcut": _shortcut(
+                    "Open GitHub Actions",
+                    "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions",
+                    "web",
+                ),
                 "source": "Testing Service / Tool Integrations",
             }
         )
@@ -2039,7 +2292,11 @@ def _dashboard_intelligence(
             "failing": len(failing_integrations),
             "manual": len(manual_integrations),
             "unknown": len(unknown_integrations),
-            "ready_or_passing": sum(1 for item in integrations.values() if item.get("health") in {"passing", "configured"} or item.get("status") == "ready"),
+            "ready_or_passing": sum(
+                1
+                for item in integrations.values()
+                if item.get("health") in {"passing", "configured"} or item.get("status") == "ready"
+            ),
         },
         "data_freshness": {
             "generated_at": generated_at,
@@ -2064,15 +2321,45 @@ def _dashboard_intelligence(
             _shortcut("Open release readiness", "memory/release-readiness.md"),
             _shortcut("Open standing backlog", "memory/work_list.md"),
             _shortcut("Open bridge index", "bridge/INDEX.md"),
-            _shortcut("Open GitHub Actions", "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions", "web"),
+            _shortcut(
+                "Open GitHub Actions", "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions", "web"
+            ),
             _shortcut("Open GT-KB upstream", "https://github.com/Remaker-Digital/groundtruth-kb", "web"),
         ],
     }
 
 
-def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str = "prime-builder") -> dict[str, Any]:
+def operating_role_path(project_root: Path = PROJECT_ROOT) -> Path:
+    return project_root / OPERATING_ROLE_RELATIVE_PATH
+
+
+def discover_role_profile(project_root: Path = PROJECT_ROOT) -> str:
+    """Read the durable role assignment for fresh-session startup."""
+
+    path = operating_role_path(project_root)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return "prime-builder"
+
+    match = re.search(r"(?im)^\s*active_role\s*:\s*`?([a-z][a-z0-9-]*)`?\s*$", text)
+    if not match:
+        return "prime-builder"
+
+    role_profile = match.group(1).strip().lower()
+    return role_profile if role_profile in ROLE_PROFILES else "prime-builder"
+
+
+def _role_profile_or_discovered(project_root: Path, role_profile: str | None = None) -> str:
+    if role_profile:
+        return role_profile if role_profile in ROLE_PROFILES else "prime-builder"
+    return discover_role_profile(project_root)
+
+
+def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str | None = None) -> dict[str, Any]:
     """Collect the complete startup disclosure model without writing files."""
 
+    resolved_role_profile = _role_profile_or_discovered(project_root, role_profile)
     generated_at = _now_iso()
     database = _database_metrics(project_root)
     backlog, top_actions = _backlog_metrics(project_root)
@@ -2083,9 +2370,7 @@ def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str = "
     test_files = sorted((project_root / "tests").rglob("test_*.py"))
     plugins = _plugin_inventory()
     agent_red_test_files = [
-        path
-        for path in test_files
-        if _path_matches(path.relative_to(project_root).as_posix(), AGENT_RED_PATH_PREFIXES)
+        path for path in test_files if _path_matches(path.relative_to(project_root).as_posix(), AGENT_RED_PATH_PREFIXES)
     ]
     metrics = {
         "backlog": backlog,
@@ -2138,7 +2423,9 @@ def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str = "
 
     return {
         "generated_at": generated_at,
-        "role": ROLE_PROFILES.get(role_profile, ROLE_PROFILES["prime-builder"]),
+        "role": ROLE_PROFILES[resolved_role_profile],
+        "role_profile": resolved_role_profile,
+        "dashboard_opening": _dashboard_opening_state(),
         "governance_stance": [
             "Strict GOV enforcement where mechanically available",
             "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
@@ -2160,6 +2447,8 @@ def build_startup_model(project_root: Path = PROJECT_ROOT, role_profile: str = "
             "hook_files": [path.name for path in hook_files],
             "hook_registrations": _hook_inventory(project_root),
         },
+        "workstream_focus": startup_focus_snapshot(project_root),
+        "session_overlay": _safe_overlay_status(project_root),
         "dashboard_requirements": {
             "spec_id": "SPEC-PROJECT-DASHBOARD-KPI-LINK-001",
             "scope_version": DASHBOARD_SCOPE_VERSION,
@@ -2219,11 +2508,7 @@ def _load_history(history_path: Path) -> list[dict[str, Any]]:
         return []
     if not isinstance(data, list):
         return []
-    return [
-        row
-        for row in data
-        if isinstance(row, dict) and row.get("scope_version") == DASHBOARD_SCOPE_VERSION
-    ]
+    return [row for row in data if isinstance(row, dict) and row.get("scope_version") == DASHBOARD_SCOPE_VERSION]
 
 
 def _write_history(
@@ -2310,14 +2595,10 @@ def _historical_agent_red_backfill(project_root: Path) -> list[dict[str, Any]]:
         tests = [row for row in states["tests"].values() if _is_agent_red_scope(row)]
         deliberations = [row for row in states["deliberations"].values() if _is_agent_red_scope(row)]
         open_work_items = [
-            row
-            for row in work_items
-            if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
+            row for row in work_items if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
         ]
         pytest_files = {
-            _normalize_path(str(row.get("test_file") or ""))
-            for row in tests
-            if str(row.get("test_file") or "").strip()
+            _normalize_path(str(row.get("test_file") or "")) for row in tests if str(row.get("test_file") or "").strip()
         }
 
         snapshots.append(
@@ -2359,6 +2640,15 @@ def _sentence_fragment(value: Any, default: str) -> str:
     return text.rstrip(".")
 
 
+def _protocol_review_queue_count(contention: dict[str, Any]) -> int:
+    """Count latest NEW/REVISED bridge entries without dashboard scope filtering."""
+
+    if "raw_review_queue_count" in contention:
+        return int(contention.get("raw_review_queue_count") or 0)
+    raw_status_counts = contention.get("raw_latest_status_counts", {})
+    return sum(int(raw_status_counts.get(status, 0) or 0) for status in REVIEW_QUEUE_BRIDGE_STATUSES)
+
+
 def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
     metrics = model["metrics"]
     intelligence = model.get("dashboard_intelligence", {})
@@ -2377,14 +2667,18 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
     top_actions = model["top_priority_actions"]
     release_blocker_count = metrics["regression"].get("release_blocker_count") or 0
     drift_count = metrics["drift"].get("changed_path_count") or 0
-    new_count = int(metrics["contention"].get("latest_status_counts", {}).get("NEW", 0) or 0)
-    revised_count = int(metrics["contention"].get("latest_status_counts", {}).get("REVISED", 0) or 0)
-    actionable_review_count = new_count + revised_count
+    raw_status_counts = metrics["contention"].get("raw_latest_status_counts", {})
+    continuation_go_count = int(raw_status_counts.get("GO", 0) or 0)
+    continuation_no_go_count = int(raw_status_counts.get("NO-GO", 0) or 0)
+    continuation_response_count = continuation_go_count + continuation_no_go_count
+    actionable_review_count = _protocol_review_queue_count(metrics["contention"])
     first_blocker = _sentence_fragment(
         _first_text(blockers, "run the release gate and confirm no blocker evidence is stale"),
         "run the release gate and confirm no blocker evidence is stale",
     )
-    first_integration = failing_integrations[0] if failing_integrations else unknown_integrations[0] if unknown_integrations else {}
+    first_integration = (
+        failing_integrations[0] if failing_integrations else unknown_integrations[0] if unknown_integrations else {}
+    )
     first_integration_name = _sentence_fragment(
         first_integration.get("display_name"),
         "the highest-risk testing integration",
@@ -2405,10 +2699,13 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
     token_option_summary = "; ".join(item.rstrip(".") for item in token_reduction_options) or (
         "prefer dashboard and index-first reads before loading full artifacts"
     )
-    action_summary = "; ".join(
-        f"{item.get('id')}: {_sentence_fragment(item.get('title'), 'standing backlog priority')}"
-        for item in top_actions[:3]
-    ) or "No active standing-backlog items found"
+    action_summary = (
+        "; ".join(
+            f"{item.get('id')}: {_sentence_fragment(item.get('title'), 'standing backlog priority')}"
+            for item in top_actions[:3]
+        )
+        or "No active standing-backlog items found"
+    )
     file_bridge_summary = (
         f"file bridge scan shows {actionable_review_count} latest NEW/REVISED entr"
         f"{'y' if actionable_review_count == 1 else 'ies'}"
@@ -2431,7 +2728,7 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
         {
             "label": "Top Priority Actions",
             "reason": (
-                f"The standing backlog already identifies the three highest-priority governed actions for this session, and the "
+                f"The standing backlog already identifies the visible highest-priority governed actions for this session, and the "
                 f"{file_bridge_summary}."
             ),
             "prompt": (
@@ -2474,14 +2771,6 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
             ),
         },
         {
-            "label": "Continue Last Session",
-            "reason": "The action center identifies the most immediate current-session continuation point.",
-            "prompt": (
-                "Continue from the last session using the dashboard action center. Start with "
-                f"{first_action.get('action', backlog_label)}; explain current evidence, next command, and expected verification."
-            ),
-        },
-        {
             "label": "Clean For Internal Review",
             "reason": f"{drift_count} changed path(s) are visible in dashboard drift.",
             "prompt": (
@@ -2495,6 +2784,51 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
             "prompt": (
                 "Choose work from the standing backlog. Start with "
                 f"{backlog_label}; restate the governing evidence, required approvals, implementation scope, and verification plan."
+            ),
+        },
+        {
+            "label": "Commit and push to GitHub",
+            "reason": "Local changes can be packaged into an evidence-backed GitHub update when the working tree is ready.",
+            "prompt": (
+                "Prepare a scoped commit and push it to GitHub. Inventory changed paths, separate unrelated work, run focused "
+                "verification, commit only the intended scope, push the branch, and report the resulting GitHub evidence."
+            ),
+        },
+        {
+            "label": "Merge to main, build and push to the staging environment",
+            "reason": "A reviewed GitHub branch can advance into the staging release lane after required checks and approvals are green.",
+            "prompt": (
+                "Merge the reviewed branch to main, build the release artifact, and push it to the staging environment. Confirm "
+                "required GitHub checks, release-gate evidence, branch provenance, build output, and staging deployment status."
+            ),
+        },
+        {
+            "label": "Execute end-to-end tests in the staging environment",
+            "reason": "Staging must prove the candidate through live end-to-end coverage before production promotion.",
+            "prompt": (
+                "Execute the staging end-to-end test plan. Verify environment health, run the governed E2E suites against staging, "
+                "capture failures with evidence, and update release-readiness records with the staging result."
+            ),
+        },
+        {
+            "label": "Push staged-and-tested build to production, then smoke test",
+            "reason": "Production promotion is only available after the staged build has passed required gates and owner approval is recorded.",
+            "prompt": (
+                "Promote the staged-and-tested build to production, then run production smoke tests. Confirm explicit production "
+                "approval, artifact provenance, deployment status, smoke-test evidence, rollback readiness, and release records."
+            ),
+        },
+        {
+            "label": "Continue Last Session",
+            "reason": (
+                f"The action center and {continuation_response_count} latest GO/NO-GO bridge response"
+                f"{'s' if continuation_response_count != 1 else ''} define the current-session continuation scope."
+            ),
+            "prompt": (
+                "Continue from the last session using the dashboard action center and any latest GO/NO-GO bridge "
+                "responses, including responses produced by a prior Loyal Opposition session. Start by inventorying "
+                f"the latest GO/NO-GO bridge entries, then continue with {first_action.get('action', backlog_label)}; "
+                "explain current evidence, next command, and expected verification."
             ),
         },
     ]
@@ -2512,6 +2846,32 @@ def _render_session_focus_options(options: list[dict[str, str]]) -> str:
             ]
         )
     return "\n".join(blocks).rstrip()
+
+
+def _is_loyal_opposition_model(model: dict[str, Any]) -> bool:
+    return model.get("role", {}).get("assumed_role") == "Loyal Opposition"
+
+
+def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
+    return "\n".join(
+        [
+            "- Startup mode: Loyal Opposition review and verification.",
+            "- Default session purpose: process Prime Builder reviews and verifications on the file bridge.",
+            "- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.",
+            "- Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism; the poller is only a monitoring/activation service.",
+            "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
+            "- Live bridge authority: current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`; this generated report is not authoritative after generation.",
+            "- Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
+            "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
+            "- Poller startup rule: activate a poller only when the roles are running in separate harnesses or asynchronous monitoring is otherwise needed.",
+            "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
+            _render_file_bridge_scan(model),
+            "- If the live bridge verification succeeds, report the live scan result and ask Mike whether to begin processing reviews and verifications from `bridge/INDEX.md`.",
+            "- Expected owner reply: `yes` to begin processing the bridge queue, or `no` / a custom instruction to stay in advisory mode.",
+            "- If the bridge is not functioning, diagnose and repair the bridge before ordinary review work.",
+            "- Bridge authority: Loyal Opposition has permanent owner permission to diagnose and repair bridge function/use and downstream bridge-dependent artifacts needed to sustain the bridge.",
+        ]
+    )
 
 
 def _render_startup_pruning(model: dict[str, Any]) -> str:
@@ -2549,7 +2909,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
             f"- Release blockers: {release.get('blocker_count', metrics['regression'].get('release_blocker_count'))}",
             f"- Active backlog items: {metrics['backlog'].get('active_item_count')}",
             f"- Open MemBase work items: {metrics['membase'].get('open_work_items')}",
-            f"- Actionable bridge/contention entries: {metrics['contention'].get('actionable_count')}",
+            f"- Dashboard-scoped bridge/contention entries, non-authoritative for queue state: {metrics['contention'].get('actionable_count')}",
             f"- Drift changed paths: {metrics['drift'].get('changed_path_count')}",
             (
                 "- Testing/tool rollup: "
@@ -2566,17 +2926,56 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
     )
 
 
+def _safe_overlay_status(project_root: Path) -> dict[str, Any]:
+    """Return session overlay snapshot, never raising into the startup model."""
+
+    try:
+        return _gtkb_overlay.current_overlay_status(project_root)
+    except Exception as exc:  # pragma: no cover - defensive against startup-time errors
+        return {
+            "authoritative": False,
+            "overlay_root": _gtkb_overlay.OVERLAY_ROOT_RELATIVE.as_posix(),
+            "overlay_present": False,
+            "overlay_id": None,
+            "expired": False,
+            "entries_stale": 0,
+            "entries_total": 0,
+            "is_stale": False,
+            "notes": [f"overlay status unavailable; treating as absent: {exc}"],
+        }
+
+
+def _render_session_overlay_status(status: dict[str, Any]) -> str:
+    lines = [
+        f"- Overlay root: `{status.get('overlay_root', _gtkb_overlay.OVERLAY_ROOT_RELATIVE.as_posix())}` (ignored by git, non-authoritative by construction).",
+        "- Overlays are copy-only context; canonical state lives in the KB, MemBase, Deliberation Archive, and source files.",
+    ]
+    if not status.get("overlay_present"):
+        lines.append("- Current overlay: none active; startup context read directly from live files.")
+    else:
+        lines.append(
+            "- Current overlay: "
+            f"`{status.get('overlay_id')}` "
+            f"(authoritative={status.get('authoritative', False)}, "
+            f"expired={status.get('expired', False)}, "
+            f"stale_entries={status.get('entries_stale', 0)}/{status.get('entries_total', 0)})."
+        )
+    notes = status.get("notes") or []
+    for note in notes:
+        lines.append(f"- {note}")
+    return "\n".join(lines)
+
+
 def _render_file_bridge_scan(model: dict[str, Any]) -> str:
     contention = model["metrics"]["contention"]
-    new_count = int(contention.get("latest_status_counts", {}).get("NEW", 0) or 0)
-    revised_count = int(contention.get("latest_status_counts", {}).get("REVISED", 0) or 0)
-    actionable_review_count = new_count + revised_count
+    actionable_review_count = _protocol_review_queue_count(contention)
     if actionable_review_count:
         return (
-            f"- File bridge scan: {actionable_review_count} latest NEW/REVISED entr"
+            f"- Generated-time file bridge scan, non-authoritative after report generation: "
+            f"{actionable_review_count} latest NEW/REVISED entr"
             f"{'y' if actionable_review_count == 1 else 'ies'} identified."
         )
-    return "- File bridge scan: 0 latest NEW/REVISED entries identified."
+    return "- Generated-time file bridge scan, non-authoritative after report generation: 0 latest NEW/REVISED entries identified."
 
 
 def _render_wrapup_trigger_commands() -> str:
@@ -2590,12 +2989,41 @@ def _render_wrapup_trigger_commands() -> str:
     )
 
 
-def render_report(model: dict[str, Any], dashboard_uri: str) -> str:
+def _markdown_file_link(path: Path) -> str:
+    """Return a visible absolute file path with a desktop-openable link target."""
+    resolved = path.resolve()
+    return f"[{resolved}](<{resolved.as_posix()}>)"
+
+
+def _markdown_url_link(url: str) -> str:
+    return f"[{url}]({url})"
+
+
+def render_report(model: dict[str, Any], dashboard_link: str) -> str:
     role = model["role"]
     metrics = model["metrics"]
-    session_focus_options = _session_focus_options(model)
+    dashboard_opening = model.get("dashboard_opening", {})
+    dashboard_open_requested = "enabled" if dashboard_opening.get("startup_open_requested") else "disabled"
+    dashboard_open_mode = dashboard_opening.get("mode") or DASHBOARD_OPEN_MODE_HARNESS
     token_count = metrics["tokens"]["tokens_consumed_before_user_input"]
     token_count_text = "unavailable" if token_count is None else str(token_count)
+    if _is_loyal_opposition_model(model):
+        startup_task_section = [
+            "## Loyal Opposition Startup Task",
+            "",
+            _render_loyal_opposition_startup_task(model),
+        ]
+    else:
+        session_focus_options = _session_focus_options(model)
+        startup_task_section = [
+            "## Choose This Session's Focus",
+            "",
+            "Reply with the number or exact label. Each option is generated from the current dashboard evidence.",
+            "",
+            _render_session_focus_options(session_focus_options),
+            "",
+            "Or provide a prompt for something else.",
+        ]
 
     return "\n".join(
         [
@@ -2610,13 +3038,15 @@ def render_report(model: dict[str, Any], dashboard_uri: str) -> str:
             f"- Role being assumed: {role['assumed_role']}",
             f"- Role assignment: {role['role_assignment']}",
             f"- Bridge: {role['bridge']}",
+            f"- Poller: {role['poller']}",
             f"- Role mapping source: {role['role_mapping_source']}",
             "",
             _markdown_list(model["governance_stance"]),
             "",
             "### Live Project Dashboard",
             "",
-            f"- Dashboard: [Agent Red Project Dashboard]({dashboard_uri})",
+            f"- Dashboard: Agent Red Project Dashboard: {dashboard_link}",
+            f"- Browser opening: use the harness-controlled browser for live dashboard inspection; startup open request: {dashboard_open_requested}; current mode: `{dashboard_open_mode}`. Startup hooks must not launch the operating system default browser unless explicitly configured with `dashboard_open_mode: system_default_browser`.",
             "- KPI coverage: Agent Red backlog, MemBase work items, Deliberation Archive records, tests, specifications, drift, regression, contention, and tokens consumed at session start before user input.",
             f"- Dashboard scope: {model['dashboard_requirements']['scope_note']}",
             f"- Token measurement status: {metrics['tokens']['measurement_status']}",
@@ -2626,28 +3056,34 @@ def render_report(model: dict[str, Any], dashboard_uri: str) -> str:
             "",
             _render_current_project_state(model),
             "",
+            "### Active Work Subject",
+            "",
+            render_startup_focus_lines(model.get("workstream_focus")),
+            "",
+            "### Session Overlay Status (Non-Authoritative)",
+            "",
+            _render_session_overlay_status(model.get("session_overlay") or {}),
+            "",
+            "### Fresh-Session Input Semantics",
+            "",
+            "- The first owner message in a fresh session is a session-start stimulus only; do not interpret it as a focus choice, task prompt, approval, answer, or other informational input.",
+            "- After presenting this startup disclosure and the session-focus choices, wait for Mike's next message before choosing or mapping session work.",
+            "",
             "### Wrap-Up Trigger Commands",
             "",
             _render_wrapup_trigger_commands(),
             "",
-            "## Choose This Session's Focus",
-            "",
-            "Reply with the number or exact label. Each option is generated from the current dashboard evidence.",
-            "",
-            _render_session_focus_options(session_focus_options),
-            "",
-            "Or provide a prompt for something else.",
+            *startup_task_section,
         ]
     )
 
 
-def render_wrapup_notice(model: dict[str, Any], dashboard_uri: str) -> str:
+def render_wrapup_notice(model: dict[str, Any], dashboard_link: str) -> str:
     metrics = model["metrics"]
     actions = model["top_priority_actions"]
-    action_lines = [
-        f"{index}. {item['id']}: {item['title']}"
-        for index, item in enumerate(actions, start=1)
-    ] or ["1. No active standing-backlog items found."]
+    action_lines = [f"{index}. {item['id']}: {item['title']}" for index, item in enumerate(actions, start=1)] or [
+        "1. No active standing-backlog items found."
+    ]
 
     return "\n".join(
         [
@@ -2664,7 +3100,7 @@ def render_wrapup_notice(model: dict[str, Any], dashboard_uri: str) -> str:
             "## Wrap-Up Procedure Entry Point",
             "",
             "- Procedure skill: `.claude/skills/kb-session-wrap/SKILL.md`",
-            f"- Dashboard: [Agent Red Project Dashboard]({dashboard_uri})",
+            f"- Dashboard: Agent Red Project Dashboard: {dashboard_link}",
             "- Safe automatic action: this report is generated without mutating MemBase, git history, or external infrastructure.",
             "- Mutating wrap-up actions still require the applicable approval, acknowledgement, or owner-authorized automation scope.",
             "",
@@ -2693,12 +3129,7 @@ def render_wrapup_notice(model: dict[str, Any], dashboard_uri: str) -> str:
 def _render_metric_table(snapshot: dict[str, Any]) -> str:
     rows = []
     for key, value in snapshot.items():
-        rows.append(
-            "<tr>"
-            f"<th>{html.escape(key.replace('_', ' ').title())}</th>"
-            f"<td>{html.escape(str(value))}</td>"
-            "</tr>"
-        )
+        rows.append(f"<tr><th>{html.escape(key.replace('_', ' ').title())}</th><td>{html.escape(str(value))}</td></tr>")
     return "\n".join(rows)
 
 
@@ -2709,7 +3140,7 @@ def _link_for_shortcut(shortcut: dict[str, str]) -> str:
     if kind == "web":
         return f'<a href="{html.escape(target, quote=True)}">{label}</a>'
     if kind == "command":
-        return f'<code>{html.escape(target)}</code>'
+        return f"<code>{html.escape(target)}</code>"
     return f'<a href="../../{html.escape(target, quote=True)}">{label}</a>'
 
 
@@ -2719,7 +3150,7 @@ def _render_health_strip(health: list[dict[str, str]]) -> str:
         f'class="health-card {html.escape(item["status"])}" '
         f'title="{html.escape(item["tooltip"], quote=True)}">'
         f'<span class="health-label">{html.escape(item["label"])}</span>'
-        f'<strong>{html.escape(item["value"])}</strong>'
+        f"<strong>{html.escape(item['value'])}</strong>"
         "</section>"
         for item in health
     )
@@ -2760,10 +3191,7 @@ def _render_risk_register(risks: list[dict[str, Any]]) -> str:
 def _render_release_readiness(release: dict[str, Any]) -> str:
     blockers = release.get("blockers") or []
     blocker_rows = "\n".join(
-        "<tr>"
-        f"<th>Blocker {index}</th>"
-        f"<td>{html.escape(str(blocker))}</td>"
-        "</tr>"
+        f"<tr><th>Blocker {index}</th><td>{html.escape(str(blocker))}</td></tr>"
         for index, blocker in enumerate(blockers, start=1)
     )
     if not blocker_rows:
@@ -2810,28 +3238,21 @@ def _render_data_freshness(freshness: dict[str, Any]) -> str:
         "Sources": sources,
     }
     return "\n".join(
-        "<tr>"
-        f"<th>{html.escape(label)}</th>"
-        f"<td>{html.escape(str(value))}</td>"
-        "</tr>"
-        for label, value in rows.items()
+        f"<tr><th>{html.escape(label)}</th><td>{html.escape(str(value))}</td></tr>" for label, value in rows.items()
     )
 
 
 def _render_shortcuts(shortcuts: list[dict[str, str]]) -> str:
-    return "\n".join(
-        f'<span class="shortcut-chip">{_link_for_shortcut(shortcut)}</span>'
-        for shortcut in shortcuts
-    )
+    return "\n".join(f'<span class="shortcut-chip">{_link_for_shortcut(shortcut)}</span>' for shortcut in shortcuts)
 
 
 def _render_delivery_timeline_summary(summary: list[dict[str, Any]]) -> str:
     return "\n".join(
         "<section "
         f'class="timeline-stage {html.escape(str(item.get("status")))}">'
-        f'<span>{html.escape(str(item.get("label")))}</span>'
-        f'<strong>{html.escape(str(item.get("count")))}</strong>'
-        f'<small>{html.escape(str(item.get("latest_result")))} / {html.escape(str(item.get("latest_version")))}</small>'
+        f"<span>{html.escape(str(item.get('label')))}</span>"
+        f"<strong>{html.escape(str(item.get('count')))}</strong>"
+        f"<small>{html.escape(str(item.get('latest_result')))} / {html.escape(str(item.get('latest_version')))}</small>"
         "</section>"
         for item in summary
     )
@@ -2869,8 +3290,8 @@ def _render_delivery_timeline_rail(rows: list[dict[str, Any]]) -> str:
                 f'<span class="timeline-node {html.escape(str(row.get("result_color")))}">{index}</span>'
                 f'<span class="timeline-date-inline">{html.escape(date_label)}</span>'
                 f'<span class="timeline-stage-label">{html.escape(str(row.get("stage_label")))}</span>'
-                f'<strong>{html.escape(str(row.get("event") or "Event"))}</strong>'
-                f'<small>{html.escape(str(row.get("version") or "not recorded"))}</small>'
+                f"<strong>{html.escape(str(row.get('event') or 'Event'))}</strong>"
+                f"<small>{html.escape(str(row.get('version') or 'not recorded'))}</small>"
                 "</section>"
             )
         rendered.append(
@@ -2883,12 +3304,12 @@ def _render_delivery_timeline_rail(rows: list[dict[str, Any]]) -> str:
 
 
 def _render_delivery_timeline_details(rows: list[dict[str, Any]]) -> str:
-    rendered = []
+    cards = []
     for index, row in enumerate(_timeline_ordered_rows(rows), start=1):
-        rendered.append(
+        cards.append(
             f"""
-      <details class="timeline-detail" id="timeline-event-{index}">
-        <summary><span class="result-pill {html.escape(str(row.get("result_color")))}">{index}. {html.escape(str(row.get("stage_label")))}</span> {html.escape(str(row.get("event") or "Event"))} <span>{html.escape(_timeline_date_label(row.get("timestamp")))} / {html.escape(str(row.get("version") or "not recorded"))}</span></summary>
+      <section class="timeline-detail" id="timeline-event-{index}">
+        <div class="timeline-detail-heading"><span class="result-pill {html.escape(str(row.get("result_color")))}">{index}. {html.escape(str(row.get("stage_label")))}</span> <strong>{html.escape(str(row.get("event") or "Event"))}</strong> <span>{html.escape(_timeline_date_label(row.get("timestamp")))} / {html.escape(str(row.get("version") or "not recorded"))}</span></div>
         <table>
           <tbody>
             <tr><th>Calendar Date</th><td>{html.escape(_timeline_date_label(row.get("timestamp")))}</td></tr>
@@ -2902,29 +3323,49 @@ def _render_delivery_timeline_details(rows: list[dict[str, Any]]) -> str:
             <tr><th>Notes</th><td>{html.escape(str(row.get("notes") or ""))}</td></tr>
           </tbody>
         </table>
-      </details>"""
+      </section>"""
         )
-    return "\n".join(rendered) or '<p class="note">No delivery timeline details detected.</p>'
+    content = "\n".join(cards) or '<p class="note">No delivery timeline details detected.</p>'
+    return f"""
+  <details class="drilldown print-page" id="deliveryTimelineDetails">
+    <summary>Delivery Timeline Details <span>Open for delivery event source details.</span></summary>
+    <div class="timeline-detail-list">
+      {content}
+    </div>
+  </details>
+"""
 
 
 def _render_delivery_timeline(timeline: dict[str, Any]) -> str:
-    version_manifest = timeline.get("version_manifest") or {}
     return f"""
   <details class="drilldown print-page" id="deliveryTimeline" open>
     <summary>Delivery Timeline <span>Commits, builds, staging/production deployment evidence, versions, and test results.</span></summary>
     <div class="timeline-wrap">
-      <p class="note">{html.escape(str(timeline.get("source_note") or ""))}</p>
-      <p class="note">Version manifest: {html.escape(str(version_manifest.get("display") or "not recorded"))}</p>
       <div class="timeline-strip">
         {_render_delivery_timeline_summary(timeline.get("stage_summary", []))}
       </div>
       <div class="timeline-rail" aria-label="Delivery events from oldest to latest">
-        {_render_delivery_timeline_rail(timeline.get("timeline", []))}
-      </div>
-      <div class="timeline-detail-list">
-        {_render_delivery_timeline_details(timeline.get("timeline", []))}
+        <div class="timeline-track">
+          {_render_delivery_timeline_rail(timeline.get("timeline", []))}
+        </div>
       </div>
     </div>
+  </details>
+"""
+
+
+def _render_action_center_section(actions: list[dict[str, Any]]) -> str:
+    return f"""
+  <details class="drilldown" id="actionCenter">
+    <summary>Action Center <span>Open for prioritized remediation actions.</span></summary>
+    <table>
+      <thead>
+        <tr><th>Action</th><th>Lane</th><th>Why</th><th>Remediation</th><th>Shortcut</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        {_render_action_center(actions)}
+      </tbody>
+    </table>
   </details>
 """
 
@@ -3040,11 +3481,7 @@ def _render_testing_service_integrations(integrations: dict[str, Any]) -> str:
             ("Artifacts / Gaps", artifact_text),
         ]
         rows = "\n".join(
-            "<tr>"
-            f"<th>{html.escape(label)}</th>"
-            f"<td>{html.escape(value)}</td>"
-            "</tr>"
-            for label, value in fact_rows
+            f"<tr><th>{html.escape(label)}</th><td>{html.escape(value)}</td></tr>" for label, value in fact_rows
         )
         sections.append(
             f"""
@@ -3068,12 +3505,7 @@ def _render_testing_service_integrations(integrations: dict[str, Any]) -> str:
 
 
 def _json_for_script(data: dict[str, Any]) -> str:
-    return (
-        json.dumps(data, sort_keys=True)
-        .replace("&", "\\u0026")
-        .replace("<", "\\u003c")
-        .replace(">", "\\u003e")
-    )
+    return json.dumps(data, sort_keys=True).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
 
 
 def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> str:
@@ -3135,7 +3567,7 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
     .note {{ background: var(--panel); border: 1px solid var(--line); padding: 12px; }}
     .dashboard-hero {{
       background: linear-gradient(135deg, #12343b 0%, #1f5f5b 52%, #6b5b2a 100%);
-      color: #ffffff;
+      color: #ffffff !important;
       border-radius: 8px;
       padding: 22px;
       margin-bottom: 18px;
@@ -3156,8 +3588,11 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
       border-radius: 8px;
       color: #12343b;
       cursor: pointer;
+      display: inline-block;
       font-weight: 700;
+      margin: 0 0 8px 8px;
       padding: 10px 14px;
+      text-decoration: none;
       width: fit-content;
     }}
     .health-strip {{
@@ -3219,6 +3654,7 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
     .panel-visual.red {{ background: #8b1e3f; }}
     .panel-visual.yellow {{ background: #8b5a0a; }}
     .panel-visual.green {{ background: #2f6b2f; }}
+    .panel-visual, .panel-visual * {{ color: #ffffff !important; }}
     .panel-visual strong {{ display: block; font-size: 34px; margin: 8px 0; }}
     .quality-grid {{
       display: grid;
@@ -3271,17 +3707,22 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
     }}
     .result-pill.green {{ background: var(--green); }}
     .result-pill.red {{ background: var(--red); }}
-    .result-pill.yellow {{ background: var(--amber); }}
+    .result-pill.yellow {{ background: #8b5a0a; }}
+    .result-pill, .result-pill * {{ color: #ffffff !important; }}
     .timeline-rail {{
-      align-items: stretch;
-      display: flex;
-      gap: 16px;
       margin: 18px 0;
       overflow-x: auto;
       padding: 10px 0 18px;
-      position: relative;
     }}
-    .timeline-rail::before {{
+    .timeline-track {{
+      align-items: stretch;
+      display: flex;
+      gap: 16px;
+      min-width: 100%;
+      position: relative;
+      width: max-content;
+    }}
+    .timeline-track::before {{
       background: var(--line);
       content: "";
       height: 3px;
@@ -3376,14 +3817,13 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
       border: 1px solid var(--line);
       border-radius: 8px;
     }}
-    .timeline-detail summary {{
+    .timeline-detail-heading {{
       align-items: center;
-      cursor: pointer;
       display: flex;
       gap: 8px;
       padding: 10px 12px;
     }}
-    .timeline-detail summary span:last-child {{
+    .timeline-detail-heading span:last-child {{
       color: var(--muted);
       margin-left: auto;
     }}
@@ -3585,23 +4025,15 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
     </div>
   </section>
 
-  {_render_delivery_timeline(model["infrastructure"].get("delivery_timeline", {}))}
-
   <section class="health-strip" aria-label="Executive health status">
     {_render_health_strip(intelligence.get("health", []))}
   </section>
 
-  <section class="section-band">
-    <h2>Action Center</h2>
-    <table>
-      <thead>
-        <tr><th>Action</th><th>Lane</th><th>Why</th><th>Remediation</th><th>Shortcut</th><th>Source</th></tr>
-      </thead>
-      <tbody>
-        {_render_action_center(intelligence.get("action_center", []))}
-      </tbody>
-    </table>
-  </section>
+  {_render_delivery_timeline(model["infrastructure"].get("delivery_timeline", {}))}
+
+  {_render_delivery_timeline_details(model["infrastructure"].get("delivery_timeline", {}).get("timeline", []))}
+
+  {_render_action_center_section(intelligence.get("action_center", []))}
 
   <section class="section-band">
     <h2>Shortcuts</h2>
@@ -3624,8 +4056,10 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
   <h2>Trend Signals</h2>
   <ul id="signalList" class="signal-list"></ul>
 
-  <h2>KPI Movement</h2>
-  <div id="chartGrid" class="visual-grid"></div>
+  <section id="kpiMovementSection">
+    <h2>KPI Movement</h2>
+    <div id="chartGrid" class="visual-grid"></div>
+  </section>
 
   <h2>Divergence And Convergence</h2>
   <div class="visual-grid">
@@ -3844,8 +4278,18 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
     }}
 
     function renderSparklines() {{
+      const movementSection = document.getElementById("kpiMovementSection");
       const chartGrid = document.getElementById("chartGrid");
-      chartGrid.innerHTML = metrics.map((def) => {{
+      const movingMetrics = metrics
+        .map((def) => ({{ def, ...deltaFor(def) }}))
+        .filter((item) => item.values.length > 1 && item.delta !== 0);
+      movementSection.hidden = movingMetrics.length === 0;
+      if (!movingMetrics.length) {{
+        chartGrid.innerHTML = "";
+        return;
+      }}
+      chartGrid.innerHTML = movingMetrics.map((item) => {{
+        const def = item.def;
         const trend = deltaFor(def);
         const values = trend.values.length ? trend.values : [0];
         const points = pointsFor(values, 280, 110, 12);
@@ -3962,7 +4406,12 @@ def _write_dashboard_pdf(dashboard_path: Path, pdf_path: Path) -> dict[str, Any]
             page.goto(dashboard_path.resolve().as_uri(), wait_until="networkidle")
             page.emulate_media(media="print")
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
-            page.pdf(path=str(pdf_path), format="Letter", print_background=True, margin={"top": "0.45in", "right": "0.35in", "bottom": "0.45in", "left": "0.35in"})
+            page.pdf(
+                path=str(pdf_path),
+                format="Letter",
+                print_background=True,
+                margin={"top": "0.45in", "right": "0.35in", "bottom": "0.45in", "left": "0.35in"},
+            )
             browser.close()
     except Exception as exc:
         return {"available": False, "path": str(pdf_path), "error": str(exc)}
@@ -3977,7 +4426,7 @@ def write_dashboard_and_report(
     seed_historical_backfill: bool = True,
     startup_bridge_maintenance: dict[str, Any] | None = None,
     startup_pruning: dict[str, Any] | None = None,
-    role_profile: str = "prime-builder",
+    role_profile: str | None = None,
 ) -> dict[str, Any]:
     model = build_startup_model(project_root, role_profile=role_profile)
     if startup_bridge_maintenance is not None:
@@ -4000,37 +4449,243 @@ def write_dashboard_and_report(
     history = _write_history(history_path, snapshot, seed_history=backfill_history)
 
     data_path = dashboard_dir / "dashboard-data.json"
-    dashboard_path = dashboard_dir / "index.html"
+    dashboard_path = project_root / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
     pdf_path = dashboard_dir / PDF_EXPORT_FILENAME
     report_path = dashboard_dir / "session-startup-report.md"
     wrapup_path = dashboard_dir / "session-wrapup-report.md"
     data = {"model": model, "history": history}
     data_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    dashboard_path.write_text(render_dashboard(model, history), encoding="utf-8")
-    dashboard_uri = dashboard_path.resolve().as_uri()
-    report_path.write_text(render_report(model, dashboard_uri), encoding="utf-8")
-    wrapup_path.write_text(render_wrapup_notice(model, dashboard_uri), encoding="utf-8")
-    pdf_export = (
-        _write_dashboard_pdf(dashboard_path, pdf_path)
-        if generate_pdf
-        else {"available": False, "path": str(pdf_path), "error": "PDF export generation skipped by caller."}
-    )
+    dashboard_link = _markdown_url_link(GRAFANA_DASHBOARD_URL)
+    report_text = render_report(model, dashboard_link)
+    wrapup_text = render_wrapup_notice(model, dashboard_link)
+    report_path.write_text(report_text, encoding="utf-8")
+    wrapup_path.write_text(wrapup_text, encoding="utf-8")
+    pdf_export = {"available": False, "path": str(pdf_path), "error": "Static dashboard PDF export is disabled."}
 
     return {
+        "project_root": project_root,
         "model": model,
         "history": history,
         "dashboard_path": dashboard_path,
+        "dashboard_url": GRAFANA_DASHBOARD_URL,
         "pdf_path": pdf_path,
         "pdf_export": pdf_export,
         "data_path": data_path,
         "report_path": report_path,
+        "report_text": report_text,
         "wrapup_path": wrapup_path,
+        "wrapup_text": wrapup_text,
     }
 
 
 def _emit_hook_context(text: str) -> None:
     print(json.dumps({"additionalContext": text}, ensure_ascii=False))
+
+
+def _source_file_observation(project_root: Path, relative_path: str, *, required: bool = True) -> dict[str, Any]:
+    path = project_root / Path(relative_path)
+    if path.is_file():
+        modified_at = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat().replace("+00:00", "Z")
+        status = "present"
+    else:
+        modified_at = None
+        status = "missing"
+    return {
+        "source": relative_path.replace("\\", "/"),
+        "kind": "local_file",
+        "required": required,
+        "status": status,
+        "path": str(path),
+        "modified_at": modified_at,
+    }
+
+
+def _workflow_inventory_observation(project_root: Path, *, required: bool = True) -> dict[str, Any]:
+    workflows_dir = project_root / ".github" / "workflows"
+    workflow_files = sorted([*workflows_dir.glob("*.yml"), *workflows_dir.glob("*.yaml")]) if workflows_dir.is_dir() else []
+    latest_modified_at = None
+    if workflow_files:
+        latest_mtime = max(path.stat().st_mtime for path in workflow_files)
+        latest_modified_at = datetime.fromtimestamp(latest_mtime, UTC).isoformat().replace("+00:00", "Z")
+    return {
+        "source": ".github/workflows",
+        "kind": "local_directory",
+        "required": required,
+        "status": "present" if workflow_files else "missing",
+        "path": str(workflows_dir),
+        "file_count": len(workflow_files),
+        "latest_modified_at": latest_modified_at,
+    }
+
+
+def _startup_freshness_metadata(
+    *,
+    project_root: Path,
+    model: dict[str, Any],
+    request_started_at: str,
+    payload_emitted_at: str,
+    report_origin: str,
+) -> dict[str, Any]:
+    dashboard_intelligence = model.get("dashboard_intelligence", {})
+    data_freshness = dashboard_intelligence.get("data_freshness", {})
+    infrastructure = model.get("infrastructure", {})
+    github = infrastructure.get("testing_service_integrations", {}).get("github", {})
+    upgrade_posture = infrastructure.get("gtkb_upgrade_posture", {})
+    generated_at = str(model.get("generated_at") or "")
+    local_sources = [
+        _source_file_observation(project_root, "groundtruth.db"),
+        _source_file_observation(project_root, "memory/work_list.md"),
+        _source_file_observation(project_root, "memory/release-readiness.md"),
+        _source_file_observation(project_root, "bridge/INDEX.md"),
+        _workflow_inventory_observation(project_root),
+    ]
+    live_probes = [
+        {
+            "source": "GitHub Actions via gh",
+            "kind": "live_probe",
+            "required": False,
+            "status": "queried" if github.get("workflow_runs_available") else "unavailable",
+            "queried_at": github.get("queried_at"),
+            "detail": github.get("latest_run_source"),
+        },
+        {
+            "source": "GT-KB latest release probe",
+            "kind": "live_probe",
+            "required": False,
+            "status": "queried" if not upgrade_posture.get("latest_release_probe_error") else "unavailable",
+            "queried_at": generated_at,
+            "detail": upgrade_posture.get("latest_release_tag"),
+            "error": upgrade_posture.get("latest_release_probe_error"),
+        },
+        {
+            "source": "GT-KB latest main probe",
+            "kind": "live_probe",
+            "required": False,
+            "status": "queried" if not upgrade_posture.get("latest_main_probe_error") else "unavailable",
+            "queried_at": generated_at,
+            "detail": upgrade_posture.get("latest_main_sha"),
+            "error": upgrade_posture.get("latest_main_probe_error"),
+        },
+    ]
+    required_local_sources_ok = all(
+        source.get("status") == "present" for source in local_sources if source.get("required") is True
+    )
+    generated_after_request = _iso_is_ordered(request_started_at, generated_at)
+    emitted_after_generation = _iso_is_ordered(generated_at, payload_emitted_at)
+    emitted_after_request = _iso_is_ordered(request_started_at, payload_emitted_at)
+    startup_payload_fresh = (
+        generated_after_request
+        and emitted_after_generation
+        and emitted_after_request
+        and required_local_sources_ok
+        and report_origin == "in_memory_model_render"
+    )
+    live_probe_gaps = [probe["source"] for probe in live_probes if probe.get("status") != "queried"]
+    validation_status = (
+        "invalid" if not startup_payload_fresh else "fresh_with_gaps" if live_probe_gaps else "fresh"
+    )
+    checks = [
+        {
+            "name": "generated_at_is_not_older_than_request",
+            "passed": generated_after_request,
+            "detail": f"request_started_at={request_started_at}; generated_at={generated_at}",
+        },
+        {
+            "name": "payload_emitted_after_generation",
+            "passed": emitted_after_generation and emitted_after_request,
+            "detail": f"generated_at={generated_at}; payload_emitted_at={payload_emitted_at}",
+        },
+        {
+            "name": "required_local_sources_present",
+            "passed": required_local_sources_ok,
+            "detail": "groundtruth.db, memory/work_list.md, memory/release-readiness.md, bridge/INDEX.md, and .github/workflows must exist for a fresh startup payload.",
+        },
+        {
+            "name": "payload_render_origin_is_in_memory",
+            "passed": report_origin == "in_memory_model_render",
+            "detail": f"render_origin={report_origin}",
+        },
+    ]
+    return {
+        "contract_version": STARTUP_FRESHNESS_CONTRACT_VERSION,
+        "request_started_at": request_started_at,
+        "generated_at": generated_at,
+        "payload_emitted_at": payload_emitted_at,
+        "report_origin": report_origin,
+        "generation_latency_ms": _iso_elapsed_ms(request_started_at, generated_at),
+        "emit_latency_ms": _iso_elapsed_ms(request_started_at, payload_emitted_at),
+        "repo": {
+            "branch": data_freshness.get("repo_branch"),
+            "sha": data_freshness.get("repo_sha"),
+            "short_sha": data_freshness.get("repo_short_sha"),
+        },
+        "validation": {
+            "status": validation_status,
+            "startup_payload_fresh": startup_payload_fresh,
+            "live_probe_gap_count": len(live_probe_gaps),
+            "live_probe_gaps": live_probe_gaps,
+            "checks": checks,
+        },
+        "required_local_sources": local_sources,
+        "live_probes": live_probes,
+    }
+
+
+def _startup_service_context(result: dict[str, Any]) -> str:
+    report_text = str(result["report_text"])
+    model = result["model"]
+    focus_option_count = len(_session_focus_options(model))
+    return "\n".join(
+        [
+            "# Agent Red / GT-KB Programmatic Startup Payload",
+            "",
+            f"- Contract: {STARTUP_SERVICE_CONTRACT_VERSION}",
+            "- Source: `scripts/session_self_initialization.py`",
+            f"- Generated: {model['generated_at']}",
+            "- User-visible startup content below was generated programmatically by the startup service.",
+            "- The AI harness must relay the generated startup message verbatim as the first durable assistant answer and then wait for Mike's focus selection.",
+            "- Do not summarize, paraphrase, shorten, reorder, or omit any startup section or any session-focus option detail.",
+            "- Preserve every generated heading, bullet, numbered item, `Current signal`, and `Prompt details` line exactly as written.",
+            (
+                f"- Prime Builder focus-menu preservation rule: when the startup message contains a session-focus menu, "
+                f"all {focus_option_count} numbered options must remain present in order with their per-option summaries intact."
+            ),
+            "- The first durable assistant answer should be the startup disclosure itself, not a meta-summary about the startup disclosure.",
+            "- The first owner message after SessionStart is discarded startup stimulus only. Never treat it as a task, resume request, focus choice, approval, or answer.",
+            "- Never map the first owner message to `Continue Last Session` or any other focus option.",
+            "- Codex Desktop durability rule: relay the startup message in the first durable assistant answer, not in transient progress/intermediary output.",
+            "- Do not replace the startup message with a shorter final answer after rendering it.",
+            "- The AI harness is not responsible for composing role, mode, bridge, process, or focus content during startup.",
+            "",
+            "## User-Visible Startup Message",
+            "",
+            report_text,
+        ]
+    )
+
+
+def _emit_startup_service_payload(result: dict[str, Any], *, request_started_at: str) -> None:
+    payload_emitted_at = _utc_now_iso()
+    startup_freshness = _startup_freshness_metadata(
+        project_root=result["project_root"],
+        model=result["model"],
+        request_started_at=request_started_at,
+        payload_emitted_at=payload_emitted_at,
+        report_origin="in_memory_model_render",
+    )
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": _startup_service_context(result),
+                    "startupFreshness": startup_freshness,
+                }
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 def _emit_no_hook_context() -> None:
@@ -4065,22 +4720,26 @@ def _startup_guard_id() -> str:
     return os.environ.get("GTKB_STARTUP_GUARD_ID") or _utc_now_iso()
 
 
-def _arm_startup_wrapup_guard(path: Path, guard_id: str) -> None:
+def _arm_startup_interaction_guard(path: Path, guard_id: str, *, suppress_next_wrapup: bool) -> None:
     state = _read_lifecycle_guard(path)
     if (
         state.get("startup_guard_id") == guard_id
-        and state.get("first_wrapup_suppressed") is True
-        and state.get("suppress_next_wrapup") is False
+        and state.get("discard_next_user_prompt") is True
+        and state.get("startup_response_pending") is False
+        and state.get("suppress_next_wrapup") is suppress_next_wrapup
     ):
         return
 
     state.update(
         {
             "armed_at": _utc_now_iso(),
-            "armed_reason": "startup_focus_input_pending",
+            "armed_reason": "startup_first_owner_prompt_must_be_discarded",
+            "discard_next_user_prompt": True,
+            "startup_prompt_discarded": False,
+            "startup_response_pending": False,
             "first_wrapup_suppressed": False,
             "startup_guard_id": guard_id,
-            "suppress_next_wrapup": True,
+            "suppress_next_wrapup": suppress_next_wrapup,
         }
     )
     _write_lifecycle_guard(path, state)
@@ -4110,7 +4769,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dashboard-dir", type=Path, default=DEFAULT_DASHBOARD_DIR)
     parser.add_argument("--history-path", type=Path, default=DEFAULT_HISTORY_PATH)
     parser.add_argument("--emit-report", action="store_true", help="Print the startup report after writing it.")
-    parser.add_argument("--emit-wrapup", action="store_true", help="Print the proactive wrap-up report after writing it.")
+    parser.add_argument(
+        "--emit-startup-service-payload",
+        action="store_true",
+        help="Print the full Codex SessionStart payload generated by the startup service.",
+    )
+    parser.add_argument(
+        "--emit-wrapup", action="store_true", help="Print the proactive wrap-up report after writing it."
+    )
     parser.add_argument(
         "--force-wrapup",
         action="store_true",
@@ -4126,15 +4792,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--role-profile",
         choices=sorted(ROLE_PROFILES),
-        default="prime-builder",
-        help="Select the role mapping to display in startup and wrap-up context.",
+        default=None,
+        help=(
+            "Diagnostic role mapping override for non-startup output. "
+            "--emit-report always discovers the startup role from .claude/rules/operating-role.md."
+        ),
     )
     parser.add_argument(
         "--fast-hook",
         action="store_true",
         help=(
-            "Use the lifecycle-hook budget path: skip historical backfill, PDF export, "
-            "and startup bridge maintenance."
+            "Use the lifecycle-hook budget path: skip historical backfill, PDF export, and startup bridge maintenance."
         ),
     )
     parser.add_argument(
@@ -4144,23 +4812,36 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     project_root = args.project_root.resolve()
+    startup_emit_requested = args.emit_report or args.emit_startup_service_payload
+    startup_requested_at = os.environ.get("GTKB_STARTUP_REQUESTED_AT") if args.emit_startup_service_payload else None
+    if _parse_iso8601(startup_requested_at) is None:
+        startup_requested_at = _utc_now_iso()
+    role_profile = (
+        discover_role_profile(project_root)
+        if startup_emit_requested
+        else _role_profile_or_discovered(project_root, args.role_profile)
+    )
     lifecycle_guard_path = (
         args.lifecycle_guard_path.resolve()
         if args.lifecycle_guard_path is not None
         else _default_lifecycle_guard_path(project_root)
     )
 
-    if args.emit_report:
-        _arm_startup_wrapup_guard(lifecycle_guard_path, _startup_guard_id())
+    if startup_emit_requested:
+        _arm_startup_interaction_guard(
+            lifecycle_guard_path,
+            _startup_guard_id(),
+            suppress_next_wrapup=role_profile != "loyal-opposition",
+        )
 
     if args.emit_wrapup and not args.force_wrapup and _consume_startup_wrapup_guard(lifecycle_guard_path):
         _emit_no_hook_context()
         return 0
 
     bridge_maintenance = None
-    if args.emit_report and not args.skip_bridge_maintenance and not args.fast_hook:
+    if startup_emit_requested and not args.skip_bridge_maintenance and not args.fast_hook:
         bridge_maintenance = _run_verified_bridge_startup_maintenance(project_root)
-    startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if args.emit_report else None
+    startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if startup_emit_requested else None
 
     result = write_dashboard_and_report(
         project_root=project_root,
@@ -4170,11 +4851,14 @@ def main(argv: list[str] | None = None) -> int:
         seed_historical_backfill=not args.fast_hook,
         startup_bridge_maintenance=bridge_maintenance,
         startup_pruning=startup_pruning,
-        role_profile=args.role_profile,
+        role_profile=role_profile,
     )
+    if startup_emit_requested:
+        _maybe_open_dashboard_on_session_start(result["dashboard_url"])
     if args.json:
         printable = {
             "dashboard_path": str(result["dashboard_path"]),
+            "dashboard_url": result["dashboard_url"],
             "data_path": str(result["data_path"]),
             "pdf_path": str(result["pdf_path"]),
             "pdf_export": result["pdf_export"],
@@ -4183,13 +4867,17 @@ def main(argv: list[str] | None = None) -> int:
             "model": result["model"],
         }
         print(json.dumps(printable, indent=2, sort_keys=True))
+    elif args.emit_startup_service_payload:
+        _emit_startup_service_payload(result, request_started_at=startup_requested_at)
     elif args.emit_report:
-        _emit_hook_context(Path(result["report_path"]).read_text(encoding="utf-8"))
+        _emit_hook_context(str(result["report_text"]))
     elif args.emit_wrapup:
-        _emit_hook_context(Path(result["wrapup_path"]).read_text(encoding="utf-8"))
+        _emit_hook_context(str(result["wrapup_text"]))
     else:
-        print(f"Dashboard: {result['dashboard_path']}")
-        print(f"PDF export: {result['pdf_path']} ({'available' if result['pdf_export']['available'] else 'not generated'})")
+        print(f"Dashboard: {result['dashboard_url']}")
+        print(
+            f"PDF export: {result['pdf_path']} ({'available' if result['pdf_export']['available'] else 'not generated'})"
+        )
         print(f"Startup report: {result['report_path']}")
         print(f"Wrap-up report: {result['wrapup_path']}")
         print("Session focus options:")

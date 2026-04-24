@@ -1,4 +1,4 @@
-"""Regression tests for GT-KB workstream focus hooks."""
+"""Regression tests for GT-KB workstream focus / work-subject hooks."""
 
 from __future__ import annotations
 
@@ -46,20 +46,115 @@ def _run_hook(payload: dict, state_path: Path, *, guard_path: Path | None = None
     return json.loads(result.stdout)
 
 
-def test_default_focus_is_application_and_startup_lines_explain_commands(tmp_path, monkeypatch) -> None:
-    module = _load_module()
-    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+def _isolate_state(monkeypatch, tmp_path: Path) -> tuple[Path, Path]:
+    canonical = tmp_path / "work-subject.json"
+    legacy = tmp_path / ".workstream-focus-state.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(canonical))
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_LEGACY_STATE", str(legacy))
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+    monkeypatch.delenv("GTKB_PRODUCT_ROOT", raising=False)
+    return canonical, legacy
+
+
+def test_default_work_subject_is_application_and_startup_lines_explain_commands(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
 
     state = module.load_state(REPO_ROOT)
     lines = module.render_startup_focus_lines(module.startup_focus_snapshot(REPO_ROOT))
 
     assert state["default_focus"] == module.FOCUS_APPLICATION
     assert state["current_focus"] == module.FOCUS_APPLICATION
-    assert "Default focus: Application Focus" in lines
-    assert "Current focus: Application Focus" in lines
+    assert state["current_subject"] == module.SUBJECT_APPLICATION
+    assert state["schema_version"] == module.SCHEMA_VERSION
+    assert state["role_slot"] == module.ROLE_SLOT_DEFAULT
+    assert "Default work subject: Application Focus" in lines
+    assert "Current work subject: Application Focus" in lines
+    assert "`work subject application`" in lines
+    assert "`work subject GT-KB`" in lines
     assert "`application mode`" in lines
     assert "`GT-KB mode`" in lines
+    assert ".claude/session/work-subject.json" in lines
+
+
+def test_canonical_state_file_written_under_claude_session(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+
+    module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT, updated_by="owner_prompt")
+
+    assert canonical.exists()
+    data = json.loads(canonical.read_text(encoding="utf-8"))
+    assert data["schema_version"] == module.SCHEMA_VERSION
+    assert data["current_subject"] == module.SUBJECT_GTKB
+    assert data["role_slot"] == module.ROLE_SLOT_DEFAULT
+    assert data["source"] == "standalone owner command"
+    assert data["updated_by"] == "owner_prompt"
+    assert data["updated_at"]
+    assert data["project_root"]
+    # gtkb_root may be None; key must exist.
+    assert "gtkb_root" in data
+
+
+def test_legacy_state_migrates_on_load_when_canonical_absent(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _, legacy = _isolate_state(monkeypatch, tmp_path)
+
+    legacy.write_text(
+        json.dumps(
+            {
+                "default_focus": "application",
+                "current_focus": "gtkb_infrastructure",
+                "application_label": "Agent Red",
+                "updated_at": "2026-04-01T00:00:00Z",
+                "updated_by": "owner_prompt",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    state = module.load_state(REPO_ROOT)
+    assert state["current_subject"] == module.SUBJECT_GTKB
+    assert state["current_focus"] == module.FOCUS_GTKB_INFRASTRUCTURE
+    assert state["source"] == "legacy workstream alias"
+
+
+def test_work_subject_application_command_sets_canonical_state(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    # Seed GT-KB so the command flips state.
+    module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT)
+
+    response = module.handle_user_prompt("work subject application", REPO_ROOT)
+
+    assert "Current work subject set to Application Focus" in response["systemMessage"]
+    data = json.loads(canonical.read_text(encoding="utf-8"))
+    assert data["current_subject"] == module.SUBJECT_APPLICATION
+
+
+def test_work_subject_gtkb_command_sets_canonical_state(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+
+    response = module.handle_user_prompt("work subject GT-KB", REPO_ROOT)
+
+    assert "Current work subject set to GT-KB Infrastructure Focus" in response["systemMessage"]
+    data = json.loads(canonical.read_text(encoding="utf-8"))
+    assert data["current_subject"] == module.SUBJECT_GTKB
+
+
+def test_legacy_aliases_still_recognized(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+
+    # Application-side legacy alias
+    module.handle_user_prompt("application mode", REPO_ROOT)
+    assert module.load_state(REPO_ROOT)["current_subject"] == module.SUBJECT_APPLICATION
+
+    # GT-KB-side legacy alias
+    module.handle_user_prompt("GT-KB mode", REPO_ROOT)
+    assert module.load_state(REPO_ROOT)["current_subject"] == module.SUBJECT_GTKB
 
 
 @pytest.mark.skip(reason="workstream-focus.py intentionally retired S304/S305; see REVISED-5 BN-3")
@@ -178,25 +273,60 @@ def test_startup_response_pending_clears_on_next_owner_prompt_and_allows_normal_
     assert guard_state["startup_input_gate_cleared_at"]
 
 
-def test_application_focus_blocks_gtkb_infrastructure_write(tmp_path, monkeypatch) -> None:
+def test_classify_root_4_categories(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
-    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+    _isolate_state(monkeypatch, tmp_path)
+
+    gtkb_dir = tmp_path / "groundtruth-kb"
+    (gtkb_dir / "src" / "groundtruth_kb").mkdir(parents=True)
+    monkeypatch.setenv("GTKB_PRODUCT_ROOT", str(gtkb_dir))
+
+    gtkb_target = gtkb_dir / "src" / "groundtruth_kb" / "foo.py"
+    assert module.classify_root(str(gtkb_target), REPO_ROOT) == module.ROOT_GTKB_PRODUCT
+    assert module.classify_root("src/example.py", REPO_ROOT) == module.ROOT_APPLICATION_PRODUCT
+    assert module.classify_root(".claude/rules/new-rule.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
+    assert module.classify_root("bridge/some-proposal-001.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
+    assert module.classify_root("AGENTS.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
+    assert module.classify_root("README.md", REPO_ROOT) == module.ROOT_NEUTRAL
+
+
+def test_application_subject_blocks_gtkb_product_write(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+
+    gtkb_dir = tmp_path / "groundtruth-kb"
+    (gtkb_dir / "src" / "groundtruth_kb").mkdir(parents=True)
+    monkeypatch.setenv("GTKB_PRODUCT_ROOT", str(gtkb_dir))
+
+    gtkb_target = gtkb_dir / "src" / "groundtruth_kb" / "foo.py"
+    response = module.guard_tool_use(
+        {"tool_name": "Write", "tool_input": {"file_path": str(gtkb_target)}},
+        REPO_ROOT,
+    )
+
+    assert response["decision"] == "block"
+    assert "Current work subject is application" in response["reason"]
+    assert "work subject GT-KB" in response["reason"]
+    assert "GT-KB product artifacts" in response["reason"]
+
+
+def test_application_subject_allows_current_repo_bridge_or_governance_write(tmp_path, monkeypatch) -> None:
+    """Phase 7 relaxation: current-repo bridge/governance paths are NOT blocked under application subject."""
+
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
 
     response = module.guard_tool_use(
         {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
         REPO_ROOT,
     )
 
-    assert response["decision"] == "block"
-    assert "Application Focus" in response["reason"]
-    assert "GT-KB mode" in response["reason"]
+    assert response == {}
 
 
-def test_application_focus_allows_application_write(tmp_path, monkeypatch) -> None:
+def test_application_subject_allows_application_write(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
-    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+    _isolate_state(monkeypatch, tmp_path)
 
     response = module.guard_tool_use(
         {"tool_name": "Write", "tool_input": {"file_path": "src/example.py"}},
@@ -206,10 +336,9 @@ def test_application_focus_allows_application_write(tmp_path, monkeypatch) -> No
     assert response == {}
 
 
-def test_gtkb_focus_blocks_application_write(tmp_path, monkeypatch) -> None:
+def test_gtkb_subject_blocks_application_product_write(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
-    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
+    _isolate_state(monkeypatch, tmp_path)
     module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT)
 
     response = module.guard_tool_use(
@@ -218,8 +347,24 @@ def test_gtkb_focus_blocks_application_write(tmp_path, monkeypatch) -> None:
     )
 
     assert response["decision"] == "block"
-    assert "GT-KB Infrastructure Focus" in response["reason"]
-    assert "application mode" in response["reason"]
+    assert "Current work subject is GT-KB" in response["reason"]
+    assert "work subject application" in response["reason"]
+    assert "application product artifacts" in response["reason"]
+
+
+def test_gtkb_subject_allows_current_repo_bridge_or_governance_write(tmp_path, monkeypatch) -> None:
+    """Phase 7: current-repo bridge/governance is allowed in BOTH subjects."""
+
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT)
+
+    response = module.guard_tool_use(
+        {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+        REPO_ROOT,
+    )
+
+    assert response == {}
 
 
 def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_path, monkeypatch) -> None:
@@ -249,21 +394,39 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
     assert "Present the startup disclosure" in response["reason"]
 
 
-def test_bash_guard_only_blocks_mutating_gtkb_commands(tmp_path, monkeypatch) -> None:
+def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+    _isolate_state(monkeypatch, tmp_path)
 
+    gtkb_dir = tmp_path / "groundtruth-kb"
+    (gtkb_dir / "src" / "groundtruth_kb").mkdir(parents=True)
+    monkeypatch.setenv("GTKB_PRODUCT_ROOT", str(gtkb_dir))
+
+    # Read commands touching bridge/governance surfaces should not block.
     read_response = module.guard_tool_use(
         {"tool_name": "Bash", "tool_input": {"command": "Get-Content .claude/rules/prime-builder-role.md"}},
         REPO_ROOT,
     )
-    write_response = module.guard_tool_use(
+    assert read_response == {}
+
+    # Mutations to bridge/governance are NOT blocked (Phase 7 relaxation).
+    governance_write_response = module.guard_tool_use(
         {
             "tool_name": "Bash",
             "tool_input": {"command": "Set-Content .claude/rules/new-rule.md 'text'"},
         },
         REPO_ROOT,
     )
+    assert governance_write_response == {}
 
-    assert read_response == {}
-    assert write_response["decision"] == "block"
+    # Mutations to GT-KB product paths ARE blocked under application subject.
+    gtkb_target = (gtkb_dir / "src" / "groundtruth_kb" / "foo.py").as_posix()
+    gtkb_write_response = module.guard_tool_use(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"Set-Content {gtkb_target} 'text'"},
+        },
+        REPO_ROOT,
+    )
+    assert gtkb_write_response["decision"] == "block"
+    assert "work subject GT-KB" in gtkb_write_response["reason"]

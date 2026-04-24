@@ -527,9 +527,11 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Current Project State" in report_text
     assert "Release blockers:" in report_text
     assert "Testing/tool rollup:" in report_text
-    assert "Active Workstream Focus" in report_text
-    assert "Default focus: Application Focus" in report_text
-    assert "Application focus commands:" in report_text
+    assert "Active Work Subject" in report_text
+    assert "Default work subject: Application Focus" in report_text
+    assert "Application work subject commands:" in report_text
+    assert "`work subject application`" in report_text
+    assert "`work subject GT-KB`" in report_text
     assert "`GT-KB mode`" in report_text
     assert "Wrap-Up Trigger Commands" in report_text
     assert "Accepted wrap-up commands:" in report_text
@@ -675,8 +677,10 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "Browser opening: use the harness-controlled browser" in context
     assert "### Current Project State" in context
     assert "Release blockers:" in context
-    assert "### Active Workstream Focus" in context
-    assert "Default focus: Application Focus" in context
+    assert "### Active Work Subject" in context
+    assert "Default work subject: Application Focus" in context
+    assert "`work subject application`" in context
+    assert "`work subject GT-KB`" in context
     assert "`application mode`" in context
     assert "`GT-KB mode`" in context
     assert "### Wrap-Up Trigger Commands" in context
@@ -1114,8 +1118,8 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
     assert "## Startup Disclosure" in context
-    assert "### Active Workstream Focus" in context
-    assert "Default focus: Application Focus" in context
+    assert "### Active Work Subject" in context
+    assert "Default work subject: Application Focus" in context
     assert "### Wrap-Up Trigger Commands" in context
     assert "Accepted wrap-up commands:" in context
     assert "### File Bridge Scan" not in context
@@ -1158,3 +1162,47 @@ def test_top_priority_actions_come_from_standing_backlog() -> None:
     assert "GTKB-GOV-002" not in action_ids
     assert "GTKB-GOV-006" not in action_ids
     assert "GTKB-GOV-010" in action_ids
+
+
+def test_direct_script_execution_emits_startup_payload(tmp_path):
+    """Regression guard for Phase 6 NO-GO -004 F2.
+
+    The SessionStart hook executes `python scripts/session_self_initialization.py
+    --emit-startup-service-payload --fast-hook` directly, which exercises a
+    different import path than `importlib.util.spec_from_file_location(...)`.
+    An `ImportError: cannot import name 'gtkb_overlay' from 'scripts'` regression
+    in that direct-execution path escaped the spec-loader tests. This subprocess
+    test exercises the actual hook command form.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-startup-service-payload",
+            "--fast-hook",
+            "--skip-bridge-maintenance",
+            "--lifecycle-guard-path",
+            str(tmp_path / "guard.json"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, (
+        f"Direct script execution failed with exit {result.returncode}.\n"
+        f"stdout: {result.stdout[:500]}\nstderr: {result.stderr[:500]}"
+    )
+    # Payload must be valid JSON with the expected hook-output shape.
+    payload = json.loads(result.stdout)
+    hook_output = payload["hookSpecificOutput"]
+    assert hook_output["hookEventName"] == "SessionStart"
+    assert "agent-red-startup-service-v2" in hook_output["additionalContext"]
