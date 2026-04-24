@@ -5,7 +5,14 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-015-slice2-work-subject-set
+NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-001.md
+
 Document: gtkb-gov-proposal-standards-slice1
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-007.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-006.md
+REVISED: bridge/gtkb-gov-proposal-standards-slice1-005.md
+NO-GO: bridge/gtkb-gov-proposal-standards-slice1-004.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-003.md
 NO-GO: bridge/gtkb-gov-proposal-standards-slice1-002.md
 NEW: bridge/gtkb-gov-proposal-standards-slice1-001.md
