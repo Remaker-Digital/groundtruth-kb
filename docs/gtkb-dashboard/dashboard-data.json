@@ -5,23 +5,6 @@
       "contention_actionable_bridge_count": 1,
       "deliberation_archive_current_total": 328,
       "drift_changed_path_count": 8,
-      "generated_at": "2026-04-23T14:54:36Z",
-      "membase_open_work_items": 29,
-      "pytest_file_count": 338,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 1,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 8,
       "generated_at": "2026-04-23T14:57:36Z",
       "membase_open_work_items": 29,
       "pytest_file_count": 338,
@@ -3399,6 +3382,23 @@
       "specification_current_total": 1847,
       "token_measurement_status": "not_exposed_by_current_harness",
       "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 1,
+      "deliberation_archive_current_total": 328,
+      "drift_changed_path_count": 8,
+      "generated_at": "2026-04-24T05:24:35Z",
+      "membase_open_work_items": 29,
+      "pytest_file_count": 338,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 38,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
     }
   ],
   "model": {
@@ -3432,12 +3432,12 @@
         }
       ],
       "data_freshness": {
-        "generated_at": "2026-04-24T04:30:36Z",
-        "groundtruth_db_modified_at": "2026-04-24T04:30:45.568423Z",
-        "last_commit": "2026-04-23T18:28:12-07:00\nbridge: gtkb-work-subject-root-enforcement Phase B foundation (GO -012)",
+        "generated_at": "2026-04-24T05:24:35Z",
+        "groundtruth_db_modified_at": "2026-04-24T04:39:35.255054Z",
+        "last_commit": "2026-04-23T22:24:17-07:00\nbridge: gtkb-isolation-015-phase7-full-integration NEW -001",
         "repo_branch": "main",
-        "repo_sha": "5adf0bb7e229679e6ade457c2ea1aa979f8009bd",
-        "repo_short_sha": "5adf0bb7",
+        "repo_sha": "16da2b0c8015031dc8b779d10aaca32001eee7ae",
+        "repo_short_sha": "16da2b0c",
         "scope_version": "agent_red_v1",
         "sources": [
           "groundtruth.db",
@@ -3623,7 +3623,7 @@
         "report-depth-prime-builder-context.md"
       ]
     },
-    "generated_at": "2026-04-24T04:30:36Z",
+    "generated_at": "2026-04-24T05:24:35Z",
     "governance_stance": [
       "Strict GOV enforcement where mechanically available",
       "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
@@ -3639,7 +3639,7 @@
             "count": 12,
             "label": "Commit",
             "latest_result": "recorded",
-            "latest_version": "v1.98.92-143-g5adf0bb7",
+            "latest_version": "v1.98.92-146-g16da2b0c",
             "stage": "commit",
             "status": "green"
           },
@@ -3677,6 +3677,51 @@
           }
         ],
         "timeline": [
+          {
+            "branch": "",
+            "commit": "16da2b0c",
+            "event": "bridge: gtkb-isolation-015-phase7-full-integration NEW -001",
+            "notes": "Remaker Digital",
+            "result": "recorded",
+            "result_color": "green",
+            "source": "git log",
+            "stage": "commit",
+            "stage_label": "Commit",
+            "test_results": "Correlate with workflow rows sharing this commit.",
+            "timestamp": "2026-04-23T22:24:17-07:00",
+            "url": "",
+            "version": "v1.98.92-146-g16da2b0c"
+          },
+          {
+            "branch": "",
+            "commit": "731aa90e",
+            "event": "S304-S305: GTKB-ISOLATION Phases 3-7 + work-subject enforcement",
+            "notes": "Remaker Digital",
+            "result": "recorded",
+            "result_color": "green",
+            "source": "git log",
+            "stage": "commit",
+            "stage_label": "Commit",
+            "test_results": "Correlate with workflow rows sharing this commit.",
+            "timestamp": "2026-04-23T22:19:39-07:00",
+            "url": "",
+            "version": "v1.98.92-145-g731aa90e"
+          },
+          {
+            "branch": "",
+            "commit": "b06f52f1",
+            "event": "Add WI-3031 bridge fallback review",
+            "notes": "Remaker Digital",
+            "result": "recorded",
+            "result_color": "green",
+            "source": "git log",
+            "stage": "commit",
+            "stage_label": "Commit",
+            "test_results": "Correlate with workflow rows sharing this commit.",
+            "timestamp": "2026-04-23T22:15:23-07:00",
+            "url": "",
+            "version": "v1.98.92-144-gb06f52f1"
+          },
           {
             "branch": "",
             "commit": "5adf0bb7",
@@ -4503,36 +4548,6 @@
             "version": "v1.98.92-135-gc372eef0"
           },
           {
-            "branch": "",
-            "commit": "e01e8ac1",
-            "event": "ci: reduce production image cve surface",
-            "notes": "Remaker Digital",
-            "result": "recorded",
-            "result_color": "green",
-            "source": "git log",
-            "stage": "commit",
-            "stage_label": "Commit",
-            "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-21T08:43:40-07:00",
-            "url": "",
-            "version": "v1.98.92-134-ge01e8ac1"
-          },
-          {
-            "branch": "",
-            "commit": "61c4dafc",
-            "event": "ci: require docker hub auth for scout",
-            "notes": "Remaker Digital",
-            "result": "recorded",
-            "result_color": "green",
-            "source": "git log",
-            "stage": "commit",
-            "stage_label": "Commit",
-            "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-21T08:15:38-07:00",
-            "url": "",
-            "version": "v1.98.92-133-g61c4dafc"
-          },
-          {
             "branch": "main",
             "commit": "16f9f359",
             "event": "Python Tests",
@@ -4696,21 +4711,6 @@
             "timestamp": "2026-04-21T07:39:42Z",
             "url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/24710099280",
             "version": "3ab9867d"
-          },
-          {
-            "branch": "",
-            "commit": "e3a4000b",
-            "event": "ci: use scan-only acr secrets for docker scout",
-            "notes": "Remaker Digital",
-            "result": "recorded",
-            "result_color": "green",
-            "source": "git log",
-            "stage": "commit",
-            "stage_label": "Commit",
-            "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-21T07:37:42-07:00",
-            "url": "",
-            "version": "v1.98.92-132-ge3a4000b"
           },
           {
             "branch": "main",
@@ -5238,13 +5238,13 @@
         "unreleased_commit_count": 20,
         "unreleased_upstream_changes_available": true,
         "upgrade_plan": {
-          "action_count": 47,
+          "action_count": 46,
           "action_counts": {
             "add": 13,
             "append-gitignore": 4,
             "informational": 24,
             "merge-event-hooks": 4,
-            "warning": 2
+            "warning": 1
           },
           "available": true,
           "error": null,
@@ -5584,7 +5584,7 @@
           "latest_run_summary": "7 required main workflow runs checked; health=passing",
           "order": 10,
           "python_tests_workflow": true,
-          "queried_at": "2026-04-24T04:30:46Z",
+          "queried_at": "2026-04-24T05:24:41Z",
           "release_branch": "main",
           "release_candidate_gate_workflow": true,
           "remediation": "Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions.",
@@ -7263,34 +7263,36 @@
       },
       "contention": {
         "actionable_by_status": {
-          "GO": 1
+          "NEW": 1
         },
         "actionable_count": 1,
         "derived_artifacts_authoritative": false,
         "latest_status_counts": {
-          "GO": 1
+          "NEW": 1
         },
         "live_index_available": true,
         "oldest_actionable": [
           {
-            "document": "gtkb-isolation-008-migration-plan-review",
-            "path": "bridge/gtkb-isolation-008-migration-plan-review-004.md",
+            "document": "gtkb-isolation-015-phase7-full-integration",
+            "path": "bridge/gtkb-isolation-015-phase7-full-integration-001.md",
             "scope": "agent_red_release",
-            "status": "GO"
+            "status": "NEW"
           }
         ],
-        "raw_actionable_count": 2,
+        "raw_actionable_count": 1,
         "raw_latest_status_counts": {
-          "GO": 2,
-          "VERIFIED": 5
+          "NEW": 1,
+          "VERIFIED": 7
         },
-        "raw_review_queue_by_status": {},
-        "raw_review_queue_count": 0,
+        "raw_review_queue_by_status": {
+          "NEW": 1
+        },
+        "raw_review_queue_count": 1,
         "scope_confidence": "agent_red_current_heuristic",
         "scope_counts": {
           "agent_red_release": 1,
-          "gtkb_framework": 3,
-          "gtkb_upstream": 3
+          "gtkb_framework": 5,
+          "gtkb_upstream": 2
         },
         "source": "bridge/INDEX.md",
         "source_authority": "live bridge/INDEX.md is the sole authoritative bridge queue source",
@@ -7318,7 +7320,7 @@
         "available": true,
         "changed_path_count": 8,
         "deleted_path_count": 0,
-        "raw_changed_path_count": 246,
+        "raw_changed_path_count": 12,
         "scope_confidence": "agent_red_current_heuristic",
         "untracked_path_count": 1
       },
@@ -7403,13 +7405,13 @@
       "source": "local harness plugin cache when present"
     },
     "role": {
-      "assumed_role": "Prime Builder",
+      "assumed_role": "Loyal Opposition",
       "bridge": "always available through bridge/INDEX.md and checked at session startup",
       "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
-      "role_assignment": "active AI harness assigned by owner through durable operating-role record",
-      "role_mapping_source": ".claude/rules/operating-role.md"
+      "role_assignment": "active AI harness assigned by owner for counterpart review",
+      "role_mapping_source": "C:\\Users\\micha\\.codex\\agent-red-hooks\\operating-role.md"
     },
-    "role_profile": "prime-builder",
+    "role_profile": "loyal-opposition",
     "session_overlay": {
       "authoritative": false,
       "entries_stale": 0,
@@ -7468,7 +7470,7 @@
       "source": "project .claude/skills plus local harness skill directories"
     },
     "startup_pruning": {
-      "candidate_count": 2,
+      "candidate_count": 1,
       "candidates": [
         {
           "action": "Review for summarization, archival split, or index-first loading.",
@@ -7477,15 +7479,6 @@
             "lines": 3403
           },
           "target": "memory/gtkb-dashboard-history.json",
-          "type": "candidate"
-        },
-        {
-          "action": "Reduce default startup reads to compact indices plus targeted detail files.",
-          "evidence": {
-            "file_count": 16,
-            "total_bytes": 261542
-          },
-          "target": "session startup corpus",
           "type": "candidate"
         }
       ],
@@ -7497,12 +7490,6 @@
           "bytes": 132034,
           "lines": 3403,
           "path": "memory/gtkb-dashboard-history.json"
-        },
-        {
-          "available": true,
-          "bytes": 36061,
-          "lines": 674,
-          "path": "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-008-PHASE8-AGENT-RED-MIGRATION-REHEARSAL-PLAN-2026-04-23.md"
         },
         {
           "available": true,
@@ -7539,10 +7526,16 @@
           "bytes": 5155,
           "lines": 137,
           "path": "independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md"
+        },
+        {
+          "available": true,
+          "bytes": 4997,
+          "lines": 91,
+          "path": "bridge/INDEX.md"
         }
       ],
       "scope": "startup_loaded_files_and_coordination_state",
-      "total_bytes": 261542
+      "total_bytes": 229202
     },
     "token_reduction_options": [
       "Use the dashboard link before loading large artifacts into context.",

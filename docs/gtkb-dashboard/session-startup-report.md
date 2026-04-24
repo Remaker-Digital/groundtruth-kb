@@ -1,16 +1,16 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-24T04:30:36Z
+Generated: 2026-04-24T05:24:35Z
 
 ## Startup Disclosure
 
 ### Role And Governance Stance
 
-- Role being assumed: Prime Builder
-- Role assignment: active AI harness assigned by owner through durable operating-role record
+- Role being assumed: Loyal Opposition
+- Role assignment: active AI harness assigned by owner for counterpart review
 - Bridge: always available through bridge/INDEX.md and checked at session startup
 - Poller: activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed
-- Role mapping source: .claude/rules/operating-role.md
+- Role mapping source: C:\Users\micha\.codex\agent-red-hooks\operating-role.md
 
 - Strict GOV enforcement where mechanically available
 - Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations
@@ -66,60 +66,20 @@ Generated: 2026-04-24T04:30:36Z
 - Accepted wrap-up commands: `wrap up`, `wrap up this session`, `session wrap-up`, `run session wrap-up`, `close this session`, `end this session`, `new session`, `fresh session`, `start a new session`, `start a fresh session`, `begin a new session`, `begin a fresh session`, `open a new session`, `prepare a new session`, `initialize a new session`, `start fresh`, `begin fresh`.
 - Optional leading or trailing `please` and final punctuation are accepted.
 
-## Choose This Session's Focus
+## Loyal Opposition Startup Task
 
-Reply with the number or exact label. Each option is generated from the current dashboard evidence.
-
-1. **Optimize Startup Token Consumption**
-   Current signal: 2 startup reduction candidate(s) are currently visible.
-   Prompt details: Focus this session on reducing startup token consumption. Review the startup-loaded artifacts, prefer dashboard and index-first reads, and trim default startup context to the minimum evidence needed. Use this reduction set: Use the dashboard link before loading large artifacts into context; Read indices and summaries first; open full artifacts only when needed; Load only the specific skill body required for the current turn; Use cached startup snapshots for stable KPI instead of re-scanning everything; Propose explicit governance relaxation only when the audit trail can preserve the tradeoff.
-
-2. **Top Priority Actions**
-   Current signal: The standing backlog already identifies the visible highest-priority governed actions for this session, and the file bridge scan shows 0 latest NEW/REVISED entries.
-   Prompt details: Focus this session on the established top priority actions. Current priorities: GTKB-GOV-010: Maintain standing backlog harvest audit as release-gate input. Start with GTKB-GOV-010: Maintain standing backlog harvest audit as release-gate input; explain the current evidence, immediate next command, and expected verification.
-
-3. **Resolve Release Blockers**
-   Current signal: 0 release blocker(s) are visible in the dashboard.
-   Prompt details: Focus this session on clearing release blockers. Start with run the release gate and confirm no blocker evidence is stale. Verify the result with scripts/release_candidate_gate.py and update governed evidence.
-
-4. **Repair Testing/Tool Integrations**
-   Current signal: 0 failing and 2 unknown integration(s) are visible.
-   Prompt details: Focus this session on restoring testing service/tool integration health. Start with Chromatic: Verify `CHROMATIC_PROJECT_TOKEN`, inspect the Chromatic build for visual diffs or build errors, accept intentional baselines or fix regressions, then rerun Chromatic. Preserve GT-KB as infrastructure evidence.
-
-5. **Remediate Known Risks**
-   Current signal: 2 active risk(s) are summarized from release, integration, GT-KB, and drift signals.
-   Prompt details: Focus this session on the dashboard risk register. Start with GT-KB scaffold drift; recommended action: Review `gt project upgrade --dry-run` and apply only after owner approval.
-
-6. **Clear Stage/Test Release Path**
-   Current signal: Release readiness, regression, integration, and staging evidence should converge before stakeholder release.
-   Prompt details: Prepare for release by clearing the path to stage and test. Confirm release blockers, required checks, tool integrations, staging readiness, and evidence freshness before recommending a release decision.
-
-7. **Clean For Internal Review**
-   Current signal: 8 changed path(s) are visible in dashboard drift.
-   Prompt details: Clean and tidy for internal review. Inventory changed paths, separate unrelated work, run focused checks, and prepare a concise review handoff without modifying formal artifacts unless explicitly approved.
-
-8. **Pick From Standing Backlog**
-   Current signal: Standing backlog remains the governed cross-session work authority.
-   Prompt details: Choose work from the standing backlog. Start with GTKB-GOV-010: Maintain standing backlog harvest audit as release-gate input; restate the governing evidence, required approvals, implementation scope, and verification plan.
-
-9. **Commit and push to GitHub**
-   Current signal: Local changes can be packaged into an evidence-backed GitHub update when the working tree is ready.
-   Prompt details: Prepare a scoped commit and push it to GitHub. Inventory changed paths, separate unrelated work, run focused verification, commit only the intended scope, push the branch, and report the resulting GitHub evidence.
-
-10. **Merge to main, build and push to the staging environment**
-   Current signal: A reviewed GitHub branch can advance into the staging release lane after required checks and approvals are green.
-   Prompt details: Merge the reviewed branch to main, build the release artifact, and push it to the staging environment. Confirm required GitHub checks, release-gate evidence, branch provenance, build output, and staging deployment status.
-
-11. **Execute end-to-end tests in the staging environment**
-   Current signal: Staging must prove the candidate through live end-to-end coverage before production promotion.
-   Prompt details: Execute the staging end-to-end test plan. Verify environment health, run the governed E2E suites against staging, capture failures with evidence, and update release-readiness records with the staging result.
-
-12. **Push staged-and-tested build to production, then smoke test**
-   Current signal: Production promotion is only available after the staged build has passed required gates and owner approval is recorded.
-   Prompt details: Promote the staged-and-tested build to production, then run production smoke tests. Confirm explicit production approval, artifact provenance, deployment status, smoke-test evidence, rollback readiness, and release records.
-
-13. **Continue Last Session**
-   Current signal: The action center and 2 latest GO/NO-GO bridge responses define the current-session continuation scope.
-   Prompt details: Continue from the last session using the dashboard action center and any latest GO/NO-GO bridge responses, including responses produced by a prior Loyal Opposition session. Start by inventorying the latest GO/NO-GO bridge entries, then continue with Review GT-KB scaffold upgrade plan; explain current evidence, next command, and expected verification.
-
-Or provide a prompt for something else.
+- Startup mode: Loyal Opposition review and verification.
+- Default session purpose: process Prime Builder reviews and verifications on the file bridge.
+- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.
+- Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism; the poller is only a monitoring/activation service.
+- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.
+- Live bridge authority: current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`; this generated report is not authoritative after generation.
+- Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.
+- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.
+- Poller startup rule: activate a poller only when the roles are running in separate harnesses or asynchronous monitoring is otherwise needed.
+- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.
+- Generated-time file bridge scan, non-authoritative after report generation: 1 latest NEW/REVISED entry identified.
+- If the live bridge verification succeeds, report the live scan result and ask Mike whether to begin processing reviews and verifications from `bridge/INDEX.md`.
+- Expected owner reply: `yes` to begin processing the bridge queue, or `no` / a custom instruction to stay in advisory mode.
+- If the bridge is not functioning, diagnose and repair the bridge before ordinary review work.
+- Bridge authority: Loyal Opposition has permanent owner permission to diagnose and repair bridge function/use and downstream bridge-dependent artifacts needed to sustain the bridge.
