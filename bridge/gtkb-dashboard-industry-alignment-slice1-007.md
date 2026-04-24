@@ -80,21 +80,47 @@ panels except Refresh Age now carry the `F` target.
 Three YAML files under
 `docs/gtkb-dashboard/grafana/provisioning/alerting/`:
 
-| File | Title | Source | Fire condition (notional) |
+| File | Title | Source | Fire condition |
 |---|---|---|---|
 | `release-blockers.yaml` | Release Blockers | `current_metrics.release_blockers` | `value > 0` |
 | `failing-ci.yaml` | CI / Testing Failing | `current_metrics.ci_testing_failing` | `value > 0` |
-| `stale-data.yaml` | Data Freshness | `refresh_runs` minutes formula | `value > 60` (threshold annotation) |
+| `stale-data.yaml` | Data Freshness | `refresh_runs` minutes formula | `value > 60` |
+
+Rule structure hardening (applied during final implementation pass):
+
+- **`datasourceUid: gtkb-dashboard-sqlite`** — matches the UID defined in
+  `docs/gtkb-dashboard/grafana/provisioning/datasources/gtkb-dashboard-sqlite.yml`.
+  Prior WIP had `frser-sqlite-datasource` (the plugin type, not a UID), which
+  would fail provisioning.
+- **Threshold expression** (`refId: B`, `datasourceUid: __expr__`,
+  `type: threshold`) converts the SQL result into an alerting condition.
+  `condition: B` at the rule level points to the threshold result so the
+  rule actually fires on a numeric breach rather than "any non-null value."
+  `conditions[0].evaluator.params` encodes the numeric threshold:
+  `[0]` for release-blockers/failing-ci, `[60]` for stale-data.
+- **Dual SQL keys** — `model.rawSql` (proposal §E required-key language)
+  and `model.rawQueryText` (what the `frser-sqlite-datasource` runtime
+  actually reads) both present with identical SQL. The validator enforces
+  byte-equality so they cannot drift apart.
+- **`relativeTimeRange: from: 0 to: 0`** — instantaneous query (prior WIP
+  had `from: 600` which is wrong for a point-in-time SQLite read).
+- **`noDataState`** — `Alerting` for `stale-data.yaml` (empty `refresh_runs`
+  means the refresh service never ran, which *is* the stale-data condition);
+  `OK` for the two current-metrics-backed rules (no row just means the key
+  hasn't been materialized yet, not that the release has a blocker).
 
 Each rule includes annotations `source_metric_key` (for current-metrics
-rules) / `source_table` (for refresh_runs) + `severity`/`scope` labels.
-Alerts route to the Grafana alert list only — no external notifier wiring
-(deferred to Slice 2).
+rules) / `source_table` (for refresh_runs), a `summary` for the alert
+panel, and `severity`/`scope` labels. Alerts route to the Grafana alert
+list only — no external notifier wiring (Slice 2 scope).
 
 **`tests/scripts/test_gtkb_dashboard_alerting.py`** (new, 7 test cases):
 
 1. `test_all_three_alert_yamls_present_and_parse` — PyYAML parse + required
-   keys.
+   keys (`uid`, `title`, `condition`, `data`). Also enforces the dual-SQL
+   invariant: both `model.rawSql` (proposal §E) and `model.rawQueryText`
+   (runtime) must be present AND contain byte-identical SQL text, so the
+   proposal-vs-runtime key pair cannot silently drift apart.
 2. `test_release_blockers_uses_exact_authoritative_metric_key` — equality on
    metric_key literal + annotation.
 3. `test_failing_ci_uses_exact_authoritative_metric_key` — same for
@@ -120,20 +146,50 @@ Alerts route to the Grafana alert list only — no external notifier wiring
 
 ## Test Evidence
 
-Ran 2026-04-24:
+Ran 2026-04-24 in capped bridge-dispatch spawn:
 
 ```text
-python -m pytest tests/scripts/test_gtkb_dashboard_alerting.py tests/scripts/test_gtkb_dashboard_grafana.py -q --tb=short
-→ 11 passed in 0.44s
+python -m pytest tests/scripts/test_gtkb_dashboard_alerting.py \
+                 tests/scripts/test_gtkb_dashboard_grafana.py \
+                 tests/scripts/test_gtkb_dashboard_control_plane.py \
+                 -v --tb=short
+→ 35 passed in 0.59s
 ```
 
 Breakdown:
-- `test_gtkb_dashboard_alerting.py`: **7 passed** (new file).
-- `test_gtkb_dashboard_grafana.py`: **4 passed** (3 existing +
-  `test_stat_panels_surface_per_panel_freshness_secondary_value` new).
+- `tests/scripts/test_gtkb_dashboard_alerting.py::*` — **7 passed** (new file):
+  - `test_all_three_alert_yamls_present_and_parse` (incl. dual-SQL invariant)
+  - `test_release_blockers_uses_exact_authoritative_metric_key`
+  - `test_failing_ci_uses_exact_authoritative_metric_key`
+  - `test_no_rejected_alias_metric_names_in_any_yaml`
+  - `test_every_alert_sql_references_only_tables_in_schema`
+  - `test_stale_data_rule_uses_refresh_runs`
+  - `test_refresh_pipeline_actually_emits_the_alert_metric_keys`
+- `tests/scripts/test_gtkb_dashboard_grafana.py::*` — **4 passed**:
+  - `test_refresh_database_populates_grafana_sqlite_tables`
+  - `test_grafana_provisioning_targets_sqlite_database`
+  - `test_stat_panels_surface_per_panel_freshness_secondary_value` (new)
+  - `test_dashboard_launch_path_does_not_require_docker_desktop`
+- `tests/scripts/test_gtkb_dashboard_control_plane.py::*` — **24 passed**
+  (neighbouring lane, unchanged by this slice, proves no collateral damage).
 
-No regressions in other lanes (Phase 7 suite already green at 107 passed in
-the preceding commit).
+Generator regeneration check: `python scripts/gtkb_dashboard/generate_grafana_dashboard.py`
+rewrote the committed JSON to a byte-identical file (no drift between the
+generator and the regenerated JSON checked in with this commit).
+
+YAML parse + `rawSql` presence smoke check:
+
+```text
+release-blockers.yaml -> OK, uid=agent-red-release-blockers, condition=B
+  rawSql: SELECT value FROM current_metrics WHERE metric_key = 'release_blockers';
+failing-ci.yaml       -> OK, uid=agent-red-failing-ci,      condition=B
+  rawSql: SELECT value FROM current_metrics WHERE metric_key = 'ci_testing_failing';
+stale-data.yaml       -> OK, uid=agent-red-stale-data,      condition=B
+  rawSql: SELECT COALESCE(CAST((julianday('now') - julianday(...)) ...)) ...
+```
+
+No regressions in other dashboard lanes. This slice does not touch `src/`
+application code, the Phase 7 work-subject code, or upstream `groundtruth-kb/`.
 
 ---
 
