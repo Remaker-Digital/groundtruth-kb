@@ -119,6 +119,56 @@
     }
     #fallback, #snapshot-meta { color: var(--muted); font-size: 0.9rem; }
     .hidden { display: none !important; }
+    #subject-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    #subject-toolbar .toolbar-label { font-weight: 600; font-size: 0.85rem; color: var(--muted); }
+    #subject-toolbar .filter-btn {
+      padding: 4px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    #subject-toolbar .filter-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    #subject-toolbar .hint { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
+    .swimlane-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .swimlane-table th, .swimlane-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .swimlane-table th { color: var(--muted); font-weight: 600; }
+    .swimlane-status {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .swimlane-status.terminal { background: var(--badge-fresh); }
+    .swimlane-status.prime { background: var(--badge-stale); }
+    .swimlane-status.lo { background: var(--accent); }
+    tr.swimlane-terminal td { opacity: 0.65; }
+    #swimlane-summary { margin-bottom: 8px; color: var(--muted); font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -129,9 +179,32 @@
   <main>
     <section aria-labelledby="snapshot-heading">
       <h2 id="snapshot-heading">Most Recent KPI Snapshot <span id="age-badge" class="badge hidden" aria-live="polite"></span></h2>
+      <div id="subject-toolbar" role="toolbar" aria-label="Work subject filter">
+        <span class="toolbar-label">View:</span>
+        <button type="button" data-filter="all" class="filter-btn active" aria-pressed="true">All</button>
+        <button type="button" data-filter="application" class="filter-btn" aria-pressed="false">Application</button>
+        <button type="button" data-filter="gtkb_infrastructure" class="filter-btn" aria-pressed="false">GT-KB Infrastructure</button>
+        <span id="current-subject-hint" class="hint" aria-live="polite"></span>
+      </div>
       <p id="snapshot-meta">Loading <code>dashboard-data.json</code>&hellip;</p>
       <ul id="kpi-grid" class="kpi-grid" aria-live="polite"></ul>
       <p id="fallback" class="hidden">No snapshot data available. Start the refresh service and local dashboard to populate live KPIs.</p>
+    </section>
+    <section aria-labelledby="swimlane-heading">
+      <h2 id="swimlane-heading">Bridge State Swimlane <span id="swimlane-updated" class="badge hidden" aria-live="polite"></span></h2>
+      <div id="swimlane-summary" role="status">Loading <code>bridge-swimlane.json</code>&hellip;</div>
+      <table id="swimlane-table" class="swimlane-table" aria-describedby="swimlane-heading">
+        <thead>
+          <tr>
+            <th scope="col">Thread</th>
+            <th scope="col">Status</th>
+            <th scope="col">Version</th>
+            <th scope="col">Age in state</th>
+          </tr>
+        </thead>
+        <tbody id="swimlane-tbody"></tbody>
+      </table>
+      <p id="swimlane-fallback" class="hidden">No bridge swimlane data available.</p>
     </section>
     <section aria-labelledby="live-heading">
       <h2 id="live-heading">Open Live Dashboard</h2>
@@ -165,6 +238,24 @@
         skill_template_count: "Skill Templates"
       };
 
+      var SCOPE_BY_METRIC = {
+        regression_release_blocker_count: "application",
+        backlog_active_items: "all",
+        membase_open_work_items: "all",
+        deliberation_archive_current_total: "all",
+        specification_current_total: "all",
+        drift_changed_path_count: "gtkb_infrastructure",
+        pytest_file_count: "application",
+        contention_actionable_bridge_count: "gtkb_infrastructure",
+        skill_template_count: "gtkb_infrastructure"
+      };
+
+      var SUBJECT_LABELS = {
+        application: "Application (Agent Red)",
+        gtkb_infrastructure: "GT-KB Infrastructure",
+        all: "All subjects"
+      };
+
       function selectLatest(payload) {
         if (!payload) return null;
         if (Array.isArray(payload)) return payload.length ? payload[payload.length - 1] : null;
@@ -188,8 +279,11 @@
         while (node.firstChild) node.removeChild(node.firstChild);
       }
 
-      function appendKpi(grid, labelText, valueText) {
+      function appendKpi(grid, key, labelText, valueText) {
         var li = document.createElement("li");
+        var scope = SCOPE_BY_METRIC[key] || "all";
+        li.setAttribute("data-scope", scope);
+        li.setAttribute("data-metric-key", key);
         var label = document.createElement("div");
         label.className = "label";
         label.textContent = labelText;
@@ -201,20 +295,62 @@
         grid.appendChild(li);
       }
 
-      function render(snapshot) {
+      function applySubjectFilter(filter) {
+        var grid = document.getElementById("kpi-grid");
+        if (!grid) return;
+        var cards = grid.querySelectorAll("li[data-scope]");
+        for (var i = 0; i < cards.length; i++) {
+          var card = cards[i];
+          var scope = card.getAttribute("data-scope");
+          var visible = (filter === "all") || (scope === "all") || (scope === filter);
+          if (visible) card.classList.remove("hidden");
+          else card.classList.add("hidden");
+        }
+        var buttons = document.querySelectorAll("#subject-toolbar .filter-btn");
+        for (var j = 0; j < buttons.length; j++) {
+          var btn = buttons[j];
+          var btnFilter = btn.getAttribute("data-filter");
+          var active = btnFilter === filter;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        }
+      }
+
+      function wireSubjectToolbar(canonicalSubject) {
+        var hint = document.getElementById("current-subject-hint");
+        if (hint) {
+          if (canonicalSubject && SUBJECT_LABELS[canonicalSubject]) {
+            hint.textContent = "Canonical subject: " + SUBJECT_LABELS[canonicalSubject];
+          } else {
+            hint.textContent = "Canonical subject: not set";
+          }
+        }
+        var defaultFilter = (canonicalSubject && SUBJECT_LABELS[canonicalSubject]) ? canonicalSubject : "all";
+        applySubjectFilter(defaultFilter);
+        var buttons = document.querySelectorAll("#subject-toolbar .filter-btn");
+        for (var i = 0; i < buttons.length; i++) {
+          buttons[i].addEventListener("click", function (event) {
+            var f = event.currentTarget.getAttribute("data-filter") || "all";
+            applySubjectFilter(f);
+          });
+        }
+      }
+
+      function render(latest) {
         var grid = document.getElementById("kpi-grid");
         var meta = document.getElementById("snapshot-meta");
         var badge = document.getElementById("age-badge");
         var fallback = document.getElementById("fallback");
         clearChildren(grid);
 
-        if (!snapshot) {
+        if (!latest) {
           meta.textContent = "";
           fallback.classList.remove("hidden");
+          wireSubjectToolbar(null);
           return;
         }
 
-        var generatedAt = snapshot.generated_at || (snapshot.data_freshness && snapshot.data_freshness.generated_at) || null;
+        var generatedAt = latest.generated_at || (latest.data_freshness && latest.data_freshness.generated_at) || null;
         meta.textContent = generatedAt ? ("Snapshot generated at " + generatedAt) : "Snapshot loaded (no timestamp).";
         var badgeInfo = ageBadge(generatedAt);
         if (badgeInfo) {
@@ -225,18 +361,99 @@
 
         var rendered = 0;
         Object.keys(META_LABELS).forEach(function (key) {
-          if (snapshot[key] === undefined || snapshot[key] === null) return;
-          appendKpi(grid, META_LABELS[key], snapshot[key]);
+          if (latest[key] === undefined || latest[key] === null) return;
+          appendKpi(grid, key, META_LABELS[key], latest[key]);
           rendered++;
         });
         if (rendered === 0) fallback.classList.remove("hidden");
         else fallback.classList.add("hidden");
+
+        var canonicalSubject = latest.current_work_subject || null;
+        wireSubjectToolbar(canonicalSubject);
+      }
+
+      function statusKlass(thread) {
+        if (thread.is_terminal) return "terminal";
+        if (thread.awaiting_prime) return "prime";
+        if (thread.awaiting_lo) return "lo";
+        return "lo";
+      }
+
+      function ageText(minutes) {
+        if (minutes === null || minutes === undefined) return "n/a";
+        if (minutes < 60) return minutes + "m";
+        var hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + "h " + (minutes % 60) + "m";
+        var days = Math.floor(hours / 24);
+        return days + "d " + (hours % 24) + "h";
+      }
+
+      function appendSwimlaneRow(tbody, thread) {
+        var tr = document.createElement("tr");
+        if (thread.is_terminal) tr.classList.add("swimlane-terminal");
+        var threadCell = document.createElement("td");
+        threadCell.textContent = thread.document;
+        var statusCell = document.createElement("td");
+        var statusBadge = document.createElement("span");
+        statusBadge.className = "swimlane-status " + statusKlass(thread);
+        statusBadge.textContent = thread.latest_status;
+        statusCell.appendChild(statusBadge);
+        var versionCell = document.createElement("td");
+        versionCell.textContent = "v" + thread.latest_version + " (" + thread.version_count + " total)";
+        var ageCell = document.createElement("td");
+        ageCell.textContent = ageText(thread.age_in_state_minutes);
+        tr.appendChild(threadCell);
+        tr.appendChild(statusCell);
+        tr.appendChild(versionCell);
+        tr.appendChild(ageCell);
+        tbody.appendChild(tr);
+      }
+
+      function renderSwimlane(payload) {
+        var summary = document.getElementById("swimlane-summary");
+        var tbody = document.getElementById("swimlane-tbody");
+        var fallback = document.getElementById("swimlane-fallback");
+        var updatedBadge = document.getElementById("swimlane-updated");
+        if (!summary || !tbody || !fallback) return;
+        clearChildren(tbody);
+
+        if (!payload || !Array.isArray(payload.threads)) {
+          summary.textContent = "";
+          fallback.classList.remove("hidden");
+          return;
+        }
+        var s = payload.summary || {};
+        summary.textContent = s.thread_count + " threads — open " + (s.open_count || 0)
+          + ", awaiting Prime " + (s.awaiting_prime_count || 0)
+          + ", awaiting LO " + (s.awaiting_lo_count || 0)
+          + ", terminal " + (s.terminal_count || 0);
+        if (payload.generated_at && updatedBadge) {
+          var info = ageBadge(payload.generated_at);
+          if (info) {
+            updatedBadge.className = "badge " + info.klass;
+            updatedBadge.textContent = "swimlane " + info.text;
+            updatedBadge.classList.remove("hidden");
+          }
+        }
+        if (payload.threads.length === 0) {
+          fallback.classList.remove("hidden");
+          return;
+        }
+        fallback.classList.add("hidden");
+        for (var i = 0; i < payload.threads.length; i++) {
+          appendSwimlaneRow(tbody, payload.threads[i]);
+        }
       }
 
       fetch("dashboard-data.json", { cache: "no-store" })
         .then(function (r) { return r.ok ? r.json() : null; })
         .catch(function () { return null; })
         .then(function (payload) { render(selectLatest(payload)); });
+
+      fetch("bridge-swimlane.json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (payload) { renderSwimlane(payload); });
     })();
   </script>
 </body>

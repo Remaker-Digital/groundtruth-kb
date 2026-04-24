@@ -20,16 +20,20 @@ from typing import Any
 
 try:
     from scripts.workstream_focus import (
+        CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,
         SubjectScopeError,
         assert_readiness_subject_scope,
+        load_state as _workstream_load_state,
         render_active_work_subject,
         render_startup_focus_lines,
         startup_focus_snapshot,
     )
 except ModuleNotFoundError:  # pragma: no cover - direct script execution path
     from workstream_focus import (  # type: ignore[no-redef]
+        CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,
         SubjectScopeError,
         assert_readiness_subject_scope,
+        load_state as _workstream_load_state,
         render_active_work_subject,
         render_startup_focus_lines,
         startup_focus_snapshot,
@@ -2558,6 +2562,7 @@ def build_startup_model(
         },
         "contention": _bridge_metrics(project_root),
         "tokens": _token_metric(),
+        "work_subject": _collect_work_subject(project_root),
     }
     infrastructure = {
         "instrumentation": "GT-KB",
@@ -2641,6 +2646,38 @@ def build_startup_model(
             "Use cached startup snapshots for stable KPI instead of re-scanning everything.",
             "Propose explicit governance relaxation only when the audit trail can preserve the tradeoff.",
         ],
+        "current_work_subject": metrics["work_subject"].get("current_subject"),
+    }
+
+
+def _collect_work_subject(project_root: Path) -> dict[str, Any]:
+    """Collect the active work-subject for the dashboard.
+
+    Distinguishes "no canonical state file" from "explicitly set to application"
+    by checking the canonical file's existence rather than relying on
+    ``load_state()`` which normalizes a missing file to the default subject.
+    Slice 2.1 of GTKB-DASHBOARD-002 (Implementation Condition #2).
+    """
+    canonical_path = project_root / _WORK_SUBJECT_CANONICAL_PATH
+    present = canonical_path.is_file()
+    if not present:
+        return {
+            "current_subject": None,
+            "source_path": str(_WORK_SUBJECT_CANONICAL_PATH).replace("\\", "/"),
+            "present": False,
+        }
+    try:
+        state = _workstream_load_state(project_root)
+    except Exception:
+        return {
+            "current_subject": None,
+            "source_path": str(_WORK_SUBJECT_CANONICAL_PATH).replace("\\", "/"),
+            "present": True,
+        }
+    return {
+        "current_subject": state.get("current_subject"),
+        "source_path": str(_WORK_SUBJECT_CANONICAL_PATH).replace("\\", "/"),
+        "present": True,
     }
 
 
@@ -2662,6 +2699,7 @@ def _snapshot_from_model(model: dict[str, Any]) -> dict[str, Any]:
         "contention_actionable_bridge_count": metrics["contention"].get("actionable_count"),
         "tokens_consumed_before_user_input": metrics["tokens"].get("tokens_consumed_before_user_input"),
         "token_measurement_status": metrics["tokens"].get("measurement_status"),
+        "current_work_subject": (metrics.get("work_subject") or {}).get("current_subject"),
     }
 
 

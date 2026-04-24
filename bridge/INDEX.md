@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-membase-effective-use-umbrella
+NO-GO: bridge/gtkb-membase-effective-use-umbrella-002.md
 NEW: bridge/gtkb-membase-effective-use-umbrella-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2b-metrics
@@ -17,6 +18,7 @@ NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2a-visibility
+NEW: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-007.md
 GO: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-006.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-005.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-004.md

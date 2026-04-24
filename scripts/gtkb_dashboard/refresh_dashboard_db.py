@@ -4,13 +4,36 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
+import logging
 import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import yaml
+
+logger = logging.getLogger(__name__)
+
+INCIDENTS_PATH = Path("memory") / "incidents.yaml"
+
+_REQUIRED_MIGRATION_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("event_kind", "TEXT NOT NULL DEFAULT 'change'"),
+    ("deployable_change_id", "TEXT NOT NULL DEFAULT ''"),
+    ("commit_range_start", "TEXT NOT NULL DEFAULT ''"),
+    ("commit_range_end", "TEXT NOT NULL DEFAULT ''"),
+    ("rollback_of_deploy_id", "TEXT NOT NULL DEFAULT ''"),
+    ("hotfix_of_deploy_id", "TEXT NOT NULL DEFAULT ''"),
+)
+
+_ROLLBACK_LINK_WINDOW_SECONDS = 7 * 24 * 60 * 60
+
+
+class IncidentIngestError(RuntimeError):
+    """Raised when memory/incidents.yaml cannot be parsed or validated."""
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB_PATH = PROJECT_ROOT / "memory" / "gtkb-dashboard.sqlite"
@@ -274,6 +297,44 @@ def initialize_database(db_path: Path) -> None:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
+def _migrate_schema(db_path: Path) -> None:
+    """Apply idempotent ALTER TABLE migrations under SQLite RESERVED lock.
+
+    The fresh-DB path is handled by `CREATE TABLE IF NOT EXISTS` in `schema.sql`;
+    this function adds the six DORA-telemetry columns to any pre-existing
+    `delivery_timeline_events` table.
+
+    Concurrency: the probe + ALTER sequence runs inside a single explicit
+    BEGIN IMMEDIATE / COMMIT transaction. BEGIN IMMEDIATE acquires a RESERVED
+    lock at the database-file level; a second concurrent writer blocks on its
+    own BEGIN IMMEDIATE until the first COMMITs, at which point its probe sees
+    the already-added columns and the ALTER branch is skipped. No
+    duplicate-column race.
+    """
+    conn = sqlite3.connect(db_path, isolation_level=None, timeout=30.0)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            existing = {
+                row[1]
+                for row in conn.execute(
+                    "PRAGMA table_info('delivery_timeline_events')"
+                ).fetchall()
+            }
+            for col_name, col_decl in _REQUIRED_MIGRATION_COLUMNS:
+                if col_name not in existing:
+                    conn.execute(
+                        f"ALTER TABLE delivery_timeline_events "
+                        f"ADD COLUMN {col_name} {col_decl}"
+                    )
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+
+
 def refresh_database(
     db_path: Path = DEFAULT_DB_PATH,
     project_root: Path = PROJECT_ROOT,
@@ -282,6 +343,7 @@ def refresh_database(
 ) -> dict[str, Any]:
     started_at = datetime.now(UTC).isoformat()
     initialize_database(db_path)
+    _migrate_schema(db_path)
     run_id: int | None = None
     with sqlite3.connect(db_path) as conn:
         cursor = conn.execute(
@@ -301,7 +363,8 @@ def refresh_database(
             snapshot = session_module._snapshot_from_model(model)
             previous_history = _read_existing_history(db_path)
             history = _append_snapshot(previous_history, snapshot)
-        _write_model_to_db(db_path, model, history)
+        _write_model_to_db(db_path, model, history, project_root)
+        _write_bridge_swimlane_safe(project_root)
         completed_at = datetime.now(UTC).isoformat()
         with sqlite3.connect(db_path) as conn:
             conn.execute(
@@ -317,6 +380,22 @@ def refresh_database(
                 (completed_at, "failed", str(exc), run_id),
             )
         raise
+
+
+def _write_bridge_swimlane_safe(project_root: Path) -> None:
+    """Generate the bridge swimlane JSON; never abort refresh on failure.
+
+    Slice 2.1 of GTKB-DASHBOARD-002. The dashboard landing page reads
+    ``docs/gtkb-dashboard/bridge-swimlane.json``; failure to write it logs a
+    warning and returns silently so the rest of the refresh is unaffected.
+    """
+    try:
+        from .generate_bridge_swimlane import write_swimlane
+
+        out_path = project_root / "docs" / "gtkb-dashboard" / "bridge-swimlane.json"
+        write_swimlane(project_root, out_path)
+    except Exception:
+        logger.warning("bridge swimlane write failed; refresh continues", exc_info=True)
 
 
 def _read_existing_history(db_path: Path) -> list[dict[str, Any]]:
@@ -349,7 +428,12 @@ def _append_snapshot(history: list[dict[str, Any]], snapshot: dict[str, Any], ma
     return filtered[-max_history:]
 
 
-def _write_model_to_db(db_path: Path, model: dict[str, Any], history: list[dict[str, Any]]) -> None:
+def _write_model_to_db(
+    db_path: Path,
+    model: dict[str, Any],
+    history: list[dict[str, Any]],
+    project_root: Path = PROJECT_ROOT,
+) -> None:
     metrics = model.get("metrics", {})
     intelligence = model.get("dashboard_intelligence", {})
     infrastructure = model.get("infrastructure", {})
@@ -445,12 +529,15 @@ def _write_model_to_db(db_path: Path, model: dict[str, Any], history: list[dict[
         )
 
         ordered_events = sorted(delivery.get("timeline", []), key=lambda row: str(row.get("timestamp") or ""))
+        enriched_events = _enrich_timeline_events(ordered_events)
         conn.executemany(
             """
             INSERT INTO delivery_timeline_events
             (sort_order, stage, stage_label, event, timestamp, date_label, version, commit_sha, branch,
-             result, result_color, test_results, source, url, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             result, result_color, test_results, source, url, notes,
+             event_kind, deployable_change_id, commit_range_start, commit_range_end,
+             rollback_of_deploy_id, hotfix_of_deploy_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -469,10 +556,23 @@ def _write_model_to_db(db_path: Path, model: dict[str, Any], history: list[dict[
                     item.get("source", ""),
                     item.get("url", ""),
                     item.get("notes", ""),
+                    item["_event_kind"],
+                    item["_deployable_change_id"],
+                    item["_commit_range_start"],
+                    item["_commit_range_end"],
+                    item["_rollback_of_deploy_id"],
+                    item["_hotfix_of_deploy_id"],
                 )
-                for idx, item in enumerate(ordered_events, start=1)
+                for idx, item in enumerate(enriched_events, start=1)
             ],
         )
+
+        known_deploy_ids = {
+            item["_deployable_change_id"]
+            for item in enriched_events
+            if item["_deployable_change_id"]
+        }
+        _load_incidents(project_root, conn, known_deploy_ids)
 
         release = intelligence.get("release_readiness", {})
         conn.executemany(
@@ -575,6 +675,198 @@ def _write_model_to_db(db_path: Path, model: dict[str, Any], history: list[dict[
 
 def _replace_table(conn: sqlite3.Connection, table_name: str) -> None:
     conn.execute(f"DELETE FROM {table_name}")
+
+
+def _classify_event_kind(row: dict[str, Any]) -> str:
+    """Classify a timeline row into a DORA event kind.
+
+    Source-based rules (checked in order). Pure; depends only on ``source`` and
+    ``result`` fields of the row.
+    """
+    source = str(row.get("source") or "")
+    result = str(row.get("result") or "")
+    if source == "git log":
+        return "change"
+    if source.startswith(".github/workflows/"):
+        if result == "configured":
+            return "config"
+        return "workflow_run"
+    lowered = source.lower()
+    if lowered.startswith("scripts/deploy/"):
+        if "rollback" in lowered:
+            return "rollback"
+        if "hotfix" in lowered:
+            return "hotfix"
+        if "restore" in lowered:
+            return "restore"
+        if lowered.endswith((".ps1", ".yaml", ".yml")):
+            return "config"
+    if source.startswith("scripts/") and lowered.endswith((".ps1", ".yaml", ".yml")):
+        return "config"
+    if source == "GitHub Actions":
+        return "workflow_run"
+    return "change"
+
+
+def _timestamp_unix(ts: Any) -> int:
+    """Best-effort ISO-8601 timestamp -> epoch seconds. 0 for unparseable."""
+    if not ts:
+        return 0
+    text = str(ts).strip()
+    if not text:
+        return 0
+    normalized = text.replace("Z", "+00:00") if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return 0
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return int(parsed.timestamp())
+
+
+def _deployable_change_id(row: dict[str, Any]) -> str:
+    """Stable ID for the change this row represents.
+
+    Commit-linked rows produce ``<sha8>-<unix>``; deploy-like rows without a
+    commit produce ``derived-<kind>-<sha1_12>``; commits-without-SHA and
+    unclassified rows produce ``''``.
+    """
+    commit = str(row.get("commit") or "").strip()
+    if commit:
+        return f"{commit[:8]}-{_timestamp_unix(row.get('timestamp'))}"
+    event_kind = _classify_event_kind(row)
+    if event_kind in {"workflow_run", "config", "rollback", "hotfix", "restore"}:
+        basis = f"{row.get('source', '')}|{row.get('timestamp', '')}|{row.get('event', '')}"
+        digest = hashlib.sha1(basis.encode("utf-8")).hexdigest()[:12]
+        return f"derived-{event_kind}-{digest}"
+    return ""
+
+
+def _link_rollback_hotfix(rows: list[dict[str, Any]]) -> None:
+    """Mutates ``rows`` in place: set ``_rollback_of_deploy_id`` /
+    ``_hotfix_of_deploy_id`` on rollback/hotfix events by finding the nearest
+    preceding ``workflow_run`` row within a 7-day window.
+    """
+    runs = sorted(
+        (row for row in rows if row["_event_kind"] == "workflow_run" and row["_deployable_change_id"]),
+        key=lambda r: _timestamp_unix(r.get("timestamp")),
+    )
+    for row in rows:
+        kind = row["_event_kind"]
+        if kind not in ("rollback", "hotfix"):
+            continue
+        target_ts = _timestamp_unix(row.get("timestamp"))
+        if not target_ts:
+            continue
+        best: dict[str, Any] | None = None
+        best_delta = _ROLLBACK_LINK_WINDOW_SECONDS + 1
+        for run in runs:
+            run_ts = _timestamp_unix(run.get("timestamp"))
+            if run_ts <= 0 or run_ts > target_ts:
+                continue
+            delta = target_ts - run_ts
+            if delta > _ROLLBACK_LINK_WINDOW_SECONDS:
+                continue
+            if delta < best_delta:
+                best = run
+                best_delta = delta
+        if best is not None:
+            if kind == "rollback":
+                row["_rollback_of_deploy_id"] = best["_deployable_change_id"]
+            else:
+                row["_hotfix_of_deploy_id"] = best["_deployable_change_id"]
+
+
+def _enrich_timeline_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return a copy of ``rows`` with the six DORA-telemetry fields populated."""
+    enriched: list[dict[str, Any]] = []
+    for row in rows:
+        enriched_row = dict(row)
+        enriched_row["_event_kind"] = _classify_event_kind(row)
+        enriched_row["_deployable_change_id"] = _deployable_change_id(row)
+        commit_sha = str(row.get("commit") or "").strip()
+        enriched_row["_commit_range_start"] = commit_sha
+        enriched_row["_commit_range_end"] = commit_sha
+        enriched_row["_rollback_of_deploy_id"] = ""
+        enriched_row["_hotfix_of_deploy_id"] = ""
+        enriched.append(enriched_row)
+    _link_rollback_hotfix(enriched)
+    return enriched
+
+
+_INCIDENT_REQUIRED_FIELDS = ("incident_id", "title", "severity", "detected_at")
+
+
+def _load_incidents(
+    project_root: Path,
+    conn: sqlite3.Connection,
+    known_deploy_ids: set[str],
+) -> None:
+    """Replace rows in ``incidents`` from ``memory/incidents.yaml``.
+
+    Absent file => empty table. Malformed YAML raises ``IncidentIngestError``.
+    Entries referencing a ``caused_by_deploy_id`` not seen in the current
+    timeline are still inserted; a warning is logged for visibility.
+    """
+    _replace_table(conn, "incidents")
+    incidents_path = project_root / INCIDENTS_PATH
+    if not incidents_path.is_file():
+        return
+    try:
+        raw = incidents_path.read_text(encoding="utf-8")
+        parsed = yaml.safe_load(raw)
+    except (OSError, yaml.YAMLError) as exc:
+        raise IncidentIngestError(
+            f"Failed to read or parse {incidents_path}: {exc}"
+        ) from exc
+    if parsed is None:
+        return
+    if not isinstance(parsed, list):
+        raise IncidentIngestError(
+            f"{incidents_path} must be a YAML list of incident objects"
+        )
+    rows: list[tuple[Any, ...]] = []
+    for index, entry in enumerate(parsed):
+        if not isinstance(entry, dict):
+            raise IncidentIngestError(
+                f"{incidents_path}[{index}] must be a mapping, got {type(entry).__name__}"
+            )
+        missing = [field for field in _INCIDENT_REQUIRED_FIELDS if not entry.get(field)]
+        if missing:
+            raise IncidentIngestError(
+                f"{incidents_path}[{index}] is missing required fields: {missing}"
+            )
+        caused_by = str(entry.get("caused_by_deploy_id") or "")
+        if caused_by and caused_by not in known_deploy_ids:
+            logger.warning(
+                "Incident %s references unknown deploy id %s; inserting anyway.",
+                entry.get("incident_id"),
+                caused_by,
+            )
+        rows.append(
+            (
+                str(entry["incident_id"]),
+                str(entry["title"]),
+                str(entry["severity"]),
+                caused_by,
+                str(entry["detected_at"]),
+                entry.get("mitigated_at"),
+                entry.get("closed_at"),
+                str(entry.get("description") or ""),
+                str(entry.get("source") or str(incidents_path)),
+            )
+        )
+    if rows:
+        conn.executemany(
+            """
+            INSERT INTO incidents
+            (incident_id, title, severity, caused_by_deploy_id, detected_at,
+             mitigated_at, closed_at, description, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
 
 
 def _kpi_rows(history: list[dict[str, Any]]) -> list[tuple[Any, ...]]:

@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Generate the bridge state swimlane JSON for the GT-KB dashboard.
+
+Reads ``bridge/INDEX.md`` (parsed via :mod:`scripts.gtkb_bridge_writer`),
+attaches per-thread timestamps from ``git log`` (with mtime fallback), and
+classifies each thread as terminal, awaiting Prime Builder, or awaiting
+Loyal Opposition.
+
+Output shape: see :func:`generate_swimlane`.
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import os
+import subprocess
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+_THIS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _THIS_DIR.parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts.gtkb_bridge_writer import (  # noqa: E402  (sys.path bootstrap)
+    DocumentBlock,
+    parse_index,
+)
+
+TERMINAL_STATUSES = frozenset({"VERIFIED"})
+AWAITING_PRIME_STATUSES = frozenset({"NO-GO", "GO"})
+AWAITING_LO_STATUSES = frozenset({"NEW", "REVISED"})
+
+
+def _now_utc() -> datetime:
+    return datetime.now(UTC)
+
+
+def _index_path(project_root: Path) -> Path:
+    return project_root / "bridge" / "INDEX.md"
+
+
+def _bridge_dir(project_root: Path) -> Path:
+    return project_root / "bridge"
+
+
+def _read_index_text(project_root: Path) -> str:
+    try:
+        return _index_path(project_root).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _index_sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _git_committer_iso(path: Path, project_root: Path, *, reverse: bool = False) -> str | None:
+    rel = path.relative_to(project_root).as_posix() if path.is_absolute() else str(path)
+    args = ["git", "log", "--format=%cI"]
+    if reverse:
+        args.append("--reverse")
+    args.extend(["--", rel])
+    try:
+        completed = subprocess.run(
+            args,
+            cwd=str(project_root),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    out = completed.stdout.strip()
+    if not out:
+        return None
+    return out.splitlines()[0].strip() or None
+
+
+def _mtime_iso(path: Path) -> str | None:
+    try:
+        ts = path.stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(ts, UTC).isoformat()
+
+
+def _resolve_timestamp(
+    bridge_path: Path,
+    project_root: Path,
+    *,
+    reverse: bool = False,
+) -> str | None:
+    """Prefer git committer date; fall back to filesystem mtime."""
+    git_value = _git_committer_iso(bridge_path, project_root, reverse=reverse)
+    if git_value:
+        return git_value
+    return _mtime_iso(bridge_path)
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+def _age_in_state_minutes(last_updated: str | None, now: datetime) -> int | None:
+    parsed = _parse_iso(last_updated)
+    if parsed is None:
+        return None
+    delta = now - parsed
+    return max(int(delta.total_seconds() // 60), 0)
+
+
+def _classify(status: str) -> tuple[bool, bool, bool]:
+    """Return (is_terminal, awaiting_prime, awaiting_lo) for a status."""
+    return (
+        status in TERMINAL_STATUSES,
+        status in AWAITING_PRIME_STATUSES,
+        status in AWAITING_LO_STATUSES,
+    )
+
+
+def _thread_record(block: DocumentBlock, project_root: Path, now: datetime) -> dict[str, Any] | None:
+    if not block.entries:
+        return None
+    latest = block.entries[0]
+    latest_filename = latest.filename
+    bridge_path = _bridge_dir(project_root) / latest_filename
+    first_filename = f"{block.name}-001.md"
+    first_path = _bridge_dir(project_root) / first_filename
+
+    last_updated_at = _resolve_timestamp(bridge_path, project_root, reverse=False)
+    first_seen_at = _resolve_timestamp(first_path, project_root, reverse=True)
+    is_terminal, awaiting_prime, awaiting_lo = _classify(latest.status)
+
+    return {
+        "document": block.name,
+        "latest_status": latest.status,
+        "latest_filename": latest_filename,
+        "latest_version": latest.version,
+        "version_count": len(block.entries),
+        "first_seen_at": first_seen_at,
+        "last_updated_at": last_updated_at,
+        "age_in_state_minutes": _age_in_state_minutes(last_updated_at, now),
+        "is_terminal": is_terminal,
+        "awaiting_prime": awaiting_prime,
+        "awaiting_lo": awaiting_lo,
+    }
+
+
+def _summarize(threads: list[dict[str, Any]]) -> dict[str, Any]:
+    open_threads = [t for t in threads if not t["is_terminal"]]
+    awaiting_prime = sum(1 for t in threads if t["awaiting_prime"])
+    awaiting_lo = sum(1 for t in threads if t["awaiting_lo"])
+    open_ages = [t["age_in_state_minutes"] for t in open_threads if t["age_in_state_minutes"] is not None]
+    return {
+        "thread_count": len(threads),
+        "terminal_count": sum(1 for t in threads if t["is_terminal"]),
+        "open_count": len(open_threads),
+        "awaiting_prime_count": awaiting_prime,
+        "awaiting_lo_count": awaiting_lo,
+        "oldest_open_minutes": max(open_ages) if open_ages else None,
+    }
+
+
+def generate_swimlane(project_root: Path) -> dict[str, Any]:
+    """Read ``bridge/INDEX.md`` fresh and return the swimlane snapshot dict."""
+    project_root = project_root.resolve()
+    raw = _read_index_text(project_root)
+    try:
+        blocks = parse_index(raw)
+    except Exception:
+        logger.warning("parse_index failed; returning empty swimlane", exc_info=True)
+        blocks = ()
+    now = _now_utc()
+    threads: list[dict[str, Any]] = []
+    for block in blocks:
+        record = _thread_record(block, project_root, now)
+        if record is not None:
+            threads.append(record)
+    return {
+        "generated_at": now.isoformat(),
+        "source_index_sha": _index_sha256(raw),
+        "threads": threads,
+        "summary": _summarize(threads),
+    }
+
+
+def _atomic_write_text(target: Path, text: str) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, target)
+
+
+def write_swimlane(project_root: Path, out_path: Path) -> dict[str, Any]:
+    """Generate the swimlane snapshot and write it atomically to ``out_path``."""
+    snapshot = generate_swimlane(project_root)
+    _atomic_write_text(out_path, json.dumps(snapshot, indent=2, sort_keys=True) + "\n")
+    return snapshot
+
+
+def _default_out_path(project_root: Path) -> Path:
+    return project_root / "docs" / "gtkb-dashboard" / "bridge-swimlane.json"
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate bridge state swimlane JSON.")
+    parser.add_argument("--project-root", type=Path, default=_REPO_ROOT)
+    parser.add_argument("--out", type=Path, default=None)
+    args = parser.parse_args(argv)
+    out_path = args.out or _default_out_path(args.project_root.resolve())
+    snapshot = write_swimlane(args.project_root.resolve(), out_path)
+    print(json.dumps({"out": str(out_path), "thread_count": snapshot["summary"]["thread_count"]}))
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry
+    raise SystemExit(main())
