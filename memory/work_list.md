@@ -5,6 +5,34 @@ propose via bridge → wait for Codex GO → implement → post-impl report → 
 
 Do not wait for owner approval between items. Continue unsupervised.
 
+---
+
+## Next Actionable Items (hand-maintained; automation tracked under GTKB-GOV-BACKLOG-DISCIPLINE)
+
+Updated: 2026-04-24 (S306).
+
+| # | ID | Status | Blocks / blocked by | Next step |
+|---|---|---|---|---|
+| 1 | `GTKB-ISOLATION-015` **Slice 2** | in-flight | Blocks `GTKB-ISOLATION-016`. Slice 1 VERIFIED. | Draft typed `work_subject.set` control-plane handler proposal. |
+| 2 | `GTKB-DASHBOARD-002` | ready | Slice 1 VERIFIED 2026-04-24. | File Slice 2 proposal (swimlane, subject selector, coverage/security/CI, notifier). |
+| 3 | `GTKB-DORA-001` | ready | Blocks `GTKB-DORA-002` and `GTKB-DASHBOARD-003`. | File DORA telemetry foundation proposal. |
+| 4 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | awaiting Codex review | Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Codex reviewing `-001`; no Prime action. |
+| 5 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
+
+Standing governance items (`GTKB-GOV-001` through `GTKB-GOV-010`, minus
+`-007` PAUSED and `-009` VERIFIED) and `GTKB-CORE-001` / `GTKB-MASS-001`
+remain below. They are not mechanically sequenced against the items above
+until `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1` lands the structured
+field block with typed `depends_on`.
+
+**Known tracking-freshness caveat:** "TOP" as a priority value is
+currently overloaded across ~10 entries below (many are historical artifacts
+from earlier sessions). The 5-row table above reflects the current actionable
+ordering; the file-wide priority text is not trustworthy until
+`GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1` mechanically validates it.
+
+---
+
 ## Completed During Current Session
 
 ### GTKB-GOV-000 — DONE — Implement strict formal artifact approval gate with scoped auto-approval mode
@@ -128,10 +156,16 @@ is complete or the owner explicitly pauses or reprioritizes the program,
 non-isolation items below are deferred except for bridge or governance work
 that directly unblocks the isolation program.
 
-### GTKB-ISOLATION-010 - Execute Phase 7 foundation slice: work-subject state and resolved-root guardrails
+### GTKB-ISOLATION-010 - DONE - Execute Phase 7 foundation slice: work-subject state and resolved-root guardrails
 
-**Priority:** TOP. This is the first concrete execution slice already entered on
-the live bridge in `bridge/gtkb-work-subject-root-enforcement-implementation-001.md`,
+**Status:** DONE 2026-04-23 (S305). **VERIFIED** at
+`bridge/gtkb-work-subject-root-enforcement-implementation-020.md`. Superseded
+by `GTKB-ISOLATION-015` which continues Phase 7 integration beyond the
+foundation slice.
+
+**Priority (historical):** TOP. This was the first concrete execution slice
+already entered on the live bridge in
+`bridge/gtkb-work-subject-root-enforcement-implementation-001.md`,
 and it should lead the queue because later environment, service, control-plane,
 overlay, and migration work need stable work-subject state, root
 classification, and startup/hook language first.
@@ -149,13 +183,17 @@ startup/hook/report language changes from `focus` to `work subject`.
 `tests/scripts/test_codex_hook_parity.py`, followed by broader `tests/hooks/`
 and `tests/scripts/` lanes once the focused slice is green.
 
-### GTKB-ISOLATION-011 - Implement Phase 3 environment boundary baseline
+### GTKB-ISOLATION-011 - DONE - Implement Phase 3 environment boundary baseline
 
-**Priority:** TOP after `GTKB-ISOLATION-010`.
+**Status:** DONE 2026-04-23 (S305). **VERIFIED**; Windows drive-letter
+compose-bind fix landed via REVISED-1. See
+`bridge/gtkb-environment-boundary-baseline-implementation-*` thread.
 
-**Bridge status:** proposal filed in
-`bridge/gtkb-environment-boundary-baseline-implementation-001.md`; awaiting
-Loyal Opposition review.
+**Priority (historical):** TOP after `GTKB-ISOLATION-010`.
+
+**Bridge status:** originally proposal filed in
+`bridge/gtkb-environment-boundary-baseline-implementation-001.md`;
+subsequently GO'd, implemented, and VERIFIED through the REVISED cycle.
 
 **Required outcome:** submit, obtain GO for, and land the first Phase 3
 execution slice: static environment policy checker, root identity probe, safe
@@ -166,13 +204,13 @@ audit, dependency-mode reporting, and bounded escape-hatch schema.
 privileged containers, GT-KB product credentials in app lanes, root-escape
 writes, and unlabeled product-release claims from app CI.
 
-### GTKB-ISOLATION-012 - Implement Phase 4 scoped GT-KB service boundary baseline
+### GTKB-ISOLATION-012 - DONE - Implement Phase 4 scoped GT-KB service boundary baseline
 
-**Priority:** TOP after `GTKB-ISOLATION-011`.
+**Status:** DONE 2026-04-23 (S305). **VERIFIED** at
+`bridge/gtkb-scoped-service-boundary-baseline-implementation-010.md`
+(narrowed to single `dashboard.summary.read` op after 4 NO-GO rounds).
 
-**Bridge status:** proposal filed in
-`bridge/gtkb-scoped-service-boundary-baseline-implementation-001.md`; awaiting
-Loyal Opposition review.
+**Priority (historical):** TOP after `GTKB-ISOLATION-011`.
 
 **Required outcome:** submit, obtain GO for, and land the first Phase 4
 execution slice: scoped operation schema, app-scoped GT-KB client,
@@ -185,13 +223,13 @@ ordinary app flows.
 product-scope writes, cannot emit combined app/product green claims, and cannot
 fall back silently to raw DB/root authority.
 
-### GTKB-ISOLATION-013 - Implement Phase 5 control-plane registry and safe projection baseline
+### GTKB-ISOLATION-013 - DONE - Implement Phase 5 control-plane registry and safe projection baseline
 
-**Priority:** TOP after `GTKB-ISOLATION-012`.
+**Status:** DONE 2026-04-23 (S305). **VERIFIED** — Phase 5 first slice
+landed (three-operation typed registry). Later typed
+`work_subject.set` handler still open under `GTKB-ISOLATION-015` Slice 2.
 
-**Bridge status:** proposal filed in
-`bridge/gtkb-dashboard-control-plane-baseline-implementation-001.md`; awaiting
-Loyal Opposition review.
+**Priority (historical):** TOP after `GTKB-ISOLATION-012`.
 
 **Required outcome:** submit, obtain GO for, and land the first Phase 5
 execution slice: typed operation registry, dry-run/diff/audit/rollback
@@ -204,13 +242,13 @@ records.
 path traversal, unmanaged projection changes, stale counterpart topology, and
 bridge writes from the wrong role slot.
 
-### GTKB-ISOLATION-014 - Implement Phase 6 overlay and snapshot baseline
+### GTKB-ISOLATION-014 - DONE - Implement Phase 6 overlay and snapshot baseline
 
-**Priority:** TOP after `GTKB-ISOLATION-013`.
+**Status:** DONE 2026-04-23 (S305). **VERIFIED** at
+`bridge/gtkb-session-overlay-baseline-implementation-006.md` (required an
+ImportError-not-ModuleNotFoundError fix for direct-script SessionStart).
 
-**Bridge status:** proposal filed in
-`bridge/gtkb-session-overlay-baseline-implementation-001.md`; awaiting Loyal
-Opposition review.
+**Priority (historical):** TOP after `GTKB-ISOLATION-013`.
 
 **Required outcome:** submit, obtain GO for, and land the first Phase 6
 execution slice: overlay manifest library, overlay builder, startup/dashboard
@@ -222,9 +260,17 @@ confined to validated overlay roots.
 source-hashed, stale-detecting, excluded from canonical scanners by default,
 and unable to copy credentials or raw `groundtruth.db` into session context.
 
-### GTKB-ISOLATION-015 - Complete full Phase 7 work-subject/root enforcement
+### GTKB-ISOLATION-015 - Complete full Phase 7 work-subject/root enforcement (Slice 1 VERIFIED; Slice 2 remaining)
 
-**Priority:** TOP after `GTKB-ISOLATION-014`.
+**Status:** **Slice 1 VERIFIED** 2026-04-24 (S306) at
+`bridge/gtkb-isolation-015-phase7-full-integration-016.md`. Slice 2 (typed
+`work_subject.set` control-plane handler) **remaining** — will be filed as
+a separate bridge under this same WI. `GTKB-ISOLATION-015` closes when
+Slice 2 VERIFIED.
+
+**Priority:** **TOP NEXT on the isolation chain** (after Phases 3-6 + Phase
+7 foundation + Phase 7 Slice 1 all VERIFIED). Unblocks `GTKB-ISOLATION-016`
+Phase 8 execution.
 
 **Required outcome:** after the Phase 3 through Phase 6 execution slices land,
 submit and execute the remaining Phase 7 integration work: subject-labeled
@@ -308,23 +354,31 @@ would be filed as a new bridge proposal (candidate approach: extend the
 existing `.claude/hooks/formal-artifact-approval-gate.py` which already
 runs on `UserPromptSubmit`). Not scheduled at time of this entry.
 
-**Tracking (updated 2026-04-24 per bridge `-006` NO-GO F1):** upstream
+**Tracking (updated 2026-04-24 per bridge `-008` NO-GO F1):** upstream
 `gtkb-da-governance-completeness-implementation-016` **GO recorded
 2026-04-18** (no blocking findings), per `release-notes-0.6.1.md:140` and
 `.implementation-log-gtkb-da-governance-completeness.md:3-5` in the
-`groundtruth-kb` repo. Implementation is in progress on a GT-KB feature
-branch; Agent Red is **awaiting upstream implementation completion +
-VERIFIED**, not awaiting the GO.
+`groundtruth-kb` repo. Implementation is **active on `main`** (prior
+checks were on `feature/ownership-matrix` but the work has since advanced
+to `main` with additional landing commits per
+`.implementation-log-gtkb-da-governance-completeness.md:691-710,2548-2556`);
+implementation surface is still outstanding. Agent Red is **awaiting
+upstream implementation completion + VERIFIED**, not awaiting the GO.
 
 **Regression visibility (deferred to upstream):** upstream scaffold
 tests already assert the hook presence. Post-upgrade Agent Red sessions
 will see DELIB search/citation enforcement on `UserPromptSubmit` and
 owner-decision archival on `PostToolUse`.
 
-### GTKB-DASHBOARD-001 - Dashboard industry-alignment Slice 1 (in flight)
+### GTKB-DASHBOARD-001 - DONE - Dashboard industry-alignment Slice 1
 
-**Priority:** filed + implemented 2026-04-24 on owner direction after the
-S306 dashboard review. Post-impl awaiting Loyal Opposition VERIFIED.
+**Status:** **VERIFIED** 2026-04-24 (S306) at
+`bridge/gtkb-dashboard-industry-alignment-slice1-008.md`. Filed,
+implemented, reviewed, and closed in a single session. Unblocks
+`GTKB-DASHBOARD-002`.
+
+**Priority (historical):** filed + implemented 2026-04-24 on owner
+direction after the S306 dashboard review.
 
 **Required outcome:** three-item slice delivered per bridge
 `gtkb-dashboard-industry-alignment-slice1-006` GO:
@@ -725,7 +779,11 @@ output file matches the required-section contract enforced by
 
 ### GTKB-ISOLATION-016 - Execute non-destructive Agent Red migration rehearsal
 
-**Priority:** TOP after `GTKB-ISOLATION-009`.
+**Priority:** TOP after `GTKB-ISOLATION-015` **closes (Slice 2 VERIFIED)**.
+Phase 8 execution requires the full Phase 7 work-subject/root enforcement
+to land — not merely the Phase 8 plan (`GTKB-ISOLATION-009` which is DONE).
+Historical priority line pointed at `-009`; corrected 2026-04-24 per S306
+backlog hygiene pass.
 
 **Required outcome:** after the Phase 8 and Phase 9 plans are complete, run the
 approved non-destructive rehearsal from the legacy mixed root into the selected
