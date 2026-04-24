@@ -308,9 +308,13 @@ would be filed as a new bridge proposal (candidate approach: extend the
 existing `.claude/hooks/formal-artifact-approval-gate.py` which already
 runs on `UserPromptSubmit`). Not scheduled at time of this entry.
 
-**Tracking:** awaiting
-`gtkb-da-governance-completeness-implementation` GO / VERIFIED in the
-upstream `groundtruth-kb` repo.
+**Tracking (updated 2026-04-24 per bridge `-006` NO-GO F1):** upstream
+`gtkb-da-governance-completeness-implementation-016` **GO recorded
+2026-04-18** (no blocking findings), per `release-notes-0.6.1.md:140` and
+`.implementation-log-gtkb-da-governance-completeness.md:3-5` in the
+`groundtruth-kb` repo. Implementation is in progress on a GT-KB feature
+branch; Agent Red is **awaiting upstream implementation completion +
+VERIFIED**, not awaiting the GO.
 
 **Regression visibility (deferred to upstream):** upstream scaffold
 tests already assert the hook presence. Post-upgrade Agent Red sessions
@@ -436,6 +440,72 @@ preserve the row cap as the primary bound; document the new env knobs in
 
 **Regression visibility:** boundary test proves snapshots within the
 retention window are preserved exactly and older ones are removed.
+
+### GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1 - Backlog schema linter + bridge→backlog citation gate (upstream-routed)
+
+**Priority:** file after the current S306 governance bundle
+(`GTKB-GOV-PROPOSAL-STANDARDS` + `GTKB-GOV-DA-ENFORCEMENT`) has at least
+Slice 1 VERIFIED. Owner-approved 2026-04-24 after the S306
+DA-effectiveness + backlog-usage audit.
+
+**Problem statement (from S306 audit):**
+
+| Weak-use pattern observed | Evidence |
+|---|---|
+| Bridge filed before backlog entry exists | `gtkb-gov-da-enforcement-slice1-001` cited `GTKB-GOV-DA-ENFORCEMENT (new standing-backlog item)` — entry was created *in the same commit*, not before. |
+| Follow-on items buried in parent prose | Slice 2/3/4 of DASHBOARD-001 and PROPOSAL-STANDARDS existed only in parent-entry narrative until owner asked; 8 items promoted to top-level this session. |
+| State never transitions automatically | `GTKB-ISOLATION-015` stayed "in flight" through 16 bridge rounds with no automatic state change. |
+| DONE entries accumulate | ~40% of `work_list.md` is DONE at time of filing. |
+| Dependencies aspirational | "after GTKB-DORA-001" is prose; nothing refuses work that violates the order. |
+
+**Required outcome (upstream, as new managed hook family parallel to
+`hook.bridge-proposal-standards`):**
+
+- `hook.backlog-cite-gate` — pre-commit + `PreToolUse(Write,Edit)` hook:
+  every `bridge/*-001.md` NEW file must carry a `**Work item:** <ID>`
+  line; `<ID>` must exist in `work_list.md` **before** the commit lands
+  (not in the same commit). Escape hatch: `[backlog-exempt: <reason>]`
+  commit-message tag with audit-log write.
+- `hook.backlog-schema-linter` — pre-commit hook validating every
+  `work_list.md` entry has required fields (`status`, `priority`,
+  `filed`, `last_changed`) with enum values, unique IDs, and resolvable
+  `depends_on` references. Rejects commits that introduce drift.
+- Structured field block per entry (to enable A3 validation): consistent
+  5-field header after the entry title.
+- `work_list.md` split into active + `work_list_done.md` archive so
+  session-start only loads active entries.
+- Top-of-file TOC table listing `| ID | Status | Priority | Title |
+  Depends on |` for all active items, auto-regenerated on edit.
+
+**Regression visibility (deferred to upstream):** upstream scaffold
+tests assert hook presence; upstream hook tests cover citation-gate
+behavior (existing-ID pass, new-same-commit-ID rejected, exempt tag
+permitted with audit-log side effect) and schema-linter behavior
+(missing field, wrong enum, unresolved `depends_on`, duplicate ID).
+
+### GTKB-GOV-BACKLOG-DISCIPLINE-SLICE2 - Backlog state automation (upstream-routed)
+
+**Priority:** file after `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1` VERIFIED.
+
+**Required outcome (upstream):**
+
+- `hook.backlog-last-changed` — `PostToolUse(Write,Edit)` on
+  `work_list.md`: if an entry body changed but `last_changed` did not,
+  auto-update it. Agents don't have to remember.
+- Bridge state transition automation: when a bridge post-impl `NEW` file
+  is filed referencing a backlog entry, auto-set entry
+  `status: awaiting-verification`. When the thread reaches `VERIFIED`,
+  auto-set `status: done` and move the entry to `work_list_done.md`.
+  Implementation: script run by the same session-start / bridge-poller
+  path that does other bridge maintenance.
+- Dependency-violation warning: when a bridge `NEW` proposal references
+  an entry whose `depends_on` is not yet `done`, surface a warning (not
+  a block). Prevents silent ordering mistakes.
+
+**Regression visibility (deferred to upstream):** upstream regression
+that seeds entries with mis-transitioned states and asserts the
+automation corrects them; dependency-violation warning fires on a
+fixture where a parent is in-flight.
 
 ### GTKB-GOV-PROPOSAL-STANDARDS - Mechanical enforcement of proposal structure (upstream-routed)
 
