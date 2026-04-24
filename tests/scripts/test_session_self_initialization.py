@@ -1343,3 +1343,77 @@ def test_render_current_project_state_permits_single_subject_green() -> None:
         )
     )
     assert "Application release blockers:" in rendered
+
+
+def test_arm_startup_interaction_guard_persists_current_subject_live_path(
+    tmp_path, monkeypatch
+) -> None:
+    """Live-runtime §E: writer persists current_subject into lifecycle guard.
+
+    Exercises the real writer path introduced for bridge -012 P1 fix.
+    The counterpart subject-divergence check in detect_counterpart_state()
+    then reads what the writer wrote — no synthetic fixture JSON.
+    """
+    session_module = _load_module()
+    import importlib.util
+    focus_spec = importlib.util.spec_from_file_location(
+        "workstream_focus_live", REPO_ROOT / "scripts" / "workstream_focus.py"
+    )
+    assert focus_spec and focus_spec.loader
+    focus_module = importlib.util.module_from_spec(focus_spec)
+    focus_spec.loader.exec_module(focus_module)
+
+    canonical = tmp_path / "work-subject.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(canonical))
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_LEGACY_STATE", str(tmp_path / "legacy.json"))
+
+    codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
+    claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_role = tmp_path / ".codex" / "operating-role.md"
+    claude_role = tmp_path / ".claude" / "operating-role.md"
+    for path, role in ((codex_role, "loyal-opposition"), (claude_role, "prime-builder")):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"active_role: {role}\n", encoding="utf-8")
+
+    # Counterpart harness (codex) runs startup with GT-KB subject.
+    session_module._arm_startup_interaction_guard(
+        codex_guard,
+        "codex-guard-id",
+        suppress_next_wrapup=False,
+        current_subject=focus_module.FOCUS_GTKB_INFRASTRUCTURE,
+    )
+    # Active harness (claude) runs startup with application subject.
+    session_module._arm_startup_interaction_guard(
+        claude_guard,
+        "claude-guard-id",
+        suppress_next_wrapup=True,
+        current_subject=focus_module.FOCUS_APPLICATION,
+    )
+
+    # Assert the writer actually populated current_subject (Codex -012 evidence:
+    # prior versions of the writer omitted this field).
+    codex_data = json.loads(codex_guard.read_text(encoding="utf-8"))
+    claude_data = json.loads(claude_guard.read_text(encoding="utf-8"))
+    assert codex_data["current_subject"] == focus_module.FOCUS_GTKB_INFRASTRUCTURE
+    assert claude_data["current_subject"] == focus_module.FOCUS_APPLICATION
+
+    # Now route detect_counterpart_state through the files the writer produced.
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setattr(
+        focus_module,
+        "HARNESS_ROLE_RECORDS",
+        {"codex": codex_role, "claude": claude_role},
+    )
+    monkeypatch.setattr(
+        focus_module,
+        "HARNESS_LIFECYCLE_GUARDS",
+        {"codex": codex_guard, "claude": claude_guard},
+    )
+    focus_module.save_state(focus_module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
+
+    result = focus_module.detect_counterpart_state(REPO_ROOT)
+    assert result["subject_mismatch"] is True
+    assert any(
+        focus_module.FOCUS_GTKB_INFRASTRUCTURE in msg and focus_module.FOCUS_APPLICATION in msg
+        for msg in result["warnings"]
+    )

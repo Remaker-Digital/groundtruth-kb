@@ -4933,28 +4933,39 @@ def _startup_guard_id() -> str:
     return os.environ.get("GTKB_STARTUP_GUARD_ID") or _utc_now_iso()
 
 
-def _arm_startup_interaction_guard(path: Path, guard_id: str, *, suppress_next_wrapup: bool) -> None:
+def _arm_startup_interaction_guard(
+    path: Path,
+    guard_id: str,
+    *,
+    suppress_next_wrapup: bool,
+    current_subject: str | None = None,
+) -> None:
     state = _read_lifecycle_guard(path)
     if (
         state.get("startup_guard_id") == guard_id
         and state.get("discard_next_user_prompt") is True
         and state.get("startup_response_pending") is False
         and state.get("suppress_next_wrapup") is suppress_next_wrapup
+        and (current_subject is None or state.get("current_subject") == current_subject)
     ):
         return
 
-    state.update(
-        {
-            "armed_at": _utc_now_iso(),
-            "armed_reason": "startup_first_owner_prompt_must_be_discarded",
-            "discard_next_user_prompt": True,
-            "startup_prompt_discarded": False,
-            "startup_response_pending": False,
-            "first_wrapup_suppressed": False,
-            "startup_guard_id": guard_id,
-            "suppress_next_wrapup": suppress_next_wrapup,
-        }
-    )
+    update: dict[str, Any] = {
+        "armed_at": _utc_now_iso(),
+        "armed_reason": "startup_first_owner_prompt_must_be_discarded",
+        "discard_next_user_prompt": True,
+        "startup_prompt_discarded": False,
+        "startup_response_pending": False,
+        "first_wrapup_suppressed": False,
+        "startup_guard_id": guard_id,
+        "suppress_next_wrapup": suppress_next_wrapup,
+    }
+    # Persist the active harness's current work subject so the counterpart
+    # harness's detect_counterpart_state() can detect divergence against a
+    # live-populated durable source (Phase 7 §E live-wiring, per bridge -012).
+    if current_subject is not None:
+        update["current_subject"] = current_subject
+    state.update(update)
     _write_lifecycle_guard(path, state)
 
 
@@ -5063,10 +5074,17 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if startup_emit_requested:
+        try:
+            current_subject_for_guard: str | None = str(
+                startup_focus_snapshot(project_root).get("current_focus") or ""
+            ) or None
+        except Exception:
+            current_subject_for_guard = None
         _arm_startup_interaction_guard(
             lifecycle_guard_path,
             _startup_guard_id(),
             suppress_next_wrapup=role_profile != "loyal-opposition",
+            current_subject=current_subject_for_guard,
         )
 
     if args.emit_wrapup and not args.force_wrapup and _consume_startup_wrapup_guard(lifecycle_guard_path):
