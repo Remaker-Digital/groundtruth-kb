@@ -108,8 +108,14 @@ desktop.ini
 # =============================================================================
 *.db-shm
 *.db-wal
+# Working KB database — owner decision 2026-04-24: gitignored in favor of
+# periodic committed snapshots (option 4). Prior LFS-tracking of this file
+# (commit c819a37b, agent-landed without owner authorization) produced
+# ~420 GB of cached LFS objects in 4 days and is retired.
+groundtruth.db
 groundtruth.db.backup-*
 groundtruth.db.pre-backfill-*
+groundtruth (*).db*
 .groundtruth-chroma/
 
 # =============================================================================
