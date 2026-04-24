@@ -32,6 +32,14 @@ SCHEMA_VERSION = 1
 ROLE_SLOT_DEFAULT = "shared"
 DEFAULT_APPLICATION_LABEL = "Agent Red"
 
+# Topology mode — whether GT-KB Prime Builder and Loyal Opposition run in one
+# harness (single) or split across two harnesses (multi). Drives counterpart
+# detection in ``detect_counterpart_state`` and the Active Work Subject block.
+TOPOLOGY_MODE_SINGLE = "single_harness"
+TOPOLOGY_MODE_MULTI = "multi_harness"
+TOPOLOGY_MODE_DEFAULT = TOPOLOGY_MODE_SINGLE
+_TOPOLOGY_MODES = {TOPOLOGY_MODE_SINGLE, TOPOLOGY_MODE_MULTI}
+
 # ---- State-file paths ---------------------------------------------------
 LEGACY_STATE_RELATIVE_PATH = Path(".claude") / "hooks" / ".workstream-focus-state.json"
 CANONICAL_STATE_RELATIVE_PATH = Path(".claude") / "session" / "work-subject.json"
@@ -331,6 +339,7 @@ def _canonical_default(project_root: Path | None = None) -> dict[str, Any]:
         "project_root": str(root),
         "gtkb_root": str(gtkb_root) if gtkb_root else None,
         "role_slot": ROLE_SLOT_DEFAULT,
+        "topology_mode": TOPOLOGY_MODE_DEFAULT,
     }
 
 
@@ -393,10 +402,13 @@ def load_state(project_root: Path | None = None) -> dict[str, Any]:
             "project_root",
             "gtkb_root",
             "role_slot",
+            "topology_mode",
         ):
             if key in canonical_raw:
                 state[key] = canonical_raw[key]
         state["current_subject"] = _normalize_subject(state.get("current_subject"))
+        if state.get("topology_mode") not in _TOPOLOGY_MODES:
+            state["topology_mode"] = TOPOLOGY_MODE_DEFAULT
         return _with_compat_keys(state)
 
     legacy_raw = _read_legacy_file(project_root)
@@ -617,6 +629,8 @@ def startup_focus_snapshot(project_root: Path | None = None) -> dict[str, str | 
         "current_label": focus_label(current),
         "application_label": str(state["application_label"]),
         "updated_at": state.get("updated_at"),
+        "role_slot": str(state.get("role_slot") or ROLE_SLOT_DEFAULT),
+        "topology_mode": str(state.get("topology_mode") or TOPOLOGY_MODE_DEFAULT),
     }
 
 
@@ -625,18 +639,203 @@ def render_startup_focus_lines(snapshot: dict[str, str | None] | None = None) ->
 
     snapshot = snapshot or startup_focus_snapshot()
     app_label = snapshot["application_label"] or DEFAULT_APPLICATION_LABEL
+    role_slot = snapshot.get("role_slot") or ROLE_SLOT_DEFAULT
+    topology_mode = snapshot.get("topology_mode") or TOPOLOGY_MODE_DEFAULT
     return "\n".join(
         [
             f"- Default work subject: {snapshot['default_label']}",
             f"- Current work subject: {snapshot['current_label']}",
             f"- Application label: {app_label}",
+            f"- Bridge role slot: `{role_slot}` (shared, prime-builder, or loyal-opposition).",
+            f"- Harness topology: `{topology_mode}` (single_harness or multi_harness).",
             "- Application work subject means owner direction is interpreted as work on the unique application being built with GroundTruth-KB.",
             "- GT-KB Infrastructure work subject is active only when explicitly declared.",
             "- Application work subject commands: `work subject application`, `application mode`, `app mode`, `agent red mode`.",
             "- GT-KB work subject commands: `work subject GT-KB`, `GT-KB mode`, `GT-KB infrastructure mode`, `GroundTruth-KB mode`.",
             "- Canonical state file: `.claude/session/work-subject.json` (legacy `.claude/hooks/.workstream-focus-state.json` migrated on next owner command).",
+            "- First owner message in a fresh session is a session-start stimulus only; do not map it to a task, focus, approval, or answer.",
+            "- Live bridge authority: `bridge/INDEX.md` is the canonical handoff/review record; poller status, scan-freshness files, and startup snapshots are non-canonical.",
         ]
     )
+
+
+def render_active_work_subject(
+    project_root: Path | None = None,
+    *,
+    snapshot: dict[str, str | None] | None = None,
+    overlay_status: dict[str, Any] | None = None,
+    include_counterpart: bool = True,
+) -> str:
+    """Render the enriched Active Work Subject block (Slice 1 §A).
+
+    Composes ``render_startup_focus_lines`` with an overlay status line (§C)
+    and, when ``include_counterpart`` is True, a counterpart-state warning
+    summary (§E). Overlay and counterpart outputs are always informational —
+    the startup report never treats them as canonical.
+    """
+
+    lines = [render_startup_focus_lines(snapshot or startup_focus_snapshot(project_root))]
+    overlay_note = overlay_startup_note(overlay_status or {})
+    lines.extend(f"- {line}" for line in overlay_note["lines"])
+    if include_counterpart:
+        counterpart = detect_counterpart_state(project_root)
+        for warning in counterpart["warnings"]:
+            lines.append(f"- WARNING: counterpart harness — {warning}")
+        if not counterpart["warnings"] and counterpart["counterpart_present"]:
+            lines.append("- Counterpart harness detected; no role or subject conflicts.")
+    return "\n".join(lines)
+
+
+# ---- §C Overlay-aware startup -------------------------------------------
+
+
+def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
+    """Map a session overlay status dict to a startup-block level + lines.
+
+    - Absent → informational note. No warning.
+    - Stale / root_mismatch / subject_mismatch / projection_diff → WARNING.
+    - Overlays are never canonical for DA/MemBase/bridge/readiness decisions.
+    """
+
+    if not status.get("overlay_present"):
+        return {
+            "level": "info",
+            "lines": ["No session overlay active; startup context from live files."],
+        }
+
+    warnings: list[str] = []
+    if status.get("is_stale"):
+        warnings.append(
+            "WARNING: session overlay is stale (source hash mismatch or expired entries); "
+            "treat overlay contents as non-canonical."
+        )
+    if status.get("root_mismatch"):
+        warnings.append(
+            "WARNING: session overlay references a different project root than the active "
+            "session; ignore overlay for routing decisions."
+        )
+    if status.get("subject_mismatch"):
+        warnings.append(
+            "WARNING: session overlay work subject differs from the active subject; "
+            "overlay is informational only."
+        )
+    if status.get("projection_diff"):
+        warnings.append(
+            "WARNING: session overlay projection differs from live state; rely on live "
+            "files for readiness and bridge decisions."
+        )
+    if warnings:
+        warnings.append(
+            "Session overlays are never canonical for Deliberation Archive, MemBase, "
+            "bridge, or readiness decisions."
+        )
+        return {"level": "warning", "lines": warnings}
+
+    return {
+        "level": "info",
+        "lines": [
+            "Session overlay present and fresh; overlay is informational only, "
+            "canonical state lives in KB/MemBase/Deliberation Archive/source files.",
+        ],
+    }
+
+
+# ---- §E Counterpart state detection -------------------------------------
+
+
+def _read_active_role_from_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return None
+    match = re.search(r"^active_role:\s*([a-z0-9_\-]+)\s*$", text, re.MULTILINE | re.IGNORECASE)
+    if not match:
+        return None
+    value = match.group(1).strip().lower()
+    return value or None
+
+
+def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]:
+    """Detect role-slot conflicts with the counterpart harness (§E).
+
+    Returns ``{"counterpart_present", "same_role_slot", "subject_mismatch",
+    "warnings"}``. Warnings are only emitted when counterpart state files are
+    present; missing files yield no warnings and no crash.
+    """
+
+    current_harness = _resolved_harness_name()
+    per_harness_roles: dict[str, str] = {}
+    for harness, record_path in HARNESS_ROLE_RECORDS.items():
+        role = _read_active_role_from_file(record_path)
+        if role:
+            per_harness_roles[harness] = role
+
+    counterpart_present = any(
+        harness != current_harness and harness in per_harness_roles
+        for harness in HARNESS_ROLE_RECORDS
+    )
+
+    warnings: list[str] = []
+    same_role_slot = False
+    if current_harness and current_harness in per_harness_roles:
+        our_role = per_harness_roles[current_harness]
+        for harness, role in per_harness_roles.items():
+            if harness == current_harness:
+                continue
+            if role == our_role and role in TOGGLEABLE_ROLE_PROFILES:
+                same_role_slot = True
+                warnings.append(
+                    f"both `{current_harness}` and `{harness}` have active_role=`{role}` "
+                    "— counterpart bridge roles may collide; verify operating-role.md per harness."
+                )
+            elif role != our_role and role in TOGGLEABLE_ROLE_PROFILES and our_role in TOGGLEABLE_ROLE_PROFILES:
+                warnings.append(
+                    f"`{current_harness}` is `{our_role}`; counterpart `{harness}` is `{role}`. "
+                    "Treat bridge message authority per operating-role.md."
+                )
+
+    subject_mismatch = False
+    return {
+        "counterpart_present": counterpart_present,
+        "same_role_slot": same_role_slot,
+        "subject_mismatch": subject_mismatch,
+        "warnings": warnings,
+    }
+
+
+# ---- §A Readiness hard-rejection ----------------------------------------
+
+
+class SubjectScopeError(RuntimeError):
+    """Raised when a readiness/report output would emit a combined application + GT-KB
+
+    green claim without an explicit dual-scope declaration (§A hard rejection).
+    """
+
+
+def assert_readiness_subject_scope(
+    *,
+    application_green: bool,
+    gtkb_green: bool,
+    dual_scope_declared: bool,
+    context: str = "release readiness",
+) -> None:
+    """Hard-reject unlabeled combined application + GT-KB green claims.
+
+    Raises ``SubjectScopeError`` when both ``application_green`` and
+    ``gtkb_green`` are True but ``dual_scope_declared`` is False. Callers must
+    provide an explicit dual-scope declaration before emitting combined green
+    claims at the readiness/report layer (not just at the startup model layer).
+    """
+
+    if application_green and gtkb_green and not dual_scope_declared:
+        raise SubjectScopeError(
+            f"{context}: combined application + GT-KB green claim rejected — "
+            "caller must pass an explicit dual-scope declaration identifying "
+            "both subjects (application and GT-KB) before emitting a combined "
+            "green claim. Use `work subject application` or `work subject GT-KB` "
+            "to scope the claim, or provide a dual-scope justification."
+        )
 
 
 def system_message_for_state(state: dict[str, Any], *, changed: bool = False) -> str:

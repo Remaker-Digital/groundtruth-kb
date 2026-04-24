@@ -570,7 +570,9 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "file:///" not in wrapup_text
     assert "Dashboard scope:" in report_text
     assert "Current Project State" in report_text
-    assert "Release blockers:" in report_text
+    assert "Application release blockers:" in report_text
+    assert "Bridge role slot:" in report_text
+    assert "Harness topology:" in report_text
     assert "Testing/tool rollup:" in report_text
     assert "Active Work Subject" in report_text
     assert "Default work subject: Application Focus" in report_text
@@ -687,7 +689,7 @@ def test_startup_pruning_scan_reports_large_inputs(tmp_path) -> None:
 
 def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -721,7 +723,7 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "Agent Red Project Dashboard" in context
     assert "Browser opening: use the harness-controlled browser" in context
     assert "### Current Project State" in context
-    assert "Release blockers:" in context
+    assert "Application release blockers:" in context
     assert "### Active Work Subject" in context
     assert "Default work subject: Application Focus" in context
     assert "`work subject application`" in context
@@ -760,7 +762,7 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
 
 def test_emit_startup_service_payload_returns_full_codex_session_start_contract(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
     monkeypatch.setenv("GTKB_STARTUP_REQUESTED_AT", "2026-04-23T13:20:00Z")
     monkeypatch.setattr(
         module,
@@ -830,7 +832,7 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
 def test_emit_report_arms_first_prompt_discard_gate(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
     guard_path = tmp_path / "guard.json"
-    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -873,7 +875,7 @@ def test_loyal_opposition_startup_arms_first_prompt_discard_without_wrapup_suppr
 ) -> None:
     module = _load_module()
     guard_path = tmp_path / "guard.json"
-    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "loyal-opposition")
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "loyal-opposition")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -913,7 +915,7 @@ def test_loyal_opposition_startup_arms_first_prompt_discard_without_wrapup_suppr
 
 def test_emit_report_ignores_forced_role_profile_and_uses_durable_toggle(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -1054,7 +1056,7 @@ def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monk
 
 def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -1137,7 +1139,7 @@ def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, ca
 
 def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
-    monkeypatch.setattr(module, "discover_role_profile", lambda project_root: "prime-builder")
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
 
     def fail_historical_backfill(project_root):
         raise AssertionError("fast hook must not recompute historical backfill")
@@ -1255,3 +1257,89 @@ def test_direct_script_execution_emits_startup_payload(tmp_path):
     hook_output = payload["hookSpecificOutput"]
     assert hook_output["hookEventName"] == "SessionStart"
     assert "agent-red-startup-service-v2" in hook_output["additionalContext"]
+
+
+# ---- GTKB-ISOLATION-015 Slice 1 §A integration coverage ----------------
+
+
+def _minimal_model(
+    *,
+    current_focus: str = "application",
+    subject_readiness: dict | None = None,
+    dual_scope_declared: bool = False,
+) -> dict:
+    intelligence: dict = {
+        "release_readiness": {"blocker_count": 0},
+        "quality_rollup": {"failing": 0, "manual": 0, "ready_or_passing": 0},
+    }
+    if subject_readiness is not None:
+        intelligence["subject_readiness"] = subject_readiness
+    intelligence["dual_scope_declared"] = dual_scope_declared
+    return {
+        "metrics": {
+            "regression": {"release_blocker_count": 0},
+            "backlog": {"active_item_count": 0},
+            "membase": {"open_work_items": 0},
+            "contention": {"actionable_count": 0},
+            "drift": {"changed_path_count": 0},
+        },
+        "dashboard_intelligence": intelligence,
+        "infrastructure": {"gtkb_upgrade_posture": {"package_version": "x", "upgrade_plan": {}}},
+        "workstream_focus": {
+            "current_focus": current_focus,
+            "role_slot": "shared",
+            "topology_mode": "single_harness",
+        },
+    }
+
+
+def test_render_current_project_state_labels_application_headers() -> None:
+    module = _load_module()
+    rendered = module._render_current_project_state(_minimal_model(current_focus="application"))
+    assert "Application release blockers:" in rendered
+    assert "Application Testing/tool rollup:" in rendered
+    assert "Bridge role slot:" in rendered
+    assert "Harness topology:" in rendered
+
+
+def test_render_current_project_state_labels_gtkb_headers() -> None:
+    module = _load_module()
+    rendered = module._render_current_project_state(_minimal_model(current_focus="gtkb_infrastructure"))
+    assert "GT-KB release blockers:" in rendered
+    assert "GT-KB Testing/tool rollup:" in rendered
+
+
+def test_render_current_project_state_hard_rejects_unlabeled_combined_green() -> None:
+    module = _load_module()
+    import pytest
+
+    with pytest.raises(module.SubjectScopeError, match="combined application \\+ GT-KB"):
+        module._render_current_project_state(
+            _minimal_model(
+                subject_readiness={"application_green": True, "gtkb_green": True},
+                dual_scope_declared=False,
+            )
+        )
+
+
+def test_render_current_project_state_permits_dual_scope_combined_green() -> None:
+    module = _load_module()
+    rendered = module._render_current_project_state(
+        _minimal_model(
+            subject_readiness={"application_green": True, "gtkb_green": True},
+            dual_scope_declared=True,
+        )
+    )
+    assert "release blockers:" in rendered
+
+
+def test_render_current_project_state_permits_single_subject_green() -> None:
+    module = _load_module()
+    # Only application green; no combined claim.
+    rendered = module._render_current_project_state(
+        _minimal_model(
+            subject_readiness={"application_green": True, "gtkb_green": False},
+            dual_scope_declared=False,
+        )
+    )
+    assert "Application release blockers:" in rendered

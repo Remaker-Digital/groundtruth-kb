@@ -19,9 +19,21 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts.workstream_focus import render_startup_focus_lines, startup_focus_snapshot
+    from scripts.workstream_focus import (
+        SubjectScopeError,
+        assert_readiness_subject_scope,
+        render_active_work_subject,
+        render_startup_focus_lines,
+        startup_focus_snapshot,
+    )
 except ModuleNotFoundError:  # pragma: no cover - direct script execution path
-    from workstream_focus import render_startup_focus_lines, startup_focus_snapshot
+    from workstream_focus import (  # type: ignore[no-redef]
+        SubjectScopeError,
+        assert_readiness_subject_scope,
+        render_active_work_subject,
+        render_startup_focus_lines,
+        startup_focus_snapshot,
+    )
 
 try:
     from scripts import gtkb_overlay as _gtkb_overlay
@@ -3049,26 +3061,58 @@ def _render_startup_pruning(model: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _active_subject_label(model: dict[str, Any]) -> str:
+    """Return a human subject label for readiness/test/drift section headers."""
+
+    focus = model.get("workstream_focus") or {}
+    current = str(focus.get("current_focus") or "").strip()
+    if current == "gtkb_infrastructure":
+        return "GT-KB"
+    return "Application"
+
+
 def _render_current_project_state(model: dict[str, Any]) -> str:
     metrics = model["metrics"]
     intelligence = model.get("dashboard_intelligence", {})
     release = intelligence.get("release_readiness", {})
     quality = intelligence.get("quality_rollup", {})
     upgrade_posture = model.get("infrastructure", {}).get("gtkb_upgrade_posture", {})
+    subject_label = _active_subject_label(model)
 
+    # §A hard-rejection: a combined application + GT-KB green claim may not be
+    # emitted without an explicit dual-scope declaration at the readiness/report
+    # layer. This is defense-in-depth against future code paths that might
+    # assemble dual-subject readiness outputs without the guard.
+    dual_scope_declared = bool(intelligence.get("dual_scope_declared"))
+    subject_readiness = intelligence.get("subject_readiness") or {}
+    app_green = bool(subject_readiness.get("application_green"))
+    gtkb_green = bool(subject_readiness.get("gtkb_green"))
+    if app_green or gtkb_green:
+        assert_readiness_subject_scope(
+            application_green=app_green,
+            gtkb_green=gtkb_green,
+            dual_scope_declared=dual_scope_declared,
+            context=f"{subject_label} release readiness",
+        )
+
+    workstream = model.get("workstream_focus") or {}
+    role_slot = str(workstream.get("role_slot") or "shared")
+    topology_mode = str(workstream.get("topology_mode") or "single_harness")
     return "\n".join(
         [
-            f"- Release blockers: {release.get('blocker_count', metrics['regression'].get('release_blocker_count'))}",
-            f"- Active backlog items: {metrics['backlog'].get('active_item_count')}",
-            f"- Open MemBase work items: {metrics['membase'].get('open_work_items')}",
-            f"- Dashboard-scoped bridge/contention entries, non-authoritative for queue state: {metrics['contention'].get('actionable_count')}",
-            f"- Drift changed paths: {metrics['drift'].get('changed_path_count')}",
+            f"- {subject_label} release blockers: {release.get('blocker_count', metrics['regression'].get('release_blocker_count'))}",
+            f"- {subject_label} active backlog items: {metrics['backlog'].get('active_item_count')}",
+            f"- {subject_label} open MemBase work items: {metrics['membase'].get('open_work_items')}",
+            f"- {subject_label} dashboard-scoped bridge/contention entries, non-authoritative for queue state: {metrics['contention'].get('actionable_count')}",
+            f"- {subject_label} drift changed paths: {metrics['drift'].get('changed_path_count')}",
             (
-                "- Testing/tool rollup: "
+                f"- {subject_label} Testing/tool rollup: "
                 f"{quality.get('failing', 'unknown')} failing, "
                 f"{quality.get('manual', 'unknown')} manual, "
                 f"{quality.get('ready_or_passing', 'unknown')} ready/passing"
             ),
+            f"- Bridge role slot: `{role_slot}` (prime-builder, loyal-opposition, or shared)",
+            f"- Harness topology: `{topology_mode}` (single_harness or multi_harness)",
             (
                 "- GT-KB infrastructure posture: "
                 f"package {upgrade_posture.get('package_version', 'unknown')}; "
@@ -3210,7 +3254,11 @@ def render_report(model: dict[str, Any], dashboard_link: str) -> str:
             "",
             "### Active Work Subject",
             "",
-            render_startup_focus_lines(model.get("workstream_focus")),
+            render_active_work_subject(
+                snapshot=model.get("workstream_focus"),
+                overlay_status=model.get("session_overlay") or {},
+                include_counterpart=True,
+            ),
             "",
             "### Session Overlay Status (Non-Authoritative)",
             "",

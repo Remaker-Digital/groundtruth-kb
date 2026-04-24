@@ -448,3 +448,206 @@ def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeyp
     )
     assert gtkb_write_response["decision"] == "block"
     assert "work subject GT-KB" in gtkb_write_response["reason"]
+
+
+# ---- GTKB-ISOLATION-015 Slice 1 §A / §C / §E regression coverage ----------
+
+
+def test_startup_focus_lines_include_role_slot_topology_mode_stimulus_and_bridge_authority(
+    tmp_path, monkeypatch
+) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+
+    snapshot = module.startup_focus_snapshot(REPO_ROOT)
+    lines = module.render_startup_focus_lines(snapshot)
+
+    assert snapshot["role_slot"] == module.ROLE_SLOT_DEFAULT
+    assert snapshot["topology_mode"] == module.TOPOLOGY_MODE_DEFAULT
+    assert "Bridge role slot:" in lines
+    assert module.ROLE_SLOT_DEFAULT in lines
+    assert "Harness topology:" in lines
+    assert module.TOPOLOGY_MODE_SINGLE in lines
+    assert "First owner message" in lines
+    assert "stimulus" in lines
+    assert "bridge/INDEX.md" in lines
+    assert "canonical handoff/review" in lines
+
+
+def test_save_state_persists_topology_mode_default(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
+    data = json.loads(canonical.read_text(encoding="utf-8"))
+    assert data["topology_mode"] == module.TOPOLOGY_MODE_SINGLE
+
+
+def test_overlay_startup_note_absent_is_informational(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    note = module.overlay_startup_note({"overlay_present": False})
+    assert note["level"] == "info"
+    assert any("No session overlay active" in line for line in note["lines"])
+    assert not any(line.startswith("WARNING") for line in note["lines"])
+
+
+def test_overlay_startup_note_stale_is_warning(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    note = module.overlay_startup_note({"overlay_present": True, "is_stale": True})
+    assert note["level"] == "warning"
+    assert any("stale" in line for line in note["lines"])
+    assert any(line.startswith("WARNING") for line in note["lines"])
+
+
+def test_overlay_startup_note_root_mismatch_is_warning() -> None:
+    module = _load_module()
+    note = module.overlay_startup_note({"overlay_present": True, "root_mismatch": True})
+    assert note["level"] == "warning"
+    assert any("different project root" in line for line in note["lines"])
+
+
+def test_overlay_startup_note_subject_mismatch_is_warning() -> None:
+    module = _load_module()
+    note = module.overlay_startup_note({"overlay_present": True, "subject_mismatch": True})
+    assert note["level"] == "warning"
+    assert any("work subject differs" in line for line in note["lines"])
+
+
+def test_overlay_startup_note_projection_diff_is_warning() -> None:
+    module = _load_module()
+    note = module.overlay_startup_note({"overlay_present": True, "projection_diff": True})
+    assert note["level"] == "warning"
+    assert any("projection differs" in line for line in note["lines"])
+
+
+def test_overlay_startup_note_never_canonical_phrasing() -> None:
+    module = _load_module()
+    note = module.overlay_startup_note({"overlay_present": True, "is_stale": True})
+    joined = " ".join(note["lines"])
+    assert "never canonical" in joined
+    assert "Deliberation Archive" in joined
+
+
+def test_detect_counterpart_state_no_counterpart_files_no_warning(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {
+            "codex": tmp_path / ".codex" / "operating-role.md",
+            "claude": tmp_path / ".claude" / "operating-role.md",
+        },
+    )
+    result = module.detect_counterpart_state(REPO_ROOT)
+    assert result["warnings"] == []
+    assert result["counterpart_present"] is False
+
+
+def test_detect_counterpart_state_same_role_warns(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    codex_record = tmp_path / ".codex" / "operating-role.md"
+    claude_record = tmp_path / ".claude" / "operating-role.md"
+    for record in (codex_record, claude_record):
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text("active_role: prime-builder\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {"codex": codex_record, "claude": claude_record},
+    )
+    result = module.detect_counterpart_state(REPO_ROOT)
+    assert result["same_role_slot"] is True
+    assert result["counterpart_present"] is True
+    assert any("prime-builder" in msg and "collide" in msg for msg in result["warnings"])
+
+
+def test_detect_counterpart_state_different_role_warns(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    codex_record = tmp_path / ".codex" / "operating-role.md"
+    claude_record = tmp_path / ".claude" / "operating-role.md"
+    codex_record.parent.mkdir(parents=True)
+    claude_record.parent.mkdir(parents=True)
+    codex_record.write_text("active_role: loyal-opposition\n", encoding="utf-8")
+    claude_record.write_text("active_role: prime-builder\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {"codex": codex_record, "claude": claude_record},
+    )
+    result = module.detect_counterpart_state(REPO_ROOT)
+    assert result["same_role_slot"] is False
+    assert result["counterpart_present"] is True
+    assert any("prime-builder" in msg and "loyal-opposition" in msg for msg in result["warnings"])
+
+
+def test_detect_counterpart_state_missing_counterpart_no_crash(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    claude_record = tmp_path / ".claude" / "operating-role.md"
+    claude_record.parent.mkdir(parents=True)
+    claude_record.write_text("active_role: prime-builder\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {
+            "codex": tmp_path / "missing" / ".codex" / "operating-role.md",
+            "claude": claude_record,
+        },
+    )
+    result = module.detect_counterpart_state(REPO_ROOT)
+    assert result["counterpart_present"] is False
+    assert result["warnings"] == []
+
+
+def test_render_active_work_subject_combines_focus_overlay_and_counterpart(
+    tmp_path, monkeypatch
+) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setattr(
+        module,
+        "HARNESS_ROLE_RECORDS",
+        {
+            "codex": tmp_path / "missing.md",
+            "claude": tmp_path / "missing-claude.md",
+        },
+    )
+
+    rendered = module.render_active_work_subject(
+        REPO_ROOT,
+        overlay_status={"overlay_present": False},
+    )
+    assert "Active Work Subject" not in rendered  # heading is rendered by caller
+    assert "Bridge role slot:" in rendered
+    assert "No session overlay active" in rendered
+
+
+def test_assert_readiness_subject_scope_hard_rejects_unlabeled_combined_green() -> None:
+    module = _load_module()
+    with pytest.raises(module.SubjectScopeError, match="combined application \\+ GT-KB"):
+        module.assert_readiness_subject_scope(
+            application_green=True, gtkb_green=True, dual_scope_declared=False
+        )
+
+
+def test_assert_readiness_subject_scope_permits_dual_scope_declaration() -> None:
+    module = _load_module()
+    module.assert_readiness_subject_scope(
+        application_green=True, gtkb_green=True, dual_scope_declared=True
+    )
+
+
+def test_assert_readiness_subject_scope_permits_single_green() -> None:
+    module = _load_module()
+    module.assert_readiness_subject_scope(
+        application_green=True, gtkb_green=False, dual_scope_declared=False
+    )
+    module.assert_readiness_subject_scope(
+        application_green=False, gtkb_green=True, dual_scope_declared=False
+    )

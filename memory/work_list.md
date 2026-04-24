@@ -237,6 +237,24 @@ checks, and upstream GT-KB delivery requirements for clean adopters.
 `bridge/INDEX.md` fresh-read authority, invalid transition rejection, stale
 counterpart detection, and split application vs GT-KB verification lanes.
 
+**Slice split (established at bridge `gtkb-isolation-015-phase7-full-integration-007` REVISED-3, GO at `-008`):**
+
+- **Slice 1 (Agent Red Tooling) — delivered via this bridge:** §A
+  subject-labeled startup / readiness / test outputs, §B bridge live-state
+  writer/validator (`scripts/gtkb_bridge_writer.py`), §C overlay-aware
+  startup status, §E multi-harness counterpart-state detection. Post-impl
+  report filed as `bridge/gtkb-isolation-015-phase7-full-integration-009.md`.
+- **Slice 2 (Typed control-plane handler) — separate bridge under the same
+  WI:** §D typed `work_subject.set` control-plane handler with input
+  schema, timing semantics, dry-run, apply, audit, and rollback. Filed as
+  a new bridge once Slice 1 is VERIFIED. `GTKB-ISOLATION-015` closes when
+  Slice 2 is VERIFIED.
+- **§F (Upstream GT-KB clean-adopter delivery) — routed to
+  `GTKB-ISOLATION-017`:** AGENTS.md template, hook templates, and
+  `gt project init/upgrade/doctor` packaging are delivered through the
+  existing Phase 9 adopter-packaging backlog item. No new bridge or WI
+  required.
+
 **Execution note:** the completed Phase 1 through Phase 7 planning records
 remain below as the governing design baseline for the execution queue above.
 
