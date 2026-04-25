@@ -58,8 +58,8 @@ STALE_SEC = 600  # <10 min: warning
 # message rather than silently using a workstation-specific path.
 #
 # Setup:
-#   PowerShell user profile:  $env:GTKB_PROJECT_ROOT = "E:\GT-KB"
-#   Bash shell profile:        export GTKB_PROJECT_ROOT="/e/GT-KB"
+#   PowerShell user profile:  $env:GTKB_PROJECT_ROOT = "E:\path\to\your\GT-KB"
+#   Bash shell profile:        export GTKB_PROJECT_ROOT="/c/path/to/your/GT-KB"
 #   Documented in:             independent-progress-assessments/bridge-automation/README-ENV-SETUP.md
 _env_fallback = os.environ.get("GTKB_PROJECT_ROOT")
 HARDCODED_FALLBACK_ROOT: Path | None = (
