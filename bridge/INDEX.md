@@ -27,6 +27,7 @@ NO-GO: bridge/gtkb-membase-effective-use-umbrella-002.md
 NEW: bridge/gtkb-membase-effective-use-umbrella-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2b-metrics
+NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-025.md
 GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-024.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-023.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-022.md
