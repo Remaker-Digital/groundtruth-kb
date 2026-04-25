@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-dora-001b-track2-implementation
+NEW: bridge/gtkb-dora-001b-track2-implementation-005.md
 GO: bridge/gtkb-dora-001b-track2-implementation-004.md
 REVISED: bridge/gtkb-dora-001b-track2-implementation-003.md
 NO-GO: bridge/gtkb-dora-001b-track2-implementation-002.md
