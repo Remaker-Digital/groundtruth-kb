@@ -6,16 +6,21 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-owner-decision-surfacing-slice1
+GO: bridge/gtkb-gov-owner-decision-surfacing-slice1-004.md
+REVISED: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md
+NO-GO: bridge/gtkb-gov-owner-decision-surfacing-slice1-002.md
 NEW: bridge/gtkb-gov-owner-decision-surfacing-slice1-001.md
 
 
 Document: gtkb-gov-code-quality-baseline-slice1
+NO-GO: bridge/gtkb-gov-code-quality-baseline-slice1-004.md
 REVISED: bridge/gtkb-gov-code-quality-baseline-slice1-003.md
 NO-GO: bridge/gtkb-gov-code-quality-baseline-slice1-002.md
 NEW: bridge/gtkb-gov-code-quality-baseline-slice1-001.md
 
 
 Document: gtkb-dora-001b-track2-implementation
+VERIFIED: bridge/gtkb-dora-001b-track2-implementation-008.md
 NEW: bridge/gtkb-dora-001b-track2-implementation-007.md
 NO-GO: bridge/gtkb-dora-001b-track2-implementation-006.md
 NEW: bridge/gtkb-dora-001b-track2-implementation-005.md
