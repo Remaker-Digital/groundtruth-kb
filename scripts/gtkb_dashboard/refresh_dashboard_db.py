@@ -9,6 +9,7 @@ import importlib.util
 import json
 import logging
 import sqlite3
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +28,18 @@ _REQUIRED_MIGRATION_COLUMNS: tuple[tuple[str, str], ...] = (
     ("commit_range_end", "TEXT NOT NULL DEFAULT ''"),
     ("rollback_of_deploy_id", "TEXT NOT NULL DEFAULT ''"),
     ("hotfix_of_deploy_id", "TEXT NOT NULL DEFAULT ''"),
+    # DORA-001b Track 2 (S308): authoritative deployment source columns.
+    # Per bridge/gtkb-dora-001b-track2-implementation-003.md sec 2.1.
+    # All TEXT NOT NULL DEFAULT to match the additive migration pattern.
+    # Existing rows get default values; canonical-manifest-sourced rows
+    # populate structured values via _ingest_canonical_pipeline_manifests().
+    ("_authority_source", "TEXT NOT NULL DEFAULT 'heuristic'"),
+    ("_image_ref", "TEXT NOT NULL DEFAULT ''"),
+    ("_image_tag", "TEXT NOT NULL DEFAULT ''"),
+    ("_revision_name", "TEXT NOT NULL DEFAULT ''"),
+    ("_deployed_at", "TEXT NOT NULL DEFAULT ''"),
+    ("_consistency", "TEXT NOT NULL DEFAULT 'unknown'"),
+    ("_confidence", "TEXT NOT NULL DEFAULT 'low'"),
 )
 
 _ROLLBACK_LINK_WINDOW_SECONDS = 7 * 24 * 60 * 60
@@ -574,6 +587,17 @@ def _write_model_to_db(
         }
         _load_incidents(project_root, conn, known_deploy_ids)
 
+        # DORA-001b Track 2 (S308): ingest canonical pipeline manifests as
+        # structured deployment evidence + reconcile against Azure revisions
+        # for the deployed-state cross-check. Both functions are graceful-
+        # degradation by design: ingest skips invalid manifests; reconciliation
+        # catches all subprocess/auth/network failures and degrades affected
+        # rows to _consistency='unknown' without affecting refresh_runs.status.
+        # Per bridge/gtkb-dora-001b-track2-implementation-003.md sec 2.4-2.5
+        # (Codex GO at -004).
+        _ingest_canonical_pipeline_manifests(conn, project_root)
+        _reconcile_against_azure_revisions(conn, ["staging", "production"])
+
         release = intelligence.get("release_readiness", {})
         conn.executemany(
             "INSERT INTO release_blockers (sort_order, blocker) VALUES (?, ?)",
@@ -677,12 +701,364 @@ def _replace_table(conn: sqlite3.Connection, table_name: str) -> None:
     conn.execute(f"DELETE FROM {table_name}")
 
 
+_DORA_DEPLOYMENT_EVENT_KINDS: frozenset[str] = frozenset({"canonical_deploy"})
+
+_DORA_AUTHORITATIVE_EVENT_KINDS: frozenset[str] = frozenset({
+    "canonical_deploy",
+    "canonical_deploy_attempted_failed",
+    "canonical_pipeline_run",
+    "canonical_pipeline_dry_run",
+})
+
+
+def _is_deployment_event(event_kind: str) -> bool:
+    """Per Codex GO -006 condition 2: only `canonical_deploy` counts as a deployment.
+
+    Used by `GTKB-DORA-002` deployment-frequency math (when it lands) to
+    exclude `canonical_pipeline_run` and `canonical_pipeline_dry_run` from
+    deployment counts. Exposed at module scope so KPI queries can import it.
+    """
+    return event_kind in _DORA_DEPLOYMENT_EVENT_KINDS
+
+
+def _classify_manifest(manifest: dict[str, Any]) -> str:
+    """Classify a `logs/deploy-result-*.json` manifest into a canonical event kind.
+
+    Implements the contract specified in
+    `bridge/gtkb-dora-001b-authoritative-deployment-source-005.md` sec 5.5.
+    Filters non-deployments before they enter the DORA event stream.
+    Uses structured fields only; never parses free-text phase names.
+
+    Returns one of:
+      - canonical_deploy
+      - canonical_deploy_attempted_failed
+      - canonical_pipeline_run
+      - canonical_pipeline_dry_run
+    """
+    # 1. Dry-runs are not deployments.
+    if manifest.get("dry_run") is True:
+        return "canonical_pipeline_dry_run"
+
+    # 2. Look up phase 8 (deploy) by integer phase number, not free-text name.
+    # Per scripts/deploy_pipeline.py:540, phase_8_deploy() returns
+    # PhaseResult(9, ...) — the integer 9 (not 8) identifies the deploy phase.
+    phases = manifest.get("phases", []) or []
+    phase_8 = next((p for p in phases if p.get("phase") == 9), None)
+
+    # 3. No deploy phase = not a deployment.
+    if phase_8 is None:
+        return "canonical_pipeline_run"
+
+    # 4. Phase 8 status semantics per scripts/deploy_pipeline.py:117 (PASS/FAIL/SKIP).
+    status = phase_8.get("status", "")
+    if status == "PASS":
+        # Track 1 enhanced manifest: prefer the explicit booleans.
+        evidence = manifest.get("deploy_evidence", {}) or {}
+        if evidence.get("target_update_attempted") is True:
+            if evidence.get("target_update_succeeded") is True:
+                return "canonical_deploy"
+            return "canonical_deploy_attempted_failed"
+        # Pre-Track-1 manifest: phase-8 PASS without evidence block.
+        # Status PASS without dry_run is sufficient signal that target update
+        # succeeded (deploy_pipeline returns FAIL when az update returncode is
+        # nonzero). _confidence='medium' until Track 1 supplies the explicit
+        # booleans (per scoping sec 7.2 ceiling + Codex -006 condition 3).
+        return "canonical_deploy"
+    if status == "FAIL":
+        return "canonical_deploy_attempted_failed"
+    if status == "SKIP":
+        return "canonical_pipeline_run"
+    return "canonical_pipeline_run"  # Unknown status: conservative.
+
+
+def _confidence_for_canonical_deploy(manifest: dict[str, Any]) -> str:
+    """Compute provisional _confidence for a canonical_deploy row.
+
+    Per Codex -006 condition 3: pre-Track-1 deploy rows must not exceed
+    'medium'. Even with full deploy_evidence, ingest emits provisional
+    'medium'; reconciliation upgrades to 'high' only when Azure revision
+    matches (per `_reconcile_against_azure_revisions` confidence-upgrade rule).
+    """
+    return "medium"
+
+
+def _ingest_canonical_pipeline_manifests(
+    conn: sqlite3.Connection,
+    project_root: Path,
+) -> dict[str, int]:
+    """Walk `logs/deploy-result-*.json` and ingest each as a delivery_timeline_events row.
+
+    Idempotent via query-before-insert using the `source` column as stable
+    manifest identity (relative path of the manifest file). Per Codex GO
+    `-004` on `bridge/gtkb-dora-001b-track2-implementation-003.md` sec 2.4.
+
+    Returns counts dict: manifests_seen, rows_inserted, rows_skipped, rows_invalid.
+    """
+    counts = {
+        "manifests_seen": 0,
+        "rows_inserted": 0,
+        "rows_skipped": 0,
+        "rows_invalid": 0,
+    }
+    logs_dir = project_root / "logs"
+    if not logs_dir.is_dir():
+        return counts
+
+    for manifest_path in sorted(logs_dir.glob("deploy-result-*.json")):
+        counts["manifests_seen"] += 1
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            counts["rows_invalid"] += 1
+            continue
+        if not isinstance(manifest, dict):
+            counts["rows_invalid"] += 1
+            continue
+
+        # Stable manifest identity in the existing `source` column.
+        # Forward-slash normalization for cross-platform stability.
+        relative_source = str(
+            manifest_path.relative_to(project_root)
+        ).replace("\\", "/")
+
+        # Query-before-insert dedup (no DB-level UNIQUE per scoping
+        # design; the per-row WHERE clause filters by _authority_source
+        # so non-manifest rows with overlapping `source` strings are
+        # not affected).
+        existing = conn.execute(
+            "SELECT 1 FROM delivery_timeline_events "
+            "WHERE _authority_source = 'canonical_manifest' "
+            "AND source = ? LIMIT 1",
+            (relative_source,),
+        ).fetchone()
+        if existing is not None:
+            counts["rows_skipped"] += 1
+            continue
+
+        # Classify, then build the row.
+        event_kind = _classify_manifest(manifest)
+        evidence = manifest.get("deploy_evidence", {}) or {}
+        commit_sha = str(manifest.get("repo_commit") or "")
+        version = str(manifest.get("version") or "")
+        timestamp = str(manifest.get("started_at") or "")
+
+        # Confidence per scoping sec 7.2: ingest emits provisional
+        # 'medium' for canonical_deploy; non-deployment kinds get 'low'.
+        if event_kind == "canonical_deploy":
+            confidence = _confidence_for_canonical_deploy(manifest)
+        elif event_kind == "canonical_deploy_attempted_failed":
+            confidence = "medium"
+        else:
+            confidence = "low"
+
+        image_ref = str(evidence.get("image") or "")
+        image_tag = str(evidence.get("image_tag") or version)
+        revision_name = str(evidence.get("revision_name") or "")
+        deployed_at = str(evidence.get("target_verified_at") or "")
+        environment = str(manifest.get("environment") or "")
+
+        conn.execute(
+            """
+            INSERT INTO delivery_timeline_events (
+                event, source, environment, result, timestamp, commit_sha, notes,
+                event_kind, deployable_change_id, commit_range_start, commit_range_end,
+                rollback_of_deploy_id, hotfix_of_deploy_id,
+                _authority_source, _image_ref, _image_tag, _revision_name,
+                _deployed_at, _consistency, _confidence
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                f"canonical_pipeline_run version={version}",
+                relative_source,
+                environment,
+                str(manifest.get("status") or ""),
+                timestamp,
+                commit_sha,
+                f"deploy-result manifest; phases={manifest.get('phases_completed', 0)}/{manifest.get('phases_total', 0)}",
+                event_kind,
+                "",  # deployable_change_id; populated by _enrich_timeline_events when relevant
+                commit_sha,
+                commit_sha,
+                "",
+                "",
+                "canonical_manifest",
+                image_ref,
+                image_tag,
+                revision_name,
+                deployed_at,
+                "unknown",  # _consistency upgraded by reconciliation
+                confidence,
+            ),
+        )
+        counts["rows_inserted"] += 1
+
+    return counts
+
+
+def _reconcile_against_azure_revisions(
+    conn: sqlite3.Connection,
+    environments: list[str],
+) -> dict[str, int]:
+    """Cross-check canonical_deploy rows against Azure Container Apps revision history.
+
+    Per Codex GO `-004` on `bridge/gtkb-dora-001b-track2-implementation-003.md`
+    sec 2.5 + scoping sec 6 graceful-degradation contract:
+
+      - All exceptions caught (subprocess errors, FileNotFoundError if az CLI
+        missing, JSONDecodeError, generic Exception).
+      - Per-row degradation: failed rows get _consistency='unknown'.
+      - Single WARNING per pass, not per row.
+      - refresh_runs.status UNAFFECTED by reconciliation outcome.
+
+    Confidence upgrade: when reconciliation confirms an Azure revision matches
+    the manifest's recorded image AND the manifest has full deploy_evidence,
+    upgrade _confidence from provisional 'medium' to 'high'.
+
+    Returns counts dict: rows_checked, rows_matched, rows_drift, rows_unknown.
+    """
+    counts = {
+        "rows_checked": 0,
+        "rows_matched": 0,
+        "rows_drift": 0,
+        "rows_unknown": 0,
+    }
+    if not environments:
+        return counts
+
+    azure_revisions: dict[str, list[dict[str, Any]]] = {}
+    az_failure_logged = False
+    for env in environments:
+        try:
+            # Map env to gateway container app name. Hardcoded here to avoid
+            # importing scripts/lib/scaling_targets.py from the dashboard module
+            # (separate concern); keep the mapping explicit.
+            container_app = {
+                "production": "agent-red-api-gateway",
+                "staging": "agent-red-staging",
+            }.get(env)
+            if container_app is None:
+                continue
+            result = subprocess.run(
+                [
+                    "az", "containerapp", "revision", "list",
+                    "--name", container_app,
+                    "--resource-group", "Agent-Red",
+                    "-o", "json",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if result.returncode != 0:
+                if not az_failure_logged:
+                    print(
+                        f"[refresh_dashboard_db] WARNING: Azure reconciliation "
+                        f"degraded; az containerapp revision list returned "
+                        f"{result.returncode} for {env}",
+                        file=sys.stderr,
+                    )
+                    az_failure_logged = True
+                continue
+            azure_revisions[env] = json.loads(result.stdout)
+        except (
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            json.JSONDecodeError,
+            Exception,  # noqa: BLE001  # graceful-degradation contract requires catching all
+        ) as exc:
+            if not az_failure_logged:
+                print(
+                    f"[refresh_dashboard_db] WARNING: Azure reconciliation "
+                    f"degraded; {type(exc).__name__} querying revisions for "
+                    f"{env}: {exc}",
+                    file=sys.stderr,
+                )
+                az_failure_logged = True
+            continue
+
+    # Pull canonical_deploy rows that are still 'unknown' or could be upgraded.
+    rows = conn.execute(
+        "SELECT rowid, environment, _image_ref, _image_tag, _revision_name, "
+        "_consistency, _confidence "
+        "FROM delivery_timeline_events "
+        "WHERE _authority_source = 'canonical_manifest' "
+        "AND event_kind = 'canonical_deploy'"
+    ).fetchall()
+
+    for row in rows:
+        counts["rows_checked"] += 1
+        rowid, environment, image_ref, image_tag, revision_name, _, _ = row
+
+        if environment not in azure_revisions:
+            # Reconciliation unavailable for this row's environment.
+            conn.execute(
+                "UPDATE delivery_timeline_events SET _consistency = ? WHERE rowid = ?",
+                ("unknown", rowid),
+            )
+            counts["rows_unknown"] += 1
+            continue
+
+        # Look for a matching revision by image (full ref) or image_tag.
+        match = None
+        for revision in azure_revisions[environment]:
+            try:
+                rev_image = (
+                    revision.get("properties", {})
+                    .get("template", {})
+                    .get("containers", [{}])[0]
+                    .get("image", "")
+                )
+            except (AttributeError, IndexError, TypeError):
+                continue
+            if image_ref and rev_image == image_ref:
+                match = revision
+                break
+            if image_tag and image_tag in rev_image:
+                match = revision
+                break
+
+        if match is not None:
+            new_revision_name = match.get("name", revision_name) or revision_name
+            new_confidence = (
+                "high" if image_ref and revision_name else "medium"
+            )
+            conn.execute(
+                "UPDATE delivery_timeline_events "
+                "SET _consistency = ?, _revision_name = ?, _confidence = ? "
+                "WHERE rowid = ?",
+                ("both_match", new_revision_name, new_confidence, rowid),
+            )
+            counts["rows_matched"] += 1
+        else:
+            conn.execute(
+                "UPDATE delivery_timeline_events "
+                "SET _consistency = ?, _confidence = ? "
+                "WHERE rowid = ?",
+                ("manifest_only", "medium", rowid),
+            )
+            counts["rows_drift"] += 1
+
+    return counts
+
+
 def _classify_event_kind(row: dict[str, Any]) -> str:
     """Classify a timeline row into a DORA event kind.
 
     Source-based rules (checked in order). Pure; depends only on ``source`` and
     ``result`` fields of the row.
+
+    Pre-check (DORA-001b Track 2): canonical_manifest-sourced rows already
+    carry an event_kind from `_classify_manifest()`; preserve it instead of
+    falling through to the string-heuristic logic below.
     """
+    # Track 2 pre-check: respect _authority_source from manifest ingest path.
+    if row.get("_authority_source") == "canonical_manifest":
+        kind = row.get("event_kind") or row.get("_event_kind")
+        if kind in _DORA_AUTHORITATIVE_EVENT_KINDS:
+            return kind
+
     source = str(row.get("source") or "")
     result = str(row.get("result") or "")
     if source == "git log":

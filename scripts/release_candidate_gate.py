@@ -103,6 +103,7 @@ def _python_gates() -> None:
             "tests/unit/test_deploy_scaling.py",
             "tests/unit/test_lib_scaling_enforcement.py",
             "tests/unit/test_deploy_pipeline_scaling.py",
+            "tests/scripts/test_dora_001b_track2_ingest.py",
             "tests/scripts/test_check_environment_isolation.py",
             "tests/scripts/test_release_candidate_gate.py",
             "tests/scripts/test_gtkb_scoped_client.py",
