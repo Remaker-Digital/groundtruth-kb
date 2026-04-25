@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-root-directory-migration-post-verify
+NEW: bridge/gtkb-root-directory-migration-post-verify-012.md
+NO-GO: bridge/gtkb-root-directory-migration-post-verify-011.md
 NEW: bridge/gtkb-root-directory-migration-post-verify-010.md
 GO: bridge/gtkb-root-directory-migration-post-verify-009.md
 REVISED: bridge/gtkb-root-directory-migration-post-verify-008.md
