@@ -5,7 +5,12 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-gov-code-quality-baseline-slice1
+NEW: bridge/gtkb-gov-code-quality-baseline-slice1-001.md
+
+
 Document: gtkb-dora-001b-track2-implementation
+NO-GO: bridge/gtkb-dora-001b-track2-implementation-006.md
 NEW: bridge/gtkb-dora-001b-track2-implementation-005.md
 GO: bridge/gtkb-dora-001b-track2-implementation-004.md
 REVISED: bridge/gtkb-dora-001b-track2-implementation-003.md
@@ -14,6 +19,7 @@ NEW: bridge/gtkb-dora-001b-track2-implementation-001.md
 
 
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
+GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-010.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-009.md
 NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-008.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-007.md
@@ -220,6 +226,7 @@ NEW: bridge/gtkb-dashboard-industry-alignment-slice2-001.md
   future-implementation specification.
 -->
 Document: gtkb-isolation-015-slice2-work-subject-set
+VERIFIED: bridge/gtkb-isolation-015-slice2-work-subject-set-007.md
 REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-006.md
 NO-GO: bridge/gtkb-isolation-015-slice2-work-subject-set-005.md
 REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-004.md

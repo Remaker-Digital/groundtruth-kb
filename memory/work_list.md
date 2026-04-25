@@ -19,6 +19,7 @@ Updated: 2026-04-25 (S308) — hygiene pass after canonical-deploy / slice2b rec
 | 4 | `GTKB-DASHBOARD-002` Slice 2.2 (metrics) | parked (external trigger) | Implementation already shipped at slice2b-metrics `-008` GO; thread parked at `-025/-026 VERIFIED` per the parking-baseline protocol. Awaits external prereq chain: commit security-scan workflow on `develop` → merge to `main` → `workflow_dispatch` on `main` → completed run with `pip-audit-results` artifact. | When external trigger fires, file post-impl evidence per `-023 §2.5` Steps A–E. |
 | 5 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | GO (upstream impl underway) | REVISED-9 GO'd at `bridge/gtkb-gov-proposal-standards-slice1-020.md`. Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Upstream implementation in `groundtruth-kb/`; Agent Red adopts via `gt project upgrade` after upstream VERIFIED. |
 | 6 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
+| 7 | `GTKB-GOV-CODE-QUALITY-BASELINE` | scoping in flight | Slice 1 governance design filed at `bridge/gtkb-gov-code-quality-baseline-slice1-001.md`; awaits Codex GO. New standing backlog entry per owner directive 2026-04-25. Defines a default code-quality checklist (CQ-* rule IDs) applying to all GT-KB adopter project proposals unless explicitly N/A or owner-suspended via the waiver lifecycle. | After Codex GO on Slice 1, file Slice 2 implementation bridge upstream in `groundtruth-kb` (hook extension + Codex/Windows fallback verifier + tests + GOV/ADR/SPEC/DCL records). Adopters consume via `gt project upgrade` after upstream VERIFIED. |
 
 **Completed in S308 (2026-04-25), removed from active table:**
 
@@ -322,6 +323,65 @@ counterpart detection, and split application vs GT-KB verification lanes.
 
 **Execution note:** the completed Phase 1 through Phase 7 planning records
 remain below as the governing design baseline for the execution queue above.
+
+### GTKB-GOV-CODE-QUALITY-BASELINE - Default code-quality checklist for all GT-KB adopter project proposals (upstream-routed)
+
+**Priority:** TOP. Filed 2026-04-25 (S308) per owner directive. Slice 1
+governance design at `bridge/gtkb-gov-code-quality-baseline-slice1-001.md`;
+awaits Codex GO before Slice 2 implementation begins.
+
+**Problem statement:** GT-KB adopter projects today rely on per-author
+discipline + per-reviewer judgment for code quality. Owner directives
+(`feedback_no_hardcoded_paths.md`, `feedback_pedagogical_comments_standard.md`)
+have surfaced repeatedly in S307–S308 because individual authors don't
+consistently apply the same rules. Without a default-on baseline,
+quality coverage is inconsistent across adopter projects and across
+proposal authors.
+
+**Required outcome (Slice 1 design, defined in the bridge proposal):**
+specify a stable rule-ID baseline (`CQ-SECRETS-001`, `CQ-PATHS-001`,
+`CQ-CONSTANTS-001`, `CQ-DOCS-001`, `CQ-COMPLEXITY-001`, `CQ-TESTS-001`,
+`CQ-LOGGING-001`, `CQ-SECURITY-001`, `CQ-VERIFICATION-001`); define
+default-on applicability with per-rule N/A or owner-suspension via the
+waiver lifecycle (six-field shape: rule_id, scope, reason,
+owner_approval_evidence, expiry_or_review_condition, compensating_control_or_accepted_risk);
+require every implementation proposal to carry a Code Quality Baseline
+table; require LO reviews to evaluate the table; route mechanical
+enforcement upstream as an extension to `hook.bridge-proposal-standards`
+plus a Windows-aware fallback verifier; ground rules in ISO/IEC 25010,
+OWASP Secure Coding Practices, SEI CERT, Twelve-Factor App, and
+language-specific style guides as informing references rather than
+direct law.
+
+**Required outcome (Slice 2 implementation, post-Slice-1-GO):** insert
+the four formal artifact records (`GOV-CODE-QUALITY-BASELINE-001`,
+`ADR-CODE-QUALITY-BASELINE-AS-DEFAULT-001`,
+`SPEC-CODE-QUALITY-CHECKLIST-001`,
+`DCL-CODE-QUALITY-WAIVER-LIFECYCLE-001`) under the
+formal-artifact-approval-gate; extend the upstream
+`hook.bridge-proposal-standards` to enforce the table; add
+`scripts/check_code_quality_baseline_parity.py` as the Codex/Windows
+fallback; add tests for missing-table, invalid-rule-ID,
+unsupported-N/A, expired-waiver, and compliant-proposal cases.
+
+**Routing:** upstream-routed. Slice 2 implementation lands in
+`groundtruth-kb`; Agent Red adopts via `gt project upgrade` after
+upstream VERIFIED. Same routing pattern as `GTKB-GOV-PROPOSAL-STANDARDS`
+and `GTKB-GOV-DA-ENFORCEMENT`.
+
+**Regression visibility:** the proposal-standards hook gains the
+table-presence + per-row-well-formedness check; the fallback verifier
+runs in the release-candidate gate. Tests in
+`tests/scripts/test_code_quality_baseline_parity.py` (Slice 2 file
+name, TBD precise location) cover all 5 enforcement cases.
+
+**Dependencies:** depends on `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
+hook extensibility (already GO'd at slice1-020 upstream). No other
+local prerequisite.
+
+**Out of scope (Slice 1):** no formal artifact records inserted; no
+hook code; no tests; no Code Quality Baseline tables backfilled into
+in-flight proposals (applies prospectively only).
 
 ### GTKB-GOV-DA-ENFORCEMENT - Mechanical enforcement of Deliberation Archive citation discipline (re-routed to upstream)
 
