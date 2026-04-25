@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-startup-enhancements-p1
+GO: bridge/gtkb-startup-enhancements-p1-004.md
 REVISED: bridge/gtkb-startup-enhancements-p1-003.md
 NO-GO: bridge/gtkb-startup-enhancements-p1-002.md
 NEW: bridge/gtkb-startup-enhancements-p1-001.md
