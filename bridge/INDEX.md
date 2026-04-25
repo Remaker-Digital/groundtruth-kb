@@ -6,10 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-dora-001b-track2-implementation
+REVISED: bridge/gtkb-dora-001b-track2-implementation-003.md
+NO-GO: bridge/gtkb-dora-001b-track2-implementation-002.md
 NEW: bridge/gtkb-dora-001b-track2-implementation-001.md
 
 
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
+REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-007.md
+NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-006.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md
 NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-003.md
@@ -212,6 +216,7 @@ NEW: bridge/gtkb-dashboard-industry-alignment-slice2-001.md
   future-implementation specification.
 -->
 Document: gtkb-isolation-015-slice2-work-subject-set
+NO-GO: bridge/gtkb-isolation-015-slice2-work-subject-set-003.md
 REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-002.md
 NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-001.md
 

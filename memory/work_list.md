@@ -14,7 +14,7 @@ Updated: 2026-04-25 (S308) — hygiene pass after canonical-deploy / slice2b rec
 | # | ID | Status | Blocks / blocked by | Next step |
 |---|---|---|---|---|
 | 1 | `GTKB-DORA-001b` | **actionable now** | Prerequisite for `GTKB-DORA-002`. Unblocked since `GTKB-DORA-001` VERIFIED at `gtkb-dora-telemetry-foundation-008` (note: -002..-008 are parallel-poller phantoms; the VERIFIED status is canonical per INDEX). | File authoritative-deployment-source scoping proposal: 2-3 source candidates (deploy_pipeline.py manifest, GitHub Actions workflow runs, Azure Container Apps revision history) with tradeoffs + recommendation. |
-| 2 | `GTKB-ISOLATION-016` | **actionable now** (large) | Phase 8 migration rehearsal. Unblocked since `GTKB-ISOLATION-015` Slice 2 VERIFIED at `gtkb-isolation-015-slice2-work-subject-set-006`. | Execute non-destructive Agent Red migration rehearsal from legacy mixed root into selected child application root. **Recommend a fresh session for focus** — multi-phase. |
+| 2 | `GTKB-ISOLATION-016` | **actionable now** (large) | Phase 8 migration rehearsal. Phase 7 Slice 1 VERIFIED is sufficient prerequisite per `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md` §1.2 (sub-scripts don't need typed control-plane API). Phase 7 Slice 2 typed `work_subject.set` / `rollback` ops re-opened as not-implemented at `bridge/gtkb-isolation-015-slice2-work-subject-set-002.md` (prior INDEX VERIFIED at phantom `-006` was unsubstantiated; corrected later in S308). Slice 2 implementation remains a future work item but does NOT block Phase 8. | Execute non-destructive Agent Red migration rehearsal from legacy mixed root into selected child application root. **Recommend a fresh session for focus** — multi-phase. |
 | 3 | `GTKB-DASHBOARD-002` Slice 2.3 (integration) | blocked on owner | Blocked on owner notifier-default choice (email / Slack / Teams / none). GO condition from `slice2-002.md` F2: justify any new `ci_runs` persistence against existing `testing_service_integrations`. | File `gtkb-dashboard-industry-alignment-slice2c-integration` after owner decides §5.5 notifier default. |
 | 4 | `GTKB-DASHBOARD-002` Slice 2.2 (metrics) | parked (external trigger) | Implementation already shipped at slice2b-metrics `-008` GO; thread parked at `-025/-026 VERIFIED` per the parking-baseline protocol. Awaits external prereq chain: commit security-scan workflow on `develop` → merge to `main` → `workflow_dispatch` on `main` → completed run with `pip-audit-results` artifact. | When external trigger fires, file post-impl evidence per `-023 §2.5` Steps A–E. |
 | 5 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | GO (upstream impl underway) | REVISED-9 GO'd at `bridge/gtkb-gov-proposal-standards-slice1-020.md`. Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Upstream implementation in `groundtruth-kb/`; Agent Red adopts via `gt project upgrade` after upstream VERIFIED. |
@@ -275,10 +275,15 @@ and unable to copy credentials or raw `groundtruth.db` into session context.
 
 **Status:** **Slice 1 VERIFIED** 2026-04-24 (S306) at
 `bridge/gtkb-isolation-015-phase7-full-integration-016.md`. **Slice 2
-implemented 2026-04-24 (S307)** via
-`bridge/gtkb-isolation-015-slice2-work-subject-set-004.md` (GO); post-impl
-report filed as a new version on that thread. `GTKB-ISOLATION-015` closes
-when Slice 2 VERIFIED.
+NOT IMPLEMENTED** — prior tracking claimed Slice 2 was implemented 2026-04-24 (S307)
+and VERIFIED at phantom `-006`, but source-level verification 2026-04-25 (S308)
+per Codex `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-004.md` F4
+confirmed the implementation never landed in this checkout (control_plane_registry.py
+exposes only 3 ops with no `work_subject.set/rollback`; no source files for
+`work_subject_*`; no git history). Slice 2 thread re-opened as not-implemented
+at `bridge/gtkb-isolation-015-slice2-work-subject-set-002.md`. `GTKB-ISOLATION-015`
+closes only when Slice 2 typed control-plane operations are genuinely implemented
+in a future session — `-001` of that thread remains the specification basis.
 
 **Priority:** **TOP NEXT on the isolation chain** (after Phases 3-6 + Phase
 7 foundation + Phase 7 Slice 1 all VERIFIED). Unblocks `GTKB-ISOLATION-016`
@@ -876,11 +881,14 @@ output file matches the required-section contract enforced by
 
 ### GTKB-ISOLATION-016 - Execute non-destructive Agent Red migration rehearsal
 
-**Priority:** TOP after `GTKB-ISOLATION-015` **closes (Slice 2 VERIFIED)**.
-Phase 8 execution requires the full Phase 7 work-subject/root enforcement
-to land — not merely the Phase 8 plan (`GTKB-ISOLATION-009` which is DONE).
-Historical priority line pointed at `-009`; corrected 2026-04-24 per S306
-backlog hygiene pass.
+**Priority:** TOP. Unblocked once Phase 7 Slice 1 VERIFIED (which it is at
+`gtkb-isolation-015-phase7-full-integration-016`); does NOT require Slice 2
+typed control-plane operations per `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md`
+§1.2 (rehearsal sub-scripts walk filesystem and emit previews; none call
+`work_subject.set/rollback`). Slice 2 was previously listed as a prerequisite
+based on phantom-INDEX VERIFIED at `-006`; that claim was retracted at
+`bridge/gtkb-isolation-015-slice2-work-subject-set-002.md` after S308
+source-level verification confirmed Slice 2 implementation is absent.
 
 **Required outcome:** after the Phase 8 and Phase 9 plans are complete, run the
 approved non-destructive rehearsal from the legacy mixed root into the selected
