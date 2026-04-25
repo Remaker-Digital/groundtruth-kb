@@ -9,10 +9,10 @@ import db
 
 MEMORY_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..',
     'Users', 'micha', '.claude', 'projects',
-    'E--Claude-Playground-CLAUDE-PROJECTS-Agent-Red-Customer-Engagement', 'memory')
+    'E--GT-KB', 'memory')
 
 # Resolve absolute path
-MEMORY_DIR = r"C:\Users\micha\.claude\projects\E--Claude-Playground-CLAUDE-PROJECTS-Agent-Red-Customer-Engagement\memory"
+MEMORY_DIR = r"C:\Users\micha\.claude\projects\E--GT-KB\memory"
 
 MIGRATIONS = [
     # (doc_id, title, category, filename, tags)

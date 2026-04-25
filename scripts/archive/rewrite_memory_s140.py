@@ -19,7 +19,7 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MEMORY_DIR = Path(r"C:\Users\micha\.claude\projects\E--Claude-Playground-CLAUDE-PROJECTS-Agent-Red-Customer-Engagement\memory")
+MEMORY_DIR = Path(r"C:\Users\micha\.claude\projects\E--GT-KB\memory")
 MEMORY_FILE = MEMORY_DIR / "MEMORY.md"
 ARCHIVE_FILE = PROJECT_ROOT / "CLAUDE_ARCHIVE.md"
 

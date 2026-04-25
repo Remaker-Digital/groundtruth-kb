@@ -7,7 +7,7 @@ db_path = os.path.join(os.path.dirname(__file__), '..', 'groundtruth.db')
 db = KnowledgeDB(db_path)
 
 prompt = r"""Continue work on Agent Red Customer Experience commercial project.
-Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Location: E:\GT-KB
 Key files: CLAUDE.md, memory/MEMORY.md
 Session: S136 (increment from S135)
 

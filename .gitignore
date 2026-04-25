@@ -248,6 +248,13 @@ independent-progress-assessments/bridge-automation/*
 # adopters can read setup procedures from a fresh checkout. Per S307
 # pedagogical commenting directive.
 !independent-progress-assessments/bridge-automation/README-*.md
+# IPA archive directory — track ONLY the explanatory README.md so adopters
+# understand the archive convention. The 6 archived one-shot scripts remain
+# untracked (consistent with the IPA blanket-ignore policy). Per
+# bridge/gtkb-root-directory-migration-post-verify-009.md Phase 1f.
+!independent-progress-assessments/archive/
+independent-progress-assessments/archive/*
+!independent-progress-assessments/archive/README.md
 # Tests for bridge-automation — tracked so CI + pre-commit can exercise the guard.
 !independent-progress-assessments/bridge-automation/tests/
 !independent-progress-assessments/bridge-automation/tests/*.ps1
