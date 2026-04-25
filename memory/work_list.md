@@ -9,18 +9,26 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Next Actionable Items (hand-maintained; automation tracked under GTKB-GOV-BACKLOG-DISCIPLINE)
 
-Updated: 2026-04-24 (S306).
+Updated: 2026-04-25 (S308) — hygiene pass after canonical-deploy / slice2b reconciliation / poller-halt session.
 
 | # | ID | Status | Blocks / blocked by | Next step |
 |---|---|---|---|---|
-| 1 | `GTKB-ISOLATION-015` **Slice 2** | awaiting Codex VERIFIED | Blocks `GTKB-ISOLATION-016`. Slice 1 VERIFIED 2026-04-24. Slice 2 implemented 2026-04-24 at `bridge/gtkb-isolation-015-slice2-work-subject-set-004.md` GO. | Codex reviewing post-impl report. |
-| 2 | `GTKB-DASHBOARD-002` Slice 2.1 (visibility) | DONE pending VERIFIED | Depends on `GTKB-DASHBOARD-002` scoping VERIFIED (GO 2026-04-24 at `slice2-002.md`). No new data ingest. Implemented 2026-04-24 at `bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-006.md` GO (swimlane generator + work-subject selector + writer-side `current_work_subject` contract). | Codex reviewing post-impl report. |
-| 3 | `GTKB-DASHBOARD-002` Slice 2.2 (metrics) | ready | Parallel to 2.1; independent schema change. GO condition from `slice2-002.md` F2: pin authoritative coverage/security sources (Dependabot vs pip-audit; Docker Scout scope). | File `gtkb-dashboard-industry-alignment-slice2b-metrics` implementation bridge with pinned source contract. |
-| 4 | `GTKB-DASHBOARD-002` Slice 2.3 (integration) | blocked | Blocked on owner notifier-default choice (email / Slack / Teams / none). GO condition from `slice2-002.md` F2: justify any new `ci_runs` persistence against existing `testing_service_integrations`. | File `gtkb-dashboard-industry-alignment-slice2c-integration` after owner decides §5.5 notifier default. |
-| 5 | `GTKB-DORA-001` | awaiting Codex VERIFIED | Blocks `GTKB-DORA-001b` and `GTKB-DORA-002`. Implemented 2026-04-24 at `bridge/gtkb-dora-telemetry-foundation-006.md` GO; post-impl report at `-007`. | Codex reviewing post-impl report. |
-| 5a | `GTKB-DORA-001b` | blocked | Prerequisite for `GTKB-DORA-002`. Depends on `GTKB-DORA-001` VERIFIED. | File authoritative-deployment-source proposal after `-001` VERIFIED. |
-| 6 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | GO (upstream impl underway) | REVISED-9 GO'd at `bridge/gtkb-gov-proposal-standards-slice1-020.md` on 2026-04-24. Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Upstream implementation in `groundtruth-kb/`; Agent Red adopts via `gt project upgrade` after upstream VERIFIED. |
-| 7 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
+| 1 | `GTKB-DORA-001b` | **actionable now** | Prerequisite for `GTKB-DORA-002`. Unblocked since `GTKB-DORA-001` VERIFIED at `gtkb-dora-telemetry-foundation-008` (note: -002..-008 are parallel-poller phantoms; the VERIFIED status is canonical per INDEX). | File authoritative-deployment-source scoping proposal: 2-3 source candidates (deploy_pipeline.py manifest, GitHub Actions workflow runs, Azure Container Apps revision history) with tradeoffs + recommendation. |
+| 2 | `GTKB-ISOLATION-016` | **actionable now** (large) | Phase 8 migration rehearsal. Unblocked since `GTKB-ISOLATION-015` Slice 2 VERIFIED at `gtkb-isolation-015-slice2-work-subject-set-006`. | Execute non-destructive Agent Red migration rehearsal from legacy mixed root into selected child application root. **Recommend a fresh session for focus** — multi-phase. |
+| 3 | `GTKB-DASHBOARD-002` Slice 2.3 (integration) | blocked on owner | Blocked on owner notifier-default choice (email / Slack / Teams / none). GO condition from `slice2-002.md` F2: justify any new `ci_runs` persistence against existing `testing_service_integrations`. | File `gtkb-dashboard-industry-alignment-slice2c-integration` after owner decides §5.5 notifier default. |
+| 4 | `GTKB-DASHBOARD-002` Slice 2.2 (metrics) | parked (external trigger) | Implementation already shipped at slice2b-metrics `-008` GO; thread parked at `-025/-026 VERIFIED` per the parking-baseline protocol. Awaits external prereq chain: commit security-scan workflow on `develop` → merge to `main` → `workflow_dispatch` on `main` → completed run with `pip-audit-results` artifact. | When external trigger fires, file post-impl evidence per `-023 §2.5` Steps A–E. |
+| 5 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | GO (upstream impl underway) | REVISED-9 GO'd at `bridge/gtkb-gov-proposal-standards-slice1-020.md`. Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Upstream implementation in `groundtruth-kb/`; Agent Red adopts via `gt project upgrade` after upstream VERIFIED. |
+| 6 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
+
+**Completed in S308 (2026-04-25), removed from active table:**
+
+- `GTKB-ISOLATION-015` Slice 2 — VERIFIED at `gtkb-isolation-015-slice2-work-subject-set-006` (closed terminal; unblocks ISOLATION-016).
+- `GTKB-DASHBOARD-002` Slice 2.1 (visibility) — VERIFIED at `gtkb-dashboard-industry-alignment-slice2a-visibility-008` (closed terminal).
+- `GTKB-DORA-001` — VERIFIED at `gtkb-dora-telemetry-foundation-008` (closed terminal; unblocks DORA-001b).
+- `gtkb-slice2b-metrics-index-reconciliation` — VERIFIED at `-008` (INDEX hygiene; closed terminal).
+- `gtkb-root-directory-migration-post-verify` — VERIFIED at `-019` (closed terminal).
+- `halt-os-pollers-token-regression` — VERIFIED at `-002` (operational change record; closed terminal).
+- `canonical-deploy-pipeline-scaling-enforcement` (WI-3031 closure) — VERIFIED at `-012` (canonical-path scaling enforcement; commits `417f187b` + `db1a63fd`; KB record updated to v4 resolved; LO log row marked Resolved 2026-04-25 (S308)). Production runtime validation pending next release window.
 
 Standing governance items (`GTKB-GOV-001` through `GTKB-GOV-010`, minus
 `-007` PAUSED and `-009` VERIFIED) and `GTKB-CORE-001` / `GTKB-MASS-001`

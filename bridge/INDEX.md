@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-dora-001b-authoritative-deployment-source
+NEW: bridge/gtkb-dora-001b-authoritative-deployment-source-001.md
+
+
 Document: halt-os-pollers-token-regression
 VERIFIED: bridge/halt-os-pollers-token-regression-002.md
 NEW: bridge/halt-os-pollers-token-regression-001.md
