@@ -285,9 +285,7 @@ at `bridge/gtkb-isolation-015-slice2-work-subject-set-002.md`. `GTKB-ISOLATION-0
 closes only when Slice 2 typed control-plane operations are genuinely implemented
 in a future session — `-001` of that thread remains the specification basis.
 
-**Priority:** **TOP NEXT on the isolation chain** (after Phases 3-6 + Phase
-7 foundation + Phase 7 Slice 1 all VERIFIED). Unblocks `GTKB-ISOLATION-016`
-Phase 8 execution.
+**Priority:** Future work item. Slice 1 already VERIFIED at `gtkb-isolation-015-phase7-full-integration-016`; Slice 2 typed control-plane operations remain not-implemented per the `gtkb-isolation-015-slice2-work-subject-set-002` reconciliation. **Does NOT unblock `GTKB-ISOLATION-016`** — Phase 8 rehearsal is already actionable on Slice 1 alone (per `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md` §1.2; rehearsal sub-scripts don't call typed control-plane API). This WI closes only when Slice 2 is genuinely implemented in a future session.
 
 **Required outcome:** after the Phase 3 through Phase 6 execution slices land,
 submit and execute the remaining Phase 7 integration work: subject-labeled
@@ -307,11 +305,15 @@ counterpart detection, and split application vs GT-KB verification lanes.
   writer/validator (`scripts/gtkb_bridge_writer.py`), §C overlay-aware
   startup status, §E multi-harness counterpart-state detection. Post-impl
   report filed as `bridge/gtkb-isolation-015-phase7-full-integration-009.md`.
-- **Slice 2 (Typed control-plane handler) — separate bridge under the same
-  WI:** §D typed `work_subject.set` control-plane handler with input
-  schema, timing semantics, dry-run, apply, audit, and rollback. Filed as
-  a new bridge once Slice 1 is VERIFIED. `GTKB-ISOLATION-015` closes when
-  Slice 2 is VERIFIED.
+- **Slice 2 (Typed control-plane handler) — NOT IMPLEMENTED, future work:**
+  §D typed `work_subject.set` control-plane handler with input schema,
+  timing semantics, dry-run, apply, audit, and rollback. **Specification:**
+  `bridge/gtkb-isolation-015-slice2-work-subject-set-001.md` (the only
+  on-disk version of that thread; see the `-002` reconciliation for
+  full context on the prior phantom-INDEX VERIFIED that was retracted).
+  When Slice 2 is genuinely implemented and Codex VERIFIES it in a
+  future session, `GTKB-ISOLATION-015` will close at that point — NOT
+  earlier, and NOT against the retracted phantom `-006`.
 - **§F (Upstream GT-KB clean-adopter delivery) — routed to
   `GTKB-ISOLATION-017`:** AGENTS.md template, hook templates, and
   `gt project init/upgrade/doctor` packaging are delivered through the
