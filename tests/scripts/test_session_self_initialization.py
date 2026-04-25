@@ -1417,3 +1417,88 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(
         focus_module.FOCUS_GTKB_INFRASTRUCTURE in msg and focus_module.FOCUS_APPLICATION in msg
         for msg in result["warnings"]
     )
+
+
+# ---------------------------------------------------------------------------
+# Pending-owner-decisions surfacing -- F1 fixture coverage
+# Per bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md §2.6
+# Codex GO -004 condition: visibility through this script, not a separate hook.
+# ---------------------------------------------------------------------------
+
+def test_pending_owner_decisions_loaded_from_durable_file(tmp_path) -> None:
+    """T5a equivalent: _load_pending_owner_decisions parses the durable file's
+    ## Pending section into a list of decision dicts."""
+    memory = tmp_path / "memory"
+    memory.mkdir()
+    (memory / "pending-owner-decisions.md").write_text(
+        """\
+# Pending Owner Decisions
+---
+## Pending
+
+- id: DECISION-0042
+  asked_at: 2026-04-25T09:00:00Z
+  thread_ref: bridge/example-001.md
+  question: "Phase 8 rehearsal target child root path"
+  options:
+    - "Sibling under E:\\\\Claude-Playground\\\\"
+    - "Fresh top-level workspace"
+  detected_via: ask_user_question
+  status: pending
+
+## Resolved
+
+(none)
+
+## History
+
+(none)
+""",
+        encoding="utf-8",
+    )
+    module = _load_module()
+    decisions = module._load_pending_owner_decisions(tmp_path)
+    assert len(decisions) == 1
+    assert decisions[0]["id"] == "DECISION-0042"
+    assert decisions[0]["question"] == "Phase 8 rehearsal target child root path"
+    # Options collapse to "; " joined string for downstream consumers.
+    assert "Sibling under" in decisions[0]["options"]
+    assert "Fresh top-level workspace" in decisions[0]["options"]
+
+
+def test_pending_owner_decisions_empty_when_section_missing_or_empty(tmp_path) -> None:
+    """T5b equivalent: empty list when file missing or ## Pending says (none)."""
+    module = _load_module()
+    # File missing: empty list, no raise.
+    assert module._load_pending_owner_decisions(tmp_path) == []
+    # File present but ## Pending section says (none).
+    memory = tmp_path / "memory"
+    memory.mkdir()
+    (memory / "pending-owner-decisions.md").write_text(
+        "# Pending Owner Decisions\n\n## Pending\n\n(none)\n\n## Resolved\n\n(none)\n",
+        encoding="utf-8",
+    )
+    assert module._load_pending_owner_decisions(tmp_path) == []
+
+
+def test_render_pending_decisions_block_omits_section_when_empty() -> None:
+    """T5b additional: renderer returns empty string for empty list."""
+    module = _load_module()
+    assert module._render_pending_decisions_block([]) == ""
+
+
+def test_render_pending_decisions_block_includes_id_question_options() -> None:
+    """T5a additional: renderer markdown includes id, question, options."""
+    module = _load_module()
+    decisions = [{
+        "id": "DECISION-0001",
+        "question": "Test?",
+        "options": "Yes; No",
+        "asked_at": "2026-04-25T09:00:00Z",
+        "thread_ref": "bridge/foo-001.md",
+    }]
+    block = module._render_pending_decisions_block(decisions)
+    assert "**DECISION-0001**" in block
+    assert "Test?" in block
+    assert "Yes; No" in block
+    assert "bridge/foo-001.md" in block

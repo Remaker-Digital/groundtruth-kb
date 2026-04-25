@@ -87,6 +87,7 @@ def _python_gates() -> None:
     _run([sys.executable, "-m", "bandit", "-r", "src/", "-ll", "-c", "pyproject.toml"], timeout=180)
     _run([sys.executable, "-m", "pip_audit", "-r", "requirements.txt"], timeout=180)
     _run([sys.executable, "scripts/check_codex_hook_parity.py"], timeout=60)
+    _run([sys.executable, "scripts/check_pending_owner_decisions_parity.py"], timeout=30)
     _run([sys.executable, "scripts/check_environment_isolation.py"], timeout=60)
     _run([sys.executable, "scripts/check_session_overlay_policy.py"], timeout=60)
     _run([sys.executable, "scripts/check_scoped_service_boundary.py"], timeout=60)
@@ -121,6 +122,7 @@ def _python_gates() -> None:
             "tests/integrations/test_shopify_billing.py",
             "tests/unit/test_stripe_webhooks.py",
             "tests/hooks/test_formal_artifact_approval_gate.py",
+            "tests/hooks/test_owner_decision_tracker.py",
             "tests/hooks/test_workstream_focus.py",
             "-q",
             "--tb=short",

@@ -3233,6 +3233,159 @@ def _markdown_url_link(url: str) -> str:
     return f"[{url}]({url})"
 
 
+# Pending owner-decisions surfacing
+# ---------------------------------
+# The .claude/hooks/owner-decision-tracker.py hook is the canonical
+# writer of memory/pending-owner-decisions.md. This renderer reads the
+# same file and surfaces any `## Pending` entries in the startup
+# disclosure so owner decisions don't drown in inline message flow.
+# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md §2.6;
+# Codex GO at -004 with condition "keep visibility through this script,
+# do not reintroduce a separate SessionStart hook as primary surface."
+
+_PENDING_DECISIONS_REL_PATH = "memory/pending-owner-decisions.md"
+
+
+def _load_pending_owner_decisions(project_root: Path) -> list[dict[str, str]]:
+    """Read pending-owner-decisions.md `## Pending` section.
+
+    Returns a list of decision dicts (id, question, options, thread_ref,
+    asked_at, asked_in_session). Empty list when the file is missing,
+    malformed, or `## Pending` is empty. All exceptions are caught and
+    logged to stderr to preserve startup-disclosure rendering -- a
+    broken pending-decisions surfacing must never break the rest of the
+    startup report.
+    """
+    path = project_root / _PENDING_DECISIONS_REL_PATH
+    if not path.exists():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:  # pragma: no cover - defensive
+        sys.stderr.write(f"_load_pending_owner_decisions read failed: {exc}\n")
+        return []
+
+    try:
+        return _parse_pending_block(text)
+    except Exception as exc:  # pragma: no cover - defensive
+        sys.stderr.write(f"_load_pending_owner_decisions parse failed: {exc}\n")
+        return []
+
+
+def _parse_pending_block(text: str) -> list[dict[str, str]]:
+    """Parse the `## Pending` section into a list of decision dicts.
+
+    Format matches the YAML-frontmatter list shape that
+    .claude/hooks/owner-decision-tracker.py writes:
+
+      - id: DECISION-NNNN
+        asked_at: 2026-04-25T07:30:00Z
+        question: "<text>"
+        options:
+          - "<label-1>"
+          - "<label-2>"
+        ...
+    """
+    entries: list[dict[str, str | list[str]]] = []
+    in_pending = False
+    current: dict[str, str | list[str]] | None = None
+    in_options = False
+
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if stripped.startswith("## "):
+            heading = stripped[3:].strip().lower()
+            if heading == "pending":
+                in_pending = True
+                continue
+            if in_pending:
+                # Hit the next section heading; flush and stop.
+                if current is not None:
+                    entries.append(current)
+                    current = None
+                break
+        if not in_pending:
+            continue
+        if stripped.startswith("- id: "):
+            if current is not None:
+                entries.append(current)
+            current = {"id": stripped[len("- id: "):].strip(), "options": []}
+            in_options = False
+            continue
+        if current is None:
+            continue
+        if raw_line.startswith("  options:"):
+            in_options = True
+            continue
+        if in_options and raw_line.startswith("    - "):
+            opt = _unquote_pending_value(raw_line[len("    - "):])
+            opts_field = current.get("options")
+            if isinstance(opts_field, list):
+                opts_field.append(opt)
+            continue
+        if raw_line.startswith("  ") and ":" in stripped:
+            in_options = False
+            key, _, val = stripped.partition(":")
+            current[key.strip()] = _unquote_pending_value(val.strip())
+
+    if current is not None:
+        entries.append(current)
+
+    # Coerce option lists to list[str] for downstream consumers.
+    out: list[dict[str, str]] = []
+    for entry in entries:
+        flat: dict[str, str] = {}
+        for k, v in entry.items():
+            if isinstance(v, list):
+                flat[k] = "; ".join(v)
+            else:
+                flat[k] = v
+        out.append(flat)
+    return out
+
+
+def _unquote_pending_value(value: str) -> str:
+    if value.startswith("\"") and value.endswith("\"") and len(value) >= 2:
+        return value[1:-1].replace("\\\"", "\"").replace("\\\\", "\\")
+    return value
+
+
+def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
+    """Format the pending-decisions list for the startup disclosure.
+
+    Matches the visual style of other startup sections (markdown bullets
+    with bold IDs). Each entry shows id, question, optional thread_ref
+    and option list.
+    """
+    if not decisions:
+        return ""
+    lines: list[str] = [
+        f"{len(decisions)} owner decision(s) await a response. "
+        "Address one by quoting its DECISION-NNNN ID, type "
+        "`resolve DECISION-NNNN: <answer>` to record an answer, "
+        "`defer all` to acknowledge without resolving, or "
+        "`clear pending` to dismiss intentionally.",
+        "",
+    ]
+    for entry in decisions:
+        decision_id = entry.get("id", "")
+        question = entry.get("question", "")
+        opts = entry.get("options", "")
+        thread_ref = entry.get("thread_ref", "")
+        asked_at = entry.get("asked_at", "")
+        suffix_parts: list[str] = []
+        if asked_at:
+            suffix_parts.append(f"asked {asked_at}")
+        if thread_ref:
+            suffix_parts.append(f"thread: `{thread_ref}`")
+        suffix = f" ({'; '.join(suffix_parts)})" if suffix_parts else ""
+        line = f"- **{decision_id}**: {question}{suffix}"
+        lines.append(line)
+        if opts:
+            lines.append(f"  - Options: {opts}")
+    return "\n".join(lines)
+
+
 def render_report(model: dict[str, Any], dashboard_link: str) -> str:
     role = model["role"]
     metrics = model["metrics"]
@@ -3241,6 +3394,17 @@ def render_report(model: dict[str, Any], dashboard_link: str) -> str:
     dashboard_open_mode = dashboard_opening.get("mode") or DASHBOARD_OPEN_MODE_HARNESS
     token_count = metrics["tokens"]["tokens_consumed_before_user_input"]
     token_count_text = "unavailable" if token_count is None else str(token_count)
+    pending_decisions = _load_pending_owner_decisions(PROJECT_ROOT)
+    if pending_decisions:
+        pending_decisions_section = [
+            "### Pending Owner Decisions",
+            "",
+            _render_pending_decisions_block(pending_decisions),
+            "",
+        ]
+    else:
+        pending_decisions_section = []
+
     if _is_loyal_opposition_model(model):
         startup_task_section = [
             "## Loyal Opposition Startup Task",
@@ -3298,6 +3462,7 @@ def render_report(model: dict[str, Any], dashboard_link: str) -> str:
                 include_counterpart=True,
             ),
             "",
+            *pending_decisions_section,
             "### Session Overlay Status (Non-Authoritative)",
             "",
             _render_session_overlay_status(model.get("session_overlay") or {}),

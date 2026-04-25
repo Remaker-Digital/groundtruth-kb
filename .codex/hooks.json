@@ -26,6 +26,12 @@
             "command": "python C:\\Users\\micha\\.codex\\agent-red-hooks\\session_wrapup_trigger_dispatch.py",
             "statusMessage": "Checking session lifecycle command",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "cmd /d /s /c C:\\Users\\micha\\.codex\\agent-red-hooks\\owner-decision-tracker-ups.cmd",
+            "statusMessage": "Checking pending owner decisions",
+            "timeout": 5
           }
         ]
       }

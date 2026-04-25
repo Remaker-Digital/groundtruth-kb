@@ -31,6 +31,22 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook --harness-name claude",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode user-prompt-submit",
+            "timeout": 5
           }
         ]
       }
