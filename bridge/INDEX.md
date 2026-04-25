@@ -5,7 +5,49 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-root-directory-migration-post-verify
+NEW: bridge/gtkb-root-directory-migration-post-verify-010.md
+GO: bridge/gtkb-root-directory-migration-post-verify-009.md
+REVISED: bridge/gtkb-root-directory-migration-post-verify-008.md
+NO-GO: bridge/gtkb-root-directory-migration-post-verify-007.md
+REVISED: bridge/gtkb-root-directory-migration-post-verify-006.md
+REVISED: bridge/gtkb-root-directory-migration-post-verify-005.md
+NO-GO: bridge/gtkb-root-directory-migration-post-verify-004.md
+REVISED: bridge/gtkb-root-directory-migration-post-verify-003.md
+NO-GO: bridge/gtkb-root-directory-migration-post-verify-002.md
+NEW: bridge/gtkb-root-directory-migration-post-verify-001.md
+
+
+Document: gtkb-root-directory-migration
+VERIFIED: bridge/gtkb-root-directory-migration-018.md
+NEW: bridge/gtkb-root-directory-migration-017.md
+GO: bridge/gtkb-root-directory-migration-016.md
+REVISED: bridge/gtkb-root-directory-migration-015.md
+NO-GO: bridge/gtkb-root-directory-migration-014.md
+NEW: bridge/gtkb-root-directory-migration-013.md
+GO: bridge/gtkb-root-directory-migration-012.md
+REVISED: bridge/gtkb-root-directory-migration-011.md
+NO-GO: bridge/gtkb-root-directory-migration-010.md
+REVISED: bridge/gtkb-root-directory-migration-009.md
+NO-GO: bridge/gtkb-root-directory-migration-008.md
+REVISED: bridge/gtkb-root-directory-migration-007.md
+NO-GO: bridge/gtkb-root-directory-migration-006.md
+REVISED: bridge/gtkb-root-directory-migration-005.md
+NO-GO: bridge/gtkb-root-directory-migration-004.md
+REVISED: bridge/gtkb-root-directory-migration-003.md
+NO-GO: bridge/gtkb-root-directory-migration-002.md
+NEW: bridge/gtkb-root-directory-migration-001.md
+
 Document: gtkb-app-boundary-mechanism-audit
+VERIFIED: bridge/gtkb-app-boundary-mechanism-audit-012.md
+REVISED: bridge/gtkb-app-boundary-mechanism-audit-011.md
+NO-GO: bridge/gtkb-app-boundary-mechanism-audit-010.md
+NEW: bridge/gtkb-app-boundary-mechanism-audit-009.md
+GO: bridge/gtkb-app-boundary-mechanism-audit-008.md
+REVISED: bridge/gtkb-app-boundary-mechanism-audit-007.md
+NO-GO: bridge/gtkb-app-boundary-mechanism-audit-006.md
+REVISED: bridge/gtkb-app-boundary-mechanism-audit-005.md
+NO-GO: bridge/gtkb-app-boundary-mechanism-audit-004.md
 REVISED: bridge/gtkb-app-boundary-mechanism-audit-003.md
 NO-GO: bridge/gtkb-app-boundary-mechanism-audit-002.md
 NEW: bridge/gtkb-app-boundary-mechanism-audit-001.md
@@ -27,6 +69,7 @@ NO-GO: bridge/gtkb-membase-effective-use-umbrella-002.md
 NEW: bridge/gtkb-membase-effective-use-umbrella-001.md
 
 Document: gtkb-dashboard-industry-alignment-slice2b-metrics
+VERIFIED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-026.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-025.md
 GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-024.md
 REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-023.md
