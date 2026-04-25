@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-dora-001b-track2-implementation
+NEW: bridge/gtkb-dora-001b-track2-implementation-001.md
+
+
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md
 NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-004.md
