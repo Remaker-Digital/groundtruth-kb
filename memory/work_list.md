@@ -20,6 +20,7 @@ Updated: 2026-04-25 (S308) — hygiene pass after canonical-deploy / slice2b rec
 | 5 | `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1 | GO (upstream impl underway) | REVISED-9 GO'd at `bridge/gtkb-gov-proposal-standards-slice1-020.md`. Blocks its own Slice 2/3/4 + `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`. | Upstream implementation in `groundtruth-kb/`; Agent Red adopts via `gt project upgrade` after upstream VERIFIED. |
 | 6 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
 | 7 | `GTKB-GOV-CODE-QUALITY-BASELINE` | scoping in flight | Slice 1 governance design filed at `bridge/gtkb-gov-code-quality-baseline-slice1-001.md`; awaits Codex GO. New standing backlog entry per owner directive 2026-04-25. Defines a default code-quality checklist (CQ-* rule IDs) applying to all GT-KB adopter project proposals unless explicitly N/A or owner-suspended via the waiver lifecycle. | After Codex GO on Slice 1, file Slice 2 implementation bridge upstream in `groundtruth-kb` (hook extension + Codex/Windows fallback verifier + tests + GOV/ADR/SPEC/DCL records). Adopters consume via `gt project upgrade` after upstream VERIFIED. |
+| 8 | `GTKB-GOV-OWNER-DECISION-SURFACING` | implementation proposal in flight | Implementation bridge filed at `bridge/gtkb-gov-owner-decision-surfacing-slice1-001.md`; awaits Codex GO. Owner directive 2026-04-25: mechanically force surfacing of owner-decision pending state so decisions don't get lost in interactive-session message flow. Agent Red-local first (immediate benefit); hook contract may later be promoted upstream once it proves out. | After Codex GO, implement: durable `memory/pending-owner-decisions.md` file, `.claude/hooks/owner-decision-tracker.py` (Stop / SessionStart / UserPromptSubmit dispatch), settings.json registration, test file in release-candidate gate. |
 
 **Completed in S308 (2026-04-25), removed from active table:**
 
@@ -323,6 +324,28 @@ counterpart detection, and split application vs GT-KB verification lanes.
 
 **Execution note:** the completed Phase 1 through Phase 7 planning records
 remain below as the governing design baseline for the execution queue above.
+
+### GTKB-GOV-OWNER-DECISION-SURFACING - Mechanical surfacing of pending owner decisions (Agent Red-local first)
+
+**Priority:** TOP. Filed 2026-04-25 (S308) per owner directive ("yields immediate benefit"). Implementation proposal at `bridge/gtkb-gov-owner-decision-surfacing-slice1-001.md`; awaits Codex GO.
+
+**Problem statement:** During long interactive sessions, owner-decision asks get lost in message flow. Three failure modes observed in S308:
+
+1. **In-prose decision burial:** Prime writes "Want me to X or Y?" in a paragraph; owner reads past it; no UI affordance distinguishes it from informational prose.
+2. **Late chain-discovery:** A multi-section proposal flags 7 decisions in §3; owner doesn't realize each is a hard gate; Prime "stands by" without owner awareness.
+3. **Cross-session loss:** Pending decisions live in transient chat, not in any durable surface that SessionStart hook reads.
+
+The existing `AskUserQuestion` tool fixes #1 *only when Prime remembers to use it*. Nothing prevents prose reversion. Nothing surfaces pending state across context-switches or sessions.
+
+**Required outcome:** durable `memory/pending-owner-decisions.md` file (YAML-frontmatter list), `.claude/hooks/owner-decision-tracker.py` hook with three modes (Stop / SessionStart / UserPromptSubmit), settings.json registration, regression tests in release-candidate gate. Stop mode scans for AskUserQuestion + prose anti-patterns; SessionStart mode displays unresolved decisions in startup disclosure; UserPromptSubmit mode emits gentle nudge if pending decisions exist and owner message doesn't reference them.
+
+**Routing:** Agent Red-local first (per `.claude/hooks/formal-artifact-approval-gate.py` precedent). Hook contract may be promoted upstream to `groundtruth-kb` if/when it proves out, mirroring the GTKB-GOV-PROPOSAL-STANDARDS upstream-routing pattern.
+
+**Regression visibility:** test file in release-candidate gate covers AskUserQuestion detection, prose anti-pattern detection, file-format validation, SessionStart surfacing, UserPromptSubmit nudging, resolved-decisions move-to-history.
+
+**Dependencies:** none beyond existing hook infrastructure. Uses the same Stop/SessionStart/UserPromptSubmit hook events already registered in `.claude/settings.json`.
+
+**Out of scope (Slice 1):** prose-pattern detection refinement (regex precision will iterate based on false-positive rate); dashboard tile for pending decisions (separate future slice); upstream promotion of the hook (depends on Slice 1 proving the contract).
 
 ### GTKB-GOV-CODE-QUALITY-BASELINE - Default code-quality checklist for all GT-KB adopter project proposals (upstream-routed)
 
