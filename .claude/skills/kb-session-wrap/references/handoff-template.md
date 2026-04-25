@@ -6,7 +6,7 @@ Use this template when generating the Phase 5 handoff prompt.
 db.insert_session_prompt(
     session_id="$0",
     prompt_text="""Continue work on Agent Red Customer Experience commercial project.
-Location: E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement
+Location: <project-root>  # local checkout root; resolved via `git rev-parse --show-toplevel`
 Key files: CLAUDE.md, memory/MEMORY.md
 
 ## Session {next_session_id} — Continuing from $0

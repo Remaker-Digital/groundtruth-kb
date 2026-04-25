@@ -32,7 +32,21 @@ If `$ARGUMENTS` is "list":
 
 ```python
 import sys
-sys.path.insert(0, "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement/tools/knowledge-db")
+import subprocess
+from pathlib import Path
+
+# Per S307 hardcoded-path directive: discover repo root from git, not a
+# machine-local literal. Falls back to GTKB_PROJECT_ROOT env var if git
+# isn't available (e.g. installed-as-package contexts).
+import os
+_repo_root = (
+    subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                   capture_output=True, text=True, check=False).stdout.strip()
+    or os.environ.get("GTKB_PROJECT_ROOT", "")
+)
+if not _repo_root:
+    raise RuntimeError("Cannot resolve GT-KB repo root: git unavailable and GTKB_PROJECT_ROOT unset.")
+sys.path.insert(0, str(Path(_repo_root) / "tools" / "knowledge-db"))
 from db import KnowledgeDB
 db = KnowledgeDB()
 adrs = db.list_specs(type="architecture_decision")
@@ -87,7 +101,21 @@ Compose a structured description string with these sections:
 
 ```python
 import sys
-sys.path.insert(0, "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement/tools/knowledge-db")
+import subprocess
+from pathlib import Path
+
+# Per S307 hardcoded-path directive: discover repo root from git, not a
+# machine-local literal. Falls back to GTKB_PROJECT_ROOT env var if git
+# isn't available (e.g. installed-as-package contexts).
+import os
+_repo_root = (
+    subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                   capture_output=True, text=True, check=False).stdout.strip()
+    or os.environ.get("GTKB_PROJECT_ROOT", "")
+)
+if not _repo_root:
+    raise RuntimeError("Cannot resolve GT-KB repo root: git unavailable and GTKB_PROJECT_ROOT unset.")
+sys.path.insert(0, str(Path(_repo_root) / "tools" / "knowledge-db"))
 from db import KnowledgeDB
 
 db = KnowledgeDB()

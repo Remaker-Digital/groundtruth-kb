@@ -39,14 +39,29 @@ Query the Agent Red Knowledge Database (`groundtruth.db`) using the Python API.
 
 ## Initialization
 
-Use `scripts/kb_init.py` for quick CLI queries, or initialize inline:
+Use `.claude/skills/kb-query/scripts/kb_init.py` for quick CLI queries, or
+initialize inline. Per S307 hardcoded-path directive, discover the repo root
+via git or env var rather than a machine-local literal:
 
 ```python
+import os
+import subprocess
 import sys
-sys.path.insert(0, "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement")
-from tools.knowledge_db.db import KnowledgeDB
+from pathlib import Path
+
+_repo_root = (
+    subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                   capture_output=True, text=True, check=False).stdout.strip()
+    or os.environ.get("GTKB_PROJECT_ROOT", "")
+)
+sys.path.insert(0, str(Path(_repo_root) / "tools" / "knowledge-db"))
+from db import KnowledgeDB  # tools/knowledge-db is dash-named; import bare module
 db = KnowledgeDB()
 ```
+
+This pattern works on any workstation that has GT-KB checked out, without
+embedding a path literal. For pip-install scenarios (long-term direction),
+this becomes `from groundtruth_kb import KnowledgeDB`.
 
 ## API Methods
 

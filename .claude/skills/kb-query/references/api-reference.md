@@ -4,12 +4,29 @@ All queries use the Python API at `tools/knowledge-db/db.py`. **Never edit the S
 
 ## Initialize
 
+Per S307 hardcoded-path directive: discover the repo root from git rather
+than embedding a workstation-local literal. The `tools/knowledge-db`
+directory uses a dash, which Python cannot import as `tools.knowledge_db`,
+so add the directory itself to `sys.path` and import the bare `db` module:
+
 ```python
+import os
+import subprocess
 import sys
-sys.path.insert(0, "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement")
-from tools.knowledge_db.db import KnowledgeDB
+from pathlib import Path
+
+_repo_root = (
+    subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                   capture_output=True, text=True, check=False).stdout.strip()
+    or os.environ.get("GTKB_PROJECT_ROOT", "")
+)
+sys.path.insert(0, str(Path(_repo_root) / "tools" / "knowledge-db"))
+from db import KnowledgeDB
 db = KnowledgeDB()
 ```
+
+(Long-term, when GT-KB is pip-installable, this becomes
+`from groundtruth_kb import KnowledgeDB`.)
 
 ## Summary
 

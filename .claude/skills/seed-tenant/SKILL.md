@@ -32,8 +32,12 @@ Run the 9-phase tenant seeding script to create a complete tenant environment in
 
 ## Execution
 
+Per S307 hardcoded-path directive: change to the repo root via `git rev-parse`,
+not a workstation-local literal. Adopters on different paths inherit the
+example without modification.
+
 ```bash
-cd "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement"
+cd "$(git rev-parse --show-toplevel)"
 python scripts/seed_tenant.py $ARGUMENTS
 ```
 
