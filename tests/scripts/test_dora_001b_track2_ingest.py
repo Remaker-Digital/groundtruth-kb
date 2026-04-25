@@ -33,8 +33,10 @@ from scripts.gtkb_dashboard.refresh_dashboard_db import (  # noqa: E402
     _classify_manifest,
     _ingest_canonical_pipeline_manifests,
     _is_deployment_event,
+    _migrate_schema,
     _reconcile_against_azure_revisions,
     _REQUIRED_MIGRATION_COLUMNS,
+    initialize_database,
 )
 
 
@@ -421,3 +423,123 @@ def test_migration_columns_include_track2_seven() -> None:
     assert track2_columns.issubset(column_names), (
         f"Missing Track 2 columns: {track2_columns - column_names}"
     )
+
+
+# ---------------------------------------------------------------------------
+# T14: real-schema reproduction — addresses Codex `-006` F1
+# ---------------------------------------------------------------------------
+#
+# The bespoke `_make_conn()` fixture above carries an `environment` column
+# matching what Codex `-006` proved was MISSING from production schema.sql +
+# migration. T14 exercises the production initialize+migrate path so a future
+# regression of either path fails here, not silently in production.
+
+def test_t14_real_schema_supports_canonical_manifest_ingest_and_reconcile(
+    tmp_path: Path,
+) -> None:
+    """T14: production `initialize_database` + `_migrate_schema` produces a
+    `delivery_timeline_events` table that accepts canonical-manifest ingestion
+    and Azure reconciliation end-to-end.
+
+    Codex `-006` reproduction: the prior implementation passed all 13 unit
+    tests via the bespoke in-memory fixture but failed against real schema
+    because `environment` was absent from both `schema.sql` and
+    `_REQUIRED_MIGRATION_COLUMNS`. This test creates a DB through the
+    production code paths only — no bespoke CREATE TABLE — and would have
+    failed with `OperationalError: table delivery_timeline_events has no
+    column named environment` against the prior implementation.
+    """
+    db_path = tmp_path / "production-like.sqlite"
+    initialize_database(db_path)
+    _migrate_schema(db_path)
+
+    # Sanity: confirm the production paths produced a table with `environment`
+    # plus all Track 2 columns. Probing column metadata catches both fresh-DB
+    # and migration regressions in a single assertion.
+    with sqlite3.connect(db_path) as probe:
+        cols = {
+            row[1]
+            for row in probe.execute(
+                "PRAGMA table_info('delivery_timeline_events')"
+            ).fetchall()
+        }
+    required = {
+        "environment",
+        "event_kind", "deployable_change_id", "commit_range_start",
+        "commit_range_end", "rollback_of_deploy_id", "hotfix_of_deploy_id",
+        "_authority_source", "_image_ref", "_image_tag", "_revision_name",
+        "_deployed_at", "_consistency", "_confidence",
+    }
+    missing = required - cols
+    assert not missing, (
+        f"Production schema/migration missing columns: {missing}. "
+        "schema.sql and _REQUIRED_MIGRATION_COLUMNS must agree."
+    )
+
+    # Exercise ingest end-to-end against the real DB.
+    _write_manifest(tmp_path, "production", 1700000099, {
+        "dry_run": False,
+        "version": "v1.99.0",
+        "environment": "production",
+        "status": "SUCCESS",
+        "repo_commit": "abc12345",
+        "started_at": "2026-04-25T00:00:00Z",
+        "phases": [{"phase": 9, "status": "PASS"}],
+        "deploy_evidence": {
+            "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+            "image_tag": "v1.99.0",
+            "revision_name": "agent-red-api-gateway--abc12",
+            "target_verified_at": "2026-04-25T00:01:00Z",
+            "target_update_attempted": True,
+            "target_update_succeeded": True,
+        },
+    })
+
+    with sqlite3.connect(db_path) as conn:
+        counts = _ingest_canonical_pipeline_manifests(conn, tmp_path)
+        assert counts["rows_inserted"] == 1
+        assert counts["rows_skipped"] == 0
+
+        # Verify the row landed with environment populated from the manifest.
+        env_value = conn.execute(
+            "SELECT environment FROM delivery_timeline_events "
+            "WHERE _authority_source = 'canonical_manifest'"
+        ).fetchone()[0]
+        assert env_value == "production"
+
+        # Reconcile against a matching Azure revision through the real DB.
+        fake_az = subprocess.CompletedProcess(
+            args=[], returncode=0,
+            stdout=json.dumps([{
+                "name": "agent-red-api-gateway--abc12",
+                "properties": {
+                    "template": {
+                        "containers": [{
+                            "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0"
+                        }]
+                    }
+                }
+            }]),
+            stderr="",
+        )
+        with patch("subprocess.run", return_value=fake_az):
+            reconcile_counts = _reconcile_against_azure_revisions(
+                conn, ["production"]
+            )
+        assert reconcile_counts["rows_matched"] == 1
+        assert reconcile_counts["rows_unknown"] == 0
+
+
+def test_t15_migration_is_idempotent_against_real_schema(tmp_path: Path) -> None:
+    """T15: running `_migrate_schema` twice on a fresh DB is a no-op.
+
+    Fresh-DB path (`schema.sql`) already declares all columns now, so the
+    migration's `ALTER TABLE ADD COLUMN` branch must skip every entry.
+    Catches regressions where schema.sql and _REQUIRED_MIGRATION_COLUMNS
+    drift apart and a duplicate-column error surfaces.
+    """
+    db_path = tmp_path / "idempotent.sqlite"
+    initialize_database(db_path)
+    _migrate_schema(db_path)
+    # Second invocation must not raise (would raise on duplicate ADD COLUMN).
+    _migrate_schema(db_path)

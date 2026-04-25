@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 INCIDENTS_PATH = Path("memory") / "incidents.yaml"
 
 _REQUIRED_MIGRATION_COLUMNS: tuple[tuple[str, str], ...] = (
+    # DORA-001b Track 2 NO-GO -006 fix (S309): `environment` is referenced by
+    # _ingest_canonical_pipeline_manifests INSERT and _reconcile_against_azure_revisions
+    # SELECT. It must exist in both fresh-DB (schema.sql) and migration paths.
+    # Listed first so pre-Track-2 production DBs gain it before the dependent
+    # Track 2 columns below.
+    ("environment", "TEXT NOT NULL DEFAULT ''"),
     ("event_kind", "TEXT NOT NULL DEFAULT 'change'"),
     ("deployable_change_id", "TEXT NOT NULL DEFAULT ''"),
     ("commit_range_start", "TEXT NOT NULL DEFAULT ''"),
@@ -314,8 +320,9 @@ def _migrate_schema(db_path: Path) -> None:
     """Apply idempotent ALTER TABLE migrations under SQLite RESERVED lock.
 
     The fresh-DB path is handled by `CREATE TABLE IF NOT EXISTS` in `schema.sql`;
-    this function adds the six DORA-telemetry columns to any pre-existing
-    `delivery_timeline_events` table.
+    this function adds the columns listed in `_REQUIRED_MIGRATION_COLUMNS` to any
+    pre-existing `delivery_timeline_events` table that predates them. Each entry
+    is checked against `PRAGMA table_info` and ALTER-added only if missing.
 
     Concurrency: the probe + ALTER sequence runs inside a single explicit
     BEGIN IMMEDIATE / COMMIT transaction. BEGIN IMMEDIATE acquires a RESERVED
@@ -857,24 +864,51 @@ def _ingest_canonical_pipeline_manifests(
         deployed_at = str(evidence.get("target_verified_at") or "")
         environment = str(manifest.get("environment") or "")
 
+        # DORA-001b Track 2 NO-GO -006 follow-on (S309): production
+        # `delivery_timeline_events` declares NOT NULL on multiple legacy
+        # columns (sort_order, stage, stage_label, date_label, version,
+        # branch, result_color, test_results). The S308 implementation
+        # omitted them from this INSERT, which only worked in unit tests
+        # because the bespoke `_make_conn()` fixture relaxed the constraints.
+        # Production reproduction (per Codex `-006` F1 + new test T14):
+        #   sqlite3.IntegrityError: NOT NULL constraint failed: sort_order
+        # Supply schema-compatible values: stage="deploy" matches the
+        # canonical_deploy semantic; date_label is the timestamp's date
+        # prefix consistent with the legacy ingest pattern at
+        # _write_model_to_db's executemany (`str(timestamp)[:10] or "configuration"`);
+        # result_color follows status convention (green for SUCCESS).
+        manifest_status = str(manifest.get("status") or "")
+        result_color = "green" if manifest_status == "SUCCESS" else "red"
+        date_label = (timestamp[:10] if timestamp else "") or "configuration"
+
         conn.execute(
             """
             INSERT INTO delivery_timeline_events (
-                event, source, environment, result, timestamp, commit_sha, notes,
+                sort_order, stage, stage_label, event, timestamp, date_label,
+                version, commit_sha, branch, result, result_color, test_results,
+                source, environment, notes,
                 event_kind, deployable_change_id, commit_range_start, commit_range_end,
                 rollback_of_deploy_id, hotfix_of_deploy_id,
                 _authority_source, _image_ref, _image_tag, _revision_name,
                 _deployed_at, _consistency, _confidence
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                0,  # sort_order: canonical_manifest rows are an additive overlay; consumers sort by timestamp.
+                "deploy",
+                "Deploy",
                 f"canonical_pipeline_run version={version}",
+                timestamp,
+                date_label,
+                version,
+                commit_sha,
+                "",  # branch: not recorded in deploy-result manifests.
+                manifest_status,
+                result_color,
+                "",  # test_results: separate concern; canonical_manifest doesn't carry this.
                 relative_source,
                 environment,
-                str(manifest.get("status") or ""),
-                timestamp,
-                commit_sha,
                 f"deploy-result manifest; phases={manifest.get('phases_completed', 0)}/{manifest.get('phases_total', 0)}",
                 event_kind,
                 "",  # deployable_change_id; populated by _enrich_timeline_events when relevant

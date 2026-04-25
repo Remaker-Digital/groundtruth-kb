@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS delivery_timeline_events (
     test_results TEXT NOT NULL,
     source TEXT NOT NULL,
     url TEXT NOT NULL DEFAULT '',
-    notes TEXT NOT NULL DEFAULT ''
+    notes TEXT NOT NULL DEFAULT '',
+    environment TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS release_blockers (
