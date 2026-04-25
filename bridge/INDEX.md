@@ -10,6 +10,7 @@ NEW: bridge/gtkb-gov-owner-decision-surfacing-slice1-001.md
 
 
 Document: gtkb-gov-code-quality-baseline-slice1
+REVISED: bridge/gtkb-gov-code-quality-baseline-slice1-003.md
 NO-GO: bridge/gtkb-gov-code-quality-baseline-slice1-002.md
 NEW: bridge/gtkb-gov-code-quality-baseline-slice1-001.md
 
