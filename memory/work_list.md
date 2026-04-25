@@ -9,7 +9,7 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ## Next Actionable Items (hand-maintained; automation tracked under GTKB-GOV-BACKLOG-DISCIPLINE)
 
-Updated: 2026-04-25 (S309) — added GTKB-STARTUP-ENHANCEMENTS row from session-start architecture evaluation.
+Updated: 2026-04-25 (S309) — P1 of GTKB-STARTUP-ENHANCEMENTS VERIFIED at `bridge/gtkb-startup-enhancements-p1-006.md`; added GTKB-WRAPUP-ENHANCEMENTS row from session-wrap-up effectiveness evaluation.
 
 | # | ID | Status | Blocks / blocked by | Next step |
 |---|---|---|---|---|
@@ -21,7 +21,8 @@ Updated: 2026-04-25 (S309) — added GTKB-STARTUP-ENHANCEMENTS row from session-
 | 6 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
 | 7 | `GTKB-GOV-CODE-QUALITY-BASELINE` | scoping in flight | Slice 1 governance design filed at `bridge/gtkb-gov-code-quality-baseline-slice1-001.md`; awaits Codex GO. New standing backlog entry per owner directive 2026-04-25. Defines a default code-quality checklist (CQ-* rule IDs) applying to all GT-KB adopter project proposals unless explicitly N/A or owner-suspended via the waiver lifecycle. | After Codex GO on Slice 1, file Slice 2 implementation bridge upstream in `groundtruth-kb` (hook extension + Codex/Windows fallback verifier + tests + GOV/ADR/SPEC/DCL records). Adopters consume via `gt project upgrade` after upstream VERIFIED. |
 | 8 | `GTKB-GOV-OWNER-DECISION-SURFACING` | implementation proposal in flight | Implementation bridge filed at `bridge/gtkb-gov-owner-decision-surfacing-slice1-001.md`; awaits Codex GO. Owner directive 2026-04-25: mechanically force surfacing of owner-decision pending state so decisions don't get lost in interactive-session message flow. Agent Red-local first (immediate benefit); hook contract may later be promoted upstream once it proves out. | After Codex GO, implement: durable `memory/pending-owner-decisions.md` file, `.claude/hooks/owner-decision-tracker.py` (Stop / SessionStart / UserPromptSubmit dispatch), settings.json registration, test file in release-candidate gate. |
-| 9 | `GTKB-STARTUP-ENHANCEMENTS` | scoping w/ architecture (revised 2026-04-25 S309) | Owner directive 2026-04-25 (S309): redesign session start to **prime** six things (collaboration protocol; canonical glossary; active code-quality + artifact-rigor ADRs; user-interaction affordances; project-relevant gap-fill priorities; order-of-work planning). Architecture = Six Primers + Project Snapshot + Action Tray (~15.5K tokens, down from ~30K). Owner-chosen P4 stance: **full consolidation** (8 rule files → 3). Owner-chosen sequence: **P1 quick wins first**. | File P1 implementation bridge: trim `MEMORY.md` to one-line index entries; atomic dashboard write; `MEMORY.md` size ceiling test; fix Codex `owner-decision-tracker-ups.cmd` wrapper. ~9K token recovery, low risk, all four sub-items independent. |
+| 9 | `GTKB-STARTUP-ENHANCEMENTS` | P1 VERIFIED 2026-04-25 (S309); P2-P8 remain | P1 closed at `bridge/gtkb-startup-enhancements-p1-006.md` VERIFIED (commit `3caa034d` impl + `857ea71e` audit). MEMORY.md trim recovered ~10,400 tokens (59,753 → 18,119 bytes); atomic-write helper + 4 call sites; ceiling test in release-gate; Codex hooks.json cleanup. Owner-chosen P4 stance: full consolidation (8 rule files → 3). | Next: P2 Claude startup-freshness contract OR P3 six-primer registry. P2 is the smaller standalone bridge; P3 is the architectural foundation that subsequent phases build on. P2 first if iterating; P3 first if ready to commit to the architectural redesign. |
+| 10 | `GTKB-WRAPUP-ENHANCEMENTS` | scoping w/ architecture (filed 2026-04-25 S309) | Owner directive 2026-04-25 (S309): make session wrap-up systematically achieve five goals (1) record knowledge/decisions/directives missed during session; (2) identify cross-artifact contradictions while context is fresh; (3) consume usable context to close in-flight work; (4) describe what next session should anticipate per topic; (5) surface hygiene/maintenance candidates. Architecture: 5-scanner suite (S1 synthesis / S2 consistency / S3 loose-ends / S4 continuation guide / S5 hygiene) running on owner-triggered `/wrap`, not auto-on-Stop. Coupled with GTKB-STARTUP-ENHANCEMENTS via S4 → P6 handoff doc. Owner-chosen trigger: **on-demand /wrap only**. Owner-chosen structure: **separate item, coordinated phases**. | File W1+W2 batch implementation bridge (transcript-snapshot precursor + S5 hygiene scan + S2 consistency check). Smallest, highest-value first slice; closes the S308-era audit-trail-gap class + phantom-INDEX-citation class that have recurred multiple times in S308/S309. |
 
 **Completed in S308 (2026-04-25), removed from active table:**
 
@@ -431,7 +432,84 @@ The existing `AskUserQuestion` tool fixes #1 *only when Prime remembers to use i
 
 **Out of scope:** changing the bridge protocol; changing the hook event model; replacing the in-memory model build with an external service; harness-specific UI beyond what the hook contract supports.
 
-**Acceptance:** when P1 ships VERIFIED, fresh-session prelude drops by ~9K and three latent bugs (atomic write, ceiling test, Codex wrapper) close. When P3-P6 ship VERIFIED, the architectural vision is realized: priming displaces catalogue; spec-gap bias surfaces; project-orientation replaces flat option list.
+**Acceptance:** when P1 ships VERIFIED, fresh-session prelude drops by ~9K and three latent bugs (atomic write, ceiling test, Codex wrapper) close. When P3-P6 ship VERIFIED, the architectural vision is realized: priming displaces catalogue; spec-gap bias surfaces; project-orientation replaces flat option list. **P1 VERIFIED 2026-04-25 (S309)** at `bridge/gtkb-startup-enhancements-p1-006.md`; ~10,400 tokens recovered (slightly above the 9K estimate). P2-P8 remain as future bridges.
+
+### GTKB-WRAPUP-ENHANCEMENTS - Session-end scanner suite for the five wrap-up goals
+
+**Priority:** medium-high. **Filed 2026-04-25 (S309)** per owner directive expanding session wrap-up from "Stop hook writes a silent report" to "five-scanner suite achieving five explicit goals." **Scope:** session wrap-up effectiveness. Coupled with `GTKB-STARTUP-ENHANCEMENTS` via S4 → P6 handoff doc (continuation guide consumed by next session's action tray).
+
+**Five Wrap-Up Goals (owner directive):**
+
+1. **Record knowledge / decisions / directives** that emerged during the session but weren't captured at the time. Today: relies on Prime remembering to file feedback-memory entries; misses inline directives ("from now on...", "always...", "never...") and factual claims that diverge from MEMORY.md/KB.
+2. **Identify cross-artifact contradictions** while context is fresh. Today: phantom-INDEX bug class has recurred 3+ times in S308/S309 (proposal-standards -020, code-quality-baseline -003 phantom feedbacks, etc.) and only Codex catches them via manual inspection during bridge review.
+3. **Consume usable context** to close in-flight work cheaply. Today: in-flight artifacts (half-filed proposals, identified-but-untracked bugs, post-impl reports awaiting filing) often drop on the floor.
+4. **Describe what next session should anticipate** per topic. Today: bridge INDEX is a status feed not a topic browser; owner walks threads manually.
+5. **Surface hygiene / maintenance candidates** for owner-chosen focus. Today: drift accumulates between sessions (untracked bridge files, stale INDEX references, MEMORY.md growth, etc.) with no proactive scan.
+
+**Mission:** make session wrap-up systematic instead of ad-hoc; close the gap between hook-driven file-write and chat-surfaced findings; produce machine-readable handoff that the next session's startup pipeline can consume.
+
+**Source evidence:** S309 conversation evaluating session-wrap-up architecture against the 5 owner goals. Concrete diagnoses: wrap-up report writes silently to disk with no chat-surface injection; no transcript scanner at wrap time (owner-decision-tracker only catches AskUserQuestion + 5 prose patterns); no cross-artifact consistency checker (Codex catches phantom-INDEX manually); no in-flight inventory (Prime reliance on memory); no per-topic continuation guide (only flat 13-option focus menu); no hygiene scan (S308-era untracked files caught only by chance during S309 bridge scans).
+
+**Target architecture: 5-Scanner Suite (Tier B of two-tier wrap-up)**
+
+| Scanner | Goal | Reads | Produces |
+|---|---|---|---|
+| **S1 Synthesis** | 1 | session transcript snapshot, MEMORY.md, KB | candidate `feedback_*.md` / MEMORY.md updates surfaced for owner confirmation; never auto-mutates per `PB-ARTIFACT-APPROVAL-001` |
+| **S2 Cross-artifact consistency** | 2 | bridge/INDEX.md, bridge/*.md, work_list.md, MEMORY.md, groundtruth.db | drift report (file-existence checks, INDEX↔file alignment, backlog status alignment, MEMORY.md numbers vs KB) with severity tiers + remediation suggestions |
+| **S3 Loose-ends inventory** | 3 | session transcript, git status, bridge state | actionable closures with effort estimates; owner picks which to chase before session ends |
+| **S4 Continuation guide** | 4 | bridge/INDEX.md (terminal-vs-active), work_list.md, pending-owner-decisions.md | per-topic markdown blocks at `docs/gtkb-dashboard/session-handoff.md`: state, last activity, next step, blocking decisions/dependencies — consumed by next session's startup-disclosure (P3+ of GTKB-STARTUP-ENHANCEMENTS) |
+| **S5 Hygiene** | 5 | filesystem, git, KB | "Hygiene Candidates" with severity tiers (P0 audit-trail / P1 drift / P2 housekeeping): untracked bridge files, stale INDEX references, MEMORY.md size, backup file age, unstaged mods, branches with stale tracking |
+
+**Two-tier execution model:**
+
+| Tier | Trigger | Components | Time budget |
+|---|---|---|---|
+| **A (FAST)** | Stop hook (every session end) | Transcript snapshot to `memory/session-snapshots/{session-id}.jsonl`; capture session-end timestamp + commit-range; lifecycle-guard update (existing); owner-decision-tracker stop-mode (existing) | <5s |
+| **B (SLOW)** | `/kb-session-wrap` skill or wrap-up trigger phrase (owner-invoked) | The 5 scanners run sequentially; outputs land in `session-wrapup-report.md` AND inject as additionalContext for the wrap turn AND produce machine-readable sidecar files for next session | unbounded |
+
+**Owner-chosen architectural decisions (2026-04-25 S309):**
+
+- **Trigger model: on-demand /wrap only.** Stop hook stays at fast tier (transcript snapshot + lifecycle guard + decision-tracker). Five scanners run on owner-invoked `/wrap` or wrap-up phrase. Avoids 15s-Stop timeout pressure; lets scanners be thorough; matches existing skill pattern.
+- **Item structure: separate work item, coordinated phases.** This work item is parallel to GTKB-STARTUP-ENHANCEMENTS, not absorbed into it. Both items independently trackable; clear ownership of start vs end of session lifecycle. Coordination via the W3↔P6 handoff doc.
+
+**Phased delivery (each phase = one bridge):**
+
+| Phase | Scanner | Notes |
+|---|---|---|
+| **W0** Transcript-snapshot precursor | (Stop-hook fast tier addition) | Tiny precursor: extends `.claude/hooks/owner-decision-tracker.py` Stop mode (or adds new hook) to copy transcript JSONL into `memory/session-snapshots/{session-id}.jsonl` for later scanner consumption. Required for W4+W5; cheap to build. |
+| **W1** S5 Hygiene scan | filesystem + git + KB | Closes hygiene gaps S308/S309 caught by chance: untracked bridge files, stale INDEX, MEMORY.md ceiling, backup age, unstaged mods. |
+| **W2** S2 Cross-artifact consistency check | static state | Closes phantom-INDEX defect class. Bridge file existence + INDEX alignment + backlog status alignment + MEMORY.md numbers. |
+| **W3** S4 Continuation guide | bridge INDEX + work_list + pending decisions | Auto-generates `docs/gtkb-dashboard/session-handoff.md`. Consumed by GTKB-STARTUP-ENHANCEMENTS P6 action tray. |
+| **W4** S3 Loose-ends inventory | session transcript + git + bridge | Walks edit/file-write history; identifies in-flight artifacts (bridge proposals not filed, post-impl reports overdue, identified follow-ups not filed). |
+| **W5** S1 Synthesis scanner | session transcript + MEMORY.md + KB | Pattern-matching for owner directives, inline decisions, factual divergence, phantom-citation candidates. Quotation-aware + code-fence-aware from day 1 (don't repeat the owner-decision-tracker false-positive class — see DECISION-0001/0002/0005 lessons). |
+
+**Suggested batching:**
+
+- **Slice 1 (highest-value foundation):** W0 + W1 + W2 — transcript-snapshot precursor + hygiene + consistency. Smallest read-only scanners; closes the recurring drift classes; foundation for later transcript-walking scanners.
+- **Slice 2 (handoff doc):** W3 — feeds GTKB-STARTUP-ENHANCEMENTS P6 action tray. Depends on W2 (uses drift findings to populate "blocking decisions/dependencies").
+- **Slice 3 (transcript-walking pair):** W4 + W5 — both consume W0's transcript snapshot. Pattern-precision work; can ship incrementally.
+
+**Coupling to GTKB-STARTUP-ENHANCEMENTS:**
+
+| Surface | Producer (wrap-up) | Consumer (startup) |
+|---|---|---|
+| `docs/gtkb-dashboard/session-handoff.md` | W3 | P6 action tray |
+| `memory/pending-owner-decisions.md` | existing tracker | existing render_report integration |
+| Hygiene-candidates JSON sidecar | W1 | startup disclosure surface (new section) |
+| Drift-report sidecar | W2 | startup disclosure surface (new section) |
+| `memory/session-snapshots/*.jsonl` | W0 | available for any future cross-session scanner |
+
+W3 is effectively the prerequisite of P6. Joint sequencing matters: W3 should ship before P6 so P6 has something to consume.
+
+**Routing:** Agent Red-local for all phases. Cross-harness scanner-suite pattern may evolve to upstream `groundtruth-kb` after proven on Agent Red (same pattern as GTKB-GOV-OWNER-DECISION-SURFACING).
+
+**Regression visibility:** each phase lands tests in `scripts/release_candidate_gate.py`. W2 + W5 add precision-tracking tests (false-positive rate budgets) per the lesson learned from owner-decision-tracker FP class.
+
+**Dependencies:** W0 prerequisite for W4 + W5. W2 prerequisite for W3 (drift findings feed continuation entries). W1 + W2 + W3 are otherwise independent of each other.
+
+**Out of scope:** auto-mutating KB/MEMORY.md/feedback files (synthesis scanner produces *candidates*, owner confirms); replacing the existing `/kb-session-wrap` skill (this extends it; doesn't replace); changing the bridge protocol or hook event model.
+
+**Acceptance:** when Slice 1 ships VERIFIED, every wrap-up surfaces hygiene + consistency findings without owner needing to remember to scan. When Slice 2 ships VERIFIED, next session inherits a per-topic continuation guide. When Slice 3 ships VERIFIED, all 5 owner goals are mechanically supported.
 
 ### GTKB-GOV-CODE-QUALITY-BASELINE - Default code-quality checklist for all GT-KB adopter project proposals (upstream-routed)
 
