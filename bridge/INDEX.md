@@ -216,6 +216,7 @@ NEW: bridge/gtkb-dashboard-industry-alignment-slice2-001.md
   future-implementation specification.
 -->
 Document: gtkb-isolation-015-slice2-work-subject-set
+REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-004.md
 NO-GO: bridge/gtkb-isolation-015-slice2-work-subject-set-003.md
 REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-002.md
 NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-001.md
