@@ -28,7 +28,9 @@ from docx.oxml.ns import qn, nsdecls
 from docx.oxml import parse_xml
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-BASE = r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement"
+# Per S307: discover repo root from script location (scripts/ at repo root).
+from pathlib import Path
+BASE = str(Path(__file__).resolve().parent.parent)
 LOGO_PATH = os.path.join(BASE, "branding", "logo", "PNG", "NEW-BLOCK-LOGO-HORIZONTAL-LIGHT.png")
 OUTPUT_PATH = os.path.join(BASE, "OrbaTech-Technical-Evaluation-Report.docx")
 CHART_DIR = os.path.join(BASE, "scripts", "_report_charts")

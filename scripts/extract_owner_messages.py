@@ -13,9 +13,21 @@ import json
 import os
 import sys
 import glob
+from pathlib import Path
 
-TRANSCRIPT_DIR = r"C:\Users\micha\.claude\projects\E--Claude-Playground-CLAUDE-PROJECTS-Agent-Red-Customer-Engagement"
-OUTPUT_FILE = r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\docs\owner-messages-all.json"
+# Per S307 hardcoded-path directive (no machine-local literals in active code):
+# - Repo root is discovered from this script's location, not hardcoded.
+# - Claude transcript dir is supplied via env var with a portable default
+#   (`~/.claude/projects/`), letting any workstation point at its own location.
+# Project hash subdirectory (e.g. "E--GT-KB") is itself derived by Claude from
+# the project path; it can be overridden via env var if a project is moved.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_TRANSCRIPT_BASE = Path(
+    os.environ.get("CLAUDE_TRANSCRIPT_DIR", Path.home() / ".claude" / "projects")
+)
+_PROJECT_HASH = os.environ.get("CLAUDE_PROJECT_HASH", "E--GT-KB")
+TRANSCRIPT_DIR = str(_TRANSCRIPT_BASE / _PROJECT_HASH)
+OUTPUT_FILE = str(_REPO_ROOT / "docs" / "owner-messages-all.json")
 
 
 def extract_text(content):

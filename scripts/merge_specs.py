@@ -16,12 +16,15 @@ import os
 import sys
 import re
 from collections import defaultdict, Counter
+from pathlib import Path
 
 # Windows UTF-8 safety
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
 
-DOCS_DIR = r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\docs"
-KB_PATH = r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\tools\knowledge-db"
+# Per S307 hardcoded-path directive: discover repo root from script location.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+DOCS_DIR = str(_REPO_ROOT / "docs")
+KB_PATH = str(_REPO_ROOT / "tools" / "knowledge-db")
 
 BATCH_FILES = [
     "specs-batch-1.json",

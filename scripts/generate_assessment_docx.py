@@ -450,6 +450,12 @@ r.font.size = Pt(9)
 r.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
 
 # ── Save ────────────────────────────────────────────
-output_path = r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\docs\Agent-Red-Full-Assessment-2026-03-05.docx"
+# Per S307 hardcoded-path directive: derive output path from script location.
+from pathlib import Path
+output_path = str(
+    Path(__file__).resolve().parent.parent
+    / "docs"
+    / "Agent-Red-Full-Assessment-2026-03-05.docx"
+)
 doc.save(output_path)
 print(f"Saved: {output_path}")

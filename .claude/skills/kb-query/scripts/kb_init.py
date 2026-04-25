@@ -1,15 +1,40 @@
 #!/usr/bin/env python3
 """Initialize KnowledgeDB connection for skill scripts.
 
+This is a kb-query skill helper invoked by Claude during KB queries. It
+imports the in-repo `tools.knowledge_db.db` module without requiring the
+package to be installed.
+
+Per S307 hardcoded-path directive (no machine-local literals in active code):
+the project root is discovered from this file's location, not configured.
+The script is at .claude/skills/kb-query/scripts/kb_init.py — four levels
+deep from the repo root. `Path(__file__).resolve().parents[4]` resolves to
+the repo root regardless of which workstation runs it. This makes the skill
+portable across workstations and pip-install scenarios.
+
+Long-term this should become `from groundtruth_kb import KnowledgeDB` once
+the package install is the supported path.
+
 Usage:
-    python scripts/kb_init.py summary
-    python scripts/kb_init.py specs specified
-    python scripts/kb_init.py wi open
-    python scripts/kb_init.py next-ids
+    python .claude/skills/kb-query/scripts/kb_init.py summary
+    python .claude/skills/kb-query/scripts/kb_init.py specs specified
+    python .claude/skills/kb-query/scripts/kb_init.py wi open
+    python .claude/skills/kb-query/scripts/kb_init.py next-ids
 """
 import sys
-sys.path.insert(0, "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement")
-from tools.knowledge_db.db import KnowledgeDB
+from pathlib import Path
+
+# Discover repo root from this file's location: .claude/skills/kb-query/scripts/kb_init.py
+# parents[0]=scripts, [1]=kb-query, [2]=skills, [3]=.claude, [4]=repo root
+# Note: the tools dir is `tools/knowledge-db` (with a dash). Python module names
+# cannot contain dashes, so we must add the knowledge-db directory itself to
+# sys.path and import the bare module name `db`. Adding `_REPO_ROOT` alone
+# does not work because `from tools.knowledge_db ...` (underscore) finds
+# nothing, and `from tools.knowledge-db ...` (dash) is a syntax error.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(_REPO_ROOT / "tools" / "knowledge-db"))
+
+from db import KnowledgeDB  # type: ignore[import-not-found]
 
 db = KnowledgeDB()
 

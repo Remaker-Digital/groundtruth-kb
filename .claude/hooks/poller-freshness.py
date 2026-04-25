@@ -48,11 +48,22 @@ FRESH_SEC = 240  # <4 min: healthy (3-min cadence + 1 min grace)
 STALE_SEC = 600  # <10 min: warning
 # >=10 min: alarm
 
-# Hardcoded fallback path -- used only if git and CLAUDE_PROJECT_DIR both fail
-# to resolve a valid repo containing the scan-status files. Update this if the
-# repo is moved. Do not rely on it as the primary path.
-HARDCODED_FALLBACK_ROOT = Path(
-    r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement"
+# Last-resort fallback — used only if git and CLAUDE_PROJECT_DIR both fail
+# to resolve a valid repo containing the scan-status files.
+#
+# Per S307 hardcoded-path directive (no machine-local literals in active code):
+# this fallback is supplied via the GTKB_PROJECT_ROOT environment variable,
+# not hardcoded. If the env var is unset and every other resolution method
+# in _resolve_repo_root() fails, the hook returns ALARM with an explanatory
+# message rather than silently using a workstation-specific path.
+#
+# Setup:
+#   PowerShell user profile:  $env:GTKB_PROJECT_ROOT = "E:\GT-KB"
+#   Bash shell profile:        export GTKB_PROJECT_ROOT="/e/GT-KB"
+#   Documented in:             independent-progress-assessments/bridge-automation/README-ENV-SETUP.md
+_env_fallback = os.environ.get("GTKB_PROJECT_ROOT")
+HARDCODED_FALLBACK_ROOT: Path | None = (
+    Path(_env_fallback) if _env_fallback else None
 )
 
 STATUS_REL_PATHS = (
@@ -129,9 +140,10 @@ def _resolve_repo_root() -> tuple[Path | None, str]:
         if _has_status_files(candidate):
             return candidate, "CLAUDE_PROJECT_DIR"
 
-    # Step 5: hardcoded fallback
-    if _has_status_files(HARDCODED_FALLBACK_ROOT):
-        return HARDCODED_FALLBACK_ROOT, "hardcoded-fallback"
+    # Step 5: env-var fallback (set via GTKB_PROJECT_ROOT, not hardcoded).
+    # If the env var is unset, HARDCODED_FALLBACK_ROOT is None and we skip.
+    if HARDCODED_FALLBACK_ROOT is not None and _has_status_files(HARDCODED_FALLBACK_ROOT):
+        return HARDCODED_FALLBACK_ROOT, "env-fallback (GTKB_PROJECT_ROOT)"
 
     return None, "no-path-contains-status-files"
 

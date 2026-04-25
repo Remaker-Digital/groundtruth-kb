@@ -25,7 +25,11 @@ from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-BASE = r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement"
+# Per S307 hardcoded-path directive: project root is discovered from this
+# script's location (scripts/...), not hardcoded. The repo layout convention
+# is that scripts/ lives at the repo root.
+from pathlib import Path
+BASE = str(Path(__file__).resolve().parent.parent)
 LOGO_PATH = os.path.join(BASE, "branding", "logo", "PNG", "NEW-BLOCK-LOGO-HORIZONTAL-LIGHT.png")
 OUTPUT_PATH = os.path.join(BASE, "AgentRed-Technical-Evaluation-Report.docx")
 CHART_DIR = os.path.join(BASE, "scripts", "_report_charts_ar")
