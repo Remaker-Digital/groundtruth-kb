@@ -22,7 +22,7 @@ Updated: 2026-04-25 (S308) — hygiene pass after canonical-deploy / slice2b rec
 
 **Completed in S308 (2026-04-25), removed from active table:**
 
-- `GTKB-ISOLATION-015` Slice 2 — VERIFIED at `gtkb-isolation-015-slice2-work-subject-set-006` (closed terminal; unblocks ISOLATION-016).
+- `GTKB-ISOLATION-015` Slice 2 — **CORRECTED 2026-04-25 later in S308:** prior INDEX claim of VERIFIED at `-006` was based on phantom-INDEX entries for files that never existed; source-level verification (per Codex `gtkb-isolation-016-phase8-rehearsal-implementation-004` F4) confirmed the implementation never landed. Reconciled at `bridge/gtkb-isolation-015-slice2-work-subject-set-002` (re-opened as not-implemented). Slice 2 typed `work_subject.set` / `work_subject.rollback` control-plane operations remain a future work item with `-001` as the specification basis. Does NOT block ISOLATION-016 Phase 8 rehearsal (per `-016-impl-005` §1.2 — sub-scripts don't call typed control-plane API).
 - `GTKB-DASHBOARD-002` Slice 2.1 (visibility) — VERIFIED at `gtkb-dashboard-industry-alignment-slice2a-visibility-008` (closed terminal).
 - `GTKB-DORA-001` — VERIFIED at `gtkb-dora-telemetry-foundation-008` (closed terminal; unblocks DORA-001b).
 - `gtkb-slice2b-metrics-index-reconciliation` — VERIFIED at `-008` (INDEX hygiene; closed terminal).

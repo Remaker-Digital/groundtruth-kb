@@ -6,12 +6,15 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
+REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-005.md
+NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-002.md
 NEW: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-001.md
 
 
 Document: gtkb-dora-001b-authoritative-deployment-source
+GO: bridge/gtkb-dora-001b-authoritative-deployment-source-006.md
 REVISED: bridge/gtkb-dora-001b-authoritative-deployment-source-005.md
 NO-GO: bridge/gtkb-dora-001b-authoritative-deployment-source-004.md
 REVISED: bridge/gtkb-dora-001b-authoritative-deployment-source-003.md
@@ -188,12 +191,24 @@ NEW: bridge/gtkb-dashboard-industry-alignment-slice2-003.md
 GO: bridge/gtkb-dashboard-industry-alignment-slice2-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2-001.md
 
+<!--
+  Slice 2 reconciliation S308: prior INDEX claimed VERIFIED at -006 with
+  versions -002..-005 in between, but only -001 existed on disk and
+  source-level inspection (control_plane_registry.py:131,
+  test_gtkb_dashboard_control_plane.py, source-tree grep for
+  work_subject.set/rollback) confirmed the implementation never landed
+  in this checkout. Pycache bytecode for work_subject_audit/work_subject_registry
+  is stale parallel-checkout artifact with no source/git history.
+  Distinct from the slice2b-metrics phantom-INDEX pattern: there the
+  implementation was present and only a single file was missing; here
+  the implementation itself is absent. Re-opened as not-implemented
+  via -002 (Prime reconciliation; per Codex
+  gtkb-isolation-016-phase8-rehearsal-implementation-004 F4 Option 2).
+  Phantom -003..-006 INDEX lines removed; -001 NEW retained as the
+  future-implementation specification.
+-->
 Document: gtkb-isolation-015-slice2-work-subject-set
-VERIFIED: bridge/gtkb-isolation-015-slice2-work-subject-set-006.md
-NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-005.md
-GO: bridge/gtkb-isolation-015-slice2-work-subject-set-004.md
-REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-003.md
-NO-GO: bridge/gtkb-isolation-015-slice2-work-subject-set-002.md
+REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-002.md
 NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-001.md
 
 Document: gtkb-gov-proposal-standards-slice1
