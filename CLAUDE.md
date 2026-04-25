@@ -172,21 +172,32 @@ At session start, scan `bridge/INDEX.md` for pending work:
 2. **Report** any findings: "Bridge scan: N entries need attention" or "Bridge scan: clear."
 3. **Process** the oldest actionable entry first (GO → implement, NO-GO → revise).
 
-### Session Start: Bridge Poller (Conditional)
+### Bridge Polling: Halted (2026-04-25 owner directive)
 
 The poller is not the bridge. The bridge is the durable handoff/review
 mechanism in `bridge/INDEX.md`; the poller is only a monitoring/activation
-service for separate-harness or asynchronous operation.
+service.
 
-After the initial bridge scan, create a recurring in-session poller only when
-Prime Builder and Loyal Opposition are running in separate harnesses or when
-asynchronous monitoring is otherwise needed:
+**Both the OS-level Windows scheduled-task pollers and the in-session
+`CronCreate` poller are now retired.** Bridge scans are manual:
 
-```
-CronCreate: cron="*/3 * * * *", recurring=true, prompt="Read bridge/INDEX.md. If the latest status on any document is GO or NO-GO that hasn't been actioned, report it and act: GO → implement per work list, NO-GO → read findings and revise. Otherwise report 'Bridge scan: clear.'"
-```
+- The owner triggers a Prime bridge scan with a brief prompt such as
+  `Bridge` or `Bridge scan`.
+- Prime then reads `bridge/INDEX.md`, identifies actionable entries
+  (NEW/REVISED needing Prime response; GO/NO-GO from Codex needing Prime
+  acknowledgement), and acts.
+- Codex bridge scans are similarly owner-triggered in the Codex harness.
 
-When active, this ensures Codex responses are detected and processed within 3 minutes throughout the session. The poller is session-scoped and dies when the session ends - this is intentional, since polling is only useful while someone is working. Note: the in-memory scheduler may silently drop jobs during long sessions; if the poller stops firing, recreate it manually.
+Do NOT recreate the in-session `CronCreate` poller or re-enable the
+Windows scheduled tasks (`AgentRedFileBridgeIndexScan-*`,
+`AgentRedBridgeLivenessAlert`, `AgentRedPollerLivenessWatcher`) without
+explicit owner approval and the cost/benefit analysis required by
+`.claude/rules/bridge-essential.md` §"Re-Enabling Pollers".
+
+Rationale: the OS Claude poller activation around 2026-04-23 drove a
+~10× session token-cost regression (~12.5M tokens/day from background
+spawns alone). Manual scans recover the cost; the bridge protocol itself
+is unaffected.
 
 ### Session Start: Active Work List (Mandatory)
 

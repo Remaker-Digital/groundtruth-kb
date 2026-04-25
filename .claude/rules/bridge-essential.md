@@ -5,100 +5,112 @@ This rule auto-loads via `.claude/rules/` convention and is TRACKED in git
 
 ## The Mandate
 
-**Bridge uptime is the top-priority task. Always.**
+**Bridge integrity is the top-priority task. Always.**
 
-The Prime Builder / Loyal Opposition bridge is how GroundTruth-KB coordinates
-implementation proposals, reviews, and verification. GroundTruth-KB is
-non-functional when the bridge stops working. Therefore: keeping the bridge
-alive and visible is the first duty of every Prime Builder session when
-counterpart review is active, ahead of feature work, backlog progress, test
-runs, deployments, and documentation updates.
+The Prime Builder / Loyal Opposition bridge is how GroundTruth-KB
+coordinates implementation proposals, reviews, and verification.
+GroundTruth-KB is non-functional when the bridge stops working.
+Therefore: keeping the bridge canonical state correct and accurately
+reflected in `bridge/INDEX.md` is the first duty of every Prime Builder
+session, ahead of feature work, backlog progress, test runs, deployments,
+and documentation updates.
 
-There is no scenario in which the owner wants bridge monitoring to cease.
-Any proposal, refactor, or cleanup that would remove, disable, or weaken the
-bridge visibility infrastructure must be rejected.
+The bridge as a *protocol* (proposal → review → revise → GO/NO-GO →
+implement → post-impl → VERIFIED, all recorded in versioned files under
+`bridge/`) is permanently in force. Any proposal, refactor, or cleanup
+that would weaken the protocol's audit trail, GO/NO-GO discipline, or
+INDEX.md as canonical state must be rejected.
 
-## The Visibility Contract
+## Operational Mode (current as of 2026-04-25)
 
-Every response from Prime Builder must begin with a fenced code block
-produced by the `poller-freshness.py` UserPromptSubmit hook:
+**Automated bridge pollers are HALTED by owner directive.** The Windows
+scheduled tasks `AgentRedFileBridgeIndexScan-Claude`,
+`AgentRedFileBridgeIndexScan-Codex`, `AgentRedBridgeLivenessAlert`, and
+`AgentRedPollerLivenessWatcher` are all `Disabled`. The
+`.claude/hooks/poller-freshness.py` `UserPromptSubmit` hook has been
+removed. Bridge scans are now **manual** in both directions.
 
-```
-POLLER OK @ HH:MM:SSZ
-  claude=OK <age> ago (<state>) <message>
-  loyal-opposition=OK <age> ago (<state>) <message>
-```
+Owner triggers a Prime bridge scan with a brief prompt such as `Bridge`
+or `Bridge scan`. Prime then reads `bridge/INDEX.md`, identifies any
+NEW/REVISED entries that need Prime action (responding to a Codex GO →
+implement; responding to a Codex NO-GO → revise) or any GO/NO-GO entries
+that need Prime acknowledgement, and acts. Codex bridge scans are
+similarly owner-triggered in the Codex harness.
 
-- `OK` means the scan-status file was updated less than 4 minutes ago.
-- `WARN` means 4–10 minutes — investigate, but continue.
-- `ALARM` means more than 10 minutes, the status file is missing, the
-  timestamp is unreadable, or the hook itself crashed. **Stop and repair
-  before any other work.**
+The change was made on 2026-04-25 (S308) after the OS Claude poller
+(activated ~2026-04-23) drove a ~10× session token-cost regression: 173
+Claude capped-spawns/day at peak, plus 92 Codex spawns/day, each costing
+~50k tokens. See the audit-trail bridge entry filed in the same change
+for the full investigation and decision record.
 
-If Prime emits a response without the POLLER block, the owner cannot tell
-whether the bridge is still running. That is the exact failure mode this
-infrastructure exists to prevent. A response without the block is a defect.
+## Re-Enabling Pollers (Future Sessions)
 
-## Mechanical Enforcement
+The poller infrastructure is preserved but disabled — not removed. To
+re-enable:
 
-Three pieces of infrastructure, all tracked in git, make the contract
-mechanical rather than procedural:
+1. `Enable-ScheduledTask -TaskName AgentRedFileBridgeIndexScan-Claude`
+   (and the other three tasks as needed).
+2. Restore the `UserPromptSubmit` hook in `.claude/settings.json` and
+   recreate `.claude/hooks/poller-freshness.py` from git history
+   (commit pre-S308) — or replace with a lighter freshness mechanism.
+3. Update this rule's "Operational Mode" section to reflect the change.
 
-1. **`.claude/hooks/poller-freshness.py`** — a `UserPromptSubmit` hook that
-   reads the two scan-status files, computes freshness against thresholds,
-   and emits a `systemMessage` instructing the active harness to prepend the
-   POLLER block. The hook is worktree-safe (resolves repo root via
-   `git rev-parse --git-common-dir`) and fail-loud (emits ALARM rather than
-   silently returning on any error path).
+Re-enabling requires explicit owner approval and a written
+cost/benefit analysis demonstrating the regression has been mitigated
+(e.g., reduced bridge thread depth, capped per-thread version count,
+narrower spawn predicates).
 
-2. **`.claude/settings.json`** — project-level settings that register the
-   hook on `UserPromptSubmit`. Every fresh clone and every worktree inherits
-   the registration automatically.
+## Invariants (Bridge Protocol Itself)
 
-3. **`independent-progress-assessments/bridge-automation/*.ps1`** — the
-   Windows scheduled tasks that actually perform the 3-minute bridge scans
-   and write the status files. Tracked in git so a PowerShell syntax bug
-   gets caught at PR review instead of causing a silent multi-hour outage.
+These are unchanged by the poller halt and remain in force:
 
-## Incident History (Lessons Encoded)
-
-- **S290–S292**: Windows OS poller broke (`$MAX_ITEMS_PER_SPAWN:` parsed as a
-  drive-scoped variable). The outage was silent for ~6 hours because nothing
-  surfaced the freshness age in the owner's chat stream. Repair required a
-  direct foreground edit because the broken poller was the thing needed to
-  run the revision. Lesson: the freshness indicator must be independent of
-  the poller it monitors.
-
-- **S292**: Session-start briefs for 7+ sessions silently omitted the
-  in-session `CronCreate` poller instantiation. The failure was invisible
-  because no alarm fired when the instantiation was skipped. Lesson:
-  procedural mandates documented in `memory/*.md` are not enforceable;
-  hooks and `.claude/settings.json` registration are.
-
-- **S294 (this session)**: Discovered that `.claude/` was blanket-ignored
-  in `.gitignore`, so the entire bridge visibility infrastructure lived
-  outside git. Worktrees couldn't see it. Fresh clones couldn't see it.
-  No PR review caught changes. Lesson: **if it is essential, it must be
-  tracked**. This file and its sibling infrastructure are now tracked via
-  explicit `!`-negation patterns.
-
-## Invariants for Future Work
+- `bridge/INDEX.md` is the canonical workflow state. Both agents must
+  trust INDEX over any other signal.
+- Bridge files are append-only. Never delete a bridge file — it forms
+  the audit trail.
+- Per-thread versioning is monotonic. Statuses are NEW, REVISED, GO,
+  NO-GO, VERIFIED.
+- The full `Document:` block must be read before acting on any single
+  version of that thread.
+- Scoped commits only. Bridge work commits should not bundle unrelated
+  source changes.
 
 Do NOT, without explicit owner approval:
 
-- Remove the `UserPromptSubmit` hook registration from `.claude/settings.json`
-- Delete or rename `.claude/hooks/poller-freshness.py`
-- Revert the `!`-negation patterns in `.gitignore` for the files listed above
-- Modify `poller-freshness.py` in a way that allows it to exit without
-  emitting a `systemMessage`
-- Bypass the POLLER block on a response, even "just this once" for brevity
+- Remove or rename `bridge/INDEX.md`
+- Delete bridge files (any version)
+- Skip the GO/NO-GO discipline for any code change beyond the explicit
+  exemptions in `.claude/rules/codex-review-gate.md`
+- Re-enable the OS pollers without the cost/benefit analysis above
 
-Do, without asking:
+## Incident History (Lessons Encoded)
 
-- Investigate any response that lacks the POLLER block
-- Treat any `WARN` or `ALARM` as the top-priority task, ahead of whatever
-  the owner is currently asking about
-- Propose changes that make the infrastructure more robust, more visible,
-  or harder to accidentally break
+- **S290–S292**: Windows OS poller broke (`$MAX_ITEMS_PER_SPAWN:` parsed
+  as a drive-scoped variable). The outage was silent for ~6 hours
+  because nothing surfaced freshness in the owner's chat stream.
+  Lesson: if poller-freshness ever returns, the visibility indicator
+  must be independent of the poller it monitors.
+
+- **S292**: Session-start briefs for 7+ sessions silently omitted the
+  in-session `CronCreate` poller instantiation. Failure was invisible
+  because no alarm fired when instantiation was skipped. Lesson:
+  procedural mandates documented in `memory/*.md` are not enforceable;
+  hooks and `.claude/settings.json` registration are.
+
+- **S294**: Discovered `.claude/` was blanket-ignored in `.gitignore`,
+  so the bridge visibility infrastructure lived outside git. Worktrees
+  couldn't see it. Fresh clones couldn't see it. Lesson: if it is
+  essential, it must be tracked. The `!`-negation patterns added then
+  remain in force for the rule files and PS1 scripts even though the
+  hook itself is now removed.
+
+- **S308 (2026-04-25)**: OS Claude poller activation drove a ~10×
+  token-cost regression (~12.5M tokens/day from background spawns
+  alone). Owner directive halted both pollers and removed the
+  freshness hook, restoring manual-trigger operation. The protocol
+  itself was unaffected — INDEX.md remains canonical. Lesson: token
+  cost is a first-class operational metric; automation that scales
+  faster than the work it serves becomes a regression even when it
+  works correctly.
 
 ## © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

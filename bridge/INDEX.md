@@ -5,7 +5,17 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: halt-os-pollers-token-regression
+NEW: bridge/halt-os-pollers-token-regression-001.md
+
+
+Document: canonical-deploy-pipeline-scaling-enforcement
+REVISED: bridge/canonical-deploy-pipeline-scaling-enforcement-003.md
+NO-GO: bridge/canonical-deploy-pipeline-scaling-enforcement-002.md
+NEW: bridge/canonical-deploy-pipeline-scaling-enforcement-001.md
+
 Document: gtkb-slice2b-metrics-index-reconciliation
+NO-GO: bridge/gtkb-slice2b-metrics-index-reconciliation-006.md
 NEW: bridge/gtkb-slice2b-metrics-index-reconciliation-005.md
 GO: bridge/gtkb-slice2b-metrics-index-reconciliation-004.md
 REVISED: bridge/gtkb-slice2b-metrics-index-reconciliation-003.md
@@ -27,6 +37,7 @@ NEW: bridge/gtkb-slice2b-metrics-index-reconciliation-001.md
   already addressed by -014 and verified by -015. See -018 section 3.
 -->
 Document: gtkb-root-directory-migration-post-verify
+VERIFIED: bridge/gtkb-root-directory-migration-post-verify-019.md
 REVISED: bridge/gtkb-root-directory-migration-post-verify-018.md
 NO-GO: bridge/gtkb-root-directory-migration-post-verify-017.md
 NO-GO: bridge/gtkb-root-directory-migration-post-verify-016.md
