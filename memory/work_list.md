@@ -21,7 +21,7 @@ Updated: 2026-04-25 (S309) — added GTKB-STARTUP-ENHANCEMENTS row from session-
 | 6 | `GTKB-GOV-DA-ENFORCEMENT` | passive tracking | Owned upstream on `groundtruth-kb` `main`. | No local action. Adopts via `gt project upgrade` after upstream VERIFIED. |
 | 7 | `GTKB-GOV-CODE-QUALITY-BASELINE` | scoping in flight | Slice 1 governance design filed at `bridge/gtkb-gov-code-quality-baseline-slice1-001.md`; awaits Codex GO. New standing backlog entry per owner directive 2026-04-25. Defines a default code-quality checklist (CQ-* rule IDs) applying to all GT-KB adopter project proposals unless explicitly N/A or owner-suspended via the waiver lifecycle. | After Codex GO on Slice 1, file Slice 2 implementation bridge upstream in `groundtruth-kb` (hook extension + Codex/Windows fallback verifier + tests + GOV/ADR/SPEC/DCL records). Adopters consume via `gt project upgrade` after upstream VERIFIED. |
 | 8 | `GTKB-GOV-OWNER-DECISION-SURFACING` | implementation proposal in flight | Implementation bridge filed at `bridge/gtkb-gov-owner-decision-surfacing-slice1-001.md`; awaits Codex GO. Owner directive 2026-04-25: mechanically force surfacing of owner-decision pending state so decisions don't get lost in interactive-session message flow. Agent Red-local first (immediate benefit); hook contract may later be promoted upstream once it proves out. | After Codex GO, implement: durable `memory/pending-owner-decisions.md` file, `.claude/hooks/owner-decision-tracker.py` (Stop / SessionStart / UserPromptSubmit dispatch), settings.json registration, test file in release-candidate gate. |
-| 9 | `GTKB-STARTUP-ENHANCEMENTS` | scoping (filed 2026-04-25 S309) | Filed per owner directive following session-start architecture evaluation. Captures 8 token-reduction opportunities + 5 reliability/correctness improvements + 1 known bug (missing Codex `owner-decision-tracker-ups.cmd` wrapper) + 1 live false-positive (DECISION-0001 auto-detected from a doc-explanation paragraph). Top-3 ROI items (trim `MEMORY.md`, port Codex startup-freshness contract to Claude, atomic dashboard write) are independent and parallelizable. | File slice plan that prioritizes the highest-ROI items first; capture each as its own implementable bridge (or batch the smallest into one slice). See Active Items entry below for full inventory. |
+| 9 | `GTKB-STARTUP-ENHANCEMENTS` | scoping w/ architecture (revised 2026-04-25 S309) | Owner directive 2026-04-25 (S309): redesign session start to **prime** six things (collaboration protocol; canonical glossary; active code-quality + artifact-rigor ADRs; user-interaction affordances; project-relevant gap-fill priorities; order-of-work planning). Architecture = Six Primers + Project Snapshot + Action Tray (~15.5K tokens, down from ~30K). Owner-chosen P4 stance: **full consolidation** (8 rule files → 3). Owner-chosen sequence: **P1 quick wins first**. | File P1 implementation bridge: trim `MEMORY.md` to one-line index entries; atomic dashboard write; `MEMORY.md` size ceiling test; fix Codex `owner-decision-tracker-ups.cmd` wrapper. ~9K token recovery, low risk, all four sub-items independent. |
 
 **Completed in S308 (2026-04-25), removed from active table:**
 
@@ -348,58 +348,90 @@ The existing `AskUserQuestion` tool fixes #1 *only when Prime remembers to use i
 
 **Out of scope (Slice 1):** prose-pattern detection refinement (regex precision will iterate based on false-positive rate); dashboard tile for pending decisions (separate future slice); upstream promotion of the hook (depends on Slice 1 proving the contract).
 
-### GTKB-STARTUP-ENHANCEMENTS - Token-reduction, reliability, and correctness improvements to the session-start pipeline
+### GTKB-STARTUP-ENHANCEMENTS - Session-start redesign: from collect-render-emit to curated priming
 
-**Priority:** medium (none of the items are release-blocking, but several are easy wins; #1 is recovering already-degraded behavior). **Filed 2026-04-25 (S309)** per owner directive following the session-start architecture evaluation that ran during S309 after the GTKB-GOV-OWNER-DECISION-SURFACING Slice 1 implementation. **Scope:** "Startup enhancements" per owner.
+**Priority:** medium-high. **Filed 2026-04-25 (S309).** **Revised 2026-04-25 (S309)** with architectural vision after owner directive expanding scope from incremental enhancement to a redesign aiming to reduce complexity + cost while making startup more useful and project-oriented. **Scope:** "Startup enhancements" per owner.
 
-**Source evidence:** S309 conversation with the owner producing a 6-section evaluation of:
-- Token consumption per fresh-session prelude (~28-34K tokens auto-loaded; `MEMORY.md` already exceeds 24.4KB ceiling and is silently truncated)
-- Hook architecture for both Claude Code and Codex (registered in `.claude/settings.json` + `.claude/settings.local.json` + `.codex/hooks.json`; converging on `scripts/session_self_initialization.py` via `--emit-report` vs `--emit-startup-service-payload`)
-- Project-state collection pipeline (13 collectors in `build_startup_model()`; `--fast-hook` skips PDF + KPI backfill + bridge maintenance)
-- Priority-task surfacing (13 numbered focus options) + S309 owner-decision-tracker integration
-- Loyal Opposition vs Prime Builder branching at `_is_loyal_opposition_model()` (focus menu replaced with checklist; harness-local durable role record)
-- Reliability contract: graceful 0-exit on every hook; Codex has explicit startup-freshness contract with fallback; Claude does not
+**Six Priming Objectives (owner directive):**
 
-**Token-reduction opportunities** (ordered by ROI):
+1. Prime collaboration protocol (bridge + Implementation Proposal → Review → Implementation Report → Verify cycle)
+2. Prime canonical glossary (system terms; GT-KB / IDP / adopter / harness / role)
+3. Prime active code-quality and artifact-rigor ADRs (currently load-bearing, not full historical set)
+4. Prime correct user-interaction affordances (when AskUserQuestion required; spec/backlog-change ceremony; visible decision surfacing)
+5. Present project-relevant prioritized options biased toward boilerplate work that fills known/anticipated gaps in project specifications
+6. Present order-of-work planning choices with status of ongoing projects
 
-1. **Trim `MEMORY.md`** — currently 60KB / ~15K tokens, exceeds the documented 24.4KB ceiling; harness silently truncates. Consolidating index entries to one-line-each per the format documented in CLAUDE.md would recover ~15K tokens with no behavior change. Lowest risk, highest impact.
-2. **Cache the startup report when source files unchanged** — recover ~2,750 tokens on no-op session starts. Needs content-hash check against `bridge/INDEX.md` + `memory/work_list.md` + `groundtruth.db` mtime + role record.
-3. **Section-level lazy rendering** — emit summaries by default; expand on `--expand=section-name` flag. Recover ~1,500-3,000 tokens for typical sessions.
-4. **Move the 13 focus options to a `/focus` slash command** — recover ~3,000 tokens but requires owner workflow change.
-5. **Compress `.claude/rules/` ruleset** — 8 files / 30KB with overlap between `prime-builder-role.md`, `acting-prime-builder.md`, `operating-role.md`. Recover ~3,000-4,000 tokens.
-6. **Replace prose anti-pattern detection in owner-decision-tracker with a structured `<decision>` tag in assistant output** — near-zero false positives; can't be enforced without assistant cooperation. Lower priority unless false-positive rate becomes painful.
-7. **Codex Windows hook runtime activation** — external dependency; if Anthropic ships full Codex hooks on Windows, the `.cmd` wrappers under `~/.codex/agent-red-hooks/` can disappear.
-8. **Token-budget telemetry** — capture actual `tokens_consumed_before_user_input` from harness API; current dashboard reports `not_exposed_by_current_harness`. Observability only.
+**Mission:** inform → affirm procedures → guide. Right answers, right time. Orderly, iterative, comprehensive.
 
-**Reliability/correctness improvements:**
+**Source evidence:** S309 conversation evaluating session-start architecture (token consumption, hooks, project-state pipeline, priority-task surfacing, LO/PB branching, reliability contract). Concrete diagnoses: ~28-34K token prelude with ~40% redundancy; 8 rule files with overlapping content; MEMORY.md silently truncated past 24.4KB ceiling; 13-option focus menu is a flat catalogue with no spec-gap bias; two parallel rendering pipelines (Codex JSON contract vs Claude raw markdown); forward-compat dead wrappers in `.codex/hooks.json`; owner-decision-tracker reactive only with documented false-positive class.
 
-A. **Port Codex startup-freshness contract to Claude.** Codex's `session_start_dispatch.py:_valid_session_start_payload()` validates the hook payload's structure + timestamps + report origin; falls back to a minimal disclosure on validation failure. Claude has no equivalent — a stale `session-startup-report.md` from a crashed mid-write would be treated as fresh. Low effort; outsize value.
-B. **Atomic write for dashboard data** — `os.replace` from `.tmp`. Trivial; prevents partial JSON writes corrupting the dashboard mid-render.
-C. **Test for `MEMORY.md` size** in release-candidate gate — fails when the file exceeds the documented ceiling. Trivial; prevents silent truncation as the file grows.
-D. **`_extract_answer_text()` schema robustness** in owner-decision-tracker — current implementation handles 3 known shapes. If Claude Code changes the AskUserQuestion result format, parsing degrades silently with empty `answer:` fields. Low effort; add a fallback log of "answer-format-unrecognized" rather than silent empty.
-E. **Fix Codex `owner-decision-tracker-ups.cmd` wrapper** — `.codex/hooks.json` references this file; it doesn't exist yet on disk. Doesn't fire today (Codex hooks are disabled on Windows per `ADR-CODEX-HOOK-PARITY-FALLBACK-001`) but is a latent bug — either create the wrapper at `~/.codex/agent-red-hooks/owner-decision-tracker-ups.cmd` matching the existing wrapper pattern, or remove the unreferenced entry from `.codex/hooks.json`. Trivial.
+**Target architecture: Six Primers + Project Snapshot + Action Tray**
 
-**Live false-positive evidence (S309):** the owner-decision-tracker's prose-anti-pattern scan flagged the literal text *"prose anti-patterns (\\\"want me to X or Y?\\\") and logs them"* from the S309 evaluation report itself — a documentation paragraph describing the detector triggered the detector. Stored as DECISION-0001 with `detected_via: prose:offering_or_choice`. The false-positive guard in `PROSE_FALSE_POSITIVE_GUARDS` only catches "decisions are hard / in general decisions / abstractly about decisions"; it doesn't recognize quoted-example or doc-explanation context. This motivates a tightening pass that (a) adds quotation/code-fence detection to the guard, or (b) makes the detector quotation-aware (skip patterns inside backticks/quotes).
+| Surface | Purpose | Token budget |
+|---|---|---|
+| P1 Bridge protocol primer | proposal → review → impl → verify cycle, statuses, when bridge is/isn't required | ~400 |
+| P2 Canonical glossary primer | GT-KB / IDP / adopter / harness / role / Prime Builder / Loyal Opposition | ~300 |
+| P3 Active-ADR primer | KB-derived: specs with `is_session_priming=True` flag (owner-curated seed list) | ~600 |
+| P4 Interaction-affordances primer | when AskUserQuestion required; spec-change / backlog-change ceremony; visible-decision surfacing | ~500 |
+| P5 Role-conditional primer (PB or LO) | role-specific authority + restrictions; consolidates 3 current rule files | ~400 |
+| P6 Wrap-up triggers primer | accepted wrap-up commands; first-prompt-discard semantics | ~150 |
+| **Six-primer subtotal** | | **~2,350** |
+| Project Snapshot | top 5 in-flight slices status; outstanding owner decisions; KPI deltas vs last session | ~500 |
+| Action Tray | 3 ordered work proposals with `id`, `title`, `unblocks`, `blocked-by`, `spec-gap status`, `suggested ceremony`. Replaces the 13-option focus catalogue. | ~600 |
+| Trimmed MEMORY.md | one-line index entries (down from ~15K) | ~6,000 |
+| CLAUDE.md (dedup'd) | governance core; references primers by ID | ~3,500 |
+| AGENTS.md (dedup'd) | Codex equivalent; references primers by ID | ~2,500 |
+| **TOTAL** | | **~15,500 (50% reduction from ~30K)** |
 
-**Required outcome:** file slice plan distributing the 13 sub-items above into bridges. Suggested batching:
-- **Slice 1 — highest-ROI quick wins:** items #1 (trim MEMORY.md), B (atomic dashboard write), C (MEMORY.md ceiling test), E (fix Codex wrapper). All trivial-to-low effort; can be one bridge.
-- **Slice 2 — Claude startup-freshness contract:** item A. Standalone bridge; mirrors the existing Codex contract.
-- **Slice 3 — startup report caching:** item #2. Needs content-hash design + invalidation rules.
-- **Slice 4 — false-positive guard tightening + answer-format robustness:** items D + the live DECISION-0001 lesson.
-- **Slice 5+ (deferred):** items #3, #4, #5 (larger token wins requiring workflow/structural change); #6, #7, #8 (external/observability).
+**Owner-chosen architectural decisions (2026-04-25 S309):**
 
-**Routing:** Mixed.
-- Items touching `.claude/hooks/` and `scripts/` (B, C, D, E) → Agent Red-local; same shape as the GTKB-GOV-OWNER-DECISION-SURFACING bridge.
-- `MEMORY.md` trimming (item #1) → not bridged; user-auto-memory edit; can be done inline by Prime in any session per existing memory-management conventions.
-- Items affecting cross-harness convention (A startup-freshness contract; #5 ruleset compression) → Agent Red-local first, evaluate upstream promotion if the contract proves out.
+- **Rule-file consolidation: FULL.** Merge `bridge-essential.md` + `file-bridge-protocol.md` + `codex-review-gate.md` into one bridge primer. Merge `prime-builder-role.md` + `acting-prime-builder.md` + `loyal-opposition.md` into one role-conditional primer. Net: 8 rule files → 3. External references to the old paths are accepted breakage; will catch via release-gate test.
+- **Starting phase: P1 quick wins.** Lowest risk, fastest token recovery (~9K), proves the iterative-slice model.
 
-**Regression visibility:** each implemented sub-item lands in `scripts/release_candidate_gate.py` test list. Token-reduction items add a `tests/scripts/test_session_self_initialization.py` assertion measuring rendered report length against a budget.
+**Phased delivery (each phase = one bridge):**
 
-**Dependencies:** none beyond existing hook infrastructure. All items are independent; no inter-item ordering except where explicitly noted (Slice 1 items can ship together).
+| Phase | What lands | Token impact | Risk |
+|---|---|---|---|
+| **P1 Quick wins** *(starting here)* | Trim `MEMORY.md` to one-line index entries; atomic dashboard write (`os.replace` from `.tmp`); `MEMORY.md` size ceiling test in release-gate; fix Codex `owner-decision-tracker-ups.cmd` wrapper (or remove unreferenced entry). All 4 sub-items independent. | −9K tokens | low |
+| **P2 Claude startup-freshness contract** | Port Codex `_valid_session_start_payload()` to Claude side; explicit fallback-context generator on validation failure. | reliability win | low |
+| **P3 Six-primer registry** | New `scripts/session_primers.py` with primer registry + by-id query API + per-primer token-budget tests. Primers cached by content hash. | restructure (no net change yet) | medium |
+| **P4 Migrate rule files into primer registry** | Full consolidation per owner decision: 8 rule files → 3 (bridge, role-conditional, interaction). CLAUDE.md + AGENTS.md reference primers by ID. | −5K tokens | medium |
+| **P5 Active-ADR primer** | KB schema: add `is_session_priming` boolean to specs; primer queries it. Owner curates initial set (seed: ADR-CODEX-HOOK-PARITY-FALLBACK-001, ADR-ARTIFACT-FORMALIZATION-GATE-001, ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001, ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001 + the new code-quality CQ rules once GO'd). | quality-positive | medium |
+| **P6 Action tray with spec-gap bias** | Replace 13-option focus menu with 3-option dependency-aware tray. New collector: `specs WHERE status='specified' AND id NOT IN (implemented_by query)` to surface up to 2 spec gaps. Structured `depends_on` chain rendered. | −2K tokens; quality-positive | medium |
+| **P7 Decision-tracker false-positive guard tightening** | Quotation-aware + code-fence-aware guards. Closes the DECISION-0001/0002 false-positive class: doc-paragraphs describing the detector should not trigger the detector. | reliability | low |
+| **P8 Cache primers by content hash** | Skip regeneration when source files unchanged. | recover ~2K tok on no-op starts | low |
 
-**Out of scope:** owner-facing UI changes to the focus menu (item #4 is the most-aggressive token win but it's a workflow change, not a startup-pipeline change); replacing the in-memory model build with an external service (out of `Startup enhancements` scope).
+**Net at completion: ~17K tokens recovered (28-34K → 11-17K). 50%+ reduction.**
 
-**Acceptance:** when Slice 1 ships VERIFIED, fresh-session token prelude drops by ~15K (item #1) and the latent bugs (B, C, E) are closed. Subsequent slices recover additional tokens incrementally.
+**Items retired (explicit deletions to reduce complexity):**
+
+- `.claude/rules/bridge-essential.md` (content → bridge primer)
+- `.claude/rules/file-bridge-protocol.md` (content → bridge primer)
+- `.claude/rules/codex-review-gate.md` (content → bridge primer)
+- `.claude/rules/prime-builder-role.md` + `acting-prime-builder.md` + `loyal-opposition.md` (content → role-conditional primer)
+- The 13-option focus catalogue in [`_session_focus_options()`](scripts/session_self_initialization.py:2854) (replaced by 3-option action tray)
+- Forward-compat Codex wrappers that never fire (`owner-decision-tracker-ups.cmd` and any others discovered)
+- Duplicate glossary entries across CLAUDE.md / AGENTS.md / docs (single primer becomes source of truth)
+
+**Items preserved exactly as-is:**
+
+- Bridge protocol itself (this is about *priming*, not changing the protocol)
+- File-bridge audit trail and INDEX.md
+- Hook architecture (consolidating outputs, not which hooks run)
+- Owner-decision-tracker (P7 tightens; doesn't replace)
+- KB / MemBase / Deliberation Archive (P5 adds one boolean flag; otherwise unchanged)
+
+**Live false-positive evidence (S309):** The prose-anti-pattern scan flagged literal text *"prose anti-patterns (\"want me to X or Y?\") and logs them"* from the S309 evaluation report itself, then again from a doc-paragraph in the redesign-plan response. Stored as DECISION-0001 and DECISION-0002 with `detected_via: prose:offering_or_choice`. Motivates P7 quotation/code-fence-aware guard tightening.
+
+**Routing:** Agent Red-local for all phases. Cross-harness primer-registry pattern may evolve to upstream `groundtruth-kb` after proven on Agent Red.
+
+**Regression visibility:** each phase lands tests in `scripts/release_candidate_gate.py`. Token-reduction phases add `tests/scripts/test_session_self_initialization.py` budget assertions per primer.
+
+**Dependencies:** P3 is prerequisite for P4 (rule migration into registry) + P5 (ADR primer in registry) + P6 (action tray rendering). P1, P2, P7, P8 are independent of each other and of the P3+ chain.
+
+**Out of scope:** changing the bridge protocol; changing the hook event model; replacing the in-memory model build with an external service; harness-specific UI beyond what the hook contract supports.
+
+**Acceptance:** when P1 ships VERIFIED, fresh-session prelude drops by ~9K and three latent bugs (atomic write, ceiling test, Codex wrapper) close. When P3-P6 ship VERIFIED, the architectural vision is realized: priming displaces catalogue; spec-gap bias surfaces; project-orientation replaces flat option list.
 
 ### GTKB-GOV-CODE-QUALITY-BASELINE - Default code-quality checklist for all GT-KB adopter project proposals (upstream-routed)
 
