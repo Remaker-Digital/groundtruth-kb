@@ -10,6 +10,7 @@ NEW: bridge/gtkb-startup-enhancements-p1-001.md
 
 
 Document: gtkb-gov-owner-decision-surfacing-slice1
+VERIFIED: bridge/gtkb-gov-owner-decision-surfacing-slice1-006.md
 NEW: bridge/gtkb-gov-owner-decision-surfacing-slice1-005.md
 GO: bridge/gtkb-gov-owner-decision-surfacing-slice1-004.md
 REVISED: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md
