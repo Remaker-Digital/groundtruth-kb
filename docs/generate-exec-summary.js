@@ -1,10 +1,17 @@
 const fs = require("fs");
+const path = require("path");
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, Header, Footer, AlignmentType, HeadingLevel, BorderStyle,
   WidthType, ShadingType, PageBreak, PageNumber, TabStopType, TabStopPosition,
   LevelFormat, VerticalAlign,
 } = require("docx");
+
+// Per S307 hardcoded-path directive: discover repo root from this script's
+// location. This file is at docs/generate-exec-summary.js; the repo root is
+// its parent directory. Using path.resolve(__dirname, "..", ...) makes the
+// script portable across workstations (no machine-local literals).
+const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Brand color
 const BRAND = "FF3621";
@@ -18,8 +25,9 @@ const WHITE = "FFFFFF";
 const BLACK = "000000";
 
 // Logo
+// Per S307: derive from REPO_ROOT (computed via __dirname above), not literal.
 const logoData = fs.readFileSync(
-  "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement\\branding\\logo\\PNG\\NEW-BLOCK-LOGO-HORIZONTAL-LIGHT.png"
+  path.resolve(REPO_ROOT, "branding", "logo", "PNG", "NEW-BLOCK-LOGO-HORIZONTAL-LIGHT.png")
 );
 
 // Table helpers
@@ -691,7 +699,8 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then((buffer) => {
-  const outPath = "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement\\docs\\Agent-Red-Executive-Summary.docx";
+  // Per S307: write to docs/ alongside this script, derived from __dirname.
+  const outPath = path.resolve(__dirname, "Agent-Red-Executive-Summary.docx");
   fs.writeFileSync(outPath, buffer);
   console.log("DOCX written to:", outPath);
   console.log("Size:", (buffer.length / 1024).toFixed(1), "KB");
