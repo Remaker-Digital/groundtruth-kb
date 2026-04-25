@@ -70,7 +70,7 @@ All new work in this repository must include:
 - **Execute:** After Codex GO, implement code, tests, and verify.
 - **Report:** Save post-implementation report as new version, add NEW entry for verification.
 - **Verify:** Codex reviews report and adds VERIFIED or NO-GO version.
-- Both agents scan the index every 3 minutes via scheduled automation.
+- Both agents scan the index when triggered manually by the owner (`Bridge` or `Bridge scan` prompt). Automated polling was halted 2026-04-25; see `.claude/rules/bridge-essential.md` §"Operational Mode" and §"Bridge Polling: Halted" below.
 - Before you deploy any build, ask this question: Is Agent Red ready for a full production deployment?
 
 ---
@@ -178,8 +178,9 @@ The poller is not the bridge. The bridge is the durable handoff/review
 mechanism in `bridge/INDEX.md`; the poller is only a monitoring/activation
 service.
 
-**Both the OS-level Windows scheduled-task pollers and the in-session
-`CronCreate` poller are now retired.** Bridge scans are manual:
+**Both the OS-level Windows scheduled-task pollers, the foreground bridge
+monitor watchdog, and the in-session `CronCreate` poller are now retired.**
+Bridge scans are manual:
 
 - The owner triggers a Prime bridge scan with a brief prompt such as
   `Bridge` or `Bridge scan`.
@@ -188,11 +189,12 @@ service.
   acknowledgement), and acts.
 - Codex bridge scans are similarly owner-triggered in the Codex harness.
 
-Do NOT recreate the in-session `CronCreate` poller or re-enable the
-Windows scheduled tasks (`AgentRedFileBridgeIndexScan-*`,
-`AgentRedBridgeLivenessAlert`, `AgentRedPollerLivenessWatcher`) without
-explicit owner approval and the cost/benefit analysis required by
-`.claude/rules/bridge-essential.md` §"Re-Enabling Pollers".
+Do NOT recreate the in-session `CronCreate` poller, restore the bridge
+monitor watchdog startup shortcut, or re-enable the Windows scheduled tasks
+(`AgentRedFileBridgeIndexScan-*`, `AgentRedBridgeLivenessAlert`,
+`AgentRedPollerLivenessWatcher`) without explicit owner approval and the
+cost/benefit analysis required by `.claude/rules/bridge-essential.md`
+§"Re-Enabling Pollers".
 
 Rationale: the OS Claude poller activation around 2026-04-23 drove a
 ~10× session token-cost regression (~12.5M tokens/day from background

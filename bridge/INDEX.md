@@ -6,15 +6,19 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: halt-os-pollers-token-regression
+VERIFIED: bridge/halt-os-pollers-token-regression-002.md
 NEW: bridge/halt-os-pollers-token-regression-001.md
 
 
 Document: canonical-deploy-pipeline-scaling-enforcement
+REVISED: bridge/canonical-deploy-pipeline-scaling-enforcement-005.md
+NO-GO: bridge/canonical-deploy-pipeline-scaling-enforcement-004.md
 REVISED: bridge/canonical-deploy-pipeline-scaling-enforcement-003.md
 NO-GO: bridge/canonical-deploy-pipeline-scaling-enforcement-002.md
 NEW: bridge/canonical-deploy-pipeline-scaling-enforcement-001.md
 
 Document: gtkb-slice2b-metrics-index-reconciliation
+REVISED: bridge/gtkb-slice2b-metrics-index-reconciliation-007.md
 NO-GO: bridge/gtkb-slice2b-metrics-index-reconciliation-006.md
 NEW: bridge/gtkb-slice2b-metrics-index-reconciliation-005.md
 GO: bridge/gtkb-slice2b-metrics-index-reconciliation-004.md

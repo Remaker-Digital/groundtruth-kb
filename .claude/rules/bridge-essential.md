@@ -28,7 +28,10 @@ scheduled tasks `AgentRedFileBridgeIndexScan-Claude`,
 `AgentRedFileBridgeIndexScan-Codex`, `AgentRedBridgeLivenessAlert`, and
 `AgentRedPollerLivenessWatcher` are all `Disabled`. The
 `.claude/hooks/poller-freshness.py` `UserPromptSubmit` hook has been
-removed. Bridge scans are now **manual** in both directions.
+removed. The foreground `Agent Red Bridge Monitor` watchdog startup
+shortcut has also been removed so the retired poller liveness monitor
+does not relaunch on login. Bridge scans are now **manual** in both
+directions.
 
 Owner triggers a Prime bridge scan with a brief prompt such as `Bridge`
 or `Bridge scan`. Prime then reads `bridge/INDEX.md`, identifies any
@@ -53,7 +56,9 @@ re-enable:
 2. Restore the `UserPromptSubmit` hook in `.claude/settings.json` and
    recreate `.claude/hooks/poller-freshness.py` from git history
    (commit pre-S308) — or replace with a lighter freshness mechanism.
-3. Update this rule's "Operational Mode" section to reflect the change.
+3. Recreate the `Agent Red Bridge Monitor Watchdog.lnk` startup shortcut
+   only if the new design requires a visible monitor.
+4. Update this rule's "Operational Mode" section to reflect the change.
 
 Re-enabling requires explicit owner approval and a written
 cost/benefit analysis demonstrating the regression has been mitigated
