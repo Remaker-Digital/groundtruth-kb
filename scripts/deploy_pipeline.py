@@ -625,6 +625,85 @@ def phase_10_startup_and_version(args: argparse.Namespace) -> PhaseResult:
     return PhaseResult(10, "Startup + Version Verify", "FAIL", time.time() - t0, detail)
 
 
+def phase_15_enforce_scaling(args: argparse.Namespace) -> PhaseResult:
+    """Enforce Container App scaling baselines (WI-3171 + canonical-path WI-3031).
+
+    Runs after Phase 10 (startup + version verify) and before any env-specific
+    post-deploy verification, so subsequent verification phases observe the
+    enforced scaling state. Calls the same shared helper that scripts/deploy.py
+    uses (smoke ≡ canonical parity).
+
+    Failure semantics: per the WI-3156 contract, scaling drift is non-blocking.
+    This phase always returns PASS. Failed apps are surfaced to the operator via:
+      1. log("WARN", ...) lines during the phase,
+      2. PhaseResult.extra (printed in the final summary table) as a literal
+         `DRIFT: N/M failed (name1,name2)` marker,
+      3. PhaseResult.detail (serialized in the JSON manifest at line ~1467) as
+         a machine-readable `failed=N ok=M total=K names=...` string.
+
+    Phase number 15 was chosen because PhaseResult(11) is already taken by
+    phase_11_production_verification AND phase_13_upgrade_verification (a
+    pre-existing collision tracked separately as WI-CPD-PHASE-NUMBER-CHAOS).
+    Phase number 15 is unused as both a function-name suffix and a
+    PhaseResult first argument.
+    """
+    t0 = time.time()
+    if args.dry_run:
+        log("INFO", f"  [DRY RUN] Would enforce scaling on {args.env} apps")
+        return PhaseResult(15, "Enforce Scaling Baseline", "PASS",
+                           time.time() - t0, "dry-run")
+
+    # Import lazily so unit tests can mock these without importing deploy.py
+    # at module load time. The shared library is cheap to import (no side effects).
+    from lib.scaling_enforcement import enforce_all_scaling
+    from lib.scaling_targets import (
+        get_scaling_targets,
+        SCALING_CONFIG,
+        RESOURCE_GROUP,
+    )
+
+    def _shell_runner(cmd: str, timeout: int) -> tuple[int, str]:
+        # Adapter from pipeline's CompletedProcess-returning _run_shell
+        # to the (exit_code, stdout) tuple shape expected by lib.scaling_enforcement.
+        r = _run_shell(cmd, timeout=timeout)
+        return r.returncode, (r.stdout or "").strip()
+
+    log("INFO", f"  Enforcing scaling baselines on {args.env} apps (WI-3171)...")
+    results = enforce_all_scaling(
+        targets=get_scaling_targets(args.env),
+        scaling_config=SCALING_CONFIG,
+        resource_group=RESOURCE_GROUP,
+        runner=_shell_runner,
+        log=lambda msg: log("INFO", f"  {msg}"),
+    )
+
+    failed = [name for name, ok in results.items() if not ok]
+    total = len(results)
+    dt = time.time() - t0
+
+    if failed:
+        for name in failed:
+            log("WARN", f"  Scaling enforcement failed: {name}")
+        log("WARN",
+            f"  {len(failed)}/{total} apps failed scaling enforcement "
+            f"(non-blocking per WI-3156)")
+        # `extra` is what _print_summary() displays after the status, so this
+        # makes drift visible in the final summary line:
+        #   Phase 15: Enforce Scaling Baseline ......... PASS (12.4s)
+        #     DRIFT: 2/8 failed (agent-red-slim,agent-red-staging)
+        extra = f"DRIFT: {len(failed)}/{total} failed ({','.join(failed)})"
+        # `detail` is what the JSON manifest serializes (see phase JSON
+        # serialization at line ~1467); machine-friendly summary plus names
+        # per Codex -008 non-blocking note + owner GOV-17 ack option.
+        detail = f"failed={len(failed)} ok={total - len(failed)} total={total} names={','.join(failed)}"
+    else:
+        extra = ""
+        detail = f"failed=0 ok={total} total={total}"
+
+    return PhaseResult(15, "Enforce Scaling Baseline", "PASS", dt,
+                       detail=detail, extra=extra)
+
+
 def phase_10a_pre_deploy_snapshot(args: argparse.Namespace) -> PhaseResult:
     """Capture pre-deploy snapshots for upgrade verification.
 
@@ -1386,6 +1465,18 @@ def main() -> int:
         result = phase_10_startup_and_version(args)
         results.append(result)
         all_ok = result.passed
+
+    if all_ok:
+        # Phase 15: Enforce Container App scaling baselines (WI-3171 + WI-3031).
+        # Closes the canonical-path scaling-enforcement gap by ensuring the
+        # documented production deploy command applies the Decision #16
+        # min/max replicas before downstream verification observes the apps.
+        # Runs for both staging and production (both gateways have baselines).
+        # Returns PASS even on per-app drift (WI-3156 contract); drift is
+        # surfaced via WARN log lines + PhaseResult.extra in the final summary.
+        result = phase_15_enforce_scaling(args)
+        results.append(result)
+        # Intentionally do NOT flip all_ok: scaling drift is non-blocking.
 
     # -----------------------------------------------------------------------
     # Post-deploy verification — DIVERGES by environment

@@ -47,6 +47,12 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# scripts/lib/ is a TRACKED source directory (canonical-deploy scaling
+# enforcement, S308). The bare `lib/` pattern above catches it as a
+# Python build-artifact convention; this negation restores tracking.
+!scripts/lib/
+!scripts/lib/**
 .pytest_cache/
 .coverage
 htmlcov/
