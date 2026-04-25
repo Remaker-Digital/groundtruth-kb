@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-wrapup-enhancements-slice1
+NEW: bridge/gtkb-wrapup-enhancements-slice1-001.md
+
+
 Document: gtkb-startup-enhancements-p1
 VERIFIED: bridge/gtkb-startup-enhancements-p1-006.md
 NEW: bridge/gtkb-startup-enhancements-p1-005.md
