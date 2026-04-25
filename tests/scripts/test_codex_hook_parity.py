@@ -59,6 +59,25 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in codex_hooks["hooks"]["PreToolUse"]
     )
     assert "Stop" not in codex_hooks["hooks"]
+    # Per bridge/gtkb-startup-enhancements-p1-003.md §2.4 (Codex GO at -004):
+    # the previously-registered owner-decision-tracker-ups.cmd entry has been
+    # removed because the wrapper file does not exist on disk, Codex hooks
+    # are disabled on Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001, and the
+    # active mechanism is scripts/check_pending_owner_decisions_parity.py in
+    # the release-candidate gate. This assertion guards against regression.
+    all_codex_commands = [
+        hook["command"]
+        for event_groups in codex_hooks["hooks"].values()
+        for group in event_groups
+        for hook in group["hooks"]
+    ]
+    assert not any(
+        "owner-decision-tracker-ups.cmd" in cmd for cmd in all_codex_commands
+    ), (
+        "Codex owner-decision-tracker-ups.cmd entry must remain absent until "
+        "the wrapper file is created on disk. Active fallback is in the "
+        "release-candidate gate via check_pending_owner_decisions_parity.py."
+    )
     assert any(
         "session_self_initialization.py" in hook["command"]
         and "--emit-report" in hook["command"]

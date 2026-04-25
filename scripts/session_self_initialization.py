@@ -2741,8 +2741,7 @@ def _write_history(
             deduped[generated_at] = row
     history = [deduped[key] for key in sorted(deduped)]
     history = history[-MAX_HISTORY:]
-    history_path.parent.mkdir(parents=True, exist_ok=True)
-    history_path.write_text(json.dumps(history, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_write_text(history_path, json.dumps(history, indent=2, sort_keys=True) + "\n")
     return history
 
 
@@ -3231,6 +3230,26 @@ def _markdown_file_link(path: Path) -> str:
 
 def _markdown_url_link(url: str) -> str:
     return f"[{url}]({url})"
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Write text to `path` atomically via write-to-.tmp + os.replace.
+
+    Prevents partial writes from corrupting downstream consumers (the
+    Grafana dashboard reading dashboard-data.json; Claude Code reading
+    session-startup-report.md as additionalContext) when a process
+    crashes or the system loses power mid-write. ``os.replace`` is
+    atomic on the same filesystem (Python 3.3+), so any reader either
+    sees the full prior content or the full new content -- never a
+    truncated mid-write tail.
+
+    Authority: bridge/gtkb-startup-enhancements-p1-003.md §2.2
+    (Codex GO at -004); part of GTKB-STARTUP-ENHANCEMENTS Phase 1.
+    """
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, path)
 
 
 # Pending owner-decisions surfacing
@@ -4864,13 +4883,13 @@ def write_dashboard_and_report(
     report_path = dashboard_dir / "session-startup-report.md"
     wrapup_path = dashboard_dir / "session-wrapup-report.md"
     data = {"model": model, "history": history}
-    data_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_write_text(data_path, json.dumps(data, indent=2, sort_keys=True) + "\n")
 
     dashboard_link = _markdown_url_link(GRAFANA_DASHBOARD_URL)
     report_text = render_report(model, dashboard_link)
     wrapup_text = render_wrapup_notice(model, dashboard_link)
-    report_path.write_text(report_text, encoding="utf-8")
-    wrapup_path.write_text(wrapup_text, encoding="utf-8")
+    _atomic_write_text(report_path, report_text)
+    _atomic_write_text(wrapup_path, wrapup_text)
     pdf_export = {"available": False, "path": str(pdf_path), "error": "Static dashboard PDF export is disabled."}
 
     return {
