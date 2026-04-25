@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-startup-enhancements-p1
+NEW: bridge/gtkb-startup-enhancements-p1-001.md
+
+
 Document: gtkb-gov-owner-decision-surfacing-slice1
 NEW: bridge/gtkb-gov-owner-decision-surfacing-slice1-005.md
 GO: bridge/gtkb-gov-owner-decision-surfacing-slice1-004.md
