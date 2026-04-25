@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-owner-decision-surfacing-slice1
+NEW: bridge/gtkb-gov-owner-decision-surfacing-slice1-005.md
 GO: bridge/gtkb-gov-owner-decision-surfacing-slice1-004.md
 REVISED: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md
 NO-GO: bridge/gtkb-gov-owner-decision-surfacing-slice1-002.md
