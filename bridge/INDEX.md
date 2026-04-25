@@ -15,6 +15,7 @@ NEW: bridge/gtkb-gov-code-quality-baseline-slice1-001.md
 
 
 Document: gtkb-dora-001b-track2-implementation
+NEW: bridge/gtkb-dora-001b-track2-implementation-007.md
 NO-GO: bridge/gtkb-dora-001b-track2-implementation-006.md
 NEW: bridge/gtkb-dora-001b-track2-implementation-005.md
 GO: bridge/gtkb-dora-001b-track2-implementation-004.md
