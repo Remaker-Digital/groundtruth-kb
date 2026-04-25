@@ -192,6 +192,12 @@ stripe
 # directory itself. This is required so that !-negations below can re-include
 # specific files. A blanket ".claude/" ignore would shadow all negations.
 # Do not collapse these patterns without reading .claude/rules/bridge-essential.md.
+#
+# Per S307 hardcoded-path directive: workstation-local config such as
+# .claude/settings.local.json (Claude permission entries with //e/... paths)
+# is intentionally NOT tracked here. The blanket .claude/* ignore covers it
+# without needing a separate name-specific rule. Each workstation regenerates
+# its own settings.local.json; do not migrate it across machines.
 .claude/*
 !.claude/settings.json
 !.claude/hooks/
