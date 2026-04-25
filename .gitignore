@@ -50,9 +50,13 @@ MANIFEST
 
 # scripts/lib/ is a TRACKED source directory (canonical-deploy scaling
 # enforcement, S308). The bare `lib/` pattern above catches it as a
-# Python build-artifact convention; this negation restores tracking.
+# Python build-artifact convention; these negations restore tracking
+# for source files only. Bytecode and other generated artifacts under
+# scripts/lib/ remain ignored.
 !scripts/lib/
-!scripts/lib/**
+!scripts/lib/*.py
+scripts/lib/__pycache__/
+scripts/lib/**/*.py[cod]
 .pytest_cache/
 .coverage
 htmlcov/
