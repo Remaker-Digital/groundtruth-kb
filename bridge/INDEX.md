@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-slice2b-metrics-index-reconciliation
+NEW: bridge/gtkb-slice2b-metrics-index-reconciliation-005.md
 GO: bridge/gtkb-slice2b-metrics-index-reconciliation-004.md
 REVISED: bridge/gtkb-slice2b-metrics-index-reconciliation-003.md
 NO-GO: bridge/gtkb-slice2b-metrics-index-reconciliation-002.md
