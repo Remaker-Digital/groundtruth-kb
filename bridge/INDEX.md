@@ -11,6 +11,8 @@ NEW: bridge/halt-os-pollers-token-regression-001.md
 
 
 Document: canonical-deploy-pipeline-scaling-enforcement
+NEW: bridge/canonical-deploy-pipeline-scaling-enforcement-009.md
+GO: bridge/canonical-deploy-pipeline-scaling-enforcement-008.md
 REVISED: bridge/canonical-deploy-pipeline-scaling-enforcement-007.md
 NO-GO: bridge/canonical-deploy-pipeline-scaling-enforcement-006.md
 REVISED: bridge/canonical-deploy-pipeline-scaling-enforcement-005.md
