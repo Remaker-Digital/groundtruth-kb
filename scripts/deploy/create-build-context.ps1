@@ -1,6 +1,10 @@
+# Per S307 hardcoded-path directive: discover repo root from this script's
+# location, not from a hardcoded literal. This file is at scripts/deploy/, so
+# `$PSScriptRoot/..\..` resolves to the repo root regardless of where the
+# checkout lives. `Resolve-Path` normalizes the result.
 $stamp = Get-Date -Format 'yyyyMMddHHmmss'
 $tmp = New-Item -ItemType Directory -Path (Join-Path $env:TEMP "agentred-build-$stamp") -Force
-$root = "E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement"
+$root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 Copy-Item "$root\Dockerfile" $tmp\
 Copy-Item "$root\requirements.txt" $tmp\

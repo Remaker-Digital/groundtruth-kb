@@ -181,11 +181,21 @@ function Invoke-CodexBridgeScan {
         "  - Document: $($_.Name) | Status: $($latest.Status) | File: $($latest.Path)"
     }) -join "`n"
 
+    # Per S307 hardcoded-path directive: external repo paths must be supplied
+    # via environment variable, with no workstation-specific fallback embedded
+    # in active source. Setup is documented in
+    # independent-progress-assessments/bridge-automation/README-ENV-SETUP.md.
+    if ($env:GROUNDTRUTH_KB_PATH -and (Test-Path -LiteralPath $env:GROUNDTRUTH_KB_PATH)) {
+        $GroundtruthKbHint = "If the bridge item targets groundtruth-kb, inspect $($env:GROUNDTRUTH_KB_PATH) for evidence."
+    } else {
+        $GroundtruthKbHint = "If the bridge item targets groundtruth-kb, the cross-repo path is not configured (set GROUNDTRUTH_KB_PATH); flag the item and request owner provide it."
+    }
+
     $prompt = @"
 You are Codex running an automated file bridge scan for Agent Red Customer Engagement.
 
 Workspace:
-E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+$Workspace
 
 THIS SPAWN IS CAPPED to $($SelectedEntries.Count) entry/entries (cap=$MAX_ITEMS_PER_SPAWN, oldest-first selection from a queue of $AttentionCount).
 Process ONLY the entries listed below. Do NOT read bridge/INDEX.md to discover
@@ -205,7 +215,7 @@ For each listed entry:
 Important constraints:
 - Use only the file bridge protocol and `bridge/INDEX.md` for coordination.
 - Respect the project file-safety contract. Only create new bridge review files and make the required targeted bridge/INDEX.md coordination update for processed entries.
-- If the bridge item targets groundtruth-kb, inspect E:\Claude-Playground\CLAUDE-PROJECTS\groundtruth-kb for evidence.
+- $GroundtruthKbHint
 - Favor verification over assumption and cite concrete paths and command results.
 "@
 

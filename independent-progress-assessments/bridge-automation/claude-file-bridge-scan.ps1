@@ -320,11 +320,13 @@ try {
         "  - Document: $($_.Name) | Status: $($latest.Status) | File: $($latest.Path)"
     }) -join "`n"
 
+    # Per S307 hardcoded-path directive: workspace path is interpolated from
+    # $Workspace (resolved at script top from $PSScriptRoot), not hardcoded.
     $prompt = @"
 You are Prime Builder running an automated file bridge scan for Agent Red Customer Engagement.
 
 Workspace:
-E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+$Workspace
 
 THIS SPAWN IS CAPPED to $($selected.Count) entry/entries (cap=$MAX_ITEMS_PER_SPAWN, oldest-first selection from a queue of $($attention.Count)).
 Process ONLY the entries listed below. Do NOT read bridge/INDEX.md to discover

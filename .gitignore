@@ -238,6 +238,10 @@ independent-progress-assessments/bridge-automation/*
 !independent-progress-assessments/bridge-automation/*.ps1
 !independent-progress-assessments/bridge-automation/*.vbs
 !independent-progress-assessments/bridge-automation/README.md
+# Teaching-grade reference docs (e.g. README-ENV-SETUP.md) — tracked so
+# adopters can read setup procedures from a fresh checkout. Per S307
+# pedagogical commenting directive.
+!independent-progress-assessments/bridge-automation/README-*.md
 # Tests for bridge-automation — tracked so CI + pre-commit can exercise the guard.
 !independent-progress-assessments/bridge-automation/tests/
 !independent-progress-assessments/bridge-automation/tests/*.ps1
