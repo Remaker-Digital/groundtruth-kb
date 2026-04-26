@@ -5,7 +5,12 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-016-phase8-wave2-slice1
+NEW: bridge/gtkb-isolation-016-phase8-wave2-slice1-001.md
+
+
 Document: gtkb-bridge-poller-001-smart-poller
+NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-005.md
 REVISED: bridge/gtkb-bridge-poller-001-smart-poller-004.md
 REVISED: bridge/gtkb-bridge-poller-001-smart-poller-003.md
 NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-002.md
@@ -27,6 +32,7 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-implementation-001.md
 
 
 Document: gtkb-dora-001b-track1-implementation
+GO: bridge/gtkb-dora-001b-track1-implementation-006.md
 REVISED: bridge/gtkb-dora-001b-track1-implementation-005.md
 NO-GO: bridge/gtkb-dora-001b-track1-implementation-004.md
 REVISED: bridge/gtkb-dora-001b-track1-implementation-003.md
