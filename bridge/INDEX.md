@@ -5,6 +5,14 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-016-phase8-wave2-implementation
+NEW: bridge/gtkb-isolation-016-phase8-wave2-implementation-001.md
+
+
+Document: gtkb-dora-001b-track1-implementation
+NEW: bridge/gtkb-dora-001b-track1-implementation-001.md
+
+
 Document: gtkb-kb-recovery-s311
 REVISED: bridge/gtkb-kb-recovery-s311-003.md
 NO-GO: bridge/gtkb-kb-recovery-s311-002.md
