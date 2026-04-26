@@ -10,6 +10,7 @@ NEW: bridge/gtkb-adr-isolation-application-placement-001.md
 
 
 Document: gtkb-incident-response
+REVISED: bridge/gtkb-incident-response-003.md
 NO-GO: bridge/gtkb-incident-response-002.md
 NEW: bridge/gtkb-incident-response-001.md
 
