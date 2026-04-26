@@ -10,6 +10,7 @@ NEW: bridge/gtkb-incident-response-001.md
 
 
 Document: gtkb-command-surface-cs1-5
+NEW: bridge/gtkb-command-surface-cs1-5-003.md
 GO: bridge/gtkb-command-surface-cs1-5-002.md
 NEW: bridge/gtkb-command-surface-cs1-5-001.md
 
