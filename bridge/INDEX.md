@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-command-surface
+REVISED: bridge/gtkb-command-surface-003.md
+NO-GO: bridge/gtkb-command-surface-002.md
 NEW: bridge/gtkb-command-surface-001.md
 
 
