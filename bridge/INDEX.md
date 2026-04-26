@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-command-surface-cs1-5
+NEW: bridge/gtkb-command-surface-cs1-5-001.md
+
+
 Document: gtkb-command-surface
 GO: bridge/gtkb-command-surface-004.md
 REVISED: bridge/gtkb-command-surface-003.md
