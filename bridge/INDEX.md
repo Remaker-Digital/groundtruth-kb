@@ -13,6 +13,8 @@ NEW: bridge/gtkb-adr-isolation-application-placement-001.md
 
 
 Document: gtkb-incident-response-ir-0-1
+REVISED: bridge/gtkb-incident-response-ir-0-1-005.md
+NO-GO: bridge/gtkb-incident-response-ir-0-1-004.md
 REVISED: bridge/gtkb-incident-response-ir-0-1-003.md
 NO-GO: bridge/gtkb-incident-response-ir-0-1-002.md
 NEW: bridge/gtkb-incident-response-ir-0-1-001.md
@@ -97,6 +99,7 @@ NEW: bridge/gtkb-dora-001b-track2-implementation-001.md
 
 
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
+VERIFIED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-018.md
 NEW: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-017.md
 NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-016.md
 NEW: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-015.md
