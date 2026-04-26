@@ -69,6 +69,7 @@ NEW: bridge/gtkb-dora-001b-track2-implementation-001.md
 
 
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
+REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-011.md
 GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-010.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-009.md
 NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-008.md
