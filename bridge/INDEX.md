@@ -131,6 +131,7 @@ NEW: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-001.md
 
 
 Document: gtkb-dora-001b-authoritative-deployment-source
+NEW: bridge/gtkb-dora-001b-authoritative-deployment-source-007.md
 GO: bridge/gtkb-dora-001b-authoritative-deployment-source-006.md
 REVISED: bridge/gtkb-dora-001b-authoritative-deployment-source-005.md
 NO-GO: bridge/gtkb-dora-001b-authoritative-deployment-source-004.md
