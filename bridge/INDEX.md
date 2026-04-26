@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-poller-001-smart-poller
+REVISED: bridge/gtkb-bridge-poller-001-smart-poller-004.md
 REVISED: bridge/gtkb-bridge-poller-001-smart-poller-003.md
 NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-002.md
 NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
