@@ -1,0 +1,39 @@
+{
+  "artifact_type": "architecture_decision",
+  "artifact_id": "ADR-ISOLATION-APPLICATION-PLACEMENT-001",
+  "action": "insert",
+  "source_ref": "Upstream commit affa5a0567a64f79bb4c5aae891889d4af50a72a in groundtruth-kb (docs/architecture/adrs/ADR-ISOLATION-APPLICATION-PLACEMENT-001.md); Agent Red bridge bridge/gtkb-adr-isolation-application-placement-004.md (Codex GO).",
+  "full_content": "## Context\n\nGT-KB is an Internal Developer Platform. Adopter applications consume GT-KB's shared infrastructure (specs, work items, bridge protocol, deliberation archive, MemBase, dashboard, hooks, skills). Two filesystem topologies were considered:\n\n- Sibling topology: GT-KB at one path, applications at separate paths (no shared parent). The Phase 9 plan was authored under this topology.\n- Hosted topology: applications live as subdirectories of `<gt-kb-root>/applications/`. GT-KB hosts adopter projects.\n\nThe hosted topology is chosen.\n\n## Decision\n\nAdopter applications adopting GroundTruth-KB live as named subdirectories under `<gt-kb-root>/applications/<name>/`, where `<gt-kb-root>` is the platform's project root and `<name>` is a valid identifier matching `^[A-Za-z][A-Za-z0-9_-]*$`. The application's filesystem boundary is a strict descendant of `<gt-kb-root>/applications/`. The platform retains write authority on its own product artifacts; the application has write authority on its own root and any platform-allowed adopter-owned artifacts as defined by the managed artifact registry.\n\n## Failed Approaches\n\nNo prior implementation attempts. This is a first-application decision rather than a failure correction. The Phase 9 plan paragraph at lines 93-98 of the GTKB-ISOLATION-009 plan document specified a sibling topology, but it was prospective design (never implemented). The supersession by this ADR is a refinement of the plan's prospective direction, not a recovery from a failed attempt.\n\n## Consequences\n\n### Positive\n- IDP semantics: a platform that hosts projects has those projects inside the platform's filesystem boundary. Mirrors how Kubernetes, Backstage, and Heroku-style PaaS organize tenant projects.\n- Cross-root portability not required: harness-adjacent infrastructure (`.claude/`, `.codex/`, `groundtruth.db`, `bridge/`, dashboard, hooks, skills) all resolves from project root via `Path(__file__).resolve().parents[N]`. Apps live inside that root; no portability claim.\n- Mechanical enforcement: `gt project init <name>` creates `<gt-kb-root>/applications/<name>/` and physically cannot land outside.\n- First-migration template: Agent Red establishes the convention; future adopters follow.\n\n### Negative\n- Multi-IDP scenarios (one developer machine hosting multiple GT-KB installations with their own applications/ namespaces) are awkward but possible. Each GT-KB root has its own applications/ subtree.\n- Adopters who would otherwise prefer their app to live elsewhere on the filesystem (e.g., for company-specific repo organization) lose that flexibility.\n\n### Risks\n- Cross-root portability claim might be needed in future (e.g., monorepo separation): mitigated by ADR amendment via successor ADR. Reversible decision.\n- Upstream tooling assumes single applications/ namespace: this is a feature, not a bug. If multi-IDP is ever needed, it requires an explicit superseding ADR.\n\n## Alternatives Considered\n\n| Alternative | Why Rejected |\n|------------|--------------|\n| Sibling topology (per Phase 9 plan paragraph 93-98) | Cross-root portability unvalidated; weaker IDP semantics; the prior plan was prospective, not a tested implementation |\n| Per-project drive separation (separate Windows drive for the application) | Cross-drive operations not atomic on Windows for `os.replace`-style moves; adds complexity to `_common.py`; weaker IDP semantics |\n| Subdirectory of legacy mixed root (e.g., `<gt-kb-root>/.adopters/<name>/`) | Conflates platform internals (dot-prefixed) with adopter projects which are product surface |\n\n## Related Specs\n\n- Supersedes Phase 9 plan paragraph at lines 93-98 of `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-009-PHASE9-ADOPTER-PACKAGING-AND-VALIDATION-PLAN-2026-04-23.md` (Agent Red repository).\n- Bridge thread: `bridge/gtkb-adr-isolation-application-placement-{001,002,003,004}.md` - proposal, NO-GO, REVISED, GO.\n- Bridge thread downstream (pending): `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-013.md` - first migration following this convention.\n\n## Upstream Source-of-Truth\n\nThe authoritative form of this ADR is the markdown file at `docs/architecture/adrs/ADR-ISOLATION-APPLICATION-PLACEMENT-001.md` in the upstream `groundtruth-kb` repository, committed at upstream commit `affa5a0567a64f79bb4c5aae891889d4af50a72a` on 2026-04-26. The Agent Red KB row reflects the same decision for runtime queries and assertion linkage; the upstream commit hash is the immutable cross-repo reference.\n",
+  "full_content_sha256": "c682522806d79d0b27123ac3d2833aaaf83f5e050ab5618df3afe3b16e9e59b8",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Proceed with Option B - Supersede Phase 9 plan: File a formal ADR ADR-ISOLATION-APPLICATION-PLACEMENT-001 capturing the apps-under-GT-KB convention as binding, AND revise the Phase 9 plan to match.",
+  "changed_by": "prime-builder/S310",
+  "change_reason": "Owner-directed Option B (S310 2026-04-26). Adopter-side mirror of upstream ADR at commit affa5a0; per-adopter KB insertion captures the architectural decision for runtime queries.",
+  "approved_by": "owner",
+  "approved_at": "2026-04-26",
+  "approved_in_session": "S310",
+  "upstream_commit_hash": "affa5a0567a64f79bb4c5aae891889d4af50a72a",
+  "upstream_repository": "groundtruth-kb",
+  "upstream_artifact_path": "docs/architecture/adrs/ADR-ISOLATION-APPLICATION-PLACEMENT-001.md",
+  "review_chain": [
+    {
+      "bridge_file": "bridge/gtkb-adr-isolation-application-placement-001.md",
+      "status": "NEW"
+    },
+    {
+      "bridge_file": "bridge/gtkb-adr-isolation-application-placement-002.md",
+      "status": "NO-GO"
+    },
+    {
+      "bridge_file": "bridge/gtkb-adr-isolation-application-placement-003.md",
+      "status": "REVISED"
+    },
+    {
+      "bridge_file": "bridge/gtkb-adr-isolation-application-placement-004.md",
+      "status": "GO"
+    }
+  ],
+  "supersedes": "GTKB-ISOLATION-009 Phase 9 plan paragraph at lines 93-98"
+}
