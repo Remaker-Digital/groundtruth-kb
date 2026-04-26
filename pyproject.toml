@@ -26,6 +26,7 @@ markers = [
     "nats: tests requiring a live NATS JetStream server (nats://localhost:4222)",
     "property: property-based tests using Hypothesis (SPEC-1843)",
     "local_env: tests requiring local environment files (.env.local, SCHEDULE.md, etc.)",
+    "perf: live-repo performance assertions; excluded from default release-candidate gate",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",

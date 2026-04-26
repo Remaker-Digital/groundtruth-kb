@@ -1,0 +1,21 @@
+schema_version = 1
+
+# Stage 1 ships EMPTY production phantoms array.
+# Stage 2 (separate follow-up bridge:
+# gtkb-wrapup-enhancements-slice1-allowlist-baseline-001) classifies
+# the live W2 findings and submits proposed entries inline for Codex
+# spot-check before any are demoted to info-severity.
+#
+# Adding entries requires bridge protocol GO. Each entry carries:
+#   index_line_pattern: the exact INDEX.md line text (whitespace-stripped)
+#                       that cites the missing bridge file
+#   reason: why this is acceptable historical state (cite incident,
+#           comment block, etc.)
+#   codex_review_bridge: the bridge file where Codex GO'd this entry
+#   added_at: ISO8601 date
+#
+# The W2 scanner consults this list at runtime. Allowlisted lines emit
+# info-severity findings; un-allowlisted missing files remain error-severity
+# (the canonical S308 phantom-INDEX class W2 was built to catch).
+
+phantoms = []

@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 23689,
-    "total_files": 519
+    "total_assertions": 23709,
+    "total_files": 522
   },
   "baselines": {
     "tests/agents/plugins/test_agent_extensibility_phase0.py": 71,
@@ -384,6 +384,7 @@
     "tests/ops/test_seed_preset_path.py": 18,
     "tests/ops/test_seed_tenant_specs.py": 63,
     "tests/ops/test_upgrade_verification_specs.py": 33,
+    "tests/perf/test_wrap_scan_hygiene_perf.py": 2,
     "tests/performance/test_concurrent_tenants.py": 19,
     "tests/performance/test_keda_scaling.py": 25,
     "tests/performance/test_performance.py": 117,
@@ -430,7 +431,9 @@
     "tests/scripts/test_standing_backlog_harvest.py": 39,
     "tests/scripts/test_wrap_capture_transcript.py": 9,
     "tests/scripts/test_wrap_scan_consistency.py": 15,
+    "tests/scripts/test_wrap_scan_consistency_allowlist.py": 12,
     "tests/scripts/test_wrap_scan_hygiene.py": 19,
+    "tests/scripts/test_wrap_scan_hygiene_skip_dirs.py": 6,
     "tests/security/test_adversarial.py": 86,
     "tests/security/test_ci_tooling.py": 18,
     "tests/security/test_config_pipeline_live.py": 32,

@@ -28,25 +28,37 @@ unified flow lands.
 ## Procedure
 
 ```bash
+set -euo pipefail
+
 SESSION_ID="${1:-${CURRENT_SESSION:-S000}}"
 SNAP_DIR=".groundtruth/session/snapshots/${SESSION_ID}"
 
 # W0 — capture session manifest (git HEAD, branch, uncommitted, untracked)
 python scripts/wrap_capture_transcript.py --session-id "${SESSION_ID}"
+W0_RC=$?
 
-# W1 — hygiene scan
+# W1 — hygiene scan (severity in JSON; exit 0=info+warn, 2=error)
 python scripts/wrap_scan_hygiene.py \
     --report-format markdown \
-    --write-report "${SNAP_DIR}/wrap-scan-hygiene.md"
+    --write-report "${SNAP_DIR}/wrap-scan-hygiene.md" || W1_RC=$?
+W1_RC="${W1_RC:-0}"
 
-# W2 — cross-artifact consistency scan
+# W2 — cross-artifact consistency scan (same exit-code contract)
 python scripts/wrap_scan_consistency.py \
     --report-format markdown \
-    --write-report "${SNAP_DIR}/wrap-scan-consistency.md"
+    --write-report "${SNAP_DIR}/wrap-scan-consistency.md" || W2_RC=$?
+W2_RC="${W2_RC:-0}"
 
 # Echo reports inline
 cat "${SNAP_DIR}/wrap-scan-hygiene.md"
 cat "${SNAP_DIR}/wrap-scan-consistency.md"
+
+# Aggregate exit code: nonzero if any scanner reported error-severity
+if [ "${W0_RC}" -ne 0 ] || [ "${W1_RC}" -eq 2 ] || [ "${W2_RC}" -eq 2 ]; then
+    echo "Wrap-scan reported error-severity findings; review before invoking /kb-session-wrap" >&2
+    exit 2
+fi
+exit 0
 ```
 
 ## Exit-code contract

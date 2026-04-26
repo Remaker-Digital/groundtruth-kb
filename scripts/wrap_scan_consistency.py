@@ -36,6 +36,12 @@ SEVERITY_ERROR = "error"
 EXIT_OK = 0
 EXIT_ERROR = 2
 
+# Per WRAPUP -011 §2: allowlist for known-acceptable historical phantom-INDEX
+# entries. Stage 1 ships an empty production list; Stage 2 (separate follow-up
+# bridge) populates with reviewed entries. Absent or empty allowlist preserves
+# current behavior (all phantom citations at error-severity).
+ALLOWLIST_PATH_RELATIVE = ".groundtruth/wrap-scan/historical-phantoms.toml"
+
 INDEX_LINE_PATTERN = re.compile(
     r"^\s*(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/[A-Za-z0-9_-]+-\d{3}\.md)\s*$"
 )
@@ -52,10 +58,72 @@ def _finding(check: str, severity: str, message: str, **details: Any) -> dict:
     return {"check": check, "severity": severity, "message": message, **details}
 
 
+def _load_allowlist(project_root: Path) -> dict[str, dict]:
+    """Load historical-phantom allowlist; fail loudly on malformed.
+
+    Per WRAPUP -012 GO conditions: malformed allowlist must fail loudly
+    (raise), not silently default. Absent/empty allowlist returns empty
+    dict and preserves current behavior (all findings at error-severity).
+    """
+    allowlist_path = project_root / ALLOWLIST_PATH_RELATIVE
+    if not allowlist_path.exists():
+        return {}
+    try:
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef,import-not-found]
+        data = tomllib.loads(allowlist_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(
+            f"Allowlist at {ALLOWLIST_PATH_RELATIVE} is malformed; refusing "
+            f"to silently default. Fix or delete the file. Underlying error: {exc}"
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"Allowlist at {ALLOWLIST_PATH_RELATIVE} must be a TOML mapping at the top level."
+        )
+
+    schema_version = data.get("schema_version")
+    if schema_version != 1:
+        raise RuntimeError(
+            f"Allowlist schema_version={schema_version!r}; expected 1. "
+            "Update the allowlist file or this scanner."
+        )
+
+    phantoms = data.get("phantoms", [])
+    if not isinstance(phantoms, list):
+        raise RuntimeError(
+            f"Allowlist 'phantoms' field must be a list; got {type(phantoms).__name__}."
+        )
+
+    by_pattern: dict[str, dict] = {}
+    for entry in phantoms:
+        if not isinstance(entry, dict):
+            raise RuntimeError(
+                f"Allowlist phantom entry must be a mapping; got {type(entry).__name__}: {entry!r}"
+            )
+        pattern = entry.get("index_line_pattern")
+        if not isinstance(pattern, str) or not pattern.strip():
+            raise RuntimeError(
+                f"Allowlist phantom entry missing/invalid 'index_line_pattern': {entry!r}"
+            )
+        by_pattern[pattern.strip()] = entry
+    return by_pattern
+
+
 def check_index_cites_missing_bridge_file(project_root: Path) -> list[dict]:
+    """Detect INDEX lines citing missing bridge files.
+
+    Per WRAPUP -012: matches against the allowlist (loaded via _load_allowlist
+    above). Allowlisted lines emit info-severity finding with reason; un-
+    allowlisted missing files remain error-severity (canonical S308 class).
+    """
     index_path = project_root / "bridge" / "INDEX.md"
     if not index_path.exists():
         return []
+    allowlist = _load_allowlist(project_root)
     findings: list[dict] = []
     for line_no, line in enumerate(index_path.read_text(encoding="utf-8").splitlines(), 1):
         match = INDEX_LINE_PATTERN.match(line)
@@ -63,7 +131,24 @@ def check_index_cites_missing_bridge_file(project_root: Path) -> list[dict]:
             continue
         status, ref = match.groups()
         cited_path = project_root / ref
-        if not cited_path.exists():
+        if cited_path.exists():
+            continue
+        normalized = line.strip()
+        allowlist_entry = allowlist.get(normalized)
+        if allowlist_entry is not None:
+            findings.append(
+                _finding(
+                    "index_cites_missing_bridge_file",
+                    SEVERITY_INFO,
+                    f"INDEX.md line {line_no} cites missing file (allowlisted historical phantom): {ref} ({status})",
+                    line_number=line_no,
+                    status=status,
+                    cited_path=ref,
+                    allowlist_reason=allowlist_entry.get("reason", "(no reason field)"),
+                    codex_review_bridge=allowlist_entry.get("codex_review_bridge"),
+                )
+            )
+        else:
             findings.append(
                 _finding(
                     "index_cites_missing_bridge_file",

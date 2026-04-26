@@ -119,6 +119,8 @@ def _python_gates() -> None:
             "tests/scripts/test_wrap_scan_hygiene.py",
             "tests/scripts/test_wrap_scan_consistency.py",
             "tests/scripts/test_gitignore_session_snapshots.py",
+            "tests/scripts/test_wrap_scan_hygiene_skip_dirs.py",
+            "tests/scripts/test_wrap_scan_consistency_allowlist.py",
             "tests/scripts/test_standing_backlog_harvest.py",
             "tests/integrations/test_commercial_state_store.py",
             "tests/integrations/test_cosmos_schema_extensions.py",

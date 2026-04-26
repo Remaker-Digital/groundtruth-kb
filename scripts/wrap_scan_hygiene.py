@@ -42,13 +42,33 @@ EXIT_OK = 0
 EXIT_ERROR = 2
 
 OLD_PROJECT_ROOT_PATTERNS = (
-    r"E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
-    r"E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement",
+    r"E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement",
+    "E:/Claude-Playground/CLAUDE-PROJECTS/Agent Red Customer Engagement",
 )
 
 # Files to scan for hardcoded-old-root references. Source-only; skip binaries/large.
-SCAN_GLOBS = ("**/*.py", "**/*.md", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml")
-SKIP_DIRS = {".git", "__pycache__", "node_modules", ".groundtruth-chroma", ".tmp.driveupload"}
+# Uses Path.rglob() for recursive walk that always includes direct children.
+SCAN_GLOBS = ("*.py", "*.md", "*.json", "*.toml", "*.yaml", "*.yml")
+
+# Per WRAPUP -011 §4: bound the hardcoded-root scan to source/governance dirs.
+# Excluded by design: bridge/ (proposal prose; legitimate quoting of old paths in
+# historical context), memory/ (operational state), independent-progress-assessments/
+# (review reports), docs/ (published documentation).
+SCAN_ROOTS = (
+    "scripts", "src", "tests", "config", "tools",
+    ".claude/rules", ".claude/skills",
+)
+SCAN_ROOT_FILES = ("CLAUDE.md", "AGENTS.md")
+
+# Per WRAPUP -011 §2.1: expanded SKIP_DIRS for W1 perf bound.
+SKIP_DIRS = frozenset({
+    ".git", "__pycache__", "node_modules",
+    ".groundtruth-chroma", ".tmp.driveupload",
+    "test-results", "test_host", "tmp", "logs", "archive",
+    "agent-red.wiki", "docs-site", "drafts", "img",
+    ".pytest_cache", ".ruff_cache", ".mypy_cache",
+    "dist", "build", "vendor", "playwright-report",
+})
 
 TMP_ARTIFACT_AGE_SECONDS = 24 * 60 * 60  # 24 hours
 TMP_ARTIFACT_SUFFIXES = (".tmp", ".bak", ".orig")
@@ -183,25 +203,48 @@ def check_tmp_artifacts_in_repo(project_root: Path) -> list[dict]:
 
 
 def check_hardcoded_old_project_root(project_root: Path) -> list[dict]:
+    """Scan SCAN_ROOTS + SCAN_ROOT_FILES for old-project-root references.
+
+    Per WRAPUP -011 §2.2/§4: bounded to source/governance directories so
+    scan completes within practical pre-wrap runtime bound. Bridge/memory/
+    docs/ etc. excluded by design (legitimate prose may quote old paths
+    in historical context).
+    """
     findings: list[dict] = []
     pattern = re.compile("|".join(re.escape(p) for p in OLD_PROJECT_ROOT_PATTERNS))
-    for glob in SCAN_GLOBS:
-        for path in project_root.glob(glob):
-            if any(part in SKIP_DIRS for part in path.parts):
-                continue
-            try:
-                text = path.read_text(encoding="utf-8", errors="ignore")
-            except (OSError, UnicodeDecodeError):
-                continue
-            if pattern.search(text):
-                findings.append(
-                    _finding(
-                        "hardcoded_old_project_root",
-                        SEVERITY_WARN,
-                        f"Reference to old project root: {path.relative_to(project_root)}",
-                        path=str(path.relative_to(project_root)),
-                    )
+
+    def _scan_file(path: Path) -> None:
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except (OSError, UnicodeDecodeError):
+            return
+        if pattern.search(text):
+            findings.append(
+                _finding(
+                    "hardcoded_old_project_root",
+                    SEVERITY_WARN,
+                    f"Reference to old project root: {path.relative_to(project_root)}",
+                    path=str(path.relative_to(project_root)),
                 )
+            )
+
+    for root in SCAN_ROOTS:
+        root_path = project_root / root
+        if not root_path.exists():
+            continue
+        for glob in SCAN_GLOBS:
+            for path in root_path.rglob(glob):
+                if any(part in SKIP_DIRS for part in path.parts):
+                    continue
+                if not path.is_file():
+                    continue
+                _scan_file(path)
+
+    for filename in SCAN_ROOT_FILES:
+        path = project_root / filename
+        if path.exists() and path.is_file():
+            _scan_file(path)
+
     return findings
 
 
