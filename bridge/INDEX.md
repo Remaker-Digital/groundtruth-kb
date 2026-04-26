@@ -23,6 +23,7 @@ NEW: bridge/gtkb-command-surface-001.md
 
 
 Document: gtkb-wrapup-enhancements-slice1
+REVISED: bridge/gtkb-wrapup-enhancements-slice1-005.md
 NO-GO: bridge/gtkb-wrapup-enhancements-slice1-004.md
 REVISED: bridge/gtkb-wrapup-enhancements-slice1-003.md
 NO-GO: bridge/gtkb-wrapup-enhancements-slice1-002.md
