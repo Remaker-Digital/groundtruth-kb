@@ -5,7 +5,12 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-incident-response
+NEW: bridge/gtkb-incident-response-001.md
+
+
 Document: gtkb-command-surface-cs1-5
+GO: bridge/gtkb-command-surface-cs1-5-002.md
 NEW: bridge/gtkb-command-surface-cs1-5-001.md
 
 
@@ -17,6 +22,7 @@ NEW: bridge/gtkb-command-surface-001.md
 
 
 Document: gtkb-wrapup-enhancements-slice1
+NO-GO: bridge/gtkb-wrapup-enhancements-slice1-004.md
 REVISED: bridge/gtkb-wrapup-enhancements-slice1-003.md
 NO-GO: bridge/gtkb-wrapup-enhancements-slice1-002.md
 NEW: bridge/gtkb-wrapup-enhancements-slice1-001.md
