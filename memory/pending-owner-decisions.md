@@ -10,6 +10,18 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0012
+  asked_at: 2026-04-26T02:28:41.727244Z
+  question: "separate artifacts  Standing by for direction. The bridge state ("
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 0b94f19641ed6eab
+  resolved_at: 2026-04-26T02:35:00Z
+  resolved_in_session: S310
+  answer: "doc-paragraph false positive; recursive class. Captured fragment is from a Prime Builder closing offering response options ('as a single bridge proposal at scoping level, or as two separate artifacts. Standing by for direction.'). Owner answered organically with 'formulate it as an implementation proposal for a multi-phase project' — consuming the offered options without needing decision archival. Same class as DECISION-0009/0011; further motivating evidence for GTKB-COMMAND-SURFACE class-eliminating approach."
+  notes: "Edited-by-prime-via-owner-direction 2026-04-26T02:35:00Z (owner directed multi-phase proposal drafting)"
+
+
 - id: DECISION-0011
   asked_at: 2026-04-26T00:15:57.816184Z
   question: "e parallel threads. Standing by for direction on which to advance"
@@ -19,7 +31,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S310
   answer: "doc-paragraph false positive; recursive class. Captured fragment is from a Prime Builder statement-form closing line ('Standing by for direction on which to advance first when you next prompt'), explicitly written to be statement-form rather than question-form for FP avoidance. The detector still fired because the literal substring 'direction' appeared. This is now motivating evidence for the GTKB-COMMAND-SURFACE program — heuristic prose detectors over unbounded natural language cannot be tightened to closure."
   notes: "Edited-by-prime-via-owner-direction 2026-04-26T00:20:00Z (owner directed architectural-plan drafting; bulk resolution of cascade)"
-
 - id: DECISION-0010
   asked_at: 2026-04-25T23:59:00.434125Z
   question: "er, not a blocker.  Want me to also revise the Slice 1 NO-GO findings now, or focus this turn entirely on the command-surface design question?"
@@ -29,7 +40,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S310
   answer: "Real question (not FP), asked by Prime Builder. Resolved organically by the owner's subsequent prompts: focus is the architectural-plan / command-surface design question; WRAPUP Slice 1 NO-GO revision is deferred until the architecture lands (since it may reframe what Slice 1 contains). NOT a Phase 7 FP-guard candidate — this category is 'real questions whose answers came in subsequent turns'; the future ::question command would mark them as non-archival."
   notes: "Edited-by-prime-via-owner-direction 2026-04-26T00:20:00Z"
-
 - id: DECISION-0009
   asked_at: 2026-04-25T23:49:08.054986Z
   question: "t demonstrated)\" / \"Awaiting your direction\"). I'll resolve it"
@@ -40,7 +50,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S310
   answer: "doc-paragraph false positive; recursive class. Fragment captured is from Prime Builder's ACKNOWLEDGEMENT of the DECISION-0008 resolution (i.e., the resolution-text of a prior FP became input to the same detector, generating the next FP). This is the canonical example of why the heuristic class cannot be tightened to closure: each FP entry's prose generates the next. Captured into GTKB-STARTUP-ENHANCEMENTS Phase 7 + cited as motivating evidence for the GTKB-COMMAND-SURFACE program."
   notes: "Edited-by-prime-via-owner-direction 2026-04-26T00:20:00Z (bulk resolution of cascade)"
-
 - id: DECISION-0008
   asked_at: 2026-04-25T23:42:57.713172Z
   question: "demonstrated)  ---  Awaiting your direction. Per the fresh-sess"
