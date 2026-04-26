@@ -125,6 +125,7 @@ desktop.ini
 groundtruth.db
 groundtruth.db.backup-*
 groundtruth.db.pre-backfill-*
+groundtruth.db.corrupt-*
 groundtruth (*).db*
 .groundtruth-chroma/
 

@@ -5,6 +5,12 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-kb-recovery-s311
+REVISED: bridge/gtkb-kb-recovery-s311-003.md
+NO-GO: bridge/gtkb-kb-recovery-s311-002.md
+NEW: bridge/gtkb-kb-recovery-s311-001.md
+
+
 Document: gtkb-adr-isolation-application-placement
 GO: bridge/gtkb-adr-isolation-application-placement-004.md
 REVISED: bridge/gtkb-adr-isolation-application-placement-003.md
@@ -13,6 +19,7 @@ NEW: bridge/gtkb-adr-isolation-application-placement-001.md
 
 
 Document: gtkb-incident-response-ir-0-1
+VERIFIED: bridge/gtkb-incident-response-ir-0-1-010.md
 NEW: bridge/gtkb-incident-response-ir-0-1-009.md
 GO: bridge/gtkb-incident-response-ir-0-1-008.md
 REVISED: bridge/gtkb-incident-response-ir-0-1-007.md
