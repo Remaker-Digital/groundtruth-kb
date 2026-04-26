@@ -4,28 +4,42 @@
 # docs/architecture/adrs/ADR-ISOLATION-APPLICATION-PLACEMENT-001.md
 # in upstream groundtruth-kb).
 #
-# Wave 1 ships the structural manifest. Wave 2 fills surface_treatments
-# from the Phase 1 authority matrix after owner answers §3.3 and §3.5.
+# Wave 1 shipped the structural manifest with placeholders.
+# §3.3 + §3.5 owner decisions landed 2026-04-26 (S311) per
+# bridge/gtkb-isolation-016-phase8-wave2-implementation-003.md REVISED.
 
 target_root = "E:/GT-KB/applications/Agent_Red"
 legacy_root = "E:/GT-KB"
 applications_namespace = "E:/GT-KB/applications"
 
-# §3.3 OWNER DECISION REQUIRED — Rehearsal output location.
-# Options: target_child_root | sandbox.
-# Surfaces at Wave 2 boundary. Wave 1 default placeholder.
-output_dir = "OWNER_DECISION_REQUIRED"
+# §3.3 owner decision 2026-04-26 (S311): sandbox dir (clean-room rehearsal).
+# Driver appends ISO timestamp at runtime to produce a unique run-specific
+# path: C:/temp/agent-red-rehearsal-{ISO_TIMESTAMP}/. The path lives
+# outside any cloud-synced location (per the S311 KB recovery incident
+# lessons that motivated the .driveignore patch in commit 12538b97).
+output_dir = "C:/temp/agent-red-rehearsal"
 
-# §3.5 OWNER DECISION REQUIRED — Git strategy for target child root.
-# Options: fresh_repo | clone_with_history_filter | clean_worktree.
-# Surfaces at Wave 2 boundary.
-git_strategy = "OWNER_DECISION_REQUIRED"
+# §3.5 owner decision 2026-04-26 (S311): clone with history filter.
+# Use git filter-repo to extract Agent Red commits into a fresh repo
+# whose root is the Agent_Red sub-tree. Preserves Agent Red authorship
+# and blame at the new root; rewrites SHAs (acceptable trade-off per
+# owner). Pre-condition: Agent Red files are not yet under
+# applications/Agent_Red/ in the legacy root, so the filter must use
+# --path enumeration of current paths plus --path-rename to map each
+# to the new namespace. Wave 2's _path_rewrite sub-script computes
+# the exact path list before invocation.
+git_strategy = "clone_with_history_filter"
+git_filter_command_template = "git filter-repo --path <agent-red-paths-from-_path_rewrite> --path-rename <each-source>:applications/Agent_Red/<each-target>"
 
 # §3.6 OWNER DECISION REQUIRED — Concurrent-session DB reconciliation.
-# Surfaces at Wave 3 boundary.
+# Surfaces at Wave 3 verification matrix boundary; not blocking Wave 2.
 db_reconciliation_strategy = "OWNER_DECISION_REQUIRED"
 
-phase_1_authority_matrix_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE-1-AUTHORITY-MATRIX.md"
+# Authority matrix path corrected per Codex
+# bridge/gtkb-isolation-016-phase8-wave2-implementation-002.md NO-GO:
+# the file lives under the PHASE1-AUTHORITY-MATRIX-PLAN naming with
+# the 2026-04-22 date suffix.
+phase_1_authority_matrix_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
 
 excluded_paths = [
     ".env",
@@ -38,6 +52,13 @@ excluded_paths = [
 python_version = "3.14"
 drift_tolerance = "strict"
 
-# Surface treatments (16 surfaces) populated in Wave 2 from the Phase 1
-# authority matrix. Wave 1 ships an empty placeholder.
+# Surface treatments populated by Wave 2 lane 1 (_inventory.py) at
+# first run, by reading phase_1_authority_matrix_path above and
+# emitting one entry per matrix row. Schema per matrix Required
+# Matrix Shape (surface_id, path, capability, environment, generated,
+# canonical owner, subject authority, access model, verification
+# evidence). Hand-authoring this section is explicitly NOT done in
+# scoping commits because it would duplicate the authority matrix
+# and could drift from it; the inventory lane produces it from the
+# authoritative source.
 [surface_treatments]

@@ -6,18 +6,25 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-db-backup-001-snapshot-daemon
+REVISED: bridge/gtkb-db-backup-001-snapshot-daemon-003.md
+NO-GO: bridge/gtkb-db-backup-001-snapshot-daemon-002.md
 NEW: bridge/gtkb-db-backup-001-snapshot-daemon-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-implementation
+REVISED: bridge/gtkb-isolation-016-phase8-wave2-implementation-003.md
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-implementation-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-implementation-001.md
 
 
 Document: gtkb-dora-001b-track1-implementation
+REVISED: bridge/gtkb-dora-001b-track1-implementation-003.md
+NO-GO: bridge/gtkb-dora-001b-track1-implementation-002.md
 NEW: bridge/gtkb-dora-001b-track1-implementation-001.md
 
 
 Document: gtkb-kb-recovery-s311
+VERIFIED: bridge/gtkb-kb-recovery-s311-004.md
 REVISED: bridge/gtkb-kb-recovery-s311-003.md
 NO-GO: bridge/gtkb-kb-recovery-s311-002.md
 NEW: bridge/gtkb-kb-recovery-s311-001.md
@@ -143,6 +150,7 @@ NEW: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-001.md
 
 
 Document: gtkb-dora-001b-authoritative-deployment-source
+GO: bridge/gtkb-dora-001b-authoritative-deployment-source-008.md
 NEW: bridge/gtkb-dora-001b-authoritative-deployment-source-007.md
 GO: bridge/gtkb-dora-001b-authoritative-deployment-source-006.md
 REVISED: bridge/gtkb-dora-001b-authoritative-deployment-source-005.md
