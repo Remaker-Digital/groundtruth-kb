@@ -6,10 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-adr-isolation-application-placement
+REVISED: bridge/gtkb-adr-isolation-application-placement-003.md
+NO-GO: bridge/gtkb-adr-isolation-application-placement-002.md
 NEW: bridge/gtkb-adr-isolation-application-placement-001.md
 
 
 Document: gtkb-incident-response
+REVISED: bridge/gtkb-incident-response-005.md
+NO-GO: bridge/gtkb-incident-response-004.md
 REVISED: bridge/gtkb-incident-response-003.md
 NO-GO: bridge/gtkb-incident-response-002.md
 NEW: bridge/gtkb-incident-response-001.md
@@ -30,6 +34,8 @@ NEW: bridge/gtkb-command-surface-001.md
 
 
 Document: gtkb-wrapup-enhancements-slice1
+REVISED: bridge/gtkb-wrapup-enhancements-slice1-009.md
+NO-GO: bridge/gtkb-wrapup-enhancements-slice1-008.md
 NEW: bridge/gtkb-wrapup-enhancements-slice1-007.md
 GO: bridge/gtkb-wrapup-enhancements-slice1-006.md
 REVISED: bridge/gtkb-wrapup-enhancements-slice1-005.md
