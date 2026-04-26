@@ -115,12 +115,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"rehearse_isolation: manifest error — {exc}", file=sys.stderr)
         return EXIT_USAGE
 
-    # Hash-set drift check (Wave 1: capture only; comparison against stored
-    # baseline is Wave 3 verification).
-    if not args.accept_drift:
-        # Walk legacy root for hash-set; in Wave 1 this is a no-op verification
-        # placeholder (the real comparison wires in Wave 3).
-        _ = hash_set_walk(LEGACY_ROOT)
+    # Per Codex `-016` finding: do NOT walk the legacy root in default
+    # execution. The walk is expensive (>120s on live repo) and Wave 1's
+    # role is to ship a safe skeleton, not exercise drift. Wave 3 will
+    # introduce real drift comparison via an explicit `drift-check` phase.
+    # The `--accept-drift` flag is preserved for forward compatibility.
 
     # Wave 1: dispatch is a stub. Sub-scripts file in Wave 2 after owner
     # decisions §3.3 / §3.5 surface.

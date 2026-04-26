@@ -252,6 +252,9 @@ independent-progress-assessments/*
 !independent-progress-assessments/CODEX-INSIGHT-DROPBOX/
 independent-progress-assessments/CODEX-INSIGHT-DROPBOX/*
 !independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-*.md
+!independent-progress-assessments/CODEX-INSIGHT-DROPBOX/rehearsal/
+independent-progress-assessments/CODEX-INSIGHT-DROPBOX/rehearsal/*
+!independent-progress-assessments/CODEX-INSIGHT-DROPBOX/rehearsal/manifest.toml
 !independent-progress-assessments/bridge-automation/
 independent-progress-assessments/bridge-automation/*
 !independent-progress-assessments/bridge-automation/*.ps1

@@ -1,0 +1,43 @@
+# GTKB-ISOLATION-016 Phase 8 rehearsal manifest.
+# Authority: ADR-ISOLATION-APPLICATION-PLACEMENT-001 (upstream commit
+# affa5a0567a64f79bb4c5aae891889d4af50a72a; authoritative form at
+# docs/architecture/adrs/ADR-ISOLATION-APPLICATION-PLACEMENT-001.md
+# in upstream groundtruth-kb).
+#
+# Wave 1 ships the structural manifest. Wave 2 fills surface_treatments
+# from the Phase 1 authority matrix after owner answers §3.3 and §3.5.
+
+target_root = "E:/GT-KB/applications/Agent_Red"
+legacy_root = "E:/GT-KB"
+applications_namespace = "E:/GT-KB/applications"
+
+# §3.3 OWNER DECISION REQUIRED — Rehearsal output location.
+# Options: target_child_root | sandbox.
+# Surfaces at Wave 2 boundary. Wave 1 default placeholder.
+output_dir = "OWNER_DECISION_REQUIRED"
+
+# §3.5 OWNER DECISION REQUIRED — Git strategy for target child root.
+# Options: fresh_repo | clone_with_history_filter | clean_worktree.
+# Surfaces at Wave 2 boundary.
+git_strategy = "OWNER_DECISION_REQUIRED"
+
+# §3.6 OWNER DECISION REQUIRED — Concurrent-session DB reconciliation.
+# Surfaces at Wave 3 boundary.
+db_reconciliation_strategy = "OWNER_DECISION_REQUIRED"
+
+phase_1_authority_matrix_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE-1-AUTHORITY-MATRIX.md"
+
+excluded_paths = [
+    ".env",
+    ".env.local",
+    "secrets/",
+    "groundtruth-artifacts/secrets/",
+    ".tmp.driveupload/",
+]
+
+python_version = "3.14"
+drift_tolerance = "strict"
+
+# Surface treatments (16 surfaces) populated in Wave 2 from the Phase 1
+# authority matrix. Wave 1 ships an empty placeholder.
+[surface_treatments]
