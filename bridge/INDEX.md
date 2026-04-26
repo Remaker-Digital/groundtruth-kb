@@ -36,6 +36,8 @@ NEW: bridge/gtkb-command-surface-001.md
 
 
 Document: gtkb-wrapup-enhancements-slice1
+NEW: bridge/gtkb-wrapup-enhancements-slice1-013.md
+GO: bridge/gtkb-wrapup-enhancements-slice1-012.md
 REVISED: bridge/gtkb-wrapup-enhancements-slice1-011.md
 NO-GO: bridge/gtkb-wrapup-enhancements-slice1-010.md
 REVISED: bridge/gtkb-wrapup-enhancements-slice1-009.md
@@ -88,6 +90,7 @@ NEW: bridge/gtkb-dora-001b-track2-implementation-001.md
 
 
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
+GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-014.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-013.md
 NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-012.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-011.md
