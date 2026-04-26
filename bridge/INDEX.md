@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-db-backup-001-snapshot-daemon
+NEW: bridge/gtkb-db-backup-001-snapshot-daemon-001.md
+
+
 Document: gtkb-isolation-016-phase8-wave2-implementation
 NEW: bridge/gtkb-isolation-016-phase8-wave2-implementation-001.md
 
