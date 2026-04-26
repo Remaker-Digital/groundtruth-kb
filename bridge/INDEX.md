@@ -6,12 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-command-surface
+GO: bridge/gtkb-command-surface-004.md
 REVISED: bridge/gtkb-command-surface-003.md
 NO-GO: bridge/gtkb-command-surface-002.md
 NEW: bridge/gtkb-command-surface-001.md
 
 
 Document: gtkb-wrapup-enhancements-slice1
+REVISED: bridge/gtkb-wrapup-enhancements-slice1-003.md
 NO-GO: bridge/gtkb-wrapup-enhancements-slice1-002.md
 NEW: bridge/gtkb-wrapup-enhancements-slice1-001.md
 
