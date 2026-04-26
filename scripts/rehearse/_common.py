@@ -24,6 +24,37 @@ TARGET_ROOT_DEFAULT: Path = APPLICATIONS_NAMESPACE / "Agent_Red"
 """Default target root for Agent Red rehearsal per ADR + S310 owner directive."""
 
 
+# Wave 2 Slice 1 validation constants (per
+# bridge/gtkb-isolation-016-phase8-wave2-slice1-002.md GO).
+
+_OUTPUT_DIR_ALLOWLIST_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^[A-Z]:[/\\]temp[/\\]agent-red-rehearsal", re.IGNORECASE),
+    re.compile(r"^/tmp/agent-red-rehearsal"),
+)
+
+_OUTPUT_DIR_ALLOWLIST_DESC: str = (
+    "C:/temp/agent-red-rehearsal* or /tmp/agent-red-rehearsal* "
+    "(extend _OUTPUT_DIR_ALLOWLIST_PATTERNS for additional sandbox paths)"
+)
+
+_VALID_GIT_STRATEGIES: frozenset[str] = frozenset(
+    {"fresh_repo", "clone_with_history_filter", "clean_worktree"}
+)
+
+_CLONE_FILTER_REQUIRED_PLACEHOLDERS: tuple[str, ...] = (
+    "<agent-red-paths-from-_path_rewrite>",
+    "<each-source>",
+    "<each-target>",
+    "git filter-repo --path",
+)
+
+
+def _is_allowed_output_dir(path: Path) -> bool:
+    """Return True iff ``path`` matches one of the sandbox allowlist patterns."""
+    s = str(path)
+    return any(p.match(s) for p in _OUTPUT_DIR_ALLOWLIST_PATTERNS)
+
+
 # Per `-013` §2: explicit blocklist enumeration. Each entry is a top-level
 # directory at <gt-kb-root>/<name>/ that contains Agent Red content mixed
 # with or alongside GT-KB infrastructure. Adding new entries requires
@@ -76,6 +107,14 @@ class TargetRootError(ValueError):
 
 class ManifestError(ValueError):
     """Raised when the rehearsal manifest is malformed or self-inconsistent."""
+
+
+class ManifestValidationError(ManifestError):
+    """Raised when a loaded manifest violates a Wave 2 validation rule (M1-M5).
+
+    Subclasses ``ManifestError`` so callers that catch ``ManifestError`` continue
+    to work without modification (no breaking change for Wave 1 call sites).
+    """
 
 
 def is_within(child: Path, ancestor: Path) -> bool:
@@ -190,8 +229,19 @@ def hash_set_walk(root: Path, ignored_top_level: frozenset[str] | None = None) -
     return result
 
 
-def load_manifest(path: Path) -> dict[str, Any]:
-    """Load the rehearsal TOML manifest. Validates ADR-required fields."""
+def load_manifest(path: Path, *, wave: int = 1) -> dict[str, Any]:
+    """Load the rehearsal TOML manifest. Validates ADR-required fields.
+
+    The ``wave`` keyword (default 1) preserves Wave 1 driver behavior. Pass
+    ``wave=2`` to enforce the Slice 1 validation rules M1-M5; pass ``wave=3``
+    to additionally reject the unresolved ``db_reconciliation_strategy``
+    placeholder.
+
+    Per ``bridge/gtkb-isolation-016-phase8-wave2-slice1-002.md`` GO:
+    Wave 2 guarantees apply only to call sites that explicitly pass
+    ``wave=2`` or later. The mere existence of this helper does not mean
+    every consumer has been validated.
+    """
     if not path.exists():
         raise ManifestError(f"manifest not found at {path}")
     try:
@@ -229,5 +279,105 @@ def load_manifest(path: Path) -> dict[str, Any]:
             f"manifest.target_root ({target}) must be a descendant of "
             f"applications_namespace ({namespace})"
         )
+
+    # Wave 2 validation rules M1-M5 per Slice 1 GO -002.
+    # Gated by the ``wave`` parameter so Wave 1 callers retain existing behavior.
+    if wave >= 2:
+        # Rule M1 — No OWNER_DECISION_REQUIRED placeholders in fields blocking
+        # the requested wave. db_reconciliation_strategy surfaces at wave>=3
+        # (Wave 3 verification matrix boundary), not Wave 2.
+        for blocking_field in ("output_dir", "git_strategy"):
+            value = data.get(blocking_field)
+            if value == "OWNER_DECISION_REQUIRED":
+                raise ManifestValidationError(
+                    f"M1: manifest.{blocking_field} = 'OWNER_DECISION_REQUIRED' "
+                    f"blocks Wave {wave}; resolve owner decision before re-running."
+                )
+        if wave >= 3:
+            if data.get("db_reconciliation_strategy") == "OWNER_DECISION_REQUIRED":
+                raise ManifestValidationError(
+                    "M1: manifest.db_reconciliation_strategy = "
+                    "'OWNER_DECISION_REQUIRED' blocks Wave 3; resolve §3.6 "
+                    "owner decision before re-running."
+                )
+
+        # Rule M2 — output_dir safety: must not be under LEGACY_ROOT or
+        # TARGET_ROOT_DEFAULT; must match the sandbox allowlist.
+        output_dir_str = data.get("output_dir")
+        if not isinstance(output_dir_str, str):
+            raise ManifestValidationError(
+                "M2: manifest.output_dir must be a string"
+            )
+        output_dir = Path(output_dir_str)
+        # Check TARGET_ROOT_DEFAULT before LEGACY_ROOT because the former is a
+        # strict subset of the latter; the more specific error is more useful
+        # to the operator.
+        if is_within(output_dir, TARGET_ROOT_DEFAULT):
+            raise ManifestValidationError(
+                f"M2: manifest.output_dir ({output_dir}) cannot be under "
+                f"TARGET_ROOT_DEFAULT ({TARGET_ROOT_DEFAULT}); must be a "
+                f"sandbox path."
+            )
+        if is_within(output_dir, LEGACY_ROOT):
+            raise ManifestValidationError(
+                f"M2: manifest.output_dir ({output_dir}) cannot be under "
+                f"LEGACY_ROOT ({LEGACY_ROOT}); must be a sandbox path."
+            )
+        if not _is_allowed_output_dir(output_dir):
+            raise ManifestValidationError(
+                f"M2: manifest.output_dir ({output_dir}) does not match the "
+                f"sandbox allowlist; permitted patterns: "
+                f"{_OUTPUT_DIR_ALLOWLIST_DESC}."
+            )
+
+        # Rule M3 — git_strategy must be valid; clone_with_history_filter
+        # requires git_filter_command_template with required placeholders.
+        git_strategy = data.get("git_strategy")
+        if git_strategy not in _VALID_GIT_STRATEGIES:
+            raise ManifestValidationError(
+                f"M3: manifest.git_strategy = {git_strategy!r} not in "
+                f"{sorted(_VALID_GIT_STRATEGIES)}."
+            )
+        if git_strategy == "clone_with_history_filter":
+            template = data.get("git_filter_command_template", "")
+            if not isinstance(template, str):
+                raise ManifestValidationError(
+                    "M3: manifest.git_filter_command_template must be a "
+                    "string when git_strategy = 'clone_with_history_filter'."
+                )
+            for required in _CLONE_FILTER_REQUIRED_PLACEHOLDERS:
+                if required not in template:
+                    raise ManifestValidationError(
+                        f"M3: manifest.git_filter_command_template missing "
+                        f"required placeholder {required!r} for "
+                        f"clone_with_history_filter."
+                    )
+
+        # Rule M4 — phase_1_authority_matrix_path must exist relative to
+        # repo root.
+        matrix_path_str = data.get("phase_1_authority_matrix_path")
+        if not isinstance(matrix_path_str, str):
+            raise ManifestValidationError(
+                "M4: manifest.phase_1_authority_matrix_path must be a string."
+            )
+        matrix_path = LEGACY_ROOT / matrix_path_str
+        if not matrix_path.exists():
+            raise ManifestValidationError(
+                f"M4: manifest.phase_1_authority_matrix_path resolves to "
+                f"{matrix_path} which does not exist on disk."
+            )
+
+        # Rule M5 — surface_treatments allowed empty for the Wave 2 source
+        # manifest (Slice 1 scope). Slice 2 will add the runtime-manifest
+        # non-empty enforcement via an ``is_runtime_manifest`` kwarg per the
+        # Slice 1 GO -002 sequencing condition.
+        surface_treatments = data.get("surface_treatments")
+        if surface_treatments is None:
+            data["surface_treatments"] = {}
+        elif not isinstance(surface_treatments, dict):
+            raise ManifestValidationError(
+                "M5: manifest.surface_treatments must be a TOML table "
+                "(dict in Python) when present."
+            )
 
     return data
