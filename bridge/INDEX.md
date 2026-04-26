@@ -5,11 +5,17 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-adr-isolation-application-placement
+NEW: bridge/gtkb-adr-isolation-application-placement-001.md
+
+
 Document: gtkb-incident-response
+NO-GO: bridge/gtkb-incident-response-002.md
 NEW: bridge/gtkb-incident-response-001.md
 
 
 Document: gtkb-command-surface-cs1-5
+VERIFIED: bridge/gtkb-command-surface-cs1-5-004.md
 NEW: bridge/gtkb-command-surface-cs1-5-003.md
 GO: bridge/gtkb-command-surface-cs1-5-002.md
 NEW: bridge/gtkb-command-surface-cs1-5-001.md
@@ -23,6 +29,7 @@ NEW: bridge/gtkb-command-surface-001.md
 
 
 Document: gtkb-wrapup-enhancements-slice1
+GO: bridge/gtkb-wrapup-enhancements-slice1-006.md
 REVISED: bridge/gtkb-wrapup-enhancements-slice1-005.md
 NO-GO: bridge/gtkb-wrapup-enhancements-slice1-004.md
 REVISED: bridge/gtkb-wrapup-enhancements-slice1-003.md
@@ -69,6 +76,7 @@ NEW: bridge/gtkb-dora-001b-track2-implementation-001.md
 
 
 Document: gtkb-isolation-016-phase8-rehearsal-implementation
+NO-GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-012.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-011.md
 GO: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-010.md
 REVISED: bridge/gtkb-isolation-016-phase8-rehearsal-implementation-009.md
