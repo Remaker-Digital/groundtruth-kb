@@ -229,6 +229,9 @@ stripe
 !.claude/skills/*/scripts/*.py
 !.claude/skills/*/helpers/
 !.claude/skills/*/helpers/*.py
+!.claude/commands/
+.claude/commands/*
+!.claude/commands/registry.json
 
 .kiro/
 cookies.txt
