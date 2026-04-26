@@ -346,6 +346,7 @@ scripts/pre-flight-results/
 # stale-aware view of already-generated dashboard artifacts. Keeping the root
 # ignored also prevents accidental promotion of overlay contents to truth.
 .groundtruth/session/overlays/
+.groundtruth/session/snapshots/
 
 # Ephemeral session/evaluation artifacts
 PRODUCTION-READINESS-ASSESSMENT.md
