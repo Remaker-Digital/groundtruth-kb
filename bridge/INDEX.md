@@ -5,19 +5,26 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-bridge-poller-001-smart-poller
+NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
+
+
 Document: gtkb-db-backup-001-snapshot-daemon
+GO: bridge/gtkb-db-backup-001-snapshot-daemon-004.md
 REVISED: bridge/gtkb-db-backup-001-snapshot-daemon-003.md
 NO-GO: bridge/gtkb-db-backup-001-snapshot-daemon-002.md
 NEW: bridge/gtkb-db-backup-001-snapshot-daemon-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-implementation
+GO: bridge/gtkb-isolation-016-phase8-wave2-implementation-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-implementation-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-implementation-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-implementation-001.md
 
 
 Document: gtkb-dora-001b-track1-implementation
+NO-GO: bridge/gtkb-dora-001b-track1-implementation-004.md
 REVISED: bridge/gtkb-dora-001b-track1-implementation-003.md
 NO-GO: bridge/gtkb-dora-001b-track1-implementation-002.md
 NEW: bridge/gtkb-dora-001b-track1-implementation-001.md
