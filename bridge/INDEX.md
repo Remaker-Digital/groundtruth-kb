@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-016-phase8-wave2-slice4
+NEW: bridge/gtkb-isolation-016-phase8-wave2-slice4-001.md
+
+
 Document: gtkb-isolation-016-phase8-wave2-slice3
 VERIFIED: bridge/gtkb-isolation-016-phase8-wave2-slice3-006.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice3-005.md
