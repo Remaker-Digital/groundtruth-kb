@@ -5,6 +5,19 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-bridge-poller-p1-detector
+NEW: bridge/gtkb-bridge-poller-p1-detector-001.md
+
+
+Document: gtkb-bridge-poller-001-smart-poller
+REVISED: bridge/gtkb-bridge-poller-001-smart-poller-006.md
+NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-005.md
+REVISED: bridge/gtkb-bridge-poller-001-smart-poller-004.md
+REVISED: bridge/gtkb-bridge-poller-001-smart-poller-003.md
+NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-002.md
+NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
+
+
 Document: generator-hardening-001
 REVISED: bridge/generator-hardening-001-003.md
 NO-GO: bridge/generator-hardening-001-002.md
@@ -169,14 +182,6 @@ VERIFIED: bridge/gtkb-isolation-016-phase8-wave2-slice1-004.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice1-003.md
 GO: bridge/gtkb-isolation-016-phase8-wave2-slice1-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice1-001.md
-
-
-Document: gtkb-bridge-poller-001-smart-poller
-NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-005.md
-REVISED: bridge/gtkb-bridge-poller-001-smart-poller-004.md
-REVISED: bridge/gtkb-bridge-poller-001-smart-poller-003.md
-NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-002.md
-NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
 
 
 Document: gtkb-db-backup-001-snapshot-daemon
