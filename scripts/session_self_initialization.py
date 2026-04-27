@@ -18,6 +18,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# UTF-8 stdout/stderr reconfigure per bridge/gtkb-startup-evidence-restoration-002.md GO.
+# Prevents UnicodeEncodeError when SessionStart hook emits non-ASCII via
+# json.dumps(..., ensure_ascii=False) at the two _emit hook-context paths
+# (~line 4900 and ~line 5103). Without this, Windows fresh-session hook
+# execution fails on cp1252 default stdout when PYTHONIOENCODING is unset.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 try:
     from scripts.workstream_focus import (
         CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,
@@ -183,7 +199,10 @@ def _role_metadata(
         role_record_path=role_record_path,
     )
     metadata["role_mapping_source"] = mapping_source
-    if role_profile in {"prime-builder", "loyal-opposition"} and mapping_source != OPERATING_ROLE_RELATIVE_PATH.as_posix():
+    if (
+        role_profile in {"prime-builder", "loyal-opposition"}
+        and mapping_source != OPERATING_ROLE_RELATIVE_PATH.as_posix()
+    ):
         metadata["role_assignment"] = metadata["role_assignment"].replace(
             "durable operating-role record",
             "durable harness-local operating-role record",
@@ -803,9 +822,7 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
         "specifications": {
             "current_total": len(agent_red_specs),
             "raw_current_total": len(specifications),
-            "status_counts": dict(
-                sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())
-            ),
+            "status_counts": dict(sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())),
             "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in agent_red_specs).items())),
             "scope_counts": _scope_counts(specifications),
             "scope_confidence": "agent_red_current_heuristic",
@@ -816,9 +833,7 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
             ),
             "open_work_items": len(open_work_items),
             "raw_open_work_items": sum(
-                1
-                for row in work_items
-                if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
+                1 for row in work_items if str(row.get("resolution_status") or "") in NON_TERMINAL_WORK_ITEM_STATUSES
             ),
             "test_records": len(agent_red_tests),
             "test_procedure_records": test_procedures_count,
@@ -3237,7 +3252,16 @@ def _markdown_url_link(url: str) -> str:
 # GO at -006). Re-imported here as a module-level alias so the four
 # existing call sites at lines ~2744, ~4886, ~4891, ~4892 continue to
 # resolve to the same function object without behavior change.
-from _wrap_io import _atomic_write_text  # noqa: E402,F401
+#
+# sys.path conditional insert per bridge/gtkb-startup-evidence-restoration-002.md
+# GO (S313): the test loader (importlib.util.spec_from_file_location) does
+# not add scripts/ to sys.path, so the bare `from _wrap_io` import fails
+# with ModuleNotFoundError. Conditional-insert avoids duplicating the path
+# on repeated test loads. Reuses top-level `sys` and `Path` imports.
+_scripts_dir = str(Path(__file__).resolve().parent)
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+from _wrap_io import _atomic_write_text  # noqa: E402,F401,I001
 
 
 # Pending owner-decisions surfacing
@@ -3316,7 +3340,7 @@ def _parse_pending_block(text: str) -> list[dict[str, str]]:
         if stripped.startswith("- id: "):
             if current is not None:
                 entries.append(current)
-            current = {"id": stripped[len("- id: "):].strip(), "options": []}
+            current = {"id": stripped[len("- id: ") :].strip(), "options": []}
             in_options = False
             continue
         if current is None:
@@ -3325,7 +3349,7 @@ def _parse_pending_block(text: str) -> list[dict[str, str]]:
             in_options = True
             continue
         if in_options and raw_line.startswith("    - "):
-            opt = _unquote_pending_value(raw_line[len("    - "):])
+            opt = _unquote_pending_value(raw_line[len("    - ") :])
             opts_field = current.get("options")
             if isinstance(opts_field, list):
                 opts_field.append(opt)
@@ -3352,8 +3376,8 @@ def _parse_pending_block(text: str) -> list[dict[str, str]]:
 
 
 def _unquote_pending_value(value: str) -> str:
-    if value.startswith("\"") and value.endswith("\"") and len(value) >= 2:
-        return value[1:-1].replace("\\\"", "\"").replace("\\\\", "\\")
+    if value.startswith('"') and value.endswith('"') and len(value) >= 2:
+        return value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
     return value
 
 
@@ -4920,7 +4944,9 @@ def _source_file_observation(project_root: Path, relative_path: str, *, required
 
 def _workflow_inventory_observation(project_root: Path, *, required: bool = True) -> dict[str, Any]:
     workflows_dir = project_root / ".github" / "workflows"
-    workflow_files = sorted([*workflows_dir.glob("*.yml"), *workflows_dir.glob("*.yaml")]) if workflows_dir.is_dir() else []
+    workflow_files = (
+        sorted([*workflows_dir.glob("*.yml"), *workflows_dir.glob("*.yaml")]) if workflows_dir.is_dir() else []
+    )
     latest_modified_at = None
     if workflow_files:
         latest_mtime = max(path.stat().st_mtime for path in workflow_files)
@@ -4999,9 +5025,7 @@ def _startup_freshness_metadata(
         and report_origin == "in_memory_model_render"
     )
     live_probe_gaps = [probe["source"] for probe in live_probes if probe.get("status") != "queried"]
-    validation_status = (
-        "invalid" if not startup_payload_fresh else "fresh_with_gaps" if live_probe_gaps else "fresh"
-    )
+    validation_status = "invalid" if not startup_payload_fresh else "fresh_with_gaps" if live_probe_gaps else "fresh"
     checks = [
         {
             "name": "generated_at_is_not_older_than_request",
@@ -5285,9 +5309,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if startup_emit_requested:
         try:
-            current_subject_for_guard: str | None = str(
-                startup_focus_snapshot(project_root).get("current_focus") or ""
-            ) or None
+            current_subject_for_guard: str | None = (
+                str(startup_focus_snapshot(project_root).get("current_focus") or "") or None
+            )
         except Exception:
             current_subject_for_guard = None
         _arm_startup_interaction_guard(
