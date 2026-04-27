@@ -94,6 +94,53 @@ def build_split_summary(buckets: dict[str, list[Any]]) -> dict[str, int]:
     }
 
 
+_DEFAULT_ADOPTER_CONTENT_MARKERS: tuple[str, ...] = (
+    "agent red",
+    "agent_red",
+    "adopter migration",
+    "adopter rehearsal",
+)
+
+
+def classify_with_content_override(
+    item_id: str,
+    content_text: str,
+    *,
+    adopter_content_markers: tuple[str, ...] = _DEFAULT_ADOPTER_CONTENT_MARKERS,
+) -> tuple[str, str]:
+    """Classify by ID prefix with adopter-content conflict routing.
+
+    Per Slice 5 ``-004`` F1 + Slice 6 ``-002`` F2: ``GTKB-*`` plus
+    explicit adopter content is a *conflict signal*, not enough by
+    itself to prove adopter ownership. Conflicts route to
+    ``unclassified`` with signal ``gtkb_prefix_with_adopter_content``
+    so Wave 3 has actionable evidence rather than silent
+    auto-classification.
+
+    Returns ``(classification, signal)``:
+
+    - ``AR-*`` prefix → ``('adopter', 'ar_prefix')``
+    - ``GTKB-*`` prefix + adopter content → ``('unclassified',
+      'gtkb_prefix_with_adopter_content')``
+    - ``GTKB-*`` prefix + no adopter content → ``('framework',
+      'gtkb_prefix')``
+    - Unknown prefix → ``('unclassified', 'unknown_prefix')``
+
+    Per Slice 6 ``-004`` GO condition 3: this helper is for ID-prefixed
+    artifacts (specs, work items, deliberations). DOC records do NOT
+    follow the GTKB-/AR- prefix structure and need a separate
+    domain-specific classifier in their consuming lane.
+    """
+    if item_id.startswith(_ADOPTER_PREFIX):
+        return ("adopter", "ar_prefix")
+    if item_id.startswith(_FRAMEWORK_PREFIX):
+        blob = content_text.lower()
+        if any(m in blob for m in adopter_content_markers):
+            return ("unclassified", "gtkb_prefix_with_adopter_content")
+        return ("framework", "gtkb_prefix")
+    return ("unclassified", "unknown_prefix")
+
+
 def emit_result(lane_dir: Path, result: dict[str, Any]) -> dict[str, Any]:
     """Write the structured result to ``{lane_dir}/result.json``.
 

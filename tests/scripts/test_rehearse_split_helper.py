@@ -71,6 +71,32 @@ def test_build_split_summary_counts_per_bucket() -> None:
     }
 
 
+def test_classify_with_content_override_routes_gtkb_prefix_conflict_to_unclassified() -> None:
+    """Per Slice 5 -004 F1 + Slice 6 -002 F2: GTKB-* + adopter content
+    conflict goes to unclassified, NOT silent adopter override."""
+    classification, signal = _split_helper.classify_with_content_override(
+        "GTKB-MIXED-001",
+        "Some text mentioning Agent Red migration tooling.",
+    )
+    assert classification == "unclassified"
+    assert signal == "gtkb_prefix_with_adopter_content"
+
+
+def test_classify_with_content_override_keeps_clean_gtkb_as_framework() -> None:
+    classification, signal = _split_helper.classify_with_content_override(
+        "GTKB-CLEAN-001",
+        "Pure framework spec with no adopter mentions.",
+    )
+    assert classification == "framework"
+    assert signal == "gtkb_prefix"
+
+
+def test_classify_with_content_override_ar_prefix_returns_adopter() -> None:
+    classification, signal = _split_helper.classify_with_content_override("AR-DASH-001", "")
+    assert classification == "adopter"
+    assert signal == "ar_prefix"
+
+
 def test_emit_result_writes_file_and_self_references(tmp_path: Path) -> None:
     """result.json is written and its path appears in output_files."""
     lane_dir = tmp_path / "lane"
