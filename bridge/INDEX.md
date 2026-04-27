@@ -31,6 +31,7 @@ NEW: bridge/gtkb-startup-evidence-restoration-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice11
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice11-006.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice11-005.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice11-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice11-003.md
@@ -39,6 +40,7 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-slice11-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice10
+GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-006.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice10-005.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice10-003.md
@@ -65,6 +67,7 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-slice8-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice7
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-008.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice7-007.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-006.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice7-005.md
