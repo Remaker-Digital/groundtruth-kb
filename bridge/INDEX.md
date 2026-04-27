@@ -31,6 +31,7 @@ NEW: bridge/gtkb-startup-evidence-restoration-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice11
+VERIFIED: bridge/gtkb-isolation-016-phase8-wave2-slice11-016.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice11-015.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice11-014.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice11-013.md
