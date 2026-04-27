@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 23883,
-    "total_files": 526
+    "total_assertions": 23961,
+    "total_files": 529
   },
   "baselines": {
     "tests/agents/plugins/test_agent_extensibility_phase0.py": 71,
@@ -425,10 +425,13 @@
     "tests/scripts/test_harvest_loud_wrap.py": 23,
     "tests/scripts/test_harvest_session_thread_level.py": 32,
     "tests/scripts/test_memory_md_ceiling.py": 1,
+    "tests/scripts/test_rehearse_backlog_split.py": 31,
+    "tests/scripts/test_rehearse_bridge_split.py": 32,
     "tests/scripts/test_rehearse_common_validation.py": 15,
     "tests/scripts/test_rehearse_inventory.py": 33,
     "tests/scripts/test_rehearse_isolation.py": 44,
     "tests/scripts/test_rehearse_path_rewrite.py": 82,
+    "tests/scripts/test_rehearse_split_helper.py": 15,
     "tests/scripts/test_release_candidate_gate.py": 22,
     "tests/scripts/test_retroactive_harvest_bridge_threads.py": 68,
     "tests/scripts/test_session_self_initialization.py": 461,
