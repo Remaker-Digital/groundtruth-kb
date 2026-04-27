@@ -69,6 +69,27 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: 98750599ecd09cd6
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0038
+  asked_at: 2026-04-27T06:42:35.876853Z
+  question: "e resuming Wave 2.  Standing by for direction."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: c1d89c2c4e056ced
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0039
+  asked_at: 2026-04-27T06:51:22.853708Z
+  question: "d like to surface.  Standing by for direction."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 3c287c647e426cbe
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0040
+  asked_at: 2026-04-27T08:37:18.827636Z
+  question: "─────────────────`  Standing by for direction."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 20c3584dccf20edd
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
