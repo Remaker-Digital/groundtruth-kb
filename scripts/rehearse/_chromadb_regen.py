@@ -183,11 +183,7 @@ def _load_membase_partition_manifest(output_dir: Path) -> dict[str, str]:
     except (OSError, json.JSONDecodeError):
         return {}
     records = data.get("records", []) if isinstance(data, dict) else []
-    return {
-        r["id"]: r.get("classification", "unclassified")
-        for r in records
-        if isinstance(r, dict) and "id" in r
-    }
+    return {r["id"]: r.get("classification", "unclassified") for r in records if isinstance(r, dict) and "id" in r}
 
 
 # ---- Byte-stable safety ----------------------------------------------
@@ -255,13 +251,8 @@ def _build_collection_summary(
         tier1 = _classify_origin_project(chunk_metadata.get("origin_project"))
         if tier1 is not None:
             classification, _signal = tier1
-            classification_basis_counts["origin_project"] = (
-                classification_basis_counts.get("origin_project", 0) + 1
-            )
-        elif (
-            membase_manifest
-            and chunk_metadata.get("delib_id") in membase_manifest
-        ):
+            classification_basis_counts["origin_project"] = classification_basis_counts.get("origin_project", 0) + 1
+        elif membase_manifest and chunk_metadata.get("delib_id") in membase_manifest:
             classification = membase_manifest[chunk_metadata["delib_id"]]
             classification_basis_counts["membase_manifest_delib_id"] = (
                 classification_basis_counts.get("membase_manifest_delib_id", 0) + 1
