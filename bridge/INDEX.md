@@ -5,23 +5,40 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-rehearsal-inventory-perf
+NEW: bridge/gtkb-rehearsal-inventory-perf-001.md
+
+
+Document: gtkb-rehearsal-package-ruff-clean
+NEW: bridge/gtkb-rehearsal-package-ruff-clean-001.md
+
+
+Document: gtkb-startup-evidence-restoration
+NEW: bridge/gtkb-startup-evidence-restoration-001.md
+
+
 Document: gtkb-isolation-016-phase8-wave2-slice11
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice11-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice11-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice10
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice10-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice9
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice9-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice9-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice8
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice8-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice8-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice7
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice7-001.md
 
 
