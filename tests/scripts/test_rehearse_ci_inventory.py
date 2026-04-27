@@ -355,30 +355,39 @@ def test_run_cross_reference_absent_leaves_column_empty(tmp_path: Path) -> None:
 def test_run_classification_matches_slice6_for_release_candidate_gate(tmp_path: Path) -> None:
     """Slice 7 + Slice 6 must agree on release-candidate-gate.yml.
 
-    Per Codex GO -004 §"Required Implementation Constraint": cross-slice
-    regression test compares classification, signal, and mechanism origin
-    exactly. Imports Slice 6's source constants and asserts equality.
+    Per Codex post-impl NO-GO -006 §"Required Revision": derive ALL three
+    expected fields (classification, signal, mechanism_origin) from
+    Slice 6's RUNTIME behavior, not from hardcoded string literals.
+    Construct a fixture root containing the workflow file, invoke
+    ``_release_readiness_split._classify_release_gate_surfaces`` against
+    it, and compare Slice 7's row to Slice 6's row exactly. If Slice 6
+    ever changes any of the three fields for this surface, this test
+    fails immediately.
     """
-    # Pull the canonical Slice 6 entry directly from its source.
-    slice6_entry = next(
-        s
-        for s in _release_readiness_split._RELEASE_GATE_SURFACES
-        if s[0] == ".github/workflows/release-candidate-gate.yml"
-    )
-    slice6_path, slice6_mechanism_origin = slice6_entry
-    # Slice 6's classifier always emits these values for release-gate surfaces.
-    slice6_classification = "adopter"
-    slice6_signal = "application_release_gate_surface"
+    slice6_relpath = ".github/workflows/release-candidate-gate.yml"
+    # Build a fixture root containing the workflow at the canonical relpath
+    # so Slice 6's classifier sees `exists=True` and emits a real row.
+    fixture_root = tmp_path / "slice6_fixture_root"
+    workflow_in_fixture = fixture_root / slice6_relpath
+    workflow_in_fixture.parent.mkdir(parents=True)
+    workflow_in_fixture.write_text("# release gate workflow\n", encoding="utf-8")
 
-    # Run Slice 7 against a fixture that includes the same workflow file.
+    # Invoke Slice 6's runtime classifier against the fixture; pull its row.
+    slice6_entries = _release_readiness_split._classify_release_gate_surfaces(fixture_root)
+    slice6_row = next(e for e in slice6_entries if e["path"] == slice6_relpath)
+
+    # Run Slice 7 against the same workflow file via its own fixture path.
     _run_lane(
         tmp_path,
         workflow_files={"release-candidate-gate.yml": "# release gate workflow\n"},
     )
     payload = _read_json_artifact(tmp_path)
-    slice7_row = next(w for w in payload["workflows"] if w["path"] == slice6_path)
+    slice7_row = next(w for w in payload["workflows"] if w["path"] == slice6_relpath)
 
-    # Classification + signal + mechanism_origin must match Slice 6 exactly.
-    assert slice7_row["classification"] == slice6_classification
-    assert slice7_row["classification_signal"] == slice6_signal
-    assert slice7_row["mechanism_origin"] == slice6_mechanism_origin
+    # All three fields derived from Slice 6's runtime output. If Slice 6's
+    # classifier changes any of classification / signal / mechanism_origin
+    # for this surface, this test fails — the regression guard requested
+    # in Codex -006 §"Required Revision".
+    assert slice7_row["classification"] == slice6_row["classification"]
+    assert slice7_row["classification_signal"] == slice6_row["classification_signal"]
+    assert slice7_row["mechanism_origin"] == slice6_row["mechanism_origin"]
