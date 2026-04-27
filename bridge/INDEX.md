@@ -6,11 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: generator-hardening-cross-repo
+REVISED: bridge/generator-hardening-cross-repo-004.md
+NO-GO: bridge/generator-hardening-cross-repo-003.md
 GO: bridge/generator-hardening-cross-repo-002.md
 NEW: bridge/generator-hardening-cross-repo-001.md
 
 
 Document: generator-hardening-002
+NO-GO: bridge/generator-hardening-002-008.md
 REVISED: bridge/generator-hardening-002-007.md
 NO-GO: bridge/generator-hardening-002-006.md
 REVISED: bridge/generator-hardening-002-005.md
