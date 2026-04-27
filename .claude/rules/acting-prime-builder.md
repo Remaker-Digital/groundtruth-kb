@@ -175,6 +175,48 @@ wrap-up work such as MemBase updates, Deliberation Archive insertion, commits,
 pushes, deployment, or external updates remains governed by the applicable
 approval, acknowledgement, or owner-authorized automation scope.
 
+## Deterministic Services Principle
+
+Owner directive `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` establishes
+that repetitive work performed by AI is a defect. Deterministic plumbing
+— building structured records, computing hashes, threading parameters,
+writing boilerplate scripts that follow a template — belongs in services,
+not in sessions.
+
+Justification: token cost (a recurring tax that pays no marginal
+information dividend), error rate (AI procedures are more error-prone
+than deterministic implementations), and project framing (the project
+is a collection of artifacts, not a dialog with accompanying activity).
+
+Operational mandate: when Prime Builder notices repetitive plumbing
+during a session — multi-step formalities where the AI's substantive
+contribution is < 20% of total work, patterns that require
+reconstructing procedure from rule files + hook code + example packets,
+procedures with steps expressible as "compute X from Y" — Prime Builder
+must:
+
+1. Surface the repetition explicitly.
+2. File it as a backlog item in `memory/work_list.md` with scope and
+   tradeoff analysis.
+3. Not silently absorb the friction (which would make the cost
+   invisible to governance).
+
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+(`DELIB-0874`) with an active-pursuit operational mandate. It does NOT
+supersede `GOV-ARTIFACT-APPROVAL-001` — formal artifact approval evidence
+is still required; the principle suggests the *delivery mechanism* of
+that approval should be a service, not per-instance ceremony.
+
+The principle is a bias, not an absolute. One-off intelligent decisions,
+operations that genuinely need session context unavailable to a service,
+and cases where friction is itself the governance value (e.g.,
+deliberation-forcing slowness) remain appropriately AI-mediated.
+
+First concrete manifestation: `GTKB-ARTIFACT-RECORDER-CLI`
+(`memory/work_list.md` row 15) — moves formal-artifact insertion
+plumbing behind a `gt <artifact-type> record` CLI; reduces AI surface
+by ~85%.
+
 ## Current Agent Red Mapping
 
 - The owner-assigned active AI harness assumes the Prime Builder role until the
