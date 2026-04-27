@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: generator-hardening-002
+NO-GO: bridge/generator-hardening-002-004.md
 REVISED: bridge/generator-hardening-002-003.md
 NO-GO: bridge/generator-hardening-002-002.md
 NEW: bridge/generator-hardening-002-001.md
@@ -19,6 +20,7 @@ NEW: bridge/gtkb-bridge-poller-p2-5-verification-spike-001.md
 
 
 Document: gtkb-bridge-poller-p2-registry
+GO: bridge/gtkb-bridge-poller-p2-registry-006.md
 REVISED: bridge/gtkb-bridge-poller-p2-registry-005.md
 NO-GO: bridge/gtkb-bridge-poller-p2-registry-004.md
 REVISED: bridge/gtkb-bridge-poller-p2-registry-003.md
@@ -44,6 +46,7 @@ NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
 
 
 Document: generator-hardening-001
+NO-GO: bridge/generator-hardening-001-008.md
 REVISED: bridge/generator-hardening-001-007.md
 NO-GO: bridge/generator-hardening-001-006.md
 NEW: bridge/generator-hardening-001-005.md
