@@ -329,13 +329,15 @@ def test_output_dir_override_non_allowlisted_rejected() -> None:
 def test_dispatch_lane_module_missing_returns_skipped() -> None:
     """A lane whose module file does not exist returns status='skipped'.
 
-    Per Slice 7 (ci lane landed at S313), this test now uses ``membase`` as
-    the still-missing lane fixture. When subsequent slices land each
-    remaining Stage B-D lane, this fixture must be updated to the next
-    still-missing lane. The test's intent — that the dispatcher correctly
-    distinguishes "module not on disk" from runtime defects — is unchanged.
+    Per Slice 8 (membase lane landed at S314), this test now uses
+    ``dashboard`` as the still-missing lane fixture. (Slice 10 ``chromadb``
+    module landed WIP at commit ``c4acfc13`` in S313; ``dashboard`` is the
+    next still-missing leaf.) When subsequent slices land each remaining
+    Stage C-D lane, this fixture must be updated to the next still-missing
+    lane. The test's intent — that the dispatcher correctly distinguishes
+    "module not on disk" from runtime defects — is unchanged.
     """
-    result = _driver._dispatch("membase", manifest={}, output_dir=Path("ignored"), dry_run=True)
+    result = _driver._dispatch("dashboard", manifest={}, output_dir=Path("ignored"), dry_run=True)
     assert result["status"] == "skipped"
     assert any("not yet implemented" in w for w in result["warnings"])
 
