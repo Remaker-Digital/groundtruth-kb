@@ -7,6 +7,7 @@ All tests are fixture-based per F2; no test walks ``LEGACY_ROOT``. The
 unreadable-file case uses monkeypatching for Windows determinism per the
 GO -004 implementation conditions.
 """
+
 from __future__ import annotations
 
 import sys
@@ -24,7 +25,6 @@ from rehearse._common import (  # noqa: E402
     ManifestValidationError,
     load_manifest,
 )
-
 
 _VALID_FILTER_TEMPLATE = (
     "git filter-repo --path <agent-red-paths-from-_path_rewrite> "
@@ -75,19 +75,22 @@ def _build_fixture_manifest(
         "output_dir": "C:/temp/agent-red-rehearsal",
         "git_strategy": "clone_with_history_filter",
         "git_filter_command_template": _VALID_FILTER_TEMPLATE,
-        "phase_1_authority_matrix_path": str(
-            matrix_path.relative_to(LEGACY_ROOT).as_posix()
-        ),
+        "phase_1_authority_matrix_path": str(matrix_path.relative_to(LEGACY_ROOT).as_posix()),
         "excluded_paths": [".env", "secrets/", ".tmp.driveupload/"],
     }
 
 
 # ----- F1: per-file inventory shape -----
 
+
 def test_walk_inventory_with_metadata_returns_per_file_dict(tmp_path: Path) -> None:
-    """Each file entry has sha256, size, mtime."""
+    """Each file entry has sha256, size, mtime.
+
+    Per inventory-perf -004 GO: helper now returns
+    ``(inventory, ignored_summary, walk_walltime, hash_walltime)``.
+    """
     _build_fixture_tree(tmp_path)
-    files = _inventory._walk_inventory_with_metadata(
+    files, _ignored, _walk_t, _hash_t = _inventory._walk_inventory_with_metadata(
         tmp_path, frozenset({".git", "node_modules"})
     )
     assert "src/main.py" in files
@@ -100,7 +103,7 @@ def test_walk_inventory_with_metadata_returns_per_file_dict(tmp_path: Path) -> N
 def test_walk_inventory_excludes_ignored_top_level(tmp_path: Path) -> None:
     """Ignored top-level directories produce no entries."""
     _build_fixture_tree(tmp_path)
-    files = _inventory._walk_inventory_with_metadata(
+    files, _ignored, _walk_t, _hash_t = _inventory._walk_inventory_with_metadata(
         tmp_path, frozenset({".git", "node_modules"})
     )
     assert all(not p.startswith(".git/") for p in files)
@@ -125,6 +128,7 @@ def test_walk_inventory_excludes_manifest_excluded_paths(tmp_path: Path) -> None
     assert "secrets" in result["output_files"][0] or True  # path written
     # Read inventory and assert no secrets/* paths
     import json as _json
+
     inventory = _json.loads((output_dir / "inventory.json").read_text(encoding="utf-8"))
     assert all(not p.startswith("secrets/") for p in inventory["files"])
 
@@ -145,7 +149,7 @@ def test_walk_inventory_handles_unreadable_file(tmp_path: Path, monkeypatch: pyt
         return real_read_bytes(self)
 
     monkeypatch.setattr(Path, "read_bytes", _selective_read)
-    files = _inventory._walk_inventory_with_metadata(
+    files, _ignored, _walk_t, _hash_t = _inventory._walk_inventory_with_metadata(
         tmp_path, frozenset({".git", "node_modules"})
     )
     assert "src/main.py" not in files
@@ -155,24 +159,31 @@ def test_walk_inventory_handles_unreadable_file(tmp_path: Path, monkeypatch: pyt
 
 # ----- F3: matrix parser -----
 
+
 def test_parse_authority_matrix_extracts_preliminary_table_rows(tmp_path: Path) -> None:
     matrix_path = tmp_path / "matrix.md"
     _build_fixture_matrix(matrix_path)
     rows = _inventory._parse_authority_matrix(matrix_path)
     assert len(rows) == 3
     assert rows[0]["surface"] == "`groundtruth.toml`"
-    assert all(set(r.keys()) >= {
-        "surface", "current_evidence", "target_authority",
-        "app_subject_access", "gtkb_subject_access",
-        "required_decision_or_verification", "_audit_note"
-    } for r in rows)
+    assert all(
+        set(r.keys())
+        >= {
+            "surface",
+            "current_evidence",
+            "target_authority",
+            "app_subject_access",
+            "gtkb_subject_access",
+            "required_decision_or_verification",
+            "_audit_note",
+        }
+        for r in rows
+    )
 
 
 def test_parse_authority_matrix_missing_section_raises(tmp_path: Path) -> None:
     matrix_path = tmp_path / "matrix.md"
-    matrix_path.write_text(
-        "# Some Other Header\n\nNo preliminary table here.\n", encoding="utf-8"
-    )
+    matrix_path.write_text("# Some Other Header\n\nNo preliminary table here.\n", encoding="utf-8")
     with pytest.raises(ManifestValidationError, match="Preliminary Authority Matrix"):
         _inventory._parse_authority_matrix(matrix_path)
 
@@ -191,15 +202,28 @@ def test_parse_authority_matrix_empty_table_raises(tmp_path: Path) -> None:
 
 # ----- runtime manifest construction -----
 
+
 def test_build_runtime_manifest_populates_surface_treatments() -> None:
     source = {"target_root": "x", "legacy_root": "y", "applications_namespace": "z"}
     rows = [
-        {"surface": "Foo Bar", "current_evidence": "ce", "target_authority": "ta",
-         "app_subject_access": "asa", "gtkb_subject_access": "gsa",
-         "required_decision_or_verification": "rdv", "_audit_note": "n"},
-        {"surface": "groundtruth.toml", "current_evidence": "ce2", "target_authority": "ta2",
-         "app_subject_access": "asa2", "gtkb_subject_access": "gsa2",
-         "required_decision_or_verification": "rdv2", "_audit_note": "n2"},
+        {
+            "surface": "Foo Bar",
+            "current_evidence": "ce",
+            "target_authority": "ta",
+            "app_subject_access": "asa",
+            "gtkb_subject_access": "gsa",
+            "required_decision_or_verification": "rdv",
+            "_audit_note": "n",
+        },
+        {
+            "surface": "groundtruth.toml",
+            "current_evidence": "ce2",
+            "target_authority": "ta2",
+            "app_subject_access": "asa2",
+            "gtkb_subject_access": "gsa2",
+            "required_decision_or_verification": "rdv2",
+            "_audit_note": "n2",
+        },
     ]
     runtime = _inventory._build_runtime_manifest(source, rows)
     assert "surface_treatments" in runtime
@@ -222,12 +246,17 @@ def test_write_runtime_manifest_produces_loadable_toml(tmp_path: Path) -> None:
         ),
         "excluded_paths": [".env", ".tmp.driveupload/"],
         "surface_treatments": {
-            "foo": {"surface": "Foo", "current_evidence": "x", "target_authority": "y",
-                    "app_subject_access": "a", "gtkb_subject_access": "b",
-                    "required_decision_or_verification": "c", "_audit_note": "n"}
+            "foo": {
+                "surface": "Foo",
+                "current_evidence": "x",
+                "target_authority": "y",
+                "app_subject_access": "a",
+                "gtkb_subject_access": "b",
+                "required_decision_or_verification": "c",
+                "_audit_note": "n",
+            }
         },
-        "_inventory_metadata": {"populated_at": "z", "matrix_source": "m",
-                                "row_count": "1", "schema_note": "s"},
+        "_inventory_metadata": {"populated_at": "z", "matrix_source": "m", "row_count": "1", "schema_note": "s"},
     }
     output_path = tmp_path / "runtime-manifest.toml"
     _inventory._write_runtime_manifest(runtime, output_path)
@@ -238,6 +267,7 @@ def test_write_runtime_manifest_produces_loadable_toml(tmp_path: Path) -> None:
 
 
 # ----- run() integration via inventory_root override -----
+
 
 def test_run_against_fixture_tree_with_inventory_root_override(tmp_path: Path) -> None:
     """Full run() against a fixture tree using inventory_root override (F2)."""
@@ -261,7 +291,9 @@ def test_run_against_fixture_tree_with_inventory_root_override(tmp_path: Path) -
     assert (output_dir / "runtime-manifest.toml").exists()
 
 
-def test_run_runtime_manifest_revalidation_failure_reports_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_runtime_manifest_revalidation_failure_reports_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """If matrix has no rows, run() returns status='error' (does NOT raise)."""
     fixture_root = tmp_path / "fixture-repo"
     fixture_root.mkdir()
@@ -293,6 +325,7 @@ def test_run_runtime_manifest_revalidation_failure_reports_error(tmp_path: Path,
 
 # ----- _common.py is_runtime_manifest extension (Slice 2 contract) -----
 
+
 def test_load_manifest_runtime_empty_surface_treatments_rejected(tmp_path: Path) -> None:
     """Runtime manifest with empty surface_treatments + is_runtime_manifest=True raises."""
     legacy_posix = LEGACY_ROOT.as_posix()
@@ -305,7 +338,7 @@ def test_load_manifest_runtime_empty_surface_treatments_rejected(tmp_path: Path)
         f'git_strategy = "fresh_repo"\n'
         f'phase_1_authority_matrix_path = "independent-progress-assessments/'
         f'CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"\n'
-        f'\n[surface_treatments]\n',
+        f"\n[surface_treatments]\n",
         encoding="utf-8",
     )
     with pytest.raises(ManifestValidationError, match="M5: runtime manifest requires non-empty"):
@@ -324,9 +357,177 @@ def test_load_manifest_runtime_populated_surface_treatments_accepted(tmp_path: P
         f'git_strategy = "fresh_repo"\n'
         f'phase_1_authority_matrix_path = "independent-progress-assessments/'
         f'CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"\n'
-        f'\n[surface_treatments.foo]\n'
+        f"\n[surface_treatments.foo]\n"
         f'surface = "Foo"\n',
         encoding="utf-8",
     )
     data = load_manifest(runtime_path, wave=2, is_runtime_manifest=True)
     assert "foo" in data["surface_treatments"]
+
+
+# ----- inventory-perf REVISED-1 (S313): cache-only exclusions + dryrun-ignored.json -----
+
+
+def test_default_ignored_top_level_includes_only_cache_and_transient() -> None:
+    """Per inventory-perf -004 GO: only cache/transient dirs; logs/ NOT in default."""
+    expected_cache_dirs = {
+        ".git",
+        "__pycache__",
+        "node_modules",
+        ".groundtruth-chroma",
+        ".tmp.driveupload",
+        ".codex_pydeps",
+        ".venv",
+        "venv",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "htmlcov",
+    }
+    assert _inventory._DEFAULT_IGNORED_TOP_LEVEL == expected_cache_dirs
+    assert "logs" not in _inventory._DEFAULT_IGNORED_TOP_LEVEL
+
+
+def test_run_descends_into_logs_subtree(tmp_path: Path) -> None:
+    """Per inventory-perf -004 GO: logs/ retained in inventory."""
+    _build_fixture_tree(tmp_path)
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "deploy-test.log").write_text("test deploy log\n", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    matrix_path = LEGACY_ROOT / (
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/"
+        "GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
+    )
+    if not matrix_path.exists():
+        pytest.skip("production matrix unavailable in checkout")
+    manifest = _build_fixture_manifest(output_dir, matrix_path, tmp_path)
+    result = _inventory.run(manifest, output_dir, inventory_root=tmp_path)
+    assert result["status"] == "ok"
+    import json as _json
+
+    inventory = _json.loads((output_dir / "inventory.json").read_text(encoding="utf-8"))
+    assert "logs/deploy-test.log" in inventory["files"]
+
+
+def test_run_excludes_codex_pydeps_subtree(tmp_path: Path) -> None:
+    """Per inventory-perf -004 GO: cache exclusion of .codex_pydeps."""
+    _build_fixture_tree(tmp_path)
+    (tmp_path / ".codex_pydeps").mkdir()
+    (tmp_path / ".codex_pydeps" / "stub.py").write_text("# stub\n", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    matrix_path = LEGACY_ROOT / (
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/"
+        "GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
+    )
+    if not matrix_path.exists():
+        pytest.skip("production matrix unavailable in checkout")
+    manifest = _build_fixture_manifest(output_dir, matrix_path, tmp_path)
+    result = _inventory.run(manifest, output_dir, inventory_root=tmp_path)
+    assert result["status"] == "ok"
+    import json as _json
+
+    inventory = _json.loads((output_dir / "inventory.json").read_text(encoding="utf-8"))
+    assert all(not p.startswith(".codex_pydeps/") for p in inventory["files"])
+
+
+def test_metrics_includes_walk_and_hash_walltime_separately(tmp_path: Path) -> None:
+    """Per inventory-perf -004 GO: 3 distinct walltime metrics."""
+    _build_fixture_tree(tmp_path)
+    output_dir = tmp_path / "output"
+    matrix_path = LEGACY_ROOT / (
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/"
+        "GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
+    )
+    if not matrix_path.exists():
+        pytest.skip("production matrix unavailable in checkout")
+    manifest = _build_fixture_manifest(output_dir, matrix_path, tmp_path)
+    result = _inventory.run(manifest, output_dir, inventory_root=tmp_path)
+    assert result["status"] == "ok"
+    metrics = result["metrics"]
+    assert "walk_walltime_seconds" in metrics
+    assert "hash_walltime_seconds" in metrics
+    assert "ignored_summary_walltime_seconds" in metrics
+    assert isinstance(metrics["walk_walltime_seconds"], (int, float))
+    assert isinstance(metrics["hash_walltime_seconds"], (int, float))
+
+
+def test_run_emits_dryrun_ignored_json(tmp_path: Path) -> None:
+    """Per inventory-perf -004 GO: dryrun-ignored.json present."""
+    _build_fixture_tree(tmp_path)
+    output_dir = tmp_path / "output"
+    matrix_path = LEGACY_ROOT / (
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/"
+        "GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
+    )
+    if not matrix_path.exists():
+        pytest.skip("production matrix unavailable in checkout")
+    manifest = _build_fixture_manifest(output_dir, matrix_path, tmp_path)
+    result = _inventory.run(manifest, output_dir, inventory_root=tmp_path)
+    assert result["status"] == "ok"
+    dryrun_ignored = output_dir / "dryrun-ignored.json"
+    assert dryrun_ignored.exists()
+    assert any(str(dryrun_ignored) in str(p) for p in result["output_files"])
+
+
+def test_dryrun_ignored_json_records_ignored_directories_with_reasons(tmp_path: Path) -> None:
+    """Per Codex GO -004 reporting constraint 1: every default ignored dir has reason."""
+    _build_fixture_tree(tmp_path)
+    (tmp_path / ".codex_pydeps").mkdir()
+    (tmp_path / ".codex_pydeps" / "x.py").write_text("\n", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    matrix_path = LEGACY_ROOT / (
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/"
+        "GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
+    )
+    if not matrix_path.exists():
+        pytest.skip("production matrix unavailable in checkout")
+    manifest = _build_fixture_manifest(output_dir, matrix_path, tmp_path)
+    _inventory.run(manifest, output_dir, inventory_root=tmp_path)
+    import json as _json
+
+    payload = _json.loads((output_dir / "dryrun-ignored.json").read_text(encoding="utf-8"))
+    assert payload["schema_kind"] == "directory_summary_not_per_file_listing"
+    assert "ignored_directories_summary" in payload
+    codex_entry = next(
+        (e for e in payload["ignored_directories_summary"] if e["path"] == ".codex_pydeps"),
+        None,
+    )
+    assert codex_entry is not None
+    assert codex_entry["reason"] == "codex_python_deps_cache_regenerable_from_pyproject_toml"
+    assert codex_entry["file_count"] == 1
+    assert codex_entry["default_or_manifest"] == "default"
+
+
+def test_dryrun_ignored_json_includes_manifest_excluded_paths_section(tmp_path: Path) -> None:
+    """Per Codex GO -004 reporting constraint 1: separately list manifest paths."""
+    _build_fixture_tree(tmp_path)
+    output_dir = tmp_path / "output"
+    matrix_path = LEGACY_ROOT / (
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/"
+        "GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
+    )
+    if not matrix_path.exists():
+        pytest.skip("production matrix unavailable in checkout")
+    manifest = _build_fixture_manifest(output_dir, matrix_path, tmp_path)
+    _inventory.run(manifest, output_dir, inventory_root=tmp_path)
+    import json as _json
+
+    payload = _json.loads((output_dir / "dryrun-ignored.json").read_text(encoding="utf-8"))
+    assert "manifest_excluded_paths" in payload
+    assert isinstance(payload["manifest_excluded_paths"], list)
+
+
+def test_walker_returns_ignored_summary_with_audit_data(tmp_path: Path) -> None:
+    """Per inventory-perf -004 GO: ignored_summary populated with file_count + bytes."""
+    _build_fixture_tree(tmp_path)
+    (tmp_path / ".pytest_cache").mkdir()
+    (tmp_path / ".pytest_cache" / "v.txt").write_text("cached\n", encoding="utf-8")
+    files, ignored_summary, walk_t, hash_t = _inventory._walk_inventory_with_metadata(
+        tmp_path, _inventory._DEFAULT_IGNORED_TOP_LEVEL
+    )
+    assert ".pytest_cache" in ignored_summary
+    assert ignored_summary[".pytest_cache"]["file_count"] >= 1
+    assert ignored_summary[".pytest_cache"]["total_bytes"] > 0
+    assert ignored_summary[".pytest_cache"]["reason"] == "pytest_run_cache_regenerated_on_next_test_run"
+    assert walk_t >= 0.0
+    assert hash_t >= 0.0
