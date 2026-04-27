@@ -1,0 +1,4 @@
+﻿# Unstaged diff
+
+# Staged diff
+diff --git a/groundtruth.db b/groundtruth.db new file mode 100644 index 00000000..16dd4b57 Binary files /dev/null and b/groundtruth.db differ

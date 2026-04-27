@@ -1,0 +1,115 @@
+﻿{
+    "timestamp":  "2026-04-27T15:58:14Z",
+    "removed":  [
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\0f27\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\1822\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\372a\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\43cb\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\50ef\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\6317\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\7121\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\958f\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\b1f8\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\bc9b\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\d0f1\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\d14b\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.codex\\worktrees\\ffea\\Agent Red Customer Engagement",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.cursor\\worktrees\\Agent_Red_Customer_Engagement\\ako",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.cursor\\worktrees\\Agent_Red_Customer_Engagement\\jcu",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.cursor\\worktrees\\Agent_Red_Customer_Engagement\\tlz",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    },
+                    {
+                        "Path":  "C:\\Users\\micha\\.cursor\\worktrees\\Agent_Red_Customer_Engagement\\yyw",
+                        "Reason":  "clean-worktree-removed",
+                        "Disposition":  "git-worktree-remove"
+                    }
+                ],
+    "preserved":  [
+                      {
+                          "Path":  "C:\\Users\\micha\\.codex\\worktrees\\claude-design-backlog",
+                          "PatchPath":  "E:\\GT-KB\\bridge\\cleanup-evidence\\worktree-patches\\C--Users-micha-.codex-worktrees-claude-design-backlog.patch",
+                          "DirtyLines":  1
+                      },
+                      {
+                          "Path":  "C:\\Users\\micha\\AppData\\Local\\Temp\\gh-dep2",
+                          "PatchPath":  "E:\\GT-KB\\bridge\\cleanup-evidence\\worktree-patches\\C--Users-micha-AppData-Local-Temp-gh-dep2.patch",
+                          "DirtyLines":  157
+                      },
+                      {
+                          "Path":  "E:\\Claude-Playground\\CLAUDE-PROJECTS\\agent-red-e1-apply",
+                          "PatchPath":  "E:\\GT-KB\\bridge\\cleanup-evidence\\worktree-patches\\E--Claude-Playground-CLAUDE-PROJECTS-agent-red-e1-apply.patch",
+                          "DirtyLines":  1
+                      },
+                      {
+                          "Path":  "E:\\Claude-Playground\\CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration",
+                          "PatchPath":  "E:\\GT-KB\\bridge\\cleanup-evidence\\worktree-patches\\E--Claude-Playground-CLAUDE-PROJECTS-agent-red-gtkb-current-main-integration.patch",
+                          "DirtyLines":  1
+                      }
+                  ],
+    "failures":  [
+
+                 ]
+}

@@ -1,0 +1,638 @@
+﻿{
+    "migrated_count":  104,
+    "skipped_count":  0,
+    "failed_count":  0,
+    "timestamp":  "2026-04-27T15:57:12Z",
+    "migrated":  [
+                     {
+                         "Name":  "activation-model.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\activation-model.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\activation-model.md",
+                         "SHA256":  "49B6996C51A53789641FA1A8CFF466DD24274DD339E650D8BA51AF49FCB8CEF8"
+                     },
+                     {
+                         "Name":  "admin-ui.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\admin-ui.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\admin-ui.md",
+                         "SHA256":  "05A1614A1AE46F50B746EFDB26E3E9C7B701A321F982DDEB4AE2FB7591AB73FF"
+                     },
+                     {
+                         "Name":  "app-module-architecture.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\app-module-architecture.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\app-module-architecture.md",
+                         "SHA256":  "23CDF642A9C56DD74735D6516463ED7328D23BB603A509E7EEB0AEC5328A90EA"
+                     },
+                     {
+                         "Name":  "canonical_vocabulary.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\canonical_vocabulary.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\canonical_vocabulary.md",
+                         "SHA256":  "286EFE9D75DCA11F97A2B990D70595AA547A226A14A9B8CA818230BACFAAA4A3"
+                     },
+                     {
+                         "Name":  "configuration-compliance.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\configuration-compliance.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\configuration-compliance.md",
+                         "SHA256":  "21B14CBA9D88DA2B208A5B7021CE029EE6A151A8661E699161E795B23894B856"
+                     },
+                     {
+                         "Name":  "conversation-quality.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\conversation-quality.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\conversation-quality.md",
+                         "SHA256":  "1439AE242F369FDEFFF62BAC89CF3E345A34E7EECAD3B038568777D1A0ADB2C5"
+                     },
+                     {
+                         "Name":  "cosmos-db.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\cosmos-db.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\cosmos-db.md",
+                         "SHA256":  "668A7D35A19F758DC88354CBC63E6F2B4188C74420886B8F5C27B392020A62D3"
+                     },
+                     {
+                         "Name":  "decision_spec1840_cors.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\decision_spec1840_cors.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\decision_spec1840_cors.md",
+                         "SHA256":  "E0EFD04882EC264CBA0041EF5A149D2DB2D5287D8665807A534F0F617ACAA9A4"
+                     },
+                     {
+                         "Name":  "deployment.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\deployment.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\deployment.md",
+                         "SHA256":  "A51FFA515D3D7CF1B0418D354E86CA7179C95F2C7C5214ED53BF5AC842813C9C"
+                     },
+                     {
+                         "Name":  "email.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\email.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\email.md",
+                         "SHA256":  "1FB7DB7718C498EFC0BBC46D57138804868910DDD7270C0D5F7F00A29771C364"
+                     },
+                     {
+                         "Name":  "feedback_agent_red_is_adopter_not_author.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_agent_red_is_adopter_not_author.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_agent_red_is_adopter_not_author.md",
+                         "SHA256":  "56538EF4D8A2451B89AE244A908AEEF0EC9D6182DC53F6954A5645333E1B8DF2"
+                     },
+                     {
+                         "Name":  "feedback_artifact_boundaries.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_artifact_boundaries.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_artifact_boundaries.md",
+                         "SHA256":  "E943F68B35B06CB8C73C725B299EDC6FEBA4C74BB845B2A5EE0517A5CF218518"
+                     },
+                     {
+                         "Name":  "feedback_bridge_autonomy.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_bridge_autonomy.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_bridge_autonomy.md",
+                         "SHA256":  "147170ED7662D0B0ADF4551B4352C6CC3683D66812127E3628A418754CDE5EFF"
+                     },
+                     {
+                         "Name":  "feedback_bridge_drift_pattern.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_bridge_drift_pattern.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_bridge_drift_pattern.md",
+                         "SHA256":  "2D65DD1ED797C4CE4ECE33E4B8B6B26924D697CB95B65751A43CFE725F6C70EB"
+                     },
+                     {
+                         "Name":  "feedback_bridge_poller.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_bridge_poller.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_bridge_poller.md",
+                         "SHA256":  "DDE379C090C045455DF9061052D611601CBFB710DF859A40FBA0220A1CA419CE"
+                     },
+                     {
+                         "Name":  "feedback_bridge_protocol.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_bridge_protocol.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_bridge_protocol.md",
+                         "SHA256":  "F035957241C9D3236D9F2F097BE700ED4FACD3173608C45793BA484E61C27E5E"
+                     },
+                     {
+                         "Name":  "feedback_bridge_synchronous.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_bridge_synchronous.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_bridge_synchronous.md",
+                         "SHA256":  "EDD11AFC3614AA0B05B7FA1499C7C95DB29D9BE9583C89959413F95E37B1A4B1"
+                     },
+                     {
+                         "Name":  "feedback_build_process.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_build_process.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_build_process.md",
+                         "SHA256":  "DC2359FB2E9FEAE29847BA48E32C20EC0DB7A4A02A12C2CA2C0B3B66BB4048F4"
+                     },
+                     {
+                         "Name":  "feedback_canonical_content_in_active_surfaces.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_canonical_content_in_active_surfaces.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_canonical_content_in_active_surfaces.md",
+                         "SHA256":  "2818764F29BF49A918A4242E17902FE58495874928D4A42EE38D5752546837D6"
+                     },
+                     {
+                         "Name":  "feedback_canonical_terminology_governance.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_canonical_terminology_governance.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_canonical_terminology_governance.md",
+                         "SHA256":  "5CBDAEE557B08FBB03124C51CED4AB468231562B2259882CEA4AFAF7AD975C67"
+                     },
+                     {
+                         "Name":  "feedback_ci_workflow.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_ci_workflow.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_ci_workflow.md",
+                         "SHA256":  "E4C21D9150929851D732443D3FD2B36B96AF0DA9590E5477BAFEA8D7E65AA82B"
+                     },
+                     {
+                         "Name":  "feedback_codex_bridge_protocol.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_codex_bridge_protocol.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_codex_bridge_protocol.md",
+                         "SHA256":  "8E1DEEE43DB58DB5FC785204FF2E073F4B98DAA6B90755F01032F5D451C96844"
+                     },
+                     {
+                         "Name":  "feedback_codex_poller_not_hung.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_codex_poller_not_hung.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_codex_poller_not_hung.md",
+                         "SHA256":  "24DDB7425D0BA6F4E04643715D20B67B2FC0F023856D67BF0D2ECAC148D5AFA1"
+                     },
+                     {
+                         "Name":  "feedback_codex_protocol.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_codex_protocol.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_codex_protocol.md",
+                         "SHA256":  "AD5D10254EA6EF388F0B669C6043DAA5910F021CB9844B384CE7FFB58400A782"
+                     },
+                     {
+                         "Name":  "feedback_collaboration_protocol.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_collaboration_protocol.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_collaboration_protocol.md",
+                         "SHA256":  "52AB3E1D004243B873808F9F89BF5F98454CEB3F48276522BBFCF328CA068A4B"
+                     },
+                     {
+                         "Name":  "feedback_complexity_fragility.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_complexity_fragility.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_complexity_fragility.md",
+                         "SHA256":  "E69816C4F092097DBAA273D4E2944E57A15A4504073F0BD030410649E53A8ABB"
+                     },
+                     {
+                         "Name":  "feedback_deploy_gate_token.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_deploy_gate_token.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_deploy_gate_token.md",
+                         "SHA256":  "2F377980C076D9398B7478EFFCF0460D8ABE52C67537AD492F2486B586A8D9AE"
+                     },
+                     {
+                         "Name":  "feedback_docs_release_gated.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_docs_release_gated.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_docs_release_gated.md",
+                         "SHA256":  "FCC0368F5FEDCF691046EC63BA15433564DAD2B425383AC1C4B54A0D8AE70DEA"
+                     },
+                     {
+                         "Name":  "feedback_dont_formalize_implicit_principles.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_dont_formalize_implicit_principles.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_dont_formalize_implicit_principles.md",
+                         "SHA256":  "6A1AD5180BB8ADE0385D71B005670D48B19399AFF5229452C28576D3369F8625"
+                     },
+                     {
+                         "Name":  "feedback_dont_re_elicit_on_agreement.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_dont_re_elicit_on_agreement.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_dont_re_elicit_on_agreement.md",
+                         "SHA256":  "1C9360BC192C1D8F840B69CC0715CFA7EC14A3043408CE364B4F756F07D4A9DC"
+                     },
+                     {
+                         "Name":  "feedback_environment_safety.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_environment_safety.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_environment_safety.md",
+                         "SHA256":  "219D40F876AE60500457CD0DB5A73C4F3D125D0D565E33A0C614AF604C049727"
+                     },
+                     {
+                         "Name":  "feedback_env_distinction.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_env_distinction.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_env_distinction.md",
+                         "SHA256":  "2F4C4D3D808D5A43864D96DFB1F0DE5D84C8FE1012513F03C3E8A1F5454B0F92"
+                     },
+                     {
+                         "Name":  "feedback_instrument_before_rule_making.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_instrument_before_rule_making.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_instrument_before_rule_making.md",
+                         "SHA256":  "A6EC37FF05FA39C178845BC9295671408CC2CD15A42B278CFDEC1A18C5A4A450"
+                     },
+                     {
+                         "Name":  "feedback_interactive_poller_monitor.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_interactive_poller_monitor.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_interactive_poller_monitor.md",
+                         "SHA256":  "3CE8783C7402824268C782A583C5BFC9AFD079C03AE2C3E462A3123908453D43"
+                     },
+                     {
+                         "Name":  "feedback_iterate_fast_on_main.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_iterate_fast_on_main.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_iterate_fast_on_main.md",
+                         "SHA256":  "C46F232879D67FE2900F4E9F52FDB77AB64032C4951FD7E11A54276FBACAE013"
+                     },
+                     {
+                         "Name":  "feedback_lossless_token_optimization.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_lossless_token_optimization.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_lossless_token_optimization.md",
+                         "SHA256":  "4144E5D1D8976EFB0627DE78EF9BBF1CF6D75C13F59016558373F1AC2CF470E1"
+                     },
+                     {
+                         "Name":  "feedback_mcp_verification_required.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_mcp_verification_required.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_mcp_verification_required.md",
+                         "SHA256":  "6610371E64F05793F794A7355609D7B296E704A2AE355237D271550DD22F69A3"
+                     },
+                     {
+                         "Name":  "feedback_no_attachment.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_no_attachment.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_no_attachment.md",
+                         "SHA256":  "6AC23A5418257A9AFFE6C2446EB16753C53C7ACA8F5CB455CABD0ED205A7D908"
+                     },
+                     {
+                         "Name":  "feedback_no_deferrals.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_no_deferrals.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_no_deferrals.md",
+                         "SHA256":  "788BE07B0C84EF0DE340863BE2A855673CADB66D0FF76D3A41041E0CC09D4397"
+                     },
+                     {
+                         "Name":  "feedback_no_deferrals_ever.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_no_deferrals_ever.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_no_deferrals_ever.md",
+                         "SHA256":  "B426E5D1747036EA22956085529960044E6A51E2782D5A15FC58736F04673D6C"
+                     },
+                     {
+                         "Name":  "feedback_no_docker_desktop.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_no_docker_desktop.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_no_docker_desktop.md",
+                         "SHA256":  "1DEA6A5C3489B07A90AE58A046CB2111291C85411E7CC6087E75CBEA51582331"
+                     },
+                     {
+                         "Name":  "feedback_no_hardcoded_paths.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_no_hardcoded_paths.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_no_hardcoded_paths.md",
+                         "SHA256":  "E3218A8825C0C34B9A4B4AFE7BCE4A50F1F39106ABDE9928ABB73BD7BDFDF60D"
+                     },
+                     {
+                         "Name":  "feedback_no_lossy_compression.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_no_lossy_compression.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_no_lossy_compression.md",
+                         "SHA256":  "8A9D39DB1EFDF8DE6CFECFBB1BB1EE0E6AC8A3335139C801C2185876D436BA2C"
+                     },
+                     {
+                         "Name":  "feedback_no_name_address.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_no_name_address.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_no_name_address.md",
+                         "SHA256":  "68FE763118A32E040633BD26672527EA74785E149749F43D9EDE66ABE6225AAE"
+                     },
+                     {
+                         "Name":  "feedback_owner_questions.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_owner_questions.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_owner_questions.md",
+                         "SHA256":  "8DF542D7C9E34660D1DD51508E266CB01F3F1A45DA7883DEDC240278E211F6D8"
+                     },
+                     {
+                         "Name":  "feedback_pedagogical_comments_standard.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_pedagogical_comments_standard.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_pedagogical_comments_standard.md",
+                         "SHA256":  "10976CA6BC44CB4EEECBDEF11730E16091916450260641CDCD21D5791B9EC0F7"
+                     },
+                     {
+                         "Name":  "feedback_poller_autonomy.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_poller_autonomy.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_poller_autonomy.md",
+                         "SHA256":  "60A32909EA98C0641D7AFDB4E0C1B17DF111A9981F44F1A2ED79AAB23E7B631C"
+                     },
+                     {
+                         "Name":  "feedback_poller_circular_dependency.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_poller_circular_dependency.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_poller_circular_dependency.md",
+                         "SHA256":  "5AB79155035688549FC3BF6785C730243ED126C539CAC3C6377277046784C8DB"
+                     },
+                     {
+                         "Name":  "feedback_postimpl_report_hygiene.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_postimpl_report_hygiene.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_postimpl_report_hygiene.md",
+                         "SHA256":  "0863CFA9E9337B6469D844B6B95384AE9A9A4A322BB3090D5A74438C90F3DD1C"
+                     },
+                     {
+                         "Name":  "feedback_precision_over_impression.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_precision_over_impression.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_precision_over_impression.md",
+                         "SHA256":  "9B72BE1E1E59395E952A6EAA7B6F67525534579541D9C01935CB78CEF4B68F4D"
+                     },
+                     {
+                         "Name":  "feedback_preproduction_migration.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_preproduction_migration.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_preproduction_migration.md",
+                         "SHA256":  "36EC6C4E741D6D98D0271085BB24E7CB309D38B6A5161D022FA97BDD93E1EB04"
+                     },
+                     {
+                         "Name":  "feedback_prime_builder_default_role.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_prime_builder_default_role.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_prime_builder_default_role.md",
+                         "SHA256":  "DB6C34A0863C8AF2E4C212FB2825D32E4A7EBB7A670D5C2A5C44FAD65A1C565E"
+                     },
+                     {
+                         "Name":  "feedback_prioritization_by_dependencies.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_prioritization_by_dependencies.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_prioritization_by_dependencies.md",
+                         "SHA256":  "72F659999425CC52B179FCAA98C6408CB735D9F93D5D74D5BDCBECACA9849988"
+                     },
+                     {
+                         "Name":  "feedback_prioritization_format.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_prioritization_format.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_prioritization_format.md",
+                         "SHA256":  "A7216117D9B9B8208CA9CD87AAAD4D71588BECA7546E04762EDBB26E27524553"
+                     },
+                     {
+                         "Name":  "feedback_production_deploy_approval.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_production_deploy_approval.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_production_deploy_approval.md",
+                         "SHA256":  "167AED81779B2C3FA34AC3937830F581432C800B48EA57BDCBE014F8339DBA82"
+                     },
+                     {
+                         "Name":  "feedback_quality_first_autonomy.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_quality_first_autonomy.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_quality_first_autonomy.md",
+                         "SHA256":  "87CB6B02F040ABDF5E2FE047015B5236BD103934CF2D52745E73E2ED1B9FE30C"
+                     },
+                     {
+                         "Name":  "feedback_questions_are_questions.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_questions_are_questions.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_questions_are_questions.md",
+                         "SHA256":  "819DD626B0CFEFB746506538DD67DE7B3B5EBC827C196D33FF60380557810A82"
+                     },
+                     {
+                         "Name":  "feedback_read_index_comments_before_executing_go.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_read_index_comments_before_executing_go.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_read_index_comments_before_executing_go.md",
+                         "SHA256":  "A4ABAD1918F020D16E249BE581AAD75C3B203BFDD71338B31787917CE5703AC4"
+                     },
+                     {
+                         "Name":  "feedback_scope_reduction_as_no_go_response.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_scope_reduction_as_no_go_response.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_scope_reduction_as_no_go_response.md",
+                         "SHA256":  "FB27E40A5B382DCF0CC445C282CEA30A997BBA34DFA94A9923B482E480586FB9"
+                     },
+                     {
+                         "Name":  "feedback_session_start_orient_block.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_session_start_orient_block.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_session_start_orient_block.md",
+                         "SHA256":  "7A440B5310C42910A7932C7EA3D9DF9FA2C68F99421B287F65AB9BEFE61D8BB4"
+                     },
+                     {
+                         "Name":  "feedback_taxonomy_simplicity.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_taxonomy_simplicity.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_taxonomy_simplicity.md",
+                         "SHA256":  "D4B1B57CFEE215F29A92130E6470290FF4A1DA620F8C575F03B22FD65AC27276"
+                     },
+                     {
+                         "Name":  "feedback_testing_binary.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_testing_binary.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_testing_binary.md",
+                         "SHA256":  "23AD0A9210EE824FB8C9B3CFE0D254F3E7585C0706C30172D0651C64A40AE8D0"
+                     },
+                     {
+                         "Name":  "feedback_tests_before_implementation.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_tests_before_implementation.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_tests_before_implementation.md",
+                         "SHA256":  "340DFAA769865B527CAE4598896911CECA0481398EF21D339CA23D2405E0FA95"
+                     },
+                     {
+                         "Name":  "feedback_use_askuserquestion_for_all_decisions.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_use_askuserquestion_for_all_decisions.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_use_askuserquestion_for_all_decisions.md",
+                         "SHA256":  "36592C290ABF65228549E9758D14782C0EACB199A1F4A87F5B4E5AB613E00E76"
+                     },
+                     {
+                         "Name":  "feedback_verify_git_diff_before_reporting.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_verify_git_diff_before_reporting.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_verify_git_diff_before_reporting.md",
+                         "SHA256":  "5D4369B9F94E8B860982F15810ACE8F42C554A9337A06AC29754B74CA51828B8"
+                     },
+                     {
+                         "Name":  "feedback_verify_source_before_parallel_proposals.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_verify_source_before_parallel_proposals.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_verify_source_before_parallel_proposals.md",
+                         "SHA256":  "9092DC6C12C44D5BB9CF58B2761A209E618D3907654DFB6F3924379893A00F03"
+                     },
+                     {
+                         "Name":  "feedback_visual_verification_required.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_visual_verification_required.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_visual_verification_required.md",
+                         "SHA256":  "30C65A6FEF1F1B4919E2CD0447D5E32F23D9FEF23C8D9331D0BAC474064C50C7"
+                     },
+                     {
+                         "Name":  "feedback_widget_visibility_gate.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_widget_visibility_gate.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_widget_visibility_gate.md",
+                         "SHA256":  "4B8C7DB8DAFAAAFC1374982556F00CA830E7BE2CCF0465A98BC2C74F6FED5FD4"
+                     },
+                     {
+                         "Name":  "feedback_worktree_drift_pattern.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\feedback_worktree_drift_pattern.md",
+                         "Dst":  "E:\\GT-KB\\memory\\feedback\\feedback_worktree_drift_pattern.md",
+                         "SHA256":  "7F6DF1293FBD4D3CC0C29BB3E7F8AB318DEECB188C60E7809FF781EEE76409A5"
+                     },
+                     {
+                         "Name":  "MEMORY.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\MEMORY.md",
+                         "Dst":  "E:\\GT-KB\\memory\\MEMORY.md",
+                         "SHA256":  "D966C9910CA3E79F5649371E3CFE3C608BABF5105CF391AE70CC8C276A6633C5"
+                     },
+                     {
+                         "Name":  "MEMORY.md.backup-20260425-222126",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\MEMORY.md.backup-20260425-222126",
+                         "Dst":  "E:\\GT-KB\\memory\\MEMORY.md.backup-20260425-222126",
+                         "SHA256":  "E90F08FDDD3DB061C2681733BD4878E1C09584B14A38C53A0490A58A39287521"
+                     },
+                     {
+                         "Name":  "onboarding-polish.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\onboarding-polish.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\onboarding-polish.md",
+                         "SHA256":  "B20E6F3419C89D597A0B328F5FC9FFACAA06D25C8CBF7CD91580DEB1A27E6874"
+                     },
+                     {
+                         "Name":  "project_architecture_specs.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_architecture_specs.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_architecture_specs.md",
+                         "SHA256":  "A3CB7CF005881A88C19E96E514B53BC6B6FA2AB3680F47A2DD499F6EACB4706C"
+                     },
+                     {
+                         "Name":  "project_backlog018_plan.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_backlog018_plan.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_backlog018_plan.md",
+                         "SHA256":  "832F9F7A04F7F5A0BE258689D03FFE0ACE0DCDA67301390DA8AE03451593B75D"
+                     },
+                     {
+                         "Name":  "project_branching_strategy.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_branching_strategy.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_branching_strategy.md",
+                         "SHA256":  "D786C667B6E566AD3C9B27D99ADBF8FA4336DFE056DFB09C28D2345593D639F7"
+                     },
+                     {
+                         "Name":  "project_codex_automation_failure.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_codex_automation_failure.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_codex_automation_failure.md",
+                         "SHA256":  "F7D9A10BBF8830740A5405F84B6037E1B49A9DF866B3C61598DDFB054C2D9863"
+                     },
+                     {
+                         "Name":  "project_control_surface_closeout.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_control_surface_closeout.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_control_surface_closeout.md",
+                         "SHA256":  "25E9D04A8ADA9D9F0FD565D393047E1F3C39BF936FB23064589D3449727EA105"
+                     },
+                     {
+                         "Name":  "project_cto_trial_onboarding_docs.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_cto_trial_onboarding_docs.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_cto_trial_onboarding_docs.md",
+                         "SHA256":  "8CE2FB8EE73B26D6FCF47CFDC05FB585932BD3DF61BAEEF53B849A7626894C9C"
+                     },
+                     {
+                         "Name":  "project_groundtruth_bootstrap_decisions.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_groundtruth_bootstrap_decisions.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_groundtruth_bootstrap_decisions.md",
+                         "SHA256":  "C40EC11BA8516DED68DCDC06A9AE1D2C4FD159417DB9F027C556D17202ABF9DF"
+                     },
+                     {
+                         "Name":  "project_groundtruth_lineage.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_groundtruth_lineage.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_groundtruth_lineage.md",
+                         "SHA256":  "198E5C2866C4F26141A51A31744F1E1FFF1B2D91E6159C467A384C56312977E4"
+                     },
+                     {
+                         "Name":  "project_gtkb_azure_saas_readiness_vision.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_gtkb_azure_saas_readiness_vision.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_gtkb_azure_saas_readiness_vision.md",
+                         "SHA256":  "E97852B2D065251484C3569C521779012DE8ABD14555398417063037F44560D3"
+                     },
+                     {
+                         "Name":  "project_gtkb_non_disruptive_upgrade_priority.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_gtkb_non_disruptive_upgrade_priority.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_gtkb_non_disruptive_upgrade_priority.md",
+                         "SHA256":  "912565C148C97E822E85A9C244C2049F001577E704318DEDA66B09DB21843D95"
+                     },
+                     {
+                         "Name":  "project_identity_refactor.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_identity_refactor.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_identity_refactor.md",
+                         "SHA256":  "8A3DD8669B43A8B8C0B276F22C3185195BDDBE129E6F442949BF8CF5676B30CC"
+                     },
+                     {
+                         "Name":  "project_phase2_quality_harness.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_phase2_quality_harness.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_phase2_quality_harness.md",
+                         "SHA256":  "33AFF901A265A507E48C1D686886FFE3CC752109227241C4F72554F60FD9F2D1"
+                     },
+                     {
+                         "Name":  "project_plan_of_record.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_plan_of_record.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_plan_of_record.md",
+                         "SHA256":  "835604E5FB238A1F77261CF143D669DB8F4D925AD4F29DE718A34BBFBA90D1B9"
+                     },
+                     {
+                         "Name":  "project_release_plan_v2.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_release_plan_v2.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_release_plan_v2.md",
+                         "SHA256":  "940CB22257E04C01AB2C6AF9184F8E14BCB889A4CEB0BDE83FA17CCFA385EFA3"
+                     },
+                     {
+                         "Name":  "project_s299_governance_lessons.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_s299_governance_lessons.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_s299_governance_lessons.md",
+                         "SHA256":  "DCCEE1150EB6E12BC2C22BF36725D9AF6361E950C87636487ECB1B21ADDD2A3F"
+                     },
+                     {
+                         "Name":  "project_strategic_thesis.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_strategic_thesis.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_strategic_thesis.md",
+                         "SHA256":  "5FC677420A9A59FD414192EDA4C5800FC4153C74119A1662F9A8040C93AD26EB"
+                     },
+                     {
+                         "Name":  "project_vision_statement.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_vision_statement.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_vision_statement.md",
+                         "SHA256":  "FD2D4BE7050FF7440D8E4A5B9EF3B2E8911304936A3803B9A2B8E50034BCB5D4"
+                     },
+                     {
+                         "Name":  "project_widget_roadmap_decisions.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\project_widget_roadmap_decisions.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\project_widget_roadmap_decisions.md",
+                         "SHA256":  "676B61A2ED001817736A974E187CF04C2AB21B143D2076E1D78CCE4DE210CDC1"
+                     },
+                     {
+                         "Name":  "provider-admin-monitoring.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\provider-admin-monitoring.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\provider-admin-monitoring.md",
+                         "SHA256":  "12FD88359911A81E95A2E8B3E583F60B78083A2B556C1CB562713C39FF217E62"
+                     },
+                     {
+                         "Name":  "provisioning-persistence.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\provisioning-persistence.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\provisioning-persistence.md",
+                         "SHA256":  "7A046551BF77A689E14931EE2F024CF299C84A602FAEAF519056DB36D17C1A99"
+                     },
+                     {
+                         "Name":  "reference_openai_api_key.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\reference_openai_api_key.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\reference_openai_api_key.md",
+                         "SHA256":  "B3A2BB11B15FE0846FF1FD961C480398EF597AE9E6F1A01FD21B3A164D83908F"
+                     },
+                     {
+                         "Name":  "reference_sarah_scenario.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\reference_sarah_scenario.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\reference_sarah_scenario.md",
+                         "SHA256":  "8FF8597A517A4A2F5F2196BD702AF3E4C407CCCD90C4601338ABF96FCDEAE2EE"
+                     },
+                     {
+                         "Name":  "reference_ui_testing_tools.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\reference_ui_testing_tools.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\reference_ui_testing_tools.md",
+                         "SHA256":  "DF144A371CB221C1BAECED70CD737A8A054781B3562019CBFC23155828D29171"
+                     },
+                     {
+                         "Name":  "session_s231_summary.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\session_s231_summary.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\session_s231_summary.md",
+                         "SHA256":  "F97A1E3E92C8BF3A3A2A43DA0E912BD2C5467122833559660F7BC39C4A65E6E3"
+                     },
+                     {
+                         "Name":  "session_s259.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\session_s259.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\session_s259.md",
+                         "SHA256":  "BF8082FCBE0C1BB6B992DF1EE871003A65C2C4F9406D533A64143D227BC67988"
+                     },
+                     {
+                         "Name":  "session_s262_summary.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\session_s262_summary.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\session_s262_summary.md",
+                         "SHA256":  "565210247D9FD713D2355656C6CA53D53B57C6D70999BBC47D7E391D005BC602"
+                     },
+                     {
+                         "Name":  "spec-maturation-process.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\spec-maturation-process.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\spec-maturation-process.md",
+                         "SHA256":  "154A269BE80EA831D039E4479BB37DCDB2FC881BDB6F1B54D90948BD8A3E093D"
+                     },
+                     {
+                         "Name":  "testing.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\testing.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\testing.md",
+                         "SHA256":  "6BBD066FAED3531BC1463DBF4319DB850F742D33163225812C2979FED075D49E"
+                     },
+                     {
+                         "Name":  "transport-hierarchy.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\transport-hierarchy.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\transport-hierarchy.md",
+                         "SHA256":  "10DF9C592F57FACFAD5DB0C4030AAC6B4D797153953276FCF97DD70C97D9A848"
+                     },
+                     {
+                         "Name":  "ui-testing.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\ui-testing.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\ui-testing.md",
+                         "SHA256":  "040FBDE9914B42243547E454964D20B234640633369200ACFE035B926AF311B8"
+                     },
+                     {
+                         "Name":  "user_communication_style.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\user_communication_style.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\user_communication_style.md",
+                         "SHA256":  "5C3E65C3B98381C2B65CE203A80329D9D155DF32634C12356CCBC7583047798C"
+                     },
+                     {
+                         "Name":  "user_workstation.md",
+                         "Src":  "C:\\Users\\micha\\.claude\\projects\\E--GT-KB\\memory\\user_workstation.md",
+                         "Dst":  "E:\\GT-KB\\memory\\topics\\user_workstation.md",
+                         "SHA256":  "06D46A97998E87AD4029C5928A786743449E0F2B2B324F8464C3C8D1AE292901"
+                     }
+                 ],
+    "failed":  [
+
+               ],
+    "skipped":  [
+
+                ]
+}
