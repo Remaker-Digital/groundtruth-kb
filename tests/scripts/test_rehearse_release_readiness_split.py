@@ -38,7 +38,14 @@ def _build_manifest(legacy_root: Path) -> dict[str, Any]:
 
 
 class _FakeKB:
-    """Duck-typed KB for tests. Tracks which methods get called."""
+    """Duck-typed KB for tests. Tracks which methods get called.
+
+    Supports the filter kwargs the lane actually uses (per Codex Slice
+    6 ``-006`` F1 fix): ``list_specs(type=...)``,
+    ``list_deliberations(outcome=...)``. Other filter kwargs are
+    ignored (returns full list). Mirrors KnowledgeDB's filter
+    semantics for the kwargs the lane uses.
+    """
 
     def __init__(
         self,
@@ -52,26 +59,38 @@ class _FakeKB:
         self._work_items = work_items or []
         self._deliberations = deliberations or []
         self.list_documents_called = False
-        self.list_specs_called = False
+        self.list_specs_called_types: list[str | None] = []
         self.list_work_items_called = False
-        self.list_deliberations_called = False
+        self.list_deliberations_called_outcomes: list[str | None] = []
         self.search_deliberations_called = False
 
     def list_documents(self, **kwargs: Any) -> list[dict[str, Any]]:
         self.list_documents_called = True
         return list(self._documents)
 
-    def list_specs(self, **kwargs: Any) -> list[dict[str, Any]]:
-        self.list_specs_called = True
-        return list(self._specs)
+    def list_specs(self, *, type: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+        self.list_specs_called_types.append(type)
+        if type is None:
+            return list(self._specs)
+        return [s for s in self._specs if s.get("type") == type]
 
     def list_work_items(self, **kwargs: Any) -> list[dict[str, Any]]:
         self.list_work_items_called = True
         return list(self._work_items)
 
-    def list_deliberations(self, **kwargs: Any) -> list[dict[str, Any]]:
-        self.list_deliberations_called = True
-        return list(self._deliberations)
+    def list_deliberations(self, *, outcome: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+        self.list_deliberations_called_outcomes.append(outcome)
+        if outcome is None:
+            return list(self._deliberations)
+        return [d for d in self._deliberations if d.get("outcome") == outcome]
+
+    @property
+    def list_deliberations_called(self) -> bool:
+        return len(self.list_deliberations_called_outcomes) > 0
+
+    @property
+    def list_specs_called(self) -> bool:
+        return len(self.list_specs_called_types) > 0
 
     def search_deliberations(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
         # Tracking only — should NOT be called by the lane.
@@ -336,8 +355,9 @@ def test_run_gtkb_spec_with_agent_red_content_routes_to_unclassified(
         specs=[
             {
                 "id": "GTKB-MIXED-001",
-                "summary": "Generic spec",
-                "content": "References Agent Red migration tooling.",
+                "type": "governance",
+                "title": "Generic release-readiness governance spec",
+                "description": "References Agent Red migration tooling for release.",
             }
         ]
     )
@@ -369,8 +389,9 @@ def test_run_clean_gtkb_spec_classifies_as_framework(tmp_path: Path) -> None:
         specs=[
             {
                 "id": "GTKB-FRAMEWORK-001",
-                "summary": "Generic framework spec",
-                "content": "Pure framework concern, no adopter mention.",
+                "type": "governance",
+                "title": "Generic framework release-readiness spec",
+                "description": "Pure framework deployment concern, no adopter mention.",
             }
         ]
     )
@@ -392,7 +413,15 @@ def test_run_ar_prefix_work_item_classifies_as_adopter(tmp_path: Path) -> None:
     ledger = tmp_path / "ledger.md"
     _write_ledger(ledger)
     manifest = _build_manifest(tmp_path)
-    fake_kb = _FakeKB(work_items=[{"id": "AR-WI-001", "title": "Adopter work item"}])
+    fake_kb = _FakeKB(
+        work_items=[
+            {
+                "id": "AR-WI-001",
+                "title": "Adopter release blocker work item",
+                "resolution_status": "open",
+            }
+        ]
+    )
     _release_readiness_split.run(
         manifest,
         tmp_path / "out",
@@ -405,6 +434,282 @@ def test_run_ar_prefix_work_item_classifies_as_adopter(tmp_path: Path) -> None:
     )
     adopter_ids = [w["id"] for w in artifact["adopter_work_items"]]
     assert "AR-WI-001" in adopter_ids
+
+
+# ---------- F2 fix: real KB ID-shape classification (Codex -006 F2) ----------
+
+
+def test_run_gov_spec_with_agent_red_content_classifies_as_adopter(
+    tmp_path: Path,
+) -> None:
+    """Real-shaped ID family: GOV-* spec with Agent Red content →
+    adopter via artifact_content_agent_red signal."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        specs=[
+            {
+                "id": "GOV-RELEASE-READINESS-GOVERNED-TESTING-001",
+                "type": "governance",
+                "title": "Agent Red release readiness governed testing",
+                "description": "Production release blocker tracking for Agent Red.",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    adopter_ids = [s["id"] for s in artifact["adopter_specs"]]
+    assert "GOV-RELEASE-READINESS-GOVERNED-TESTING-001" in adopter_ids
+    entry = next(s for s in artifact["adopter_specs"] if s["id"] == "GOV-RELEASE-READINESS-GOVERNED-TESTING-001")
+    assert entry["classification_signal"] == "artifact_content_agent_red"
+
+
+def test_run_gov_spec_with_framework_content_classifies_as_framework(
+    tmp_path: Path,
+) -> None:
+    """GOV-* spec with framework keyword → framework via artifact_content_framework."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        specs=[
+            {
+                "id": "GOV-UPSTREAM-RELEASE-001",
+                "type": "governance",
+                "title": "Upstream release management",
+                "description": "groundtruth-kb upstream package release deployment.",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    framework_ids = [s["id"] for s in artifact["framework_specs"]]
+    assert "GOV-UPSTREAM-RELEASE-001" in framework_ids
+
+
+def test_run_pb_spec_with_mixed_content_classifies_as_unclassified(
+    tmp_path: Path,
+) -> None:
+    """Real-ID + both adopter AND framework content → unclassified
+    with mixed_content_signals."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        specs=[
+            {
+                "id": "PB-MIXED-RELEASE-001",
+                "type": "protected_behavior",
+                "title": "Release readiness protected behavior",
+                "description": "Agent Red release with groundtruth-kb upstream coordination.",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    unclassified_ids = [s["id"] for s in artifact["unclassified_specs"]]
+    assert "PB-MIXED-RELEASE-001" in unclassified_ids
+    entry = next(s for s in artifact["unclassified_specs"] if s["id"] == "PB-MIXED-RELEASE-001")
+    assert entry["classification_signal"] == "mixed_content_signals"
+
+
+def test_run_delib_owner_decision_with_agent_red_content_classifies_as_adopter(
+    tmp_path: Path,
+) -> None:
+    """DELIB-* + outcome=owner_decision + Agent Red content → adopter."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        deliberations=[
+            {
+                "id": "DELIB-0834",
+                "outcome": "owner_decision",
+                "title": "Agent Red release decision",
+                "summary": "Release deployment to staging for Agent Red.",
+                "content": "Decision content here.",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    adopter_ids = [d["id"] for d in artifact["adopter_deliberations"]]
+    assert "DELIB-0834" in adopter_ids
+
+
+# ---------- F1 fix: source filters (Codex -006 F1) ----------
+
+
+def test_run_filters_out_non_release_relevant_specs(tmp_path: Path) -> None:
+    """Specs without release-readiness keyword are filtered out."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        specs=[
+            {
+                "id": "GOV-UNRELATED-FOO-001",
+                "type": "governance",
+                "title": "Some unrelated governance spec",
+                "description": "Has nothing to do with that subject.",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    all_spec_ids = (
+        [s["id"] for s in artifact["framework_specs"]]
+        + [s["id"] for s in artifact["adopter_specs"]]
+        + [s["id"] for s in artifact["unclassified_specs"]]
+    )
+    assert "GOV-UNRELATED-FOO-001" not in all_spec_ids, "F1 regression: non-release-relevant spec leaked through filter"
+
+
+def test_run_filters_out_resolved_work_items(tmp_path: Path) -> None:
+    """WIs with resolution_status='resolved' are filtered out."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        work_items=[
+            {
+                "id": "WI-3168",
+                "title": "Resolved Agent Red release blocker",
+                "description": "Release deployment work, already resolved.",
+                "resolution_status": "resolved",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    all_wi_ids = (
+        [w["id"] for w in artifact["framework_work_items"]]
+        + [w["id"] for w in artifact["adopter_work_items"]]
+        + [w["id"] for w in artifact["unclassified_work_items"]]
+    )
+    assert "WI-3168" not in all_wi_ids, "F1 regression: resolved WI leaked through filter"
+
+
+def test_run_filters_specs_by_type(tmp_path: Path) -> None:
+    """Only relevant spec types queried; irrelevant types filtered at DB layer."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        specs=[
+            {
+                "id": "SPEC-RELEASE-NOTE-001",
+                "type": "release_note",  # NOT in _RELEVANT_SPEC_TYPES
+                "title": "Release note for v1.0",
+                "description": "Some release note content.",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    queried_types = [t for t in fake_kb.list_specs_called_types if t is not None]
+    assert "release_note" not in queried_types
+    assert "governance" in queried_types
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    all_spec_ids = (
+        [s["id"] for s in artifact["framework_specs"]]
+        + [s["id"] for s in artifact["adopter_specs"]]
+        + [s["id"] for s in artifact["unclassified_specs"]]
+    )
+    assert "SPEC-RELEASE-NOTE-001" not in all_spec_ids
+
+
+def test_run_includes_owner_decision_deliberations_without_release_keyword(
+    tmp_path: Path,
+) -> None:
+    """list_deliberations(outcome='owner_decision') always included
+    (owner decisions are policy-bearing regardless of subject)."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        deliberations=[
+            {
+                "id": "DELIB-0900",
+                "outcome": "owner_decision",
+                "title": "Owner decision on something unrelated",
+                "summary": "Generic content.",
+                "content": "More content.",
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    all_delib_ids = (
+        [d["id"] for d in artifact["framework_deliberations"]]
+        + [d["id"] for d in artifact["adopter_deliberations"]]
+        + [d["id"] for d in artifact["unclassified_deliberations"]]
+    )
+    assert "DELIB-0900" in all_delib_ids
 
 
 # ---------- T12-T14: artifact structure + result.json ----------

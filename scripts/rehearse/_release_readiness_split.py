@@ -40,7 +40,6 @@ from typing import Any
 
 from rehearse._common import LEGACY_ROOT
 from rehearse._split_helper import (
-    classify_with_content_override,
     emit_result,
     partition_items,
 )
@@ -170,28 +169,182 @@ def _classify_release_gate_surfaces(legacy_root: Path) -> list[dict[str, Any]]:
     return entries
 
 
+_RELEASE_READINESS_KEYWORDS: tuple[str, ...] = (
+    "release",
+    "readiness",
+    "deployment",
+    "deploy",
+    "blocker",
+    "gate",
+    "recovery",
+    "regression",
+    "production",
+    "staging",
+)
+
+# Spec types relevant to release-readiness inventory (per Codex Slice 6
+# `-006` F1 fix: don't blindly include all SPEC-* rows). Sourced from
+# the live KB type set.
+_RELEVANT_SPEC_TYPES: tuple[str, ...] = (
+    "governance",
+    "protected_behavior",
+    "architecture_decision",
+    "design_constraint",
+    "requirement",
+)
+
+# Resolution-statuses considered "open / recently closed" for the WI
+# filter per the original Slice 6 -001 §2.4 contract. The live KB also
+# uses 'resolved' which is excluded so historical WIs don't flood the
+# split.
+_OPEN_RESOLUTION_STATUSES: frozenset[str | None] = frozenset({None, "", "open", "in_progress", "pending", "blocked"})
+
+# Framework-content markers complement adopter markers per Codex Slice
+# 6 ``-006`` F2 fix. Real KB IDs (SPEC-/GOV-/PB-/ADR-/DCL-/WI-/DELIB-)
+# don't carry inherent subject signal; content is the only signal. Use
+# explicit framework keywords as the symmetric counterpart to adopter
+# markers so the classifier can detect framework-targeted records.
+_FRAMEWORK_CONTENT_MARKERS: tuple[str, ...] = (
+    "groundtruth-kb",
+    "groundtruth_kb",
+    "gt-kb framework",
+    "framework upstream",
+    "upstream package",
+)
+
+
 def _spec_content_blob(spec: dict[str, Any]) -> str:
-    return (spec.get("summary") or "") + " " + (spec.get("content") or "")
+    """Per Codex Slice 6 ``-006`` F2: include the actual KB fields
+    (title, description, scope) — not the absent summary/content fields
+    the original implementation read."""
+    return (
+        (spec.get("title") or "")
+        + " "
+        + (spec.get("description") or "")
+        + " "
+        + (spec.get("scope") or "")
+        + " "
+        + (spec.get("rationale") or "")
+    )
 
 
 def _wi_content_blob(wi: dict[str, Any]) -> str:
-    return (wi.get("title") or "") + " " + (wi.get("description") or "")
+    return (wi.get("title") or "") + " " + (wi.get("description") or "") + " " + (wi.get("failure_description") or "")
 
 
 def _delib_content_blob(delib: dict[str, Any]) -> str:
-    return (delib.get("title") or "") + " " + (delib.get("summary") or "")
+    """Per Codex Slice 6 ``-006`` F2: include the content field as well
+    (deliberations have title + summary + content)."""
+    return (delib.get("title") or "") + " " + (delib.get("summary") or "") + " " + (delib.get("content") or "")
+
+
+def _is_release_readiness_relevant(text: str) -> bool:
+    """True if the text mentions any release-readiness keyword."""
+    blob = text.lower()
+    return any(k in blob for k in _RELEASE_READINESS_KEYWORDS)
+
+
+def _filtered_specs(kb: Any) -> list[dict[str, Any]]:
+    """Per Codex Slice 6 ``-006`` F1: filter specs by relevant types
+    AND release-readiness keyword match before classification."""
+    specs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for spec_type in _RELEVANT_SPEC_TYPES:
+        for spec in kb.list_specs(type=spec_type):
+            spec_id = spec.get("id", "")
+            if spec_id in seen_ids:
+                continue
+            if _is_release_readiness_relevant(_spec_content_blob(spec)):
+                specs.append(spec)
+                seen_ids.add(spec_id)
+    return specs
+
+
+def _filtered_work_items(kb: Any) -> list[dict[str, Any]]:
+    """Per Codex Slice 6 ``-006`` F1: filter WIs to open/recently-closed
+    AND release-readiness keyword match before classification."""
+    return [
+        w
+        for w in kb.list_work_items()
+        if w.get("resolution_status") in _OPEN_RESOLUTION_STATUSES
+        and _is_release_readiness_relevant(_wi_content_blob(w))
+    ]
+
+
+def _filtered_deliberations(kb: Any) -> list[dict[str, Any]]:
+    """Per Codex Slice 6 ``-006`` F1: filter deliberations to
+    owner_decision outcomes OR release-readiness keyword matches.
+
+    Uses the inventory ``list_deliberations()`` API; never
+    ``search_deliberations()`` (which is capped) per Codex Slice 5
+    ``-002``.
+    """
+    owner_decisions = kb.list_deliberations(outcome="owner_decision")
+    seen_ids = {d.get("id", "") for d in owner_decisions}
+    relevant_others = [
+        d
+        for d in kb.list_deliberations()
+        if d.get("id") not in seen_ids and _is_release_readiness_relevant(_delib_content_blob(d))
+    ]
+    return owner_decisions + relevant_others
+
+
+def _classify_release_readiness_artifact(
+    record_id: str,
+    content_blob: str,
+) -> tuple[str, str]:
+    """Real-ID-family classifier per Codex Slice 6 ``-006`` F2.
+
+    Real KB IDs (SPEC-/GOV-/PB-/ADR-/DCL-/WI-/DELIB-) do NOT carry
+    inherent subject signal; content is the only reliable indicator.
+    GTKB-/AR- records still use the prefix-with-conflict-routing rule.
+
+    Returns ``(classification, signal)``:
+
+    - ``AR-*`` prefix → ``('adopter', 'ar_prefix')``
+    - ``GTKB-*`` prefix + adopter content → ``('unclassified',
+      'gtkb_prefix_with_adopter_content')``
+    - ``GTKB-*`` prefix + no adopter content → ``('framework',
+      'gtkb_prefix')``
+    - Any other prefix + both adopter and framework content →
+      ``('unclassified', 'mixed_content_signals')`` (conflict-preserving)
+    - Any other prefix + only adopter content → ``('adopter',
+      'artifact_content_agent_red')``
+    - Any other prefix + only framework content → ``('framework',
+      'artifact_content_framework')``
+    - Any other prefix + neither → ``('unclassified',
+      'artifact_no_subject_signal')``
+    """
+    blob = content_blob.lower()
+    has_adopter = any(m in blob for m in ("agent red", "agent_red"))
+    has_framework = any(m in blob for m in _FRAMEWORK_CONTENT_MARKERS)
+
+    if record_id.startswith("AR-"):
+        return ("adopter", "ar_prefix")
+    if record_id.startswith("GTKB-"):
+        if has_adopter:
+            return ("unclassified", "gtkb_prefix_with_adopter_content")
+        return ("framework", "gtkb_prefix")
+
+    if has_adopter and has_framework:
+        return ("unclassified", "mixed_content_signals")
+    if has_adopter:
+        return ("adopter", "artifact_content_agent_red")
+    if has_framework:
+        return ("framework", "artifact_content_framework")
+    return ("unclassified", "artifact_no_subject_signal")
 
 
 def _classify_spec(spec: dict[str, Any]) -> tuple[str, str]:
-    return classify_with_content_override(spec.get("id", ""), _spec_content_blob(spec))
+    return _classify_release_readiness_artifact(spec.get("id", ""), _spec_content_blob(spec))
 
 
 def _classify_work_item(wi: dict[str, Any]) -> tuple[str, str]:
-    return classify_with_content_override(wi.get("id", ""), _wi_content_blob(wi))
+    return _classify_release_readiness_artifact(wi.get("id", ""), _wi_content_blob(wi))
 
 
 def _classify_deliberation(delib: dict[str, Any]) -> tuple[str, str]:
-    return classify_with_content_override(delib.get("id", ""), _delib_content_blob(delib))
+    return _classify_release_readiness_artifact(delib.get("id", ""), _delib_content_blob(delib))
 
 
 def run(
@@ -281,9 +434,15 @@ def run(
     release_gate_surfaces = _classify_release_gate_surfaces(LEGACY_ROOT)
 
     try:
-        all_specs = kb.list_specs()
-        all_work_items = kb.list_work_items()
-        all_deliberations = kb.list_deliberations()
+        # Per Codex Slice 6 -006 F1 fix: filter sources before
+        # classification. Specs by type + release-keyword content;
+        # work items by open status + release-keyword content;
+        # deliberations by owner_decision outcome OR release-keyword
+        # content. Replaces the prior whole-KB dump that produced
+        # 5,150 artifacts with 5,139 unclassified.
+        filtered_specs = _filtered_specs(kb)
+        filtered_work_items = _filtered_work_items(kb)
+        filtered_deliberations = _filtered_deliberations(kb)
     except Exception as exc:
         return emit_result(
             lane_dir,
@@ -295,9 +454,9 @@ def run(
             },
         )
 
-    spec_buckets = partition_items(all_specs, _classify_spec)
-    wi_buckets = partition_items(all_work_items, _classify_work_item)
-    delib_buckets = partition_items(all_deliberations, _classify_deliberation)
+    spec_buckets = partition_items(filtered_specs, _classify_spec)
+    wi_buckets = partition_items(filtered_work_items, _classify_work_item)
+    delib_buckets = partition_items(filtered_deliberations, _classify_deliberation)
 
     framework_artifact_count = (
         len(spec_buckets["framework"]) + len(wi_buckets["framework"]) + len(delib_buckets["framework"])
