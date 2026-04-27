@@ -28,9 +28,20 @@ from rehearse import _membase_export  # noqa: E402
 
 
 # Live KB schemas (subset of columns needed for each test). The full live
-# schema has more columns, but only id/version/content-bearing/session_id
-# are load-bearing for classification.
+# schema has more columns, but only id/version/content-bearing/session_id/
+# type-specific are load-bearing for classification.
 _VERSIONED_TABLE_SCHEMA = "id TEXT, version INTEGER, title TEXT, description TEXT"
+# Per Codex ``-008`` Finding 1: tests classify by ``test_file`` path.
+# Fixture schema must include the path columns so ``_classify_test_path``
+# is exercised end-to-end.
+_TESTS_TABLE_SCHEMA = (
+    "id TEXT, version INTEGER, title TEXT, description TEXT, test_file TEXT, test_class TEXT, test_function TEXT"
+)
+# Per Codex ``-008`` Finding 1: deliberations classify by
+# ``origin_project``. Fixture schema includes the origin columns.
+_DELIBERATIONS_TABLE_SCHEMA = (
+    "id TEXT, version INTEGER, title TEXT, description TEXT, origin_project TEXT, origin_repo TEXT"
+)
 _RELATIONSHIP_DELIB_SPECS_SCHEMA = "deliberation_id TEXT, spec_id TEXT"
 _RELATIONSHIP_DELIB_WIS_SCHEMA = "deliberation_id TEXT, work_item_id TEXT"
 _TELEMETRY_SCHEMA = "id INTEGER PRIMARY KEY, payload TEXT"
@@ -49,14 +60,16 @@ def _create_minimal_live_schema(kb_path: Path) -> sqlite3.Connection:
     """
     conn = sqlite3.connect(kb_path)
     cur = conn.cursor()
-    # Versioned artifact tables (12).
+    # Versioned artifact tables (12). Per Codex ``-008`` Finding 1:
+    # ``tests`` and ``deliberations`` get extended schemas matching the
+    # live DB columns the type-specific classifier reads.
+    cur.execute(f'CREATE TABLE "tests" ({_TESTS_TABLE_SCHEMA})')
+    cur.execute(f'CREATE TABLE "deliberations" ({_DELIBERATIONS_TABLE_SCHEMA})')
     for name in (
         "specifications",
-        "tests",
         "work_items",
         "documents",
         "operational_procedures",
-        "deliberations",
         "environment_config",
         "backlog_snapshots",
         "test_plans",
@@ -336,6 +349,258 @@ def test_run_classifies_non_prefixed_id_by_content_scan(tmp_path: Path) -> None:
     assert by_id["SPEC-9999"]["classification_signal"] == "agent_red_product_reference"
     assert by_id["SPEC-1834"]["classification"] == "unclassified"
     assert by_id["SPEC-1834"]["classification_signal"] == "no_classification_signal"
+
+
+# ---- Type-specific override: tests.test_file path classification -----
+# Per Codex `-008` Finding 1 — REVISED-1.
+
+
+def test_run_classifies_test_path_groundtruth_kb_as_framework(tmp_path: Path) -> None:
+    """tests/groundtruth_kb/* → framework via test_file path.
+
+    The description deliberately contains an adopter content marker
+    ("agent red") to prove the path classifier wins over content scan.
+    """
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO tests (id, version, title, description, test_file, test_class, test_function) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            "TEST-FW-001",
+            1,
+            "Framework test",
+            "agent red references in body should not flip classification",
+            "tests/groundtruth_kb/test_assertion_runner.py",
+            "TestAssertionRunner",
+            "test_pass",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "TEST-FW-001")
+    assert record["classification"] == "framework"
+    assert record["classification_signal"] == "test_path_framework_groundtruth_kb"
+
+
+def test_run_classifies_test_path_transport_as_adopter_named(tmp_path: Path) -> None:
+    """tests/transport/* → adopter (named in original Slice 8 proposal)."""
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
+        ("TEST-TRANSPORT", 1, "Transport", "generic", "tests/transport/test_pipeline.py"),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "TEST-TRANSPORT")
+    assert record["classification"] == "adopter"
+    assert record["classification_signal"] == "test_path_adopter_named"
+
+
+def test_run_classifies_test_path_admin_scripts_as_adopter_named(tmp_path: Path) -> None:
+    """tests/scripts/test_admin_* → adopter (named)."""
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
+        ("TEST-ADMIN", 1, "Admin", "x", "tests/scripts/test_admin_team_api.py"),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "TEST-ADMIN")
+    assert record["classification"] == "adopter"
+    assert record["classification_signal"] == "test_path_adopter_named"
+
+
+def test_run_classifies_test_path_provider_scripts_as_adopter_named(tmp_path: Path) -> None:
+    """tests/scripts/test_provider_* → adopter (named)."""
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
+        ("TEST-PROVIDER", 1, "Provider", "x", "tests/scripts/test_provider_admin.py"),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "TEST-PROVIDER")
+    assert record["classification"] == "adopter"
+    assert record["classification_signal"] == "test_path_adopter_named"
+
+
+def test_run_classifies_test_path_release_candidate_gate_as_mixed_scope(tmp_path: Path) -> None:
+    """test_release_candidate_gate.py → unclassified mixed_scope_test.
+
+    Mixed-scope check must run BEFORE the adopter-product default;
+    otherwise this path (under tests/scripts/) would absorb into the
+    adopter bucket.
+    """
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
+        ("TEST-MIXED", 1, "Gate", "x", "tests/scripts/test_release_candidate_gate.py"),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "TEST-MIXED")
+    assert record["classification"] == "unclassified"
+    assert record["classification_signal"] == "mixed_scope_test"
+
+
+def test_run_classifies_other_test_path_under_tests_as_adopter_product(tmp_path: Path) -> None:
+    """Any tests/<dir>/ path that is not framework or named → adopter (product default).
+
+    Justification: this lane runs against the *adopter* project's KB.
+    Framework tests live in the upstream `groundtruth-kb` repo's KB.
+    A future framework-side import of test artifacts would still be
+    caught: an explicit ``tests/groundtruth_kb/`` prefix overrides this
+    default.
+    """
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    paths = [
+        "tests/widget/test_admin.py",
+        "tests/multi_tenant/test_auth.py",
+        "tests/integration/test_e2e.py",
+        "tests/unit/test_parser.py",
+    ]
+    for i, path in enumerate(paths):
+        conn.execute(
+            "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
+            (f"TEST-PROD-{i:03d}", 1, "p", "x", path),
+        )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    prod_records = [r for r in payload["versioned_records"] if r["id"].startswith("TEST-PROD-")]
+    assert len(prod_records) == 4
+    for record in prod_records:
+        assert record["classification"] == "adopter"
+        assert record["classification_signal"] == "test_path_adopter_product"
+
+
+def test_run_falls_through_to_id_prefix_when_test_file_null(tmp_path: Path) -> None:
+    """tests with NULL test_file fall through to ID-prefix + content scan."""
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
+        ("AR-TEST-001", 1, "AR-prefixed test", "no path content", None),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "AR-TEST-001")
+    assert record["classification"] == "adopter"
+    assert record["classification_signal"] == "ar_prefix"
+
+
+def test_run_falls_through_when_test_file_outside_tests_dir(tmp_path: Path) -> None:
+    """tests with test_file outside tests/ dir fall through to content scan."""
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
+        ("TEST-OUT", 1, "x", "x", "src/some_module.py"),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "TEST-OUT")
+    assert record["classification"] == "unclassified"
+    assert record["classification_signal"] == "no_classification_signal"
+
+
+# ---- Type-specific override: deliberations.origin_project -------------
+# Per Codex `-008` Finding 1 — REVISED-1.
+
+
+def test_run_classifies_deliberation_origin_agent_red_as_adopter(tmp_path: Path) -> None:
+    """deliberations.origin_project='agent-red' → adopter via type-specific signal.
+
+    Title/description carry NO scope-bearing content; classification
+    must come from origin_project alone.
+    """
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO deliberations (id, version, title, description, origin_project, origin_repo) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "DELIB-AR-001",
+            1,
+            "Generic deliberation",
+            "Generic content with no scope markers",
+            "agent-red",
+            "Remaker-Digital/agent-red-customer-engagement",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "DELIB-AR-001")
+    assert record["classification"] == "adopter"
+    assert record["classification_signal"] == "deliberation_origin_project_agent_red"
+
+
+def test_run_classifies_deliberation_origin_groundtruth_kb_as_framework(tmp_path: Path) -> None:
+    """deliberations.origin_project='groundtruth-kb' → framework."""
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO deliberations (id, version, title, description, origin_project) VALUES (?, ?, ?, ?, ?)",
+        ("DELIB-FW-001", 1, "Generic", "Generic", "groundtruth-kb"),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "DELIB-FW-001")
+    assert record["classification"] == "framework"
+    assert record["classification_signal"] == "deliberation_origin_project_framework"
+
+
+def test_run_classifies_deliberation_with_null_origin_falls_through_to_content(tmp_path: Path) -> None:
+    """deliberations with NULL origin_project fall through to content scan."""
+    kb_path = _build_kb(tmp_path)
+    conn = sqlite3.connect(kb_path)
+    conn.execute(
+        "INSERT INTO deliberations (id, version, title, description, origin_project) VALUES (?, ?, ?, ?, ?)",
+        ("DELIB-NULL", 1, "Agent Red", "agent red migration discussion", None),
+    )
+    conn.commit()
+    conn.close()
+
+    _run_lane(kb_path, tmp_path / "output")
+    payload = _read_manifest(tmp_path / "output")
+    record = next(r for r in payload["versioned_records"] if r["id"] == "DELIB-NULL")
+    assert record["classification"] == "adopter"
+    assert record["classification_signal"] == "agent_red_product_reference"
 
 
 # ---- Excluded telemetry (Codex -006 constraint 2) ---------------------

@@ -25,6 +25,39 @@ per Codex ``-006`` constraint 1 (NOT silent ``ok``-with-warning). This
 defends the cutover plan against silent omission of new schema
 additions.
 
+Type-Specific Override Decisions (per Codex ``-008`` Finding 1)
+---------------------------------------------------------------
+The classification cascade for each versioned-artifact row is:
+
+1. **Type-specific signal** (table-specific override):
+   - ``tests``: classify by ``test_file`` path. Mixed-scope test
+     filenames first; ``tests/groundtruth_kb/`` → framework;
+     ``tests/transport/``, ``tests/scripts/test_admin_*``,
+     ``tests/scripts/test_provider_*`` → adopter (named); any other
+     ``tests/`` path → adopter (this lane runs against the *adopter*
+     project's KB; framework tests live upstream).
+   - ``deliberations``: classify by ``origin_project``. Markers like
+     ``groundtruth-kb`` → framework; ``agent-red`` / ``agent_red`` →
+     adopter. NULL or unrecognized → fall through.
+
+2. **ID prefix + generic content scan** (fallback for rows without a
+   type-specific signal): existing ``_classify_artifact_id`` logic.
+
+Tables with **no override** (explicit decision per Codex ``-008``
+required-action option):
+   - ``operational_procedures``: ``type`` column is workflow type, not
+     scope; no clean adopter/framework discriminator.
+   - ``documents``: ``category`` is content-type ("assessment",
+     "architecture"), not scope; ``source_path`` is sparsely populated.
+   - ``work_items``: ``component`` is functional area, not scope.
+   - ``specifications``: ``type`` is artifact subtype; ``tags`` are
+     mostly non-scope ("phase-2", "owner_directive").
+   - ``test_plans``, ``test_plan_phases``, ``test_procedures``,
+     ``testable_elements``, ``backlog_snapshots``, ``environment_config``:
+     limited adopter/framework signal beyond ID prefix + content scan.
+
+These tables fall through to ID-prefix + content scan unconditionally.
+
 Outputs:
   - ``membase-partition-manifest.json`` (machine-readable cutover plan)
   - ``membase-partition-manifest-preview.md`` (human review)
@@ -136,6 +169,75 @@ _CONTENT_BEARING_COLUMNS: tuple[str, ...] = (
     "summary",
 )
 
+# Per-table additional columns queried for the type-specific classifier
+# (separate from generic content scan). Per Codex `-008` Finding 1: the
+# original Slice 8 proposal called for type-specific overrides per
+# versioned-table type. REVISED-1 implements them for the two tables with
+# strong, distinct signal columns; explicitly documents no-override for
+# the others (see "Type-specific override decisions" in the module
+# docstring).
+_TABLE_SPECIFIC_TYPE_COLUMNS: dict[str, tuple[str, ...]] = {
+    # Per Codex `-008`: tests classify by file path FIRST, falling back to
+    # ID prefix + content scan for tests with NULL ``test_file``.
+    "tests": ("test_file", "test_class", "test_function"),
+    # Highest-leverage signal in this KB: ``deliberations.origin_project``
+    # is populated for ~96% of rows (1,264 / 1,318 in the live schema)
+    # and explicitly identifies the originating project.
+    "deliberations": ("origin_project", "origin_repo"),
+    # Explicitly empty (no override) for these tables; their type-columns
+    # are functional categories, not adopter/framework discriminators:
+    #   - operational_procedures.type: workflow type, not scope
+    #   - documents.category: content-type ("assessment", "architecture"),
+    #     not scope; ``source_path`` is sparsely populated
+    #   - work_items.component: functional area ("infrastructure_automation",
+    #     "customer_interface"), not scope
+    #   - specifications.type: artifact subtype ("architecture_decision",
+    #     "governance"), not scope; ``tags`` are mostly non-scope
+    #     ("phase-2", "owner_directive")
+    # These tables fall through to ID-prefix + content scan for every row.
+}
+
+# Test-path classification patterns (per Codex `-008` Finding 1 and the
+# principled "this is the adopter KB" default rule). Order is
+# significant: mixed-scope check runs FIRST so a path like
+# ``test_release_candidate_gate.py`` (which lives under a typically-adopter
+# directory) is correctly classified as mixed.
+_TEST_PATH_MIXED_SCOPE_MARKERS: tuple[str, ...] = (
+    "test_release_candidate_gate",
+    "test_groundtruth_governance_adoption",
+)
+
+_TEST_PATH_FRAMEWORK_PREFIXES: tuple[str, ...] = ("tests/groundtruth_kb/",)
+
+_TEST_PATH_ADOPTER_NAMED_PREFIXES: tuple[str, ...] = (
+    "tests/transport/",
+    "tests/scripts/test_admin_",
+    "tests/scripts/test_provider_",
+)
+
+# Default fallback: any path under ``tests/`` that didn't match a
+# mixed-scope marker, framework prefix, or adopter-named prefix is treated
+# as adopter product test. Justification: this Slice-8 lane runs against
+# the *adopter* project's KB. Framework tests live in the upstream
+# `groundtruth-kb` repo's KB, not here. Tests in this DB that reference
+# product-area paths (`tests/widget/`, `tests/multi_tenant/`,
+# `tests/integration/`, etc.) are adopter content by construction. A
+# future framework-side import of test artifacts into this KB would still
+# be caught: an explicit ``tests/groundtruth_kb/`` prefix overrides this
+# default.
+_TEST_PATH_DEFAULT_ADOPTER_PREFIX: str = "tests/"
+
+# Deliberation origin classification markers.
+_DELIBERATION_ORIGIN_FRAMEWORK_MARKERS: tuple[str, ...] = (
+    "groundtruth",
+    "gt-kb",
+)
+_DELIBERATION_ORIGIN_ADOPTER_MARKERS: tuple[str, ...] = (
+    "agent-red",
+    "agent_red",
+    "agent red",
+)
+
 
 # ---- KB access helpers -----------------------------------------------
 
@@ -210,34 +312,131 @@ def _classify_artifact_id(item_id: str, content_text: str = "") -> tuple[str, st
     return ("unclassified", "no_classification_signal")
 
 
+def _classify_test_path(test_file: str | None) -> tuple[str, str] | None:
+    """Path-based classifier for the ``tests`` table.
+
+    Per Codex ``-008`` Finding 1. Returns ``(classification, signal)`` if
+    ``test_file`` carries a recognized scope signal; ``None`` if NULL,
+    empty, or unrecognized (caller falls through to ID-prefix + content
+    scan).
+
+    Order is significant: mixed-scope check runs first so a known mixed
+    file isn't shadowed by a directory-prefix match.
+    """
+    if not test_file:
+        return None
+    p = test_file.replace("\\", "/").lower()
+    for marker in _TEST_PATH_MIXED_SCOPE_MARKERS:
+        if marker in p:
+            return ("unclassified", "mixed_scope_test")
+    for prefix in _TEST_PATH_FRAMEWORK_PREFIXES:
+        if p.startswith(prefix):
+            return ("framework", "test_path_framework_groundtruth_kb")
+    for prefix in _TEST_PATH_ADOPTER_NAMED_PREFIXES:
+        if p.startswith(prefix):
+            return ("adopter", "test_path_adopter_named")
+    if p.startswith(_TEST_PATH_DEFAULT_ADOPTER_PREFIX):
+        return ("adopter", "test_path_adopter_product")
+    return None
+
+
+def _classify_deliberation_origin(origin_project: str | None) -> tuple[str, str] | None:
+    """Origin-project classifier for the ``deliberations`` table.
+
+    Returns ``(classification, signal)`` if ``origin_project`` carries a
+    recognized scope marker; ``None`` if NULL or unrecognized (caller
+    falls through to ID-prefix + content scan).
+    """
+    if not origin_project:
+        return None
+    p = origin_project.lower().strip()
+    if any(marker in p for marker in _DELIBERATION_ORIGIN_FRAMEWORK_MARKERS):
+        return ("framework", "deliberation_origin_project_framework")
+    if any(marker in p for marker in _DELIBERATION_ORIGIN_ADOPTER_MARKERS):
+        return ("adopter", "deliberation_origin_project_agent_red")
+    return None
+
+
+def _classify_by_type_specific_signal(table_name: str, type_columns: dict[str, str | None]) -> tuple[str, str] | None:
+    """Dispatch to per-table type-specific classifier.
+
+    Returns ``(classification, signal)`` if the table has a strong
+    type-specific signal; ``None`` if no signal applies (caller falls
+    through to ID-prefix + content scan).
+
+    Per Codex ``-008`` Finding 1: the originally promised type-specific
+    override layer. Implemented for ``tests`` (path-based) and
+    ``deliberations`` (origin_project-based). Explicitly absent for
+    other versioned tables — see module docstring "Type-Specific
+    Override Decisions".
+    """
+    if table_name == "tests":
+        return _classify_test_path(type_columns.get("test_file"))
+    if table_name == "deliberations":
+        return _classify_deliberation_origin(type_columns.get("origin_project"))
+    return None
+
+
 def _enumerate_versioned_table(conn: sqlite3.Connection, table_name: str) -> list[dict[str, Any]]:
     """Enumerate ``(id, versions[], classification)`` for a versioned table.
 
     One entry per unique ``id``; ``versions`` is the sorted list of
-    ``version`` values that exist for that id. Classification uses the
-    concatenation of all version rows' content-bearing columns.
+    ``version`` values that exist for that id.
+
+    Classification cascade per Codex ``-008`` Finding 1:
+      1. Type-specific signal (table-specific column scan; e.g.,
+         ``tests.test_file`` path or ``deliberations.origin_project``).
+      2. Fall through: ID prefix + generic content scan across
+         ``_CONTENT_BEARING_COLUMNS``.
+
+    For type-specific columns, a per-id representative value is taken
+    as the first non-null value across version rows (typically all
+    versions of the same id share these values).
     """
     cur = conn.cursor()
     cur.execute(f'PRAGMA table_info("{table_name}")')
     columns = [c[1] for c in cur.fetchall()]
     content_cols = [c for c in _CONTENT_BEARING_COLUMNS if c in columns]
-    select_list = "id, version" + (", " + ", ".join(content_cols) if content_cols else "")
+    type_cols = [c for c in _TABLE_SPECIFIC_TYPE_COLUMNS.get(table_name, ()) if c in columns]
+    select_cols = ["id", "version", *content_cols, *type_cols]
+    select_list = ", ".join(select_cols)
     cur.execute(f'SELECT {select_list} FROM "{table_name}" ORDER BY id, version')
     rows = cur.fetchall()
+
+    n_content = len(content_cols)
+
     by_id: dict[str, dict[str, Any]] = {}
     for row in rows:
         row_id = row[0]
         version = row[1]
-        content_blob = " ".join(str(v) for v in row[2:] if v is not None)
+        content_values = row[2 : 2 + n_content]
+        type_values = row[2 + n_content : 2 + n_content + len(type_cols)]
+        content_blob = " ".join(str(v) for v in content_values if v is not None)
         if row_id not in by_id:
-            by_id[row_id] = {"id": row_id, "versions": [], "content_blob": []}
+            by_id[row_id] = {
+                "id": row_id,
+                "versions": [],
+                "content_blob": [],
+                # Per-id type-column representative: first non-null value
+                # observed across version rows.
+                "type_columns": {col: None for col in type_cols},
+            }
         by_id[row_id]["versions"].append(version)
         by_id[row_id]["content_blob"].append(content_blob)
+        for col_name, value in zip(type_cols, type_values, strict=False):
+            if value is not None and by_id[row_id]["type_columns"].get(col_name) is None:
+                by_id[row_id]["type_columns"][col_name] = value
 
     entries: list[dict[str, Any]] = []
     for row_id, data in by_id.items():
-        content_text = " ".join(data["content_blob"])
-        classification, signal = _classify_artifact_id(row_id, content_text)
+        # Tier 1 — type-specific signal.
+        type_specific = _classify_by_type_specific_signal(table_name, data["type_columns"])
+        if type_specific is not None:
+            classification, signal = type_specific
+        else:
+            # Tier 2 — ID prefix + content scan fallback.
+            content_text = " ".join(data["content_blob"])
+            classification, signal = _classify_artifact_id(row_id, content_text)
         entries.append(
             {
                 "table_name": table_name,
