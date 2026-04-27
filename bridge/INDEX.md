@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: critical-remediation-root-isolation
+REVISED: bridge/critical-remediation-root-isolation-004.md
 REVISED: bridge/critical-remediation-root-isolation-003.md
 NO-GO: bridge/critical-remediation-root-isolation-002.md
 NEW: bridge/critical-remediation-root-isolation-001.md
