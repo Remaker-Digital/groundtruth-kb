@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-directive-enforcement-registry
+NEW: bridge/gtkb-directive-enforcement-registry-001.md
+
+
 Document: critical-remediation-root-isolation
 NEW: bridge/critical-remediation-root-isolation-007.md
 NEW: bridge/critical-remediation-root-isolation-006.md
