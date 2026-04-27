@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: generator-hardening-001
+REVISED: bridge/generator-hardening-001-003.md
+NO-GO: bridge/generator-hardening-001-002.md
 NEW: bridge/generator-hardening-001-001.md
 
 
