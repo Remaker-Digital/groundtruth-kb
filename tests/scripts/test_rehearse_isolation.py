@@ -309,9 +309,16 @@ def test_output_dir_override_non_allowlisted_rejected() -> None:
 # ----- F3: dispatch exception narrowing -----
 
 def test_dispatch_lane_module_missing_returns_skipped() -> None:
-    """A lane whose module file does not exist returns status='skipped'."""
+    """A lane whose module file does not exist returns status='skipped'.
+
+    Per Slice 4 (rewrite lane landed), this test now uses ``ci`` as the
+    still-missing lane fixture. When subsequent slices land each remaining
+    Stage B-D lane, this fixture must be updated to the next still-missing
+    lane. The test's intent — that the dispatcher correctly distinguishes
+    "module not on disk" from runtime defects — is unchanged.
+    """
     result = _driver._dispatch(
-        "rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True
+        "ci", manifest={}, output_dir=Path("ignored"), dry_run=True
     )
     assert result["status"] == "skipped"
     assert any("not yet implemented" in w for w in result["warnings"])
@@ -424,3 +431,68 @@ def test_run_summary_not_written_when_all_lanes_skipped(
     assert not summary_path.exists(), (
         "run-summary.json should NOT be emitted when every lane was skipped"
     )
+
+
+# ----- Slice 4: rewrite lane is now implemented (driver integration) -----
+
+def test_driver_dispatches_path_rewrite_lane_with_module_now_present(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Per Slice 4 -003 §3 driver integration: _dispatch('rewrite', ...) now
+    returns non-skipped status because _path_rewrite.py is on disk.
+
+    Verifies Slice 3 -005 §7 sequencing claim that "Stage B-D lanes become
+    independently implementable in any order; each is its own bridge" —
+    Slice 4 lights up the rewrite lane via module addition only, no driver
+    changes. classify-tree subprocess mocked per Codex GO -004 condition 3
+    (do not run live classify-tree against LEGACY_ROOT in unit tests).
+    """
+    import subprocess as _subprocess
+
+    def _fake_run(cmd, *args, **kwargs):
+        if "--output" in cmd:
+            output_idx = cmd.index("--output") + 1
+            output_path = Path(cmd[output_idx])
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(
+                _json.dumps(
+                    {
+                        "generated": "test",
+                        "gt_kb_version": "test",
+                        "gt_kb_head": "test",
+                        "target_tree": str(tmp_path),
+                        "target_head": "test",
+                        "total_paths_classified": 0,
+                        "owner_decision_pending_rows": 0,
+                        "rows": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+        return _subprocess.CompletedProcess(
+            args=cmd, returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setattr(_subprocess, "run", _fake_run)
+
+    output_dir = tmp_path / "rewrite-driver-test"
+    output_dir.mkdir()
+    manifest = {
+        "target_root": str((tmp_path / "applications" / "Agent_Red").as_posix()),
+        "legacy_root": str(tmp_path.as_posix()),
+        "applications_namespace": str((tmp_path / "applications").as_posix()),
+        "output_dir": "C:/temp/agent-red-rehearsal",
+        "git_strategy": "clone_with_history_filter",
+        "excluded_paths": [],
+    }
+
+    result = _driver._dispatch("rewrite", manifest, output_dir, dry_run=False)
+
+    # Pre-Slice-4 expectation: would have been "skipped" because the module
+    # didn't exist on disk. Post-Slice-4: must be "ok" — the rewrite lane is
+    # implemented and the synthetic empty classification produces a valid
+    # (zero-rewrite) result.
+    assert result["status"] == "ok", (
+        f"rewrite lane should be implemented post-Slice-4, got {result}"
+    )
+    assert result["status"] != "skipped"
