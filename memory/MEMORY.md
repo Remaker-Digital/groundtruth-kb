@@ -1,0 +1,172 @@
+# Agent Red Memory
+
+## Current Status
+- **🛑 ROOT-ISOLATION REMEDIATION ACTIVE (S315):** All non-isolation work paused per owner directive. See `.claude/rules/project-root-boundary.md`. **Critical remediation Phases A-D EXECUTED + Phase F verified.** Phase E audit REVISED-1 → **Codex NO-GO at `-010`** (count mismatch 105 vs 116; literal-path inaccuracy on `CUsersmichaAppDataLocalTempagentred-build-196`; grouped backup rows must be one-per-file). **Audit REVISED-2 needed next session.** **Directive-enforcement REVISED-1 → Codex GO at `-004`**: P1+P2 ship together, Codex adapter tests reflect Windows hook limitations, first registry entries must include DIR-ROOT-BOUNDARY-001, NO runtime overrides for non_negotiable. Auto-memory: 104 files migrated to `E:\GT-KB\memory\` (feedback/, topics/, MEMORY.md). Pip editable install removed. 17/21 outside-root worktrees removed; 4 dirty preserved as patches awaiting owner direction.
+- **Production:** v1.98.92, **HIBERNATING 2026-04-27 (S314)** — 13 Container Apps in Agent-Red RG at min=0/max=1; workspace-gentedTYtR capped 0.023 GB/day; Cosmos serverless (no-op); Redis C1 + ACR kept. No commercial users. Burn $27.68/day → ~$3-5/day. Resume runbook: `memory/agent-red-hibernation-runbook-2026-04-27.md` (commit `845baeef`). State + per-app pre-min/max: `memory/agent-red-hibernation-state-2026-04-27.md` + `C:/temp/agent-red-hibernation/containerapps-pre.json`.
+- **Branches:** `main` = production (v1.98.92, 6f857e89). `develop` = active.
+- **CI:** Lint GREEN. Python 9/11 shards GREEN. Security Scan + SonarCloud + Dependabot active.
+- **GitHub:** Release v1.98.89 published. 3 open issues. Copilot Pro + CodeRabbit PRO active.
+- **SonarCloud:** Org `mike-remakerdigital`. agent-red private (paid). groundtruth public free. 104 issues triaged S275.
+- **groundtruth-kb:** v0.6.1 on PyPI (S300). Main at `ffe8570`. Phase 4B complete (coverage 70.04%, mypy --strict clean, docstrings 85%). 1209 tests pass. Remaining: 4C structured logging, 4D broad-exception review.
+- **Evaluation tenant (staging):** "Evaluation Customer" (4e349f02), professional/standalone.
+- **Staging:** v1.98.92. 8/8 containers. minReplicas=1. SMS OTP verified.
+- **ACS SMS:** Toll-free +18772178051. Carrier verification IN PROGRESS (App 346df3eb). Monitor scheduled.
+- **Test Hosts:** `agent-red-test-host` (staging) + `agent-red-test-host-prod`. Internal ingress. GitHub Actions builds only.
+- **Tests:** Transport suite Phases 3-5: 72/72 PASS on staging v1.98.61.
+- **Knowledge DB:** `groundtruth.db` at repo root (migrated S285). 2,105 specs (1,572 implemented, 325 verified, 6 specified). 11,055 tests. 14 procedures, 179 documents. 1,851 WIs. 710 deliberations. ChromaDB at `.groundtruth-chroma/`.
+- **GT-KB Spec Pipeline:** ALL 8 PHASES COMPLETE + VERIFIED (S289). 600 tests pass.
+- **CI Workflows:** Lint, Python (5 shards), Security Scan, SonarCloud, Chromatic, Accessibility (axe-core WCAG 2.1 AA, 9 pages), OpenAPI compat, Playwright screenshot baselines.
+- **Deliberation Archive (SPEC-2098):** ALL 6 PHASES COMPLETE + WI-3168 migration DONE. 705 deliberations. ChromaDB 6990 chunks.
+- **Completed feature tracks (all in KB):** Customer Competitiveness (7), Agent Extensibility ADR-003 (13), Quality Measurement (4), Canonical Identity ADR-004, SPA Control Plane (18), A/B Testing (5), Integration Framework (18, 402 tests), MCP Agents (7, 100 tests), Pipeline Observatory (10, 51 tests), BACKLOG-018 (55 specs, DOC-177).
+- **Commercial Readiness:** 7/7 implemented; 4/7 verified (SPEC-1828/1829/1830/1834). Remaining: 1831/1832/1833 at implemented.
+- **Zero-Knowledge Architecture:** 4 specs planned. BL-ZK-001: 31 WIs, 5 phases.
+- **Rate Limits:** 300 RPM/tenant, 10 RPM floor, platform admin exempt.
+- **Release Plan:** Steps 1-3 COMPLETE. Step 4 (beta feedback) IN PROGRESS.
+
+## Feedback Index
+- [Worktree drift pattern](feedback_worktree_drift_pattern.md) — Don't work from `.claude/worktrees/*` branches behind develop; bridge views diverge silently. S307.
+- [No hardcoded paths](feedback_no_hardcoded_paths.md) — Use relative/discovered paths or env vars; 5-category triage. S307.
+- [Pedagogical comments](feedback_pedagogical_comments_standard.md) — Module docstrings + why-comments + rationale links. S307.
+- [Prime Builder default role](feedback_prime_builder_default_role.md) — Always start as Prime Builder; correct operating-role.md if it says loyal-opposition. S305.
+- [Canonical content in active surfaces](feedback_canonical_content_in_active_surfaces.md) — Canonical terms in CLAUDE.md/AGENTS.md/.claude/rules/, not read-on-demand files. S305.
+- [Bridge autonomy](feedback_bridge_autonomy.md) — Never ask owner to sweep/check/repair bridge; act autonomously.
+- [Poller autonomy](feedback_poller_autonomy.md) — Leave working pollers alone; mitigate races via fast writes, not shutdown.
+- [Poller circular dependency](feedback_poller_circular_dependency.md) — Bridge protocol can't self-heal a broken poller; direct foreground repair only. S291.
+- [Codex poller not hung](feedback_codex_poller_not_hung.md) — codex exec buffers stdout; check stderr before diagnosing stuck. S292.
+- [Prioritization by dependencies](feedback_prioritization_by_dependencies.md) — Bridge correctness P0; everything else by dependency graph. No P0/P1/P2 labels.
+- [Session-start CronCreate poller](feedback_interactive_poller_monitor.md) — Per CLAUDE.md, MANDATORY at session start unless poller-halt directive active. S292.
+- [Post-impl report hygiene](feedback_postimpl_report_hygiene.md) — Class-qualified pytest IDs; commit-local vs range delta. S299.
+- [Session-start ORIENT block](feedback_session_start_orient_block.md) — 7-item ORIENT block at session start, fixed format, live sources only.
+- [Iterate fast on main](feedback_iterate_fast_on_main.md) — GT-KB pre-production; merge+push frequently. Agent Red production stays conservative.
+- [Quality-first autonomy](feedback_quality_first_autonomy.md) — Default to max-quality option autonomously; only wait when truly symmetric or owner-only.
+- [Don't re-elicit on agreement](feedback_dont_re_elicit_on_agreement.md) — When owner quotes my recommendation back, treat my own language as the spec. S302.
+- [AskUserQuestion for ALL decisions](feedback_use_askuserquestion_for_all_decisions.md) — Use AskUserQuestion for every owner-only decision; not prose. S302.
+- [No deferrals ever](feedback_no_deferrals_ever.md) — Never defer; only legitimate delay is dependency ordering. Max quality+completeness always. S302.
+- [Instrument before rule-making](feedback_instrument_before_rule_making.md) — Hypothesize → instrument → backlog → decide. Bias toward data, not new rules. S302.
+- [Verify git diff before reporting](feedback_verify_git_diff_before_reporting.md) — Edit success ≠ committed; always run `git diff --name-status HEAD~1 HEAD`. S302.
+- [Read INDEX comments before GO execution](feedback_read_index_comments_before_executing_go.md) — Scan INDEX.md HTML comments for DEFERRAL MARKER before implementing. S302.
+- [Bridge drift pattern](feedback_bridge_drift_pattern.md) — When bridge breaks, check uncommitted drift first; surgical revert, not rewrite. S304.
+- [No lossy compression of agent I/O](feedback_no_lossy_compression.md) — Reject compress/filter/summarize middleware between agent and raw I/O; quality > cost. RTK rejected. S311.
+- [MCP verification required before MCP-dependent designs](feedback_mcp_verification_required.md) — Don't assume MCP works on Claude Code / Codex; verify each required capability end-to-end before proposing it as a load-bearing path. S311.
+- [Don't formalize implicit principles](feedback_dont_formalize_implicit_principles.md) — When owner restates existing framing, don't auto-escalate to DELIB. Ask before formalizing; default to no formal capture absent explicit direction. S312.
+- [Verify source before parallel proposals](feedback_verify_source_before_parallel_proposals.md) — Each parallel bridge proposal must independently pass a source-verification gate; hallucinated cross-references surface as Codex NO-GOs and multiply rework. S313.
+- [Lossless token optimization only](feedback_lossless_token_optimization.md) — When optimizing token use, never reduce quality, completeness, parallel throughput, verification rigor, or test/schema depth. Cut redundancy, not substance. S313.
+- [Scope reduction as NO-GO response](feedback_scope_reduction_as_no_go_response.md) — When Codex NO-GO surfaces "claiming more than evidence supports", prefer scope-down (defer to follow-on slice) over defending the larger scope. S315 P2 REVISED-2 + GH-002 split examples.
+
+## Strategic Thesis
+- [Pipeline vision](project_vision_statement.md) — Software factory: owner delivers specs, pipeline produces deployable SaaS.
+- [Pipeline is the product](project_strategic_thesis.md) — Agent Red validates the pipeline; groundtruth-kb is the core IP.
+- [No attachment to implementations](feedback_no_attachment.md) — Adopt better alternatives without hesitation; evaluate on merit only.
+- [GT-KB non-disruptive upgrade priority](project_gtkb_non_disruptive_upgrade_priority.md) — Pre-Azure priority: CTO env upgrades non-disruptively. S298.
+- [GT-KB Azure SaaS Readiness vision](project_gtkb_azure_saas_readiness_vision.md) — Post-non-disruptive direction; 15 deficiencies, 7 workstreams. S298.
+
+## Plan-of-Record
+- [Production Readiness v1.98.92](project_plan_of_record.md) — 16-step plan. Steps 1-13, 15 COMPLETE. Step 14 blocked on carrier. Step 16 PENDING (post-prod, non-blocking).
+- **Production OPERATIONAL** v1.98.92. 1 tenant: Remaker Digital. minReplicas=2.
+- **Step 14:** E2E phone OTP smoke, blocked on toll-free carrier (App 346df3eb); passive monitor `acs-tollfree-sms-verification-check`.
+- **Step 16:** Spec hygiene remediation: 118 untested specs + 10,440/11,066 orphan tests. Deferred until post-production.
+- **WI-3156:** deploy.py scaling enforcement (separate from POR).
+- **Bridge infrastructure (S295 permanent fix):** `.claude/hooks/`, `.claude/settings.json`, `.claude/rules/bridge-essential.md`, ps1/vbs scripts tracked via `!`-negation in `.gitignore`. Commit `94392a1b`.
+
+## Standing Operating Decisions
+- **2026-04-09 - Bridge ownership:** For bridge runtime/protocol/poller/worker/handshake work, Codex implements; Prime reviews.
+- **2026-04-09 - Bridge protocol model:** Asynchronous message passing; not all messages require replies.
+- **2026-04-09 - Bridge restart bias:** Don't restart healthy bridge for state cleanup; only for concrete reason.
+
+## Recent Sessions
+- S315: **CRITICAL ROOT-ISOLATION REMEDIATION (owner directive supersedes all other work).** Session began with Wave 2 Slice 10 REVISED-1 + Codex VERIFIED at `-010` closing Wave 2 at 11/11. Then 8 bridge cycles across GH-001 (Type B/C/D/§4.6 implementation: 17→1 Slice 11 violations), GH-002 (Type F harness-home parameterization), GH-CROSS-REPO (cross-repo subprocess remediation), bridge-poller P1/P2/P2.5 scoping. Mid-session: Prime created files at outside-root path `E:\Claude-Playground\CLAUDE-PROJECTS\groundtruth-kb\` per Codex-GO'd P2 REVISED-2 proposal. **OWNER CRITICAL CORRECTION**: filed `.claude/rules/project-root-boundary.md` (NON-NEGOTIABLE: all GT-KB files in E:\GT-KB; all Agent Red files in E:\GT-KB\applications\; no exceptions). Outside-root files deleted. Codex independently cascaded the directive into NO-GOs across all open bridges. **CRITICAL REMEDIATION program filed** (`bridge/critical-remediation-root-isolation-*.md`): scoping → REVISED-1 (manifest-backed cleanup + app-boundary audit) → REVISED-2 (owner-corrected auto-memory framing: migration not Branch A/B) → GO at `-005` with 5 binding execution conditions + Required Execution Order. **EXECUTED**: Phase A (cleanup manifests A+B+C); Phase B (`pip uninstall groundtruth-kb` editable; verified absent); Phase C (104/104 auto-memory files migrated to `E:\GT-KB\memory\` with SHA256 verify; source confirmed empty); Phase D (17/21 worktrees removed cleanly; 4 dirty preserved as patches at `bridge/cleanup-evidence/worktree-patches/` for owner review); Phase E (top-level audit; REVISED-1 at `-009` after Codex F1-F4 NO-GO at `-008` for incomplete inventory + double-classification + DELETE-language + missing pre-move impact); Phase F (verification re-scan: pip clean, auto-memory empty, 104+ files in-root memory). **STRUCTURAL prevention proposed**: `bridge/gtkb-directive-enforcement-registry-*.md` 7-phase framework feature (registry at `.gtkb/directive-registry.json` harness-neutral; PreToolUse + Codex review + CI gate three-layer; per-harness adapters; no override for non-negotiable; Bash parse-explicit-target model; 3 read modes). REVISED-1 at `-003` after Codex `-002` NO-GO (6 findings: harness-neutral path + adapters + no override + Bash model + read modes + per-harness tests). **Owner Q on instruction-literalness root cause** answered honestly: AI attention-weight decays on standing rules; framework must enforce mechanically. Critical-remediation REVISED-1 audit `-009` and directive-enforcement REVISED-1 `-003` both await Codex review. **Migration target `E:\GT-KB\memory\` populated**: feedback/ (57), topics/ (45), MEMORY.md+backup at root. **Owner driving harness-state migration in parallel**: `.codex/agent-red-hooks/` and `applications/Agent_Red/harness-state/` directories created in-root. **All other Prime work paused** per owner directive until isolation complete. ~26 commits on develop. Quality guardrails green throughout.
+- S314: **Wave 2 closure (10/11 VERIFIED + 1 NO-GO awaiting revision) + Agent Red 5-day hibernation executed.** Slice 8 `_membase_export.py` shipped + REVISED-1 + VERIFIED at `-010` (type-specific override layer; live KB classification 65% reduction in unclassified records: 15,775→5,600). Slice 11 `_dashboard_regen.py` + `_dashboard_regen_runner.py` shipped REVISED-3 → REVISED-4 → REVISED-5 → impl → REVISED-1-of-post-impl → VERIFIED at `-016`. Slice 11 architecture: audit-hook subprocess wrapper + per-file allowlist + sandbox + 5 deployment files copied byte-equal + `os._exit(99)` fail-closed termination + sample_render quarantine. Live smoke captures legitimate legacy reads (the proof shape — generator has 17 PROJECT_ROOT-bound leaks for ISOLATION-018 hardening). Slice 10 `_chromadb_regen.py` tests added (25 tests) + ruff fix + post-impl filed at `-007`; **Codex NO-GO at `-008`** (Tier 2 cross-ref uses wrong filename `partition_manifest.json` vs Slice 8's actual `membase-partition-manifest.json` + wrong key `records` vs `versioned_records`). Slice 10 fix is shape-only (rename file, change key, update fixture); next session ~30 min. **Agent Red hibernated** (Tier 1+ executed: 13 Container Apps min=0/max=1, workspace-gentedTYtR daily cap 0.023 GB, Cosmos no-op serverless; expected ~$3-5/day vs $27.68/day baseline; runbook + state file at `memory/agent-red-hibernation-{runbook,state}-2026-04-27.md`; commit `845baeef`). **GENERATOR-HARDENING-001** filed at `memory/work_list.md` row 16 with source-verified leak inventory (lines 89-90, 646, 1161/1182, 3434, 5232 of `session_self_initialization.py` + user-home configs). **Quality guardrails green throughout**; all 5 pass on every commit. **Composite quality 90.9/100; 1687/1687 assertions PASS; KB integrity ok.** ~9 commits on develop.
+- S313: **Wave 2 dense bridge cycle: 8 of 11 lanes shipped + 3 fix bridges VERIFIED.** Bridge state moved through ~25 commits across propose/Codex-review/revise/implement/post-impl loops. **VERIFIED terminal this session:** 3 LO-finding fix bridges (`gtkb-startup-evidence-restoration` 33→37 startup tests pass + UTF-8 stdout reconfigure; `gtkb-rehearsal-package-ruff-clean` 6 ruff fixes + drift-prevention regression guard; `gtkb-rehearsal-inventory-perf` 39s walltime down from 120s+ timeout via `os.scandir` top-level prune + `dryrun-ignored.json` per-dir reasons). Plus **Slice 7 `_ci_inventory.py`** VERIFIED at `-012` after **4-cycle saga** (NO-GO chain on hardcoded test literals → missing `excluded_paths` consumption + python-tests classifier → live-vs-synthetic shape gap on GHA `test_args=` pattern). Plus **Slice 9 `_production_effects.py`** VERIFIED at `-010` after 1 NO-GO cycle (directory existence + live approval-packet schema mismatch). **Wave 2 progress: 8 of 11 lanes shipped + VERIFIED** (Slices 1-7 + 9). **Pending bridge state:** Slice 8 (`_membase_export.py`) GO at `-006` ready for impl; Slice 10 (`_chromadb_regen.py`) GO at `-006` — module written WIP at commit `c4acfc13` but TESTS NOT YET ADDED (DO NOT post-impl from this commit; next session adds tests + verifies before filing); Slice 11 (`_dashboard_regen.py`) NO-GO at `-006`, sentinel-plant approach rejected as canonical-file-mutation risk; needs REVISED-3 with isolated-copy approach. **Three new feedback memories**: `feedback_verify_source_before_parallel_proposals.md` (each parallel proposal needs source-verification gate; hallucinated facts surface as Codex NO-GOs), `feedback_lossless_token_optimization.md` (when conserving tokens, never reduce quality/completeness/parallelism/verification rigor — cut redundancy not substance), and the 4-cycle Slice 7 pattern reinforced "live-shape fixtures over synthetic-shape fixtures" (synthetic passes; live exposes the gap). All 5 quality guardrails green throughout. KB integrity ok. ~25 commits on develop.
+- S312: **Wave 2 Stage B split-pattern cluster complete.** Slices 4-5-6 all VERIFIED terminally: Slice 4 `_path_rewrite.py` (21 tests; 8 versions; 2 NO-GO/REVISED cycles); Slice 5 `_bridge_split.py` + `_backlog_split.py` + `_split_helper.py` (31 tests; 10 versions; 2 NO-GO/REVISED cycles + post-impl revision for metadata-source bug Codex caught via live-tree probe); Slice 6 `_release_readiness_split.py` (26 tests; 10 versions; 3 NO-GO/REVISED cycles for source filters + real-ID classifier + recently-closed window). Wave 2 progress: **5 of 11 lanes shipped** (`_inventory.py`, `_path_rewrite.py`, `_bridge_split.py`, `_backlog_split.py`, `_release_readiness_split.py` + Stage A foundation). Remaining: Stage B (`_ci_inventory.py`, `_membase_export.py`, `_production_effects.py`), Stage C (`_chromadb_regen.py`, `_dashboard_regen.py`), Stage D (`_rollback.py`). **2 new DELIBs**: `DELIB-S312-ROLE-CONTRACT-EFFECTIVENESS-UPDATE` (extends DELIB-S310 9-gap analysis with Slice 4 lifecycle empirical evidence) + `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` (owner-stated: "actively pursue opportunities to reduce repetitive AI work"; first manifestation `GTKB-ARTIFACT-RECORDER-CLI` filed at work_list row 15). **acting-prime-builder.md** extended with Deterministic Services Principle section. **2 feedback memories** added: `feedback_dont_formalize_implicit_principles.md` (don't auto-escalate principle-shaped statements to DELIBs without explicit owner direction). Audit-trail drift fix at `68f9d245` (slice4-008 missing from git earlier in session). 14 deliberations harvested at session-wrap; release-candidate gate green throughout. **Composite quality 90.9/100; 1687/1687 assertions PASS; KB integrity ok.** ~25 commits on develop.
+- S311: **KB recovery + Wave 2 foundation complete.** P0: recovered `groundtruth.db` from Drive-induced Tree 9 b-tree corruption via Python `.recover` analog (snapshot + rowid-iteration); 1,776 `assertion_runs` lost; 0 project data loss; live DB now 842 MB (was 1.19 GB; orphaned pages reclaimed); integrity_check ok. Permanent fix: `.driveignore` tracked + `.gitignore` `corrupt-*` pattern. Both backup paths (Drive + SyncBackSE) confirmed corrupted; G: re-validated clean post-recovery. **GTKB-ISOLATION-016 Wave 2 foundation FULLY VERIFIED**: Slice 1 (`_common.py` validation rules M1-M5 + 14 tests), Slice 2 (`_inventory.py` per-file walker + matrix parser + runtime manifest pipeline + 13 tests; `surface_treatments` reframed as audit-metadata only), Slice 3 (driver wire-up: `wave=2` load + `--execute` opt-in + `--output-dir` M2-validated override + narrowed `_dispatch()` exception handling + run-summary.json + 13 tests). Driver operationally usable: `python scripts/rehearse_isolation.py --phase inventory --execute`. **Other GO'd this session (deferred per isolation priority)**: DORA-001b authoritative-deployment-source -008 (3-source comparative scoping with rejected alternatives); DORA-001b Track 1 -006 (manifest writer enhancement); GTKB-DB-BACKUP-001 -004 (snapshot+atomic-publish daemon design). **GTKB-BRIDGE-POLLER-001** REVISED-2 (-004): owner-out-of-loop architecture via headless CLI spawn (`claude -p ... --bare` / `codex exec`); v2 MCP-based push channel deferred and verification-gated. **IR-0.1 closed terminally** (VERIFIED at -010); unblocks IR-1 through IR-6 capability slices. **Two new feedback memories**: `feedback_no_lossy_compression.md` (RTK rejected as a class — no compress/filter/summarize middleware between agent and raw I/O) + `feedback_mcp_verification_required.md` (verify MCP capabilities end-to-end on each target harness before MCP becomes load-bearing). Composite quality score 90.9/100 with all 6 metrics passing; assertion baseline pruned 26,638→10,058 runs. **141 deliberations harvested** at session-wrap. ~19 commits on develop; all 5 quality gates green throughout.
+- S310: **Major architectural session.** 5 threads VERIFIED (CS-1.5 registry tracking, WRAPUP Slice 1 Stage 1 perf+allowlist, ISOLATION-016 Wave 1 driver skeleton, ADR-supersession governance, IR-0.1 boundary SPEC + 33-row inventory). Cross-repo execution pattern established with `groundtruth-kb` upstream (commits `affa5a0` ADR + `3b5a527c` SPEC). Three new architectural artifacts: ADR-ISOLATION-APPLICATION-PLACEMENT-001 (apps live at `<gt-kb-root>/applications/<name>/`), SPEC-INCIDENT-SURFACES-BOUNDARY-001 (5-rule framework/adopter contract), DELIB-S310-ROLE-DEFINITION-ASSESSMENT (9-gap role-contract analysis). Three backlog rows added: row 10 sub-feature S1.a Insight harvesting; row 11 GTKB-ROLE-ENHANCEMENT (deferred until post-isolation); row 12 GTKB-COMMAND-SURFACE program tracking + CS-2.help. First concrete `applications/Agent_Red/` namespace use. ~25 commits across develop + upstream main. **KB malformed-image warning** in `groundtruth.db` flagged for next-session attention (assertion check returned partial results: DCL 4/4 passing, transport 0 violations, but database-disk-image-malformed errors during quality-dashboard step).
+- S309: 4 threads VERIFIED (DORA Track 2 -008, owner-decision-surfacing -006, code-quality-baseline -006 GO, startup-enhancements P1 -006). Filed GTKB-STARTUP-ENHANCEMENTS with 6-objective vision + 8-phase Six-Primers architecture. P1 (MEMORY.md trim + atomic writes + ceiling test + Codex hooks cleanup) landed at `3caa034d`; ~10,400 tokens recovered. 14 commits on develop. Backup `MEMORY.md.backup-20260425-222126`.
+- S308: Filed three S309-carryover NO-GOs (DORA Track 2, code-quality-baseline, owner-decision-surfacing). Bridge-poller halt directive. Owner-decision-tracker scoping.
+- S307: Worktree drift incident. No-hardcoded-paths + pedagogical-comments directives saved.
+- S306: 2 VERIFIEDs landed + 4 new bridge threads + backlog hygiene + 2 new enforcement programs (PROPOSAL-STANDARDS, DA-ENFORCEMENT, BACKLOG-DISCIPLINE) scoped upstream.
+- S305: GTKB-ISOLATION Phase 3-7 baselines all VERIFIED + Phase 8/9 detailed plans VERIFIED + IDP terminology formalized + disk-full incident resolved (387 GB freed from .tmp.driveupload).
+- S304: Bridge/OS-poller restored to 2026-04-17 baseline; 3 layers of uncommitted drift identified + reverted at `c6882c9d`. feedback_bridge_drift_pattern.md saved.
+- S303: D3 (azure-iac-skeleton) VERIFIED at -006 (`1d1b698`); D4 (azure-cicd-gates) REVISED-2 -005 with OIDC contract + adopter-edits + actionlint scope tightening.
+- S300: v0.6.1 to PyPI (VERIFIED -018, tag at `e2384ce`). Two design bridges GO'd (rollback-receipts, da-governance-completeness); fast-iterate posture established.
+- S299: Tier A Phase A COMPLETE + v0.6.0 to PyPI. Post-Phase-A parallel workstreams opened. Owner Option C (parallel non-disruptive-upgrade + Azure-readiness-taxonomy).
+- S298: Tier A Phase A — 4 of 6 VERIFIED. Non-disruptive upgrade primitive established. Owner priority: Azure SaaS DEFERRED; non-disruptive upgrade pre-Azure.
+- S296: CTO trial day. Governance hardening C1/C3 gap closure. SPEC-1834 OTEL → verified. codex-review-gate rule created. Comprehensive 5-track plan approved.
+- S295: Largest session in project history. Bridge infra permanently tracked. 4B.7 mypy --strict 39→0; 4B.8 line coverage 54%→70%; 4B.9 docstrings 65%→85%. v0.5.0 Developer Preview to PyPI.
+- S294: Not separately tracked; work folded into S295.
+- S293: Not separately tracked.
+- S292: Codex poller misdiagnosis incident; killed legitimate run ~72s from completion. 3 NEW bridge proposals drafted (4B.5b, poller-liveness-watcher, ps1-syntax-validation).
+- S291: Phase 4B.6 VERIFIED + SPA investigation/remediation VERIFIED + Claude poller emergency repair (PowerShell `$var:` syntax bug). Observability mirror at `claude-scan-status.json`.
+- S290: GT-KB v0.4.0 to PyPI. 4B.1/housekeeping/2/3 sub-rounds landed. First fully-autonomous Phase 4 sub-rounds. Poller infra repaired (auth token + 15-min spawn cap + toast notifications).
+- S289: Phase 4 COMPLETE + VERIFIED — entire 8-feature GT-KB Spec Pipeline done. F6+F8+depth-guard at `87e7bd7`. 600 tests.
+- S288: Phase 2/2B/3 COMPLETE + VERIFIED. 7 GT-KB commits, 472→561 tests. Phase 4 proposal in progress.
+- S287: PyPI v0.3.1. Sarah scenario doc. F1 + F3 + F4-A implemented. Phase 2 GO. 472 tests.
+- S286: GT-KB Specification Pipeline research + design. 8 feature proposals (F1-F8). 5 owner decisions archived. No code changes.
+- S285: WI-3168 knowledge.db → groundtruth.db migration (`8b9a1def`, VERIFIED -026). 35 files updated. Chromatic CI activated.
+- S284: GT-kb v0.3.0 docs Phases 3-8 (`0fe21c9`). CLI ref + config + deliberation + 13 Mermaid diagrams. 421 tests.
+- S283: SPEC-2098 C3-C5 complete. GT-kb docs Phases 0-2 implemented (v0.3.0). Deliberation archive VERIFIED.
+- S282: WI-3166 axe-core CI + WI-3167 Playwright baselines. Deliberation Archive C1+C2+C6: 649 deliberations + ChromaDB 6990 chunks.
+- S281: WI-3142 credential-scan + WI-3162 LO backfill + WI-3165 Chromatic CI. 3 UI quality specs.
+- S280: WI-0929..0974 won't-fix; pipeline dashboard; deliberation tests; ruff lint/format. Bridge migrated to file-based.
+- S276: v1.98.92 production deploy. SMS dependency fix. 8/8 containers. Main merged at `6f857e89`.
+- S275: POR Steps 10-12 COMPLETE. SonarCloud triage (104 issues). P0-P1 backlog resolved.
+- S274: GT-kb docs/automation + SonarCloud + CodeRabbit PRO. LinkedIn article.
+- S273: Due-diligence hygiene + GT-kb v0.2.0 + Phase 2 quality harness.
+- S270-S272: SPEC-1879 Phases 1-4 + POR Steps 10-14B + v1.98.91-92 + ACS SMS.
+- S266-S269: P0 CLOSED + v1.98.89 production + OrbaTech report v2.1 + CI remediation.
+- S264: P0 encryption incident confirmed + .env.local cleanup + v1.98.89 staging.
+- S259-S263: ADR-004 canonical identity + bridge v3 rewrite + production incidents. See CLAUDE_ARCHIVE.md.
+- S258 and earlier: see CLAUDE_ARCHIVE.md.
+
+## Protected Files (DO NOT MODIFY)
+- `branding/logo/SVG/icon-master.svg`, `branding/logo/SVG/primary-logo-no-wordmark.svg`
+- `branding/logo/PNG/icon-master.png`, `branding/logo/PNG/primary-logo-no-wordmark.png`
+
+## Quick Reference
+- **Azure:** Subscription 4dce2122, ACR acragentredeastus.azurecr.io, Cosmos cosmos-agentred-eastus, KV kv-agentred-eastus, Redis redis-agentred-eastus (C1, TLS).
+- **API Gateway:** agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
+- **Docs site:** https://agentredcx.com (GHA from main). **Storefront:** https://blanco-9939.myshopify.com/
+- **Brand color:** #ff3621. **Email:** Titan SMTP primary, ACS fallback.
+- **Knowledge DB:** `groundtruth.db` at repo root — SQLite, web UI localhost:8090, Python API `tools/knowledge-db/db.py`.
+- **GroundTruth KB:** `E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/` v0.3.0. GitHub-installable only.
+- **Scripts:** `seed_tenant.py` (9-phase), `upgrade_verification.py` (35 assertions), `test_pipeline.py` (13 phases, canonical E2E runner).
+- **Admin SPAs:** standalone (port 3300), shopify, provider (port 3400). All have `dev:mock` mode.
+- **SPEC-1673:** Provider MUST NOT hold raw tenant API keys.
+
+## Memory Files
+- [project_backlog018_plan.md](project_backlog018_plan.md) — BACKLOG-018 plan (6 phases, 55 specs). DEFAULT work priority.
+- [feedback_codex_bridge_protocol.md](feedback_codex_bridge_protocol.md) — Codex role, $20/mo budget, prime-bridge notification discipline.
+- [testing-research.md](testing-research.md) — S210 research; AI-generated code testing; 4-phase guardrail plan.
+- [feedback_artifact_boundaries.md](feedback_artifact_boundaries.md) — KB for project artifacts; MEMORY.md for operational patterns. S218.
+- [feedback_docs_release_gated.md](feedback_docs_release_gated.md) — Public docs release-gated with same rigor as code. S218.
+- [feedback_deploy_gate_token.md](feedback_deploy_gate_token.md) — Production deploy gate = env token (test pass + owner approval). S218.
+- [project_architecture_specs.md](project_architecture_specs.md) — Lightweight architecture spec tagging (GOV-21 pending). S219.
+- [feedback_taxonomy_simplicity.md](feedback_taxonomy_simplicity.md) — Collapse `architecture` type into ADR/DCL; resist taxonomy bloat.
+- [feedback_bridge_protocol.md](feedback_bridge_protocol.md) — Near-real-time autonomous bridge exchange. 60s ack. S223.
+- [project_groundtruth_lineage.md](project_groundtruth_lineage.md) — GroundTruth = evolution of membase-4-claude. S237.
+- [canonical_vocabulary.md](canonical_vocabulary.md) — Interim stopgap definitions for MemBase/DA/MEMORY.md/GT-KB/Prime/LO. S299.
+- [project_s299_governance_lessons.md](project_s299_governance_lessons.md) — S299: 3 gaps exposed; 5 owner decisions pending S300.
+- [project_cto_trial_onboarding_docs.md](project_cto_trial_onboarding_docs.md) — Weekend CTO deadline; scope bridge GO'd.
+- [feedback_canonical_terminology_governance.md](feedback_canonical_terminology_governance.md) — Pre-proposal DA search MANDATORY. S299.
+- [feedback_agent_red_is_adopter_not_author.md](feedback_agent_red_is_adopter_not_author.md) — Agent Red is adopter of GT-KB, not author. S299.
+- [feedback_complexity_fragility.md](feedback_complexity_fragility.md) — Evaluate every proposal element for coupling/testability/maintenance. S253.
+- [project_widget_roadmap_decisions.md](project_widget_roadmap_decisions.md) — 4 owner decisions: re-baseline, stream-then-validate, fail-closed, WCAG AA. S253.
+- [feedback_collaboration_protocol.md](feedback_collaboration_protocol.md) — MANDATORY dev lifecycle: phase discipline, staging-first, Codex gates, GitHub Actions builds, GOV-16. S254.
+- [feedback_environment_safety.md](feedback_environment_safety.md) — Never modify production without explicit confirmation. S254.
+- [feedback_owner_questions.md](feedback_owner_questions.md) — Owner questions are reasoning tests, not indirect objections. S256.
+- [feedback_build_process.md](feedback_build_process.md) — All builds via GitHub Actions only; never docker build or az acr build locally. S254.
+- [project_control_surface_closeout.md](project_control_surface_closeout.md) — 5-phase plan (Phase 0+1 done, Phase 2 next). S253-S254.
+- [feedback_tests_before_implementation.md](feedback_tests_before_implementation.md) — Tests MUST be written BEFORE implementation code. S255.
+
+## References
+- [Sarah Scenario (GT-KB UX Anchor)](reference_sarah_scenario.md) — Anchor reference for all GT-KB documentation; 7-phase user journey (DOC-SARAH-SCENARIO).
+- [UI Testing Tool Evaluation](reference_ui_testing_tools.md) — Chromatic already installed; activate + axe-core first; Percy/Applitools deferred.
+- [Codex automation failure](project_codex_automation_failure.md) — Desktop automations silently fail; use OS cron + codex exec.
+
+## Project Knowledge (in Knowledge Database)
+- **Cross-cutting lessons (85+):** `DOC-cross-cutting-lessons` — Python, API, Cosmos, build, testing, Playwright, frontend, infrastructure patterns.
+- **Owner preferences (6):** `DOC-owner-preferences` — quality, process, product directives.
+- **Shopify production deployment guide:** `DOC-141`.
+- **Docs site deployment:** KB procedure `docs-site-deploy` — Commit to main + push.
+- **Roadmap planning wiki:** `wiki/Roadmap-planning.md` — P1 (Integration Ecosystem) COMPLETE. P2-P7 pending.
+- **Protected behaviors:** PB-* specs in KB — machine-verifiable assertions checked at session start.
+- [Production deploy approval](feedback_production_deploy_approval.md) — Require explicit "deploy to production" confirmation; never infer from "continue".

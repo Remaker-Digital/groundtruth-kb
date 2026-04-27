@@ -6,12 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-directive-enforcement-registry
+GO: bridge/gtkb-directive-enforcement-registry-004.md
 REVISED: bridge/gtkb-directive-enforcement-registry-003.md
 NO-GO: bridge/gtkb-directive-enforcement-registry-002.md
 NEW: bridge/gtkb-directive-enforcement-registry-001.md
 
 
 Document: critical-remediation-root-isolation
+NO-GO: bridge/critical-remediation-root-isolation-010.md
 REVISED: bridge/critical-remediation-root-isolation-009.md
 NO-GO: bridge/critical-remediation-root-isolation-008.md
 NEW: bridge/critical-remediation-root-isolation-007.md
