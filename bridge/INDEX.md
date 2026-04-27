@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-rehearsal-inventory-perf
+NEW: bridge/gtkb-rehearsal-inventory-perf-005.md
 GO: bridge/gtkb-rehearsal-inventory-perf-004.md
 REVISED: bridge/gtkb-rehearsal-inventory-perf-003.md
 NO-GO: bridge/gtkb-rehearsal-inventory-perf-002.md
