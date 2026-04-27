@@ -229,13 +229,25 @@ def hash_set_walk(root: Path, ignored_top_level: frozenset[str] | None = None) -
     return result
 
 
-def load_manifest(path: Path, *, wave: int = 1) -> dict[str, Any]:
+def load_manifest(
+    path: Path,
+    *,
+    wave: int = 1,
+    is_runtime_manifest: bool = False,
+) -> dict[str, Any]:
     """Load the rehearsal TOML manifest. Validates ADR-required fields.
 
     The ``wave`` keyword (default 1) preserves Wave 1 driver behavior. Pass
     ``wave=2`` to enforce the Slice 1 validation rules M1-M5; pass ``wave=3``
     to additionally reject the unresolved ``db_reconciliation_strategy``
     placeholder.
+
+    The ``is_runtime_manifest`` keyword (default False) extends M5 at
+    ``wave>=2`` to require non-empty ``surface_treatments``. Per Slice 2
+    contract, ``_inventory.py`` is the only call site that should pass
+    ``is_runtime_manifest=True`` — it does so to revalidate its own runtime
+    manifest after populating ``surface_treatments`` from the authority
+    matrix.
 
     Per ``bridge/gtkb-isolation-016-phase8-wave2-slice1-002.md`` GO:
     Wave 2 guarantees apply only to call sites that explicitly pass
@@ -367,13 +379,25 @@ def load_manifest(path: Path, *, wave: int = 1) -> dict[str, Any]:
                 f"{matrix_path} which does not exist on disk."
             )
 
-        # Rule M5 — surface_treatments allowed empty for the Wave 2 source
-        # manifest (Slice 1 scope). Slice 2 will add the runtime-manifest
-        # non-empty enforcement via an ``is_runtime_manifest`` kwarg per the
-        # Slice 1 GO -002 sequencing condition.
+        # Rule M5 — surface_treatments shape:
+        #   - Source manifest (default): empty allowed; non-dict rejected.
+        #   - Runtime manifest (is_runtime_manifest=True): non-empty required.
+        # The runtime-manifest enforcement was deferred from Slice 1 to Slice 2
+        # per Slice 1 GO -002 sequencing condition; Slice 2 GO -004 confirms
+        # this extension as the only call site that should pass True.
         surface_treatments = data.get("surface_treatments")
-        if surface_treatments is None:
-            data["surface_treatments"] = {}
+        if surface_treatments is None or (
+            isinstance(surface_treatments, dict) and not surface_treatments
+        ):
+            if is_runtime_manifest:
+                raise ManifestValidationError(
+                    "M5: runtime manifest requires non-empty surface_treatments; "
+                    "Wave 2 lane 1 (_inventory.py) must populate it from the "
+                    "authority matrix before downstream lanes can consume it."
+                )
+            # Source manifest: empty/missing acceptable — normalize to {}.
+            if surface_treatments is None:
+                data["surface_treatments"] = {}
         elif not isinstance(surface_treatments, dict):
             raise ManifestValidationError(
                 "M5: manifest.surface_treatments must be a TOML table "
