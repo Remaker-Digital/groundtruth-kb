@@ -6,48 +6,57 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-rehearsal-inventory-perf
+GO: bridge/gtkb-rehearsal-inventory-perf-004.md
 REVISED: bridge/gtkb-rehearsal-inventory-perf-003.md
 NO-GO: bridge/gtkb-rehearsal-inventory-perf-002.md
 NEW: bridge/gtkb-rehearsal-inventory-perf-001.md
 
 
 Document: gtkb-rehearsal-package-ruff-clean
+VERIFIED: bridge/gtkb-rehearsal-package-ruff-clean-004.md
 NEW: bridge/gtkb-rehearsal-package-ruff-clean-003.md
 GO: bridge/gtkb-rehearsal-package-ruff-clean-002.md
 NEW: bridge/gtkb-rehearsal-package-ruff-clean-001.md
 
 
 Document: gtkb-startup-evidence-restoration
+REVISED: bridge/gtkb-startup-evidence-restoration-005.md
+NO-GO: bridge/gtkb-startup-evidence-restoration-004.md
 NEW: bridge/gtkb-startup-evidence-restoration-003.md
 GO: bridge/gtkb-startup-evidence-restoration-002.md
 NEW: bridge/gtkb-startup-evidence-restoration-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice11
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice11-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice11-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice11-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice11-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice10
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice10-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice10-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice9
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice9-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice9-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice9-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice9-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice8
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice8-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice8-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice8-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice8-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice7
+GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice7-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice7-001.md
