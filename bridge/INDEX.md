@@ -6,10 +6,13 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-poller-p1-detector
+REVISED: bridge/gtkb-bridge-poller-p1-detector-003.md
+NO-GO: bridge/gtkb-bridge-poller-p1-detector-002.md
 NEW: bridge/gtkb-bridge-poller-p1-detector-001.md
 
 
 Document: gtkb-bridge-poller-001-smart-poller
+GO: bridge/gtkb-bridge-poller-001-smart-poller-007.md
 REVISED: bridge/gtkb-bridge-poller-001-smart-poller-006.md
 NO-GO: bridge/gtkb-bridge-poller-001-smart-poller-005.md
 REVISED: bridge/gtkb-bridge-poller-001-smart-poller-004.md
@@ -19,6 +22,7 @@ NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
 
 
 Document: generator-hardening-001
+GO: bridge/generator-hardening-001-004.md
 REVISED: bridge/generator-hardening-001-003.md
 NO-GO: bridge/generator-hardening-001-002.md
 NEW: bridge/generator-hardening-001-001.md
