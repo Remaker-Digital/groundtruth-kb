@@ -5,6 +5,14 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-bridge-poller-p2-5-verification-spike
+NEW: bridge/gtkb-bridge-poller-p2-5-verification-spike-001.md
+
+
+Document: gtkb-bridge-poller-p2-registry
+NEW: bridge/gtkb-bridge-poller-p2-registry-001.md
+
+
 Document: gtkb-bridge-poller-p1-detector
 REVISED: bridge/gtkb-bridge-poller-p1-detector-003.md
 NO-GO: bridge/gtkb-bridge-poller-p1-detector-002.md
