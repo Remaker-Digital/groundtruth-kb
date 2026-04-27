@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-rehearsal-inventory-perf
+VERIFIED: bridge/gtkb-rehearsal-inventory-perf-006.md
 NEW: bridge/gtkb-rehearsal-inventory-perf-005.md
 GO: bridge/gtkb-rehearsal-inventory-perf-004.md
 REVISED: bridge/gtkb-rehearsal-inventory-perf-003.md
@@ -21,6 +22,7 @@ NEW: bridge/gtkb-rehearsal-package-ruff-clean-001.md
 
 
 Document: gtkb-startup-evidence-restoration
+VERIFIED: bridge/gtkb-startup-evidence-restoration-006.md
 REVISED: bridge/gtkb-startup-evidence-restoration-005.md
 NO-GO: bridge/gtkb-startup-evidence-restoration-004.md
 NEW: bridge/gtkb-startup-evidence-restoration-003.md
@@ -57,6 +59,7 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-slice8-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice7
+NEW: bridge/gtkb-isolation-016-phase8-wave2-slice7-005.md
 GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice7-003.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-002.md
