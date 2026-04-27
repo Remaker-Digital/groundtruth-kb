@@ -6,7 +6,69 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-0029
+  asked_at: 2026-04-26T19:35:00.271540Z
+  question: "s green throughout. Standing by for owner decision on poller v1 scope"
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 61e91be58bdc2678
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0030
+  asked_at: 2026-04-27T00:28:51.000753Z
+  question: "ap if you'd prefer. Standing by for direction. `─────────────────"
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: b10806190aa5e6a3
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0031
+  asked_at: 2026-04-27T01:11:44.187119Z
+  question: "total in S311) ```  Standing by for Codex VERIFIED on Slice 3 -005, or for your direction."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 3bde1f936473aca8
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0032
+  asked_at: 2026-04-27T01:21:52.614673Z
+  question: "re ready. Otherwise standing by for next direction."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: a9209bc27fd2a2ae
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0033
+  asked_at: 2026-04-27T01:24:31.046057Z
+  question: "ant to address it.  Standing by for `/kb-session-wrap S311` or other direction."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 675e6ee971a3ef76
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0034
+  asked_at: 2026-04-27T01:28:40.561671Z
+  question: "5 (handoff) remain. Want me to skip the harvest and continue, or construct the approval packet?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 8a238611d3a8e62b
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0035
+  asked_at: 2026-04-27T01:40:52.091559Z
+  question: "tart stimulus only. Awaiting your direction (focus choice from"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 58662ebc32207825
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0036
+  asked_at: 2026-04-27T03:49:12.435752Z
+  question: "──────────────`  ## Standing By for Insertion Approval  Per `.claude/rules"
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 302c6541b50390f2
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0037
+  asked_at: 2026-04-27T04:29:22.544912Z
+  question: "──────────────`  ## Standing By for Approval  **Approve insertio"
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 98750599ecd09cd6
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -20,8 +82,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S310
   answer: "doc-paragraph false positive; recursive class (same as DECISION-0009/0011/0012/0013). Captured fragment is from Prime Builder bridge-state table prose ('INCIDENT-RESPONSE -001 NO-GO awaiting owner input on governance question'). The 'awaiting_input' detector continues to fire on Prime Builder bridge-state descriptions. Owner directed one-by-one question presentation, organically converting the bridge-state into AskUserQuestion flow. Yet more motivating evidence for GTKB-COMMAND-SURFACE class-elimination."
   notes: "Edited-by-prime-via-owner-direction 2026-04-26T06:00:00Z (owner directed one-by-one question presentation)"
-
-
 - id: DECISION-0013
   asked_at: 2026-04-26T02:38:08.123026Z
   question: "dge state captured; standing by for direction on which thread to"
@@ -161,6 +221,192 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 74bc648053632a90
   resolved_at: 2026-04-25T23:37:21.713306Z
   answer: "User has answered your questions: \"Should the scanner suite run automatically on Stop (within budget) or only on owner-triggered /wrap?\"=\"On-demand /wrap only (Recommended)\", \"Where should the GTKB-WRAPUP-ENHANCEMENTS work item live relative to the existing GTKB-STARTUP-ENHANCEMENTS?\"=\"Separate item, coordinated phases (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0015
+  asked_at: 2026-04-26T06:24:19.672743Z
+  question: "How should fast-path mitigation actions (rollback, scale-up, traffic shift, feature flag toggle) interact with the bridge protocol during a SEV-1 at 2 AM? Codex flagged the original 'bypasses bridge review' framing as a material governance change. Three coherent models exist:"
+  options:
+    - "Pre-reviewed registry + post-execution review (Recommended)"
+    - "Explicit bypass via GOV/ADR"
+    - "No fast-path; bridge protocol always"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ff2802c2b7023b7b
+  resolved_at: 2026-04-26T06:24:19.672743Z
+  answer: "User has answered your questions: \"How should fast-path mitigation actions (rollback, scale-up, traffic shift, feature flag toggle) interact with the bridge protocol during a SEV-1 at 2 AM? Codex flagged the original 'bypasses bridge review' framing as a material governance change. Three coherent models exist:\"=\"Pre-reviewed registry + post-execution review (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0016
+  asked_at: 2026-04-26T06:24:19.672743Z
+  question: "Where should the GTKB-INCIDENT-RESPONSE framework artifacts ship? This shapes who else benefits and how the documents are scoped. The framework is the SRE/ITIL 8-phase model SPEC, the ADR, severity schema, fast-path mitigation registry, postmortem skill, etc."
+  options:
+    - "Mixed: framework upstream, documents Agent Red-local (Recommended)"
+    - "All upstream to groundtruth-kb"
+    - "All Agent Red-local"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 19e09ff2ea324ad9
+  resolved_at: 2026-04-26T06:24:19.672743Z
+  answer: "User has answered your questions: \"Where should the GTKB-INCIDENT-RESPONSE framework artifacts ship? This shapes who else benefits and how the documents are scoped. The framework is the SRE/ITIL 8-phase model SPEC, the ADR, severity schema, fast-path mitigation registry, postmortem skill, etc.\"=\"All upstream to groundtruth-kb\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0017
+  asked_at: 2026-04-26T06:24:19.672743Z
+  question: "What should Phase IR-1 contain? The original proposal had six deliverables (framework SPEC, ADR, CTO 1-page, LinkedIn article concept, backlog placeholders, DELIB). Codex's [P2] finding flagged that Agent Red ALREADY has incident infrastructure (cosmos schema, incidents repository, public status API, tests, GTKB-DORA-001 dashboard incidents) — these need to be mapped to the new framework before the framework lands, otherwise parallel concepts diverge."
+  options:
+    - "IR-0 inventory first, then IR-1 framework (Recommended)"
+    - "Single combined Phase IR-1 (inventory + framework + docs)"
+    - "IR-1 framework + IR-2 inventory (defer)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9dd9c76f44c738fc
+  resolved_at: 2026-04-26T06:24:19.672743Z
+  answer: "User has answered your questions: \"What should Phase IR-1 contain? The original proposal had six deliverables (framework SPEC, ADR, CTO 1-page, LinkedIn article concept, backlog placeholders, DELIB). Codex's [P2] finding flagged that Agent Red ALREADY has incident infrastructure (cosmos schema, incidents repository, public status API, tests, GTKB-DORA-001 dashboard incidents) — these need to be mapped to the new framework before the framework lands, otherwise parallel concepts diverge.\"=\"IR-0 inventory first, then IR-1 framework (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0018
+  asked_at: 2026-04-26T06:24:19.672743Z
+  question: "Which capabilities ship in Phase IR-2 to make the framework demonstrable end-to-end? The original proposed five: IR-CS-1 severity classification spec, IR-CS-2 ::incident <id> command, IR-CS-3 postmortem auto-draft skill, IR-CS-4 fast-path mitigation registry (now pre-reviewed per the earlier governance answer), IR-CS-5 status-page draft generator (::incident-update)."
+  options:
+    - "All five as proposed (Recommended)"
+    - "Trim to three: severity + ::incident + postmortem"
+    - "Expand: add ::mitigate-rollback as IR-CS-6"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4e101e69cb070a89
+  resolved_at: 2026-04-26T06:24:19.672743Z
+  answer: "User has answered your questions: \"Which capabilities ship in Phase IR-2 to make the framework demonstrable end-to-end? The original proposed five: IR-CS-1 severity classification spec, IR-CS-2 ::incident <id> command, IR-CS-3 postmortem auto-draft skill, IR-CS-4 fast-path mitigation registry (now pre-reviewed per the earlier governance answer), IR-CS-5 status-page draft generator (::incident-update).\"=\"All five as proposed (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0019
+  asked_at: 2026-04-26T06:24:19.672743Z
+  question: "How should incident-response commands integrate with the command-surface architecture? The relevant commands are ::incident, ::mitigate-*, ::postmortem, ::incident-update, ::incident-close."
+  options:
+    - "Single registry under GTKB-COMMAND-SURFACE (Recommended)"
+    - "Parallel incident-specific dispatcher"
+    - "Hybrid: shared registry + dedicated incident-aware hook layer"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 978ce5ed30429c1a
+  resolved_at: 2026-04-26T06:24:19.672743Z
+  answer: "User has answered your questions: \"How should incident-response commands integrate with the command-surface architecture? The relevant commands are ::incident, ::mitigate-*, ::postmortem, ::incident-update, ::incident-close.\"=\"Single registry under GTKB-COMMAND-SURFACE (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0020
+  asked_at: 2026-04-26T17:41:04.744095Z
+  question: "Which recovery path should I execute?"
+  options:
+    - "Option A: .recover from live (Recommended)"
+    - "Option B: Restore April 11 backup + replay"
+    - "Option C: Investigate further before deciding"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c2cce3ef927f4d44
+  resolved_at: 2026-04-26T17:41:04.744095Z
+  answer: "User has answered your questions: \"Which recovery path should I execute?\"=\"Option A: .recover from live (Recommended)\", \"How should I handle the OneDrive sync issue (root cause)?\"=\"Stop sync of GT-KB folder now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0021
+  asked_at: 2026-04-26T17:41:04.744095Z
+  question: "How should I handle the OneDrive sync issue (root cause)?"
+  options:
+    - "Stop sync of GT-KB folder now (Recommended)"
+    - "Move GT-KB out of OneDrive entirely"
+    - "Defer — I'll handle OneDrive separately"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0060cf7647e54adb
+  resolved_at: 2026-04-26T17:41:04.744095Z
+  answer: "User has answered your questions: \"Which recovery path should I execute?\"=\"Option A: .recover from live (Recommended)\", \"How should I handle the OneDrive sync issue (root cause)?\"=\"Stop sync of GT-KB folder now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0022
+  asked_at: 2026-04-26T17:41:04.744095Z
+  question: "How should I handle the atomic-replace step (final commit of recovery)?"
+  options:
+    - "Pause Drive in system tray, then I'll swap (Recommended)"
+    - "I'll kill GoogleDriveFS.exe processes briefly, then swap"
+    - "Swap now without pausing Drive (risky)"
+    - "Hold — let me inspect recovered.db first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 46ee8950bb4ee82d
+  resolved_at: 2026-04-26T17:41:04.744095Z
+  answer: "User has answered your questions: \"How should I handle the atomic-replace step (final commit of recovery)?\"=\"Pause Drive in system tray, then I'll swap (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0023
+  asked_at: 2026-04-26T18:00:22.154791Z
+  question: "Which permanent Google Drive exclusion strategy do you want?"
+  options:
+    - "Add .driveignore for SQLite triple (Recommended)"
+    - "Drive UI per-file exclusion"
+    - "Move groundtruth.db outside GT-KB folder"
+    - "Build snapshot+upload daemon"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 89feaa37246ba2cd
+  resolved_at: 2026-04-26T18:00:22.154791Z
+  answer: "User has answered your questions: \"Which permanent Google Drive exclusion strategy do you want?\"=\"Add .driveignore for SQLite triple (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0024
+  asked_at: 2026-04-26T18:14:03.420521Z
+  question: "DORA-001b -007 §7.1 — Confirm the 3-source authority split shape?"
+  options:
+    - "A primary, C reconcile, B deferred (Recommended)"
+    - "A + C only, drop B-deferred plan"
+    - "Flat single-source A only"
+    - "Different shape — explain"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 10b1d3f81dbc0e28
+  resolved_at: 2026-04-26T18:14:03.420521Z
+  answer: "User has answered your questions: \"DORA-001b -007 §7.1 — Confirm the 3-source authority split shape?\"=\"A primary, C reconcile, B deferred (Recommended)\", \"DORA-001b -007 §7.2 — Where does Source B (GH Actions out-of-band detection) live?\"=\"GTKB-DORA-001c (Recommended)\", \"DORA-001b -007 §7.3 — Track 1 GOV-17 acknowledgement (modifies scripts/deploy_pipeline.py)?\"=\"Acknowledged — Track 1 may modify deploy_pipeline.py\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0025
+  asked_at: 2026-04-26T18:14:03.420521Z
+  question: "DORA-001b -007 §7.2 — Where does Source B (GH Actions out-of-band detection) live?"
+  options:
+    - "GTKB-DORA-001c (Recommended)"
+    - "Defer indefinitely (no work item)"
+    - "Different work item home"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 06b50753fe9a0c91
+  resolved_at: 2026-04-26T18:14:03.420521Z
+  answer: "User has answered your questions: \"DORA-001b -007 §7.1 — Confirm the 3-source authority split shape?\"=\"A primary, C reconcile, B deferred (Recommended)\", \"DORA-001b -007 §7.2 — Where does Source B (GH Actions out-of-band detection) live?\"=\"GTKB-DORA-001c (Recommended)\", \"DORA-001b -007 §7.3 — Track 1 GOV-17 acknowledgement (modifies scripts/deploy_pipeline.py)?\"=\"Acknowledged — Track 1 may modify deploy_pipeline.py\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0026
+  asked_at: 2026-04-26T18:14:03.420521Z
+  question: "DORA-001b -007 §7.3 — Track 1 GOV-17 acknowledgement (modifies scripts/deploy_pipeline.py)?"
+  options:
+    - "Acknowledged — Track 1 may modify deploy_pipeline.py"
+    - "Hold — want to see Track 1 impl proposal first"
+    - "NO — find approach that doesn't modify deploy_pipeline.py"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ecd2f21d2b408b15
+  resolved_at: 2026-04-26T18:14:03.420521Z
+  answer: "User has answered your questions: \"DORA-001b -007 §7.1 — Confirm the 3-source authority split shape?\"=\"A primary, C reconcile, B deferred (Recommended)\", \"DORA-001b -007 §7.2 — Where does Source B (GH Actions out-of-band detection) live?\"=\"GTKB-DORA-001c (Recommended)\", \"DORA-001b -007 §7.3 — Track 1 GOV-17 acknowledgement (modifies scripts/deploy_pipeline.py)?\"=\"Acknowledged — Track 1 may modify deploy_pipeline.py\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0027
+  asked_at: 2026-04-26T18:14:03.420521Z
+  question: "ISOLATION-016 §3.3 — Where should rehearsal sub-scripts write their preview outputs?"
+  options:
+    - "Separate sandbox dir, never becomes target child root (Recommended)"
+    - "Target child root, becomes part of eventual real root"
+    - "Different approach — explain"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 07e4e32555595105
+  resolved_at: 2026-04-26T18:14:03.420521Z
+  answer: "User has answered your questions: \"ISOLATION-016 §3.3 — Where should rehearsal sub-scripts write their preview outputs?\"=\"Separate sandbox dir, never becomes target child root (Recommended)\", \"ISOLATION-016 §3.5 — Git strategy for the target child root?\"=\"Clone with history filter (Agent Red commits only)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0028
+  asked_at: 2026-04-26T18:14:03.420521Z
+  question: "ISOLATION-016 §3.5 — Git strategy for the target child root?"
+  options:
+    - "Fresh repo (no history)"
+    - "Clone with history filter (Agent Red commits only)"
+    - "Clean worktree (shares history, separate working tree)"
+    - "Different approach — explain"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a9c8b642ee3aac45
+  resolved_at: 2026-04-26T18:14:03.420521Z
+  answer: "User has answered your questions: \"ISOLATION-016 §3.3 — Where should rehearsal sub-scripts write their preview outputs?\"=\"Separate sandbox dir, never becomes target child root (Recommended)\", \"ISOLATION-016 §3.5 — Git strategy for the target child root?\"=\"Clone with history filter (Agent Red commits only)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
