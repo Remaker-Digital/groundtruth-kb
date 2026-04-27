@@ -206,3 +206,221 @@ def test_manifest_validation_accepts_canonical_paths(tmp_path: Path) -> None:
     )
     data = load_manifest(good_manifest)
     assert data["target_root"] == target.as_posix()
+
+
+# =============================================================================
+# Slice 3 driver wire-up tests (per
+# bridge/gtkb-isolation-016-phase8-wave2-slice3-003.md REVISED-1 + -004 GO).
+# All fixture-based; no live-root walks.
+# =============================================================================
+
+import json as _json  # noqa: E402
+
+import rehearse_isolation as _driver  # noqa: E402
+from rehearse._common import LEGACY_ROOT, ManifestValidationError  # noqa: E402
+
+
+_PRODUCTION_MANIFEST_PATH = (
+    LEGACY_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    / "rehearsal" / "manifest.toml"
+)
+
+
+def _slice3_skip_if_no_production_manifest():
+    if not _PRODUCTION_MANIFEST_PATH.exists():
+        pytest.skip("production manifest unavailable in this checkout")
+
+
+# ----- F1: --execute opt-in semantics -----
+
+def test_main_loads_manifest_at_wave2(monkeypatch: pytest.MonkeyPatch) -> None:
+    """main() calls load_manifest with wave=2."""
+    _slice3_skip_if_no_production_manifest()
+    captured: dict = {}
+
+    def _spy_load(path, *, wave=1, is_runtime_manifest=False):
+        captured["wave"] = wave
+        captured["is_runtime_manifest"] = is_runtime_manifest
+        return {
+            "target_root": str((LEGACY_ROOT / "applications" / "Agent_Red").as_posix()),
+            "legacy_root": str(LEGACY_ROOT.as_posix()),
+            "applications_namespace": str((LEGACY_ROOT / "applications").as_posix()),
+            "output_dir": "C:/temp/agent-red-rehearsal",
+        }
+
+    monkeypatch.setattr(_driver, "load_manifest", _spy_load)
+    rc = _driver.main(["--phase", "verify"])
+    assert rc == _driver.EXIT_OK
+    assert captured["wave"] == 2
+
+
+def test_execute_flag_enables_real_run() -> None:
+    """--execute does NOT trigger v1 hard refusal."""
+    _slice3_skip_if_no_production_manifest()
+    rc = _driver.main(["--phase", "verify", "--execute"])
+    assert rc == _driver.EXIT_OK
+
+
+def test_no_dry_run_still_refused_even_with_execute() -> None:
+    """--no-dry-run continues to be refused even when --execute is also passed."""
+    rc = _driver.main(["--phase", "verify", "--execute", "--no-dry-run"])
+    assert rc == _driver.EXIT_REFUSE
+
+
+# ----- output_dir construction + F2: override safety -----
+
+def test_resolve_output_dir_default_appends_iso_timestamp() -> None:
+    manifest = {"output_dir": "C:/temp/agent-red-rehearsal"}
+    result = _driver._resolve_output_dir(manifest, override=None)
+    s = str(result)
+    assert "agent-red-rehearsal-" in s
+    suffix = s.split("agent-red-rehearsal-", 1)[1]
+    assert len(suffix) == 16 and suffix.endswith("Z") and "T" in suffix
+
+
+def test_output_dir_override_in_sandbox_accepted() -> None:
+    manifest = {"output_dir": "C:/temp/agent-red-rehearsal"}
+    override = Path("C:/temp/agent-red-rehearsal-custom")
+    result = _driver._resolve_output_dir(manifest, override=override)
+    assert result == override
+
+
+def test_output_dir_override_under_legacy_root_rejected() -> None:
+    manifest = {"output_dir": "C:/temp/agent-red-rehearsal"}
+    override = LEGACY_ROOT / "foo"
+    with pytest.raises(ManifestValidationError, match="M2.*LEGACY_ROOT"):
+        _driver._resolve_output_dir(manifest, override=override)
+
+
+def test_output_dir_override_under_target_root_rejected() -> None:
+    manifest = {"output_dir": "C:/temp/agent-red-rehearsal"}
+    override = LEGACY_ROOT / "applications" / "Agent_Red" / "foo"
+    with pytest.raises(ManifestValidationError, match="M2.*TARGET_ROOT_DEFAULT"):
+        _driver._resolve_output_dir(manifest, override=override)
+
+
+def test_output_dir_override_non_allowlisted_rejected() -> None:
+    manifest = {"output_dir": "C:/temp/agent-red-rehearsal"}
+    override = Path("C:/Users/micha/OneDrive/foo")
+    with pytest.raises(ManifestValidationError, match="M2.*sandbox allowlist"):
+        _driver._resolve_output_dir(manifest, override=override)
+
+
+# ----- F3: dispatch exception narrowing -----
+
+def test_dispatch_lane_module_missing_returns_skipped() -> None:
+    """A lane whose module file does not exist returns status='skipped'."""
+    result = _driver._dispatch(
+        "rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True
+    )
+    assert result["status"] == "skipped"
+    assert any("not yet implemented" in w for w in result["warnings"])
+
+
+def test_dispatch_lane_module_broken_dependency_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A lane whose module imports a missing dependency returns status='error'."""
+    real_import = _driver.importlib.import_module
+
+    def _broken_import(name, *args, **kwargs):
+        if name == "rehearse._path_rewrite":
+            raise ModuleNotFoundError(
+                "No module named 'some_missing_dependency'",
+                name="some_missing_dependency",
+            )
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(_driver.importlib, "import_module", _broken_import)
+    result = _driver._dispatch(
+        "rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True
+    )
+    assert result["status"] == "error"
+    assert any(
+        "missing dependency" in w and "some_missing_dependency" in w
+        for w in result["warnings"]
+    )
+
+
+def test_dispatch_lane_module_missing_run_function_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A lane module that exists but lacks run() returns status='error'."""
+    real_import = _driver.importlib.import_module
+
+    class _ModWithoutRun:
+        pass
+
+    def _import_module_without_run(name, *args, **kwargs):
+        if name == "rehearse._path_rewrite":
+            return _ModWithoutRun()
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(_driver.importlib, "import_module", _import_module_without_run)
+    result = _driver._dispatch(
+        "rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True
+    )
+    assert result["status"] == "error"
+    assert any("module exists but has no" in w for w in result["warnings"])
+
+
+def test_dispatch_unknown_phase_raises_valueerror() -> None:
+    with pytest.raises(ValueError, match="unknown phase"):
+        _driver._dispatch(
+            "nonexistent-phase",
+            manifest={},
+            output_dir=Path("ignored"),
+            dry_run=True,
+        )
+
+
+# ----- run-summary.json emission (per GO -004 implementation note) -----
+
+def test_run_summary_written_when_lane_returns_ok(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Summary file appears when at least one lane returns ok."""
+    _slice3_skip_if_no_production_manifest()
+    output_dir = tmp_path / "run-output"
+
+    def _spy_dispatch(phase_name, manifest, output_dir, *, dry_run):
+        return {"status": "ok", "output_files": [], "metrics": {}, "warnings": []}
+
+    monkeypatch.setattr(_driver, "_dispatch", _spy_dispatch)
+    monkeypatch.setattr(
+        _driver, "_resolve_output_dir", lambda m, override=None: output_dir
+    )
+    rc = _driver.main(["--phase", "inventory", "--execute"])
+    assert rc == _driver.EXIT_OK
+    summary_path = output_dir / "run-summary.json"
+    assert summary_path.exists(), "run-summary.json should be emitted on ok"
+    summary = _json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["dry_run"] is False
+    assert "inventory" in summary["results"]
+
+
+def test_run_summary_not_written_when_all_lanes_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Summary file does NOT appear if every lane returned skipped."""
+    _slice3_skip_if_no_production_manifest()
+    output_dir = tmp_path / "run-output-skipped"
+
+    def _all_skipped_dispatch(phase_name, manifest, output_dir, *, dry_run):
+        return {
+            "status": "skipped",
+            "output_files": [],
+            "metrics": {},
+            "warnings": ["test stub: not implemented"],
+        }
+
+    monkeypatch.setattr(_driver, "_dispatch", _all_skipped_dispatch)
+    monkeypatch.setattr(
+        _driver, "_resolve_output_dir", lambda m, override=None: output_dir
+    )
+    rc = _driver.main(["--phase", "rewrite"])
+    assert rc == _driver.EXIT_OK
+    summary_path = output_dir / "run-summary.json"
+    assert not summary_path.exists(), (
+        "run-summary.json should NOT be emitted when every lane was skipped"
+    )

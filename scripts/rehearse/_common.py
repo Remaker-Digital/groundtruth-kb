@@ -55,6 +55,36 @@ def _is_allowed_output_dir(path: Path) -> bool:
     return any(p.match(s) for p in _OUTPUT_DIR_ALLOWLIST_PATTERNS)
 
 
+def validate_sandbox_output_dir(output_dir: Path) -> None:
+    """Apply M2 sandbox-safety rules to an output_dir path.
+
+    Raises ``ManifestValidationError`` on violation. Used from both
+    :func:`load_manifest` (for ``manifest.output_dir``) and from the
+    rehearsal driver (for ``--output-dir`` CLI override). Same rules;
+    same enforcement.
+
+    Per ``bridge/gtkb-isolation-016-phase8-wave2-slice3-003.md`` F2 fix:
+    extracting this helper lets the driver enforce M2 safety on operator-
+    provided override paths before any file writes.
+    """
+    if is_within(output_dir, TARGET_ROOT_DEFAULT):
+        raise ManifestValidationError(
+            f"M2: output_dir ({output_dir}) cannot be under "
+            f"TARGET_ROOT_DEFAULT ({TARGET_ROOT_DEFAULT}); must be a "
+            f"sandbox path."
+        )
+    if is_within(output_dir, LEGACY_ROOT):
+        raise ManifestValidationError(
+            f"M2: output_dir ({output_dir}) cannot be under "
+            f"LEGACY_ROOT ({LEGACY_ROOT}); must be a sandbox path."
+        )
+    if not _is_allowed_output_dir(output_dir):
+        raise ManifestValidationError(
+            f"M2: output_dir ({output_dir}) does not match the sandbox "
+            f"allowlist; permitted patterns: {_OUTPUT_DIR_ALLOWLIST_DESC}."
+        )
+
+
 # Per `-013` §2: explicit blocklist enumeration. Each entry is a top-level
 # directory at <gt-kb-root>/<name>/ that contains Agent Red content mixed
 # with or alongside GT-KB infrastructure. Adding new entries requires
@@ -321,26 +351,11 @@ def load_manifest(
                 "M2: manifest.output_dir must be a string"
             )
         output_dir = Path(output_dir_str)
-        # Check TARGET_ROOT_DEFAULT before LEGACY_ROOT because the former is a
-        # strict subset of the latter; the more specific error is more useful
-        # to the operator.
-        if is_within(output_dir, TARGET_ROOT_DEFAULT):
-            raise ManifestValidationError(
-                f"M2: manifest.output_dir ({output_dir}) cannot be under "
-                f"TARGET_ROOT_DEFAULT ({TARGET_ROOT_DEFAULT}); must be a "
-                f"sandbox path."
-            )
-        if is_within(output_dir, LEGACY_ROOT):
-            raise ManifestValidationError(
-                f"M2: manifest.output_dir ({output_dir}) cannot be under "
-                f"LEGACY_ROOT ({LEGACY_ROOT}); must be a sandbox path."
-            )
-        if not _is_allowed_output_dir(output_dir):
-            raise ManifestValidationError(
-                f"M2: manifest.output_dir ({output_dir}) does not match the "
-                f"sandbox allowlist; permitted patterns: "
-                f"{_OUTPUT_DIR_ALLOWLIST_DESC}."
-            )
+        # Per Slice 3 F2 fix: M2 enforcement extracted into
+        # validate_sandbox_output_dir() so the driver can apply the same
+        # rules to --output-dir CLI overrides. Functionally identical to
+        # the pre-Slice-3 inline checks.
+        validate_sandbox_output_dir(output_dir)
 
         # Rule M3 — git_strategy must be valid; clone_with_history_filter
         # requires git_filter_command_template with required placeholders.
