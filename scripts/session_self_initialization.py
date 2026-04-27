@@ -37,22 +37,28 @@ if hasattr(sys.stderr, "reconfigure"):
 try:
     from scripts.workstream_focus import (
         CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,
-        SubjectScopeError,
+    )
+    from scripts.workstream_focus import (
+        SubjectScopeError,  # noqa: F401  # intentional re-export for module.SubjectScopeError test access
         assert_readiness_subject_scope,
-        load_state as _workstream_load_state,
         render_active_work_subject,
-        render_startup_focus_lines,
         startup_focus_snapshot,
+    )
+    from scripts.workstream_focus import (
+        load_state as _workstream_load_state,
     )
 except ModuleNotFoundError:  # pragma: no cover - direct script execution path
     from workstream_focus import (  # type: ignore[no-redef]
         CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,
-        SubjectScopeError,
+    )
+    from workstream_focus import (  # type: ignore[no-redef]
+        SubjectScopeError,  # noqa: F401  # intentional re-export for module.SubjectScopeError test access
         assert_readiness_subject_scope,
-        load_state as _workstream_load_state,
         render_active_work_subject,
-        render_startup_focus_lines,
         startup_focus_snapshot,
+    )
+    from workstream_focus import (
+        load_state as _workstream_load_state,
     )
 
 try:
