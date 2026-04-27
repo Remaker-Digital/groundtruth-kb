@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-016-phase8-wave2-slice4
+REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice4-007.md
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice4-006.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice4-005.md
 GO: bridge/gtkb-isolation-016-phase8-wave2-slice4-004.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice4-003.md

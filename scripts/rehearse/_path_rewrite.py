@@ -30,7 +30,6 @@ from typing import Any
 
 from rehearse._common import LEGACY_ROOT
 
-
 _CLASSIFY_TREE_DEFAULT_MAX_DEPTH = 10
 """Matches ``gt project classify-tree --max-depth`` default."""
 
@@ -138,13 +137,9 @@ def _partition_rows(
                 }
             )
         elif ownership in ("gt-kb-managed", "gt-kb-scaffolded"):
-            keep_at_root.append(
-                {"path": path, "ownership": ownership, "record_id": record_id}
-            )
+            keep_at_root.append({"path": path, "ownership": ownership, "record_id": record_id})
         elif ownership == "shared-structured":
-            shared_paths.append(
-                {"path": path, "ownership": ownership, "record_id": record_id}
-            )
+            shared_paths.append({"path": path, "ownership": ownership, "record_id": record_id})
         elif ownership == "legacy-exception":
             legacy_exceptions.append(
                 {
@@ -155,9 +150,7 @@ def _partition_rows(
                 }
             )
         else:
-            unknown_ownership.append(
-                {"path": path, "ownership": ownership, "record_id": record_id}
-            )
+            unknown_ownership.append({"path": path, "ownership": ownership, "record_id": record_id})
 
     return {
         "rewrites": rewrites,
@@ -173,10 +166,27 @@ def _compose_git_filter_args(
     rewrites: list[dict[str, Any]],
 ) -> str:
     """Compose the git-filter-repo --path / --path-rename argument lines."""
-    return "".join(
-        f"--path {r['source']} --path-rename {r['source']}:{r['target']}\n"
-        for r in rewrites
-    )
+    return "".join(f"--path {r['source']} --path-rename {r['source']}:{r['target']}\n" for r in rewrites)
+
+
+def _emit_result(lane_dir: Path, result: dict[str, Any]) -> dict[str, Any]:
+    """Write the structured result to ``{lane_dir}/result.json``.
+
+    Per Wave 2 -003 §4.2 + umbrella -001 §4.2 common contract: each
+    sub-script writes ``result.json`` under its lane dir containing the
+    structured result returned by ``run()``. Per slice4 NO-GO ``-006`` F2:
+    the post-impl must include this artifact and list it in
+    ``output_files``.
+
+    Mutates ``result["output_files"]`` to append the result.json path
+    BEFORE serialization, so result.json's content correctly references
+    its own path. Returns the (now-augmented) result dict for the caller
+    to ``return``.
+    """
+    result_path = lane_dir / "result.json"
+    result["output_files"] = [*result["output_files"], str(result_path)]
+    result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return result
 
 
 def run(
@@ -209,65 +219,74 @@ def run(
     cmd = _build_classify_tree_command(LEGACY_ROOT, classification_path)
 
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     except OSError as exc:
-        return {
-            "status": "error",
-            "output_files": [],
-            "metrics": {},
-            "warnings": [f"classify_tree_subprocess_failed_to_spawn: {exc}"],
-        }
+        return _emit_result(
+            lane_dir,
+            {
+                "status": "error",
+                "output_files": [],
+                "metrics": {},
+                "warnings": [f"classify_tree_subprocess_failed_to_spawn: {exc}"],
+            },
+        )
 
     if result.returncode != 0:
-        return {
-            "status": "error",
-            "output_files": [],
-            "metrics": {},
-            "warnings": [
-                f"classify_tree_nonzero_exit: code={result.returncode}; "
-                f"stderr={result.stderr.strip()[:500]}"
-            ],
-        }
+        return _emit_result(
+            lane_dir,
+            {
+                "status": "error",
+                "output_files": [],
+                "metrics": {},
+                "warnings": [
+                    f"classify_tree_nonzero_exit: code={result.returncode}; stderr={result.stderr.strip()[:500]}"
+                ],
+            },
+        )
 
     # Per Codex GO -004 condition 2: explicit file-existence check after
     # zero-exit return. Catches the historical "python -m no-op" failure
     # mode in production even if the entrypoint regresses.
     if not classification_path.exists():
-        return {
-            "status": "error",
-            "output_files": [],
-            "metrics": {},
-            "warnings": [
-                "classify_tree_zero_exit_but_no_classification_file: "
-                f"expected {classification_path}; classify-tree subprocess "
-                "exited 0 but did not write the JSON output. Likely indicates "
-                "an entrypoint regression (see slice4-002 F1)."
-            ],
-        }
+        return _emit_result(
+            lane_dir,
+            {
+                "status": "error",
+                "output_files": [],
+                "metrics": {},
+                "warnings": [
+                    "classify_tree_zero_exit_but_no_classification_file: "
+                    f"expected {classification_path}; classify-tree subprocess "
+                    "exited 0 but did not write the JSON output. Likely indicates "
+                    "an entrypoint regression (see slice4-002 F1)."
+                ],
+            },
+        )
 
     try:
         classification = json.loads(classification_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        return {
-            "status": "error",
-            "output_files": [str(classification_path)],
-            "metrics": {},
-            "warnings": [f"classification_json_unreadable: {exc}"],
-        }
+        return _emit_result(
+            lane_dir,
+            {
+                "status": "error",
+                "output_files": [str(classification_path)],
+                "metrics": {},
+                "warnings": [f"classification_json_unreadable: {exc}"],
+            },
+        )
 
     rows = classification.get("rows")
     if not isinstance(rows, list):
-        return {
-            "status": "error",
-            "output_files": [str(classification_path)],
-            "metrics": {},
-            "warnings": [
-                f"classification_rows_missing_or_malformed: "
-                f"expected list, got {type(rows).__name__}"
-            ],
-        }
+        return _emit_result(
+            lane_dir,
+            {
+                "status": "error",
+                "output_files": [str(classification_path)],
+                "metrics": {},
+                "warnings": [f"classification_rows_missing_or_malformed: expected list, got {type(rows).__name__}"],
+            },
+        )
 
     target_namespace = _derive_target_namespace(manifest)
     buckets = _partition_rows(rows, target_namespace)
@@ -305,9 +324,7 @@ def run(
             "gt_kb_version": classification.get("gt_kb_version", ""),
             "gt_kb_head": classification.get("gt_kb_head", ""),
             "target_head": classification.get("target_head", ""),
-            "total_paths_classified": classification.get(
-                "total_paths_classified", len(rows)
-            ),
+            "total_paths_classified": classification.get("total_paths_classified", len(rows)),
         },
         "summary": {
             "rewrites_count": len(buckets["rewrites"]),
@@ -326,26 +343,25 @@ def run(
     }
 
     path_rewrite_path = lane_dir / "path_rewrite.json"
-    path_rewrite_path.write_text(
-        json.dumps(path_rewrite_doc, indent=2), encoding="utf-8"
-    )
+    path_rewrite_path.write_text(json.dumps(path_rewrite_doc, indent=2), encoding="utf-8")
 
     git_filter_path = lane_dir / "git_filter_args.txt"
-    git_filter_path.write_text(
-        _compose_git_filter_args(buckets["rewrites"]), encoding="utf-8"
-    )
+    git_filter_path.write_text(_compose_git_filter_args(buckets["rewrites"]), encoding="utf-8")
 
-    return {
-        "status": "ok",
-        "output_files": [
-            str(classification_path),
-            str(path_rewrite_path),
-            str(git_filter_path),
-        ],
-        "metrics": {
-            "rewrites_count": len(buckets["rewrites"]),
-            "total_classified": len(rows),
-            "target_namespace": target_namespace,
+    return _emit_result(
+        lane_dir,
+        {
+            "status": "ok",
+            "output_files": [
+                str(classification_path),
+                str(path_rewrite_path),
+                str(git_filter_path),
+            ],
+            "metrics": {
+                "rewrites_count": len(buckets["rewrites"]),
+                "total_classified": len(rows),
+                "target_namespace": target_namespace,
+            },
+            "warnings": warnings,
         },
-        "warnings": warnings,
-    }
+    )
