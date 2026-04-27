@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-27T08:58:12Z
+Generated: 2026-04-27T18:38:45Z
 
 ## Startup Disclosure
 
@@ -58,7 +58,7 @@ Generated: 2026-04-27T08:58:12Z
 
 ### Pending Owner Decisions
 
-12 owner decision(s) await a response. Address one by quoting its DECISION-NNNN ID, type `resolve DECISION-NNNN: <answer>` to record an answer, `defer all` to acknowledge without resolving, or `clear pending` to dismiss intentionally.
+14 owner decision(s) await a response. Address one by quoting its DECISION-NNNN ID, type `resolve DECISION-NNNN: <answer>` to record an answer, `defer all` to acknowledge without resolving, or `clear pending` to dismiss intentionally.
 
 - **DECISION-0029**: s green throughout. Standing by for owner decision on poller v1 scope (asked 2026-04-26T19:35:00.271540Z)
 - **DECISION-0030**: ap if you'd prefer. Standing by for direction. `───────────────── (asked 2026-04-27T00:28:51.000753Z)
@@ -72,6 +72,8 @@ Generated: 2026-04-27T08:58:12Z
 - **DECISION-0038**: e resuming Wave 2.  Standing by for direction. (asked 2026-04-27T06:42:35.876853Z)
 - **DECISION-0039**: d like to surface.  Standing by for direction. (asked 2026-04-27T06:51:22.853708Z)
 - **DECISION-0040**: ─────────────────`  Standing by for direction. (asked 2026-04-27T08:37:18.827636Z)
+- **DECISION-0042**: prised me before  **Standing by for whatever's next** — another bridge scan when you have direction, or a different pri (asked 2026-04-27T15:24:04.713902Z)
+- **DECISION-0043**: no implementation.  Standing by for direction or session wrap. (asked 2026-04-27T18:29:58.141516Z)
 
 ### Session Overlay Status (Non-Authoritative)
 
@@ -144,7 +146,7 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Promote the staged-and-tested build to production, then run production smoke tests. Confirm explicit production approval, artifact provenance, deployment status, smoke-test evidence, rollback readiness, and release records.
 
 13. **Continue Last Session**
-   Current signal: The action center and 12 latest GO/NO-GO bridge responses define the current-session continuation scope.
+   Current signal: The action center and 9 latest GO/NO-GO bridge responses define the current-session continuation scope.
    Prompt details: Continue from the last session using the dashboard action center and any latest GO/NO-GO bridge responses, including responses produced by a prior Loyal Opposition session. Start by inventorying the latest GO/NO-GO bridge entries, then continue with Repair Release Candidate Gate; explain current evidence, next command, and expected verification.
 
 Or provide a prompt for something else.

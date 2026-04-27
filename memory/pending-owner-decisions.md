@@ -90,6 +90,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: 20c3584dccf20edd
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0042
+  asked_at: 2026-04-27T15:24:04.713902Z
+  question: "prised me before  **Standing by for whatever's next** — another bridge scan when you have direction, or a different pri"
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 907710153e53864f
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0043
+  asked_at: 2026-04-27T18:29:58.141516Z
+  question: "no implementation.  Standing by for direction or session wrap."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 4373a198ddd92d82
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -428,6 +442,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: a9c8b642ee3aac45
   resolved_at: 2026-04-26T18:14:03.420521Z
   answer: "User has answered your questions: \"ISOLATION-016 §3.3 — Where should rehearsal sub-scripts write their preview outputs?\"=\"Separate sandbox dir, never becomes target child root (Recommended)\", \"ISOLATION-016 §3.5 — Git strategy for the target child root?\"=\"Clone with history filter (Agent Red commits only)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0041
+  asked_at: 2026-04-27T14:47:52.141335Z
+  question: "Approve Phase 2 hibernation execution against subscription 4dce2122 / Agent-Red RG?"
+  options:
+    - "Execute 2.1 + 2.2 (Recommended)"
+    - "Execute 2.1 only"
+    - "Cancel hibernation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 82b8b2f0d5fbf02d
+  resolved_at: 2026-04-27T14:47:52.141335Z
+  answer: "User has answered your questions: \"Approve Phase 2 hibernation execution against subscription 4dce2122 / Agent-Red RG?\"=\"Execute 2.1 + 2.2 (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

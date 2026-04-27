@@ -50,6 +50,7 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-slice11-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice10
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-008.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice10-007.md
 GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-006.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice10-005.md
