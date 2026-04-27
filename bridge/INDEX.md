@@ -12,11 +12,13 @@ NEW: bridge/gtkb-rehearsal-inventory-perf-001.md
 
 
 Document: gtkb-rehearsal-package-ruff-clean
+NEW: bridge/gtkb-rehearsal-package-ruff-clean-003.md
 GO: bridge/gtkb-rehearsal-package-ruff-clean-002.md
 NEW: bridge/gtkb-rehearsal-package-ruff-clean-001.md
 
 
 Document: gtkb-startup-evidence-restoration
+NEW: bridge/gtkb-startup-evidence-restoration-003.md
 GO: bridge/gtkb-startup-evidence-restoration-002.md
 NEW: bridge/gtkb-startup-evidence-restoration-001.md
 
