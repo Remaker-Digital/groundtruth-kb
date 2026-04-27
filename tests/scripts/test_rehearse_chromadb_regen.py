@@ -93,12 +93,47 @@ def _build_chroma_fixture(
 
 
 def _write_membase_manifest(output_dir: Path, records: list[dict[str, Any]]) -> Path:
-    """Write a Slice 8 partition_manifest.json fixture for tier-2 cross-ref tests."""
+    """Write a Slice 8 ``membase-partition-manifest.json`` fixture in producer shape.
+
+    Per ``-008`` Codex NO-GO + ``-009`` REVISED-1 §1.1-1.2: filename and
+    schema must match what ``_membase_export.py:854-865`` actually emits.
+    Tests pass minimum-shape records (``{"id": ..., "classification": ...}``);
+    helper enriches each entry with the audit fields a real Slice 8 entry
+    carries (``table_name``, ``version_count``, ``max_version``,
+    ``classification_signal``) so the fixture is shape-identical to producer
+    output.
+    """
     manifest_dir = output_dir / "membase_export"
     manifest_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = manifest_dir / "partition_manifest.json"
+    manifest_path = manifest_dir / "membase-partition-manifest.json"
+    enriched_records = [
+        {
+            "id": r["id"],
+            "table_name": r.get("table_name", "deliberations"),
+            "version_count": r.get("version_count", 1),
+            "max_version": r.get("max_version", 1),
+            "classification": r["classification"],
+            "classification_signal": r.get("classification_signal", "fixture"),
+        }
+        for r in records
+    ]
     manifest_path.write_text(
-        json.dumps({"records": records}, indent=2),
+        json.dumps(
+            {
+                "schema_version": 1,
+                "generated_at": "2026-04-27T00:00:00Z",
+                "kb_path": "fixture",
+                "summary": {
+                    "tables_discovered": 1,
+                    "versioned_records_count": len(enriched_records),
+                },
+                "versioned_records": enriched_records,
+                "relationship_records": [],
+                "per_session_records": [],
+                "warnings": [],
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     return manifest_path
@@ -575,3 +610,190 @@ def test_run_records_source_type_distribution(tmp_path: Path) -> None:
     plan = _read_plan(tmp_path / "output")
     coll = plan["collections"][0]
     assert coll["source_type_distribution"] == {"lo_review": 2, "bridge_thread": 1}
+
+
+# =====================================================================
+# REVISED-1 (S315): Slice 8 producer-shape compatibility
+# Per bridge/gtkb-isolation-016-phase8-wave2-slice10-008.md NO-GO +
+# bridge/gtkb-isolation-016-phase8-wave2-slice10-009.md REVISED-1.
+# =====================================================================
+
+
+def test_load_membase_partition_manifest_uses_real_producer_filename(tmp_path: Path) -> None:
+    """Default path must be ``membase-partition-manifest.json`` (the real
+    Slice 8 producer filename), not the test-only ``partition_manifest.json``.
+
+    Regression guard for the `-008` NO-GO finding.
+    """
+    output_dir = tmp_path / "output"
+    _write_membase_manifest(
+        output_dir,
+        [{"id": "DELIB-PRODUCER-FILENAME-001", "classification": "framework"}],
+    )
+    # Helper writes the real producer filename; if the loader looked at the
+    # old test-only filename, this map would be empty.
+    result = _chromadb_regen._load_membase_partition_manifest(output_dir)
+    assert result == {"DELIB-PRODUCER-FILENAME-001": "framework"}
+
+
+def test_load_membase_partition_manifest_parses_versioned_records_key(tmp_path: Path) -> None:
+    """Loader must consume ``versioned_records[*]``, not the test-only ``records[*]`` key.
+
+    Regression guard: explicitly write a manifest with both keys; only
+    ``versioned_records`` should produce entries.
+    """
+    output_dir = tmp_path / "output"
+    manifest_dir = output_dir / "membase_export"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    (manifest_dir / "membase-partition-manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "versioned_records": [
+                    {"id": "DELIB-VR-001", "classification": "adopter"},
+                ],
+                "records": [
+                    # Old test-only key — must be ignored.
+                    {"id": "DELIB-OLD-KEY-002", "classification": "framework"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = _chromadb_regen._load_membase_partition_manifest(output_dir)
+    assert result == {"DELIB-VR-001": "adopter"}
+    assert "DELIB-OLD-KEY-002" not in result
+
+
+def test_load_membase_partition_manifest_skips_invalid_classifications(tmp_path: Path) -> None:
+    """Records carrying unrecognized classifications are skipped (defense-in-depth).
+
+    Only ``framework``, ``adopter``, ``unclassified`` are accepted.
+    """
+    output_dir = tmp_path / "output"
+    manifest_dir = output_dir / "membase_export"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    (manifest_dir / "membase-partition-manifest.json").write_text(
+        json.dumps(
+            {
+                "versioned_records": [
+                    {"id": "DELIB-OK-001", "classification": "adopter"},
+                    {"id": "DELIB-BAD-002", "classification": "MALFORMED"},
+                    {"id": "DELIB-NONE-003", "classification": None},
+                    {"classification": "framework"},  # missing id
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = _chromadb_regen._load_membase_partition_manifest(output_dir)
+    assert result == {"DELIB-OK-001": "adopter"}
+
+
+def test_run_honors_explicit_partition_manifest_path_verbatim(tmp_path: Path) -> None:
+    """Per `-008` NO-GO §3 + `-009` REVISED-1 §1.3: the explicit
+    ``partition_manifest_path`` keyword must be honored as a full path,
+    not stripped to its parent and rejoined with a hard-coded filename.
+
+    Test writes a manifest at a non-default custom location and proves the
+    chunk gets classified from THAT manifest (not from anything under
+    ``output_dir/membase_export/``).
+    """
+    chroma_dir = tmp_path / "chroma"
+    _build_chroma_fixture(
+        chroma_dir,
+        chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-CUSTOM-PATH-001"}}],
+    )
+    custom_dir = tmp_path / "elsewhere" / "nested"
+    custom_dir.mkdir(parents=True, exist_ok=True)
+    custom_manifest = custom_dir / "renamed-manifest.json"
+    custom_manifest.write_text(
+        json.dumps(
+            {
+                "versioned_records": [
+                    {"id": "DELIB-CUSTOM-PATH-001", "classification": "framework"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "output"
+    # Note: NO manifest is written under output_dir/membase_export/ — the
+    # only manifest is at the custom path. If the override-handling bug
+    # were still present, the loader would look for
+    # output_dir/membase_export/<old-name> and find nothing.
+    _chromadb_regen.run({}, output_dir, chroma_path=chroma_dir, partition_manifest_path=custom_manifest)
+    plan = _read_plan(output_dir)
+    coll = plan["collections"][0]
+    assert coll["framework_chunk_count"] == 1
+    assert coll["classification_basis_counts"].get("membase_manifest_delib_id") == 1
+
+
+def test_run_classifies_via_real_membase_partition_manifest_when_slice8_lane_runs_first(
+    tmp_path: Path,
+) -> None:
+    """Coordinated integration test per `-008` NO-GO §"Required Revision" item 4.
+
+    Drives the real ``_membase_export.run()`` against the live ``groundtruth.db``,
+    then drives ``_chromadb_regen.run()`` against the same output directory
+    using a synthetic ChromaDB fixture seeded with one DELIB-* id pulled
+    from the just-emitted manifest. Asserts the cross-reference path
+    actually fires (``classification_basis_counts["membase_manifest_delib_id"] >= 1``).
+
+    Skipped when the live KB is not present (keeps suite hermetic).
+    """
+    from rehearse import _common, _membase_export
+
+    live_kb = _common.LEGACY_ROOT / "groundtruth.db"
+    if not live_kb.exists():
+        pytest.skip(f"live KB not present at {live_kb}; integration test requires it")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Step 1: real Slice 8 emits the producer-shape manifest into output_dir.
+    membase_result = _membase_export.run({}, output_dir)
+    assert membase_result["status"] == "ok", f"Slice 8 lane failed: {membase_result}"
+    manifest_path = output_dir / "membase_export" / "membase-partition-manifest.json"
+    assert manifest_path.exists(), "Slice 8 did not emit manifest at expected path"
+
+    # Step 2: pull one real DELIB-* id from the manifest's versioned_records.
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    deliberation_entries = [
+        r
+        for r in manifest_data["versioned_records"]
+        if r.get("table_name") == "deliberations" and isinstance(r.get("id"), str) and r["id"].startswith("DELIB-")
+    ]
+    if not deliberation_entries:
+        pytest.skip("live KB has no deliberations table entries; cannot exercise cross-ref path")
+    sample_entry = deliberation_entries[0]
+    sample_id = sample_entry["id"]
+    sample_classification = sample_entry["classification"]
+
+    # Step 3: build a synthetic ChromaDB fixture with one chunk that
+    # references the real DELIB-* id (no origin_project so Tier 1 misses
+    # and Tier 2 manifest cross-ref must fire).
+    chroma_dir = tmp_path / "chroma"
+    _build_chroma_fixture(
+        chroma_dir,
+        chunks=[{"id": 1, "metadata": {"delib_id": sample_id}}],
+    )
+
+    # Step 4: real Slice 10 reads the same output_dir, pulling in Slice 8's manifest.
+    chromadb_result = _chromadb_regen.run({}, output_dir, chroma_path=chroma_dir)
+    assert chromadb_result["status"] == "ok", f"Slice 10 lane failed: {chromadb_result}"
+
+    plan = _read_plan(output_dir)
+    coll = plan["collections"][0]
+    # The proof shape Codex `-008` reported as missing.
+    assert coll["classification_basis_counts"].get("membase_manifest_delib_id", 0) >= 1, (
+        f"Tier 2 manifest cross-ref did not fire; basis_counts={coll['classification_basis_counts']}"
+    )
+    # The chunk's classification must match the manifest's recorded value.
+    if sample_classification == "framework":
+        assert coll["framework_chunk_count"] == 1
+    elif sample_classification == "adopter":
+        assert coll["adopter_chunk_count"] == 1
+    else:
+        assert coll["unclassified_chunk_count"] == 1

@@ -167,23 +167,65 @@ def _pivot_metadata_per_chunk(
     return chunks
 
 
-def _load_membase_partition_manifest(output_dir: Path) -> dict[str, str]:
-    """Load Slice 8's per-record classification map, if present in same output dir.
+_MEMBASE_PARTITION_MANIFEST_FILENAME = "membase-partition-manifest.json"
+_VALID_CLASSIFICATIONS: frozenset[str] = frozenset({"framework", "adopter", "unclassified"})
 
-    Returns ``{record_id: classification}`` keyed by record ID. Used as
-    optional Tier 1 fallback when ``origin_project`` is missing/unrecognized.
-    Empty dict when Slice 8 output is absent — Slice 10 then falls back to
-    Tier 2 (delib_id prefix) per design.
+
+def _load_membase_partition_manifest(
+    output_dir: Path,
+    *,
+    explicit_path: Path | None = None,
+) -> dict[str, str]:
+    """Load Slice 8's per-record classification map, if present.
+
+    Default path (when ``explicit_path`` is None):
+    ``<output_dir>/membase_export/membase-partition-manifest.json`` — the
+    exact filename produced by ``_membase_export.py:854``.
+
+    When ``explicit_path`` is provided, that path is used verbatim — no
+    parent stripping, no rejoining with the default filename. This honors
+    the ``run(partition_manifest_path=...)`` override so callers can point
+    the lane at a non-default location.
+
+    Returns ``{record_id: classification}`` keyed by ``versioned_records[*].id``.
+    Used as Tier 2 fallback when ``origin_project`` (Tier 1) is missing or
+    unrecognized. Empty dict when the manifest is absent or unreadable —
+    Slice 10 then falls back to Tier 3 (delib_id prefix) per design.
+
+    Schema source: ``_membase_export.py`` emits payload with key
+    ``versioned_records`` (list[dict]); each entry has ``id`` and
+    ``classification`` per ``_enumerate_versioned_table()`` at
+    ``_membase_export.py:442-449``. ``relationship_records`` and
+    ``per_session_records`` are intentionally excluded from the cross-ref
+    map: ChromaDB chunks reference deliberation IDs only, and folding in
+    other record groups risks ID-collision misclassification with no
+    matching benefit.
     """
-    manifest_path = output_dir / "membase_export" / "partition_manifest.json"
+    if explicit_path is not None:
+        manifest_path = explicit_path
+    else:
+        manifest_path = output_dir / "membase_export" / _MEMBASE_PARTITION_MANIFEST_FILENAME
     if not manifest_path.exists():
         return {}
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    records = data.get("records", []) if isinstance(data, dict) else []
-    return {r["id"]: r.get("classification", "unclassified") for r in records if isinstance(r, dict) and "id" in r}
+    if not isinstance(data, dict):
+        return {}
+    records = data.get("versioned_records", [])
+    if not isinstance(records, list):
+        return {}
+    classification_map: dict[str, str] = {}
+    for r in records:
+        if not isinstance(r, dict):
+            continue
+        record_id = r.get("id")
+        classification = r.get("classification")
+        if not isinstance(record_id, str) or classification not in _VALID_CLASSIFICATIONS:
+            continue
+        classification_map[record_id] = classification
+    return classification_map
 
 
 # ---- Byte-stable safety ----------------------------------------------
@@ -409,9 +451,7 @@ def run(
     # Capture before-hash (byte-stable safety).
     before_hashes = _hash_chroma_files(chroma_root)
 
-    membase_manifest = _load_membase_partition_manifest(
-        partition_manifest_path.parent if partition_manifest_path is not None else output_dir
-    )
+    membase_manifest = _load_membase_partition_manifest(output_dir, explicit_path=partition_manifest_path)
 
     try:
         with _open_chroma_readonly(chroma_root) as conn:
