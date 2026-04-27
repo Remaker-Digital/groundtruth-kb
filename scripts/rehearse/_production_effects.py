@@ -522,6 +522,48 @@ def _override_for_framework_reference(
 # ---- Per-category probes ----------------------------------------------
 
 
+def _build_secret_material_row(
+    rel: str,
+    path: Path | None,
+    signal: str,
+    match_kind: str,
+) -> dict[str, Any]:
+    """Build a secret-material row with is_file/is_directory metadata.
+
+    Per Codex -008 Finding 1: distinguish directory vs file existence.
+    secrets/ is a directory; .env.local is a file. Both presence-only.
+    """
+    if path is None or not path.exists():
+        return {
+            "path": rel,
+            "exists": False,
+            "is_file": False,
+            "is_directory": False,
+            "size_bytes": 0,
+            "disposition": _DISPOSITION_DO_NOT_MOVE,
+            "signal": signal,
+            "deploy_safety": _DEPLOY_SAFETY_BLOCKING,
+            "content_read": False,
+            "category": "secret_material",
+            "match_kind": match_kind,
+        }
+    is_file = path.is_file()
+    is_directory = path.is_dir()
+    return {
+        "path": rel,
+        "exists": True,
+        "is_file": is_file,
+        "is_directory": is_directory,
+        "size_bytes": _safe_size_bytes(path) if is_file else 0,
+        "disposition": _DISPOSITION_DO_NOT_MOVE,
+        "signal": signal,
+        "deploy_safety": _DEPLOY_SAFETY_BLOCKING,
+        "content_read": False,
+        "category": "secret_material",
+        "match_kind": match_kind,
+    }
+
+
 def _probe_secret_material(project_root: Path) -> list[dict[str, Any]]:
     """§2.1: secret-material surfaces. Presence/size only; never content-read.
 
@@ -534,51 +576,13 @@ def _probe_secret_material(project_root: Path) -> list[dict[str, Any]]:
         if is_glob:
             matched = _glob_matches(project_root, relpath_or_glob)
             if not matched:
-                # Record probe as absent.
-                rows.append(
-                    {
-                        "path": relpath_or_glob,
-                        "exists": False,
-                        "size_bytes": 0,
-                        "disposition": _DISPOSITION_DO_NOT_MOVE,
-                        "signal": signal,
-                        "deploy_safety": _DEPLOY_SAFETY_BLOCKING,
-                        "content_read": False,
-                        "category": "secret_material",
-                        "match_kind": "glob_no_matches",
-                    }
-                )
+                rows.append(_build_secret_material_row(relpath_or_glob, None, signal, "glob_no_matches"))
             for path in matched:
                 rel = str(path.relative_to(project_root)).replace("\\", "/")
-                rows.append(
-                    {
-                        "path": rel,
-                        "exists": True,
-                        "size_bytes": _safe_size_bytes(path),
-                        "disposition": _DISPOSITION_DO_NOT_MOVE,
-                        "signal": signal,
-                        "deploy_safety": _DEPLOY_SAFETY_BLOCKING,
-                        "content_read": False,
-                        "category": "secret_material",
-                        "match_kind": "glob_match",
-                    }
-                )
+                rows.append(_build_secret_material_row(rel, path, signal, "glob_match"))
         else:
             path = project_root / relpath_or_glob
-            exists = path.exists()
-            rows.append(
-                {
-                    "path": relpath_or_glob,
-                    "exists": exists,
-                    "size_bytes": _safe_size_bytes(path),
-                    "disposition": _DISPOSITION_DO_NOT_MOVE,
-                    "signal": signal,
-                    "deploy_safety": _DEPLOY_SAFETY_BLOCKING,
-                    "content_read": False,
-                    "category": "secret_material",
-                    "match_kind": "literal",
-                }
-            )
+            rows.append(_build_secret_material_row(relpath_or_glob, path, signal, "literal"))
     return rows
 
 
@@ -618,13 +622,19 @@ def _probe_non_secret_surfaces(project_root: Path) -> list[dict[str, Any]]:
                 if is_glob
                 else relpath
             )
-            exists = path.exists() and path.is_file()
+            # Per Codex -008 Finding 1: distinguish exists/is_file/is_dir.
+            # Real directory surfaces (.shopify/deploy-bundle, .groundtruth/wrap-scan,
+            # .groundtruth/session) must surface as exists=True even though they
+            # are not files. Content scanning remains file-only.
+            exists = path.exists()
+            is_file = exists and path.is_file()
+            is_directory = exists and path.is_dir()
             disposition = default_disp
             signal = default_signal
             content: str | None = None
             content_read = False
             hardcoded_findings: list[dict[str, Any]] = []
-            if exists and content_scannable:
+            if is_file and content_scannable:
                 try:
                     content = path.read_text(encoding="utf-8", errors="replace")
                     content_read = True
@@ -638,7 +648,9 @@ def _probe_non_secret_surfaces(project_root: Path) -> list[dict[str, Any]]:
             row: dict[str, Any] = {
                 "path": rel,
                 "exists": exists,
-                "size_bytes": _safe_size_bytes(path) if exists else 0,
+                "is_file": is_file,
+                "is_directory": is_directory,
+                "size_bytes": _safe_size_bytes(path) if is_file else 0,
                 "disposition": disposition,
                 "signal": signal,
                 "deploy_safety": deploy_safety,
@@ -652,12 +664,80 @@ def _probe_non_secret_surfaces(project_root: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _probe_approval_packets(project_root: Path) -> list[dict[str, Any]]:
-    """§2.6: classify each approval packet by approved-record ID prefixes.
+def _classify_approval_packet_by_artifact(
+    artifact_id: str,
+    artifact_type: str,
+    source_ref: str,
+) -> tuple[str, str]:
+    """Classify approval packet using top-level artifact metadata.
 
-    Reads packet structure (top-level keys + approved_records IDs) — never
-    credential or token fields. Per Slice 5 lesson: classify by content
-    signals, not just filename.
+    Per Codex -008 Finding 2: live packets use top-level ``artifact_id`` +
+    ``artifact_type`` + ``source_ref`` (NOT ``approved_records[*]`` —
+    that's a synthetic/legacy shape). One packet = one artifact.
+
+    Classification by artifact_id prefix + artifact_type + source_ref keywords:
+      - GTKB- prefix or governance-suffix → KEEP (framework)
+      - AR- prefix → MOVE (adopter)
+      - DELIB- prefix: source_ref keyword scan
+        (agent_red/adopter → MOVE; framework topic → KEEP; ambiguous → owner)
+      - artifact_type ∈ {governance, architecture_decision, design_constraint,
+        protected_behavior, architecture} with no adopter signal → KEEP
+      - Other → OWNER_DECISION_REQUIRED
+    """
+    aid = artifact_id or ""
+    atype = (artifact_type or "").lower()
+    sref = (source_ref or "").lower()
+
+    # Tier 1: explicit prefix
+    if aid.startswith("AR-"):
+        return (_DISPOSITION_MOVE, "adopter_approval_packet_ar_prefix")
+    if aid.startswith("GTKB-"):
+        return (_DISPOSITION_KEEP, "framework_approval_packet_gtkb_prefix")
+
+    # Tier 2: deliberation classification by source_ref + artifact_id keywords
+    if aid.startswith("DELIB-"):
+        adopter_markers = ("agent-red", "agent_red", "adopter", "shopify", "transport")
+        framework_markers = ("groundtruth-kb", "groundtruth_kb", "gt-kb", "framework")
+        has_adopter = any(m in sref or m in aid.lower() for m in adopter_markers)
+        has_framework = any(m in sref or m in aid.lower() for m in framework_markers)
+        if has_adopter and not has_framework:
+            return (_DISPOSITION_MOVE, "adopter_deliberation_approval_packet")
+        if has_framework and not has_adopter:
+            return (_DISPOSITION_KEEP, "framework_deliberation_approval_packet")
+        # Ambiguous deliberation → owner decision
+        return (
+            _DISPOSITION_OWNER_DECISION,
+            "deliberation_approval_packet_subject_ambiguous",
+        )
+
+    # Tier 3: artifact_type-based default for governance/architecture artifacts
+    framework_artifact_types = {
+        "governance",
+        "architecture_decision",
+        "design_constraint",
+        "protected_behavior",
+        "architecture",
+    }
+    if atype in framework_artifact_types:
+        return (_DISPOSITION_KEEP, f"framework_approval_packet_artifact_type_{atype}")
+
+    # Tier 4: ambiguous
+    return (
+        _DISPOSITION_OWNER_DECISION,
+        "approval_packet_unclassified_owner_decision",
+    )
+
+
+def _probe_approval_packets(project_root: Path) -> list[dict[str, Any]]:
+    """§2.6: classify each approval packet by top-level artifact metadata.
+
+    Reads packet structure (top-level ``artifact_id``, ``artifact_type``,
+    ``source_ref``) — NEVER credential or token fields and NEVER the
+    ``full_content`` field (which can carry sensitive embedded text).
+
+    Per Codex -008 Finding 2: live packets do NOT use ``approved_records``;
+    they use top-level metadata. The legacy ``approved_records`` schema is
+    retained as backward-compat for synthetic / older packets.
     """
     rows: list[dict[str, Any]] = []
     approvals_dir = project_root / ".groundtruth" / "formal-artifact-approvals"
@@ -673,6 +753,8 @@ def _probe_approval_packets(project_root: Path) -> list[dict[str, Any]]:
                 {
                     "path": rel,
                     "exists": True,
+                    "is_file": True,
+                    "is_directory": False,
                     "size_bytes": size_bytes,
                     "disposition": _DISPOSITION_OWNER_DECISION,
                     "signal": "approval_packet_unreadable",
@@ -683,42 +765,65 @@ def _probe_approval_packets(project_root: Path) -> list[dict[str, Any]]:
                 }
             )
             continue
-        # Classify by approved_records ID prefixes (read structure only;
-        # NEVER read individual approval body fields).
+        # Live schema (Codex -008 Finding 2): top-level artifact_id +
+        # artifact_type + source_ref. Backward-compat fallback to
+        # approved_records[] if present.
+        if isinstance(data, dict):
+            artifact_id = str(data.get("artifact_id", ""))
+            artifact_type = str(data.get("artifact_type", ""))
+            source_ref = str(data.get("source_ref", ""))
+        else:
+            artifact_id = artifact_type = source_ref = ""
         approved_records = data.get("approved_records", []) if isinstance(data, dict) else []
-        ids = [rec.get("id", "") for rec in approved_records if isinstance(rec, dict)]
-        gtkb_count = sum(1 for i in ids if i.startswith("GTKB-"))
-        ar_count = sum(1 for i in ids if i.startswith("AR-"))
-        if gtkb_count > 0 and ar_count > 0:
-            disposition = _DISPOSITION_OWNER_DECISION
-            signal = "mixed_scope_approval_packet"
-        elif ar_count > 0:
-            disposition = _DISPOSITION_MOVE
-            signal = "adopter_approval_packet"
-        elif gtkb_count > 0:
-            disposition = _DISPOSITION_KEEP
-            signal = "framework_approval_packet"
+
+        if artifact_id:
+            disposition, signal = _classify_approval_packet_by_artifact(artifact_id, artifact_type, source_ref)
+            classification_basis = "live_schema_top_level_artifact"
+        elif approved_records:
+            # Backward-compat: legacy approved_records[] shape
+            ids = [rec.get("id", "") for rec in approved_records if isinstance(rec, dict)]
+            gtkb_count = sum(1 for i in ids if i.startswith("GTKB-"))
+            ar_count = sum(1 for i in ids if i.startswith("AR-"))
+            if gtkb_count > 0 and ar_count > 0:
+                disposition, signal = _DISPOSITION_OWNER_DECISION, "mixed_scope_approval_packet"
+            elif ar_count > 0:
+                disposition, signal = _DISPOSITION_MOVE, "adopter_approval_packet_legacy_records"
+            elif gtkb_count > 0:
+                disposition, signal = _DISPOSITION_KEEP, "framework_approval_packet_legacy_records"
+            else:
+                disposition, signal = _DISPOSITION_OWNER_DECISION, "neutral_approval_packet_owner_decision"
+            classification_basis = "legacy_schema_approved_records"
         else:
             disposition = _DISPOSITION_OWNER_DECISION
-            signal = "neutral_approval_packet_owner_decision"
-        rows.append(
-            {
-                "path": rel,
-                "exists": True,
-                "size_bytes": size_bytes,
-                "disposition": disposition,
-                "signal": signal,
-                "deploy_safety": _DEPLOY_SAFETY_AFTER_REVIEW,
-                "content_read": True,
-                "category": "approval_packet",
-                "match_kind": "literal",
-                "approved_record_id_prefix_counts": {
-                    "GTKB": gtkb_count,
-                    "AR": ar_count,
-                    "other": len(ids) - gtkb_count - ar_count,
-                },
+            signal = "approval_packet_no_recognized_schema"
+            classification_basis = "no_recognized_schema"
+
+        row: dict[str, Any] = {
+            "path": rel,
+            "exists": True,
+            "is_file": True,
+            "is_directory": False,
+            "size_bytes": size_bytes,
+            "disposition": disposition,
+            "signal": signal,
+            "deploy_safety": _DEPLOY_SAFETY_AFTER_REVIEW,
+            "content_read": True,
+            "category": "approval_packet",
+            "match_kind": "literal",
+            "classification_basis": classification_basis,
+            "artifact_id": artifact_id or None,
+            "artifact_type": artifact_type or None,
+        }
+        if approved_records:
+            ids = [r.get("id", "") for r in approved_records if isinstance(r, dict)]
+            gtkb_count = sum(1 for i in ids if i.startswith("GTKB-"))
+            ar_count = sum(1 for i in ids if i.startswith("AR-"))
+            row["approved_record_id_prefix_counts"] = {
+                "GTKB": gtkb_count,
+                "AR": ar_count,
+                "other": len(ids) - gtkb_count - ar_count,
             }
-        )
+        rows.append(row)
     return rows
 
 

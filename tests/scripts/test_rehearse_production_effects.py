@@ -320,7 +320,8 @@ def test_run_records_github_actions_hardcoded_path_references(tmp_path: Path) ->
 # ---- §2.6 Approval packets -------------------------------------------
 
 
-def test_run_classifies_approval_packet_by_subject_adopter(tmp_path: Path) -> None:
+def test_run_classifies_approval_packet_by_legacy_records_schema(tmp_path: Path) -> None:
+    """Backward-compat: legacy approved_records[] schema still classified."""
     project_root = _build_project_root(tmp_path)
     approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
     approvals.mkdir(parents=True)
@@ -333,7 +334,8 @@ def test_run_classifies_approval_packet_by_subject_adopter(tmp_path: Path) -> No
     payload = _read_json(output_dir)
     row = next(s for s in payload["surfaces"] if "ar-approval.json" in s["path"])
     assert row["disposition"] == "MOVE"
-    assert row["signal"] == "adopter_approval_packet"
+    assert row["signal"] == "adopter_approval_packet_legacy_records"
+    assert row["classification_basis"] == "legacy_schema_approved_records"
 
 
 def test_run_classifies_mixed_scope_approval_packet_as_owner_decision(tmp_path: Path) -> None:
@@ -402,3 +404,184 @@ def test_run_writes_result_json_on_ok_path(tmp_path: Path) -> None:
     result = _run_lane(project_root, output_dir)
     assert result["status"] == "ok"
     assert (output_dir / "production_effects" / "result.json").exists()
+
+
+# ---- Codex -008 Finding 1: directory existence ------------------------
+
+
+def test_run_reports_directory_surfaces_as_existing(tmp_path: Path) -> None:
+    """Per Codex -008 Finding 1: real directory surfaces must surface as
+    exists=True with is_directory=True, not exists=False.
+
+    Tests .shopify/deploy-bundle, .groundtruth/wrap-scan, .groundtruth/session.
+    """
+    project_root = _build_project_root(tmp_path)
+    (project_root / ".shopify" / "deploy-bundle").mkdir(parents=True)
+    (project_root / ".groundtruth" / "wrap-scan").mkdir(parents=True)
+    (project_root / ".groundtruth" / "session").mkdir(parents=True)
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    for path_suffix in (".shopify/deploy-bundle", ".groundtruth/wrap-scan", ".groundtruth/session"):
+        row = next(s for s in payload["surfaces"] if s["path"] == path_suffix)
+        assert row["exists"] is True, f"Directory {path_suffix} reported as absent"
+        assert row["is_directory"] is True
+        assert row["is_file"] is False
+        assert row["content_read"] is False  # directories never content-read
+
+
+def test_run_reports_file_surfaces_with_is_file_true(tmp_path: Path) -> None:
+    """Files distinguishable from directories via is_file/is_directory."""
+    project_root = _build_project_root(tmp_path)
+    (project_root / "Dockerfile").write_text("FROM python:3.14\n", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    row = next(s for s in payload["surfaces"] if s["path"] == "Dockerfile")
+    assert row["exists"] is True
+    assert row["is_file"] is True
+    assert row["is_directory"] is False
+
+
+# ---- Codex -008 Finding 2: live approval schema ----------------------
+
+
+def test_run_classifies_live_schema_gtkb_artifact_id_as_keep(tmp_path: Path) -> None:
+    """Live schema: artifact_id starts with GTKB- → KEEP framework."""
+    project_root = _build_project_root(tmp_path)
+    approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
+    approvals.mkdir(parents=True)
+    (approvals / "gov-approval.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "governance",
+                "artifact_id": "GTKB-GOV-011-IMPLEMENTATION-VERIFICATION",
+                "source_ref": "owner_conversation:2026-04-20-gtkb-gov-011-proceed",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    row = next(s for s in payload["surfaces"] if "gov-approval.json" in s["path"])
+    assert row["disposition"] == "KEEP"
+    assert row["signal"] == "framework_approval_packet_gtkb_prefix"
+    assert row["classification_basis"] == "live_schema_top_level_artifact"
+    assert row["artifact_id"] == "GTKB-GOV-011-IMPLEMENTATION-VERIFICATION"
+    assert row["artifact_type"] == "governance"
+
+
+def test_run_classifies_live_schema_governance_artifact_type_as_keep(tmp_path: Path) -> None:
+    """Live schema: artifact_type=governance with no GTKB-/AR- prefix → KEEP."""
+    project_root = _build_project_root(tmp_path)
+    approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
+    approvals.mkdir(parents=True)
+    (approvals / "gov-batch.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "governance",
+                "artifact_id": "ARTIFACT-ORIENTED-GOVERNANCE-BATCH-2026-04-22",
+                "source_ref": "owner_conversation:2026-04-22",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    row = next(s for s in payload["surfaces"] if "gov-batch.json" in s["path"])
+    assert row["disposition"] == "KEEP"
+    assert row["signal"] == "framework_approval_packet_artifact_type_governance"
+
+
+def test_run_classifies_live_schema_deliberation_with_framework_source_ref(tmp_path: Path) -> None:
+    """Live schema: DELIB-* with framework source_ref → KEEP."""
+    project_root = _build_project_root(tmp_path)
+    approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
+    approvals.mkdir(parents=True)
+    (approvals / "delib.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "deliberation",
+                "artifact_id": "DELIB-0836",
+                "source_ref": "owner_conversation:2026-04-20-codex-hook-windows-limitation-groundtruth_kb",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    row = next(s for s in payload["surfaces"] if "delib.json" in s["path"])
+    assert row["disposition"] == "KEEP"
+    assert row["signal"] == "framework_deliberation_approval_packet"
+
+
+def test_run_classifies_live_schema_deliberation_with_adopter_source_ref(tmp_path: Path) -> None:
+    """Live schema: DELIB-* with agent_red source_ref → MOVE."""
+    project_root = _build_project_root(tmp_path)
+    approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
+    approvals.mkdir(parents=True)
+    (approvals / "ar-delib.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "deliberation",
+                "artifact_id": "DELIB-0900",
+                "source_ref": "owner_conversation:2026-04-20-agent-red-shopify-rollout",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    row = next(s for s in payload["surfaces"] if "ar-delib.json" in s["path"])
+    assert row["disposition"] == "MOVE"
+    assert row["signal"] == "adopter_deliberation_approval_packet"
+
+
+def test_run_classifies_live_schema_ambiguous_deliberation_as_owner_decision(tmp_path: Path) -> None:
+    """Live schema: DELIB-* with no clear adopter/framework signal → owner decision."""
+    project_root = _build_project_root(tmp_path)
+    approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
+    approvals.mkdir(parents=True)
+    (approvals / "ambiguous.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "deliberation",
+                "artifact_id": "DELIB-0500",
+                "source_ref": "owner_conversation:2026-04-15-process-improvement",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    row = next(s for s in payload["surfaces"] if "ambiguous.json" in s["path"])
+    assert row["disposition"] == "OWNER_DECISION_REQUIRED"
+    assert row["signal"] == "deliberation_approval_packet_subject_ambiguous"
+
+
+def test_run_classifies_live_schema_ar_artifact_id_as_move(tmp_path: Path) -> None:
+    """Live schema: artifact_id starts with AR- → MOVE adopter."""
+    project_root = _build_project_root(tmp_path)
+    approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
+    approvals.mkdir(parents=True)
+    (approvals / "ar-approval.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "specification",
+                "artifact_id": "AR-DASH-001",
+                "source_ref": "owner_conversation:agent-red-dashboard",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+    _run_lane(project_root, output_dir)
+    payload = _read_json(output_dir)
+    row = next(s for s in payload["surfaces"] if "ar-approval.json" in s["path"])
+    assert row["disposition"] == "MOVE"
+    assert row["signal"] == "adopter_approval_packet_ar_prefix"
