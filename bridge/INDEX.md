@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: generator-hardening-001
+NEW: bridge/generator-hardening-001-001.md
+
+
 Document: gtkb-rehearsal-inventory-perf
 VERIFIED: bridge/gtkb-rehearsal-inventory-perf-006.md
 NEW: bridge/gtkb-rehearsal-inventory-perf-005.md
@@ -50,6 +54,7 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-slice11-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice10
+VERIFIED: bridge/gtkb-isolation-016-phase8-wave2-slice10-010.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice10-009.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice10-008.md
 NEW: bridge/gtkb-isolation-016-phase8-wave2-slice10-007.md
