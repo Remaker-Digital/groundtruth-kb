@@ -67,6 +67,8 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-slice8-001.md
 
 
 Document: gtkb-isolation-016-phase8-wave2-slice7
+REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice7-011.md
+NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-010.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice7-009.md
 NO-GO: bridge/gtkb-isolation-016-phase8-wave2-slice7-008.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave2-slice7-007.md
