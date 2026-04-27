@@ -13,7 +13,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 LEGACY_ROOT: Path = Path(__file__).resolve().parents[2]
 """The current project root, equal to the legacy mixed root for Agent Red."""
 
@@ -37,9 +36,7 @@ _OUTPUT_DIR_ALLOWLIST_DESC: str = (
     "(extend _OUTPUT_DIR_ALLOWLIST_PATTERNS for additional sandbox paths)"
 )
 
-_VALID_GIT_STRATEGIES: frozenset[str] = frozenset(
-    {"fresh_repo", "clone_with_history_filter", "clean_worktree"}
-)
+_VALID_GIT_STRATEGIES: frozenset[str] = frozenset({"fresh_repo", "clone_with_history_filter", "clean_worktree"})
 
 _CLONE_FILTER_REQUIRED_PLACEHOLDERS: tuple[str, ...] = (
     "<agent-red-paths-from-_path_rewrite>",
@@ -75,8 +72,7 @@ def validate_sandbox_output_dir(output_dir: Path) -> None:
         )
     if is_within(output_dir, LEGACY_ROOT):
         raise ManifestValidationError(
-            f"M2: output_dir ({output_dir}) cannot be under "
-            f"LEGACY_ROOT ({LEGACY_ROOT}); must be a sandbox path."
+            f"M2: output_dir ({output_dir}) cannot be under LEGACY_ROOT ({LEGACY_ROOT}); must be a sandbox path."
         )
     if not _is_allowed_output_dir(output_dir):
         raise ManifestValidationError(
@@ -218,10 +214,7 @@ def validate_target_root(path: Path) -> None:
     # Inside applications/: must have a named child matching the ADR pattern.
     relative = resolved.relative_to(namespace)
     if not relative.parts:
-        raise TargetRootError(
-            f"target-root cannot be the applications/ parent ({namespace}). "
-            f"Specify a named child."
-        )
+        raise TargetRootError(f"target-root cannot be the applications/ parent ({namespace}). Specify a named child.")
     name = relative.parts[0]
     if not VALID_NAME_PATTERN.match(name):
         raise TargetRootError(
@@ -238,7 +231,9 @@ def hash_set_walk(root: Path, ignored_top_level: frozenset[str] | None = None) -
     not followed; binary content hashed normally.
     """
     if ignored_top_level is None:
-        ignored_top_level = frozenset({".git", "__pycache__", "node_modules", ".groundtruth-chroma", ".tmp.driveupload"})
+        ignored_top_level = frozenset(
+            {".git", "__pycache__", "node_modules", ".groundtruth-chroma", ".tmp.driveupload"}
+        )
     result: dict[str, str] = {}
     if not root.exists() or not root.is_dir():
         return result
@@ -318,8 +313,7 @@ def load_manifest(
     target = Path(target_root_str).resolve()
     if not is_within(target, namespace):
         raise ManifestError(
-            f"manifest.target_root ({target}) must be a descendant of "
-            f"applications_namespace ({namespace})"
+            f"manifest.target_root ({target}) must be a descendant of applications_namespace ({namespace})"
         )
 
     # Wave 2 validation rules M1-M5 per Slice 1 GO -002.
@@ -347,9 +341,7 @@ def load_manifest(
         # TARGET_ROOT_DEFAULT; must match the sandbox allowlist.
         output_dir_str = data.get("output_dir")
         if not isinstance(output_dir_str, str):
-            raise ManifestValidationError(
-                "M2: manifest.output_dir must be a string"
-            )
+            raise ManifestValidationError("M2: manifest.output_dir must be a string")
         output_dir = Path(output_dir_str)
         # Per Slice 3 F2 fix: M2 enforcement extracted into
         # validate_sandbox_output_dir() so the driver can apply the same
@@ -362,8 +354,7 @@ def load_manifest(
         git_strategy = data.get("git_strategy")
         if git_strategy not in _VALID_GIT_STRATEGIES:
             raise ManifestValidationError(
-                f"M3: manifest.git_strategy = {git_strategy!r} not in "
-                f"{sorted(_VALID_GIT_STRATEGIES)}."
+                f"M3: manifest.git_strategy = {git_strategy!r} not in {sorted(_VALID_GIT_STRATEGIES)}."
             )
         if git_strategy == "clone_with_history_filter":
             template = data.get("git_filter_command_template", "")
@@ -384,14 +375,11 @@ def load_manifest(
         # repo root.
         matrix_path_str = data.get("phase_1_authority_matrix_path")
         if not isinstance(matrix_path_str, str):
-            raise ManifestValidationError(
-                "M4: manifest.phase_1_authority_matrix_path must be a string."
-            )
+            raise ManifestValidationError("M4: manifest.phase_1_authority_matrix_path must be a string.")
         matrix_path = LEGACY_ROOT / matrix_path_str
         if not matrix_path.exists():
             raise ManifestValidationError(
-                f"M4: manifest.phase_1_authority_matrix_path resolves to "
-                f"{matrix_path} which does not exist on disk."
+                f"M4: manifest.phase_1_authority_matrix_path resolves to {matrix_path} which does not exist on disk."
             )
 
         # Rule M5 — surface_treatments shape:
@@ -401,9 +389,7 @@ def load_manifest(
         # per Slice 1 GO -002 sequencing condition; Slice 2 GO -004 confirms
         # this extension as the only call site that should pass True.
         surface_treatments = data.get("surface_treatments")
-        if surface_treatments is None or (
-            isinstance(surface_treatments, dict) and not surface_treatments
-        ):
+        if surface_treatments is None or (isinstance(surface_treatments, dict) and not surface_treatments):
             if is_runtime_manifest:
                 raise ManifestValidationError(
                     "M5: runtime manifest requires non-empty surface_treatments; "
@@ -415,8 +401,7 @@ def load_manifest(
                 data["surface_treatments"] = {}
         elif not isinstance(surface_treatments, dict):
             raise ManifestValidationError(
-                "M5: manifest.surface_treatments must be a TOML table "
-                "(dict in Python) when present."
+                "M5: manifest.surface_treatments must be a TOML table (dict in Python) when present."
             )
 
     return data

@@ -30,10 +30,7 @@ from rehearse._common import (
     load_manifest,
 )
 
-
-_PRELIM_MATRIX_HEADER_PATTERN = re.compile(
-    r"^##\s+Preliminary Authority Matrix\s*$", re.MULTILINE
-)
+_PRELIM_MATRIX_HEADER_PATTERN = re.compile(r"^##\s+Preliminary Authority Matrix\s*$", re.MULTILINE)
 _NEXT_SECTION_PATTERN = re.compile(r"^##\s+\S", re.MULTILINE)
 _DEFAULT_IGNORED_TOP_LEVEL: frozenset[str] = frozenset(
     {".git", "__pycache__", "node_modules", ".groundtruth-chroma", ".tmp.driveupload"}
@@ -79,9 +76,7 @@ def _walk_inventory_with_metadata(
         result[str(rel).replace("\\", "/")] = {
             "sha256": hashlib.sha256(data).hexdigest(),
             "size": stat_result.st_size,
-            "mtime": time.strftime(
-                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(stat_result.st_mtime)
-            ),
+            "mtime": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stat_result.st_mtime)),
         }
     return result
 
@@ -95,10 +90,7 @@ def _parse_authority_matrix(matrix_path: Path) -> list[dict[str, str]]:
     content = matrix_path.read_text(encoding="utf-8")
     header_match = _PRELIM_MATRIX_HEADER_PATTERN.search(content)
     if not header_match:
-        raise ManifestValidationError(
-            f"_inventory: 'Preliminary Authority Matrix' section not found in "
-            f"{matrix_path}."
-        )
+        raise ManifestValidationError(f"_inventory: 'Preliminary Authority Matrix' section not found in {matrix_path}.")
     section_start = header_match.end()
     next_section = _NEXT_SECTION_PATTERN.search(content, pos=section_start)
     section_end = next_section.start() if next_section else len(content)
@@ -122,15 +114,13 @@ def _parse_authority_matrix(matrix_path: Path) -> list[dict[str, str]]:
                 "gtkb_subject_access": cells[4],
                 "required_decision_or_verification": cells[5],
                 "_audit_note": (
-                    "Wave 2 audit metadata only; lanes consume operational "
-                    "data from their own authoritative sources."
+                    "Wave 2 audit metadata only; lanes consume operational data from their own authoritative sources."
                 ),
             }
         )
     if not rows:
         raise ManifestValidationError(
-            f"_inventory: no surface rows extracted from "
-            f"'Preliminary Authority Matrix' in {matrix_path}."
+            f"_inventory: no surface rows extracted from 'Preliminary Authority Matrix' in {matrix_path}."
         )
     return rows
 
@@ -141,9 +131,7 @@ def _build_runtime_manifest(
 ) -> dict[str, Any]:
     """Build runtime manifest = source + populated surface_treatments + metadata."""
     runtime = dict(source_manifest)
-    runtime["surface_treatments"] = {
-        _slugify(row["surface"]): row for row in surface_rows
-    }
+    runtime["surface_treatments"] = {_slugify(row["surface"]): row for row in surface_rows}
     runtime["_inventory_metadata"] = {
         "populated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "matrix_source": source_manifest.get("phase_1_authority_matrix_path", ""),
@@ -172,9 +160,7 @@ def _write_runtime_manifest(runtime: dict[str, Any], output_path: Path) -> None:
     dependency for this single use site.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    lines: list[str] = [
-        "# Runtime manifest produced by Wave 2 lane 1 (_inventory.py).\n"
-    ]
+    lines: list[str] = ["# Runtime manifest produced by Wave 2 lane 1 (_inventory.py).\n"]
     for key, value in runtime.items():
         if isinstance(value, dict):
             continue
@@ -232,10 +218,7 @@ def run(
         }
 
     excluded = set(manifest.get("excluded_paths", []))
-    excluded_top = (
-        frozenset(e.rstrip("/").split("/")[0] for e in excluded)
-        | _DEFAULT_IGNORED_TOP_LEVEL
-    )
+    excluded_top = frozenset(e.rstrip("/").split("/")[0] for e in excluded) | _DEFAULT_IGNORED_TOP_LEVEL
 
     try:
         files = _walk_inventory_with_metadata(root, excluded_top)
@@ -258,9 +241,7 @@ def run(
 
     inventory_path = output_dir / "inventory.json"
     inventory_path.parent.mkdir(parents=True, exist_ok=True)
-    inventory_path.write_text(
-        json.dumps(inventory, indent=2), encoding="utf-8"
-    )
+    inventory_path.write_text(json.dumps(inventory, indent=2), encoding="utf-8")
     output_files.append(inventory_path)
 
     matrix_path = LEGACY_ROOT / manifest["phase_1_authority_matrix_path"]

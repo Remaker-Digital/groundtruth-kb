@@ -3,6 +3,7 @@
 Per ``bridge/gtkb-isolation-016-phase8-wave2-slice1-001.md`` §3 (NEW)
 and ``-002`` (Codex GO).
 """
+
 from __future__ import annotations
 
 import sys
@@ -14,11 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
 from rehearse._common import (  # noqa: E402
     LEGACY_ROOT,
-    ManifestError,
     ManifestValidationError,
     load_manifest,
 )
-
 
 _VALID_FILTER_TEMPLATE = (
     "git filter-repo --path <agent-red-paths-from-_path_rewrite> "
@@ -59,6 +58,7 @@ _empty_table_marker = object()
 
 # ----- Rule M1 — placeholder rejection -----
 
+
 def test_m1_owner_decision_required_in_blocking_field_rejected_for_wave2(tmp_path: Path) -> None:
     """M1: output_dir = OWNER_DECISION_REQUIRED rejected when wave=2."""
     manifest_path = _write_manifest(tmp_path, output_dir="OWNER_DECISION_REQUIRED")
@@ -81,6 +81,7 @@ def test_m1_owner_decision_required_in_db_reconciliation_rejected_for_wave3(tmp_
 
 
 # ----- Rule M2 — output_dir safety -----
+
 
 def test_m2_output_dir_under_legacy_root_rejected(tmp_path: Path) -> None:
     """M2: output_dir under LEGACY_ROOT rejected."""
@@ -114,6 +115,7 @@ def test_m2_output_dir_c_temp_accepted(tmp_path: Path) -> None:
 
 # ----- Rule M3 — git_strategy + filter template -----
 
+
 def test_m3_git_strategy_unknown_rejected(tmp_path: Path) -> None:
     """M3: unknown git_strategy rejected."""
     manifest_path = _write_manifest(tmp_path, git_strategy="monorepo_split")
@@ -123,14 +125,13 @@ def test_m3_git_strategy_unknown_rejected(tmp_path: Path) -> None:
 
 def test_m3_clone_with_history_filter_requires_command_template(tmp_path: Path) -> None:
     """M3: clone_with_history_filter without required placeholders in template rejected."""
-    manifest_path = _write_manifest(
-        tmp_path, git_filter_command_template="git filter-repo --foo bar"
-    )
+    manifest_path = _write_manifest(tmp_path, git_filter_command_template="git filter-repo --foo bar")
     with pytest.raises(ManifestValidationError, match="M3.*missing required placeholder"):
         load_manifest(manifest_path, wave=2)
 
 
 # ----- Rule M4 — authority matrix path existence -----
+
 
 def test_m4_authority_matrix_path_missing_rejected(tmp_path: Path) -> None:
     """M4: phase_1_authority_matrix_path pointing at non-existent file rejected."""
@@ -145,11 +146,7 @@ def test_m4_authority_matrix_path_correct_accepted(tmp_path: Path) -> None:
     """M4: real production authority matrix path accepted."""
     # Use the actual production manifest — should pass wave=2 validation.
     production_manifest = (
-        LEGACY_ROOT
-        / "independent-progress-assessments"
-        / "CODEX-INSIGHT-DROPBOX"
-        / "rehearsal"
-        / "manifest.toml"
+        LEGACY_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX" / "rehearsal" / "manifest.toml"
     )
     if not production_manifest.exists():
         pytest.skip("production manifest not available in this checkout")
@@ -158,6 +155,7 @@ def test_m4_authority_matrix_path_correct_accepted(tmp_path: Path) -> None:
 
 
 # ----- Rule M5 — surface_treatments shape -----
+
 
 def test_m5_empty_surface_treatments_accepted_for_source_manifest(tmp_path: Path) -> None:
     """M5: empty [surface_treatments] table accepted for Wave 2 source manifest."""
@@ -193,6 +191,7 @@ def test_m5_non_dict_surface_treatments_rejected(tmp_path: Path) -> None:
 
 # ----- Backward-compat regression -----
 
+
 def test_wave1_default_preserves_existing_behavior(tmp_path: Path) -> None:
     """Wave 1 default (load_manifest(path)) preserves existing behavior:
     no M1-M5 enforcement; Wave 1 callers continue to pass."""
@@ -204,9 +203,8 @@ def test_wave1_default_preserves_existing_behavior(tmp_path: Path) -> None:
         f'legacy_root = "{legacy_posix}"\n'
         f'applications_namespace = "{legacy_posix}/applications"\n'
         f'output_dir = "OWNER_DECISION_REQUIRED"\n'
-        f'git_strategy = "OWNER_DECISION_REQUIRED"\n'
+        f'git_strategy = "OWNER_DECISION_REQUIRED"\n',
         # No phase_1_authority_matrix_path; no surface_treatments
-        ,
         encoding="utf-8",
     )
     # Wave 1 default — no exception raised.

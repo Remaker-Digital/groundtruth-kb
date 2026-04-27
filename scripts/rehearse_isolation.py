@@ -30,12 +30,10 @@ from rehearse._common import (  # noqa: E402
     ManifestError,
     ManifestValidationError,
     TargetRootError,
-    hash_set_walk,
     load_manifest,
     validate_sandbox_output_dir,
     validate_target_root,
 )
-
 
 EXIT_OK = 0
 EXIT_USAGE = 1
@@ -73,7 +71,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=LEGACY_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX" / "rehearsal" / "manifest.toml",
+        default=LEGACY_ROOT
+        / "independent-progress-assessments"
+        / "CODEX-INSIGHT-DROPBOX"
+        / "rehearsal"
+        / "manifest.toml",
         help="Path to rehearsal manifest.toml",
     )
     parser.add_argument(
@@ -87,8 +89,8 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=True,
         help="Default true; --no-dry-run is explicitly forbidden in v1. "
-             "For Wave 2 real execution, use --execute (which takes "
-             "precedence over --dry-run if both are passed).",
+        "For Wave 2 real execution, use --execute (which takes "
+        "precedence over --dry-run if both are passed).",
     )
     parser.add_argument(
         "--no-dry-run",
@@ -100,17 +102,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "--execute",
         action="store_true",
         help="Wave 2 explicit opt-in: actually invoke the lane (sets "
-             "dry_run=False). Default is dry_run=True. Distinct from "
-             "--no-dry-run which remains a Wave 1 hard refusal. If both "
-             "--dry-run and --execute are passed, --execute takes precedence.",
+        "dry_run=False). Default is dry_run=True. Distinct from "
+        "--no-dry-run which remains a Wave 1 hard refusal. If both "
+        "--dry-run and --execute are passed, --execute takes precedence.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
         help="Override output directory. Default: manifest.output_dir + ISO "
-             "timestamp suffix. The override is validated with the same M2 "
-             "sandbox-safety rules as manifest.output_dir.",
+        "timestamp suffix. The override is validated with the same M2 "
+        "sandbox-safety rules as manifest.output_dir.",
     )
     parser.add_argument(
         "--accept-drift",
@@ -196,10 +198,7 @@ def _dispatch(
                     "status": "error",
                     "output_files": [],
                     "metrics": {},
-                    "warnings": [
-                        f"lane {phase_name!r} module exists but has no "
-                        f"{func_name}() function — lane defect."
-                    ],
+                    "warnings": [f"lane {phase_name!r} module exists but has no {func_name}() function — lane defect."],
                 }
             return fn(manifest, output_dir, dry_run=dry_run)
     raise ValueError(f"unknown phase: {phase_name}")
@@ -210,8 +209,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.no_dry_run:
         print(
-            "rehearse_isolation: --no-dry-run is forbidden; "
-            "use --execute for Wave 2 real-run",
+            "rehearse_isolation: --no-dry-run is forbidden; use --execute for Wave 2 real-run",
             file=sys.stderr,
         )
         return EXIT_REFUSE
@@ -255,16 +253,11 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_USAGE
 
     if args.phase == "verify":
-        print(
-            "rehearse_isolation: Wave 3 verification matrix not yet "
-            "implemented (Wave 2 driver-only)"
-        )
+        print("rehearse_isolation: Wave 3 verification matrix not yet implemented (Wave 2 driver-only)")
         return EXIT_OK
 
     selected = (
-        DISPATCH_TABLE
-        if args.phase == "all"
-        else tuple(entry for entry in DISPATCH_TABLE if entry[0] == args.phase)
+        DISPATCH_TABLE if args.phase == "all" else tuple(entry for entry in DISPATCH_TABLE if entry[0] == args.phase)
     )
 
     print(f"rehearse_isolation: Wave 2 dispatch — {len(selected)} phase(s)")
@@ -293,9 +286,7 @@ def main(argv: list[str] | None = None) -> int:
         summary_path.write_text(
             json.dumps(
                 {
-                    "run_started_at": time.strftime(
-                        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
-                    ),
+                    "run_started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                     "manifest_path": str(args.manifest),
                     "phase_requested": args.phase,
                     "dry_run": dry_run,
