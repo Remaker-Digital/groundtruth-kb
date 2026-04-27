@@ -23,6 +23,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
+from datetime import UTC
+
 from rehearse import _release_readiness_split  # noqa: E402
 
 
@@ -606,18 +608,27 @@ def test_run_filters_out_non_release_relevant_specs(tmp_path: Path) -> None:
     assert "GOV-UNRELATED-FOO-001" not in all_spec_ids, "F1 regression: non-release-relevant spec leaked through filter"
 
 
-def test_run_filters_out_resolved_work_items(tmp_path: Path) -> None:
-    """WIs with resolution_status='resolved' are filtered out."""
+def test_run_includes_recently_closed_work_items(tmp_path: Path) -> None:
+    """Per Codex Slice 6 ``-008`` NO-GO: 'open + recently closed' contract.
+
+    A resolved WI with ``changed_at`` within
+    ``_RECENT_CLOSURE_WINDOW_DAYS`` MUST be included as recent context
+    for release-readiness inventory.
+    """
+    from datetime import datetime, timedelta
+
     ledger = tmp_path / "ledger.md"
     _write_ledger(ledger)
     manifest = _build_manifest(tmp_path)
+    recent_iso = (datetime.now(tz=UTC) - timedelta(days=30)).isoformat()
     fake_kb = _FakeKB(
         work_items=[
             {
                 "id": "WI-3168",
-                "title": "Resolved Agent Red release blocker",
-                "description": "Release deployment work, already resolved.",
+                "title": "Recently resolved Agent Red release blocker",
+                "description": "Release deployment work, recently resolved.",
                 "resolution_status": "resolved",
+                "changed_at": recent_iso,
             }
         ]
     )
@@ -636,7 +647,102 @@ def test_run_filters_out_resolved_work_items(tmp_path: Path) -> None:
         + [w["id"] for w in artifact["adopter_work_items"]]
         + [w["id"] for w in artifact["unclassified_work_items"]]
     )
-    assert "WI-3168" not in all_wi_ids, "F1 regression: resolved WI leaked through filter"
+    assert "WI-3168" in all_wi_ids, "Slice 6 -008 contract: recently-closed WI must be included as context"
+
+
+def test_run_filters_out_old_resolved_work_items(tmp_path: Path) -> None:
+    """Resolved WIs with ``changed_at`` outside the recency window are
+    excluded (they're historical, not 'recently closed')."""
+    from datetime import datetime, timedelta
+
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    old_iso = (datetime.now(tz=UTC) - timedelta(days=200)).isoformat()
+    fake_kb = _FakeKB(
+        work_items=[
+            {
+                "id": "WI-OLD-001",
+                "title": "Old resolved Agent Red release blocker",
+                "description": "Release deployment work, resolved long ago.",
+                "resolution_status": "resolved",
+                "changed_at": old_iso,
+            }
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    all_wi_ids = (
+        [w["id"] for w in artifact["framework_work_items"]]
+        + [w["id"] for w in artifact["adopter_work_items"]]
+        + [w["id"] for w in artifact["unclassified_work_items"]]
+    )
+    assert "WI-OLD-001" not in all_wi_ids, "Slice 6 -008: old resolved WIs (outside recency window) must be excluded"
+
+
+def test_run_excludes_resolved_wi_with_malformed_changed_at(tmp_path: Path) -> None:
+    """Defensive: resolved WIs with malformed/missing changed_at are
+    excluded (conservative — don't flood split with undated records)."""
+    ledger = tmp_path / "ledger.md"
+    _write_ledger(ledger)
+    manifest = _build_manifest(tmp_path)
+    fake_kb = _FakeKB(
+        work_items=[
+            {
+                "id": "WI-NODATE-001",
+                "title": "Resolved Agent Red release WI with no timestamp",
+                "description": "Release deployment work without changed_at.",
+                "resolution_status": "resolved",
+                # changed_at intentionally missing
+            },
+            {
+                "id": "WI-BADDATE-001",
+                "title": "Resolved Agent Red release WI with bad timestamp",
+                "description": "Release deployment work with invalid date.",
+                "resolution_status": "resolved",
+                "changed_at": "not-a-real-date",
+            },
+        ]
+    )
+    _release_readiness_split.run(
+        manifest,
+        tmp_path / "out",
+        dry_run=False,
+        release_readiness_path=ledger,
+        kb=fake_kb,
+    )
+    artifact = json.loads(
+        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+    )
+    all_wi_ids = (
+        [w["id"] for w in artifact["framework_work_items"]]
+        + [w["id"] for w in artifact["adopter_work_items"]]
+        + [w["id"] for w in artifact["unclassified_work_items"]]
+    )
+    assert "WI-NODATE-001" not in all_wi_ids
+    assert "WI-BADDATE-001" not in all_wi_ids
+
+
+def test_is_recently_changed_helper_handles_iso_with_z_suffix() -> None:
+    """Helper accepts ISO-8601 with Z (Zulu) suffix as well as +00:00."""
+    from datetime import datetime
+
+    now = datetime(2026, 4, 27, tzinfo=UTC)
+    recent_z = "2026-03-28T12:00:00Z"  # ~30 days before now
+    old_z = "2025-09-01T12:00:00Z"  # >200 days before now
+    assert _release_readiness_split._is_recently_changed(recent_z, now=now) is True
+    assert _release_readiness_split._is_recently_changed(old_z, now=now) is False
+    assert _release_readiness_split._is_recently_changed(None, now=now) is False
+    assert _release_readiness_split._is_recently_changed("", now=now) is False
+    assert _release_readiness_split._is_recently_changed("garbage", now=now) is False
 
 
 def test_run_filters_specs_by_type(tmp_path: Path) -> None:

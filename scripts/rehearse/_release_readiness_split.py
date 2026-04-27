@@ -35,6 +35,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -193,11 +194,17 @@ _RELEVANT_SPEC_TYPES: tuple[str, ...] = (
     "requirement",
 )
 
-# Resolution-statuses considered "open / recently closed" for the WI
-# filter per the original Slice 6 -001 §2.4 contract. The live KB also
-# uses 'resolved' which is excluded so historical WIs don't flood the
-# split.
+# Resolution-statuses considered "open" for the WI filter. Open WIs
+# are included regardless of changed_at; recently-closed ('resolved'
+# within window) are included via the recency check.
 _OPEN_RESOLUTION_STATUSES: frozenset[str | None] = frozenset({None, "", "open", "in_progress", "pending", "blocked"})
+
+# Window for "recently closed" work items per Slice 6 -001 §2.4
+# contract + Codex Slice 6 -008 NO-GO. Resolved WIs whose changed_at
+# is within this window are included as recent context. Live KB uses
+# changed_at as the only timestamp signal (no separate resolved_at),
+# so this proxies for resolution recency.
+_RECENT_CLOSURE_WINDOW_DAYS: int = 90
 
 # Framework-content markers complement adopter markers per Codex Slice
 # 6 ``-006`` F2 fix. Real KB IDs (SPEC-/GOV-/PB-/ADR-/DCL-/WI-/DELIB-)
@@ -260,15 +267,64 @@ def _filtered_specs(kb: Any) -> list[dict[str, Any]]:
     return specs
 
 
-def _filtered_work_items(kb: Any) -> list[dict[str, Any]]:
-    """Per Codex Slice 6 ``-006`` F1: filter WIs to open/recently-closed
-    AND release-readiness keyword match before classification."""
-    return [
-        w
-        for w in kb.list_work_items()
-        if w.get("resolution_status") in _OPEN_RESOLUTION_STATUSES
-        and _is_release_readiness_relevant(_wi_content_blob(w))
-    ]
+def _is_recently_changed(
+    changed_at_str: Any,
+    *,
+    window_days: int = _RECENT_CLOSURE_WINDOW_DAYS,
+    now: datetime | None = None,
+) -> bool:
+    """True if ``changed_at_str`` parses as ISO datetime within ``window_days``.
+
+    Per Codex Slice 6 ``-008`` NO-GO: 'recently closed' WIs need a
+    deterministic recency rule. Live KB ``changed_at`` is ISO-8601 with
+    timezone; ``datetime.fromisoformat`` handles it directly. Malformed
+    or missing timestamps return False (conservative: exclude resolved
+    WIs we can't date rather than flooding the split).
+
+    The ``now`` parameter is for test injection; production calls use
+    the default ``datetime.now(tz=UTC)``.
+    """
+    if not changed_at_str:
+        return False
+    try:
+        s = str(changed_at_str)
+        # Tolerate both 'Z' and '+00:00' suffixes
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+    except (ValueError, TypeError):
+        return False
+    current = now if now is not None else datetime.now(tz=UTC)
+    return (current - dt) <= timedelta(days=window_days)
+
+
+def _filtered_work_items(
+    kb: Any,
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Per Codex Slice 6 ``-006`` F1 + ``-008`` NO-GO: filter WIs to
+    open OR recently-closed (resolved within ``_RECENT_CLOSURE_WINDOW_DAYS``)
+    AND release-readiness keyword match before classification.
+
+    The ``now`` parameter is for test injection — production callers
+    should not pass it.
+    """
+    items: list[dict[str, Any]] = []
+    for w in kb.list_work_items():
+        if not _is_release_readiness_relevant(_wi_content_blob(w)):
+            continue
+        status = w.get("resolution_status")
+        if (
+            status in _OPEN_RESOLUTION_STATUSES
+            or status == "resolved"
+            and _is_recently_changed(w.get("changed_at"), now=now)
+        ):
+            items.append(w)
+        # Other statuses (won't_fix, duplicate, ...) → excluded by design.
+    return items
 
 
 def _filtered_deliberations(kb: Any) -> list[dict[str, Any]]:
