@@ -86,8 +86,11 @@ except ImportError:  # pragma: no cover - direct script execution path
     )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DASHBOARD_DIR = PROJECT_ROOT / "docs" / "gtkb-dashboard"
-DEFAULT_HISTORY_PATH = PROJECT_ROOT / "memory" / "gtkb-dashboard-history.json"
+# DEFAULT_DASHBOARD_DIR / DEFAULT_HISTORY_PATH removed per
+# bridge/generator-hardening-001-003.md §4.6: argparse defaults to None;
+# main() derives both from resolved --project-root post-parse.
+# Codex GO -004 implementation constraint (i): PROJECT_ROOT only as CLI
+# fallback for --project-root, never as internal output/read-path fallback.
 DEFAULT_USER_STARTUP_PREFERENCES_PATH = Path.home() / ".codex" / "agent-red-hooks" / "session-startup-preferences.json"
 GRAFANA_DASHBOARD_URL = "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
 DASHBOARD_OPEN_MODE_HARNESS = "harness_browser"
@@ -149,12 +152,12 @@ def _resolved_harness_name(explicit: str | None = None) -> str | None:
     return _normalize_harness_name(explicit) or _normalize_harness_name(os.environ.get("GTKB_HARNESS_NAME"))
 
 
-def _repo_operating_role_path(project_root: Path = PROJECT_ROOT) -> Path:
+def _repo_operating_role_path(project_root: Path) -> Path:
     return project_root / OPERATING_ROLE_RELATIVE_PATH
 
 
 def operating_role_path(
-    project_root: Path = PROJECT_ROOT,
+    project_root: Path,
     *,
     harness_name: str | None = None,
     role_record_path: Path | None = None,
@@ -174,7 +177,7 @@ def operating_role_path(
 
 
 def _display_role_mapping_source(
-    project_root: Path = PROJECT_ROOT,
+    project_root: Path,
     *,
     harness_name: str | None = None,
     role_record_path: Path | None = None,
@@ -193,7 +196,7 @@ def _display_role_mapping_source(
 
 def _role_metadata(
     role_profile: str,
-    project_root: Path = PROJECT_ROOT,
+    project_root: Path,
     *,
     harness_name: str | None = None,
     role_record_path: Path | None = None,
@@ -632,18 +635,21 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-_LOCAL_ENV_CACHE: dict[str, str] | None = None
+# Per bridge/generator-hardening-001-003.md §4.7 + Codex -004 GO:
+# _LOCAL_ENV_CACHE dropped. With project_root threaded, the cache would
+# need a per-root key; the .env.local parse is trivial work and
+# eliminates the multi-root cache-correctness question.
 
 
-def _local_env_values() -> dict[str, str]:
-    """Read non-secret routing values from local env files without logging them."""
+def _local_env_values(project_root: Path) -> dict[str, str]:
+    """Read non-secret routing values from local env files without logging them.
 
-    global _LOCAL_ENV_CACHE
-    if _LOCAL_ENV_CACHE is not None:
-        return _LOCAL_ENV_CACHE
+    Per bridge/generator-hardening-001-003.md §4.7: project_root is now
+    a required parameter (was: bound to module-level PROJECT_ROOT).
+    """
 
     values: dict[str, str] = {}
-    for path in (PROJECT_ROOT / ".env.local", PROJECT_ROOT / "env.local"):
+    for path in (project_root / ".env.local", project_root / "env.local"):
         if not path.is_file():
             continue
         for raw_line in _read_text(path).splitlines():
@@ -652,12 +658,16 @@ def _local_env_values() -> dict[str, str]:
                 continue
             key, value = line.split("=", 1)
             values[key.strip()] = value.strip().strip('"').strip("'")
-    _LOCAL_ENV_CACHE = values
     return values
 
 
-def _local_env_value(name: str, default: str = "") -> str:
-    return os.environ.get(name) or _local_env_values().get(name, default)
+def _local_env_value(project_root: Path, name: str, default: str = "") -> str:
+    """Read one local-env value with environment-variable override.
+
+    Per bridge/generator-hardening-001-003.md §4.7 + Codex -002 Finding 2:
+    project_root is now a required parameter (was: parameterless wrapper).
+    """
+    return os.environ.get(name) or _local_env_values(project_root).get(name, default)
 
 
 def _github_repo_slug(value: str) -> str:
@@ -1059,7 +1069,7 @@ def _command_available(command: str) -> bool:
 
 
 def _git_remote_origin(project_root: Path) -> dict[str, Any]:
-    configured_repo = _github_repo_slug(_local_env_value("AGENT_RED_GITHUB_REPO"))
+    configured_repo = _github_repo_slug(_local_env_value(project_root, "AGENT_RED_GITHUB_REPO"))
     if configured_repo:
         return {
             "present": True,
@@ -1157,8 +1167,8 @@ def _repo_web_url(remote_url: str | None) -> str | None:
     return value
 
 
-def _latest_remote_semver_tag(remote_url: str) -> dict[str, Any]:
-    result = _command_output(["git", "ls-remote", "--tags", "--sort=-v:refname", remote_url], PROJECT_ROOT, timeout=12)
+def _latest_remote_semver_tag(project_root: Path, remote_url: str) -> dict[str, Any]:
+    result = _command_output(["git", "ls-remote", "--tags", "--sort=-v:refname", remote_url], project_root, timeout=12)
     if not result["ok"]:
         return {"available": False, "tag": None, "sha": None, "error": result["stderr"]}
     tags: dict[str, str] = {}
@@ -1178,8 +1188,8 @@ def _latest_remote_semver_tag(remote_url: str) -> dict[str, Any]:
     return {"available": True, "tag": tag, "sha": tags[tag], "error": None}
 
 
-def _remote_branch_sha(remote_url: str, branch: str = "main") -> dict[str, Any]:
-    result = _command_output(["git", "ls-remote", remote_url, f"refs/heads/{branch}"], PROJECT_ROOT, timeout=12)
+def _remote_branch_sha(project_root: Path, remote_url: str, branch: str = "main") -> dict[str, Any]:
+    result = _command_output(["git", "ls-remote", remote_url, f"refs/heads/{branch}"], project_root, timeout=12)
     if not result["ok"]:
         return {"available": False, "branch": branch, "sha": None, "error": result["stderr"]}
     first_line = result["stdout"].splitlines()[0] if result["stdout"] else ""
@@ -1262,14 +1272,14 @@ def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
     adjacent_checkout = project_root.parent / "groundtruth-kb"
     checkout_path = inferred_checkout or adjacent_checkout
     checkout = _git_checkout_info(checkout_path)
-    configured_gtkb_repo = _github_repo_slug(_local_env_value("GROUND_TRUTH_GITHUB_REPO"))
+    configured_gtkb_repo = _github_repo_slug(_local_env_value(project_root, "GROUND_TRUTH_GITHUB_REPO"))
     remote_url = (
         _github_repo_url(configured_gtkb_repo)
         if configured_gtkb_repo
         else checkout.get("remote_url") or "https://github.com/Remaker-Digital/groundtruth-kb.git"
     )
-    latest_release = _latest_remote_semver_tag(str(remote_url))
-    latest_main = _remote_branch_sha(str(remote_url), "main")
+    latest_release = _latest_remote_semver_tag(project_root, str(remote_url))
+    latest_main = _remote_branch_sha(project_root, str(remote_url), "main")
     upgrade_plan = _gtkb_upgrade_plan(project_root)
 
     package_version = package.get("version")
@@ -1388,7 +1398,7 @@ def _workflow_inventory(project_root: Path) -> dict[str, dict[str, Any]]:
 def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dict[str, Any]:
     if gh_auth_status != "authenticated":
         return {"available": False, "reason": gh_auth_status, "runs_by_workflow": {}}
-    repo = _github_repo_slug(_local_env_value("AGENT_RED_GITHUB_REPO"))
+    repo = _github_repo_slug(_local_env_value(project_root, "AGENT_RED_GITHUB_REPO"))
     command = [
         "gh",
         "run",
@@ -2480,7 +2490,7 @@ def _dashboard_intelligence(
 
 
 def discover_role_profile(
-    project_root: Path = PROJECT_ROOT,
+    project_root: Path,
     *,
     harness_name: str | None = None,
     role_record_path: Path | None = None,
@@ -2530,7 +2540,7 @@ def _role_profile_or_discovered(
 
 
 def build_startup_model(
-    project_root: Path = PROJECT_ROOT,
+    project_root: Path,
     role_profile: str | None = None,
     *,
     harness_name: str | None = None,
@@ -3423,7 +3433,13 @@ def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def render_report(model: dict[str, Any], dashboard_link: str) -> str:
+def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path) -> str:
+    """Render the startup report markdown.
+
+    Per bridge/generator-hardening-001-003.md §4.5 + Codex -004 GO:
+    project_root is now a required parameter (was: model lacked
+    project_root, so the function read PROJECT_ROOT global directly).
+    """
     role = model["role"]
     metrics = model["metrics"]
     dashboard_opening = model.get("dashboard_opening", {})
@@ -3431,7 +3447,7 @@ def render_report(model: dict[str, Any], dashboard_link: str) -> str:
     dashboard_open_mode = dashboard_opening.get("mode") or DASHBOARD_OPEN_MODE_HARNESS
     token_count = metrics["tokens"]["tokens_consumed_before_user_input"]
     token_count_text = "unavailable" if token_count is None else str(token_count)
-    pending_decisions = _load_pending_owner_decisions(PROJECT_ROOT)
+    pending_decisions = _load_pending_owner_decisions(project_root)
     if pending_decisions:
         pending_decisions_section = [
             "### Pending Owner Decisions",
@@ -4859,9 +4875,9 @@ def _write_dashboard_pdf(dashboard_path: Path, pdf_path: Path) -> dict[str, Any]
 
 
 def write_dashboard_and_report(
-    project_root: Path = PROJECT_ROOT,
-    dashboard_dir: Path = DEFAULT_DASHBOARD_DIR,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    project_root: Path,
+    dashboard_dir: Path,
+    history_path: Path,
     generate_pdf: bool = True,
     seed_historical_backfill: bool = True,
     startup_bridge_maintenance: dict[str, Any] | None = None,
@@ -4904,7 +4920,7 @@ def write_dashboard_and_report(
     _atomic_write_text(data_path, json.dumps(data, indent=2, sort_keys=True) + "\n")
 
     dashboard_link = _markdown_url_link(GRAFANA_DASHBOARD_URL)
-    report_text = render_report(model, dashboard_link)
+    report_text = render_report(model, dashboard_link, project_root)
     wrapup_text = render_wrapup_notice(model, dashboard_link)
     _atomic_write_text(report_path, report_text)
     _atomic_write_text(wrapup_path, wrapup_text)
@@ -5230,8 +5246,23 @@ def _consume_startup_wrapup_guard(path: Path) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    parser.add_argument("--dashboard-dir", type=Path, default=DEFAULT_DASHBOARD_DIR)
-    parser.add_argument("--history-path", type=Path, default=DEFAULT_HISTORY_PATH)
+    # Per bridge/generator-hardening-001-003.md §4.6: dashboard-dir and
+    # history-path default to None; main() derives them from the resolved
+    # --project-root post-parse. This means a caller passing only
+    # --project-root <child-root> gets all output under <child-root>, not
+    # under the canonical PROJECT_ROOT.
+    parser.add_argument(
+        "--dashboard-dir",
+        type=Path,
+        default=None,
+        help="Default: <project-root>/docs/gtkb-dashboard",
+    )
+    parser.add_argument(
+        "--history-path",
+        type=Path,
+        default=None,
+        help="Default: <project-root>/memory/gtkb-dashboard-history.json",
+    )
     parser.add_argument("--emit-report", action="store_true", help="Print the startup report after writing it.")
     parser.add_argument(
         "--emit-startup-service-payload",
@@ -5336,10 +5367,21 @@ def main(argv: list[str] | None = None) -> int:
         bridge_maintenance = _run_verified_bridge_startup_maintenance(project_root)
     startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if startup_emit_requested else None
 
+    # Per bridge/generator-hardening-001-003.md §4.6: derive output paths
+    # from resolved project_root when CLI args are omitted, so a caller
+    # passing only --project-root <child> gets all output under <child>.
+    dashboard_dir = (
+        args.dashboard_dir.resolve() if args.dashboard_dir is not None else project_root / "docs" / "gtkb-dashboard"
+    )
+    history_path = (
+        args.history_path.resolve()
+        if args.history_path is not None
+        else project_root / "memory" / "gtkb-dashboard-history.json"
+    )
     result = write_dashboard_and_report(
         project_root=project_root,
-        dashboard_dir=args.dashboard_dir.resolve(),
-        history_path=args.history_path.resolve(),
+        dashboard_dir=dashboard_dir,
+        history_path=history_path,
         generate_pdf=not args.fast_hook,
         seed_historical_backfill=not args.fast_hook,
         startup_bridge_maintenance=bridge_maintenance,

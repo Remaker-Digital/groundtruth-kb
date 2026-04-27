@@ -203,7 +203,7 @@ def test_startup_model_discovers_durable_operating_role() -> None:
     assert discovered_role in module.ROLE_PROFILES
 
     model = module.build_startup_model(REPO_ROOT)
-    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard")
+    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard", REPO_ROOT)
 
     assert model["role_profile"] == discovered_role
     assert model["role"]["assumed_role"] == module.ROLE_PROFILES[discovered_role]["assumed_role"]
@@ -269,6 +269,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     prime_report = module.render_report(
         prime_model,
         "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard",
+        REPO_ROOT,
     )
 
     assert "### Fresh-Session Input Semantics" in prime_report
@@ -283,6 +284,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     loyal_report = module.render_report(
         loyal_model,
         "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard",
+        REPO_ROOT,
     )
 
     assert "### Fresh-Session Input Semantics" in loyal_report
@@ -290,9 +292,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "wait for Mike's next message before choosing or mapping session work" in loyal_report
 
 
-def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(
-    tmp_path, monkeypatch
-) -> None:
+def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
 
@@ -308,7 +308,7 @@ def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(
     assert isinstance(overlay.get("notes"), list)
     assert any("non-authoritative" in note or "no current session overlay" in note for note in overlay["notes"])
 
-    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard")
+    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard", REPO_ROOT)
     assert "### Session Overlay Status (Non-Authoritative)" in report
     assert "non-authoritative by construction" in report
     # The overlay section must appear before the input-semantics section so
@@ -350,7 +350,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     module = _load_module()
 
     model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
-    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard")
+    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard", REPO_ROOT)
 
     assert model["role"]["assumed_role"] == "Loyal Opposition"
     assert model["role"]["role_assignment"] == "active AI harness assigned by owner for counterpart review"
@@ -801,7 +801,10 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "User-visible startup content below was generated programmatically by the startup service." in context
     assert "relay the generated startup message verbatim as the first durable assistant answer" in context
     assert "Do not summarize, paraphrase, shorten, reorder, or omit any startup section" in context
-    assert "Preserve every generated heading, bullet, numbered item, `Current signal`, and `Prompt details` line" in context
+    assert (
+        "Preserve every generated heading, bullet, numbered item, `Current signal`, and `Prompt details` line"
+        in context
+    )
     assert "all 13 numbered options must remain present in order with their per-option summaries intact" in context
     assert "The first durable assistant answer should be the startup disclosure itself" in context
     assert "The first owner message after SessionStart is discarded startup stimulus only" in context
@@ -1345,9 +1348,7 @@ def test_render_current_project_state_permits_single_subject_green() -> None:
     assert "Application release blockers:" in rendered
 
 
-def test_arm_startup_interaction_guard_persists_current_subject_live_path(
-    tmp_path, monkeypatch
-) -> None:
+def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_path, monkeypatch) -> None:
     """Live-runtime §E: writer persists current_subject into lifecycle guard.
 
     Exercises the real writer path introduced for bridge -012 P1 fix.
@@ -1356,6 +1357,7 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(
     """
     session_module = _load_module()
     import importlib.util
+
     focus_spec = importlib.util.spec_from_file_location(
         "workstream_focus_live", REPO_ROOT / "scripts" / "workstream_focus.py"
     )
@@ -1425,6 +1427,7 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(
 # Codex GO -004 condition: visibility through this script, not a separate hook.
 # ---------------------------------------------------------------------------
 
+
 def test_pending_owner_decisions_loaded_from_durable_file(tmp_path) -> None:
     """T5a equivalent: _load_pending_owner_decisions parses the durable file's
     ## Pending section into a list of decision dicts."""
@@ -1490,15 +1493,84 @@ def test_render_pending_decisions_block_omits_section_when_empty() -> None:
 def test_render_pending_decisions_block_includes_id_question_options() -> None:
     """T5a additional: renderer markdown includes id, question, options."""
     module = _load_module()
-    decisions = [{
-        "id": "DECISION-0001",
-        "question": "Test?",
-        "options": "Yes; No",
-        "asked_at": "2026-04-25T09:00:00Z",
-        "thread_ref": "bridge/foo-001.md",
-    }]
+    decisions = [
+        {
+            "id": "DECISION-0001",
+            "question": "Test?",
+            "options": "Yes; No",
+            "asked_at": "2026-04-25T09:00:00Z",
+            "thread_ref": "bridge/foo-001.md",
+        }
+    ]
     block = module._render_pending_decisions_block(decisions)
     assert "**DECISION-0001**" in block
     assert "Test?" in block
     assert "Yes; No" in block
     assert "bridge/foo-001.md" in block
+
+
+# =====================================================================
+# REVISED-1 (S315): public-CLI partial-arg regression test
+# Per bridge/generator-hardening-001-003.md §5.2 + Codex -004 GO
+# =====================================================================
+
+
+def test_main_with_only_project_root_writes_under_that_root(tmp_path, monkeypatch, capsys) -> None:
+    """Per bridge/generator-hardening-001-003.md §5.2 + Codex -004 GO:
+
+    `--project-root <tmp-root>` without explicit `--dashboard-dir` /
+    `--history-path` MUST write all output under <tmp-root>, not under
+    the canonical PROJECT_ROOT. This is the contract test that would
+    have caught the bug Codex -002 flagged (dashboard/history defaults
+    bound to PROJECT_ROOT-based module constants).
+
+    Sentinel: capture mtimes of canonical PROJECT_ROOT-bound paths
+    before the run; assert they are unchanged after.
+    """
+    module = _load_module()
+
+    fake_root = tmp_path / "fake-project"
+    fake_root.mkdir()
+    # Seed minimal project structure expected by the generator.
+    (fake_root / "memory").mkdir()
+    (fake_root / "docs").mkdir()
+    (fake_root / ".claude" / "rules").mkdir(parents=True)
+    (fake_root / ".claude" / "rules" / "operating-role.md").write_text("active_role: prime-builder\n", encoding="utf-8")
+
+    # Capture canonical-path sentinels (must remain untouched).
+    canonical_dashboard_dir = REPO_ROOT / "docs" / "gtkb-dashboard"
+    canonical_history_path = REPO_ROOT / "memory" / "gtkb-dashboard-history.json"
+    pre_dashboard_mtime = canonical_dashboard_dir.stat().st_mtime if canonical_dashboard_dir.exists() else None
+    pre_history_mtime = canonical_history_path.stat().st_mtime if canonical_history_path.exists() else None
+
+    rc = module.main(
+        [
+            "--project-root",
+            str(fake_root),
+            # Deliberately omit --dashboard-dir and --history-path.
+            "--fast-hook",
+        ]
+    )
+    assert rc == 0, f"main() returned {rc}"
+
+    # All outputs MUST land under fake_root.
+    assert (fake_root / "docs" / "gtkb-dashboard" / "dashboard-data.json").exists(), (
+        "dashboard-data.json was not written under fake_root"
+    )
+    assert (fake_root / "memory" / "gtkb-dashboard-history.json").exists(), (
+        "history file was not written under fake_root"
+    )
+
+    # Sentinel: canonical paths must NOT have been touched.
+    if pre_dashboard_mtime is not None:
+        post_dashboard_mtime = canonical_dashboard_dir.stat().st_mtime if canonical_dashboard_dir.exists() else None
+        assert post_dashboard_mtime == pre_dashboard_mtime, (
+            "Canonical PROJECT_ROOT/docs/gtkb-dashboard mtime changed during run; "
+            "this means the generator wrote to the canonical path despite --project-root override"
+        )
+    if pre_history_mtime is not None:
+        post_history_mtime = canonical_history_path.stat().st_mtime if canonical_history_path.exists() else None
+        assert post_history_mtime == pre_history_mtime, (
+            "Canonical PROJECT_ROOT/memory/gtkb-dashboard-history.json mtime changed; "
+            "generator leaked a write to the canonical path"
+        )
