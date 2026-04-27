@@ -40,12 +40,29 @@ _METADATA_BLOCK_TERMINATOR = re.compile(r"^---\s*$")
 
 
 def _parse_index_threads(index_text: str) -> list[dict[str, Any]]:
-    """Walk INDEX.md, returning per-thread {name, latest_status, latest_version, latest_filename}.
+    """Walk INDEX.md, returning per-thread thread records.
 
-    The latest line in each Document entry is the most recent status
-    transition (per ``.claude/rules/file-bridge-protocol.md`` §"Index
-    File": "The latest version is always at the top of the version
-    list within each entry").
+    Each record:
+        {
+            thread_name,
+            latest_status,        # status from the top INDEX line
+            latest_version,       # version from the top INDEX line
+            latest_filename,      # filename from the top INDEX line
+            metadata_filename,    # filename of the latest NEW or REVISED
+                                  # (Prime metadata source); None if absent
+        }
+
+    Per Codex Slice 5 ``-008`` F1: the top-of-entry status line is often
+    a Loyal Opposition response (GO/NO-GO/VERIFIED) without a Prime
+    metadata block. Classification metadata lives in the latest NEW or
+    REVISED file (Prime's most recent submission). Walking down the
+    ordered status lines and selecting the first NEW/REVISED yields the
+    correct metadata source while preserving latest_status from the top
+    line.
+
+    Per ``.claude/rules/file-bridge-protocol.md`` §"Index File": "The
+    latest version is always at the top of the version list within each
+    entry."
     """
     threads: list[dict[str, Any]] = []
     current_name: str | None = None
@@ -57,12 +74,24 @@ def _parse_index_threads(index_text: str) -> list[dict[str, Any]]:
         latest_status, latest_filename = current_lines[0]
         version_match = _VERSION_SUFFIX.search(latest_filename)
         version = int(version_match.group(1)) if version_match else 0
+
+        # Find the most recent NEW/REVISED in the ordered list (top is
+        # newest). Per Slice 5 -008 F1: this is the Prime metadata
+        # source. None if no NEW/REVISED appears (e.g., a thread that
+        # only has Codex responses, which would be malformed).
+        metadata_filename: str | None = None
+        for status, filename in current_lines:
+            if status in ("NEW", "REVISED"):
+                metadata_filename = filename
+                break
+
         threads.append(
             {
                 "thread_name": current_name,
                 "latest_status": latest_status,
                 "latest_version": version,
                 "latest_filename": latest_filename,
+                "metadata_filename": metadata_filename,
             }
         )
 
@@ -231,11 +260,23 @@ def run(
 
     warnings: list[str] = []
     for thread in threads:
-        bridge_file = root / thread["latest_filename"]
+        # Per Codex Slice 5 -008 F1: classification metadata comes from
+        # the latest NEW/REVISED (Prime) file, not the top INDEX line
+        # which may be a Codex GO/NO-GO/VERIFIED response without
+        # metadata. ``metadata_filename`` is None only if the thread has
+        # no NEW/REVISED entries — surface that as a warning.
+        metadata_source = thread.get("metadata_filename")
+        if metadata_source is None:
+            thread["metadata"] = {}
+            warnings.append(
+                f"bridge_thread_no_prime_metadata_file: {thread['thread_name']} (no NEW/REVISED line in INDEX entry)"
+            )
+            continue
+        bridge_file = root / metadata_source
         if not bridge_file.exists():
             thread["metadata"] = {}
             warnings.append(
-                f"bridge_file_missing: {bridge_file.name} (referenced by INDEX entry {thread['thread_name']})"
+                f"bridge_file_missing: {bridge_file.name} (Prime metadata source for {thread['thread_name']})"
             )
             continue
         try:

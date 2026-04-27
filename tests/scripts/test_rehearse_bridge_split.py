@@ -253,6 +253,73 @@ def test_run_writes_result_json_on_ok_path(tmp_path: Path) -> None:
     assert str(result_path) in on_disk["output_files"]
 
 
+def test_metadata_sourced_from_latest_new_or_revised_not_top_status_line(
+    tmp_path: Path,
+) -> None:
+    """Per Codex Slice 5 ``-008`` F1: when an INDEX entry's top line is GO/VERIFIED
+    without metadata, classification must walk down to the latest NEW/REVISED
+    (Prime) file for metadata, while ``latest_status`` stays at the top line.
+
+    Regression guard for the live-tree miss where 25 of 45 threads silently
+    became ``unclassified_threads`` because their top line was a Codex
+    response file lacking the Prime metadata block.
+    """
+    bridge_root = tmp_path / "bridge"
+    bridge_root.mkdir(parents=True)
+    # Top line: GO file (Codex response; no Prime metadata block)
+    (bridge_root / "test-thread-004.md").write_text(
+        "GO\n\n# LO Response: Test Thread Revision 1\n\nStatus: GO\n\n## Claim\n\nApproved.\n",
+        encoding="utf-8",
+    )
+    # Lower line: REVISED file (Prime; HAS metadata block)
+    (bridge_root / "test-thread-003.md").write_text(
+        "REVISED\n\n# Title\n\n**Status:** REVISED\n\n"
+        "bridge_kind: implementation_slice\n"
+        "work_item_ids: [GTKB-COMMAND-SURFACE]\n"
+        "target_project: groundtruth-kb\n\n"
+        "---\n\n## Body\n",
+        encoding="utf-8",
+    )
+    (bridge_root / "INDEX.md").write_text(
+        "# Bridge Index\n\nDocument: test-thread\nGO: bridge/test-thread-004.md\nREVISED: bridge/test-thread-003.md\n",
+        encoding="utf-8",
+    )
+    manifest = _build_manifest(tmp_path)
+    result = _bridge_split.run(manifest, tmp_path / "out", dry_run=False, bridge_root=bridge_root)
+    assert result["status"] == "ok"
+    bs = json.loads((tmp_path / "out" / "bridge_split" / "bridge_split.json").read_text(encoding="utf-8"))
+    # latest_status remains the top line (GO)
+    framework = bs["framework_threads"]
+    assert len(framework) == 1, (
+        f"Expected thread classified as framework via metadata file, got: "
+        f"framework={bs['framework_threads']}, "
+        f"unclassified={bs['unclassified_threads']}"
+    )
+    assert framework[0]["thread_name"] == "test-thread"
+    assert framework[0]["latest_status"] == "GO"
+    assert framework[0]["latest_version"] == 4
+    # Classification used the lower NEW/REVISED file (target_project: groundtruth-kb)
+    assert framework[0]["classification_signal"] == "target_project_groundtruth_kb"
+
+
+def test_run_warns_when_thread_has_no_new_or_revised_entry(tmp_path: Path) -> None:
+    """Edge case: malformed INDEX entry with only a Codex response line.
+
+    Should warn (not crash) and surface as unclassified.
+    """
+    bridge_root = tmp_path / "bridge"
+    bridge_root.mkdir(parents=True)
+    (bridge_root / "INDEX.md").write_text(
+        "# Bridge Index\n\nDocument: orphan-thread\nGO: bridge/orphan-thread-002.md\n",
+        encoding="utf-8",
+    )
+    (bridge_root / "orphan-thread-002.md").write_text("GO\n\n# orphan\n", encoding="utf-8")
+    manifest = _build_manifest(tmp_path)
+    result = _bridge_split.run(manifest, tmp_path / "out", dry_run=False, bridge_root=bridge_root)
+    assert result["status"] == "ok"
+    assert any("bridge_thread_no_prime_metadata_file" in w for w in result["warnings"])
+
+
 def test_run_writes_result_json_on_error_path(tmp_path: Path) -> None:
     manifest = _build_manifest(tmp_path)
     bridge_root = tmp_path / "bridge"
