@@ -5,7 +5,12 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: generator-hardening-cross-repo
+NEW: bridge/generator-hardening-cross-repo-001.md
+
+
 Document: generator-hardening-002
+REVISED: bridge/generator-hardening-002-005.md
 NO-GO: bridge/generator-hardening-002-004.md
 REVISED: bridge/generator-hardening-002-003.md
 NO-GO: bridge/generator-hardening-002-002.md
