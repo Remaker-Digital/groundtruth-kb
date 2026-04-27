@@ -505,3 +505,53 @@ def test_run_pytest_workflow_classifies_no_pytest_command_as_unclassified(tmp_pa
     row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
     assert row["classification"] == "unclassified"
     assert row["classification_signal"] == "no_classification_signal"
+
+
+def test_run_pytest_workflow_recognizes_gha_test_args_pattern(tmp_path: Path) -> None:
+    """Per Codex -010 NO-GO: live python-tests.yml uses GHA test_args=tests/...
+    output-forwarding pattern. Classifier must recognize this shape.
+    """
+    live_shape_content = (
+        "name: Python Tests\n"
+        "jobs:\n"
+        "  test:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - name: Resolve test paths\n"
+        "        id: paths\n"
+        "        run: |\n"
+        '          case "${{ matrix.shard }}" in\n'
+        "            unit)\n"
+        '              echo "test_args=tests/unit" >> "$GITHUB_OUTPUT"\n'
+        "              ;;\n"
+        "            core)\n"
+        '              echo "test_args=tests/multi_tenant tests/migrations" >> "$GITHUB_OUTPUT"\n'
+        "              ;;\n"
+        "          esac\n"
+        "      - name: Run tests\n"
+        "        run: |\n"
+        "          python -m pytest ${{ steps.paths.outputs.test_args }}\n"
+    )
+    _run_lane(tmp_path, workflow_files={"python-tests.yml": live_shape_content})
+    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    assert row["classification"] == "adopter"
+    assert row["classification_signal"] == "agent_red_pytest_workflow"
+
+
+def test_extract_pytest_targets_handles_multi_target_test_args(tmp_path: Path) -> None:
+    """_extract_pytest_targets splits multi-target test_args= lines correctly."""
+    content = (
+        '          echo "test_args=tests/multi_tenant tests/migrations tests/test_health.py" >> "$GITHUB_OUTPUT"\n'
+    )
+    targets = _ci_inventory._extract_pytest_targets(content.lower())
+    assert "multi_tenant" in targets
+    assert "migrations" in targets
+    assert "test_health.py" in targets
+
+
+def test_extract_pytest_targets_handles_literal_pytest_command(tmp_path: Path) -> None:
+    """_extract_pytest_targets handles plain `pytest tests/<subpath>` shape."""
+    content = "      - run: pytest tests/groundtruth_kb/test_specs.py\n"
+    targets = _ci_inventory._extract_pytest_targets(content.lower())
+    assert "groundtruth_kb/test_specs.py" in targets

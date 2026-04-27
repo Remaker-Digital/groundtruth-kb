@@ -123,29 +123,53 @@ def _content_scan(content: str) -> tuple[str | None, str | None]:
     return (None, None)
 
 
+def _extract_pytest_targets(content_lower: str) -> list[str]:
+    """Extract pytest target subpaths from a workflow file's content.
+
+    Handles two patterns observed in live + synthetic workflows:
+      - Literal command: ``pytest tests/<subpath>`` (or ``python -m pytest tests/...``)
+      - GitHub Actions output forwarding (live python-tests.yml pattern at
+        S313): ``test_args=tests/<subpath> [tests/<subpath2> ...]`` written
+        to ``$GITHUB_OUTPUT``, then consumed via
+        ``python -m pytest ${{ steps.paths.outputs.test_args }}``.
+
+    Returns a list of subpaths after ``tests/``. Empty list means no
+    pytest target was found in either pattern.
+    """
+    targets: list[str] = []
+    # Pattern A: literal `pytest tests/<subpath>` (covers `pytest`,
+    # `python -m pytest`, etc.)
+    targets.extend(re.findall(r"pytest\s+tests/(\S*)", content_lower))
+    # Pattern B: GHA `test_args=tests/<subpath> [tests/<subpath2> ...]`
+    # The right-hand side may contain multiple space-separated tokens.
+    # Stop the assignment value at quote, newline, or `>>` (redirection).
+    for assignment in re.findall(r"test_args=([^\"'\n>]*)", content_lower):
+        for token in assignment.split():
+            if token.startswith("tests/"):
+                targets.append(token[len("tests/") :])
+    return targets
+
+
 def _classify_python_tests_workflow(content: str) -> tuple[str, str, str | None]:
     """Classify python-tests.yml by its pytest target paths.
 
     Per proposal -001 §3 specific call:
       - pytest tests/groundtruth_kb/  → framework
-      - pytest tests/ (without groundtruth_kb subpath) → adopter
+      - pytest tests/<other> → adopter
       - both → unclassified (mixed_scope_pytest_owner_decision_required)
 
-    Uses regex to extract each ``pytest tests/<subpath>`` invocation
-    distinctly so a sole ``pytest tests/groundtruth_kb/`` doesn't
-    spuriously match the bare ``pytest tests/`` substring as adopter.
+    Per Codex S313 -010 NO-GO: covers both literal ``pytest tests/...``
+    invocations AND the GHA ``test_args=tests/...`` output-forwarding
+    pattern used in the live workflow.
     """
-    blob = content.lower()
-    # Capture the immediate subpath after `tests/`. \S* allows empty,
-    # `groundtruth_kb/...`, `transport/...`, `scripts/...`, etc.
-    pytest_calls = re.findall(r"pytest\s+tests/(\S*)", blob)
-    framework_calls = [c for c in pytest_calls if c.startswith("groundtruth_kb")]
-    adopter_calls = [c for c in pytest_calls if not c.startswith("groundtruth_kb")]
-    if framework_calls and adopter_calls:
+    targets = _extract_pytest_targets(content.lower())
+    framework_targets = [t for t in targets if t.startswith("groundtruth_kb")]
+    adopter_targets = [t for t in targets if not t.startswith("groundtruth_kb")]
+    if framework_targets and adopter_targets:
         return ("unclassified", "mixed_scope_pytest_owner_decision_required", None)
-    if framework_calls:
+    if framework_targets:
         return ("framework", "framework_pytest_workflow", None)
-    if adopter_calls:
+    if adopter_targets:
         return ("adopter", "agent_red_pytest_workflow", None)
     return ("unclassified", "no_classification_signal", None)
 
