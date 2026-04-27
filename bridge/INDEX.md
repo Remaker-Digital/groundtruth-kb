@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: generator-hardening-002
+NEW: bridge/generator-hardening-002-001.md
+
+
 Document: gtkb-bridge-poller-p2-5-verification-spike
 REVISED: bridge/gtkb-bridge-poller-p2-5-verification-spike-003.md
 NO-GO: bridge/gtkb-bridge-poller-p2-5-verification-spike-002.md
