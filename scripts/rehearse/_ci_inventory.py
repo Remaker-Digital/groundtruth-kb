@@ -123,6 +123,33 @@ def _content_scan(content: str) -> tuple[str | None, str | None]:
     return (None, None)
 
 
+def _classify_python_tests_workflow(content: str) -> tuple[str, str, str | None]:
+    """Classify python-tests.yml by its pytest target paths.
+
+    Per proposal -001 §3 specific call:
+      - pytest tests/groundtruth_kb/  → framework
+      - pytest tests/ (without groundtruth_kb subpath) → adopter
+      - both → unclassified (mixed_scope_pytest_owner_decision_required)
+
+    Uses regex to extract each ``pytest tests/<subpath>`` invocation
+    distinctly so a sole ``pytest tests/groundtruth_kb/`` doesn't
+    spuriously match the bare ``pytest tests/`` substring as adopter.
+    """
+    blob = content.lower()
+    # Capture the immediate subpath after `tests/`. \S* allows empty,
+    # `groundtruth_kb/...`, `transport/...`, `scripts/...`, etc.
+    pytest_calls = re.findall(r"pytest\s+tests/(\S*)", blob)
+    framework_calls = [c for c in pytest_calls if c.startswith("groundtruth_kb")]
+    adopter_calls = [c for c in pytest_calls if not c.startswith("groundtruth_kb")]
+    if framework_calls and adopter_calls:
+        return ("unclassified", "mixed_scope_pytest_owner_decision_required", None)
+    if framework_calls:
+        return ("framework", "framework_pytest_workflow", None)
+    if adopter_calls:
+        return ("adopter", "agent_red_pytest_workflow", None)
+    return ("unclassified", "no_classification_signal", None)
+
+
 def _classify_workflow(
     filename: str,
     content: str,
@@ -130,6 +157,8 @@ def _classify_workflow(
     """Classify a workflow file. Returns (classification, signal, mechanism_origin)."""
     if filename in _MIXED_SCOPE_WORKFLOWS:
         return ("unclassified", "mixed_scope_linter_owner_decision_required", None)
+    if filename == "python-tests.yml":
+        return _classify_python_tests_workflow(content)
     classification, signal, mechanism_origin = _apply_filename_rules(filename)
     if classification is not None:
         return (classification, signal or "filename_rule", mechanism_origin)
@@ -177,16 +206,46 @@ def _load_path_rewrite_classification(output_dir: Path) -> dict[str, str]:
 # ---- Probes ------------------------------------------------------------
 
 
+def _is_path_excluded_by_manifest(
+    relative_path: str,
+    excluded_top: frozenset[str],
+    excluded_full: frozenset[str],
+) -> bool:
+    """Return True when the relative path is covered by manifest excluded_paths.
+
+    Per proposal -001 §6.6 (common contract): lane consumes manifest's
+    excluded_paths to skip surfaces under excluded top-level roots.
+
+    Two match modes:
+      - Top-level dir match: relative_path's first segment is in
+        excluded_top (e.g., '.github' excludes '.github/workflows/x.yml').
+      - Full-path match: relative_path is exactly in excluded_full
+        (e.g., 'sonar-project.properties' explicitly excluded).
+    """
+    if relative_path in excluded_full:
+        return True
+    top = relative_path.split("/", 1)[0]
+    return top in excluded_top
+
+
 def _probe_workflows(
     ci_root: Path,
     classify_tree_lookup: dict[str, str],
+    excluded_top: frozenset[str] = frozenset(),
+    excluded_full: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """Walk .github/workflows/*.yml; classify each."""
+    """Walk .github/workflows/*.yml; classify each.
+
+    Workflows under excluded top-level dirs (e.g., manifest excludes
+    '.github') are skipped entirely per the common contract.
+    """
     rows: list[dict[str, Any]] = []
     if not ci_root.exists() or not ci_root.is_dir():
         return rows
     for yml_path in sorted(ci_root.glob("*.yml")):
         rel = f".github/workflows/{yml_path.name}"
+        if _is_path_excluded_by_manifest(rel, excluded_top, excluded_full):
+            continue
         try:
             size_bytes = yml_path.stat().st_size
             content = yml_path.read_text(encoding="utf-8", errors="replace")
@@ -223,10 +282,18 @@ def _probe_workflows(
 def _probe_ci_configs(
     project_root: Path,
     classify_tree_lookup: dict[str, str],
+    excluded_top: frozenset[str] = frozenset(),
+    excluded_full: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """Probe known root-relative CI config paths."""
+    """Probe known root-relative CI config paths.
+
+    Configs whose path is manifest-excluded (top-level dir match or full
+    path match) are skipped entirely.
+    """
     rows: list[dict[str, Any]] = []
     for relative_path, default_classification, default_signal in _CI_CONFIG_PROBES:
+        if _is_path_excluded_by_manifest(relative_path, excluded_top, excluded_full):
+            continue
         full = project_root / relative_path
         exists = full.exists() and full.is_file()
         size_bytes = 0
@@ -396,11 +463,16 @@ def run(
     warnings: list[str] = []
     output_files: list[Path] = []
 
+    # Per common contract -001 §6.6: consume manifest['excluded_paths'].
+    excluded = set(manifest.get("excluded_paths", []))
+    excluded_full = frozenset(excluded)
+    excluded_top = frozenset(e.rstrip("/").split("/")[0] for e in excluded if e)
+
     lane_dir = output_dir / "ci_inventory"
     lane_dir.mkdir(parents=True, exist_ok=True)
     try:
-        workflows = _probe_workflows(workflows_root, classify_tree_lookup)
-        ci_configs = _probe_ci_configs(project_root, classify_tree_lookup)
+        workflows = _probe_workflows(workflows_root, classify_tree_lookup, excluded_top, excluded_full)
+        ci_configs = _probe_ci_configs(project_root, classify_tree_lookup, excluded_top, excluded_full)
     except OSError as exc:
         return emit_result(
             lane_dir,

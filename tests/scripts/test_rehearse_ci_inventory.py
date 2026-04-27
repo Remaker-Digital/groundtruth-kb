@@ -391,3 +391,117 @@ def test_run_classification_matches_slice6_for_release_candidate_gate(tmp_path: 
     assert slice7_row["classification"] == slice6_row["classification"]
     assert slice7_row["classification_signal"] == slice6_row["classification_signal"]
     assert slice7_row["mechanism_origin"] == slice6_row["mechanism_origin"]
+
+
+# ---- Manifest excluded_paths consumption (per Codex -008 NO-GO) -------
+
+
+def test_run_excluded_paths_skip_workflow_files_under_excluded_top_level(tmp_path: Path) -> None:
+    """Per proposal -001 §6.6 + Codex -008 §"Required Revision" item 1:
+    when manifest excludes a top-level dir containing CI surfaces, those
+    surfaces must NOT appear in the inventory.
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    workflows_dir = project_root / ".github" / "workflows"
+    _build_workflow_fixture(workflows_dir, {"accessibility.yml": "# adopter UI gate\n"})
+    output_dir = tmp_path / "output"
+    # Manifest excludes the entire .github tree.
+    result = _ci_inventory.run(
+        {"excluded_paths": [".github"]},
+        output_dir,
+        ci_root=workflows_dir,
+        ci_configs_root=project_root,
+    )
+    assert result["status"] == "ok"
+    payload = json.loads((output_dir / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    # accessibility.yml should NOT be in the inventory because .github excluded.
+    assert payload["workflows"] == [], f"Excluded workflow appeared in inventory: {payload['workflows']}"
+    # CI configs probed at root: .github/dependabot.yml is also excluded.
+    rel_paths = {c["path"] for c in payload["ci_configs"]}
+    assert ".github/dependabot.yml" not in rel_paths
+
+
+def test_run_excluded_paths_full_path_match_skips_specific_config(tmp_path: Path) -> None:
+    """A specific full-path match in excluded_paths skips that single CI config.
+
+    Validates the second match mode in _is_path_excluded_by_manifest:
+    relative_path in excluded_full (not just top-level dir match).
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    workflows_dir = project_root / ".github" / "workflows"
+    workflows_dir.mkdir(parents=True)
+    _build_ci_configs_fixture(
+        project_root,
+        {"sonar-project.properties": "sonar.projectKey=mike-remakerdigital_agent-red\n"},
+    )
+    output_dir = tmp_path / "output"
+    result = _ci_inventory.run(
+        {"excluded_paths": ["sonar-project.properties"]},
+        output_dir,
+        ci_root=workflows_dir,
+        ci_configs_root=project_root,
+    )
+    assert result["status"] == "ok"
+    payload = json.loads((output_dir / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    rel_paths = {c["path"] for c in payload["ci_configs"]}
+    assert "sonar-project.properties" not in rel_paths
+
+
+# ---- python-tests.yml content-scan classifier (per proposal §3 + Codex -008) ---
+
+
+def test_run_pytest_workflow_classifies_by_pytest_target_adopter(tmp_path: Path) -> None:
+    """python-tests.yml running pytest against tests/ (no groundtruth_kb subpath)
+    classifies as adopter with signal agent_red_pytest_workflow."""
+    _run_lane(
+        tmp_path,
+        workflow_files={
+            "python-tests.yml": (
+                "name: python-tests\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest tests/\n"
+            )
+        },
+    )
+    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    assert row["classification"] == "adopter"
+    assert row["classification_signal"] == "agent_red_pytest_workflow"
+
+
+def test_run_pytest_workflow_classifies_by_pytest_target_framework(tmp_path: Path) -> None:
+    """python-tests.yml running pytest tests/groundtruth_kb classifies as framework."""
+    _run_lane(
+        tmp_path,
+        workflow_files={
+            "python-tests.yml": (
+                "name: python-tests\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest tests/groundtruth_kb/\n"
+            )
+        },
+    )
+    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    assert row["classification"] == "framework"
+    assert row["classification_signal"] == "framework_pytest_workflow"
+
+
+def test_run_pytest_workflow_classifies_no_pytest_command_as_unclassified(tmp_path: Path) -> None:
+    """python-tests.yml with no pytest command falls to no_classification_signal."""
+    _run_lane(
+        tmp_path,
+        workflow_files={"python-tests.yml": "# placeholder\n"},
+    )
+    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    assert row["classification"] == "unclassified"
+    assert row["classification_signal"] == "no_classification_signal"
