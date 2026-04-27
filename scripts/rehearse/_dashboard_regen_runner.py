@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 import sys
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -198,17 +199,22 @@ def build_is_allowed(legacy_root: Path, sandbox_root: Path) -> Callable[[str], b
             for pattern in _DENIED_FILENAME_GLOBS_UNDER_LEGACY_SCRIPTS:
                 if p.match(pattern):
                     return False
-        # Tier 1: exact-file allowlist
-        for kind, allowed in allowed_rules:
-            if kind == "exact" and p == allowed:
-                return True
-        # Tier 2: prefix allowlist
-        for kind, allowed in allowed_rules:
-            if kind == "prefix" and _is_relative_to(p, allowed):
-                return True
-        return False
+        # Tier 1: exact-file allowlist (SIM110: any() over loop+return-True+return-False).
+        if any(kind == "exact" and p == allowed for kind, allowed in allowed_rules):
+            return True
+        # Tier 2: prefix allowlist.
+        return any(kind == "prefix" and _is_relative_to(p, allowed) for kind, allowed in allowed_rules)
 
     return is_allowed
+
+
+_TERMINATION_EXIT_CODE = 99
+"""Subprocess exit code for audit-hook fail-closed termination.
+
+Lane recognizes ``returncode == 99`` as the canonical signal that the
+runner subprocess terminated due to an audit-hook violation. Distinct
+from generator's normal exit codes (0 / 1) and from ``TimeoutExpired``.
+"""
 
 
 def build_audit_hook(
@@ -216,52 +222,99 @@ def build_audit_hook(
     sandbox_root: Path,
     violations: list[dict[str, Any]],
     violations_out: Path | None,
+    *,
+    terminate_after_violation: bool = True,
 ) -> Callable[[str, tuple[Any, ...]], None]:
     """Factory: return an ``sys.addaudithook``-compatible callable.
 
-    Intercepts ``open`` and ``subprocess.Popen`` audit events. Out-of-
-    sandbox accesses append to ``violations``. ``violations_out`` is
-    used by the lane to persist the list AFTER the subprocess returns;
-    the hook itself does NOT flush on every violation — that would
-    trigger an infinite recursion (write → audit event → hook fires →
-    appends + flushes → write triggers audit event → ...).
+    Intercepts ``open`` and ``subprocess.Popen`` audit events. The first
+    out-of-sandbox access:
 
-    Implementation notes (impl-time discoveries on Python 3.14 Windows):
+    1. Appends the violation to the in-memory ``violations`` list.
+    2. Flushes ``violations_out`` to disk (with re-entrancy guard, so
+       the write itself doesn't re-enter the hook).
+    3. Calls ``os._exit(99)`` to terminate the subprocess fail-closed.
 
-    - **Log-and-continue, not raise.** Raising ``PermissionError`` from
-      inside the hook triggers a pathlib internal-attribute
-      ``AttributeError`` chain during traceback formatting that hangs
-      the subprocess (~120s timeout reproducibly). Switching to
-      log-and-continue: the hook appends to ``violations`` and returns
-      normally. The generator proceeds; subsequent legacy reads also
-      produce violations, which is more informative — operators see the
-      FULL set of legacy reads in one run, not just the first.
-    - **No per-violation flush.** ``violations_out`` is the path the
-      lane reads after the subprocess returns. The hook's own write
-      would re-enter via the ``open`` audit event, causing recursion.
+    Step 3 is the design contract Codex `-012` GO required: the denied
+    read is prevented from completing (PEP 578 audit hooks fire BEFORE
+    the underlying operation, so the open() / subprocess spawn never
+    proceeds), and no further generator logic runs that could write
+    derived artifacts.
 
-    Lane-side semantics unchanged from REVISED-5: ``len(violations) > 0``
-    produces ``status='error'`` per Codex `-012` constraint matrix.
-    Proof of no-leak is still ``status='ok'`` with empty violations —
-    achievable only when the generator is hardened to read only from
-    sandbox. Until then, every dashboard rehearsal run produces
-    ``status='error'`` with an enumerated list of legacy paths.
+    ``terminate_after_violation=False`` is for unit tests — they
+    inspect the in-memory violations list without ending the test
+    process. Production always uses the default ``True``.
+
+    Implementation notes (Slice 11 REVISED-1 of post-impl, addressing
+    Codex `-014` Finding 1):
+
+    - **``os._exit`` instead of ``raise PermissionError``.** Discovered
+      at impl time: raising from inside the audit hook on Python 3.14
+      Windows triggers a pathlib internal-attribute ``AttributeError``
+      chain during traceback formatting that hangs the subprocess.
+      ``os._exit`` is a C-level ``_exit()`` syscall that bypasses
+      Python's exception unwinding and traceback machinery entirely —
+      no pathlib interaction, no recursion, immediate process death.
+    - **Re-entrancy guard via ``threading.local``.** The flush write
+      to ``violations_out`` triggers an ``open`` audit event that would
+      re-enter the hook. The guard short-circuits nested calls.
     """
     is_allowed = build_is_allowed(legacy_root, sandbox_root)
-    # ``violations_out`` retained on closure so the lane can persist
-    # post-subprocess; not used inside the hook itself (see docstring
-    # "No per-violation flush" rationale).
-    _ = violations_out
+    in_hook = threading.local()
+    violations_out_resolved = _resolve(violations_out) if violations_out is not None else None
+
+    def _flush_and_terminate(violation: dict[str, Any]) -> None:
+        """Persist violations + write quarantine marker + fail-closed exit."""
+        if violations_out is not None:
+            try:
+                violations_out.parent.mkdir(parents=True, exist_ok=True)
+                violations_out.write_text(json.dumps(violations, indent=2), encoding="utf-8")
+                # Quarantine marker: a sibling file the lane checks to know the
+                # subprocess terminated due to an audit-hook violation (vs. a
+                # normal generator crash with returncode != 0).
+                marker_path = violations_out.with_suffix(".terminated-marker")
+                marker_path.write_text(
+                    json.dumps({"reason": "audit_hook_fail_closed", "first_violation": violation}, indent=2),
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass  # Best-effort; subprocess will still terminate
+        if terminate_after_violation:
+            os._exit(_TERMINATION_EXIT_CODE)
 
     def hook(event: str, args_tuple: tuple[Any, ...]) -> None:
-        if event == "open":
-            path = args_tuple[0] if args_tuple else None
-            if isinstance(path, (str, bytes, os.PathLike)) and not is_allowed(str(path)):
-                violations.append({"event": "open", "path": str(path)})
-        elif event == "subprocess.Popen":
-            cwd = args_tuple[2] if len(args_tuple) > 2 else None
-            if cwd and not is_allowed(str(cwd)):
-                violations.append({"event": "subprocess.Popen.cwd", "cwd": str(cwd)})
+        # Re-entrancy guard: flush write triggers `open` audit; without
+        # this guard the hook would recurse on its own write call.
+        if getattr(in_hook, "active", False):
+            return
+        in_hook.active = True
+        try:
+            if event == "open":
+                path = args_tuple[0] if args_tuple else None
+                if isinstance(path, (str, bytes, os.PathLike)):
+                    path_str = str(path)
+                    # Skip the violations_out write itself (re-entrancy guard
+                    # also catches it but explicit check is clearer).
+                    if violations_out_resolved is not None:
+                        try:
+                            if _resolve(Path(path_str)) == violations_out_resolved:
+                                return
+                            if _resolve(Path(path_str)) == violations_out_resolved.with_suffix(".terminated-marker"):
+                                return
+                        except (OSError, ValueError):
+                            pass
+                    if not is_allowed(path_str):
+                        violation = {"event": "open", "path": path_str}
+                        violations.append(violation)
+                        _flush_and_terminate(violation)
+            elif event == "subprocess.Popen":
+                cwd = args_tuple[2] if len(args_tuple) > 2 else None
+                if cwd and not is_allowed(str(cwd)):
+                    violation = {"event": "subprocess.Popen.cwd", "cwd": str(cwd)}
+                    violations.append(violation)
+                    _flush_and_terminate(violation)
+        finally:
+            in_hook.active = False
 
     return hook
 

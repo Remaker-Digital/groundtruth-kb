@@ -96,6 +96,12 @@ _FRESH_SANDBOX_FILES: dict[str, str] = {
 # Subprocess timeout (seconds) for the sample-render runner.
 _SUBPROCESS_TIMEOUT = 120
 
+# Per Slice 11 REVISED-1 of post-impl (addressing Codex `-014` Finding 1):
+# the runner subprocess uses ``os._exit(99)`` to fail-closed on the first
+# audit-hook violation. The lane recognizes returncode 99 as the canonical
+# audit-hook termination signal (vs. generator's normal codes 0/1).
+_AUDIT_HOOK_TERMINATION_RETURNCODE = 99
+
 
 # ---- Probe helpers ----------------------------------------------------
 
@@ -414,6 +420,39 @@ def _run_sample_render(
 # ---- Output emitters --------------------------------------------------
 
 
+def _quarantine_sample_render(sample_render_dir: Path, violation_count: int) -> None:
+    """Rename sample_render dir to ``.QUARANTINED-<count>-violations`` to signal
+    operator the artifacts are incomplete / suspect.
+
+    Per Codex `-014` Finding 1 required revision: "Prevent preserved
+    sample artifacts from containing content derived from denied legacy
+    reads. ... add explicit handling for quarantining or suppressing
+    sample-render artifacts when violations are non-empty."
+
+    Subprocess termination via ``os._exit(99)`` already prevents the
+    denied open() from completing (PEP 578 audit hooks fire pre-action).
+    The partial sample_render contents at termination time contain only
+    sandbox-derived data — no leaked legacy content. The quarantine
+    rename is defense-in-depth: it signals the artifacts are incomplete
+    and should not be trusted, even though they're technically clean.
+    """
+    if not sample_render_dir.exists():
+        return
+    quarantine_path = sample_render_dir.with_name(f"{sample_render_dir.name}.QUARANTINED-{violation_count}-violations")
+    # If a previous quarantine already exists (rare; same lane re-run),
+    # append a discriminator.
+    if quarantine_path.exists():
+        ts = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        quarantine_path = sample_render_dir.with_name(
+            f"{sample_render_dir.name}.QUARANTINED-{violation_count}-violations-{ts}"
+        )
+    try:
+        sample_render_dir.rename(quarantine_path)
+    except OSError:
+        # Best-effort; rename can fail if a process holds the dir on Windows.
+        pass
+
+
 def _build_audit_hook_proof(
     legacy_root: Path,
     sandbox_root: Path,
@@ -691,12 +730,26 @@ def run(
     )
 
     # Phase 5: status determination.
+    # Per Slice 11 REVISED-1 of post-impl: subprocess returncode 99
+    # signals fail-closed termination by the audit hook on first
+    # violation (Codex `-014` Finding 1 fix). Distinct from generator's
+    # normal returncodes (0 / 1).
     if error_kind == "timeout":
         status = "error"
         warnings.append(f"subprocess_timeout: exceeded {_SUBPROCESS_TIMEOUT}s")
+    elif proc is not None and proc.returncode == _AUDIT_HOOK_TERMINATION_RETURNCODE:
+        status = "error"
+        warnings.append(
+            f"audit_hook_fail_closed_termination: subprocess terminated by audit hook on first "
+            f"of {len(violations)} violation(s); sample_render quarantined"
+        )
+        _quarantine_sample_render(sample_render_dir, len(violations))
     elif violations:
+        # Defense-in-depth: any non-empty violations list → error,
+        # even if subprocess didn't terminate (legacy fallback path).
         status = "error"
         warnings.append(f"legacy_data_read_detected: {len(violations)} violations")
+        _quarantine_sample_render(sample_render_dir, len(violations))
     elif proc is not None and proc.returncode != 0:
         status = "error"
         warnings.append(f"subprocess_returncode_nonzero: {proc.returncode}")

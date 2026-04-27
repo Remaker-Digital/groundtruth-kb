@@ -562,22 +562,94 @@ def test_audit_hook_rejects_symlink_to_legacy_data(tmp_path: Path) -> None:
 def test_audit_hook_subprocess_popen_records_legacy_cwd_violation(tmp_path: Path) -> None:
     """subprocess.Popen audit event with cwd=legacy → recorded violation.
 
-    Note: REVISED-3/4/5 specified ``raise PermissionError``. Impl-time
-    discovery: raising from inside the audit hook on Python 3.14 Windows
-    triggers a pathlib internal-attribute AttributeError chain during
-    traceback formatting that hangs the subprocess. Switched to
-    log-and-continue: violations are recorded; lane reports
-    ``status='error'`` if violations is non-empty (semantically
-    equivalent end-state).
+    Note: REVISED-1 of post-impl (Codex `-014` Finding 1 fix): production
+    runner uses ``os._exit(99)`` to fail-closed on first violation. Tests
+    pass ``terminate_after_violation=False`` to inspect the in-memory
+    violations list without ending the test process.
     """
     legacy, sandbox = _setup_runner_fixture(tmp_path)
     violations: list[dict[str, Any]] = []
-    hook = _dashboard_regen_runner.build_audit_hook(legacy, sandbox, violations, None)
-    # Hook records but does not raise; lane-side check on violations.
+    hook = _dashboard_regen_runner.build_audit_hook(legacy, sandbox, violations, None, terminate_after_violation=False)
     hook("subprocess.Popen", ("git", ["git", "ls-remote"], str(legacy), {}))
     assert len(violations) == 1
     assert violations[0]["event"] == "subprocess.Popen.cwd"
     assert str(legacy) in violations[0]["cwd"]
+
+
+# ---- REVISED-1 of post-impl: fail-closed termination + quarantine ----
+
+
+def test_audit_hook_terminates_subprocess_on_first_open_violation(tmp_path: Path) -> None:
+    """First denied open → os._exit(99). Test injects a fake terminate.
+
+    Captures that the hook calls os._exit on the first violation when
+    ``terminate_after_violation=True`` (default).
+    """
+    legacy, sandbox = _setup_runner_fixture(tmp_path)
+    target = legacy / "memory" / "work_list.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("legacy data", encoding="utf-8")
+
+    violations: list[dict[str, Any]] = []
+    violations_out = tmp_path / "violations.json"
+
+    # Use terminate_after_violation=False to inspect behavior without exit.
+    hook = _dashboard_regen_runner.build_audit_hook(
+        legacy, sandbox, violations, violations_out, terminate_after_violation=False
+    )
+    hook("open", (str(target), "r", 0))
+    # Hook recorded the violation
+    assert len(violations) == 1
+    assert violations[0]["event"] == "open"
+    # Violations file flushed (this happens regardless of terminate flag).
+    assert violations_out.exists()
+    payload = json.loads(violations_out.read_text(encoding="utf-8"))
+    assert len(payload) == 1
+    # Quarantine marker also written for the lane to detect terminated state.
+    marker = violations_out.with_suffix(".terminated-marker")
+    assert marker.exists()
+    marker_payload = json.loads(marker.read_text(encoding="utf-8"))
+    assert marker_payload["reason"] == "audit_hook_fail_closed"
+
+
+def test_run_status_error_on_subprocess_returncode_99_quarantines_sample_render(tmp_path: Path) -> None:
+    """returncode=99 → status='error' AND sample_render renamed to .QUARANTINED.
+
+    Per Codex `-014` Required Revision: "Prevent preserved sample
+    artifacts from containing content derived from denied legacy reads.
+    ... add explicit handling for quarantining ... when violations are
+    non-empty."
+    """
+    legacy = _make_minimal_legacy_root(tmp_path)
+    invoker = _make_fake_invoker(
+        returncode=99,
+        violations=[{"event": "open", "path": str(legacy / ".env.local")}],
+    )
+    result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=invoker)
+    assert result["status"] == "error"
+    assert any("audit_hook_fail_closed_termination" in w for w in result["warnings"])
+    # Sample_render was renamed; original path no longer exists.
+    sample_render = tmp_path / "output" / "dashboard_regen" / "sample_render"
+    quarantined = tmp_path / "output" / "dashboard_regen" / "sample_render.QUARANTINED-1-violations"
+    assert not sample_render.exists()
+    assert quarantined.exists()
+
+
+def test_run_quarantines_sample_render_even_on_violations_without_returncode_99(tmp_path: Path) -> None:
+    """Defense-in-depth: violations non-empty even with returncode=0 → still quarantine.
+
+    Covers the case where a future runner change might not terminate
+    via os._exit (e.g., test-injected hook with ``terminate_after_violation=False``).
+    """
+    legacy = _make_minimal_legacy_root(tmp_path)
+    invoker = _make_fake_invoker(
+        returncode=0,  # generator completed normally
+        violations=[{"event": "open", "path": str(legacy / ".env.local")}],
+    )
+    result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=invoker)
+    assert result["status"] == "error"
+    quarantined = tmp_path / "output" / "dashboard_regen" / "sample_render.QUARANTINED-1-violations"
+    assert quarantined.exists()
 
 
 # =====================================================================
