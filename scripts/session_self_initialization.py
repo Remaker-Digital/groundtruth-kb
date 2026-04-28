@@ -1039,12 +1039,24 @@ def _git_drift(project_root: Path) -> dict[str, Any]:
     }
 
 
+def _user_extension_discovery_opt_in() -> bool:
+    """Per bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-004.md (GO):
+    Home-directory user-extension discovery for skills + plugin-cache is OFF
+    by default (root-contained per .claude/rules/project-root-boundary.md).
+    Owner can set GTKB_DISCOVER_USER_EXTENSIONS=1 to enable opt-in scanning.
+    Strict "1" only; no other truthy values. SessionStart hooks must NOT
+    set this env var.
+    """
+    return os.environ.get("GTKB_DISCOVER_USER_EXTENSIONS") == "1"
+
+
 def _discover_skill_files(project_root: Path) -> list[Path]:
-    roots = [
-        project_root / ".claude" / "skills",
-        Path.home() / ".codex" / "skills",
-        Path.home() / ".agents" / "skills",
-    ]
+    roots = [project_root / ".claude" / "skills"]
+    if _user_extension_discovery_opt_in():
+        roots.extend([
+            Path.home() / ".codex" / "skills",
+            Path.home() / ".agents" / "skills",
+        ])
     skill_files: list[Path] = []
     for root in roots:
         if not root.is_dir():
@@ -1064,6 +1076,8 @@ def _skill_name(path: Path) -> str:
 
 def _plugin_inventory() -> list[str]:
     plugins: set[str] = set()
+    if not _user_extension_discovery_opt_in():
+        return sorted(plugins)
     plugin_cache = Path.home() / ".codex" / "plugins" / "cache"
     if plugin_cache.is_dir():
         for path in plugin_cache.glob("*/*"):
@@ -2644,12 +2658,23 @@ def build_startup_model(
         "skills": {
             "count": len(skill_files),
             "items": [_skill_name(path) for path in skill_files[:80]],
-            "source": "project .claude/skills plus local harness skill directories",
+            "source": (
+                "project .claude/skills plus opt-in local harness skill directories"
+                if _user_extension_discovery_opt_in()
+                else "project .claude/skills (root-contained default per project-root-boundary)"
+            ),
         },
         "plugins": {
             "items": plugins,
-            "source": "local harness plugin cache when present",
+            "source": (
+                "opt-in local harness plugin cache via GTKB_DISCOVER_USER_EXTENSIONS=1"
+                if _user_extension_discovery_opt_in()
+                else "default root-contained (no plugin cache scan; opt-in via GTKB_DISCOVER_USER_EXTENSIONS=1)"
+            ),
         },
+        "user_extension_discovery": (
+            "opt_in_active" if _user_extension_discovery_opt_in() else "default_root_contained"
+        ),
         "directives": {
             "rule_files": [path.name for path in rule_files],
             "hook_files": [path.name for path in hook_files],

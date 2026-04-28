@@ -346,6 +346,95 @@ def test_project_root_rejects_drive_relative_path_to_prevent_doubling() -> None:
     )
 
 
+def test_default_invocation_does_not_scan_home_directory_for_skills_or_plugins(monkeypatch) -> None:
+    """Regression test for bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28.
+
+    Default behavior (env var unset) must NOT scan home-directory locations for
+    skills or plugin-cache. Closes GH-002 row-17 default-secure contract.
+    """
+    module = _load_module()
+    monkeypatch.delenv("GTKB_DISCOVER_USER_EXTENSIONS", raising=False)
+
+    # Sentinel: monkeypatch Path.home to raise if called from within the gated
+    # discovery functions. If _discover_skill_files() or _plugin_inventory()
+    # accidentally call Path.home() in the default branch, this test fails.
+    def _raise_if_called():
+        raise AssertionError(
+            "Path.home() called in default discovery path; opt-in gate is missing. "
+            "Per bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-004.md, "
+            "GTKB_DISCOVER_USER_EXTENSIONS=1 must be set to trigger home-dir scan."
+        )
+    monkeypatch.setattr(module.Path, "home", _raise_if_called)
+
+    skill_files = module._discover_skill_files(REPO_ROOT)
+    plugin_list = module._plugin_inventory()
+
+    # Default behavior: skill discovery includes only project-root skills.
+    project_skill_root = REPO_ROOT / ".claude" / "skills"
+    if project_skill_root.is_dir():
+        expected_skills = sorted(project_skill_root.rglob("SKILL.md"), key=lambda p: str(p).lower())
+        assert sorted(skill_files, key=lambda p: str(p).lower()) == expected_skills, (
+            "Default skill discovery must equal project-root scan only"
+        )
+
+    # Default behavior: plugin inventory is empty (home-dir plugin cache not scanned).
+    assert plugin_list == [], (
+        f"Default plugin inventory must be empty (no home-dir scan); got {plugin_list}"
+    )
+
+
+def test_opt_in_invocation_scans_home_directory_for_skills_and_plugins(monkeypatch, tmp_path) -> None:
+    """Regression test for bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28.
+
+    Opt-in behavior (GTKB_DISCOVER_USER_EXTENSIONS=1) must scan synthetic
+    home-dir skill + plugin fixtures. Verifies the opt-in path is functional.
+    """
+    module = _load_module()
+    monkeypatch.setenv("GTKB_DISCOVER_USER_EXTENSIONS", "1")
+    # Mock Path.home() to point at tmp_path with synthetic skills/plugins inside.
+    monkeypatch.setattr(module.Path, "home", lambda: tmp_path)
+
+    # Synthetic home-dir skill fixture
+    synthetic_skill_dir = tmp_path / ".codex" / "skills" / "synthetic-skill"
+    synthetic_skill_dir.mkdir(parents=True)
+    (synthetic_skill_dir / "SKILL.md").write_text("# synthetic-skill", encoding="utf-8")
+
+    # Synthetic home-dir plugin fixture
+    plugin_cache_dir = tmp_path / ".codex" / "plugins" / "cache" / "synthetic-cache" / "synthetic-plugin"
+    plugin_cache_dir.mkdir(parents=True)
+
+    skill_files = module._discover_skill_files(REPO_ROOT)
+    plugin_list = module._plugin_inventory()
+
+    found_synthetic_skill = any("synthetic-skill" in str(p) for p in skill_files)
+    assert found_synthetic_skill, (
+        f"Opt-in must scan home-dir skills; got {[str(p) for p in skill_files]}"
+    )
+
+    assert "synthetic-plugin" in plugin_list, (
+        f"Opt-in must scan home-dir plugin cache; got {plugin_list}"
+    )
+
+
+def test_startup_payload_marks_user_extension_discovery_state(monkeypatch) -> None:
+    """Regression test for bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28.
+
+    Per Codex GO -004 condition 3: when opt-in discovery is active, startup
+    output must make that visible with a concise marker. The model exposes
+    a 'user_extension_discovery' field; default = 'default_root_contained',
+    opt-in = 'opt_in_active'.
+    """
+    module = _load_module()
+
+    monkeypatch.delenv("GTKB_DISCOVER_USER_EXTENSIONS", raising=False)
+    default_model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+    assert default_model.get("user_extension_discovery") == "default_root_contained"
+
+    monkeypatch.setenv("GTKB_DISCOVER_USER_EXTENSIONS", "1")
+    opt_in_model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+    assert opt_in_model.get("user_extension_discovery") == "opt_in_active"
+
+
 def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -> None:
     module = _load_module()
 
