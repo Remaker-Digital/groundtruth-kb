@@ -1,16 +1,16 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-28T03:14:42Z
+Generated: 2026-04-28T04:20:04Z
 
 ## Startup Disclosure
 
 ### Role And Governance Stance
 
 - Role being assumed: Prime Builder
-- Role assignment: active AI harness assigned by owner through durable operating-role record
+- Role assignment: active AI harness assigned by owner through durable harness-local operating-role record
 - Bridge: always available through bridge/INDEX.md and checked at session startup
 - Poller: activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed
-- Role mapping source: .claude/rules/operating-role.md
+- Role mapping source: applications/Agent_Red/harness-state/claude/operating-role.md
 
 - Strict GOV enforcement where mechanically available
 - Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations
@@ -79,7 +79,7 @@ Generated: 2026-04-28T03:14:42Z
 Reply with the number or exact label. Each option is generated from the current dashboard evidence.
 
 1. **Optimize Startup Token Consumption**
-   Current signal: Startup context can be reduced by preferring dashboard and index-first reads.
+   Current signal: 2 startup reduction candidate(s) are currently visible.
    Prompt details: Focus this session on reducing startup token consumption. Review the startup-loaded artifacts, prefer dashboard and index-first reads, and trim default startup context to the minimum evidence needed. Use this reduction set: Use the dashboard link before loading large artifacts into context; Read indices and summaries first; open full artifacts only when needed; Load only the specific skill body required for the current turn; Use cached startup snapshots for stable KPI instead of re-scanning everything; Propose explicit governance relaxation only when the audit trail can preserve the tradeoff.
 
 2. **Top Priority Actions**

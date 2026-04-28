@@ -563,6 +563,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-04-28T02:58:42.574242Z
   answer: "owner cleared without specific answer"
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0051
+  asked_at: 2026-04-28T04:26:26.098049Z
+  question: "Per `feedback_explicit_destructive_action_authorization.md`, I need explicit authorization before deleting the nested `E:\\GT-KB\\GT-KB\\` directory (created by my verification commands due to a path-handling bug in `session_self_initialization.py`). The directory contains 4 auto-regenerable dashboard output files (~176K total): `GT-KB/docs/gtkb-dashboard/dashboard-data.json`, `GT-KB/docs/gtkb-dashboard/session-startup-report.md`, `GT-KB/docs/gtkb-dashboard/session-wrapup-report.md`, `GT-KB/memory/gtkb-dashboard-history.json`. The same 4 files exist correctly at `E:\\GT-KB\\docs/...` and `E:\\GT-KB\\memory/...` (Commit 6 of S317 tracked them). Codex requires this directory be removed before VERIFIED. How should I proceed?"
+  options:
+    - "APPROVE: delete `E:\\GT-KB\\GT-KB\\` recursively (Recommended)"
+    - "Add `GT-KB/` to .gitignore (no deletion)"
+    - "I will delete it myself; you file REVISED-1 after"
+    - "Different approach — I will specify"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3bf126423c32aec1
+  resolved_at: 2026-04-28T04:26:26.098049Z
+  answer: "User has answered your questions: \"Per `feedback_explicit_destructive_action_authorization.md`, I need explicit authorization before deleting the nested `E:\\GT-KB\\GT-KB\\` directory (created by my verification commands due to a path-handling bug in `session_self_initialization.py`). The directory contains 4 auto-regenerable dashboard output files (~176K total): `GT-KB/docs/gtkb-dashboard/dashboard-data.json`, `GT-KB/docs/gtkb-dashboard/session-startup-report.md`, `GT-KB/docs/gtkb-dashboard/session-wrapup-report.md`, `GT-KB/memory/gtkb-dashboard-history.json`. The same 4 files exist correctly at `E:\\GT-KB\\docs/...` and `E:\\GT-KB\\memory/...` (Commit 6 of S317 tracked them). Codex requires this directory be removed before VERIFIED. How should I proceed?\"=\"APPROVE: delete `E:\\GT-KB\\GT-KB\\` recursively (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

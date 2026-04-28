@@ -6,167 +6,6 @@
       "current_work_subject": null,
       "deliberation_archive_current_total": 328,
       "drift_changed_path_count": 0,
-      "generated_at": "2026-04-25T23:37:21Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
-      "generated_at": "2026-04-25T23:40:01Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
-      "generated_at": "2026-04-25T23:41:51Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
-      "generated_at": "2026-04-25T23:49:08Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
-      "generated_at": "2026-04-25T23:59:00Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
-      "generated_at": "2026-04-25T23:59:39Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": null,
-      "contention_actionable_bridge_count": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": null,
-      "generated_at": "2026-04-25T23:59:59Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 335,
-      "regression_release_blocker_count": null,
-      "scope_confidence": "agent_red_inferred",
-      "scope_source": "groundtruth.db version history by changed_at",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": null,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
-      "generated_at": "2026-04-26T00:04:10Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
-      "generated_at": "2026-04-26T00:15:57Z",
-      "membase_open_work_items": 51,
-      "pytest_file_count": 340,
-      "regression_release_blocker_count": 0,
-      "scope_confidence": "agent_red_current_heuristic",
-      "scope_source": "current dashboard model",
-      "scope_version": "agent_red_v1",
-      "skill_template_count": 38,
-      "specification_current_total": 1847,
-      "token_measurement_status": "not_exposed_by_current_harness",
-      "tokens_consumed_before_user_input": null
-    },
-    {
-      "backlog_active_items": 1,
-      "contention_actionable_bridge_count": 0,
-      "current_work_subject": null,
-      "deliberation_archive_current_total": 328,
-      "drift_changed_path_count": 0,
       "generated_at": "2026-04-26T00:28:42Z",
       "membase_open_work_items": 51,
       "pytest_file_count": 340,
@@ -3023,6 +2862,23 @@
       "tokens_consumed_before_user_input": null
     },
     {
+      "backlog_active_items": null,
+      "contention_actionable_bridge_count": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": null,
+      "generated_at": "2026-04-27T23:59:59Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 335,
+      "regression_release_blocker_count": null,
+      "scope_confidence": "agent_red_inferred",
+      "scope_source": "groundtruth.db version history by changed_at",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": null,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
       "backlog_active_items": 1,
       "contention_actionable_bridge_count": 0,
       "current_work_subject": null,
@@ -3597,6 +3453,150 @@
       "specification_current_total": 1847,
       "token_measurement_status": "not_exposed_by_current_harness",
       "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 0,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T03:24:09Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 0,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T03:27:15Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 0,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T03:34:16Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 0,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T03:50:04Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 0,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T03:50:41Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 1,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T03:59:44Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 0,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T04:07:07Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
+    },
+    {
+      "backlog_active_items": 1,
+      "contention_actionable_bridge_count": 0,
+      "current_work_subject": null,
+      "deliberation_archive_current_total": 381,
+      "drift_changed_path_count": 0,
+      "generated_at": "2026-04-28T04:20:04Z",
+      "membase_open_work_items": 51,
+      "pytest_file_count": 340,
+      "regression_release_blocker_count": 0,
+      "scope_confidence": "agent_red_current_heuristic",
+      "scope_source": "current dashboard model",
+      "scope_version": "agent_red_v1",
+      "skill_template_count": 39,
+      "specification_current_total": 1847,
+      "token_measurement_status": "not_exposed_by_current_harness",
+      "tokens_consumed_before_user_input": null
     }
   ],
   "model": {
@@ -3722,12 +3722,12 @@
         }
       ],
       "data_freshness": {
-        "generated_at": "2026-04-28T03:14:42Z",
+        "generated_at": "2026-04-28T04:20:04Z",
         "groundtruth_db_modified_at": "2026-04-27T19:39:37.215510Z",
-        "last_commit": "2026-04-27T19:39:44-07:00\nS316: deletion-readiness manifests + application-isolation foundation",
+        "last_commit": "2026-04-27T21:14:36-07:00\nbridge: Record harness-state-authority-migration thread + INDEX update",
         "repo_branch": "develop",
-        "repo_sha": "b1d21aa031db5d72181de7f3cd7602129c795a75",
-        "repo_short_sha": "b1d21aa0",
+        "repo_sha": "6e4f6886c62df47045545e274e2d673795d241eb",
+        "repo_short_sha": "6e4f6886",
         "scope_version": "agent_red_v1",
         "sources": [
           "groundtruth.db",
@@ -3907,7 +3907,7 @@
         "report-depth-prime-builder-context.md"
       ]
     },
-    "generated_at": "2026-04-28T03:14:42Z",
+    "generated_at": "2026-04-28T04:20:04Z",
     "governance_stance": [
       "Strict GOV enforcement where mechanically available",
       "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
@@ -3923,7 +3923,7 @@
             "count": 12,
             "label": "Commit",
             "latest_result": "recorded",
-            "latest_version": "pre-lfs-filter-2026-04-24-183-gb1d21aa0",
+            "latest_version": "pre-lfs-filter-2026-04-24-197-g6e4f6886",
             "stage": "commit",
             "status": "green"
           },
@@ -4353,8 +4353,8 @@
           },
           {
             "branch": "",
-            "commit": "b1d21aa0",
-            "event": "S316: deletion-readiness manifests + application-isolation foundation",
+            "commit": "6e4f6886",
+            "event": "bridge: Record harness-state-authority-migration thread + INDEX update",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4362,14 +4362,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T19:39:44-07:00",
+            "timestamp": "2026-04-27T21:14:36-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-183-gb1d21aa0"
+            "version": "pre-lfs-filter-2026-04-24-197-g6e4f6886"
           },
           {
             "branch": "",
-            "commit": "e07c756d",
-            "event": "S315 wrap-up: MEMORY.md S315 entry + round 9 audit (GO + NO-GO)",
+            "commit": "4f35650a",
+            "event": "docs: Update operating-role.md + AGENTS.md to reflect canonical authority paths",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4377,14 +4377,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T16:20:36-07:00",
+            "timestamp": "2026-04-27T21:14:18-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-182-ge07c756d"
+            "version": "pre-lfs-filter-2026-04-24-196-g4f35650a"
           },
           {
             "branch": "",
-            "commit": "9a6087bc",
-            "event": "S315 Round 7+8 NO-GOs addressed: 2 REVISED-1 + audit files",
+            "commit": "dd719019",
+            "event": "scripts: Migrate session_self_initialization.py harness-state authority to in-root paths",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4392,14 +4392,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T16:17:38-07:00",
+            "timestamp": "2026-04-27T21:13:49-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-181-g9a6087bc"
+            "version": "pre-lfs-filter-2026-04-24-195-gdd719019"
           },
           {
             "branch": "",
-            "commit": "41558917",
-            "event": "S315 GTKB-DIRECTIVE-ENFORCEMENT-REGISTRY scoping NEW (framework feature)",
+            "commit": "c60ea9e3",
+            "event": "harness-state: Track in-root role records and Codex preferences (closes S317 F5 deferral)",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4407,14 +4407,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T16:09:18-07:00",
+            "timestamp": "2026-04-27T21:12:15-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-180-g41558917"
+            "version": "pre-lfs-filter-2026-04-24-194-gc60ea9e3"
           },
           {
             "branch": "",
-            "commit": "8b491698",
-            "event": "S315 CRITICAL Phase E (app-boundary audit) + Phase F (verification)",
+            "commit": "531151ad",
+            "event": "bridge: Close S317 working-tree-triage thread (VERIFIED)",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4422,14 +4422,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T16:01:46-07:00",
+            "timestamp": "2026-04-27T20:26:44-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-179-g8b491698"
+            "version": "pre-lfs-filter-2026-04-24-193-g531151ad"
           },
           {
             "branch": "",
-            "commit": "ec9d7372",
-            "event": "S315 CRITICAL Phases B+C+D execution evidence",
+            "commit": "69cda42d",
+            "event": "telemetry: S317 session-start regen + DECISION-0044 resolved (auto)",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4437,14 +4437,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T15:59:04-07:00",
+            "timestamp": "2026-04-27T20:21:01-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-178-gec9d7372"
+            "version": "pre-lfs-filter-2026-04-24-192-g69cda42d"
           },
           {
             "branch": "",
-            "commit": "7b66a587",
-            "event": "S315 CRITICAL Phase A: cleanup manifests A+B+C (pre-execution inventory)",
+            "commit": "cfa072f1",
+            "event": "bridge: Record S317 working-tree-triage thread + INDEX update",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4452,14 +4452,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T15:56:15-07:00",
+            "timestamp": "2026-04-27T20:20:43-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-177-g7b66a587"
+            "version": "pre-lfs-filter-2026-04-24-191-gcfa072f1"
           },
           {
             "branch": "",
-            "commit": "dd8eab00",
-            "event": "S315 CRITICAL plan REVISED-2 GO at -005 (5 execution conditions + order)",
+            "commit": "d8c8172d",
+            "event": "docs: S316 wrap-up updates to work_list, Codex bootstrap, and LO log",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4467,14 +4467,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T15:49:40-07:00",
+            "timestamp": "2026-04-27T20:20:23-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-176-gdd8eab00"
+            "version": "pre-lfs-filter-2026-04-24-190-gd8c8172d"
           },
           {
             "branch": "",
-            "commit": "cd249754",
-            "event": "S315 CRITICAL remediation REVISED-2 (-004): owner correction of \u00a73.2 framing",
+            "commit": "c557cfeb",
+            "event": "harness-hooks: Track Codex hook dispatch scripts (S315 carryover)",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4482,14 +4482,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T15:45:42-07:00",
+            "timestamp": "2026-04-27T20:19:46-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-175-gcd249754"
+            "version": "pre-lfs-filter-2026-04-24-189-gc557cfeb"
           },
           {
             "branch": "",
-            "commit": "6bab67a9",
-            "event": "S315 CRITICAL remediation REVISED-1 (-003) addresses Codex -002 NO-GO",
+            "commit": "9adb03b0",
+            "event": "memory: Track auto-memory topic files migrated in S315 (43 files)",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4497,14 +4497,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T15:37:53-07:00",
+            "timestamp": "2026-04-27T20:19:24-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-174-g6bab67a9"
+            "version": "pre-lfs-filter-2026-04-24-188-g9adb03b0"
           },
           {
             "branch": "",
-            "commit": "9453cd7a",
-            "event": "S315 CRITICAL remediation plan: root-isolation mandate compliance",
+            "commit": "605f46ca",
+            "event": "memory: Track auto-memory feedback files migrated in S315 (59 files)",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4512,14 +4512,14 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T15:23:33-07:00",
+            "timestamp": "2026-04-27T20:18:58-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-173-g9453cd7a"
+            "version": "pre-lfs-filter-2026-04-24-187-g605f46ca"
           },
           {
             "branch": "",
-            "commit": "8e28afc1",
-            "event": "S315 GH-CROSS-REPO REVISED-1 GO at -005 (degrade-only approved)",
+            "commit": "786685d4",
+            "event": "scripts: Resolve auto-memory paths from project root",
             "notes": "Remaker Digital",
             "result": "recorded",
             "result_color": "green",
@@ -4527,9 +4527,9 @@
             "stage": "commit",
             "stage_label": "Commit",
             "test_results": "Correlate with workflow rows sharing this commit.",
-            "timestamp": "2026-04-27T15:17:49-07:00",
+            "timestamp": "2026-04-27T20:18:36-07:00",
             "url": "",
-            "version": "pre-lfs-filter-2026-04-24-172-g8e28afc1"
+            "version": "pre-lfs-filter-2026-04-24-186-g786685d4"
           },
           {
             "branch": "develop",
@@ -5796,7 +5796,7 @@
           "latest_run_summary": "7 required main workflow runs checked; health=passing",
           "order": 10,
           "python_tests_workflow": true,
-          "queried_at": "2026-04-28T03:14:47Z",
+          "queried_at": "2026-04-28T04:20:09Z",
           "release_branch": "main",
           "release_candidate_gate_workflow": true,
           "remediation": "Open the latest failing required workflow runs, fix the child gate rows they identify, then rerun the failed workflows from GitHub Actions.",
@@ -7485,20 +7485,19 @@
         "raw_actionable_count": 17,
         "raw_latest_status_counts": {
           "GO": 14,
+          "NEW": 1,
           "NO-GO": 2,
-          "REVISED": 1,
-          "VERIFIED": 49
+          "VERIFIED": 50
         },
         "raw_review_queue_by_status": {
-          "REVISED": 1
+          "NEW": 1
         },
         "raw_review_queue_count": 1,
         "scope_confidence": "agent_red_current_heuristic",
         "scope_counts": {
           "agent_red_release": 1,
-          "gtkb_framework": 61,
-          "gtkb_upstream": 3,
-          "unknown": 1
+          "gtkb_framework": 63,
+          "gtkb_upstream": 3
         },
         "source": "bridge/INDEX.md",
         "source_authority": "live bridge/INDEX.md is the sole authoritative bridge queue source",
@@ -7527,7 +7526,7 @@
         "available": true,
         "changed_path_count": 0,
         "deleted_path_count": 0,
-        "raw_changed_path_count": 93,
+        "raw_changed_path_count": 10,
         "scope_confidence": "agent_red_current_heuristic",
         "untracked_path_count": 0
       },
@@ -7624,8 +7623,8 @@
       "assumed_role": "Prime Builder",
       "bridge": "always available through bridge/INDEX.md and checked at session startup",
       "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
-      "role_assignment": "active AI harness assigned by owner through durable operating-role record",
-      "role_mapping_source": ".claude/rules/operating-role.md"
+      "role_assignment": "active AI harness assigned by owner through durable harness-local operating-role record",
+      "role_mapping_source": "applications/Agent_Red/harness-state/claude/operating-role.md"
     },
     "role_profile": "prime-builder",
     "session_overlay": {
@@ -7685,6 +7684,83 @@
         "spec-intake"
       ],
       "source": "project .claude/skills plus local harness skill directories"
+    },
+    "startup_pruning": {
+      "candidate_count": 2,
+      "candidates": [
+        {
+          "action": "Review for summarization, archival split, or index-first loading.",
+          "evidence": {
+            "bytes": 138987,
+            "lines": 3601
+          },
+          "target": "memory/gtkb-dashboard-history.json",
+          "type": "candidate"
+        },
+        {
+          "action": "Reduce default startup reads to compact indices plus targeted detail files.",
+          "evidence": {
+            "file_count": 16,
+            "total_bytes": 278867
+          },
+          "target": "session startup corpus",
+          "type": "candidate"
+        }
+      ],
+      "completed_count": 0,
+      "file_count": 16,
+      "largest_files": [
+        {
+          "available": true,
+          "bytes": 138987,
+          "lines": 3601,
+          "path": "memory/gtkb-dashboard-history.json"
+        },
+        {
+          "available": true,
+          "bytes": 40908,
+          "lines": 809,
+          "path": "bridge/INDEX.md"
+        },
+        {
+          "available": true,
+          "bytes": 19977,
+          "lines": 309,
+          "path": "CLAUDE.md"
+        },
+        {
+          "available": true,
+          "bytes": 18060,
+          "lines": 144,
+          "path": "independent-progress-assessments/LOYAL-OPPOSITION-LOG.md"
+        },
+        {
+          "available": true,
+          "bytes": 16390,
+          "lines": 241,
+          "path": "AGENTS.md"
+        },
+        {
+          "available": true,
+          "bytes": 8881,
+          "lines": 164,
+          "path": "independent-progress-assessments/CODEX-WAY-OF-WORKING.md"
+        },
+        {
+          "available": true,
+          "bytes": 7195,
+          "lines": 145,
+          "path": "independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md"
+        },
+        {
+          "available": true,
+          "bytes": 5277,
+          "lines": 75,
+          "path": "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-27-19-37.md"
+        }
+      ],
+      "scope": "startup_loaded_files_and_coordination_state",
+      "total_bytes": 278867
     },
     "token_reduction_options": [
       "Use the dashboard link before loading large artifacts into context.",
