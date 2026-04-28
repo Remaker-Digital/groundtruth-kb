@@ -12,6 +12,7 @@ NEW: bridge/role-contract-clarifications-2026-04-28-001.md
 
 
 Document: session-hygiene-gitignore-extensions-2026-04-28
+NEW: bridge/session-hygiene-gitignore-extensions-2026-04-28-003.md
 GO: bridge/session-hygiene-gitignore-extensions-2026-04-28-002.md
 NEW: bridge/session-hygiene-gitignore-extensions-2026-04-28-001.md
 

@@ -367,12 +367,15 @@ memory/grafana/
 # =============================================================================
 # Dashboard auto-regen telemetry — high-churn snapshots
 # =============================================================================
-# Per bridge/gtkb-telemetry-churn-policy-2026-04-28-002.md (GO): these two
-# files regenerate via SessionStart hook with timestamps + snapshot content,
-# producing ~5980 lines of diff churn per session. Reproducible from
-# scripts/session_self_initialization.py at session boundary.
+# Per bridge/gtkb-telemetry-churn-policy-2026-04-28-002.md (GO) and
+# bridge/session-hygiene-gitignore-extensions-2026-04-28-002.md (GO): these
+# four files regenerate via SessionStart/Stop hooks with timestamps + snapshot
+# content. Reproducible from scripts/session_self_initialization.py
+# `write_dashboard_and_report(...)` at session boundary; tracking creates noise.
 docs/gtkb-dashboard/dashboard-data.json
 memory/gtkb-dashboard-history.json
+docs/gtkb-dashboard/session-startup-report.md
+docs/gtkb-dashboard/session-wrapup-report.md
 
 # =============================================================================
 # Drive-sync staging directory (added 2026-04-27 S317 working-tree triage)
@@ -398,3 +401,25 @@ memory/gtkb-dashboard-history.json
 # the in-root paths become canonical and may be tracked.
 .codex/agent-red-hooks/session-lifecycle-guard.json
 applications/Agent_Red/harness-state/*/session-lifecycle-guard.json
+
+# =============================================================================
+# Hardlink aliases of canonical harness-state files (added 2026-04-28 S319)
+# =============================================================================
+# Per bridge/session-hygiene-gitignore-extensions-2026-04-28-002.md (GO):
+# These .codex/agent-red-hooks/ paths are hardlink aliases of canonical-home
+# tracked files at applications/Agent_Red/harness-state/codex/. Tracking both
+# would create dual-canonical confusion. The canonical home is tracked; the
+# aliases are silently ignored. Distinct from runtime breadcrumbs (above) and
+# mutable lifecycle-guard JSONs (above) — these are stable static content.
+.codex/agent-red-hooks/operating-role.md
+.codex/agent-red-hooks/session-startup-preferences.json
+
+# =============================================================================
+# MEMORY.md trim backups (added 2026-04-28 S319)
+# =============================================================================
+# Per bridge/session-hygiene-gitignore-extensions-2026-04-28-002.md (GO) and
+# bridge/gtkb-startup-enhancements-p1-006.md (S309 P1 origin): one-time
+# point-in-time backups before MEMORY.md trim operations. Pre-trim state
+# is already preserved in git history at the commit before the trim;
+# tracking the backup file is redundant and creates noise on future trims.
+memory/MEMORY.md.backup-*
