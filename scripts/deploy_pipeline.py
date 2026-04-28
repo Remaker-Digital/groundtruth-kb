@@ -35,7 +35,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 # NOTE: UTF-8 stdout/stderr wrapping for Windows is performed inside the
@@ -53,7 +53,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
 
-from scripts.deploy_config import ENVIRONMENTS, TENANTS  # noqa: E402
+from scripts.deploy_config import ENVIRONMENTS  # noqa: E402
 from upgrade_verification import api_call  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ def _write_log_file(env: str) -> Path:
 # ---------------------------------------------------------------------------
 # Subprocess helpers — real-time streaming (SPEC-1619)
 # ---------------------------------------------------------------------------
-from scripts._subprocess_stream import stream_subprocess as _stream
+from scripts._subprocess_stream import stream_subprocess as _stream  # noqa: E402
 
 
 def _run(cmd: list[str], cwd: str | Path | None = None,
@@ -484,7 +484,7 @@ def phase_7_acr_build(args: argparse.Namespace, build_context: str) -> PhaseResu
     version = args.version
     log("INFO", f"  Building {IMAGE_REPO}:{version} on ACR (--no-logs)...")
 
-    r = _run([
+    _run([
         "az", "acr", "build",
         "--registry", ACR_NAME,
         "--image", f"{IMAGE_REPO}:{version}",
@@ -636,7 +636,6 @@ def phase_10_startup_and_version(args: argparse.Namespace) -> PhaseResult:
     log("INFO", f"  Waiting up to {HEALTH_WAIT_SECONDS}s for /health (version={expected_version})...")
     elapsed = 0
     last_status = 0
-    last_version = "?"
 
     while elapsed < HEALTH_WAIT_SECONDS:
         time.sleep(HEALTH_POLL_INTERVAL)
@@ -645,7 +644,6 @@ def phase_10_startup_and_version(args: argparse.Namespace) -> PhaseResult:
         last_status = status
         if status == 200 and isinstance(body, dict):
             actual_version = body.get("product_version", "?")
-            last_version = actual_version
             if actual_version == expected_version:
                 log("PASS", f"  /health 200, product_version={actual_version} (matched after {elapsed}s)")
                 # Track 1 (GTKB-DORA-001b): record deployed_at + phase timing on success.
@@ -1452,7 +1450,7 @@ def main() -> int:
     except Exception:
         pass
 
-    log("INFO", f"  Pipeline metadata:")
+    log("INFO", "  Pipeline metadata:")
     log("INFO", f"    repo_commit:     {repo_sha}")
     log("INFO", f"    repo_root:       {PROJECT_ROOT}")
     log("INFO", f"    version_tag:     {args.version}")
