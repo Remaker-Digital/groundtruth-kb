@@ -112,7 +112,6 @@ def test_phase_8_target_update_succeeded_false_when_az_returncode_nonzero() -> N
 def test_phase_8_target_update_succeeded_downgraded_on_image_mismatch() -> None:
     """T5: az update succeeds but verify-image returns different image → False."""
     args = _build_args()
-    expected = f"{deploy_pipeline.ACR_LOGIN_SERVER}/{deploy_pipeline.IMAGE_REPO}:v1.99.0"
     actual = f"{deploy_pipeline.ACR_LOGIN_SERVER}/{deploy_pipeline.IMAGE_REPO}:v1.98.92"
     with patch.object(deploy_pipeline, "_run") as mock_run:
         mock_run.side_effect = [

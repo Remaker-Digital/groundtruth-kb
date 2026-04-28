@@ -401,6 +401,8 @@ NEW: bridge/gtkb-isolation-016-phase8-wave2-implementation-001.md
 
 
 Document: gtkb-dora-001b-track1-implementation
+REVISED: bridge/gtkb-dora-001b-track1-implementation-009.md
+NO-GO: bridge/gtkb-dora-001b-track1-implementation-008.md
 NEW: bridge/gtkb-dora-001b-track1-implementation-007.md
 GO: bridge/gtkb-dora-001b-track1-implementation-006.md
 REVISED: bridge/gtkb-dora-001b-track1-implementation-005.md
