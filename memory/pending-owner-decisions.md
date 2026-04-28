@@ -6,104 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0029
-  asked_at: 2026-04-26T19:35:00.271540Z
-  question: "s green throughout. Standing by for owner decision on poller v1 scope"
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 61e91be58bdc2678
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0030
-  asked_at: 2026-04-27T00:28:51.000753Z
-  question: "ap if you'd prefer. Standing by for direction. `─────────────────"
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: b10806190aa5e6a3
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0031
-  asked_at: 2026-04-27T01:11:44.187119Z
-  question: "total in S311) ```  Standing by for Codex VERIFIED on Slice 3 -005, or for your direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 3bde1f936473aca8
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0032
-  asked_at: 2026-04-27T01:21:52.614673Z
-  question: "re ready. Otherwise standing by for next direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: a9209bc27fd2a2ae
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0033
-  asked_at: 2026-04-27T01:24:31.046057Z
-  question: "ant to address it.  Standing by for `/kb-session-wrap S311` or other direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 675e6ee971a3ef76
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0034
-  asked_at: 2026-04-27T01:28:40.561671Z
-  question: "5 (handoff) remain. Want me to skip the harvest and continue, or construct the approval packet?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 8a238611d3a8e62b
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0035
-  asked_at: 2026-04-27T01:40:52.091559Z
-  question: "tart stimulus only. Awaiting your direction (focus choice from"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: 58662ebc32207825
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0036
-  asked_at: 2026-04-27T03:49:12.435752Z
-  question: "──────────────`  ## Standing By for Insertion Approval  Per `.claude/rules"
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 302c6541b50390f2
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0037
-  asked_at: 2026-04-27T04:29:22.544912Z
-  question: "──────────────`  ## Standing By for Approval  **Approve insertio"
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 98750599ecd09cd6
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0038
-  asked_at: 2026-04-27T06:42:35.876853Z
-  question: "e resuming Wave 2.  Standing by for direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: c1d89c2c4e056ced
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0039
-  asked_at: 2026-04-27T06:51:22.853708Z
-  question: "d like to surface.  Standing by for direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 3c287c647e426cbe
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0040
-  asked_at: 2026-04-27T08:37:18.827636Z
-  question: "─────────────────`  Standing by for direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 20c3584dccf20edd
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0042
-  asked_at: 2026-04-27T15:24:04.713902Z
-  question: "prised me before  **Standing by for whatever's next** — another bridge scan when you have direction, or a different pri"
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 907710153e53864f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0043
-  asked_at: 2026-04-27T18:29:58.141516Z
-  question: "no implementation.  Standing by for direction or session wrap."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 4373a198ddd92d82
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -456,6 +359,210 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-04-27T14:47:52.141335Z
   answer: "User has answered your questions: \"Approve Phase 2 hibernation execution against subscription 4dce2122 / Agent-Red RG?\"=\"Execute 2.1 + 2.2 (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0046
+  asked_at: 2026-04-28T02:51:12.397457Z
+  question: "Which priority should lead this session? (Top-3 surfaced from work_list, bridge state, and uncommitted-tree triage; per session-self-initialization principle DELIB-0840.)"
+  options:
+    - "Commit untracked feedback/* + triage drift (Recommended)"
+    - "Resume isolation chain: file row 18 GH-CROSS-REPO impl"
+    - "Bulk-resolve the 12 pending-decision FPs"
+    - "Different direction — I will specify"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 638b7beb5770a96c
+  resolved_at: 2026-04-28T02:51:12.397457Z
+  answer: "User has answered your questions: \"Which priority should lead this session? (Top-3 surfaced from work_list, bridge state, and uncommitted-tree triage; per session-self-initialization principle DELIB-0840.)\"=\"Commit untracked feedback/* + triage drift (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0048
+  asked_at: 2026-04-28T02:57:56.927026Z
+  question: "How would you like to handle the 17 pending owner decisions while we wait for Codex review on the working-tree-triage bridge proposal?"
+  options:
+    - "Bulk-clear FPs + I confirm DECISION-0044 (Recommended)"
+    - "Trigger Codex bridge review now"
+    - "Leave the queue; pick a different task"
+    - "Resolve DECISION-0044 only; leave FPs for batch cleanup later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dc5b4ed393bf6705
+  resolved_at: 2026-04-28T02:57:56.927026Z
+  answer: "User has answered your questions: \"How would you like to handle the 17 pending owner decisions while we wait for Codex review on the working-tree-triage bridge proposal?\"=\"Bulk-clear FPs + I confirm DECISION-0044 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0049
+  asked_at: 2026-04-28T02:57:56.927026Z
+  question: "Confirm the DECISION-0044 resolution. The S316 implementation chose option (a) empty/minimal placeholders, structurally enforced by Codex GO condition 2 (no GT-KB platform content imported). Does that match your intent?"
+  options:
+    - "Confirm (a) — record as resolved (Recommended)"
+    - "Reverse to (b) — import filtered GT-KB starter selection"
+    - "Hybrid — keep (a) for now, plan a curated starter for later"
+    - "Different framing entirely — I will explain"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0d626e7983e08d1b
+  resolved_at: 2026-04-28T02:57:56.927026Z
+  answer: "User has answered your questions: \"Confirm the DECISION-0044 resolution. The S316 implementation chose option (a) empty/minimal placeholders, structurally enforced by Codex GO condition 2 (no GT-KB platform content imported). Does that match your intent?\"=\"Confirm (a) — record as resolved (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0044
+  asked_at: 2026-04-27T23:52:20.367859Z
+  question: "de/` and `.codex/`, should I (a) start with empty/minimal directories and let you populate the agent/skill/plugin selections, or (b) propose a starter selection drawn from the GT-KB-level configs filtered to app-relevant items?  I'll wait on these"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 2eb91454e4a8c959
+  resolved_at: 2026-04-28T02:58:26.706391Z
+  answer: "option (a) chosen during S316 sub-slice 1 per Codex GO condition 2 (minimization principle); starter selection (b) structurally rejected by DCL-APP-ROOT-MINIMIZATION-001."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0029
+  asked_at: 2026-04-26T19:35:00.271540Z
+  question: "s green throughout. Standing by for owner decision on poller v1 scope"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 61e91be58bdc2678
+  resolved_at: 2026-04-28T02:58:42.574199Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0030
+  asked_at: 2026-04-27T00:28:51.000753Z
+  question: "ap if you'd prefer. Standing by for direction. `─────────────────"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: b10806190aa5e6a3
+  resolved_at: 2026-04-28T02:58:42.574216Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0031
+  asked_at: 2026-04-27T01:11:44.187119Z
+  question: "total in S311) ```  Standing by for Codex VERIFIED on Slice 3 -005, or for your direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 3bde1f936473aca8
+  resolved_at: 2026-04-28T02:58:42.574219Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0032
+  asked_at: 2026-04-27T01:21:52.614673Z
+  question: "re ready. Otherwise standing by for next direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: a9209bc27fd2a2ae
+  resolved_at: 2026-04-28T02:58:42.574221Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0033
+  asked_at: 2026-04-27T01:24:31.046057Z
+  question: "ant to address it.  Standing by for `/kb-session-wrap S311` or other direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 675e6ee971a3ef76
+  resolved_at: 2026-04-28T02:58:42.574223Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0034
+  asked_at: 2026-04-27T01:28:40.561671Z
+  question: "5 (handoff) remain. Want me to skip the harvest and continue, or construct the approval packet?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 8a238611d3a8e62b
+  resolved_at: 2026-04-28T02:58:42.574224Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0035
+  asked_at: 2026-04-27T01:40:52.091559Z
+  question: "tart stimulus only. Awaiting your direction (focus choice from"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 58662ebc32207825
+  resolved_at: 2026-04-28T02:58:42.574226Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0036
+  asked_at: 2026-04-27T03:49:12.435752Z
+  question: "──────────────`  ## Standing By for Insertion Approval  Per `.claude/rules"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 302c6541b50390f2
+  resolved_at: 2026-04-28T02:58:42.574227Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0037
+  asked_at: 2026-04-27T04:29:22.544912Z
+  question: "──────────────`  ## Standing By for Approval  **Approve insertio"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 98750599ecd09cd6
+  resolved_at: 2026-04-28T02:58:42.574229Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0038
+  asked_at: 2026-04-27T06:42:35.876853Z
+  question: "e resuming Wave 2.  Standing by for direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: c1d89c2c4e056ced
+  resolved_at: 2026-04-28T02:58:42.574231Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0039
+  asked_at: 2026-04-27T06:51:22.853708Z
+  question: "d like to surface.  Standing by for direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 3c287c647e426cbe
+  resolved_at: 2026-04-28T02:58:42.574233Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0040
+  asked_at: 2026-04-27T08:37:18.827636Z
+  question: "─────────────────`  Standing by for direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 20c3584dccf20edd
+  resolved_at: 2026-04-28T02:58:42.574234Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0042
+  asked_at: 2026-04-27T15:24:04.713902Z
+  question: "prised me before  **Standing by for whatever's next** — another bridge scan when you have direction, or a different pri"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 907710153e53864f
+  resolved_at: 2026-04-28T02:58:42.574236Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0043
+  asked_at: 2026-04-27T18:29:58.141516Z
+  question: "no implementation.  Standing by for direction or session wrap."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 4373a198ddd92d82
+  resolved_at: 2026-04-28T02:58:42.574237Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0045
+  asked_at: 2026-04-28T02:15:37.359759Z
+  question: "store integrity  **Standing by for your direction.** The deletion-saf"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: eb3eba454aa1d1de
+  resolved_at: 2026-04-28T02:58:42.574239Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0047
+  asked_at: 2026-04-28T02:51:12.397457Z
+  question: "age fragments like \"standing by for direction\" — and previously-resolved DECISION-0008/0009/0011/0013 showed each FP's resolution-text became input to the next FP. Thi"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 50a6bf31ae4f8f32
+  resolved_at: 2026-04-28T02:58:42.574240Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0050
+  asked_at: 2026-04-28T02:57:56.927026Z
+  question: "e FP class to you (\"standing by for direction\" was a quoted examp"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 392e3762d1d0dcfe
+  resolved_at: 2026-04-28T02:58:42.574242Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 

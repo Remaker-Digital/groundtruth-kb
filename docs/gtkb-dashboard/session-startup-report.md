@@ -1,6 +1,6 @@
 # Agent Red / GT-KB Fresh Session Startup
 
-Generated: 2026-04-27T18:38:45Z
+Generated: 2026-04-28T03:14:42Z
 
 ## Startup Disclosure
 
@@ -34,10 +34,10 @@ Generated: 2026-04-27T18:38:45Z
 - Application open MemBase work items: 51
 - Application dashboard-scoped bridge/contention entries, non-authoritative for queue state: 0
 - Application drift changed paths: 0
-- Application Testing/tool rollup: 6 failing, 6 manual, 16 ready/passing
+- Application Testing/tool rollup: 8 failing, 6 manual, 16 ready/passing
 - Bridge role slot: `shared` (prime-builder, loyal-opposition, or shared)
 - Harness topology: `single_harness` (single_harness or multi_harness)
-- GT-KB infrastructure posture: package 0.6.1; dry-run upgrade plan available: True
+- GT-KB infrastructure posture: package None; dry-run upgrade plan available: False
 
 ### Active Work Subject
 
@@ -55,25 +55,6 @@ Generated: 2026-04-27T18:38:45Z
 - Live bridge authority: `bridge/INDEX.md` is the canonical handoff/review record; poller status, scan-freshness files, and startup snapshots are non-canonical.
 - No session overlay active; startup context from live files.
 - Counterpart harness detected; no role or subject conflicts.
-
-### Pending Owner Decisions
-
-14 owner decision(s) await a response. Address one by quoting its DECISION-NNNN ID, type `resolve DECISION-NNNN: <answer>` to record an answer, `defer all` to acknowledge without resolving, or `clear pending` to dismiss intentionally.
-
-- **DECISION-0029**: s green throughout. Standing by for owner decision on poller v1 scope (asked 2026-04-26T19:35:00.271540Z)
-- **DECISION-0030**: ap if you'd prefer. Standing by for direction. `───────────────── (asked 2026-04-27T00:28:51.000753Z)
-- **DECISION-0031**: total in S311) ```  Standing by for Codex VERIFIED on Slice 3 -005, or for your direction. (asked 2026-04-27T01:11:44.187119Z)
-- **DECISION-0032**: re ready. Otherwise standing by for next direction. (asked 2026-04-27T01:21:52.614673Z)
-- **DECISION-0033**: ant to address it.  Standing by for `/kb-session-wrap S311` or other direction. (asked 2026-04-27T01:24:31.046057Z)
-- **DECISION-0034**: 5 (handoff) remain. Want me to skip the harvest and continue, or construct the approval packet? (asked 2026-04-27T01:28:40.561671Z)
-- **DECISION-0035**: tart stimulus only. Awaiting your direction (focus choice from (asked 2026-04-27T01:40:52.091559Z)
-- **DECISION-0036**: ──────────────`  ## Standing By for Insertion Approval  Per `.claude/rules (asked 2026-04-27T03:49:12.435752Z)
-- **DECISION-0037**: ──────────────`  ## Standing By for Approval  **Approve insertio (asked 2026-04-27T04:29:22.544912Z)
-- **DECISION-0038**: e resuming Wave 2.  Standing by for direction. (asked 2026-04-27T06:42:35.876853Z)
-- **DECISION-0039**: d like to surface.  Standing by for direction. (asked 2026-04-27T06:51:22.853708Z)
-- **DECISION-0040**: ─────────────────`  Standing by for direction. (asked 2026-04-27T08:37:18.827636Z)
-- **DECISION-0042**: prised me before  **Standing by for whatever's next** — another bridge scan when you have direction, or a different pri (asked 2026-04-27T15:24:04.713902Z)
-- **DECISION-0043**: no implementation.  Standing by for direction or session wrap. (asked 2026-04-27T18:29:58.141516Z)
 
 ### Session Overlay Status (Non-Authoritative)
 
@@ -110,11 +91,11 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Focus this session on clearing release blockers. Start with run the release gate and confirm no blocker evidence is stale. Verify the result with scripts/release_candidate_gate.py and update governed evidence.
 
 4. **Repair Testing/Tool Integrations**
-   Current signal: 6 failing and 2 unknown integration(s) are visible.
-   Prompt details: Focus this session on restoring testing service/tool integration health. Start with Release Candidate Gate: Run the release candidate gate locally, fix the first failing release blocker or frontend gate, then rerun the Release Candidate Gate workflow. Preserve GT-KB as infrastructure evidence.
+   Current signal: 8 failing and 2 unknown integration(s) are visible.
+   Prompt details: Focus this session on restoring testing service/tool integration health. Start with Pytest Coverage: Inspect the pytest shard and merged coverage artifacts, reproduce the failing shard locally, then restore the configured coverage threshold before rerunning Python Tests. Preserve GT-KB as infrastructure evidence.
 
 5. **Remediate Known Risks**
-   Current signal: 2 active risk(s) are summarized from release, integration, GT-KB, and drift signals.
+   Current signal: 1 active risk(s) are summarized from release, integration, GT-KB, and drift signals.
    Prompt details: Focus this session on the dashboard risk register. Start with Automated quality gates are failing; recommended action: Work through the failing integration remediation list.
 
 6. **Clear Stage/Test Release Path**
@@ -146,7 +127,7 @@ Reply with the number or exact label. Each option is generated from the current 
    Prompt details: Promote the staged-and-tested build to production, then run production smoke tests. Confirm explicit production approval, artifact provenance, deployment status, smoke-test evidence, rollback readiness, and release records.
 
 13. **Continue Last Session**
-   Current signal: The action center and 9 latest GO/NO-GO bridge responses define the current-session continuation scope.
-   Prompt details: Continue from the last session using the dashboard action center and any latest GO/NO-GO bridge responses, including responses produced by a prior Loyal Opposition session. Start by inventorying the latest GO/NO-GO bridge entries, then continue with Repair Release Candidate Gate; explain current evidence, next command, and expected verification.
+   Current signal: The action center and 16 latest GO/NO-GO bridge responses define the current-session continuation scope.
+   Prompt details: Continue from the last session using the dashboard action center and any latest GO/NO-GO bridge responses, including responses produced by a prior Loyal Opposition session. Start by inventorying the latest GO/NO-GO bridge entries, then continue with Repair Pytest Coverage; explain current evidence, next command, and expected verification.
 
 Or provide a prompt for something else.
