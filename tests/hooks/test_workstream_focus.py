@@ -789,6 +789,90 @@ def test_assert_readiness_subject_scope_permits_dual_scope_declaration() -> None
     )
 
 
+def test_harness_state_records_for_project_returns_sandbox_relative_paths(tmp_path) -> None:
+    """Per bridge/harness-state-preferences-path-cli-2026-04-28-005.md class-level fix.
+
+    The helper builds harness role-record and lifecycle-guard dicts rooted at
+    the passed project_root, mirroring the module-level canonical-bound
+    constants but parameterized for sandbox-aware execution.
+    """
+    module = _load_module()
+    sandbox = tmp_path / "sandbox"
+    role_records, lifecycle_guards = module._harness_state_records_for_project(sandbox)
+
+    assert role_records["codex"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "codex" / "operating-role.md"
+    assert role_records["claude"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "claude" / "operating-role.md"
+    assert lifecycle_guards["codex"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "codex" / "session-lifecycle-guard.json"
+    assert lifecycle_guards["claude"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "claude" / "session-lifecycle-guard.json"
+
+    # Helper paths must NOT match the canonical module-level constants when a
+    # different project_root is supplied (the whole point of the class-level
+    # fix).
+    assert role_records["codex"] != module.HARNESS_ROLE_RECORDS["codex"]
+    assert lifecycle_guards["codex"] != module.HARNESS_LIFECYCLE_GUARDS["codex"]
+
+
+def test_detect_counterpart_state_uses_project_root_paths_when_provided(tmp_path, monkeypatch) -> None:
+    """Per bridge/harness-state-preferences-path-cli-2026-04-28-005.md class-level fix.
+
+    When detect_counterpart_state is called with a sandbox project_root, it
+    must NOT iterate the canonical module-level HARNESS_ROLE_RECORDS or
+    HARNESS_LIFECYCLE_GUARDS dictionaries. Monkeypatch
+    _read_active_role_from_file to record every path it is asked to read;
+    all recorded paths must be sandbox-relative.
+    """
+    module = _load_module()
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    recorded_paths: list[Path] = []
+
+    def _fake_read(path: Path) -> str | None:
+        recorded_paths.append(path)
+        return None
+
+    monkeypatch.setattr(module, "_read_active_role_from_file", _fake_read)
+    monkeypatch.setattr(module, "_read_counterpart_subject", lambda _path: None)
+
+    module.detect_counterpart_state(sandbox)
+
+    assert recorded_paths, "expected detect_counterpart_state to call _read_active_role_from_file"
+    canonical_root = module.PROJECT_ROOT
+    for path in recorded_paths:
+        assert sandbox in path.parents, (
+            f"role record path {path!r} should be under sandbox {sandbox!r} "
+            "but is not — class-level fix regressed"
+        )
+        assert canonical_root not in path.parents, (
+            f"role record path {path!r} should NOT be under canonical "
+            f"PROJECT_ROOT {canonical_root!r} — class-level fix regressed"
+        )
+
+
+def test_detect_counterpart_state_falls_back_to_canonical_when_project_root_omitted(tmp_path, monkeypatch) -> None:
+    """Back-compat guarantee: detect_counterpart_state() without project_root must
+    still iterate the canonical module-level HARNESS_ROLE_RECORDS dict, preserving
+    production behavior where this module is imported from the canonical project root.
+    """
+    module = _load_module()
+    recorded_paths: list[Path] = []
+
+    def _fake_read(path: Path) -> str | None:
+        recorded_paths.append(path)
+        return None
+
+    monkeypatch.setattr(module, "_read_active_role_from_file", _fake_read)
+    monkeypatch.setattr(module, "_read_counterpart_subject", lambda _path: None)
+
+    module.detect_counterpart_state()  # no project_root arg
+
+    assert recorded_paths, "expected detect_counterpart_state to call _read_active_role_from_file"
+    canonical_paths_seen = {module.HARNESS_ROLE_RECORDS["codex"], module.HARNESS_ROLE_RECORDS["claude"]}
+    assert set(recorded_paths) == canonical_paths_seen, (
+        f"back-compat path: when project_root omitted, must iterate canonical "
+        f"HARNESS_ROLE_RECORDS; got {recorded_paths!r}"
+    )
+
+
 def test_assert_readiness_subject_scope_permits_single_green() -> None:
     module = _load_module()
     module.assert_readiness_subject_scope(

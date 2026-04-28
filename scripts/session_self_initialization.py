@@ -3563,6 +3563,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "### Active Work Subject",
             "",
             render_active_work_subject(
+                project_root,
                 snapshot=model.get("workstream_focus"),
                 overlay_status=model.get("session_overlay") or {},
                 include_counterpart=True,

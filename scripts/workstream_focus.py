@@ -775,24 +775,64 @@ def _read_counterpart_subject(path: Path) -> str | None:
     return subject if isinstance(subject, str) and subject else None
 
 
+def _harness_state_records_for_project(
+    project_root: Path,
+) -> tuple[dict[str, Path], dict[str, Path]]:
+    """Build harness role-record and lifecycle-guard path dicts rooted at project_root.
+
+    Mirrors the module-level ``HARNESS_ROLE_RECORDS`` and
+    ``HARNESS_LIFECYCLE_GUARDS`` constants but builds them from a passed
+    ``project_root`` rather than from this module's ``PROJECT_ROOT`` (which
+    is computed from ``__file__`` at import time and resolves to the legacy
+    root when this module is imported from there — e.g., during the Slice 11
+    rehearsal lane subprocess).
+
+    Per bridge/harness-state-preferences-path-cli-2026-04-28-004.md Codex
+    NO-GO Required Revision Option 1 (preferred): fix at the class boundary
+    so ``detect_counterpart_state`` does not iterate canonical-bound
+    module-level dictionaries when called with a sandbox project_root.
+    """
+    state_root = project_root / "applications" / "Agent_Red" / "harness-state"
+    role_records: dict[str, Path] = {
+        "codex": state_root / "codex" / "operating-role.md",
+        "claude": state_root / "claude" / "operating-role.md",
+    }
+    lifecycle_guards: dict[str, Path] = {
+        "codex": state_root / "codex" / "session-lifecycle-guard.json",
+        "claude": state_root / "claude" / "session-lifecycle-guard.json",
+    }
+    return role_records, lifecycle_guards
+
+
 def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]:
     """Detect role-slot and subject conflicts with the counterpart harness (§E).
 
     Returns ``{"counterpart_present", "same_role_slot", "subject_mismatch",
     "warnings"}``. Warnings are only emitted when counterpart state files are
     present; missing files yield no warnings and no crash.
+
+    When ``project_root`` is provided, harness-state record/guard paths are
+    resolved relative to that root (sandbox-aware execution). When omitted,
+    falls back to the canonical module-level constants (production default
+    where this module is imported from the canonical project root).
     """
+
+    if project_root is not None:
+        role_records, lifecycle_guards = _harness_state_records_for_project(project_root)
+    else:
+        role_records = HARNESS_ROLE_RECORDS
+        lifecycle_guards = HARNESS_LIFECYCLE_GUARDS
 
     current_harness = _resolved_harness_name()
     per_harness_roles: dict[str, str] = {}
-    for harness, record_path in HARNESS_ROLE_RECORDS.items():
+    for harness, record_path in role_records.items():
         role = _read_active_role_from_file(record_path)
         if role:
             per_harness_roles[harness] = role
 
     counterpart_present = any(
         harness != current_harness and harness in per_harness_roles
-        for harness in HARNESS_ROLE_RECORDS
+        for harness in role_records
     )
 
     warnings: list[str] = []
@@ -824,7 +864,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
     # hadn't yet been extended).
     subject_mismatch = False
     our_subject: str | None = None
-    our_guard_path = HARNESS_LIFECYCLE_GUARDS.get(current_harness) if current_harness else None
+    our_guard_path = lifecycle_guards.get(current_harness) if current_harness else None
     if our_guard_path is not None:
         our_subject = _read_counterpart_subject(our_guard_path)
     if our_subject is None:
@@ -832,7 +872,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
             our_subject = str(load_state(project_root).get("current_subject") or "") or None
         except Exception:
             our_subject = None
-    for harness, guard_path in HARNESS_LIFECYCLE_GUARDS.items():
+    for harness, guard_path in lifecycle_guards.items():
         if harness == current_harness:
             continue
         counterpart_subject = _read_counterpart_subject(guard_path)
