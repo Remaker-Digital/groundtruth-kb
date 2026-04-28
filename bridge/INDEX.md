@@ -200,6 +200,7 @@ NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
 
 
 Document: generator-hardening-001
+REVISED: bridge/generator-hardening-001-009.md
 NO-GO: bridge/generator-hardening-001-008.md
 REVISED: bridge/generator-hardening-001-007.md
 NO-GO: bridge/generator-hardening-001-006.md
