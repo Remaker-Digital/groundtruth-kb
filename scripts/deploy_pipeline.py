@@ -38,10 +38,12 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Force UTF-8 stdout on Windows to avoid cp1252 encoding crashes
-if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+# NOTE: UTF-8 stdout/stderr wrapping for Windows is performed inside the
+# `if __name__ == "__main__":` guard at end of file. Doing it at module-import
+# time breaks pytest's stdout/stderr capture for any test that imports this
+# module (per bridge/gtkb-dora-001b-track1-implementation-010.md). The wrap
+# is only needed when this script is invoked directly, not when imported as
+# a library by tests.
 
 # ---------------------------------------------------------------------------
 # Project paths
@@ -1664,4 +1666,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Force UTF-8 stdout/stderr on Windows to avoid cp1252 encoding crashes.
+    # Performed here (not at module-import time) so pytest stdout/stderr
+    # capture is not broken when tests import this module.
+    if sys.platform == "win32":
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
     sys.exit(main())
