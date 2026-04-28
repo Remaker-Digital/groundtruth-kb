@@ -365,6 +365,16 @@ memory/gtkb-dashboard.sqlite-wal
 memory/grafana/
 
 # =============================================================================
+# Dashboard auto-regen telemetry — high-churn snapshots
+# =============================================================================
+# Per bridge/gtkb-telemetry-churn-policy-2026-04-28-002.md (GO): these two
+# files regenerate via SessionStart hook with timestamps + snapshot content,
+# producing ~5980 lines of diff churn per session. Reproducible from
+# scripts/session_self_initialization.py at session boundary.
+docs/gtkb-dashboard/dashboard-data.json
+memory/gtkb-dashboard-history.json
+
+# =============================================================================
 # Drive-sync staging directory (added 2026-04-27 S317 working-tree triage)
 # =============================================================================
 # .tmp.driveupload/ is a Drive-sync staging directory (~3.6 GB observed S317).

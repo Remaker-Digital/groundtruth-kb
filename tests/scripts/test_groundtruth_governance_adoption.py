@@ -124,10 +124,8 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         "scripts/session_self_initialization.py",
         "scripts/workstream_focus.py",
         "docs/gtkb-dashboard/index.html",
-        "docs/gtkb-dashboard/dashboard-data.json",
         "docs/gtkb-dashboard/session-startup-report.md",
         "docs/gtkb-dashboard/session-wrapup-report.md",
-        "memory/gtkb-dashboard-history.json",
         "scripts/audit_standing_backlog_sources.py",
         "tests/scripts/test_codex_hook_parity.py",
         "tests/scripts/test_session_self_initialization.py",
@@ -136,7 +134,19 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md",
     ]
 
+    # Per bridge/gtkb-telemetry-churn-policy-2026-04-28-002.md (GO): these 2
+    # auto-regen telemetry files are intentionally gitignored (high diff churn,
+    # reproducible by SessionStart hook). They must still exist on disk at
+    # session-start time but are NOT required to be git-tracked.
+    runtime_present_only_paths = [
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "memory/gtkb-dashboard-history.json",
+    ]
+
     missing = [path for path in required_paths if not (REPO_ROOT / path).is_file()]
+    missing.extend(
+        path for path in runtime_present_only_paths if not (REPO_ROOT / path).is_file()
+    )
     assert not missing, f"Missing GroundTruth governance artifacts: {missing}"
     _assert_not_git_ignored(required_paths)
 
