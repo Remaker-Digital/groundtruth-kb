@@ -10,6 +10,17 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0053
+  asked_at: 2026-04-28T15:45:34.683808Z
+  question: "-report.md)  ---  **Standing by for direction.** Per fresh-sessio"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 913e5a16493d895f
+  resolved_at: 2026-04-28T15:50:00Z
+  resolved_in_session: S318
+  answer: "doc-paragraph false positive; recursive class (same as DECISION-0029..0050). Captured fragment is from Prime Builder S318 startup-disclosure closing line ('Standing by for direction.'). Per fresh-session input semantics, the closing acknowledgement is a stimulus-response convention, not an owner question. The 'standing_by_for' detector continues to fire on Prime Builder closing lines; class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T15:50:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+
 - id: DECISION-0014
   asked_at: 2026-04-26T05:54:24.554619Z
   question: "RESPONSE -001 NO-GO awaiting owner input on governance quest"
@@ -576,6 +587,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 3bf126423c32aec1
   resolved_at: 2026-04-28T04:26:26.098049Z
   answer: "User has answered your questions: \"Per `feedback_explicit_destructive_action_authorization.md`, I need explicit authorization before deleting the nested `E:\\GT-KB\\GT-KB\\` directory (created by my verification commands due to a path-handling bug in `session_self_initialization.py`). The directory contains 4 auto-regenerable dashboard output files (~176K total): `GT-KB/docs/gtkb-dashboard/dashboard-data.json`, `GT-KB/docs/gtkb-dashboard/session-startup-report.md`, `GT-KB/docs/gtkb-dashboard/session-wrapup-report.md`, `GT-KB/memory/gtkb-dashboard-history.json`. The same 4 files exist correctly at `E:\\GT-KB\\docs/...` and `E:\\GT-KB\\memory/...` (Commit 6 of S317 tracked them). Codex requires this directory be removed before VERIFIED. How should I proceed?\"=\"APPROVE: delete `E:\\GT-KB\\GT-KB\\` recursively (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0052
+  asked_at: 2026-04-28T14:41:26.074384Z
+  question: "Per Codex GO -002 condition 2 (telemetry-churn-policy thread), I need to run `git rm --cached` to remove 2 files from git tracking while preserving them on disk. The destructive-gate hook is blocking the bash form. The exact operation: `git rm --cached docs/gtkb-dashboard/dashboard-data.json memory/gtkb-dashboard-history.json` — removes from git index only, files stay on disk for runtime regen. Both files are auto-regen telemetry; no data loss. How should I proceed?"
+  options:
+    - "APPROVE: run `git rm --cached` on the 2 named files (Recommended)"
+    - "I will run it myself; you proceed after I confirm"
+    - "Different approach — use Python equivalent"
+    - "Defer this thread; revise to a different approach"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3baf195b98556af4
+  resolved_at: 2026-04-28T14:41:26.074384Z
+  answer: "User has answered your questions: \"Per Codex GO -002 condition 2 (telemetry-churn-policy thread), I need to run `git rm --cached` to remove 2 files from git tracking while preserving them on disk. The destructive-gate hook is blocking the bash form. The exact operation: `git rm --cached docs/gtkb-dashboard/dashboard-data.json memory/gtkb-dashboard-history.json` — removes from git index only, files stay on disk for runtime regen. Both files are auto-regen telemetry; no data loss. How should I proceed?\"=\"APPROVE: run `git rm --cached` on the 2 named files (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
