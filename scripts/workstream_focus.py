@@ -19,6 +19,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+AGENT_RED_HARNESS_STATE_ROOT = PROJECT_ROOT / "applications" / "Agent_Red" / "harness-state"
+
 # ---- Work-subject identity ----------------------------------------------
 FOCUS_APPLICATION = "application"
 FOCUS_GTKB_INFRASTRUCTURE = "gtkb_infrastructure"
@@ -49,15 +52,15 @@ OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
 STARTUP_REPORT_RELATIVE_PATH = Path("docs") / "gtkb-dashboard" / "session-startup-report.md"
 DEFAULT_DASHBOARD_PREFERENCES_PATH = (
-    Path.home() / ".codex" / "agent-red-hooks" / "session-startup-preferences.json"
+    AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
 )
 HARNESS_ROLE_RECORDS = {
-    "codex": Path.home() / ".codex" / "agent-red-hooks" / "operating-role.md",
-    "claude": Path.home() / ".claude" / "agent-red-hooks" / "operating-role.md",
+    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
+    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
 }
 HARNESS_LIFECYCLE_GUARDS = {
-    "codex": Path.home() / ".codex" / "agent-red-hooks" / "session-lifecycle-guard.json",
-    "claude": Path.home() / ".claude" / "agent-red-hooks" / "session-lifecycle-guard.json",
+    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
+    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
 }
 
 # ---- Role profiles (unchanged from prior module) -----------------------
@@ -287,7 +290,7 @@ def gtkb_product_root() -> Path | None:
     Resolution order:
 
     1. Explicit env override ``GTKB_PRODUCT_ROOT``.
-    2. Sibling ``../groundtruth-kb`` checkout when it contains ``src/groundtruth_kb``.
+    2. The current project root when it contains ``src/groundtruth_kb``.
     3. Otherwise, ``None`` (unknown/external paths stay ``neutral``).
     """
 
@@ -299,7 +302,7 @@ def gtkb_product_root() -> Path | None:
         except OSError:
             return None
     project = _project_root_from_env()
-    candidate = project.parent / "groundtruth-kb"
+    candidate = project
     try:
         if candidate.is_dir() and (candidate / "src" / "groundtruth_kb").is_dir():
             return candidate.resolve()

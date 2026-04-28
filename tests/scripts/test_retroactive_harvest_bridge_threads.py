@@ -8,8 +8,8 @@ Covers the Codex GO conditions on bridge/gtkb-da-harvest-coverage-implementation
     - Empty active index returns 100% coverage.
     - Threshold-boundary behavior for coverage metric.
 
-Raw transcript exclusion is proven by source inspection (no reference to
-~/.claude/projects/ in retroactive_harvest_bridge_threads.py).
+Raw transcript exclusion is proven by source inspection (no home-directory
+transcript path reference in retroactive_harvest_bridge_threads.py).
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """

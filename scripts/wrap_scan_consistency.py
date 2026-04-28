@@ -209,15 +209,8 @@ def check_worklist_cites_missing_bridge_file(project_root: Path) -> list[dict]:
 
 
 def check_memory_md_cites_missing_topic_file(project_root: Path) -> list[dict]:
-    """Check user-auto-memory MEMORY.md (not in repo) for missing topic refs."""
-    memory_dir = Path.home() / ".claude" / "projects"
-    if not memory_dir.exists():
-        return []
-    parts = project_root.resolve().parts
-    drive = parts[0].rstrip(":\\/")
-    rest = "-".join(p for p in parts[1:] if p)
-    encoded = f"{drive}--{rest}" if drive and rest else (drive or rest)
-    memory_md = memory_dir / encoded / "memory" / "MEMORY.md"
+    """Check in-root MEMORY.md for missing topic refs."""
+    memory_md = project_root / "memory" / "MEMORY.md"
     if not memory_md.exists():
         return []
     findings: list[dict] = []

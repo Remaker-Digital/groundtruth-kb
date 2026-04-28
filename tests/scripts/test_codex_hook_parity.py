@@ -121,7 +121,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
         for command in commands
     )
 
-    start_dispatcher = Path.home() / ".codex" / "agent-red-hooks" / "session_start_dispatch.py"
+    start_dispatcher = REPO_ROOT / ".codex" / "agent-red-hooks" / "session_start_dispatch.py"
     if not start_dispatcher.is_file():
         assert os.environ.get("CI") == "true"
         return
@@ -157,7 +157,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "last-session-start.json" in start_text
     assert "last-session-start.err" in start_text
 
-    wrapup_dispatcher = Path.home() / ".codex" / "agent-red-hooks" / "session_wrapup_trigger_dispatch.py"
+    wrapup_dispatcher = REPO_ROOT / ".codex" / "agent-red-hooks" / "session_wrapup_trigger_dispatch.py"
     wrapup_text = wrapup_dispatcher.read_text(encoding="utf-8")
     assert "--emit-wrapup" in wrapup_text
     assert "--force-wrapup" in wrapup_text
@@ -183,7 +183,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "last-wrapup-trigger.err" in wrapup_text
     assert "last-wrapup-trigger-input.json" in wrapup_text
 
-    workstream_wrapper = Path.home() / ".codex" / "agent-red-hooks" / "workstream-focus.cmd"
+    workstream_wrapper = REPO_ROOT / ".codex" / "agent-red-hooks" / "workstream-focus.cmd"
     workstream_text = workstream_wrapper.read_text(encoding="utf-8")
     assert "workstream-focus.py" in workstream_text
     assert "GTKB_HARNESS_NAME=codex" in workstream_text
