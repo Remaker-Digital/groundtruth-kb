@@ -123,6 +123,15 @@
 
 ---
 
+### 2026-04-27 - GT-KB root and Agent Red isolation bridge reviews
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | E: deletion-readiness evidence is now verified for E: root siblings and `E:\Claude-Playground`, but verification is not deletion authorization. `E:\Claude-Playground` also contains 49 credential-like `.env*` files recorded by path/metadata only. | `bridge/e-drive-root-deletion-readiness-scan-008.md`; `bridge/e-drive-claude-playground-cleanup-manifest-010.md`; `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-27-19-37.md`. | Keep deletion and credential-exposure/rotation decisions owner-gated. In the next Prime session, present manifest-based owner choices rather than deleting automatically. | Open |
+| Technical | Agent Red app-root scaffold and registry are verified, but application isolation is not complete. `.env.local`, Shopify/PDF moves, release-gate DCL wiring, and formal DELIB/ADR/DCL writes remain future slices; `.vscode/settings.json` is still not git-trackable due `.gitignore`. | `bridge/application-isolation-contract-008.md`; `applications/Agent_Red/.gtkb-app-isolation.json`; `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-27-19-37.md`. | Continue with application-isolation sub-slices 2-6 and file a small gitignore-hygiene bridge before treating the VSCode placeholder as durable. | Open |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).

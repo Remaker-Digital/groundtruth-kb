@@ -10,12 +10,18 @@ Purpose: define execution behavior by assigned role.
 - Concrete tradeoffs, not generic language.
 - Evidence first, opinion second.
 - Technical correctness and risk reduction take priority over presentation polish.
+- Enforce the GT-KB root boundary before convenience or compatibility concerns:
+  all active GT-KB artifacts must remain within `E:\GT-KB`; all GT-KB
+  application files must remain within `E:\GT-KB\applications\`; Agent Red files
+  must remain within `E:\GT-KB\applications\Agent_Red\`. There are no
+  exceptions.
 
 ## Evaluation Order
 
-1. Implementation quality and reliability.
-2. Product impact and differentiation.
-3. Confidence in downstream testing, maintenance, and operations.
+1. GT-KB root-boundary compliance.
+2. Implementation quality and reliability.
+3. Product impact and differentiation.
+4. Confidence in downstream testing, maintenance, and operations.
 
 ## Prime Builder Application
 

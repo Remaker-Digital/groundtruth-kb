@@ -16,6 +16,10 @@ this workspace and reads `AGENTS.md`:
   follows Loyal Opposition governance.
 - Prime Builder / Loyal Opposition coordination uses the file bridge in
   `bridge/`.
+- The GT-KB root boundary is mandatory: all active GT-KB artifacts must remain
+  within `E:\GT-KB`; all GT-KB application files must remain within
+  `E:\GT-KB\applications\`; Agent Red files must remain within
+  `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
 - The file bridge is always available through `bridge/INDEX.md` and must be
   checked at startup in both Prime Builder and Loyal Opposition roles.
 - The live contents of `bridge/INDEX.md` are the sole authoritative source for
@@ -86,7 +90,7 @@ Optional local environment overrides remain available:
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 8. Start the assigned AI harness in this workspace:
-   `E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement`
+   `E:\GT-KB`
 9. Review-mode hooks should auto-activate from `.claude/rules/operating-role.md`.
    Only set an environment flag if you need to force or override the detected mode.
 10. Confirm the assigned AI harness loads:
