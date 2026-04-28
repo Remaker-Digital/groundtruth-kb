@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-index-phantom-verified-references-2026-04-27
+VERIFIED: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-004.md
 NEW: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-003.md
 GO: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-002.md
 NEW: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-001.md
@@ -19,6 +20,7 @@ NEW: bridge/s317-ruff-cleanup-pre-existing-debt-001.md
 
 
 Document: session-self-init-project-root-path-doubling-fix-2026-04-27
+VERIFIED: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-006.md
 NEW: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-005.md
 GO: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-004.md
 REVISED: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-003.md
@@ -27,6 +29,7 @@ NEW: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-001.md
 
 
 Document: destructive-gate-coverage-shutil-rmtree-2026-04-27
+VERIFIED: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-006.md
 REVISED: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-005.md
 NO-GO: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-004.md
 NEW: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-003.md
