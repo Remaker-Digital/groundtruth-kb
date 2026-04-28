@@ -10,6 +10,18 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0060
+  asked_at: 2026-04-28T20:37:14.674192Z
+  question: "\"GT-KB relocation.\" Should I include them as part of the cleanup pass or leave them?  - **I. Pre-existin"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 9f60a68c10b30411
+  resolved_at: 2026-04-28T20:40:00Z
+  resolved_in_session: S319
+  answer: "Real two-part question (not FP) at end of GT-KB relocation clarifications: (H) include S311/S318 stale wrap-scan snapshot files in cleanup? — owner answered YES; (I) include scripts/deploy_pipeline.py pre-existing ruff E,F debt? — owner confirmed clean (do it). Both items will be handled as Phase 4 of the GT-KB relocation work."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T20:40:00Z (real question; resolved by owner explicit answer 'H - Yes update' / 'I - Confirmed clean' in same turn)"
+
+
 - id: DECISION-0059
   asked_at: 2026-04-28T18:53:28.329598Z
   question: "y remaining blocker awaiting your explicit approval."
@@ -40,9 +52,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S319
   answer: "Real two-part question (not FP); capture truncated mid-sentence. Q1 (proceed with deliberation search + Bridge 1 drafting?) — owner answered 'Yes'. Q2 (begin drafting Bridge 2 in parallel after Bridge 1 filed?) — owner answered 'begin drafting Bridge 2'. Both bridges then drafted, GO'd, and implemented per the parallel autonomy directive. Companion to DECISION-0058 (which captured Q2 as its own entry due to detector firing twice on the same prompt block)."
   notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T19:25:00Z (real question; resolved by owner direction; truncated capture reduces searchability but content recovered from session transcript)"
-
-
-
 - id: DECISION-0056
   asked_at: 2026-04-28T17:28:29.110575Z
   question: "lose S318 cleanly.  Awaiting owner direction."
