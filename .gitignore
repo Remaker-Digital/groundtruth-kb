@@ -363,3 +363,28 @@ memory/gtkb-dashboard.sqlite
 memory/gtkb-dashboard.sqlite-shm
 memory/gtkb-dashboard.sqlite-wal
 memory/grafana/
+
+# =============================================================================
+# Drive-sync staging directory (added 2026-04-27 S317 working-tree triage)
+# =============================================================================
+# .tmp.driveupload/ is a Drive-sync staging directory (~3.6 GB observed S317).
+# It must never be committed.
+.tmp.driveupload/
+
+# =============================================================================
+# Codex harness-state runtime breadcrumbs (added 2026-04-27 S317)
+# =============================================================================
+# Per-session payload, stderr, and trigger-input from .codex/agent-red-hooks/
+# hook dispatch. Replaceable on every Stop/SessionStart hook invocation.
+.codex/agent-red-hooks/last-session-start.json
+.codex/agent-red-hooks/last-session-start.err
+.codex/agent-red-hooks/last-wrapup-trigger-input.json
+
+# =============================================================================
+# Mutable session-lifecycle guard JSONs (added 2026-04-27 S317)
+# =============================================================================
+# Cross-session armed-state with timestamps and counters. Treated as runtime
+# until harness-state-authority-migration-2026-04-27 thread VERIFIED. Then
+# the in-root paths become canonical and may be tracked.
+.codex/agent-red-hooks/session-lifecycle-guard.json
+applications/Agent_Red/harness-state/*/session-lifecycle-guard.json
