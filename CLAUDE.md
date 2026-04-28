@@ -7,13 +7,29 @@ This document provides active guidance for AI assistants working on the Agent Re
 > **📁 Reference data** (legal, pricing, infrastructure, AGNTCY rules): `CLAUDE-REFERENCE.md` — read on demand.
 > **📁 Architecture** (project structure, module inventory): `CLAUDE-ARCHITECTURE.md` — read on demand.
 > **📁 Historical archive** (session logs, technical decisions): `CLAUDE_ARCHIVE.md` — read when investigating historical decisions.
-> **📁 Session memory** (operational patterns, lessons): `memory/MEMORY.md` — loaded automatically via Claude Code's auto-memory system (resolves from `~/.claude/projects/<project-hash>/memory/`, not the repo's `memory/` directory).
+> **📁 Session memory** (operational patterns, lessons): `memory/MEMORY.md` — active GT-KB memory must resolve inside `E:\GT-KB`, not a home-directory mirror or legacy project path.
 
 ### Canonical Terminology (Glossary)
 
 - **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared project infrastructure, governance artifacts, and conventions that adopter applications consume. Expanded reference: `docs/gtkb-idp-concept.md`. Full managed glossary (when adopted): `.claude/rules/canonical-terminology.md`.
 - **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
 - **Adopter:** A project that consumes GT-KB (like Agent Red Customer Engagement). Governance flows from GT-KB templates to the adopter via scaffolding and upgrade.
+
+### Mandatory Project Root Boundary
+
+All active files for the GT-KB project MUST be within `E:\GT-KB`. No GT-KB
+artifact may be created, read as a live dependency, updated, verified, or
+required from outside that root. GT-KB application files MUST be within
+`E:\GT-KB\applications\`; Agent Red application files MUST be within
+`E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
+`E:\Claude-Playground` is an archive only and must not be used as a live
+GT-KB, Agent Red, harness-state, bridge, dashboard, memory, source,
+verification, or dependency location.
+
+Apply `.claude/rules/project-root-boundary.md` to all GT-KB work, all
+implementation proposals, all Codex reviews, all tests, all dashboard
+generation, all harness configuration, and all applications developed or
+managed by GT-KB.
 
 ### CLAUDE.md vs MEMORY.md Boundary
 
@@ -159,7 +175,7 @@ See `CLAUDE-ARCHITECTURE.md` § Work Item Taxonomy for full origin/component lis
 
 ```
 Continue work on Agent Red Customer Experience commercial project.
-Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Location: E:\GT-KB
 Key files: CLAUDE.md, memory/MEMORY.md
 Next: [describe task].
 ```

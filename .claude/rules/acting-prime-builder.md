@@ -11,6 +11,14 @@ rules.
 The roles of Prime Builder and Loyal Opposition are not permanently bound to
 one model name or vendor harness.
 
+## Mandatory Project Root Boundary
+
+All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
+application files must remain within `E:\GT-KB\applications\`; Agent Red files
+must remain within `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
+Apply `.claude/rules/project-root-boundary.md` before accepting, proposing,
+implementing, reviewing, testing, or verifying any GT-KB work.
+
 Any AI model harness may assume either role if it supports the operational
 capabilities needed for that role, including hooks, skills, plugins, CLI access,
 desktop/app access when needed, filesystem access, and related integration

@@ -1,8 +1,8 @@
 # Project-scoped Codex configuration for Agent Red.
 #
 # Codex hooks are enabled for this Windows workspace. Lifecycle hooks use
-# no-space launchers under C:\Users\micha\.codex\agent-red-hooks so project
-# paths with spaces do not break hook startup execution. Wrap-up is phrase-gated
+# no-space launchers under E:\GT-KB\.codex\agent-red-hooks so project paths do
+# not break hook startup execution. Wrap-up is phrase-gated
 # through UserPromptSubmit so normal assistant completions do not look like
 # session boundaries.
 

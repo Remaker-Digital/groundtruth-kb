@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:\\Users\\micha\\.codex\\agent-red-hooks\\session_start_dispatch.py",
+            "command": "python E:\\GT-KB\\.codex\\agent-red-hooks\\session_start_dispatch.py",
             "statusMessage": "Preparing GT-KB startup orientation",
             "timeout": 15
           }
@@ -17,13 +17,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /s /c C:\\Users\\micha\\.codex\\agent-red-hooks\\workstream-focus.cmd",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\agent-red-hooks\\workstream-focus.cmd",
             "statusMessage": "Checking active workstream focus",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python C:\\Users\\micha\\.codex\\agent-red-hooks\\session_wrapup_trigger_dispatch.py",
+            "command": "python E:\\GT-KB\\.codex\\agent-red-hooks\\session_wrapup_trigger_dispatch.py",
             "statusMessage": "Checking session lifecycle command",
             "timeout": 15
           }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /s /c C:\\Users\\micha\\.codex\\agent-red-hooks\\workstream-focus.cmd",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\agent-red-hooks\\workstream-focus.cmd",
             "statusMessage": "Checking active workstream focus",
             "timeout": 5
           }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /s /c C:\\Users\\micha\\.codex\\agent-red-hooks\\formal-artifact-approval.cmd",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\agent-red-hooks\\formal-artifact-approval.cmd",
             "statusMessage": "Checking formal artifact approval",
             "timeout": 5
           }

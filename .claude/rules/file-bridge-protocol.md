@@ -8,6 +8,15 @@ of versioned markdown files governed by a single index file.
 `bridge/` at project root. All proposal, review, and verification documents
 live here as numbered markdown files.
 
+## Mandatory Root Boundary Gate
+
+Every bridge proposal, review, implementation report, and verification must
+comply with `.claude/rules/project-root-boundary.md`: all active GT-KB files and
+artifacts must remain within `E:\GT-KB`; all GT-KB application files must remain
+within `E:\GT-KB\applications\`; Agent Red files must remain within
+`E:\GT-KB\applications\Agent_Red\`. There are no exceptions. A bridge item that
+depends on a live path outside those roots is `NO-GO`.
+
 ## File Naming
 
 `{descriptive-name}-{NNN}.md`

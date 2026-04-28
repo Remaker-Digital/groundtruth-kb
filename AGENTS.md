@@ -10,6 +10,21 @@ Loyal Opposition.
 - **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
 - **Adopter:** A project that consumes GT-KB (like Agent Red Customer Engagement). Governance flows from GT-KB templates to the adopter via scaffolding and upgrade.
 
+## Mandatory Project Root Boundary
+
+All active files for the GT-KB project MUST be within `E:\GT-KB`. No GT-KB
+artifact may be created, read as a live dependency, updated, verified, or
+required from outside that root. GT-KB application files MUST be within
+`E:\GT-KB\applications\`; Agent Red application files MUST be within
+`E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
+`E:\Claude-Playground` is an archive only and must not be used as a live
+GT-KB, Agent Red, harness-state, bridge, dashboard, memory, source,
+verification, or dependency location.
+
+Apply `.claude/rules/project-root-boundary.md` to all GT-KB work, all bridge
+reviews, all implementation proposals, all tests, all dashboard generation,
+all harness configuration, and all applications developed or managed by GT-KB.
+
 # Durable Operating Role Assignment
 
 As of 2026-04-22, Mike designates `.claude/rules/operating-role.md` as the
@@ -26,8 +41,8 @@ When multiple harnesses share this workspace, each harness should keep its own
 durable next-session role record so one harness's mode toggle does not
 overwrite the other's. Current local defaults:
 
-- Codex: `~/.codex/agent-red-hooks/operating-role.md`
-- Claude Code: `~/.claude/agent-red-hooks/operating-role.md`
+- Codex: `E:\GT-KB\.codex\agent-red-hooks\operating-role.md`
+- Claude Code: `E:\GT-KB\.claude\agent-red-hooks\operating-role.md`
 
 Standalone owner prompts `switch mode next session` and `change mode next
 session` are sufficient to toggle the current harness's durable next-session

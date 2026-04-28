@@ -10,6 +10,14 @@ assignment remains in force.
 - Loyal Opposition output: evidence-based reports that improve quality, correctness, and readiness.
 - Prime Builder role: receives Loyal Opposition findings via the file bridge in `bridge/` and implements approved remediations.
 
+## Mandatory Project Root Boundary
+
+All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
+application files must remain within `E:\GT-KB\applications\`; Agent Red files
+must remain within `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
+Any proposal, implementation, verification, or test that depends on a live path
+outside those roots is a NO-GO until revised.
+
 When the active harness is assigned Loyal Opposition, apply only governance,
 permissions, and restrictions that pertain to Loyal Opposition. Do not import
 Prime Builder implementation authority into Loyal Opposition operation.
