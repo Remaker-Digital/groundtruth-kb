@@ -36,3 +36,23 @@ This rule becomes especially important under the S299 Option C parallel-workstre
 **How to apply:** After `git commit`, run `git show --stat <sha>` (NOT just the staged diff) and use that as the source of truth for the "Files Changed" table in the post-impl report. Hook-authored files belong in the table even if their content is mechanical/baseline-y — Codex will diff them and noting them in the report shows the report-author saw what actually committed.
 
 **Source:** `bridge/gtkb-startup-enhancements-p1-006.md` §"Findings" non-blocking note (Codex VERIFIED for P1, 2026-04-25)
+
+---
+
+**Rule 4: Run pytest WITHOUT `-s` (capture disabled) in post-impl evidence.**
+
+**Why:** Running with `-s` to disable pytest's stdout/stderr capture during development can mask import-time interactions between the module under test and pytest's capture machinery. If the imported module performs `sys.stdout = io.TextIOWrapper(...)` at module load (or similar capture-mutating ops), the wrap re-wraps pytest's capture streams and breaks `tmpfile.seek(0)` on capture finalization — producing the symptom "0 tests collected" with `ValueError: I/O operation on closed file.` only under default capture, never under `-s`. S319 DORA-001b Track 1 post-impl claimed "31/31 PASS" which was true under `-s` but false under default capture; Codex `bridge/gtkb-dora-001b-track1-implementation-010.md` NO-GO surfaced the discrepancy.
+
+**How to apply:** When generating evidence for a post-impl report, the documented test command MUST be the default-capture form: `pytest <files> -q --tb=short` (no `-s`). If you've been using `-s` during development, run the default form once before writing the report and confirm collection + pass count match. If they don't, fix the underlying capture-incompatibility (typically by gating module-level stream mutations behind `if __name__ == "__main__":`) before claiming PASS.
+
+**Source:** `bridge/gtkb-dora-001b-track1-implementation-010.md` (Codex NO-GO REVISED-1, 2026-04-28)
+
+---
+
+**Rule 5: Run ruff E,F lint on touched test files in post-impl evidence.**
+
+**Why:** The project's commit-time quality guardrails (Test deletion, Assertion ratchet, Architectural guards, Credential scan, TSX commit gate) do NOT include ruff `E,F` checks against newly-added test files. A post-impl report claiming "5/5 quality guardrails GREEN" can be technically true while still introducing F841 unused-locals or F401 unused-imports in test code. S319 DORA-001b Track 1 post-impl `-007` made this exact claim while a stray `expected = ...` local in T5 of the new writer test file was unused; Codex `bridge/gtkb-dora-001b-track1-implementation-008.md` NO-GO caught it.
+
+**How to apply:** When adding or modifying test files in a bridge implementation, run `python -m ruff check <test-files> --select E,F` and include the result in the post-impl evidence table. The lint check is independent of the configured commit-time guardrails and should be treated as a separate gate. Applies to writer-side tests, regression armor tests, and any other test file the bridge touches.
+
+**Source:** `bridge/gtkb-dora-001b-track1-implementation-008.md` (Codex NO-GO REVISED-1, 2026-04-28)
