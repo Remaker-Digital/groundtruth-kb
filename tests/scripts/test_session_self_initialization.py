@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -1747,6 +1748,101 @@ def test_main_with_only_project_root_writes_under_that_root(tmp_path, monkeypatc
             "Canonical PROJECT_ROOT/memory/gtkb-dashboard-history.json mtime changed; "
             "generator leaked a write to the canonical path"
         )
+
+
+def test_user_preferences_path_cli_arg_sets_env_when_unset(tmp_path, monkeypatch) -> None:
+    """Per bridge/harness-state-preferences-path-cli-2026-04-28-002.md Codex GO condition 1+3.
+
+    --user-preferences-path must affect the generator's preference reader.
+    Candidate B implementation bridges the CLI arg into the
+    GTKB_STARTUP_PREFERENCES_PATH env var via os.environ.setdefault, so
+    _user_startup_preferences_path() returns the CLI-supplied value when
+    no pre-existing env var is set.
+
+    The setdefault mutation bypasses monkeypatch's auto-restore tracking, so
+    the test uses a try/finally to clean up the env var explicitly after
+    the assertion.
+    """
+    monkeypatch.delenv("GTKB_STARTUP_PREFERENCES_PATH", raising=False)
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    cli_pref_path = tmp_path / "sandbox-prefs.json"
+
+    module = _load_module()
+    try:
+        module.main(
+            [
+                "--project-root",
+                str(project_root),
+                "--dashboard-dir",
+                str(tmp_path / "out_dash"),
+                "--history-path",
+                str(tmp_path / "out_history.json"),
+                "--user-preferences-path",
+                str(cli_pref_path),
+                "--harness-name",
+                "claude",
+                "--skip-bridge-maintenance",
+                "--fast-hook",
+            ]
+        )
+
+        resolved_path = module._user_startup_preferences_path()
+        assert resolved_path == cli_pref_path.resolve()
+    finally:
+        os.environ.pop("GTKB_STARTUP_PREFERENCES_PATH", None)
+
+
+def test_user_preferences_path_existing_env_var_wins_over_cli(tmp_path, monkeypatch) -> None:
+    """Per bridge/harness-state-preferences-path-cli-2026-04-28-002.md GO condition 2.
+
+    Existing GTKB_STARTUP_PREFERENCES_PATH env var must take precedence over
+    the CLI argument. Implementation uses os.environ.setdefault, which only
+    sets when the key is absent. monkeypatch.setenv tracks and restores the
+    env var automatically here.
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    pre_existing_pref = tmp_path / "from-env.json"
+    cli_pref = tmp_path / "from-cli.json"
+    monkeypatch.setenv("GTKB_STARTUP_PREFERENCES_PATH", str(pre_existing_pref))
+
+    module = _load_module()
+    module.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--dashboard-dir",
+            str(tmp_path / "out_dash"),
+            "--history-path",
+            str(tmp_path / "out_history.json"),
+            "--user-preferences-path",
+            str(cli_pref),
+            "--harness-name",
+            "claude",
+            "--skip-bridge-maintenance",
+            "--fast-hook",
+        ]
+    )
+
+    # Pre-existing env var unchanged; CLI arg did NOT override it.
+    assert os.environ.get("GTKB_STARTUP_PREFERENCES_PATH") == str(pre_existing_pref)
+    resolved_path = module._user_startup_preferences_path()
+    assert resolved_path == pre_existing_pref
+
+
+def test_user_preferences_path_omitted_falls_back_to_default(tmp_path, monkeypatch) -> None:
+    """Per bridge/harness-state-preferences-path-cli-2026-04-28-002.md GO condition 2.
+
+    When both --user-preferences-path AND GTKB_STARTUP_PREFERENCES_PATH are
+    absent, _user_startup_preferences_path() must return the canonical
+    DEFAULT_USER_STARTUP_PREFERENCES_PATH (production default preserved).
+    """
+    monkeypatch.delenv("GTKB_STARTUP_PREFERENCES_PATH", raising=False)
+    module = _load_module()
+
+    resolved_path = module._user_startup_preferences_path()
+    assert resolved_path == module.DEFAULT_USER_STARTUP_PREFERENCES_PATH
 
 
 def test_git_checkout_info_returns_degraded_when_outside_project_root(tmp_path, monkeypatch) -> None:

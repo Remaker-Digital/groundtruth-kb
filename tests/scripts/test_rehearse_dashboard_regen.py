@@ -396,6 +396,46 @@ def test_run_subprocess_command_includes_fast_hook_flag(tmp_path: Path) -> None:
     assert "--fast-hook" in captured_cmds[0]
 
 
+def test_run_subprocess_command_passes_user_preferences_path_to_generator(tmp_path: Path) -> None:
+    """Per bridge/harness-state-preferences-path-cli-2026-04-28-002.md GO condition 4.
+
+    The lane MUST thread `--user-preferences-path` into the generator argv
+    pointing at the sandbox-relative
+    applications/Agent_Red/harness-state/codex/session-startup-preferences.json
+    location. The path is intentionally non-existent in the sandbox so the
+    generator's preference reader short-circuits before any read fires (per
+    GO condition 5: do not add audit-hook allowlist entries; the lane should
+    stop reading the canonical path).
+    """
+    legacy = _make_minimal_legacy_root(tmp_path)
+    captured_cmds: list[list[str]] = []
+
+    def _capture(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        captured_cmds.append(list(cmd))
+        Path(cmd[cmd.index("--violations-out") + 1]).parent.mkdir(parents=True, exist_ok=True)
+        Path(cmd[cmd.index("--violations-out") + 1]).write_text("[]", encoding="utf-8")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_capture)
+    assert captured_cmds, "expected at least one subprocess call"
+    assert "--user-preferences-path" in captured_cmds[0]
+    pref_idx = captured_cmds[0].index("--user-preferences-path")
+    pref_value = captured_cmds[0][pref_idx + 1]
+    # The value must be sandbox-relative; the sandbox root is named "sandbox"
+    # by convention inside the lane output dir.
+    assert "sandbox" in pref_value, (
+        f"--user-preferences-path value should be sandbox-relative, got {pref_value!r}"
+    )
+    assert pref_value.endswith(
+        str(Path("applications") / "Agent_Red" / "harness-state" / "codex" / "session-startup-preferences.json")
+    ), f"path tail mismatch: {pref_value!r}"
+    # Confirm it is NOT the canonical legacy_root path (per GO condition 5).
+    canonical_pref = legacy / "applications" / "Agent_Red" / "harness-state" / "codex" / "session-startup-preferences.json"
+    assert pref_value != str(canonical_pref), (
+        "lane must not pass the canonical legacy preferences path"
+    )
+
+
 def test_run_subprocess_command_routes_through_runner_not_legacy_script_directly(tmp_path: Path) -> None:
     legacy = _make_minimal_legacy_root(tmp_path)
     captured_cmds: list[list[str]] = []

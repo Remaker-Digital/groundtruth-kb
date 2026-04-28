@@ -5343,6 +5343,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Override the durable operating-role record path for this harness.",
     )
     parser.add_argument(
+        "--user-preferences-path",
+        type=Path,
+        default=None,
+        help=(
+            "Override the user startup preferences JSON path. Mirrors "
+            "--role-record-path / --lifecycle-guard-path. Used by the Slice 11 "
+            "audit-hook lane to thread a sandbox-relative preferences path so "
+            "the legacy generator does not read the canonical "
+            "applications/Agent_Red/harness-state/codex/session-startup-"
+            "preferences.json from outside its sandbox. Per "
+            "bridge/harness-state-preferences-path-cli-2026-04-28-002.md "
+            "Codex GO. Implemented as a setdefault env-var bridge so the "
+            "existing GTKB_STARTUP_PREFERENCES_PATH override remains "
+            "highest-precedence."
+        ),
+    )
+    parser.add_argument(
         "--harness-name",
         choices=sorted(HARNESS_ROLE_RECORDS),
         default=None,
@@ -5385,6 +5402,17 @@ def main(argv: list[str] | None = None) -> int:
             f"e.g., 'E:\\\\GT-KB' (escaped backslash) or 'E:/GT-KB' (forward slashes)."
         )
     project_root = args.project_root.resolve()
+    if args.user_preferences_path is not None:
+        # Per bridge/harness-state-preferences-path-cli-2026-04-28-002.md Codex
+        # GO Candidate B: bridge the CLI arg into the existing
+        # GTKB_STARTUP_PREFERENCES_PATH env-var override channel so downstream
+        # readers (_user_startup_preferences_path) honor it without signature
+        # changes. setdefault preserves the precedence order required by GO
+        # condition 2: existing env var > CLI arg > canonical default.
+        os.environ.setdefault(
+            "GTKB_STARTUP_PREFERENCES_PATH",
+            str(args.user_preferences_path.resolve()),
+        )
     startup_emit_requested = args.emit_report or args.emit_startup_service_payload
     startup_requested_at = os.environ.get("GTKB_STARTUP_REQUESTED_AT") if args.emit_startup_service_payload else None
     if _parse_iso8601(startup_requested_at) is None:

@@ -331,7 +331,15 @@ def _verify_deployment_files(legacy_root: Path, sandbox_root: Path) -> dict[str,
 
 
 def _build_generator_argv(sandbox_root: Path) -> list[str]:
-    """Build argv for the legacy generator per REVISED-5 §2.3."""
+    """Build argv for the legacy generator per REVISED-5 §2.3.
+
+    The ``--user-preferences-path`` value points at a sandbox-relative
+    location that intentionally does not exist; the generator's preference
+    reader short-circuits on ``is_file() == False`` and never reads the
+    canonical ``applications/Agent_Red/harness-state/codex/session-startup-
+    preferences.json``. Per bridge/harness-state-preferences-path-cli-
+    2026-04-28-002.md Codex GO conditions 4 and 5.
+    """
     return [
         "--project-root",
         str(sandbox_root),
@@ -343,6 +351,15 @@ def _build_generator_argv(sandbox_root: Path) -> list[str]:
         str(sandbox_root / ".claude" / "rules" / "operating-role.md"),
         "--lifecycle-guard-path",
         str(sandbox_root / ".claude" / "session" / "lifecycle-guard.json"),
+        "--user-preferences-path",
+        str(
+            sandbox_root
+            / "applications"
+            / "Agent_Red"
+            / "harness-state"
+            / "codex"
+            / "session-startup-preferences.json"
+        ),
         "--harness-name",
         "claude",
         "--skip-bridge-maintenance",
