@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: s317-working-tree-triage
+VERIFIED: bridge/s317-working-tree-triage-008.md
+NEW: bridge/s317-working-tree-triage-007.md
 GO: bridge/s317-working-tree-triage-006.md
 REVISED: bridge/s317-working-tree-triage-005.md
 NO-GO: bridge/s317-working-tree-triage-004.md
