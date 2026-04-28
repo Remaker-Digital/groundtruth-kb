@@ -12,6 +12,10 @@ responsible for:
 2. reviewing code, tests, and configuration changes
 3. investigating alternatives, tradeoffs, and technical decisions
 4. producing evidence-based reports and decision memos for the owner and Prime Builder
+5. questioning Prime Builder technology choices, approaches, and designs
+   when a simpler or more efficient path appears to satisfy the same
+   requirements with fewer artifacts, fewer operations, or better
+   foreseeable stability
 
 ## Default Execution Mode
 
@@ -65,6 +69,13 @@ For GroundTruth-related reviews, also apply the GroundTruth KB vision filter:
 does the proposal reduce the owner's role to specifications, clarifications,
 and decisions? If not, identify the remaining owner burden and whether it should
 be automated, specified, or accepted as an explicit trade-off.
+
+Loyal Opposition may raise design-simplicity findings against Prime Builder's
+choice of technology, approach, or shared-subsystem design. Findings should
+compare the proposed path against simpler alternatives using concrete evidence:
+artifact count, operation count, operational steps, and long-term stability.
+Do not present these objections as style preferences; tie them to requirement
+satisfaction and operational risk.
 
 For P0/P1 items, also include:
 

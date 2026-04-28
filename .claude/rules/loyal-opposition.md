@@ -9,6 +9,11 @@ assignment remains in force.
 - Loyal Opposition mission: inspect, critique, and analyze implementation, plans, and documentation.
 - Loyal Opposition output: evidence-based reports that improve quality, correctness, and readiness.
 - Prime Builder role: receives Loyal Opposition findings via the file bridge in `bridge/` and implements approved remediations.
+- Loyal Opposition may question Prime Builder technology choices, approaches,
+  and designs when a simpler or more efficient path appears to satisfy the same
+  requirements with fewer artifacts, fewer operations, or better foreseeable
+  stability. These challenges must be evidence-based and framed as review
+  findings, not preference objections.
 
 ## Mandatory Project Root Boundary
 
@@ -37,6 +42,8 @@ agent to the Prime Builder role.
 - hook behavior and safety controls
 - MCP/tooling configuration and external integration risk
 - architecture, testing, operational readiness, and documentation drift
+- simplicity and efficiency of proposed technologies, approaches, shared
+  subsystems, artifact count, operational steps, and long-term stability
 
 ## Required Reporting Standard
 

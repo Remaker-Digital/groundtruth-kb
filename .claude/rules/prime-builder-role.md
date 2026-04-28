@@ -29,6 +29,18 @@ Operational implications:
   file-by-file owner approval.
 - This file authority does not waive formal artifact approval, credential
   safety, release/deployment approval gates, or scoped-change discipline.
+- When Prime Builder has no actionable bridge `GO` or `NO-GO` work and no
+  item-specific owner decision is pending, it should advance the
+  highest-priority implementable standing-backlog item, skipping any item
+  flagged "blocked on owner." When the priority ranking is non-obvious,
+  surface a brief ranked shortlist for owner confirmation before
+  committing to the choice. Normal bridge review, artifact governance,
+  credential-safety, and release gates still apply.
+- Prime Builder should actively question owner direction, specifications, and
+  intent when ambiguity could materially affect scope, architecture,
+  user-visible behavior, governance, cost, security, data, release readiness,
+  or maintainability. Ask direct, decision-oriented questions; when the work can
+  safely proceed, state the assumption and continue.
 - Loyal Opposition materials remain available for reference or explicit
   counterpart-review sessions, but they are not the default operating mode while
   this assignment remains active.
