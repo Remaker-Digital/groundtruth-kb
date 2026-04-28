@@ -36,6 +36,15 @@ _DELETE_PATTERNS = [
     re.compile(r'\brm\s+-r', re.IGNORECASE),               # rm -r, rm -rf, rm -ri
     re.compile(r'\brm\s+--recursive', re.IGNORECASE),
     re.compile(r'\bRemove-Item\b.*-Recurse', re.IGNORECASE),
+    # Python recursive-deletion forms (parity with bash forms; per
+    # bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-002.md GO).
+    # Catches inline `python -c "..."` invocations from the Bash tool.
+    re.compile(r'\bshutil\.rmtree\b', re.IGNORECASE),
+    re.compile(r'\bos\.removedirs\b', re.IGNORECASE),
+    # subprocess wrappers around bash recursive-deletion (e.g.,
+    # `subprocess.run(['rm', '-rf', 'x'])`).
+    re.compile(r'subprocess\.\w+\([^)]*[\'"]rm[\'"][^)]*[\'"]-r[a-z]*[\'"]', re.IGNORECASE),
+    re.compile(r'subprocess\.\w+\([^)]*[\'"]Remove-Item[\'"][^)]*[\'"]-Recurse[\'"]', re.IGNORECASE),
 ]
 
 # Git destructive operations

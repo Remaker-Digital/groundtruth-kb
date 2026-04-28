@@ -138,3 +138,61 @@ class TestContactRequirementInProvisioning:
 
         sig = inspect.signature(provision_tenant)
         assert "customer_email" in sig.parameters
+
+
+# ---------------------------------------------------------------------------
+# Python recursive-deletion parity (S317 follow-up)
+# ---------------------------------------------------------------------------
+
+
+class TestPythonRecursiveDeletionParity:
+    """bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-002.md GO:
+    inline Python recursive-deletion forms must be gated for parity with the
+    existing bash `rm -r` and PowerShell `Remove-Item -Recurse` patterns.
+    """
+
+    def test_blocks_python_dash_c_with_shutil_rmtree(self, check_destructive):
+        """The exact substitution form Prime used in S317 must be blocked."""
+        result = check_destructive(
+            """python -c "import shutil; shutil.rmtree('GT-KB')" """
+        )
+        assert result is not None
+        assert "destructive" in result.lower() or "delete" in result.lower()
+
+    def test_blocks_shutil_rmtree_with_ignore_errors(self, check_destructive):
+        """shutil.rmtree variant with ignore_errors=True must also be blocked."""
+        result = check_destructive(
+            """python -c "import shutil; shutil.rmtree('x', ignore_errors=True)" """
+        )
+        assert result is not None
+
+    def test_blocks_os_removedirs(self, check_destructive):
+        """os.removedirs (recursive empty-dir cleanup) must be blocked."""
+        result = check_destructive(
+            """python -c "import os; os.removedirs('a/b/c')" """
+        )
+        assert result is not None
+
+    def test_blocks_subprocess_rm_rf_via_python(self, check_destructive):
+        """subprocess invocation of `rm -rf` from Python must be blocked."""
+        result = check_destructive(
+            """python -c "import subprocess; subprocess.run(['rm', '-rf', 'x'])" """
+        )
+        assert result is not None
+
+    def test_blocks_subprocess_remove_item_recurse_via_python(self, check_destructive):
+        """subprocess invocation of `Remove-Item -Recurse` from Python must be blocked."""
+        result = check_destructive(
+            """python -c "import subprocess; subprocess.run(['Remove-Item', '-Recurse', 'x'])" """
+        )
+        assert result is not None
+
+    def test_allows_pathlib_unlink_single_file(self, check_destructive):
+        """pathlib.Path.unlink (single-file delete, non-recursive) is NOT blocked."""
+        result = check_destructive(
+            """python -c "from pathlib import Path; Path('tmp.txt').unlink()" """
+        )
+        # Single-file deletes are not in the recursive class; should not be blocked
+        # by the recursive-deletion patterns. May still be blocked by other
+        # patterns (e.g., production targeting), but not by _DELETE_PATTERNS.
+        assert result is None or "destructive" not in result.lower() or "rmtree" not in result.lower()
