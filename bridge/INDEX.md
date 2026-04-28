@@ -5,6 +5,32 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-bridge-index-phantom-verified-references-2026-04-27
+GO: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-002.md
+NEW: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-001.md
+
+
+Document: s317-ruff-cleanup-pre-existing-debt
+VERIFIED: bridge/s317-ruff-cleanup-pre-existing-debt-004.md
+NEW: bridge/s317-ruff-cleanup-pre-existing-debt-003.md
+GO: bridge/s317-ruff-cleanup-pre-existing-debt-002.md
+NEW: bridge/s317-ruff-cleanup-pre-existing-debt-001.md
+
+
+Document: session-self-init-project-root-path-doubling-fix-2026-04-27
+GO: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-004.md
+REVISED: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-003.md
+NO-GO: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-002.md
+NEW: bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-001.md
+
+
+Document: destructive-gate-coverage-shutil-rmtree-2026-04-27
+NO-GO: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-004.md
+NEW: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-003.md
+GO: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-002.md
+NEW: bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-001.md
+
+
 Document: harness-state-authority-migration-2026-04-27
 VERIFIED: bridge/harness-state-authority-migration-2026-04-27-010.md
 REVISED: bridge/harness-state-authority-migration-2026-04-27-009.md
@@ -524,6 +550,7 @@ NEW: bridge/gtkb-root-directory-migration-post-verify-012.md
 NEW: bridge/gtkb-root-directory-migration-post-verify-010.md
 
 
+<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -018 absent from disk + git history. Latest on-disk version belongs to companion thread gtkb-root-directory-migration-post-verify (VERIFIED at -019); the close-out work likely landed there. -->
 Document: gtkb-root-directory-migration
 VERIFIED: bridge/gtkb-root-directory-migration-018.md
 NEW: bridge/gtkb-root-directory-migration-017.md
@@ -544,6 +571,7 @@ REVISED: bridge/gtkb-root-directory-migration-003.md
 NO-GO: bridge/gtkb-root-directory-migration-002.md
 NEW: bridge/gtkb-root-directory-migration-001.md
 
+<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -012 absent from disk + git history. Latest on-disk version is -003; thread appears stalled; reopen is per-thread follow-up out of scope here. -->
 Document: gtkb-app-boundary-mechanism-audit
 VERIFIED: bridge/gtkb-app-boundary-mechanism-audit-012.md
 REVISED: bridge/gtkb-app-boundary-mechanism-audit-011.md
@@ -558,6 +586,7 @@ REVISED: bridge/gtkb-app-boundary-mechanism-audit-003.md
 NO-GO: bridge/gtkb-app-boundary-mechanism-audit-002.md
 NEW: bridge/gtkb-app-boundary-mechanism-audit-001.md
 
+<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -014 absent from disk + git history. Only -001 exists on disk. Extends the existing parallel-poller annotation already documented for this thread (covering -004..-022). -->
 Document: gtkb-membase-effective-use-umbrella
 VERIFIED: bridge/gtkb-membase-effective-use-umbrella-014.md
 NEW: bridge/gtkb-membase-effective-use-umbrella-013.md
@@ -612,6 +641,7 @@ REVISED: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-003.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2b-metrics-001.md
 
+<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -008 absent from disk + git history. Latest on-disk -007. Slice 2 work continued in slice2b-metrics (VERIFIED at -026 reconciled by gtkb-slice2b-metrics-index-reconciliation). -->
 Document: gtkb-dashboard-industry-alignment-slice2a-visibility
 VERIFIED: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-008.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-007.md
@@ -622,6 +652,7 @@ REVISED: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-003.md
 NO-GO: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-002.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-001.md
 
+<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -008 absent from disk + git history. Only -001 exists on disk. DORA work continued in DORA-001b threads (which exist). -->
 Document: gtkb-dora-telemetry-foundation
 VERIFIED: bridge/gtkb-dora-telemetry-foundation-008.md
 NEW: bridge/gtkb-dora-telemetry-foundation-007.md
@@ -632,6 +663,7 @@ REVISED: bridge/gtkb-dora-telemetry-foundation-003.md
 NO-GO: bridge/gtkb-dora-telemetry-foundation-002.md
 NEW: bridge/gtkb-dora-telemetry-foundation-001.md
 
+<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -004 absent from disk + git history. Only -001 exists on disk; -002 through -004 phantom. -->
 Document: gtkb-dashboard-industry-alignment-slice2
 VERIFIED: bridge/gtkb-dashboard-industry-alignment-slice2-004.md
 NEW: bridge/gtkb-dashboard-industry-alignment-slice2-003.md
@@ -663,6 +695,7 @@ NO-GO: bridge/gtkb-isolation-015-slice2-work-subject-set-003.md
 REVISED: bridge/gtkb-isolation-015-slice2-work-subject-set-002.md
 NEW: bridge/gtkb-isolation-015-slice2-work-subject-set-001.md
 
+<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -024 absent from disk + git history. Latest on-disk -021 (REVISED-9 GO); -022, -023, -024 phantom. -->
 Document: gtkb-gov-proposal-standards-slice1
 VERIFIED: bridge/gtkb-gov-proposal-standards-slice1-024.md
 REVISED: bridge/gtkb-gov-proposal-standards-slice1-023.md
