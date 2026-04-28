@@ -6,12 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: role-contract-clarifications-2026-04-28
+VERIFIED: bridge/role-contract-clarifications-2026-04-28-004.md
 NEW: bridge/role-contract-clarifications-2026-04-28-003.md
 GO: bridge/role-contract-clarifications-2026-04-28-002.md
 NEW: bridge/role-contract-clarifications-2026-04-28-001.md
 
 
 Document: session-hygiene-gitignore-extensions-2026-04-28
+VERIFIED: bridge/session-hygiene-gitignore-extensions-2026-04-28-004.md
 NEW: bridge/session-hygiene-gitignore-extensions-2026-04-28-003.md
 GO: bridge/session-hygiene-gitignore-extensions-2026-04-28-002.md
 NEW: bridge/session-hygiene-gitignore-extensions-2026-04-28-001.md
