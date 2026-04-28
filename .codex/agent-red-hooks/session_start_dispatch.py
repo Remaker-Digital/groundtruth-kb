@@ -1,0 +1,158 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+
+PROJECT_ROOT = Path(r"E:\GT-KB")
+OUT_DIR = PROJECT_ROOT / ".codex" / "agent-red-hooks"
+STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
+STARTUP_FRESHNESS_CONTRACT_VERSION = "agent-red-startup-freshness-v1"
+HARNESS_NAME = "codex"
+# Parity marker for tests: Role: Prime Builder
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _parse_iso8601(value: str | None) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _is_ordered(earlier: str | None, later: str | None) -> bool:
+    earlier_dt = _parse_iso8601(earlier)
+    later_dt = _parse_iso8601(later)
+    if earlier_dt is None or later_dt is None:
+        return False
+    return earlier_dt <= later_dt
+
+
+def _purge_previous_diagnostics(*paths: Path) -> None:
+    for path in paths:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            pass
+
+
+def _fallback_context(reason: str) -> str:
+    dashboard = "file:///E:/GT-KB/docs/gtkb-dashboard/index.html"
+    return "\n".join(
+        [
+            "# Agent Red / GT-KB Startup Service Degraded",
+            "",
+            f"Generated: {_now_iso()}",
+            "",
+            "The SessionStart hook could not retrieve the programmatic startup payload.",
+            f"Reason: {reason}",
+            "",
+            f"Dashboard: [Agent Red Project Dashboard]({dashboard})",
+            "",
+            "Use filesystem reads and the dashboard as the live authority before acting.",
+        ]
+    )
+
+
+def _session_start_payload(context: str) -> dict[str, dict[str, str]]:
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": context,
+        }
+    }
+
+
+def _valid_session_start_payload(text: str, request_started_at: str) -> bool:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return False
+    hook_output = payload.get("hookSpecificOutput")
+    if not (
+        isinstance(hook_output, dict)
+        and hook_output.get("hookEventName") == "SessionStart"
+        and isinstance(hook_output.get("additionalContext"), str)
+        and "Programmatic Startup Payload" in hook_output["additionalContext"]
+    ):
+        return False
+    startup_freshness = hook_output.get("startupFreshness")
+    if not isinstance(startup_freshness, dict):
+        return False
+    validation = startup_freshness.get("validation")
+    return (
+        startup_freshness.get("contract_version") == STARTUP_FRESHNESS_CONTRACT_VERSION
+        and startup_freshness.get("request_started_at") == request_started_at
+        and startup_freshness.get("report_origin") == "in_memory_model_render"
+        and isinstance(validation, dict)
+        and validation.get("startup_payload_fresh") is True
+        and validation.get("status") in {"fresh", "fresh_with_gaps"}
+        and _is_ordered(request_started_at, startup_freshness.get("generated_at"))
+        and _is_ordered(startup_freshness.get("generated_at"), startup_freshness.get("payload_emitted_at"))
+    )
+
+
+def main() -> int:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    stdout_path = OUT_DIR / "last-session-start.json"
+    stderr_path = OUT_DIR / "last-session-start.err"
+    request_started_at = _now_iso()
+    _purge_previous_diagnostics(stdout_path, stderr_path)
+    command = [
+        sys.executable,
+        str(STARTUP_SERVICE),
+        "--project-root",
+        str(PROJECT_ROOT),
+        "--emit-startup-service-payload",
+        "--fast-hook",
+        "--harness-name",
+        HARNESS_NAME,
+    ]
+    try:
+        env = dict(os.environ)
+        env["GTKB_STARTUP_REQUESTED_AT"] = request_started_at
+        process = subprocess.run(
+            command,
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=14.0,
+            check=False,
+            env=env,
+        )
+        stdout_path.write_text(process.stdout, encoding="utf-8")
+        stderr_path.write_text(process.stderr, encoding="utf-8")
+        if process.returncode == 0 and _valid_session_start_payload(process.stdout, request_started_at):
+            print(process.stdout.strip())
+            return 0
+        reason = f"startup service returned exit {process.returncode}"
+        if process.stderr.strip():
+            reason = f"{reason}: {process.stderr.strip()[:400]}"
+        elif process.returncode == 0:
+            reason = "startup service freshness contract validation failed"
+        print(json.dumps(_session_start_payload(_fallback_context(reason)), ensure_ascii=False))
+    except Exception as exc:  # noqa: BLE001 - lifecycle hook must fail soft.
+        try:
+            stderr_path.write_text(str(exc), encoding="utf-8")
+        except OSError:
+            pass
+        print(json.dumps(_session_start_payload(_fallback_context(str(exc))), ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
