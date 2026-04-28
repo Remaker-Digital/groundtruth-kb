@@ -41,8 +41,8 @@ When multiple harnesses share this workspace, each harness should keep its own
 durable next-session role record so one harness's mode toggle does not
 overwrite the other's. Current local defaults:
 
-- Codex: `E:\GT-KB\.codex\agent-red-hooks\operating-role.md`
-- Claude Code: `E:\GT-KB\.claude\agent-red-hooks\operating-role.md`
+- Codex: `applications/Agent_Red/harness-state/codex/operating-role.md`
+- Claude Code: `applications/Agent_Red/harness-state/claude/operating-role.md`
 
 Standalone owner prompts `switch mode next session` and `change mode next
 session` are sufficient to toggle the current harness's durable next-session

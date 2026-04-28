@@ -21,8 +21,8 @@ vendor, or harness name. When multiple harnesses share this workspace, each
 harness should keep its own durable next-session role record so one harness's
 mode toggle does not overwrite the other's. Current local defaults:
 
-- Codex: `~/.codex/agent-red-hooks/operating-role.md`
-- Claude Code: `~/.claude/agent-red-hooks/operating-role.md`
+- Codex: `applications/Agent_Red/harness-state/codex/operating-role.md`
+- Claude Code: `applications/Agent_Red/harness-state/claude/operating-role.md`
 
 While Claude Code is unavailable, Codex may be assigned either Prime Builder or
 Loyal Opposition so the normal Prime Builder / Loyal Opposition process can
