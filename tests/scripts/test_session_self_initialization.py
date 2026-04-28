@@ -219,7 +219,11 @@ def test_startup_model_discovers_durable_operating_role() -> None:
 
 def test_harness_local_role_record_overrides_repo_default_for_startup(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
-    codex_dir = tmp_path / ".codex" / "agent-red-hooks"
+    # Post-migration tmp path mirrors the canonical
+    # applications/Agent_Red/harness-state/codex/ location used in production.
+    # Tests still monkeypatch HARNESS_ROLE_RECORDS so the actual location
+    # is the temp path; rename is a clarity improvement, not a behavior change.
+    codex_dir = tmp_path / "applications" / "Agent_Red" / "harness-state" / "codex"
     codex_dir.mkdir(parents=True)
     role_path = codex_dir / "operating-role.md"
     guard_path = codex_dir / "session-lifecycle-guard.json"
@@ -260,6 +264,41 @@ def test_harness_local_role_record_overrides_repo_default_for_startup(tmp_path, 
     assert "Role being assumed: Loyal Opposition" in context
     assert f"Role mapping source: {role_path}" in context
     assert guard_path.exists()
+
+
+def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() -> None:
+    """Regression test for harness-state-authority-migration-2026-04-27.
+
+    Verifies session_self_initialization resolves Codex and Claude harness-local
+    authority records under applications/Agent_Red/harness-state/, not Path.home().
+    Closes bridge/s317-working-tree-triage-005.md F5 deferral. Does NOT close
+    bridge/generator-hardening-002-008.md (skills/plugin-cache sites remain
+    out of scope).
+    """
+    module = _load_module()
+    expected_root = REPO_ROOT / "applications" / "Agent_Red" / "harness-state"
+
+    # Constant-level invariant: the authority root resolves under PROJECT_ROOT.
+    assert module.AGENT_RED_HARNESS_STATE_ROOT == expected_root
+    for harness_name in ("codex", "claude"):
+        assert module.HARNESS_ROLE_RECORDS[harness_name].is_relative_to(expected_root)
+        assert module.HARNESS_LIFECYCLE_GUARDS[harness_name].is_relative_to(expected_root)
+    assert module.DEFAULT_USER_STARTUP_PREFERENCES_PATH.is_relative_to(expected_root)
+
+    # Behavior-level invariant: operating_role_path() with --harness-name resolves
+    # to the in-root authority record (not the .claude/rules/operating-role.md
+    # repo fallback). prefer_local=False forces the function to gate on
+    # local_path.is_file(), which requires the authority files to be tracked
+    # (Commit 1 in this thread). If this assertion fails with the repo-fallback
+    # path, the migration is incomplete (likely Commit 1 missing).
+    for harness_name in ("codex", "claude"):
+        role_path = module.operating_role_path(
+            REPO_ROOT, harness_name=harness_name, prefer_local=False
+        )
+        assert role_path == expected_root / harness_name / "operating-role.md", (
+            f"--harness-name {harness_name} must resolve to in-root authority, "
+            f"got {role_path}"
+        )
 
 
 def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -> None:

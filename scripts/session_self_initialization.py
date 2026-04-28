@@ -86,12 +86,20 @@ except ImportError:  # pragma: no cover - direct script execution path
     )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Per bridge/harness-state-authority-migration-2026-04-27-006.md (GO):
+# Authority records for harness-local role, lifecycle guard, and startup
+# preferences resolve under applications/Agent_Red/harness-state/, not
+# Path.home(). Mirrors scripts/workstream_focus.py:23 pattern. Closes
+# bridge/s317-working-tree-triage-005.md F5 deferral.
+AGENT_RED_HARNESS_STATE_ROOT = PROJECT_ROOT / "applications" / "Agent_Red" / "harness-state"
 # DEFAULT_DASHBOARD_DIR / DEFAULT_HISTORY_PATH removed per
 # bridge/generator-hardening-001-003.md §4.6: argparse defaults to None;
 # main() derives both from resolved --project-root post-parse.
 # Codex GO -004 implementation constraint (i): PROJECT_ROOT only as CLI
 # fallback for --project-root, never as internal output/read-path fallback.
-DEFAULT_USER_STARTUP_PREFERENCES_PATH = Path.home() / ".codex" / "agent-red-hooks" / "session-startup-preferences.json"
+DEFAULT_USER_STARTUP_PREFERENCES_PATH = (
+    AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
+)
 GRAFANA_DASHBOARD_URL = "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
 DASHBOARD_OPEN_MODE_HARNESS = "harness_browser"
 DASHBOARD_OPEN_MODE_SYSTEM = "system_default_browser"
@@ -104,12 +112,12 @@ STARTUP_SERVICE_CONTRACT_VERSION = "agent-red-startup-service-v2"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "agent-red-startup-freshness-v1"
 OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
 HARNESS_ROLE_RECORDS = {
-    "codex": Path.home() / ".codex" / "agent-red-hooks" / "operating-role.md",
-    "claude": Path.home() / ".claude" / "agent-red-hooks" / "operating-role.md",
+    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
+    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
 }
 HARNESS_LIFECYCLE_GUARDS = {
-    "codex": Path.home() / ".codex" / "agent-red-hooks" / "session-lifecycle-guard.json",
-    "claude": Path.home() / ".claude" / "agent-red-hooks" / "session-lifecycle-guard.json",
+    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
+    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
 }
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
