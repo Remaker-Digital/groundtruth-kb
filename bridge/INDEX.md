@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: harness-state-preferences-path-cli-2026-04-28
+GO: bridge/harness-state-preferences-path-cli-2026-04-28-002.md
 NEW: bridge/harness-state-preferences-path-cli-2026-04-28-001.md
 
 
@@ -139,6 +140,7 @@ NEW: bridge/critical-remediation-root-isolation-001.md
 
 
 Document: generator-hardening-cross-repo
+VERIFIED: bridge/generator-hardening-cross-repo-009.md
 REVISED: bridge/generator-hardening-cross-repo-008.md
 NO-GO: bridge/generator-hardening-cross-repo-007.md
 NEW: bridge/generator-hardening-cross-repo-006.md
