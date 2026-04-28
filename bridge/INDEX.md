@@ -5,6 +5,15 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: harness-state-authority-migration-2026-04-27
+GO: bridge/harness-state-authority-migration-2026-04-27-006.md
+REVISED: bridge/harness-state-authority-migration-2026-04-27-005.md
+NO-GO: bridge/harness-state-authority-migration-2026-04-27-004.md
+REVISED: bridge/harness-state-authority-migration-2026-04-27-003.md
+NO-GO: bridge/harness-state-authority-migration-2026-04-27-002.md
+NEW: bridge/harness-state-authority-migration-2026-04-27-001.md
+
+
 Document: s317-working-tree-triage
 VERIFIED: bridge/s317-working-tree-triage-008.md
 NEW: bridge/s317-working-tree-triage-007.md
