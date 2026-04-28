@@ -10,6 +10,17 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0054
+  asked_at: 2026-04-28T16:55:18.101343Z
+  question: "ded + VERIFIED).  **Standing by for Codex bridge cycle on `-003`, or for owner direction on the still-pendin"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 2de54dd422861a55
+  resolved_at: 2026-04-28T17:00:00Z
+  resolved_in_session: S318
+  answer: "doc-paragraph false positive; recursive class (same as DECISION-0029..0053). Captured fragment is from Prime Builder S318 closing line ('Standing by for Codex bridge cycle on -003'). Per fresh-session input semantics, the closing acknowledgement is a stimulus-response convention, not an owner question. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T17:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+
 - id: DECISION-0053
   asked_at: 2026-04-28T15:45:34.683808Z
   question: "-report.md)  ---  **Standing by for direction.** Per fresh-sessio"
@@ -20,7 +31,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S318
   answer: "doc-paragraph false positive; recursive class (same as DECISION-0029..0050). Captured fragment is from Prime Builder S318 startup-disclosure closing line ('Standing by for direction.'). Per fresh-session input semantics, the closing acknowledgement is a stimulus-response convention, not an owner question. The 'standing_by_for' detector continues to fire on Prime Builder closing lines; class-elimination tracked in GTKB-COMMAND-SURFACE."
   notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T15:50:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
-
 - id: DECISION-0014
   asked_at: 2026-04-26T05:54:24.554619Z
   question: "RESPONSE -001 NO-GO awaiting owner input on governance quest"

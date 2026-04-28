@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: harness-state-preferences-path-cli-2026-04-28
+NO-GO: bridge/harness-state-preferences-path-cli-2026-04-28-004.md
 NEW: bridge/harness-state-preferences-path-cli-2026-04-28-003.md
 GO: bridge/harness-state-preferences-path-cli-2026-04-28-002.md
 NEW: bridge/harness-state-preferences-path-cli-2026-04-28-001.md
