@@ -542,3 +542,97 @@ def test_t15_migration_is_idempotent_against_real_schema(tmp_path: Path) -> None
     _migrate_schema(db_path)
     # Second invocation must not raise (would raise on duplicate ADD COLUMN).
     _migrate_schema(db_path)
+
+
+# ---------------------------------------------------------------------------
+# T16-T17: Track 1 backward-compat regression armor
+# Per bridge/gtkb-dora-001b-track1-implementation-005.md §3.2
+# Per bridge/gtkb-dora-001b-track1-implementation-006.md GO condition: "Add
+# the proposed writer tests and the two ingest regression tests."
+# ---------------------------------------------------------------------------
+
+def test_t16_pre_track1_manifest_still_classified_as_canonical_deploy(
+    tmp_path: Path,
+) -> None:
+    """T16: a pre-Track-1 manifest (PASS phase 9, NO deploy_evidence block)
+    must classify as `canonical_deploy` AND ingest at `_confidence='medium'`.
+
+    Regression armor: if Track 1 ever modifies `_classify_manifest()` to require
+    deploy_evidence presence for canonical_deploy classification, this test fails
+    immediately. The contract is that pre-Track-1 manifests already on disk
+    remain valid canonical_deploy events.
+    """
+    # Classification side: pre-Track-1 shape (no deploy_evidence) -> canonical_deploy
+    assert _classify_manifest({
+        "phases": [{"phase": 9, "status": "PASS"}],
+    }) == "canonical_deploy"
+
+    # Ingest side: pre-Track-1 manifest -> _confidence='medium'
+    _write_manifest(tmp_path, "production", 1700000099, {
+        "dry_run": False,
+        "version": "v1.98.92",
+        "environment": "production",
+        "status": "SUCCESS",
+        "repo_commit": "deadbeef0001",
+        "started_at": "2026-04-20T00:00:00Z",
+        "phases": [{"phase": 9, "status": "PASS"}],
+        # Intentionally NO deploy_evidence block — pre-Track-1 shape.
+    })
+
+    conn = _make_conn()
+    _ingest_canonical_pipeline_manifests(conn, tmp_path)
+
+    confidence = conn.execute(
+        "SELECT _confidence FROM delivery_timeline_events"
+    ).fetchone()[0]
+    assert confidence == "medium", (
+        "Pre-Track-1 manifest must ingest at _confidence='medium' per "
+        "Codex GO -006 condition 3 cap. If this fails, Track 1 may have "
+        "introduced a confidence-contract regression for legacy manifests."
+    )
+
+
+def test_t17_track1_manifest_with_full_evidence_capped_at_medium_until_reconcile(
+    tmp_path: Path,
+) -> None:
+    """T17: a Track 1 manifest with target_update_succeeded=true must still
+    ingest at `_confidence='medium'` (NOT 'high'). Confidence upgrade to
+    'high' is reserved for post-reconciliation when an Azure revision
+    matches.
+
+    Regression armor: this is the exact mistake `-003` made in proposing
+    `_confidence='high'` for full-evidence manifests at ingest time. If this
+    test ever fails, the confidence-contract has regressed in that direction.
+    Per `bridge/gtkb-dora-001b-authoritative-deployment-source-007.md` §4.2,
+    only Source C reconciliation may upgrade to 'high'.
+    """
+    _write_manifest(tmp_path, "production", 1700000100, {
+        "dry_run": False,
+        "version": "v1.99.0",
+        "environment": "production",
+        "status": "SUCCESS",
+        "repo_commit": "abc12345",
+        "started_at": "2026-04-28T00:00:00Z",
+        "phases": [{"phase": 9, "status": "PASS"}],
+        "deploy_evidence": {
+            "image": "acragentredeastus.azurecr.io/agent-red:v1.99.0",
+            "image_tag": "v1.99.0",
+            "revision_name": "agent-red-api-gateway--xyz99",
+            "target_verified_at": "2026-04-28T00:01:00Z",
+            "target_update_attempted": True,
+            "target_update_succeeded": True,
+        },
+    })
+
+    conn = _make_conn()
+    _ingest_canonical_pipeline_manifests(conn, tmp_path)
+
+    confidence = conn.execute(
+        "SELECT _confidence FROM delivery_timeline_events"
+    ).fetchone()[0]
+    assert confidence == "medium", (
+        "Full-evidence Track 1 manifests must still ingest at medium "
+        "per Source A → Source C reconciliation contract; only Azure "
+        "reconciliation may upgrade to high. Regression check against "
+        "the confidence-contract mistake from -003."
+    )

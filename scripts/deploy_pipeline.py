@@ -548,6 +548,12 @@ def phase_8_deploy(args: argparse.Namespace) -> PhaseResult:
         log("INFO", f"  [DRY RUN] Would deploy {new_image} to {container_app}")
         return PhaseResult(9, "Deploy to Target", "PASS", time.time() - t0, "dry-run")
 
+    # Track 1 (GTKB-DORA-001b): capture image metadata before az update call.
+    if hasattr(args, "_deploy_evidence"):
+        args._deploy_evidence["image"] = new_image
+        args._deploy_evidence["image_tag"] = args.version
+        args._deploy_evidence["target_container_app"] = container_app
+
     log("INFO", f"  Deploying {new_image} to {container_app}...")
     r = _run([
         "az", "containerapp", "update",
@@ -556,7 +562,21 @@ def phase_8_deploy(args: argparse.Namespace) -> PhaseResult:
         "--image", new_image,
     ], timeout=120)
 
+    # Track 1: record update attempt outcome BEFORE returning failure
+    # (Codex GO -006 condition 2: failed update must record evidence).
+    if hasattr(args, "_deploy_evidence"):
+        args._deploy_evidence["target_update_attempted"] = True
+        args._deploy_evidence["target_update_succeeded"] = (r.returncode == 0)
+
     if r.returncode != 0:
+        # Track 1: record phase timing on failure path so attempted-failed
+        # manifests retain the Track 1 signal.
+        if hasattr(args, "_deploy_evidence"):
+            args._deploy_evidence["phase_timings"]["phase_9_deploy"] = {
+                "started_at": datetime.fromtimestamp(t0).isoformat(),
+                "completed_at": datetime.now().isoformat(),
+                "duration_seconds": round(time.time() - t0, 1),
+            }
         detail = f"Container app update failed: {r.stderr.strip()[:300]}"
         log("FAIL", f"  {detail}")
         return PhaseResult(9, "Deploy to Target", "FAIL", time.time() - t0, detail)
@@ -572,6 +592,28 @@ def phase_8_deploy(args: argparse.Namespace) -> PhaseResult:
     deployed_image = r2.stdout.strip()
     if deployed_image != new_image:
         log("WARN", f"  Expected {new_image}, got {deployed_image} — may still be transitioning")
+        # Track 1: image mismatch downgrades target_update_succeeded.
+        if hasattr(args, "_deploy_evidence"):
+            args._deploy_evidence["target_update_succeeded"] = False
+
+    # Track 1: query revision name (non-fatal on failure) and record
+    # phase timing + verification timestamp.
+    if hasattr(args, "_deploy_evidence"):
+        r3 = _run([
+            "az", "containerapp", "revision", "list",
+            "--name", container_app,
+            "--resource-group", RESOURCE_GROUP,
+            "--query", f"[?properties.template.containers[0].image=='{new_image}'].name | [0]",
+            "-o", "tsv",
+        ], timeout=30)
+        if r3.returncode == 0 and r3.stdout.strip():
+            args._deploy_evidence["revision_name"] = r3.stdout.strip()
+        args._deploy_evidence["target_verified_at"] = datetime.now().isoformat()
+        args._deploy_evidence["phase_timings"]["phase_9_deploy"] = {
+            "started_at": datetime.fromtimestamp(t0).isoformat(),
+            "completed_at": datetime.now().isoformat(),
+            "duration_seconds": round(time.time() - t0, 1),
+        }
 
     log("PASS", f"  Deployed to {container_app}")
     dt = time.time() - t0
@@ -604,6 +646,14 @@ def phase_10_startup_and_version(args: argparse.Namespace) -> PhaseResult:
             last_version = actual_version
             if actual_version == expected_version:
                 log("PASS", f"  /health 200, product_version={actual_version} (matched after {elapsed}s)")
+                # Track 1 (GTKB-DORA-001b): record deployed_at + phase timing on success.
+                if hasattr(args, "_deploy_evidence"):
+                    args._deploy_evidence["deployed_at"] = datetime.now().isoformat()
+                    args._deploy_evidence["phase_timings"]["phase_10_startup_and_version"] = {
+                        "started_at": datetime.fromtimestamp(t0).isoformat(),
+                        "completed_at": datetime.now().isoformat(),
+                        "duration_seconds": round(time.time() - t0, 1),
+                    }
                 return PhaseResult(10, "Startup + Version Verify", "PASS", time.time() - t0)
             else:
                 log("INFO", f"  Waiting... [{elapsed}s] (200 but version={actual_version}, want {expected_version})")
@@ -615,6 +665,14 @@ def phase_10_startup_and_version(args: argparse.Namespace) -> PhaseResult:
     if status == 200 and isinstance(body, dict):
         actual_version = body.get("product_version", "?")
         if actual_version == expected_version:
+            # Track 1: record deployed_at + phase timing on final-attempt success.
+            if hasattr(args, "_deploy_evidence"):
+                args._deploy_evidence["deployed_at"] = datetime.now().isoformat()
+                args._deploy_evidence["phase_timings"]["phase_10_startup_and_version"] = {
+                    "started_at": datetime.fromtimestamp(t0).isoformat(),
+                    "completed_at": datetime.now().isoformat(),
+                    "duration_seconds": round(time.time() - t0, 1),
+                }
             return PhaseResult(10, "Startup + Version Verify", "PASS", time.time() - t0)
         detail = (f"Health 200 but product_version={actual_version}, expected={expected_version} "
                   f"-- old revision still active")
@@ -699,6 +757,14 @@ def phase_15_enforce_scaling(args: argparse.Namespace) -> PhaseResult:
     else:
         extra = ""
         detail = f"failed=0 ok={total} total={total}"
+
+    # Track 1 (GTKB-DORA-001b): record phase timing.
+    if hasattr(args, "_deploy_evidence"):
+        args._deploy_evidence["phase_timings"]["phase_15_enforce_scaling"] = {
+            "started_at": datetime.fromtimestamp(t0).isoformat(),
+            "completed_at": datetime.now().isoformat(),
+            "duration_seconds": round(dt, 1),
+        }
 
     return PhaseResult(15, "Enforce Scaling Baseline", "PASS", dt,
                        detail=detail, extra=extra)
@@ -1357,6 +1423,12 @@ def main() -> int:
         print(f"ERROR: Version must be in format vX.Y.Z (got: {args.version})")
         return 1
 
+    # Track 1 (GTKB-DORA-001b): initialize deploy_evidence accumulator.
+    # Phase 8/10/15 populate fields when not dry-run; manifest write site
+    # injects the block only if phase_timings is non-empty (meaningful
+    # evidence). See bridge/gtkb-dora-001b-track1-implementation-005.md §2.
+    args._deploy_evidence = {"phase_timings": {}}
+
     start_time = time.time()
     results: list[PhaseResult] = []
     build_context = ""
@@ -1571,6 +1643,15 @@ def main() -> int:
         "defect_wi": defect_wi,
         "log_file": str(log_path) if log_path else None,
     }
+
+    # Track 1 (GTKB-DORA-001b): inject deploy_evidence block when at least
+    # one phase recorded timing. Dry-run mode leaves phase_timings empty
+    # (no phase populates it), so the block is omitted from dry-run manifests
+    # per Codex GO -006 condition 1.
+    evidence = getattr(args, "_deploy_evidence", None)
+    if evidence and len(evidence.get("phase_timings", {})) > 0:
+        deploy_result["deploy_evidence"] = evidence
+
     result_path = PROJECT_ROOT / "logs" / f"deploy-result-{args.env}-{int(start_time)}.json"
     try:
         result_path.parent.mkdir(parents=True, exist_ok=True)
