@@ -104,7 +104,7 @@ def test_registry_loose_md_files_remain_local() -> None:
             cwd=project_root,
         )
         assert result.returncode == 0, (
-            f"Loose .md files under .claude/commands/ are no longer ignored. "
+            "Loose .md files under .claude/commands/ are no longer ignored. "
             "The tracked-vs-local distinction per architectural plan "
             "§6 has been broken. If this is intentional, update the "
             "architectural plan and CS-7 disposition; if not, narrow "

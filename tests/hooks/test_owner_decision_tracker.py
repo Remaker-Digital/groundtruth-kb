@@ -32,7 +32,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
@@ -434,6 +433,7 @@ def test_t15_truncated_transcript_returns_zero_no_mutation(tmp_path: Path) -> No
     after = _read_pending_file(project)
     # Should not crash; durable file should be intact (may be unchanged
     # since the truncated fixture has no parseable AskUserQuestion).
+    assert after == before, "Truncated transcript must not mutate the durable file"
     assert "## Pending" in after
     assert "(none)" in after.split("## Pending", 1)[1].split("##", 1)[0]
     # Sanity: test fixture file exists

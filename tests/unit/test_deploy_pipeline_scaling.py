@@ -31,7 +31,6 @@ Created 2026-04-25 (S308) per
 from __future__ import annotations
 
 import importlib.util
-import io
 import re
 import subprocess
 import sys

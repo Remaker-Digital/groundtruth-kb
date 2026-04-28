@@ -9,9 +9,7 @@ Slice 2.1 of GTKB-DASHBOARD-002 — see
 from __future__ import annotations
 
 import hashlib
-import json
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -23,7 +21,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.gtkb_dashboard import generate_bridge_swimlane as gbs
+# E402: import intentionally follows the sys.path.insert above so the test
+# can resolve scripts.gtkb_dashboard from REPO_ROOT regardless of CWD.
+from scripts.gtkb_dashboard import generate_bridge_swimlane as gbs  # noqa: E402
 
 
 # ----------------------------- helpers -----------------------------

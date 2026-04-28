@@ -229,7 +229,7 @@ def test_stat_panels_surface_per_panel_freshness_secondary_value() -> None:
         if title == "Refresh Age":
             # Refresh Age exemption: primary value already IS the freshness reading.
             assert all(t.get("refId") != freshness_refid for t in targets), (
-                f"Refresh Age panel must not carry a secondary F target; primary is already the freshness value"
+                "Refresh Age panel must not carry a secondary F target; primary is already the freshness value"
             )
             continue
         freshness_targets = [t for t in targets if t.get("refId") == freshness_refid]
