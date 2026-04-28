@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-completion-plan-2026-04-28
+NEW: bridge/gtkb-isolation-completion-plan-2026-04-28-002.md
 NEW: bridge/gtkb-isolation-completion-plan-2026-04-28-001.md
 
 
