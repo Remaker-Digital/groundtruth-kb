@@ -28,17 +28,26 @@ import sys
 # Destructive command patterns (compiled for performance)
 # ---------------------------------------------------------------------------
 
-# File deletion — Windows and Unix
-_DELETE_PATTERNS = [
+# File deletion patterns with safe-path exception — bash/PowerShell forms
+# (e.g., `rm -rf node_modules` is allowed because the safe-path check
+# recognizes node_modules as a known cache target).
+_DELETE_PATTERNS_WITH_SAFE_EXCEPTION = [
     re.compile(r'\bdel\s+/[sfq]', re.IGNORECASE),        # del /S, /F, /Q (recursive/force)
     re.compile(r'\bdel\s+"?[^"]*\*', re.IGNORECASE),       # del with wildcards
     re.compile(r'\brmdir\s+/s', re.IGNORECASE),            # rmdir /S (recursive)
     re.compile(r'\brm\s+-r', re.IGNORECASE),               # rm -r, rm -rf, rm -ri
     re.compile(r'\brm\s+--recursive', re.IGNORECASE),
     re.compile(r'\bRemove-Item\b.*-Recurse', re.IGNORECASE),
-    # Python recursive-deletion forms (parity with bash forms; per
-    # bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-002.md GO).
-    # Catches inline `python -c "..."` invocations from the Bash tool.
+]
+
+# Python recursive-deletion forms — ALWAYS BLOCKED regardless of safe-path
+# substrings elsewhere in the command. Per
+# bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-004.md NO-GO:
+# the safe-path heuristic is too broad for inline Python source where unrelated
+# strings (e.g., `print('node_modules')`) can suppress a block for a dangerous
+# target. Rather than try to extract the actual deletion target from Python
+# call arguments (brittle), these patterns bypass the safe-path check.
+_DELETE_PATTERNS_ALWAYS_BLOCKED = [
     re.compile(r'\bshutil\.rmtree\b', re.IGNORECASE),
     re.compile(r'\bos\.removedirs\b', re.IGNORECASE),
     # subprocess wrappers around bash recursive-deletion (e.g.,
@@ -46,6 +55,9 @@ _DELETE_PATTERNS = [
     re.compile(r'subprocess\.\w+\([^)]*[\'"]rm[\'"][^)]*[\'"]-r[a-z]*[\'"]', re.IGNORECASE),
     re.compile(r'subprocess\.\w+\([^)]*[\'"]Remove-Item[\'"][^)]*[\'"]-Recurse[\'"]', re.IGNORECASE),
 ]
+
+# Backward-compat alias — used by tests that iterate the full list.
+_DELETE_PATTERNS = _DELETE_PATTERNS_WITH_SAFE_EXCEPTION + _DELETE_PATTERNS_ALWAYS_BLOCKED
 
 # Git destructive operations
 _GIT_DESTRUCTIVE = [
@@ -149,8 +161,21 @@ def _check_destructive(command: str) -> str | None:
                 f"TSX gate) cannot be bypassed without owner approval."
             )
 
-    # File deletion checks (with safe-path exception)
-    for pattern in _DELETE_PATTERNS:
+    # Python recursive-deletion forms: ALWAYS blocked, regardless of safe-path.
+    # Safe-path bypass class: see bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-004.md
+    # NO-GO. An unrelated safe-path substring (e.g., `print('node_modules')`)
+    # could otherwise suppress a block for a dangerous deletion target.
+    for pattern in _DELETE_PATTERNS_ALWAYS_BLOCKED:
+        if pattern.search(command):
+            return (
+                f"BLOCKED: Destructive file operation detected. "
+                f"Pattern: {pattern.pattern}. "
+                f"Python recursive-deletion forms cannot bypass via safe-path "
+                f"substrings; ask the owner for approval before deleting files."
+            )
+
+    # Bash/PowerShell deletion checks (with safe-path exception)
+    for pattern in _DELETE_PATTERNS_WITH_SAFE_EXCEPTION:
         if pattern.search(command) and not _is_safe_path(command):
             return (
                 f"BLOCKED: Destructive file operation detected. "

@@ -196,3 +196,31 @@ class TestPythonRecursiveDeletionParity:
         # by the recursive-deletion patterns. May still be blocked by other
         # patterns (e.g., production targeting), but not by _DELETE_PATTERNS.
         assert result is None or "destructive" not in result.lower() or "rmtree" not in result.lower()
+
+    def test_blocks_shutil_rmtree_with_unrelated_safe_path_substring(self, check_destructive):
+        """Per bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-004 NO-GO:
+        Python recursive-deletion must NOT be bypassed by an unrelated safe-path
+        substring elsewhere in the command. Critical bypass test #1.
+        """
+        result = check_destructive(
+            """python -c "import shutil; print('node_modules'); shutil.rmtree('GT-KB')" """
+        )
+        assert result is not None, (
+            "shutil.rmtree must remain blocked even when an unrelated safe-path "
+            "substring (node_modules) appears in a print statement. "
+            "Got: result is None (would have allowed the deletion)."
+        )
+
+    def test_blocks_shutil_rmtree_with_safe_path_in_comment(self, check_destructive):
+        """Per bridge/destructive-gate-coverage-shutil-rmtree-2026-04-27-004 NO-GO:
+        Critical bypass test #2 — safe-path substring in a Python comment must
+        not suppress the block.
+        """
+        result = check_destructive(
+            """python -c "import shutil; shutil.rmtree('GT-KB') # node_modules" """
+        )
+        assert result is not None, (
+            "shutil.rmtree must remain blocked even when an unrelated safe-path "
+            "substring (node_modules) appears in a comment. "
+            "Got: result is None (would have allowed the deletion)."
+        )
