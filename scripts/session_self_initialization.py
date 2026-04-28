@@ -1232,9 +1232,29 @@ def _gtkb_package_info() -> dict[str, Any]:
     }
 
 
-def _git_checkout_info(path: Path) -> dict[str, Any]:
+def _git_checkout_info(path: Path, project_root: Path) -> dict[str, Any]:
     if not path.is_dir():
         return {"available": False, "path": str(path), "error": "checkout not found"}
+    # Owner-directive scope check per .claude/rules/project-root-boundary.md:
+    # checkouts outside project_root must not trigger live git subprocesses.
+    # See bridge/generator-hardening-cross-repo-005.md GO. Live cross-repo
+    # upgrade-posture inspection is removed by design; the dashboard renders
+    # the degraded record gracefully via the "available: false" branch.
+    resolved_path = path.resolve()
+    resolved_root = project_root.resolve()
+    try:
+        resolved_path.relative_to(resolved_root)
+    except ValueError:
+        return {
+            "available": False,
+            "path": str(path),
+            "error": "checkout_outside_project_root",
+            "scope_diagnostic": (
+                "checkout outside --project-root; live cross-repo inspection "
+                "removed per owner directive (all live GT-KB artifacts must be "
+                "within project root)."
+            ),
+        }
     branch = _command_output(["git", "branch", "--show-current"], path)
     sha = _command_output(["git", "rev-parse", "HEAD"], path)
     short_sha = _command_output(["git", "rev-parse", "--short", "HEAD"], path)
@@ -1293,7 +1313,7 @@ def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
             inferred_checkout = package_path.parents[2]
     adjacent_checkout = project_root.parent / "groundtruth-kb"
     checkout_path = inferred_checkout or adjacent_checkout
-    checkout = _git_checkout_info(checkout_path)
+    checkout = _git_checkout_info(checkout_path, project_root)
     configured_gtkb_repo = _github_repo_slug(_local_env_value(project_root, "GROUND_TRUTH_GITHUB_REPO"))
     remote_url = (
         _github_repo_url(configured_gtkb_repo)

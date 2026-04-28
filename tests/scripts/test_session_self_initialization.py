@@ -1747,3 +1747,35 @@ def test_main_with_only_project_root_writes_under_that_root(tmp_path, monkeypatc
             "Canonical PROJECT_ROOT/memory/gtkb-dashboard-history.json mtime changed; "
             "generator leaked a write to the canonical path"
         )
+
+
+def test_git_checkout_info_returns_degraded_when_outside_project_root(tmp_path, monkeypatch) -> None:
+    """Per bridge/generator-hardening-cross-repo-005.md GO conditions.
+
+    GO condition 3: 'The test must prove no git subprocess is spawned for a
+    checkout path outside project_root.' Monkeypatch _command_output to fail
+    loudly if invoked; the scope-check guard must short-circuit before any
+    git call. Verifies the degrade-only contract from the project-root-
+    boundary directive (.claude/rules/project-root-boundary.md).
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    outside_checkout = tmp_path / "outside" / "fake-repo"
+    outside_checkout.mkdir(parents=True)
+
+    module = _load_module()
+
+    def _fail_on_git(*_args, **_kwargs) -> None:
+        raise AssertionError(
+            "git subprocess invoked for checkout outside project_root; "
+            "scope-check guard regressed"
+        )
+
+    monkeypatch.setattr(module, "_command_output", _fail_on_git)
+
+    result = module._git_checkout_info(outside_checkout, project_root)
+
+    assert result["available"] is False, "outside-root checkout must report unavailable"
+    assert result["error"] == "checkout_outside_project_root"
+    assert "scope_diagnostic" in result
+    assert "outside" in result["scope_diagnostic"].lower()
