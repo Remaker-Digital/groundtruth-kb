@@ -10,6 +10,39 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0059
+  asked_at: 2026-04-28T18:53:28.329598Z
+  question: "y remaining blocker awaiting your explicit approval."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 980b414bcaeb639e
+  resolved_at: 2026-04-28T19:25:00Z
+  resolved_in_session: S319
+  answer: "Real question (not FP) — Prime Builder asked owner for explicit destructive-action approval to run `git rm --cached` per feedback_explicit_destructive_action_authorization.md, after destructive-gate hook blocked. Resolved organically: owner ran the cached-removal command themselves at PowerShell prompt, sidestepping the hook. Bridge 2 then committed (b95520c5). Same FP class as DECISION-0052 (S317): hook regex over-broad, catches non-destructive cached-only form. Tracked as follow-on in bridge/session-hygiene-gitignore-extensions-2026-04-28-003.md §8 — recommend hook refinement to recognize --cached/--staged as non-destructive flags."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T19:25:00Z (real question; resolved by owner action)"
+- id: DECISION-0058
+  asked_at: 2026-04-28T18:05:12.361592Z
+  question: "Bridge 1 is filed, should I also begin drafting Bridge 2 (the hygiene gitignore extensions for items #5–#9 from the original drift triage) in parallel, or wait until Bridge 1 is VERIFIED before opening another thread?"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 50d3c43d8cab9623
+  resolved_at: 2026-04-28T19:25:00Z
+  resolved_in_session: S319
+  answer: "Real question (not FP) — Prime Builder asked whether to draft Bridge 2 in parallel with Bridge 1. Owner answered: 'begin drafting Bridge 2'. Both bridges (role-contract-clarifications-2026-04-28 and session-hygiene-gitignore-extensions-2026-04-28) were drafted in parallel, filed at -001 NEW, GO'd by Codex at -002, implemented at commit a0a83c23 (Bridge 1) and b95520c5 (Bridge 2), with -003 post-impl reports filed awaiting Codex VERIFIED."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T19:25:00Z (real question; resolved by owner direction in subsequent turns)"
+- id: DECISION-0057
+  asked_at: 2026-04-28T18:05:12.361592Z
+  question: "eed  **Q1**: Do you want me to proceed with the deliberation search + Bridge 1 drafting now, or pause to revisit any of the confirmed dispositions?  **Q2**: After Brid"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: a63384ecb64e1e1b
+  resolved_at: 2026-04-28T19:25:00Z
+  resolved_in_session: S319
+  answer: "Real two-part question (not FP); capture truncated mid-sentence. Q1 (proceed with deliberation search + Bridge 1 drafting?) — owner answered 'Yes'. Q2 (begin drafting Bridge 2 in parallel after Bridge 1 filed?) — owner answered 'begin drafting Bridge 2'. Both bridges then drafted, GO'd, and implemented per the parallel autonomy directive. Companion to DECISION-0058 (which captured Q2 as its own entry due to detector firing twice on the same prompt block)."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T19:25:00Z (real question; resolved by owner direction; truncated capture reduces searchability but content recovered from session transcript)"
+
+
+
 - id: DECISION-0056
   asked_at: 2026-04-28T17:28:29.110575Z
   question: "lose S318 cleanly.  Awaiting owner direction."
@@ -20,7 +53,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S318
   answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0055). Captured fragment is Prime Builder closing summary line offering session-wrap option. Owner directed wrap-up after this prompt, organically resolving without archival need. Class-elimination tracked in GTKB-COMMAND-SURFACE."
   notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T17:32:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
-
 - id: DECISION-0055
   asked_at: 2026-04-28T17:25:18.270792Z
   question: "terminally closed. Standing by for owner direction on next focus."
