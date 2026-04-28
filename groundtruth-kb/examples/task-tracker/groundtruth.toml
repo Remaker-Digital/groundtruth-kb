@@ -1,0 +1,6 @@
+[groundtruth]
+db_path = "./groundtruth.db"
+project_root = "."
+app_title = "Task Tracker KB"
+brand_mark = "TT"
+brand_color = "#059669"

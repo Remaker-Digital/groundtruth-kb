@@ -1,0 +1,468 @@
+=== Fixture C Evidence ===
+Bridge: gtkb-da-governance-completeness-implementation-015 sec.7 item 9
+groundtruth_kb __version__: 0.6.1
+
+Registry order by event:
+  PostToolUse:
+    delib-search-tracker.py
+    owner-decision-capture.py
+  PreToolUse:
+    spec-before-code.py
+    bridge-compliance-gate.py
+    kb-not-markdown.py
+    destructive-gate.py
+    credential-scan.py
+    scanner-safe-writer.py
+  SessionStart:
+    session-start-governance.py
+    assertion-check.py
+  UserPromptSubmit:
+    delib-search-gate.py
+    intake-classifier.py
+    turn-marker.py
+    delib-preflight-gate.py
+    gov09-capture.py
+
+--- Pre-upgrade .claude/settings.json (fixture C) ---
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/spec-before-code.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/bridge-compliance-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/kb-not-markdown.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/destructive-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/credential-scan.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/scanner-safe-writer.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/session-start-governance.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/assertion-check.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-search-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/intake-classifier.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/custom-ups.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/turn-marker.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-preflight-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/gov09-capture.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-search-tracker.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/custom-post.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/owner-decision-capture.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+--- plan_upgrade(target)  [== `gt project upgrade --dry-run`] ---
+Total actions emitted: 49
+merge-event-hooks actions: 2
+  [MERGE-EVENT-HOOKS] .claude/settings.json - Merge UserPromptSubmit hooks to registry order [event=UserPromptSubmit]
+  [MERGE-EVENT-HOOKS] .claude/settings.json - Merge PostToolUse hooks to registry order [event=PostToolUse]
+
+Other actions (not subject of this evidence): 47
+  [INFORMATIONAL] .claude/hooks/bridge-compliance-gate.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/delib-search-gate.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/delib-search-tracker.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/kb-not-markdown.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/session-health.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/session-start-governance.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/spec-before-code.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/settings.local.json - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .editorconfig - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .pre-commit-config.yaml - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] AGENTS.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] BRIDGE-INVENTORY.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] CLAUDE.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] MEMORY.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] Makefile - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] bridge-os-poller-setup-prompt.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] bridge/INDEX.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] groundtruth.db - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] groundtruth.toml - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/CODEX-WAY-OF-WORKING.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/LOYAL-OPPOSITION-LOG.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] pyproject.toml - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [SKIP] .claude/hooks/assertion-check.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/spec-classifier.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/intake-classifier.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/destructive-gate.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/credential-scan.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/scanner-safe-writer.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/_delib_common.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/turn-marker.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/delib-preflight-gate.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/owner-decision-capture.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/hooks/gov09-capture.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/rules/prime-builder.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/rules/loyal-opposition.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/rules/bridge-poller-canonical.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/rules/report-depth.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/rules/file-bridge-protocol.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/rules/bridge-essential.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/skills/decision-capture/SKILL.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/skills/decision-capture/helpers/record_decision.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/skills/bridge-propose/SKILL.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/skills/bridge-propose/helpers/write_bridge.py - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/skills/spec-intake/SKILL.md - File differs from template (customized?) — use --force to overwrite
+  [SKIP] .claude/skills/spec-intake/helpers/spec_intake.py - File differs from template (customized?) — use --force to overwrite
+
+--- execute_upgrade(target, mutating)  [== `gt project upgrade --apply`] ---
+Total result lines: 28
+MERGED lines: 3
+  MERGED .claude/settings.json — UserPromptSubmit rebuilt (5 managed, 1 preserved)
+  MERGED .claude/settings.json — PostToolUse rebuilt (2 managed, 1 preserved)
+  MERGED payload into master @ 0251c75efd
+
+Other result lines: 25
+  SKIPPED .claude/hooks/assertion-check.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/spec-classifier.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/intake-classifier.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/destructive-gate.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/credential-scan.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/scanner-safe-writer.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/_delib_common.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/turn-marker.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/delib-preflight-gate.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/owner-decision-capture.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/hooks/gov09-capture.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/rules/prime-builder.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/rules/loyal-opposition.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/rules/bridge-poller-canonical.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/rules/report-depth.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/rules/file-bridge-protocol.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/rules/bridge-essential.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/skills/decision-capture/SKILL.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/skills/decision-capture/helpers/record_decision.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/skills/bridge-propose/SKILL.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/skills/bridge-propose/helpers/write_bridge.py — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/skills/spec-intake/SKILL.md — File differs from template (customized?) — use --force to overwrite
+  SKIPPED .claude/skills/spec-intake/helpers/spec_intake.py — File differs from template (customized?) — use --force to overwrite
+  VERSION scaffold_version → 0.6.1
+  RECEIPT tracked @ 5e9d132159 (34e599fda8c347f0.json)
+
+--- Post-upgrade .claude/settings.json ---
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/spec-before-code.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/bridge-compliance-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/kb-not-markdown.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/destructive-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/credential-scan.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/scanner-safe-writer.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/session-start-governance.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/assertion-check.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-search-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/intake-classifier.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/turn-marker.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-preflight-gate.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/gov09-capture.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/custom-ups.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/delib-search-tracker.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/owner-decision-capture.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/custom-post.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+--- plan_upgrade(target)  [second pass - idempotence proof] ---
+Total second-pass actions: 24
+second-pass merge-event-hooks actions: 0
+
+Other second-pass actions (non-merge): 24
+  [INFORMATIONAL] .claude/hooks/bridge-compliance-gate.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/delib-search-gate.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/delib-search-tracker.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/kb-not-markdown.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/session-health.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/session-start-governance.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/hooks/spec-before-code.py - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .claude/settings.local.json - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .editorconfig - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] .pre-commit-config.yaml - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] AGENTS.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] BRIDGE-INVENTORY.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] CLAUDE.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] MEMORY.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] Makefile - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] bridge-os-poller-setup-prompt.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] bridge/INDEX.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] groundtruth.db - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] groundtruth.toml - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/CODEX-WAY-OF-WORKING.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] independent-progress-assessments/LOYAL-OPPOSITION-LOG.md - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+  [INFORMATIONAL] pyproject.toml - Created by gt project init for this profile; upgrade cannot repair or update it if deleted.
+
+--- Structural assertions ---
+UserPromptSubmit final order (6 entries):
+    python .claude/hooks/delib-search-gate.py
+    python .claude/hooks/intake-classifier.py
+    python .claude/hooks/turn-marker.py
+    python .claude/hooks/delib-preflight-gate.py
+    python .claude/hooks/gov09-capture.py
+    python .claude/hooks/custom-ups.py
+PostToolUse final order (3 entries):
+    python .claude/hooks/delib-search-tracker.py
+    python .claude/hooks/owner-decision-capture.py
+    python .claude/hooks/custom-post.py
+PreToolUse final order (6 entries) - must be unchanged:
+    python .claude/hooks/spec-before-code.py
+    python .claude/hooks/bridge-compliance-gate.py
+    python .claude/hooks/kb-not-markdown.py
+    python .claude/hooks/destructive-gate.py
+    python .claude/hooks/credential-scan.py
+    python .claude/hooks/scanner-safe-writer.py
+SessionStart final order (2 entries) - must be unchanged:
+    python .claude/hooks/session-start-governance.py
+    python .claude/hooks/assertion-check.py

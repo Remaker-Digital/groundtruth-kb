@@ -1,0 +1,76 @@
+# Security scanning — Semgrep SAST + pip-audit dependency check
+# Runs on every PR and push to main. Uploads SARIF to GitHub Code Scanning.
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+name: Security
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/security-audit
+            p/secrets
+          generateSarif: "1"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  pip-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install package
+        run: pip install -e ".[dev,web]"
+
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit
+          mkdir -p .quality
+          # PYSEC-2022-42969: py 1.11.0 py.path.svnwc vulnerability — not exploitable
+          # in our usage (transitive dep from CI runner, not imported by our code).
+          pip-audit --ignore-vuln PYSEC-2022-42969 --format=json --output=.quality/pip-audit.json || true
+          pip-audit --ignore-vuln PYSEC-2022-42969 --format=cyclonedx-json --output=.quality/sbom.json || true
+          pip-audit --ignore-vuln PYSEC-2022-42969
+        continue-on-error: false
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pip-audit-results
+          path: .quality/

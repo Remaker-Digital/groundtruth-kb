@@ -1,0 +1,123 @@
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Sibling Ownership Map — ownership-glob records keyed by path_glob.
+#
+# Every record has class = "ownership-glob" and carries the ownership block
+# inline (no defaults are ever applied to ownership-glob rows).
+#
+# Loader invariants (InvalidArtifactRecord on violation):
+#   - priority must be int (higher wins among overlapping globs)
+#   - ownership / upgrade_policy REQUIRED on every row (no defaults)
+#   - adopter_divergence_policy present iff upgrade_policy in
+#     {overwrite, structured-merge, adopter-opt-in}
+#   - id unique across both this file and managed-artifacts.toml
+#
+# Added by sub-bridge `gtkb-artifact-ownership-matrix-003` (GO -004).
+
+# =========================================================================
+# ADOPTER PROJECT FILES
+# =========================================================================
+
+[[artifacts]]
+class = "ownership-glob"
+id = "adopter-groundtruth-toml"
+path_glob = "groundtruth.toml"
+priority = 100
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "gt-kb-scaffolded"
+upgrade_policy = "preserve"
+notes = "Written once at scaffold; adopter edits freely. Any scaffold_version bump is handled by a separate structured-patch mechanism, not this row."
+
+[[artifacts]]
+class = "ownership-glob"
+id = "adopter-groundtruth-db"
+path_glob = "groundtruth.db"
+priority = 100
+initial_profiles = []
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "legacy-exception"
+upgrade_policy = "preserve"
+notes = "Fresh scaffold gitignores; Agent Red tracks. Owner decision pending on product default (S296-S299 context)."
+
+[[artifacts]]
+class = "ownership-glob"
+id = "adopter-bridge-files"
+path_glob = "bridge/**/*.md"
+priority = 50
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "shared-structured"
+upgrade_policy = "preserve"
+notes = "GT-KB defines protocol in docs and scaffold; adopter owns per-file content."
+
+[[artifacts]]
+class = "ownership-glob"
+id = "adopter-memory-files"
+path_glob = "memory/**/*.md"
+priority = 50
+initial_profiles = []
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "adopter-owned"
+upgrade_policy = "preserve"
+
+[[artifacts]]
+class = "ownership-glob"
+id = "adopter-webapp"
+path_glob = "webapp/**"
+priority = 50
+initial_profiles = []
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "adopter-owned"
+upgrade_policy = "preserve"
+
+# =========================================================================
+# GT-KB RUNTIME-MANAGED (TRANSIENT)
+# =========================================================================
+
+[[artifacts]]
+class = "ownership-glob"
+id = "gt-kb-staging"
+path_glob = ".gt-upgrade-staging/**"
+priority = 100
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "transient"
+
+# =========================================================================
+# GO CONDITION C3 — OWNER-DECISION-PENDING REQUIREMENT FILES
+# =========================================================================
+# These rows deterministically surface Agent Red's stale v0.2.1 GT-KB pins as
+# owner-decision-pending entries in the classification report. See
+# `bridge/gtkb-artifact-ownership-matrix-004.md` §C3.
+
+[[artifacts]]
+class = "ownership-glob"
+id = "adopter-requirements-local-txt"
+path_glob = "requirements-local.txt"
+priority = 100
+initial_profiles = []
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "legacy-exception"
+upgrade_policy = "preserve"
+notes = "GT-KB pip dependency pin location. Owner decision pending on adoption cadence (stale v0.2.1 pin as of 2026-04-17)."
+
+[[artifacts]]
+class = "ownership-glob"
+id = "adopter-requirements-test-txt"
+path_glob = "requirements-test.txt"
+priority = 100
+initial_profiles = []
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "legacy-exception"
+upgrade_policy = "preserve"
+notes = "GT-KB pip test dependency pin location. Owner decision pending on adoption cadence (stale v0.2.1 pin as of 2026-04-17)."

@@ -1,0 +1,65 @@
+{
+  "gate_bound": [
+    {
+      "command": "python -m pytest --collect-only -q",
+      "commit_sha": "f475c8b",
+      "metric_name": "test_count",
+      "nondeterminism": "deterministic",
+      "source_scope": "tests/ directory, all collected test ids",
+      "timestamp_utc": "2026-04-17T21:15:59Z",
+      "value": 1266
+    },
+    {
+      "command": "python -m mypy --strict src/groundtruth_kb/",
+      "commit_sha": "f475c8b",
+      "metric_name": "mypy_strict",
+      "nondeterminism": "deterministic",
+      "source_scope": "src/groundtruth_kb/ (all modules)",
+      "timestamp_utc": "2026-04-17T21:15:59Z",
+      "value": {
+        "source_files": 40,
+        "status": "pass"
+      }
+    },
+    {
+      "command": "python scripts/audit_docstrings.py",
+      "commit_sha": "f475c8b",
+      "metric_name": "docstring_coverage_percent",
+      "nondeterminism": "deterministic",
+      "source_scope": "src/groundtruth_kb/ public API (audit_docstrings.py scope)",
+      "timestamp_utc": "2026-04-17T21:15:59Z",
+      "value": 87.31
+    }
+  ],
+  "generated_at_commit": "f475c8b",
+  "generated_at_utc": "2026-04-17T21:15:59Z",
+  "live_snapshot": [
+    {
+      "command": "sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'",
+      "commit_sha": "f475c8b",
+      "metric_name": "specs_specified",
+      "reproducibility": "local_install_snapshot",
+      "source_scope": "local groundtruth-kb/groundtruth.db at repo root",
+      "timestamp_utc": "2026-04-17T21:15:59Z",
+      "value": 30
+    },
+    {
+      "command": "sqlite3 groundtruth.db 'SELECT status, COUNT(*) FROM (...) GROUP BY status'",
+      "commit_sha": "f475c8b",
+      "metric_name": "specs_verified",
+      "reproducibility": "local_install_snapshot",
+      "source_scope": "local groundtruth-kb/groundtruth.db at repo root",
+      "timestamp_utc": "2026-04-17T21:15:59Z",
+      "value": 6
+    },
+    {
+      "command": "sqlite3 groundtruth.db 'SELECT COUNT(DISTINCT id) FROM deliberations'",
+      "commit_sha": "f475c8b",
+      "metric_name": "deliberations_total",
+      "reproducibility": "local_install_snapshot",
+      "source_scope": "local groundtruth-kb/groundtruth.db at repo root. This is the reference install's local archive, NOT the downstream Agent Red deliberation history which is measured separately.",
+      "timestamp_utc": "2026-04-17T21:15:59Z",
+      "value": 1
+    }
+  ]
+}

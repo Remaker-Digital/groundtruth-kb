@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Assertion Results{% endblock %}
+{% block content %}
+<h1>Assertion Results</h1>
+
+{% if runs %}
+<table>
+    <thead>
+        <tr>
+            <th>Spec ID</th>
+            <th>Title</th>
+            <th>Result</th>
+            <th>Run at</th>
+            <th>Triggered by</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr>
+            <td class="mono"><a href="/specs/{{ run.spec_id }}">{{ run.spec_id }}</a></td>
+            <td>{{ run.spec_title }}</td>
+            <td>
+                <span class="{{ pass_fail_class(run.overall_passed) }}">
+                    {{ 'PASS' if run.overall_passed else 'FAIL' }}
+                </span>
+            </td>
+            <td class="mono">{{ run.run_at[:16] }}</td>
+            <td>{{ run.triggered_by }}</td>
+            <td>
+                {% if run._results_parsed %}
+                {{ run._results_parsed|length }} assertion(s)
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No assertion runs yet. Run <code>gt assert</code> to generate results.</p>
+{% endif %}
+{% endblock %}
