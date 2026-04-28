@@ -5,6 +5,41 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: e-drive-claude-playground-cleanup-manifest
+VERIFIED: bridge/e-drive-claude-playground-cleanup-manifest-010.md
+REVISED: bridge/e-drive-claude-playground-cleanup-manifest-009.md
+NO-GO: bridge/e-drive-claude-playground-cleanup-manifest-008.md
+REVISED: bridge/e-drive-claude-playground-cleanup-manifest-007.md
+NO-GO: bridge/e-drive-claude-playground-cleanup-manifest-006.md
+REVISED: bridge/e-drive-claude-playground-cleanup-manifest-005.md
+NO-GO: bridge/e-drive-claude-playground-cleanup-manifest-004.md
+NEW: bridge/e-drive-claude-playground-cleanup-manifest-003.md
+GO: bridge/e-drive-claude-playground-cleanup-manifest-002.md
+NEW: bridge/e-drive-claude-playground-cleanup-manifest-001.md
+
+
+Document: e-drive-root-deletion-readiness-scan
+VERIFIED: bridge/e-drive-root-deletion-readiness-scan-008.md
+REVISED: bridge/e-drive-root-deletion-readiness-scan-007.md
+NO-GO: bridge/e-drive-root-deletion-readiness-scan-006.md
+REVISED: bridge/e-drive-root-deletion-readiness-scan-005.md
+NO-GO: bridge/e-drive-root-deletion-readiness-scan-004.md
+NEW: bridge/e-drive-root-deletion-readiness-scan-003.md
+GO: bridge/e-drive-root-deletion-readiness-scan-002.md
+NEW: bridge/e-drive-root-deletion-readiness-scan-001.md
+
+
+Document: application-isolation-contract
+VERIFIED: bridge/application-isolation-contract-008.md
+NEW: bridge/application-isolation-contract-007.md
+GO: bridge/application-isolation-contract-006.md
+REVISED: bridge/application-isolation-contract-005.md
+NO-GO: bridge/application-isolation-contract-004.md
+REVISED: bridge/application-isolation-contract-003.md
+NO-GO: bridge/application-isolation-contract-002.md
+NEW: bridge/application-isolation-contract-001.md
+
+
 Document: gtkb-directive-enforcement-registry
 GO: bridge/gtkb-directive-enforcement-registry-004.md
 REVISED: bridge/gtkb-directive-enforcement-registry-003.md
@@ -13,6 +48,8 @@ NEW: bridge/gtkb-directive-enforcement-registry-001.md
 
 
 Document: critical-remediation-root-isolation
+VERIFIED: bridge/critical-remediation-root-isolation-012.md
+REVISED: bridge/critical-remediation-root-isolation-011.md
 NO-GO: bridge/critical-remediation-root-isolation-010.md
 REVISED: bridge/critical-remediation-root-isolation-009.md
 NO-GO: bridge/critical-remediation-root-isolation-008.md

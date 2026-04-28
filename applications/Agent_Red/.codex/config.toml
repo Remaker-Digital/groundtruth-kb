@@ -1,0 +1,8 @@
+# Agent Red application-scoped Codex configuration.
+# Minimal placeholder created in sub-slice 1 of application-isolation-contract
+# (bridge/application-isolation-contract-006.md GO).
+# Per Codex GO condition 2, this file contains no GT-KB platform rules,
+# hooks, prompts, credentials, memories, or startup files. Future sub-slices
+# may populate sections here as Agent-Red-scoped Codex behavior is defined.
+
+[default]

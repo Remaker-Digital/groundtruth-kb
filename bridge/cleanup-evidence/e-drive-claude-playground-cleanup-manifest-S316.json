@@ -1,0 +1,350 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "e-drive-claude-playground-cleanup-S316",
+  "scan_timestamp_utc": "2026-04-28T01:45:35.1080758Z",
+  "scope": {
+    "scanned_path": "E:\\Claude-Playground",
+    "depth": "top-level only (per Codex GO conditions; reparse points not traversed even at top)",
+    "total_top_level_entries": 16
+  },
+  "scan_method": "PowerShell Get-ChildItem + recursive size/file-count rollup (skipping reparse points). Worktree-tracking verification via git worktree list --porcelain filtered for Claude-Playground paths. Live-dependency grep across E:\\GT-KB active surfaces.",
+  "reparse_points_detected": 0,
+  "registered_worktrees_under_claude_playground": 0,
+  "credential_files_detected": 49,
+  "credential_detection_method": "Recursive filename scan: Get-ChildItem -LiteralPath E:\\Claude-Playground -Force -Recurse -File -Filter '.env*'. No file content read. Path, size, last-modified captured. Per Codex GO condition 6, no secret values or content excerpts recorded.",
+  "credentials_inventory": {
+    "total": 49,
+    "by_top_level_entry": {
+      "AGNTCY-upstream": {
+        "count": 5,
+        "files": [
+          {"relative_path": "AGNTCY-upstream\\.env", "size_bytes": 3229, "last_modified": "2026-01-29T10:41:53"},
+          {"relative_path": "AGNTCY-upstream\\.env.azure.example", "size_bytes": 8328, "last_modified": "2026-01-29T10:41:39"},
+          {"relative_path": "AGNTCY-upstream\\.env.example", "size_bytes": 3229, "last_modified": "2026-01-29T10:41:39"},
+          {"relative_path": "AGNTCY-upstream\\.env.phase3.5", "size_bytes": 351, "last_modified": "2026-01-29T10:56:45"},
+          {"relative_path": "AGNTCY-upstream\\.env.phase3.5.example", "size_bytes": 2388, "last_modified": "2026-01-29T10:41:39"}
+        ]
+      },
+      "CLAUDE-PROJECTS_Agent_Red_OLD": {
+        "count": 26,
+        "files": [
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.env.example", "size_bytes": 3030, "last_modified": "2026-04-23T22:28:30"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.env.integration.example", "size_bytes": 4005, "last_modified": "2026-04-20T22:37:55"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.env.local", "size_bytes": 12375, "last_modified": "2026-04-21T11:18:06"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\.env.example", "size_bytes": 2694, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\.env.integration.example", "size_bytes": 3877, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\provider\\.env.mock", "size_bytes": 235, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\provider\\.env.production", "size_bytes": 381, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\provider\\.env.staging", "size_bytes": 258, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\shopify\\.env.mock", "size_bytes": 235, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\shopify\\.env.production", "size_bytes": 383, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\standalone\\.env.mock", "size_bytes": 125, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\standalone\\.env.production", "size_bytes": 383, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\.claude\\worktrees\\elegant-brattain\\admin\\standalone\\.env.staging", "size_bytes": 261, "last_modified": "2026-04-15T10:07:28"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\provider\\.env.local", "size_bytes": 341, "last_modified": "2026-04-20T23:31:29"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\provider\\.env.mock", "size_bytes": 235, "last_modified": "2026-03-11T18:12:16"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\provider\\.env.production", "size_bytes": 381, "last_modified": "2026-03-05T09:03:17"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\provider\\.env.staging", "size_bytes": 258, "last_modified": "2026-04-03T14:06:33"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\shopify\\.env.local", "size_bytes": 341, "last_modified": "2026-04-20T23:31:29"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\shopify\\.env.mock", "size_bytes": 235, "last_modified": "2026-03-11T18:12:02"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\shopify\\.env.production", "size_bytes": 383, "last_modified": "2026-03-05T09:02:32"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\standalone\\.env.local", "size_bytes": 341, "last_modified": "2026-04-20T23:31:29"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\standalone\\.env.mock", "size_bytes": 125, "last_modified": "2026-03-10T20:25:32"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\standalone\\.env.production", "size_bytes": 383, "last_modified": "2026-03-05T09:02:37"},
+          {"relative_path": "CLAUDE-PROJECTS\\Agent Red Customer Engagement-OLD\\admin\\standalone\\.env.staging", "size_bytes": 261, "last_modified": "2026-04-03T14:06:33"}
+        ]
+      },
+      "CLAUDE-PROJECTS_agent_red_e1_apply_decommissioned_worktree": {
+        "count": 9,
+        "files": [
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\.env.example", "size_bytes": 2694, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\.env.integration.example", "size_bytes": 3877, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\provider\\.env.mock", "size_bytes": 235, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\provider\\.env.production", "size_bytes": 381, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\provider\\.env.staging", "size_bytes": 258, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\shopify\\.env.mock", "size_bytes": 235, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\shopify\\.env.production", "size_bytes": 383, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\standalone\\.env.mock", "size_bytes": 125, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\standalone\\.env.production", "size_bytes": 383, "last_modified": "2026-04-18T08:47:03"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-e1-apply\\admin\\standalone\\.env.staging", "size_bytes": 261, "last_modified": "2026-04-18T08:47:03"}
+        ]
+      },
+      "CLAUDE-PROJECTS_agent_red_gtkb_current_main_integration_decommissioned_worktree": {
+        "count": 9,
+        "files": [
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\.env.example", "size_bytes": 2820, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\.env.integration.example", "size_bytes": 4005, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\provider\\.env.mock", "size_bytes": 235, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\provider\\.env.production", "size_bytes": 381, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\provider\\.env.staging", "size_bytes": 258, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\shopify\\.env.mock", "size_bytes": 235, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\shopify\\.env.production", "size_bytes": 383, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\standalone\\.env.mock", "size_bytes": 125, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\standalone\\.env.production", "size_bytes": 383, "last_modified": "2026-04-22T02:10:39"},
+          {"relative_path": "CLAUDE-PROJECTS\\agent-red-gtkb-current-main-integration\\admin\\standalone\\.env.staging", "size_bytes": 261, "last_modified": "2026-04-22T02:10:39"}
+        ]
+      }
+    },
+    "owner_inspection_recommendation": "Highest-priority files (likely real secrets vs templates/mocks) are: AGNTCY-upstream\\.env, AGNTCY-upstream\\.env.phase3.5, Agent Red Customer Engagement-OLD\\.env.local (12 KB), and the per-app .env.local files under Agent Red Customer Engagement-OLD\\admin\\{provider,shopify,standalone}. Files named with .example, .mock, .production, .staging suffixes may be templates or per-environment configs. Owner should consider whether any of these archived credentials may have been exposed via Drive sync or similar before deletion authorizes — credential rotation may be appropriate independent of file deletion.",
+    "no_content_read_assertion": "No file content was read during this scan. Filename, size, and last-modified timestamp only. No values, content excerpts, or hashes recorded for credential-like files."
+  },
+  "classification_taxonomy_authority": "bridge/e-drive-claude-playground-cleanup-manifest-001.md §2.2 + bridge/e-drive-claude-playground-cleanup-manifest-002.md §GO-conditions",
+  "deletion_authority_note": "This manifest is read-only evidence. The owner authorizes deletion separately. No entry is presented as deletion-authorized by the manifest itself.",
+  "live_dependency_grep": {
+    "search_term": "Claude-Playground",
+    "scanned_globs": ["*.md", "*.toml", "*.json", "*.yml", "*.yaml", "*.py", "*.ts", "*.tsx", "*.js", "*.jsx", "*.ps1", "*.sh", "*.bat"],
+    "excluded_paths": [
+      "bridge/",
+      ".venv/",
+      "node_modules/",
+      ".codex_pydeps/",
+      "__pycache__/",
+      ".claude/hooks/.codex-bridge-*-context.json (cached prior bridge messages)",
+      "memory/grafana/logs/grafana.err.log (historical service log)"
+    ],
+    "raw_total_hits_in_scanned_globs": "100+ (head_limit hit; large fraction in bridge/ which is excluded)",
+    "non_excluded_hits_categorized": {
+      "pattern_matching_constants_in_active_scripts": [
+        "scripts/wrap_scan_hygiene.py:44-47 (OLD_PROJECT_ROOT_PATTERNS — strings used to FIND old-path references in other files; not a runtime path access)",
+        "scripts/migrate_root_to_gtkb.py:88-126 (one-time migration script's path-rewrite table — finds old paths to rewrite; does not depend on Claude-Playground existing)",
+        "tests/scripts/test_wrap_scan_hygiene_skip_dirs.py:20 (OLD_ROOT_TOKEN test constant — verifies wrap-scan-hygiene's old-path detection logic)",
+        "tests/scripts/test_session_self_initialization.py:1447 (docstring/comment reference)"
+      ],
+      "declarative_or_documentation_references": [
+        "CLAUDE.md (declares Claude-Playground as archive-only)",
+        ".claude/rules/project-root-boundary.md (mandates Claude-Playground is not a live location)",
+        "AGENTS.md, CLAUDE-ARCHITECTURE.md (project instructions referencing the archive directive)",
+        "memory/MEMORY.md (operational state mentioning legacy paths historically)",
+        "memory/feedback/feedback_no_hardcoded_paths.md (feedback memory naming Claude-Playground as anti-pattern)",
+        "docs/operations/*.md (historical procedure docs from pre-migration era)",
+        "docs/PROJECT-PLAN.md, docs/testing-infrastructure-proposal*.md, etc. (historical documentation)",
+        "independent-progress-assessments/*.md (Loyal Opposition reports referencing migration history)",
+        ".groundtruth/formal-artifact-approvals/*.json (formal approval packets; historical evidence)",
+        "scripts/archive/*.py (S117/S119/S144/S146/S153/S154/S156 handoff scripts; pre-migration era; in archive subdir)"
+      ],
+      "permissions_or_settings": [
+        ".claude/settings.local.json (Claude permission entries; reference patterns, not runtime paths)"
+      ]
+    },
+    "runtime_path_dependencies_count": 0,
+    "conclusion": "No active GT-KB code, configuration, or runtime artifact resolves a path under E:\\Claude-Playground at runtime. Every reference falls into one of three non-load-bearing categories: (1) pattern-matching constants used by hygiene/migration scripts to FIND old-path references in other files (forward-only, no Claude-Playground access), (2) declarative or documentation references (declaring or describing the archive's existence and disposition), (3) historical evidence files (handoff scripts, LO reports, approval packets, feedback memories). Removing E:\\Claude-Playground would not break any runtime path resolution from inside E:\\GT-KB."
+  },
+  "candidates": [
+    {
+      "row": 1,
+      "name": ".cursor",
+      "type": "DIR",
+      "size_bytes": 0,
+      "file_count": 0,
+      "last_modified": "2026-02-23T20:47:56",
+      "is_reparse_point": false,
+      "classification": "EMPTY",
+      "recommended_action": "candidate safe after owner authorization (empty directory; Cursor IDE config dir from a previous workspace at this location)"
+    },
+    {
+      "row": 2,
+      "name": ".tmp.drivedownload",
+      "type": "DIR",
+      "size_bytes": 0,
+      "file_count": 0,
+      "last_modified": "2026-04-24T22:23:36",
+      "is_reparse_point": false,
+      "classification": "EMPTY",
+      "recommended_action": "candidate safe after owner authorization (empty Drive sync staging directory)"
+    },
+    {
+      "row": 3,
+      "name": ".tmp.driveupload",
+      "type": "DIR",
+      "size_bytes": 4523167,
+      "file_count": 692,
+      "last_modified": "2026-04-27T15:01:03",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (Drive sync staging directory; .driveignore patterns mark this class of directory as transient; recently modified suggests Drive sync is still active in this location)"
+    },
+    {
+      "row": 4,
+      "name": ".vscode",
+      "type": "DIR",
+      "size_bytes": 32,
+      "file_count": 1,
+      "last_modified": "2026-02-23T14:07:25",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (VSCode workspace settings from when E:\\Claude-Playground was an active workspace; superseded by E:\\GT-KB workspace)"
+    },
+    {
+      "row": 5,
+      "name": "AGNTCY-upstream",
+      "type": "DIR",
+      "size_bytes": 632771073,
+      "file_count": 35437,
+      "last_modified": "2026-01-29T10:52:20",
+      "is_reparse_point": false,
+      "credential_files_in_subtree": 5,
+      "classification": "NEEDS-OWNER-INSPECTION",
+      "recommended_action": "owner classifies retention need (632 MB local checkout of AGNTCY framework; per CLAUDE.md the canonical reference is the public GitHub repo at https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service, not a local copy; large size + 5 credential-like files in subtree — including .env (3.2 KB, 2026-01-29) and .env.phase3.5 (351 B, 2026-01-29) which may contain real secrets vs the .example/.azure.example variants which appear to be templates — warrants owner-aware decision; credential rotation may be appropriate independent of file deletion if archive was exposed via Drive sync)"
+    },
+    {
+      "row": 6,
+      "name": "CLAUDE-KNOWLEDGE-BASE",
+      "type": "DIR",
+      "size_bytes": 38627,
+      "file_count": 18,
+      "last_modified": "2026-01-27T22:38:45",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (38 KB historical Claude knowledge base directory; January 2026; superseded by current memory/ + KB infrastructure)"
+    },
+    {
+      "row": 7,
+      "name": "CLAUDE-PROJECTS",
+      "type": "DIR",
+      "size_bytes": 14652762473,
+      "file_count": 241386,
+      "last_modified": "2026-04-24T22:17:25",
+      "is_reparse_point": false,
+      "credential_files_in_subtree": 44,
+      "credential_files_breakdown": {
+        "Agent Red Customer Engagement-OLD": 26,
+        "agent-red-e1-apply (decommissioned worktree)": 9,
+        "agent-red-gtkb-current-main-integration (decommissioned worktree)": 9
+      },
+      "classification": "NEEDS-OWNER-INSPECTION",
+      "recommended_action": "owner classifies retention need (14.65 GB / 241386 files; contains 44 credential-like .env* files split across the legacy 'Agent Red Customer Engagement-OLD' directory (26 — including a 12.3 KB .env.local at top level plus per-app .env.local files in admin/{provider,shopify,standalone}), the agent-red-e1-apply decommissioned worktree (9 — mostly .example, .mock, .production, .staging templates), and the agent-red-gtkb-current-main-integration decommissioned worktree (9 — same template breakdown). Highest-secret-likelihood files: 'Agent Red Customer Engagement-OLD\\.env.local' (12.3 KB) and the 4 per-app .env.local files under that directory. Branches are pushed to origin per bridge/cleanup-evidence/worktree-patches/S316-pre-deletion-evidence.md so deletion does not lose the worktree commits. Owner should consider whether archived credentials may have been exposed via Drive sync before deletion authorizes — credential rotation may be appropriate independent of file deletion)"
+    },
+    {
+      "row": 8,
+      "name": "COMMITMENTS.md",
+      "type": "FILE",
+      "size_bytes": 1775,
+      "file_count": 1,
+      "last_modified": "2026-01-27T22:32:02",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (1.8 KB top-level navigation note from January 2026; pre-migration project notes)"
+    },
+    {
+      "row": 9,
+      "name": "CURRENT-PRIORITIES.md",
+      "type": "FILE",
+      "size_bytes": 1387,
+      "file_count": 1,
+      "last_modified": "2026-01-27T22:31:19",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (1.4 KB historical priorities note from January 2026; superseded by current memory/work_list.md)"
+    },
+    {
+      "row": 10,
+      "name": "DOMAINS.md",
+      "type": "FILE",
+      "size_bytes": 3364,
+      "file_count": 1,
+      "last_modified": "2026-01-27T22:31:51",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (3.4 KB top-level note from January 2026)"
+    },
+    {
+      "row": 11,
+      "name": "groundtruth-kb",
+      "type": "DIR",
+      "size_bytes": 25492908,
+      "file_count": 1322,
+      "last_modified": "2026-04-18T04:22:55",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (25 MB legacy GroundTruth-KB framework checkout; per memory/MEMORY.md groundtruth-kb is now installable from PyPI at v0.6.1, fully superseding this local v0.3.0-era checkout; per .claude/rules/project-root-boundary.md no GT-KB executable should live outside E:\\GT-KB anyway)"
+    },
+    {
+      "row": 12,
+      "name": "membase-4-claude",
+      "type": "DIR",
+      "size_bytes": 194865,
+      "file_count": 44,
+      "last_modified": "2026-03-08T20:20:04",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (195 KB historical predecessor to GroundTruth-KB per memory/project_groundtruth_lineage.md; superseded by current GroundTruth-KB infrastructure)"
+    },
+    {
+      "row": 13,
+      "name": "nul",
+      "type": "FILE",
+      "size_bytes": 116,
+      "file_count": 1,
+      "last_modified": "2026-03-03T15:33:53",
+      "is_reparse_point": false,
+      "classification": "ORPHAN",
+      "recommended_action": "owner may authorize deletion after verifying no value (116-byte file with reserved Windows filename 'nul'; same shell-redirect-bug pattern as the in-root nul at row 80 of e-drive-root-deletion-readiness-manifest-S316; deletion may require -LiteralPath similar to other reserved-name handling)"
+    },
+    {
+      "row": 14,
+      "name": "SHARED-RESOURCES",
+      "type": "DIR",
+      "size_bytes": 9284,
+      "file_count": 4,
+      "last_modified": "2026-01-27T22:33:15",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (9.3 KB historical shared resources directory from January 2026)"
+    },
+    {
+      "row": 15,
+      "name": "START-HERE.md",
+      "type": "FILE",
+      "size_bytes": 3714,
+      "file_count": 1,
+      "last_modified": "2026-01-27T22:31:05",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (3.7 KB historical session-start note from January 2026; superseded by current CLAUDE.md session-start procedures)"
+    },
+    {
+      "row": 16,
+      "name": "WEEKLY-SYNC.md",
+      "type": "FILE",
+      "size_bytes": 1246,
+      "file_count": 1,
+      "last_modified": "2026-01-27T22:31:33",
+      "is_reparse_point": false,
+      "classification": "ARCHIVE",
+      "recommended_action": "owner may authorize deletion (1.2 KB historical weekly-sync note from January 2026)"
+    }
+  ],
+  "tally": {
+    "total_top_level_entries": 16,
+    "by_classification": {
+      "ARCHIVE": 11,
+      "EMPTY": 2,
+      "NEEDS-OWNER-INSPECTION": 2,
+      "ORPHAN": 1,
+      "CONFIRMED-CLEAR": 0
+    },
+    "verification": "11 + 2 + 2 + 1 + 0 = 16 (matches scope.total_top_level_entries)"
+  },
+  "summary_for_owner": {
+    "deletion_readiness_status": "All 16 top-level entries classified. Zero runtime path dependencies from inside E:\\GT-KB to anything under E:\\Claude-Playground. Zero registered git worktrees under E:\\Claude-Playground (the 2 prior outside-root worktrees were pushed to origin and removed from tracking earlier this session). Zero reparse points or symlinks. 49 credential-like .env* files detected by filename only (path, size, timestamp recorded; no content read); confined to AGNTCY-upstream (5) and CLAUDE-PROJECTS (44 — split across the 'Agent Red Customer Engagement-OLD' subtree and the 2 decommissioned worktrees). Owner should consider credential exposure / rotation before deletion authorization, independently of file deletion itself. Owner-authorization-gated language used throughout; the manifest does not declare any entry deletion-ready independently of owner action.",
+    "tier_minimal_review": ["COMMITMENTS.md", "CURRENT-PRIORITIES.md", "DOMAINS.md", "START-HERE.md", "WEEKLY-SYNC.md", ".tmp.drivedownload", ".cursor", ".vscode", "CLAUDE-KNOWLEDGE-BASE", "SHARED-RESOURCES", "membase-4-claude"],
+    "tier_minimal_rationale": "11 entries are January-2026-or-March-2026-era ARCHIVE/EMPTY content with no live deps; deletion is candidate-after-owner-authorization with minimal review.",
+    "tier_substantive_review": ["AGNTCY-upstream", "CLAUDE-PROJECTS", "groundtruth-kb", ".tmp.driveupload"],
+    "tier_substantive_rationale": "4 entries warrant substantive review before deletion: AGNTCY-upstream is 632 MB (per CLAUDE.md the canonical AGNTCY source is GitHub, not a local copy); CLAUDE-PROJECTS is 14.65 GB (contains the 2 decommissioned worktree directories whose branches are durable on origin, plus historical Agent Red checkouts and wiki work); groundtruth-kb is 25 MB legacy v0.3.0 superseded by v0.6.1 PyPI; .tmp.driveupload is 4.5 MB Drive sync staging that may have transient content owner wants to capture before deletion.",
+    "reserved_name_handling": ["nul"],
+    "reserved_name_rationale": "1 entry needs owner-aware deletion: the 'nul' reserved-name file requires -LiteralPath in PowerShell or equivalent in other shells; owner authorization triggers a manifest-backed cleanup similar to the other 'nul' artifact at E:\\GT-KB\\nul (row 80 of sister manifest)."
+  },
+  "out_of_scope": {
+    "e_drive_root_level_entries": "Separate manifest at bridge/cleanup-evidence/e-drive-root-deletion-readiness-manifest-S316.{md,json} (VERIFIED at e-drive-root-deletion-readiness-scan-008.md)",
+    "c_drive_worktrees": "Separate disposition track for the 2 outside-root worktrees on C:\\ (claude-design-backlog and gh-dep2)",
+    "actual_deletion": "Owner-authorized in a separate operation; this manifest is read-only evidence",
+    "recursive_content_hashing_inside_claude_playground": "Not performed; the deletion-readiness question turns on liveness (no path resolves into the archive from inside E:\\GT-KB), not content equivalence"
+  },
+  "reproducibility_commands": {
+    "enumerate_top_level": "Get-ChildItem -LiteralPath \"E:\\Claude-Playground\" -Force | Sort-Object Name",
+    "rollup_size_and_count_skip_reparse": "Get-ChildItem -LiteralPath <entry> -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum (skip if (Get-Item).Attributes -band [IO.FileAttributes]::ReparsePoint)",
+    "detect_reparse_points": "Get-ChildItem -LiteralPath \"E:\\Claude-Playground\" -Force | ForEach-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 }",
+    "verify_no_registered_worktrees": "git -C E:/GT-KB worktree list --porcelain | Select-String 'Claude-Playground' (expected: empty result)",
+    "live_dependency_grep": "Grep tool with pattern='Claude-Playground' across globs=*.{md,toml,json,yml,yaml,py,ts,tsx,js,jsx,ps1,sh,bat} excluding bridge/, .venv/, node_modules/, .codex_pydeps/, __pycache__/, and known cached-context paths"
+  }
+}

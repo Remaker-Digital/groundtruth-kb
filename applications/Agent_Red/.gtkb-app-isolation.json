@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0",
+  "application": "Agent_Red",
+  "isolation_contract_adr": "ADR-APPLICATION-ISOLATION-CONTRACT-001 (proposed; pending sub-slice 6)",
+  "minimization_principle_dcl": "DCL-APP-ROOT-MINIMIZATION-001 (proposed; pending sub-slice 6)",
+  "last_updated": "2026-04-27",
+  "established_by": "bridge/application-isolation-contract-006.md (GO) sub-slice 1",
+  "top_level_artifacts": [
+    {
+      "name": ".claude",
+      "type": "DIR",
+      "bucket": "B",
+      "tool": "Claude Code",
+      "justification": "CWD-rooted rule/agent/skill/hook/plugin discovery for Agent-Red-scoped Claude Code sessions; minimal placeholder per Codex GO sub-slice 1 condition 2 (no GT-KB platform content imported)"
+    },
+    {
+      "name": ".codex",
+      "type": "DIR",
+      "bucket": "B",
+      "tool": "Codex CLI",
+      "justification": "CWD-rooted config discovery for Agent-Red-scoped Codex sessions; minimal placeholder per Codex GO sub-slice 1 condition 2 (no GT-KB platform content imported)"
+    },
+    {
+      "name": ".dockerignore",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Docker",
+      "justification": "Build-context ignore at Dockerfile location; placeholder pending Phase 3 infra cluster move that brings Dockerfile* into this directory"
+    },
+    {
+      "name": ".gtkb-app-isolation.json",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "GT-KB release-gate scan (DCL-APP-ROOT-MINIMIZATION-001 assertion)",
+      "justification": "Self-referential registry file required by the minimization principle; the registry must contain itself for the scanner to validate its own presence"
+    },
+    {
+      "name": ".vscode",
+      "type": "DIR",
+      "bucket": "B",
+      "tool": "VSCode",
+      "justification": "Workspace settings discovery from opened folder; per owner directive 2026-04-27 the VSCode workspace root for the Agent Red project is applications/Agent_Red/"
+    },
+    {
+      "name": "harness-state",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Application-level harness state (created S315 by owner; pre-existing; in-scope of application-isolation-contract)"
+    },
+    {
+      "name": "incident-response",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red incident-response artifacts (created S310 by IR-0.1 boundary work; pre-existing; in-scope of application-isolation-contract)"
+    }
+  ],
+  "validator_contract": {
+    "scan_path": "applications/Agent_Red/",
+    "depth": "top-level only",
+    "rules": [
+      "Every top-level entry must match a registry entry by name+type",
+      "Registry entries with bucket=A require non-empty purpose",
+      "Registry entries with bucket=B require non-empty tool and justification",
+      "Bucket=C and bucket=D are not allowed at app root",
+      "Unmatched entries fail the gate"
+    ],
+    "implementation_status": "pending sub-slice 5 (DCL runner + release-gate integration)"
+  },
+  "out_of_scope_for_sub_slice_1": [
+    ".env.local handling (sub-slice 2; owner-action-only)",
+    ".shopify and .shopifyignore moves (sub-slice 3)",
+    "PDF cluster move into pdf-tooling/ (sub-slice 4)",
+    "DCL runner and release-gate wiring (sub-slice 5)",
+    "Formal DELIB/ADR/DCL writes via approval packets (sub-slice 6)",
+    "Cluster moves beyond PDF (subsequent phases per Phase E audit §B.1 sequence)",
+    ".gitignore modifications (per proposal -005 §7.2; deferred to a follow-up hygiene sub-slice)"
+  ],
+  "known_limitations": [
+    {
+      "artifact": ".vscode/settings.json",
+      "issue": "File exists on disk but is not git-tracked. The existing .gitignore line 90 (.vscode/) ignores the entire .vscode/ directory at any depth; the negation at line 91 (!.vscode/settings.json) cannot take effect because git does not descend into ignored parent directories.",
+      "impact": "VSCode opening applications/Agent_Red/ in this checkout will read settings.json correctly. Fresh clones or git clean -fdx will not retain the file or directory. Cross-machine persistence requires either changing line 90 to .vscode/* or adding a more specific negation pattern.",
+      "deferred_to": "Follow-up gitignore-hygiene sub-slice. Per sub-slice 1 proposal -005 §7.2, .gitignore modifications were explicitly out of scope of this slice."
+    }
+  ]
+}

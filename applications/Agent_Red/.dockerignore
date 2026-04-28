@@ -1,0 +1,5 @@
+# Agent Red application-scoped Docker build-context ignore.
+# Minimal placeholder created in sub-slice 1 of application-isolation-contract
+# (bridge/application-isolation-contract-006.md GO).
+# Patterns will be populated when Dockerfile* and infrastructure/ move into
+# this directory in the Phase 3 infra cluster move (separate bridge thread).
