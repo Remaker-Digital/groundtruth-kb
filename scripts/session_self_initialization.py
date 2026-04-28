@@ -5326,6 +5326,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip startup archival/pruning of VERIFIED bridge index entries.",
     )
     args = parser.parse_args(argv)
+    if not args.project_root.is_absolute():
+        # Per bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-004.md (GO):
+        # drive-relative inputs like 'E:GT-KB' (no slash) silently combine with
+        # the drive's current directory via Path.resolve(), producing doubled
+        # paths (e.g., E:\GT-KB\GT-KB). Reject them up front.
+        raise SystemExit(
+            f"--project-root must be an absolute path; got {args.project_root!r}. "
+            f"On Windows, drive-relative paths like 'E:GT-KB' (no slash after the "
+            f"colon) are silently combined with the drive's current directory by "
+            f"Path.resolve(), which can produce a doubled path (e.g., "
+            f"E:\\GT-KB\\GT-KB). Pass an absolute path: "
+            f"e.g., 'E:\\\\GT-KB' (escaped backslash) or 'E:/GT-KB' (forward slashes)."
+        )
     project_root = args.project_root.resolve()
     startup_emit_requested = args.emit_report or args.emit_startup_service_payload
     startup_requested_at = os.environ.get("GTKB_STARTUP_REQUESTED_AT") if args.emit_startup_service_payload else None

@@ -301,6 +301,51 @@ def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() ->
         )
 
 
+def test_project_root_rejects_drive_relative_path_to_prevent_doubling() -> None:
+    """Regression test for bridge/session-self-init-project-root-path-doubling-fix-2026-04-27.
+
+    Drive-relative paths like 'E:GT-KB' (no slash after the colon) on Windows
+    silently produce doubled output paths via Path.resolve() when CWD is on the
+    same drive. The fix raises SystemExit instead of allowing the silent
+    corruption.
+
+    Verified at the pathlib level that the input shape is non-absolute, then
+    invokes the script via subprocess and asserts non-zero exit + informative
+    error message. Pre-fix behavior: subprocess returns 0 and creates nested
+    output. Post-fix: subprocess returns non-zero with "absolute" in the error.
+    """
+    drive_relative_input = "E:GT-KB"
+    # Confirm the failing input shape: drive-relative is non-absolute.
+    assert not Path(drive_relative_input).is_absolute(), (
+        "Drive-relative path must be identified as non-absolute by pathlib; "
+        "this is the input shape the fix must reject."
+    )
+    import subprocess
+    import sys
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "session_self_initialization.py"),
+            "--project-root", drive_relative_input,
+            "--emit-startup-service-payload",
+            "--fast-hook",
+            "--harness-name", "codex",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    assert result.returncode != 0, (
+        f"Script must reject drive-relative --project-root, but exited 0. "
+        f"stdout={result.stdout[:200]!r} stderr={result.stderr[:200]!r}"
+    )
+    combined = (result.stderr + result.stdout).lower()
+    assert "absolute" in combined, (
+        f"Error message must mention 'absolute path' requirement; "
+        f"got stderr={result.stderr[:200]!r} stdout={result.stdout[:200]!r}"
+    )
+
+
 def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -> None:
     module = _load_module()
 
