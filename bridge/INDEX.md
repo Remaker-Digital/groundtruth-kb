@@ -5,6 +5,14 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: role-contract-clarifications-2026-04-28
+NEW: bridge/role-contract-clarifications-2026-04-28-001.md
+
+
+Document: session-hygiene-gitignore-extensions-2026-04-28
+NEW: bridge/session-hygiene-gitignore-extensions-2026-04-28-001.md
+
+
 Document: harness-state-preferences-path-cli-2026-04-28
 VERIFIED: bridge/harness-state-preferences-path-cli-2026-04-28-006.md
 REVISED: bridge/harness-state-preferences-path-cli-2026-04-28-005.md
