@@ -135,6 +135,7 @@ NEW: bridge/critical-remediation-root-isolation-001.md
 
 
 Document: generator-hardening-cross-repo
+NEW: bridge/generator-hardening-cross-repo-006.md
 GO: bridge/generator-hardening-cross-repo-005.md
 REVISED: bridge/generator-hardening-cross-repo-004.md
 NO-GO: bridge/generator-hardening-cross-repo-003.md
