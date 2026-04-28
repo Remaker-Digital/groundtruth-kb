@@ -10,6 +10,17 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0056
+  asked_at: 2026-04-28T17:28:29.110575Z
+  question: "lose S318 cleanly.  Awaiting owner direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 057065de6e8d25fb
+  resolved_at: 2026-04-28T17:32:00Z
+  resolved_in_session: S318
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0055). Captured fragment is Prime Builder closing summary line offering session-wrap option. Owner directed wrap-up after this prompt, organically resolving without archival need. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T17:32:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+
 - id: DECISION-0055
   asked_at: 2026-04-28T17:25:18.270792Z
   question: "terminally closed. Standing by for owner direction on next focus."
@@ -20,7 +31,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S318
   answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0054). Captured fragment is from Prime Builder S318 closing line announcing generator-hardening triad terminal closure ('terminally closed. Standing by for owner direction on next focus.'). Per fresh-session input semantics, the closing acknowledgement is a stimulus-response convention, not an owner question. Class-elimination tracked in GTKB-COMMAND-SURFACE."
   notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T17:30:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
-
 - id: DECISION-0054
   asked_at: 2026-04-28T16:55:18.101343Z
   question: "ded + VERIFIED).  **Standing by for Codex bridge cycle on `-003`, or for owner direction on the still-pendin"
