@@ -5,6 +5,21 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-telemetry-churn-policy-2026-04-28
+VERIFIED: bridge/gtkb-telemetry-churn-policy-2026-04-28-004.md
+NEW: bridge/gtkb-telemetry-churn-policy-2026-04-28-003.md
+GO: bridge/gtkb-telemetry-churn-policy-2026-04-28-002.md
+NEW: bridge/gtkb-telemetry-churn-policy-2026-04-28-001.md
+
+
+Document: gh-002-skills-plugin-cache-closure-scoping-2026-04-28
+NEW: bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-005.md
+GO: bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-004.md
+REVISED: bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-003.md
+NO-GO: bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-002.md
+NEW: bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-001.md
+
+
 Document: gtkb-bridge-index-phantom-verified-references-2026-04-27
 VERIFIED: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-004.md
 NEW: bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27-003.md
