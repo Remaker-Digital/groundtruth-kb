@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: harness-state-preferences-path-cli-2026-04-28
+NEW: bridge/harness-state-preferences-path-cli-2026-04-28-001.md
+
+
 Document: gtkb-telemetry-churn-policy-2026-04-28
 VERIFIED: bridge/gtkb-telemetry-churn-policy-2026-04-28-004.md
 NEW: bridge/gtkb-telemetry-churn-policy-2026-04-28-003.md
@@ -135,6 +139,7 @@ NEW: bridge/critical-remediation-root-isolation-001.md
 
 
 Document: generator-hardening-cross-repo
+REVISED: bridge/generator-hardening-cross-repo-008.md
 NO-GO: bridge/generator-hardening-cross-repo-007.md
 NEW: bridge/generator-hardening-cross-repo-006.md
 GO: bridge/generator-hardening-cross-repo-005.md
