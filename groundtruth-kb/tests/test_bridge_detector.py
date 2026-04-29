@@ -149,9 +149,7 @@ def test_parser_against_live_index_md() -> None:
     text = fixture.read_text(encoding="utf-8")
     result = d.parse_index(text)
     assert result.errors == ()
-    assert len(result.documents) >= 30, (
-        f"Expected ≥30 documents in live INDEX snapshot, got {len(result.documents)}"
-    )
+    assert len(result.documents) >= 30, f"Expected ≥30 documents in live INDEX snapshot, got {len(result.documents)}"
     for doc in result.documents:
         assert not doc.name.startswith("<!--")
         assert not doc.name.startswith("-->")

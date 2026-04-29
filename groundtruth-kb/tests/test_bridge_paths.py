@@ -57,9 +57,7 @@ def synthetic_gtkb_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     return synth
 
 
-def test_resolve_project_root_from_groundtruth_toml(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_project_root_from_groundtruth_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = _paths()
     synth = tmp_path / "synth_gtkb"
     synth.mkdir()
@@ -84,9 +82,7 @@ def test_resolve_project_root_from_git_toplevel_with_groundtruth_toml(
     assert p.resolve_project_root().resolve() == synth.resolve()
 
 
-def test_resolve_project_root_walks_up_parents(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_project_root_walks_up_parents(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = _paths()
     synth = tmp_path / "synth_gtkb"
     nested = synth / "deep" / "nested"
@@ -102,9 +98,7 @@ def test_resolve_project_root_walks_up_parents(
     assert p.resolve_project_root().resolve() == synth.resolve()
 
 
-def test_resolve_project_root_raises_when_no_marker_found(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_project_root_raises_when_no_marker_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = _paths()
     empty = tmp_path / "empty"
     empty.mkdir()
