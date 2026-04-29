@@ -14,6 +14,7 @@ NEW: bridge/spec-smart-poller-auto-trigger-2026-04-29-001.md
 
 
 Document: gtkb-platform-spec-coverage-architecture-2026-04-29
+REVISED: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-003.md
 NO-GO: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-002.md
 NEW: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-001.md
 
