@@ -34,7 +34,11 @@ import uuid
 from pathlib import Path
 
 from groundtruth_kb.bridge.audit import emit_audit_event
-from groundtruth_kb.bridge.checkpoint import load_checkpoint, write_checkpoint
+from groundtruth_kb.bridge.checkpoint import (
+    diff_against_checkpoint,
+    load_checkpoint,
+    write_checkpoint,
+)
 from groundtruth_kb.bridge.detector import parse_index
 from groundtruth_kb.bridge.notify import (
     compute_actionable_pending,
@@ -121,8 +125,10 @@ def run_one_iteration(
     update_notification(state_dir, BridgeAgent.PRIME, actionable_for_prime, poller_run_id=run_id)
     update_notification(state_dir, BridgeAgent.CODEX, actionable_for_codex, poller_run_id=run_id)
 
-    # Audit-only: still record what transitioned this iteration for log/observability,
-    # but DO NOT use it as the source of notification contents.
+    # Audit-only transition diff (per -005 §1.2 / -007 §3 preserved contract):
+    # observability for "what changed since last scan" without affecting
+    # notification contents (which remain current-state via compute_actionable_pending).
+    transitions = diff_against_checkpoint(parse_result.documents, cp_load.checkpoint, is_bootstrap=False)
     write_checkpoint(state_dir, parse_result.documents)
     emit_audit_event(
         state_dir,
@@ -131,6 +137,7 @@ def run_one_iteration(
             "run_id": run_id,
             "iteration": iteration,
             "documents_seen": len(parse_result.documents),
+            "transitions_count": len(transitions),
             "actionable_prime_count": len(actionable_for_prime),
             "actionable_codex_count": len(actionable_for_codex),
         },
@@ -140,6 +147,7 @@ def run_one_iteration(
         "run_id": run_id,
         "iteration": iteration,
         "documents_seen": len(parse_result.documents),
+        "transitions_count": len(transitions),
         "actionable_prime_count": len(actionable_for_prime),
         "actionable_codex_count": len(actionable_for_codex),
     }

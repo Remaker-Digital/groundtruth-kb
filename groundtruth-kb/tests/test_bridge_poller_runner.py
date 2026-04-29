@@ -318,3 +318,91 @@ def test_main_loop_respects_max_iterations(synthetic_gtkb_root: Path) -> None:
     _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
     completed = runner.main_loop(interval_s=0, max_iterations=5, quiet=True)
     assert completed == 5
+
+
+# --- audit-only transitions_count (per -005 §1.2 / -007 §3 / -010 NO-GO) ---
+
+
+def test_post_bootstrap_records_transitions_count_audit_only(synthetic_gtkb_root: Path) -> None:
+    """Per `-005 §1.2` preserved in `-007 §3` and required by `-010` NO-GO:
+    post-bootstrap iterations must compute `transitions = diff_against_checkpoint(...)`
+    for audit-only observability, emit `transitions_count` in the scan audit
+    payload + per-iteration JSONL log, and keep notification contents sourced
+    only from `compute_actionable_pending()` (current-state semantics)."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED", top_version=2)
+    state_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+
+    # Iteration 0: bootstrap — writes checkpoint, no notification, no scan event.
+    bootstrap_payload = runner.run_one_iteration(
+        state_dir=state_dir,
+        project_root=synthetic_gtkb_root,
+        run_id="test-run-trans",
+        iteration=0,
+    )
+    assert bootstrap_payload["kind"] == "bootstrap"
+    # Bootstrap reports `transitions_routable`, not transitions_count.
+    assert "transitions_count" not in bootstrap_payload
+
+    # Iteration 1: first post-bootstrap with unchanged INDEX → 0 transitions
+    # but notification still surfaces REVISED for codex (Option A current-state).
+    unchanged_payload = runner.run_one_iteration(
+        state_dir=state_dir,
+        project_root=synthetic_gtkb_root,
+        run_id="test-run-trans",
+        iteration=1,
+    )
+    assert unchanged_payload["kind"] == "scan"
+    assert unchanged_payload["transitions_count"] == 0
+    assert unchanged_payload["actionable_codex_count"] == 1
+    assert unchanged_payload["actionable_prime_count"] == 0
+
+    codex_json, _ = _notify_paths(state_dir, "codex")
+    assert codex_json.is_file()
+    payload_after_unchanged = json.loads(codex_json.read_text(encoding="utf-8"))
+    assert payload_after_unchanged["pending_actions"][0]["top_status"] == "REVISED"
+
+    # Promote top to GO so the diff produces exactly one transition.
+    bridge_dir = synthetic_gtkb_root / "bridge"
+    (bridge_dir / "foo-003.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "INDEX.md").write_text(
+        "# Bridge Index\n\nDocument: foo\nGO: bridge/foo-003.md\nREVISED: bridge/foo-002.md\nNEW: bridge/foo-001.md\n",
+        encoding="utf-8",
+    )
+
+    # Iteration 2: REVISED → GO transition.
+    transition_payload = runner.run_one_iteration(
+        state_dir=state_dir,
+        project_root=synthetic_gtkb_root,
+        run_id="test-run-trans",
+        iteration=2,
+    )
+    assert transition_payload["kind"] == "scan"
+    assert transition_payload["transitions_count"] == 1
+    # Notification routing follows current-state, NOT the diff: GO routes to prime.
+    assert transition_payload["actionable_prime_count"] == 1
+    assert transition_payload["actionable_codex_count"] == 0
+
+    prime_json, _ = _notify_paths(state_dir, "prime")
+    assert prime_json.is_file()
+    assert not codex_json.is_file()  # codex notification cleared by current-state recompute.
+    payload_after_transition = json.loads(prime_json.read_text(encoding="utf-8"))
+    assert payload_after_transition["pending_actions"][0]["top_status"] == "GO"
+
+
+def test_main_loop_writes_transitions_count_to_jsonl_audit_log(synthetic_gtkb_root: Path) -> None:
+    """Companion to test_post_bootstrap_records_transitions_count_audit_only:
+    confirm `transitions_count` lands in the per-run JSONL log written by
+    `_log_iteration` (which records the run_one_iteration return payload)."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "GO")
+    runner.main_loop(interval_s=0, max_iterations=2, quiet=True)
+    state_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    log_files = list((state_dir / "poller-runs").glob("*.jsonl"))
+    assert len(log_files) == 1
+    payloads = [json.loads(line) for line in log_files[0].read_text(encoding="utf-8").strip().splitlines()]
+    scan_payloads = [p for p in payloads if p["kind"] == "scan"]
+    assert len(scan_payloads) == 1
+    assert "transitions_count" in scan_payloads[0]
+    # Single-doc seed; first post-bootstrap scan against unchanged checkpoint → 0 transitions.
+    assert scan_payloads[0]["transitions_count"] == 0
