@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: smart-poller-orient-verification-2026-04-29
+NEW: bridge/smart-poller-orient-verification-2026-04-29-007.md
+GO: bridge/smart-poller-orient-verification-2026-04-29-006.md
 REVISED: bridge/smart-poller-orient-verification-2026-04-29-005.md
 NO-GO: bridge/smart-poller-orient-verification-2026-04-29-004.md
 REVISED: bridge/smart-poller-orient-verification-2026-04-29-003.md
