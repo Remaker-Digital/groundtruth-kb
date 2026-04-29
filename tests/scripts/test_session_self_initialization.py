@@ -33,7 +33,7 @@ def test_user_local_preference_controls_startup_dashboard_open(tmp_path, monkeyp
     module = _load_module()
     preference_path = tmp_path / "session-startup-preferences.json"
     opened: list[str] = []
-    dashboard_url = "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
+    dashboard_url = "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard"
 
     monkeypatch.setenv("GTKB_STARTUP_PREFERENCES_PATH", str(preference_path))
     monkeypatch.delenv("GTKB_OPEN_DASHBOARD_ON_SESSION_START", raising=False)
@@ -85,17 +85,18 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
         model["role"]["role_assignment"] == "active AI harness assigned by owner through durable operating-role record"
     )
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
-    assert "separate harnesses" in model["role"]["poller"]
+    assert "verified smart poller" in model["role"]["poller"]
+    assert "retired OS poller remains disabled" in model["role"]["poller"]
     assert "Strict GOV enforcement" in model["governance_stance"][0]
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
     assert model["skills"]["count"] > 0
     assert "operating-role.md" in model["role"]["role_mapping_source"]
     assert "formal-artifact-approval-gate.py" in model["directives"]["hook_files"]
-    assert model["workstream_focus"]["default_label"] == "Application Focus"
-    assert model["workstream_focus"]["current_label"] == "Application Focus"
-    assert model["workstream_focus"]["application_label"] == "Agent Red"
-    assert model["dashboard_requirements"]["scope_version"] == "agent_red_v1"
-    assert model["dashboard_requirements"]["scope_note"] == "Agent Red product/project dashboard."
+    assert model["workstream_focus"]["default_label"] == "GT-KB Infrastructure Focus"
+    assert model["workstream_focus"]["current_label"] == "GT-KB Infrastructure Focus"
+    assert model["workstream_focus"]["application_label"] == "Agent Red demo adopter"
+    assert model["dashboard_requirements"]["scope_version"] == "gtkb_v1"
+    assert model["dashboard_requirements"]["scope_note"] == "GroundTruth-KB project dashboard."
     assert (
         model["metrics"]["specifications"]["raw_current_total"] >= model["metrics"]["specifications"]["current_total"]
     )
@@ -204,7 +205,7 @@ def test_startup_model_discovers_durable_operating_role() -> None:
     assert discovered_role in module.ROLE_PROFILES
 
     model = module.build_startup_model(REPO_ROOT)
-    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard", REPO_ROOT)
+    report = module.render_report(model, "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
 
     assert model["role_profile"] == discovered_role
     assert model["role"]["assumed_role"] == module.ROLE_PROFILES[discovered_role]["assumed_role"]
@@ -221,10 +222,10 @@ def test_startup_model_discovers_durable_operating_role() -> None:
 def test_harness_local_role_record_overrides_repo_default_for_startup(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
     # Post-migration tmp path mirrors the canonical
-    # applications/Agent_Red/harness-state/codex/ location used in production.
+    # harness-state/codex/ location used in production.
     # Tests still monkeypatch HARNESS_ROLE_RECORDS so the actual location
     # is the temp path; rename is a clarity improvement, not a behavior change.
-    codex_dir = tmp_path / "applications" / "Agent_Red" / "harness-state" / "codex"
+    codex_dir = tmp_path / "harness-state" / "codex"
     codex_dir.mkdir(parents=True)
     role_path = codex_dir / "operating-role.md"
     guard_path = codex_dir / "session-lifecycle-guard.json"
@@ -271,16 +272,16 @@ def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() ->
     """Regression test for harness-state-authority-migration-2026-04-27.
 
     Verifies session_self_initialization resolves Codex and Claude harness-local
-    authority records under applications/Agent_Red/harness-state/, not Path.home().
+    authority records under harness-state/, not Path.home().
     Closes bridge/s317-working-tree-triage-005.md F5 deferral. Does NOT close
     bridge/generator-hardening-002-008.md (skills/plugin-cache sites remain
     out of scope).
     """
     module = _load_module()
-    expected_root = REPO_ROOT / "applications" / "Agent_Red" / "harness-state"
+    expected_root = REPO_ROOT / "harness-state"
 
     # Constant-level invariant: the authority root resolves under PROJECT_ROOT.
-    assert module.AGENT_RED_HARNESS_STATE_ROOT == expected_root
+    assert module.GTKB_HARNESS_STATE_ROOT == expected_root
     for harness_name in ("codex", "claude"):
         assert module.HARNESS_ROLE_RECORDS[harness_name].is_relative_to(expected_root)
         assert module.HARNESS_LIFECYCLE_GUARDS[harness_name].is_relative_to(expected_root)
@@ -293,12 +294,9 @@ def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() ->
     # (Commit 1 in this thread). If this assertion fails with the repo-fallback
     # path, the migration is incomplete (likely Commit 1 missing).
     for harness_name in ("codex", "claude"):
-        role_path = module.operating_role_path(
-            REPO_ROOT, harness_name=harness_name, prefer_local=False
-        )
+        role_path = module.operating_role_path(REPO_ROOT, harness_name=harness_name, prefer_local=False)
         assert role_path == expected_root / harness_name / "operating-role.md", (
-            f"--harness-name {harness_name} must resolve to in-root authority, "
-            f"got {role_path}"
+            f"--harness-name {harness_name} must resolve to in-root authority, got {role_path}"
         )
 
 
@@ -323,14 +321,17 @@ def test_project_root_rejects_drive_relative_path_to_prevent_doubling() -> None:
     )
     import subprocess
     import sys
+
     result = subprocess.run(
         [
             sys.executable,
             str(REPO_ROOT / "scripts" / "session_self_initialization.py"),
-            "--project-root", drive_relative_input,
+            "--project-root",
+            drive_relative_input,
             "--emit-startup-service-payload",
             "--fast-hook",
-            "--harness-name", "codex",
+            "--harness-name",
+            "codex",
         ],
         capture_output=True,
         text=True,
@@ -365,6 +366,7 @@ def test_default_invocation_does_not_scan_home_directory_for_skills_or_plugins(m
             "Per bridge/gh-002-skills-plugin-cache-closure-scoping-2026-04-28-004.md, "
             "GTKB_DISCOVER_USER_EXTENSIONS=1 must be set to trigger home-dir scan."
         )
+
     monkeypatch.setattr(module.Path, "home", _raise_if_called)
 
     skill_files = module._discover_skill_files(REPO_ROOT)
@@ -379,9 +381,7 @@ def test_default_invocation_does_not_scan_home_directory_for_skills_or_plugins(m
         )
 
     # Default behavior: plugin inventory is empty (home-dir plugin cache not scanned).
-    assert plugin_list == [], (
-        f"Default plugin inventory must be empty (no home-dir scan); got {plugin_list}"
-    )
+    assert plugin_list == [], f"Default plugin inventory must be empty (no home-dir scan); got {plugin_list}"
 
 
 def test_opt_in_invocation_scans_home_directory_for_skills_and_plugins(monkeypatch, tmp_path) -> None:
@@ -408,13 +408,9 @@ def test_opt_in_invocation_scans_home_directory_for_skills_and_plugins(monkeypat
     plugin_list = module._plugin_inventory()
 
     found_synthetic_skill = any("synthetic-skill" in str(p) for p in skill_files)
-    assert found_synthetic_skill, (
-        f"Opt-in must scan home-dir skills; got {[str(p) for p in skill_files]}"
-    )
+    assert found_synthetic_skill, f"Opt-in must scan home-dir skills; got {[str(p) for p in skill_files]}"
 
-    assert "synthetic-plugin" in plugin_list, (
-        f"Opt-in must scan home-dir plugin cache; got {plugin_list}"
-    )
+    assert "synthetic-plugin" in plugin_list, f"Opt-in must scan home-dir plugin cache; got {plugin_list}"
 
 
 def test_startup_payload_marks_user_extension_discovery_state(monkeypatch) -> None:
@@ -442,7 +438,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     prime_model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
     prime_report = module.render_report(
         prime_model,
-        "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard",
+        "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard",
         REPO_ROOT,
     )
 
@@ -457,7 +453,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     loyal_model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
     loyal_report = module.render_report(
         loyal_model,
-        "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard",
+        "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard",
         REPO_ROOT,
     )
 
@@ -482,7 +478,7 @@ def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(tmp
     assert isinstance(overlay.get("notes"), list)
     assert any("non-authoritative" in note or "no current session overlay" in note for note in overlay["notes"])
 
-    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard", REPO_ROOT)
+    report = module.render_report(model, "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
     assert "### Session Overlay Status (Non-Authoritative)" in report
     assert "non-authoritative by construction" in report
     # The overlay section must appear before the input-semantics section so
@@ -524,12 +520,13 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     module = _load_module()
 
     model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
-    report = module.render_report(model, "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard", REPO_ROOT)
+    report = module.render_report(model, "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
 
     assert model["role"]["assumed_role"] == "Loyal Opposition"
     assert model["role"]["role_assignment"] == "active AI harness assigned by owner for counterpart review"
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
-    assert "separate harnesses" in model["role"]["poller"]
+    assert "verified smart poller" in model["role"]["poller"]
+    assert "retired OS poller remains disabled" in model["role"]["poller"]
     assert model["role"]["role_mapping_source"] == ".claude/rules/operating-role.md"
     assert "## Loyal Opposition Startup Task" in report
     assert "## Choose This Session's Focus" not in report
@@ -548,7 +545,8 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         in report
     )
     assert "do not display this checklist as a substitute for performing the verification" in report
-    assert "Poller startup rule: activate a poller only when the roles are running in separate harnesses" in report
+    assert "Poller startup rule: use the verified smart poller when it is available and functioning" in report
+    assert "do not restore the retired OS poller" in report
     assert "First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning." in report
     assert "permanent owner permission to diagnose and repair bridge function/use" in report
     assert "report the live scan result and ask Mike whether to begin processing reviews and verifications" in report
@@ -649,13 +647,13 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     legacy_static_dashboard = dashboard_dir / "index.html"
     assert dashboard.name == "gtkb-dashboard.json"
     assert dashboard.is_file()
-    assert result["dashboard_url"] == "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
+    assert result["dashboard_url"] == "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard"
     assert not legacy_static_dashboard.exists()
     assert data.is_file()
     assert report.is_file()
     assert wrapup.is_file()
     assert history_path.is_file()
-    assert pdf.name == "agent-red-project-dashboard.pdf"
+    assert pdf.name == "groundtruth-kb-project-dashboard.pdf"
     assert result["pdf_export"]["available"] is False
     assert result["pdf_export"]["error"] == "Static dashboard PDF export is disabled."
 
@@ -666,7 +664,7 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     history = json.loads(history_path.read_text(encoding="utf-8"))
 
     panel_titles = set(_panel_titles(dashboard_json["panels"]))
-    assert dashboard_json["title"] == "Agent Red GT-KB Dashboard"
+    assert dashboard_json["title"] == "GroundTruth-KB Dashboard"
     assert "Shortcuts" in panel_titles
     assert "Health Signals" in panel_titles
     assert [panel["title"] for panel in dashboard_json["panels"][:10]] == [
@@ -732,24 +730,25 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     )
     assert "Role being assumed: Prime Builder" in report_text
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in report_text
-    assert "Poller: activate only when Prime Builder and Loyal Opposition run in separate harnesses" in report_text
+    assert "Poller: use verified smart poller when available and functioning" in report_text
+    assert "retired OS poller remains disabled" in report_text
     assert "Startup Disclosure" in report_text
-    assert "Agent Red Project Dashboard" in report_text
-    assert "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard" in report_text
+    assert "GroundTruth-KB Project Dashboard" in report_text
+    assert "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard" in report_text
     assert "Browser opening: use the harness-controlled browser" in report_text
     assert "system_default_browser" in report_text
-    assert "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard" in wrapup_text
+    assert "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard" in wrapup_text
     assert str(dashboard.resolve()) not in report_text
     assert "file:///" not in report_text
     assert "file:///" not in wrapup_text
     assert "Dashboard scope:" in report_text
     assert "Current Project State" in report_text
-    assert "Application release blockers:" in report_text
+    assert "GT-KB release blockers:" in report_text
     assert "Bridge role slot:" in report_text
     assert "Harness topology:" in report_text
     assert "Testing/tool rollup:" in report_text
     assert "Active Work Subject" in report_text
-    assert "Default work subject: Application Focus" in report_text
+    assert "Default work subject: GT-KB Infrastructure Focus" in report_text
     assert "Application work subject commands:" in report_text
     assert "`work subject application`" in report_text
     assert "`work subject GT-KB`" in report_text
@@ -799,13 +798,13 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Suggested Next User Actions" in wrapup_text
     assert "Safe automatic action" in wrapup_text
     assert dashboard_data["history"]
-    assert dashboard_data["model"]["dashboard_requirements"]["scope_version"] == "agent_red_v1"
+    assert dashboard_data["model"]["dashboard_requirements"]["scope_version"] == "gtkb_v1"
     intelligence = dashboard_data["model"]["dashboard_intelligence"]
     assert intelligence["health"]
     assert intelligence["action_center"]
     assert intelligence["release_readiness"]["release_gate_script"] == "scripts/release_candidate_gate.py"
     assert intelligence["quality_rollup"]["total"] >= 1
-    assert intelligence["data_freshness"]["scope_version"] == "agent_red_v1"
+    assert intelligence["data_freshness"]["scope_version"] == "gtkb_v1"
     assert any(shortcut["label"] == "Open GitHub Actions" for shortcut in intelligence["shortcuts"])
     delivery_timeline = dashboard_data["model"]["infrastructure"]["delivery_timeline"]
     assert delivery_timeline["timeline"]
@@ -824,10 +823,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert dashboard_data["model"]["infrastructure"]["testing_service_integrations"]["sonarcloud"]["scope"] == (
         "implementation_infrastructure"
     )
-    assert any(row["scope_confidence"] == "agent_red_inferred" for row in dashboard_data["history"])
-    assert all(row["scope_version"] == "agent_red_v1" for row in dashboard_data["history"])
+    assert any(row["scope_confidence"] == "gtkb_inferred" for row in dashboard_data["history"])
+    assert all(row["scope_version"] == "gtkb_v1" for row in dashboard_data["history"])
     assert history[-1]["token_measurement_status"]
-    assert history[-1]["scope_version"] == "agent_red_v1"
+    assert history[-1]["scope_version"] == "gtkb_v1"
 
 
 def test_startup_pruning_scan_reports_large_inputs(tmp_path) -> None:
@@ -894,12 +893,12 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
     context = payload["additionalContext"]
     assert "## Startup Disclosure" in context
     assert "### Live Project Dashboard" in context
-    assert "Agent Red Project Dashboard" in context
+    assert "GroundTruth-KB Project Dashboard" in context
     assert "Browser opening: use the harness-controlled browser" in context
     assert "### Current Project State" in context
-    assert "Application release blockers:" in context
+    assert "GT-KB release blockers:" in context
     assert "### Active Work Subject" in context
-    assert "Default work subject: Application Focus" in context
+    assert "Default work subject: GT-KB Infrastructure Focus" in context
     assert "`work subject application`" in context
     assert "`work subject GT-KB`" in context
     assert "`application mode`" in context
@@ -971,7 +970,7 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     freshness = hook_output["startupFreshness"]
     assert hook_output["hookEventName"] == "SessionStart"
     assert "Programmatic Startup Payload" in context
-    assert "agent-red-startup-service-v2" in context
+    assert "gtkb-startup-service-v2" in context
     assert "User-visible startup content below was generated programmatically by the startup service." in context
     assert "relay the generated startup message verbatim as the first durable assistant answer" in context
     assert "Do not summarize, paraphrase, shorten, reorder, or omit any startup section" in context
@@ -995,7 +994,7 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "Startup First-Response Directive" not in context
     assert "Mandatory Direct Live Bridge Index Read" not in context
     assert "SHA-256:" not in context
-    assert freshness["contract_version"] == "agent-red-startup-freshness-v1"
+    assert freshness["contract_version"] == "gtkb-startup-freshness-v1"
     assert freshness["request_started_at"] == "2026-04-23T13:20:00Z"
     assert freshness["report_origin"] == "in_memory_model_render"
     assert freshness["validation"]["startup_payload_fresh"] is True
@@ -1175,7 +1174,8 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     context = payload["additionalContext"]
     assert f"Role being assumed: {module.ROLE_PROFILES[discovered_role]['assumed_role']}" in context
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in context
-    assert "Poller: activate only when Prime Builder and Loyal Opposition run in separate harnesses" in context
+    assert "Poller: use verified smart poller when available and functioning" in context
+    assert "retired OS poller remains disabled" in context
     assert "Role mapping source: .claude/rules/operating-role.md" in context
     if discovered_role == "loyal-opposition":
         assert "## Loyal Opposition Startup Task" in context
@@ -1227,7 +1227,7 @@ def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monk
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
     assert "Proactive Session Wrap-Up" in context
-    assert "Agent Red Project Dashboard" in context
+    assert "GroundTruth-KB Project Dashboard" in context
     assert "Suggested Next User Actions" in context
 
 
@@ -1347,7 +1347,7 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     context = payload["additionalContext"]
     assert "## Startup Disclosure" in context
     assert "### Active Work Subject" in context
-    assert "Default work subject: Application Focus" in context
+    assert "Default work subject: GT-KB Infrastructure Focus" in context
     assert "### Wrap-Up Trigger Commands" in context
     assert "Accepted wrap-up commands:" in context
     assert "### File Bridge Scan" not in context
@@ -1374,7 +1374,7 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     assert context.index("## Startup Disclosure") < context.index("## Choose This Session's Focus")
     history = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert history
-    assert all(row["scope_confidence"] != "agent_red_inferred" for row in history)
+    assert all(row["scope_confidence"] != "gtkb_inferred" for row in history)
 
 
 def test_top_priority_actions_come_from_standing_backlog() -> None:
@@ -1433,10 +1433,10 @@ def test_direct_script_execution_emits_startup_payload(tmp_path):
     payload = json.loads(result.stdout)
     hook_output = payload["hookSpecificOutput"]
     assert hook_output["hookEventName"] == "SessionStart"
-    assert "agent-red-startup-service-v2" in hook_output["additionalContext"]
+    assert "gtkb-startup-service-v2" in hook_output["additionalContext"]
 
 
-# ---- GTKB-ISOLATION-015 Slice 1 §A integration coverage ----------------
+# ---- GTKB-ISOLATION-015 Slice 1 Ã‚Â§A integration coverage ----------------
 
 
 def _minimal_model(
@@ -1523,11 +1523,11 @@ def test_render_current_project_state_permits_single_subject_green() -> None:
 
 
 def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_path, monkeypatch) -> None:
-    """Live-runtime §E: writer persists current_subject into lifecycle guard.
+    """Live-runtime Ã‚Â§E: writer persists current_subject into lifecycle guard.
 
     Exercises the real writer path introduced for bridge -012 P1 fix.
     The counterpart subject-divergence check in detect_counterpart_state()
-    then reads what the writer wrote — no synthetic fixture JSON.
+    then reads what the writer wrote Ã¢â‚¬â€ no synthetic fixture JSON.
     """
     session_module = _load_module()
     import importlib.util
@@ -1587,7 +1587,7 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_pa
     )
     focus_module.save_state(focus_module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
 
-    result = focus_module.detect_counterpart_state(REPO_ROOT)
+    result = focus_module.detect_counterpart_state()
     assert result["subject_mismatch"] is True
     assert any(
         focus_module.FOCUS_GTKB_INFRASTRUCTURE in msg and focus_module.FOCUS_APPLICATION in msg
@@ -1597,7 +1597,7 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_pa
 
 # ---------------------------------------------------------------------------
 # Pending-owner-decisions surfacing -- F1 fixture coverage
-# Per bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md §2.6
+# Per bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Ã‚Â§2.6
 # Codex GO -004 condition: visibility through this script, not a separate hook.
 # ---------------------------------------------------------------------------
 
@@ -1684,13 +1684,113 @@ def test_render_pending_decisions_block_includes_id_question_options() -> None:
 
 
 # =====================================================================
+# Activation (-003 §3.3 + -004 GO guardrail 1): smart-poller wiring
+# Per bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md
+# =====================================================================
+
+
+def test_smart_poller_section_empty_when_no_notification(tmp_path) -> None:
+    """Absent notification → empty list (no orient section)."""
+    module = _load_module()
+    role = {"assumed_role": "Prime Builder"}
+    assert module._render_smart_poller_section(tmp_path, role) == []
+
+
+def test_smart_poller_section_renders_when_notification_present(tmp_path) -> None:
+    """Notification with pending_actions → section list non-empty + contains markdown."""
+    module = _load_module()
+    # Write a real notification via the canonical API.
+    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
+    from groundtruth_kb.bridge.routing import BridgeAgent
+
+    state = tmp_path / ".gtkb-state" / "bridge-poller"
+    state.mkdir(parents=True, exist_ok=True)
+    items = [
+        ActionablePending(
+            document_name="my-bridge",
+            top_status="GO",
+            top_file="bridge/my-bridge-003.md",
+            index_line_number=12,
+        )
+    ]
+    update_notification(state, BridgeAgent.PRIME, items, poller_run_id="test-run")
+
+    role = {"assumed_role": "Prime Builder"}
+    section = module._render_smart_poller_section(tmp_path, role)
+    assert len(section) == 2  # body + trailing blank line
+    assert "Smart-poller notification" in section[0]
+    assert "**GO**" in section[0]
+    assert "`my-bridge`" in section[0]
+
+
+def test_smart_poller_section_fail_open_on_unknown_role(tmp_path) -> None:
+    """Unknown role string → empty list (fail-open per guardrail 1)."""
+    module = _load_module()
+    role = {"assumed_role": "Some Other Role"}
+    assert module._render_smart_poller_section(tmp_path, role) == []
+
+
+def test_smart_poller_section_fail_open_on_reader_exception(tmp_path, monkeypatch) -> None:
+    """Reader raises → empty list (fail-open per guardrail 1).
+
+    Even if the reader module raises an unexpected exception, the orient
+    must continue to render. This test forces an exception via monkeypatch
+    and asserts the helper returns an empty list rather than propagating.
+    """
+    module = _load_module()
+
+    # Force an exception by replacing the imported function with a raiser.
+    # The helper does its own try/except, so this should be swallowed.
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated reader failure")
+
+    # Patch via the same import path the helper uses.
+    import sys
+
+    if "scripts.bridge_notify_reader" in sys.modules:
+        monkeypatch.setattr(sys.modules["scripts.bridge_notify_reader"], "read_for_recipient", _raise)
+    elif "bridge_notify_reader" in sys.modules:
+        monkeypatch.setattr(sys.modules["bridge_notify_reader"], "read_for_recipient", _raise)
+
+    role = {"assumed_role": "Prime Builder"}
+    assert module._render_smart_poller_section(tmp_path, role) == []
+
+
+def test_smart_poller_section_routes_loyal_opposition_to_codex(tmp_path) -> None:
+    """Loyal Opposition role reads codex notification (not prime)."""
+    module = _load_module()
+    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
+    from groundtruth_kb.bridge.routing import BridgeAgent
+
+    state = tmp_path / ".gtkb-state" / "bridge-poller"
+    state.mkdir(parents=True, exist_ok=True)
+    # Write to CODEX recipient (not PRIME).
+    items = [
+        ActionablePending(
+            document_name="codex-thread",
+            top_status="REVISED",
+            top_file="bridge/codex-thread-002.md",
+            index_line_number=5,
+        )
+    ]
+    update_notification(state, BridgeAgent.CODEX, items, poller_run_id="test-run")
+
+    role = {"assumed_role": "Loyal Opposition"}
+    section = module._render_smart_poller_section(tmp_path, role)
+    assert len(section) == 2
+    assert "Smart-poller notification" in section[0]
+    assert "**REVISED**" in section[0]
+    assert "`codex-thread`" in section[0]
+
+
+# =====================================================================
 # REVISED-1 (S315): public-CLI partial-arg regression test
-# Per bridge/generator-hardening-001-003.md §5.2 + Codex -004 GO
+# Per bridge/generator-hardening-001-003.md Ã‚Â§5.2 + Codex -004 GO
 # =====================================================================
 
 
 def test_main_with_only_project_root_writes_under_that_root(tmp_path, monkeypatch, capsys) -> None:
-    """Per bridge/generator-hardening-001-003.md §5.2 + Codex -004 GO:
+    """Per bridge/generator-hardening-001-003.md Ã‚Â§5.2 + Codex -004 GO:
 
     `--project-root <tmp-root>` without explicit `--dashboard-dir` /
     `--history-path` MUST write all output under <tmp-root>, not under
@@ -1862,10 +1962,7 @@ def test_git_checkout_info_returns_degraded_when_outside_project_root(tmp_path, 
     module = _load_module()
 
     def _fail_on_git(*_args, **_kwargs) -> None:
-        raise AssertionError(
-            "git subprocess invoked for checkout outside project_root; "
-            "scope-check guard regressed"
-        )
+        raise AssertionError("git subprocess invoked for checkout outside project_root; scope-check guard regressed")
 
     monkeypatch.setattr(module, "_command_output", _fail_on_git)
 

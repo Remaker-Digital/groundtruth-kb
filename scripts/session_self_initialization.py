@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Agent Red / GT-KB fresh-session startup report and dashboard."""
+"""Generate the GroundTruth-KB fresh-session startup report and dashboard."""
 
 from __future__ import annotations
 
@@ -86,59 +86,59 @@ except ImportError:  # pragma: no cover - direct script execution path
     )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# Per bridge/harness-state-authority-migration-2026-04-27-006.md (GO):
-# Authority records for harness-local role, lifecycle guard, and startup
-# preferences resolve under applications/Agent_Red/harness-state/, not
-# Path.home(). Mirrors scripts/workstream_focus.py:23 pattern. Closes
-# bridge/s317-working-tree-triage-005.md F5 deferral.
-AGENT_RED_HARNESS_STATE_ROOT = PROJECT_ROOT / "applications" / "Agent_Red" / "harness-state"
+# Harness-local role, lifecycle guard, and startup preference records belong to
+# GT-KB itself. Agent Red is an adopter/demo and must not own active harness
+# state unless Mike explicitly switches the session to Agent Red work.
+GTKB_HARNESS_STATE_ROOT = PROJECT_ROOT / "harness-state"
 # DEFAULT_DASHBOARD_DIR / DEFAULT_HISTORY_PATH removed per
-# bridge/generator-hardening-001-003.md §4.6: argparse defaults to None;
+# bridge/generator-hardening-001-003.md Â§4.6: argparse defaults to None;
 # main() derives both from resolved --project-root post-parse.
 # Codex GO -004 implementation constraint (i): PROJECT_ROOT only as CLI
 # fallback for --project-root, never as internal output/read-path fallback.
-DEFAULT_USER_STARTUP_PREFERENCES_PATH = (
-    AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
-)
-GRAFANA_DASHBOARD_URL = "http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard"
+DEFAULT_USER_STARTUP_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
+GRAFANA_DASHBOARD_URL = "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard"
 DASHBOARD_OPEN_MODE_HARNESS = "harness_browser"
 DASHBOARD_OPEN_MODE_SYSTEM = "system_default_browser"
-PDF_EXPORT_FILENAME = "agent-red-project-dashboard.pdf"
+PDF_EXPORT_FILENAME = "groundtruth-kb-project-dashboard.pdf"
 MAX_HISTORY = 200
-DASHBOARD_SCOPE_VERSION = "agent_red_v1"
-DASHBOARD_SCOPE_NOTE = "Agent Red product/project dashboard."
+DASHBOARD_SCOPE_VERSION = "gtkb_v1"
+DASHBOARD_SCOPE_NOTE = "GroundTruth-KB project dashboard."
 DEFAULT_RELEASE_BRANCH = "main"
-STARTUP_SERVICE_CONTRACT_VERSION = "agent-red-startup-service-v2"
-STARTUP_FRESHNESS_CONTRACT_VERSION = "agent-red-startup-freshness-v1"
+STARTUP_SERVICE_CONTRACT_VERSION = "gtkb-startup-service-v2"
+STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
 OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
 HARNESS_ROLE_RECORDS = {
-    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
-    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
+    "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
+    "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
 }
 HARNESS_LIFECYCLE_GUARDS = {
-    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
-    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
+    "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
+    "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
 }
+POLLER_ROLE_TEXT = (
+    "use verified smart poller when available and functioning; retired OS poller remains disabled; "
+    "otherwise use manual scans or monitoring only for separate harnesses/asynchronous monitoring"
+)
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
         "role_assignment": "active AI harness assigned by owner through durable operating-role record",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
-        "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
+        "poller": POLLER_ROLE_TEXT,
         "role_mapping_source": ".claude/rules/operating-role.md",
     },
     "acting-prime-builder": {
         "assumed_role": "Acting Prime Builder",
         "role_assignment": "active AI harness assigned by owner for this session",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
-        "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
+        "poller": POLLER_ROLE_TEXT,
         "role_mapping_source": ".claude/rules/acting-prime-builder.md",
     },
     "loyal-opposition": {
         "assumed_role": "Loyal Opposition",
         "role_assignment": "active AI harness assigned by owner for counterpart review",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
-        "poller": "activate only when Prime Builder and Loyal Opposition run in separate harnesses or asynchronous monitoring is needed",
+        "poller": POLLER_ROLE_TEXT,
         "role_mapping_source": ".claude/rules/operating-role.md",
     },
 }
@@ -643,7 +643,7 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-# Per bridge/generator-hardening-001-003.md §4.7 + Codex -004 GO:
+# Per bridge/generator-hardening-001-003.md Â§4.7 + Codex -004 GO:
 # _LOCAL_ENV_CACHE dropped. With project_root threaded, the cache would
 # need a per-root key; the .env.local parse is trivial work and
 # eliminates the multi-root cache-correctness question.
@@ -652,7 +652,7 @@ def _read_text(path: Path) -> str:
 def _local_env_values(project_root: Path) -> dict[str, str]:
     """Read non-secret routing values from local env files without logging them.
 
-    Per bridge/generator-hardening-001-003.md §4.7: project_root is now
+    Per bridge/generator-hardening-001-003.md Â§4.7: project_root is now
     a required parameter (was: bound to module-level PROJECT_ROOT).
     """
 
@@ -672,7 +672,7 @@ def _local_env_values(project_root: Path) -> dict[str, str]:
 def _local_env_value(project_root: Path, name: str, default: str = "") -> str:
     """Read one local-env value with environment-variable override.
 
-    Per bridge/generator-hardening-001-003.md §4.7 + Codex -002 Finding 2:
+    Per bridge/generator-hardening-001-003.md Â§4.7 + Codex -002 Finding 2:
     project_root is now a required parameter (was: parameterless wrapper).
     """
     return os.environ.get(name) or _local_env_values(project_root).get(name, default)
@@ -849,7 +849,7 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
             "status_counts": dict(sorted(Counter(str(row.get("status") or "none") for row in agent_red_specs).items())),
             "type_counts": dict(sorted(Counter(str(row.get("type") or "none") for row in agent_red_specs).items())),
             "scope_counts": _scope_counts(specifications),
-            "scope_confidence": "agent_red_current_heuristic",
+            "scope_confidence": "gtkb_current_heuristic",
         },
         "membase": {
             "work_item_status_counts": dict(
@@ -862,7 +862,7 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
             "test_records": len(agent_red_tests),
             "test_procedure_records": test_procedures_count,
             "scope_counts": _scope_counts(work_items),
-            "scope_confidence": "agent_red_current_heuristic",
+            "scope_confidence": "gtkb_current_heuristic",
         },
         "deliberation_archive": {
             "current_total": len(agent_red_deliberations),
@@ -871,7 +871,7 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
                 sorted(Counter(str(row.get("outcome") or "none") for row in agent_red_deliberations).items())
             ),
             "scope_counts": _scope_counts(deliberations),
-            "scope_confidence": "agent_red_current_heuristic",
+            "scope_confidence": "gtkb_current_heuristic",
         },
         "scope": {
             "version": DASHBOARD_SCOPE_VERSION,
@@ -906,7 +906,7 @@ def _parse_active_work_items(work_list_text: str) -> list[dict[str, str]]:
             if re.search(r"\b(DONE|PAUSED|OBSOLETE|RETIRED)\b", heading, re.IGNORECASE):
                 current = None
                 continue
-            match = re.match(r"(?P<id>[A-Z0-9-]+)\s+[—-]\s+(?P<title>.+)", heading)
+            match = re.match(r"(?P<id>[A-Z0-9-]+)\s+[â€”-]\s+(?P<title>.+)", heading)
             if match:
                 current = {"id": match.group("id"), "title": match.group("title")}
             else:
@@ -934,7 +934,7 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
         "top_priority_actions": visible_items[:3],
         "source": "memory/work_list.md",
         "scope_counts": dict(sorted(Counter(item["scope"] for item in classified).items())),
-        "scope_confidence": "agent_red_current_heuristic",
+        "scope_confidence": "gtkb_current_heuristic",
     }, visible_items[:3]
 
 
@@ -980,7 +980,7 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         "raw_review_queue_count": len(raw_review_queue),
         "raw_review_queue_by_status": dict(sorted(Counter(entry["status"] for entry in raw_review_queue).items())),
         "scope_counts": dict(sorted(Counter(entry["scope"] for entry in classified).items())),
-        "scope_confidence": "agent_red_current_heuristic",
+        "scope_confidence": "gtkb_current_heuristic",
         "source": "bridge/INDEX.md",
         "source_read_mode": "direct_file_read",
         "source_authority": "live bridge/INDEX.md is the sole authoritative bridge queue source",
@@ -1035,7 +1035,7 @@ def _git_drift(project_root: Path) -> dict[str, Any]:
         "raw_changed_path_count": len(lines),
         "untracked_path_count": sum(1 for line in agent_red_lines if line.startswith("??")),
         "deleted_path_count": sum(1 for line in agent_red_lines if "D" in line[:2]),
-        "scope_confidence": "agent_red_current_heuristic",
+        "scope_confidence": "gtkb_current_heuristic",
     }
 
 
@@ -1053,10 +1053,12 @@ def _user_extension_discovery_opt_in() -> bool:
 def _discover_skill_files(project_root: Path) -> list[Path]:
     roots = [project_root / ".claude" / "skills"]
     if _user_extension_discovery_opt_in():
-        roots.extend([
-            Path.home() / ".codex" / "skills",
-            Path.home() / ".agents" / "skills",
-        ])
+        roots.extend(
+            [
+                Path.home() / ".codex" / "skills",
+                Path.home() / ".agents" / "skills",
+            ]
+        )
     skill_files: list[Path] = []
     for root in roots:
         if not root.is_dir():
@@ -2471,7 +2473,7 @@ def _dashboard_intelligence(
             {
                 "severity": drift_status,
                 "risk": "Working tree drift",
-                "evidence": f"{drift_count} Agent Red changed path(s).",
+                "evidence": f"{drift_count} GT-KB changed path(s).",
                 "impact": "Dashboard evidence may include uncommitted local state.",
                 "remediation": "Review drift and stage/commit or explicitly defer it.",
                 "owner": "Prime Builder",
@@ -2617,7 +2619,7 @@ def build_startup_model(
             "raw_pytest_file_count": len(test_files),
             "test_records": database.get("membase", {}).get("test_records"),
             "test_procedure_records": database.get("membase", {}).get("test_procedure_records"),
-            "scope_confidence": "agent_red_current_heuristic",
+            "scope_confidence": "gtkb_current_heuristic",
         },
         "templates": {
             "skill_template_count": len(skill_files),
@@ -2639,7 +2641,7 @@ def build_startup_model(
     }
     infrastructure = {
         "instrumentation": "GT-KB",
-        "scope_note": "Infrastructure is reported separately from primary Agent Red product KPIs.",
+        "scope_note": "GT-KB infrastructure is the primary dashboard scope; adopter-application KPIs are explicit secondary context.",
         "skill_template_count": len(skill_files),
         "rule_template_count": len(rule_files),
         "hook_template_count": len(hook_files),
@@ -2769,7 +2771,7 @@ def _snapshot_from_model(model: dict[str, Any]) -> dict[str, Any]:
     metrics = model["metrics"]
     return {
         "scope_version": DASHBOARD_SCOPE_VERSION,
-        "scope_confidence": "agent_red_current_heuristic",
+        "scope_confidence": "gtkb_current_heuristic",
         "scope_source": "current dashboard model",
         "generated_at": model["generated_at"],
         "backlog_active_items": metrics["backlog"].get("active_item_count"),
@@ -2809,8 +2811,7 @@ def _write_history(
         row
         for row in _load_history(history_path)
         if not (
-            str(row.get("generated_at", ""))[:10] >= snapshot_day
-            and row.get("scope_confidence") == "agent_red_inferred"
+            str(row.get("generated_at", ""))[:10] >= snapshot_day and row.get("scope_confidence") == "gtkb_inferred"
         )
     ]
     seen = {row.get("generated_at") for row in history}
@@ -2889,7 +2890,7 @@ def _historical_agent_red_backfill(project_root: Path) -> list[dict[str, Any]]:
         snapshots.append(
             {
                 "scope_version": DASHBOARD_SCOPE_VERSION,
-                "scope_confidence": "agent_red_inferred",
+                "scope_confidence": "gtkb_inferred",
                 "scope_source": "groundtruth.db version history by changed_at",
                 "generated_at": f"{day}T23:59:59Z",
                 "backlog_active_items": None,
@@ -3143,12 +3144,12 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Startup mode: Loyal Opposition review and verification.",
             "- Default session purpose: process Prime Builder reviews and verifications on the file bridge.",
             "- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.",
-            "- Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism; the poller is only a monitoring/activation service.",
+            "- Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism; the smart poller is a monitoring/activation service.",
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
             "- Live bridge authority: current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`; this generated report is not authoritative after generation.",
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
-            "- Poller startup rule: activate a poller only when the roles are running in separate harnesses or asynchronous monitoring is otherwise needed.",
+            "- Poller startup rule: use the verified smart poller when it is available and functioning; do not restore the retired OS poller. Otherwise use manual scans or monitoring only when the roles are running in separate harnesses or asynchronous monitoring is otherwise needed.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
             "- If the live bridge verification succeeds, report the live scan result and ask Mike whether to begin processing reviews and verifications from `bridge/INDEX.md`.",
@@ -3200,7 +3201,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
     upgrade_posture = model.get("infrastructure", {}).get("gtkb_upgrade_posture", {})
     subject_label = _active_subject_label(model)
 
-    # §A hard-rejection: a combined application + GT-KB green claim may not be
+    # Â§A hard-rejection: a combined application + GT-KB green claim may not be
     # emitted without an explicit dual-scope declaration at the readiness/report
     # layer. This is defense-in-depth against future code paths that might
     # assemble dual-subject readiness outputs without the guard.
@@ -3317,7 +3318,7 @@ def _markdown_url_link(url: str) -> str:
 
 
 # _atomic_write_text relocated to scripts/_wrap_io.py per
-# bridge/gtkb-wrapup-enhancements-slice1-005.md §2.4 (REVISED-2 binding,
+# bridge/gtkb-wrapup-enhancements-slice1-005.md Â§2.4 (REVISED-2 binding,
 # GO at -006). Re-imported here as a module-level alias so the four
 # existing call sites at lines ~2744, ~4886, ~4891, ~4892 continue to
 # resolve to the same function object without behavior change.
@@ -3339,7 +3340,7 @@ from _wrap_io import _atomic_write_text  # noqa: E402,F401,I001
 # writer of memory/pending-owner-decisions.md. This renderer reads the
 # same file and surfaces any `## Pending` entries in the startup
 # disclosure so owner decisions don't drown in inline message flow.
-# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md §2.6;
+# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Â§2.6;
 # Codex GO at -004 with condition "keep visibility through this script,
 # do not reintroduce a separate SessionStart hook as primary surface."
 
@@ -3450,6 +3451,48 @@ def _unquote_pending_value(value: str) -> str:
     return value
 
 
+def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> list[str]:
+    """Render the smart-poller notification section for the startup orient.
+
+    Fail-open per `bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md`
+    GO guardrail 1: any failure in import, canonical-API read, or formatting
+    returns an empty list. The startup orient never blocks on smart-poller
+    behavior; absent notifications and reader failures are both silent.
+
+    Recipient is derived from the harness's assumed role:
+      - Prime Builder → BridgeAgent.PRIME (acts on GO/NO-GO)
+      - Loyal Opposition → BridgeAgent.CODEX (reviews NEW/REVISED)
+    """
+    try:
+        try:
+            from scripts.bridge_notify_reader import (
+                format_orient_section,
+                read_for_recipient,
+            )
+        except ModuleNotFoundError:
+            from bridge_notify_reader import (  # type: ignore[no-redef]
+                format_orient_section,
+                read_for_recipient,
+            )
+        from groundtruth_kb.bridge.routing import BridgeAgent
+
+        assumed = str(role.get("assumed_role", "")).lower()
+        if "prime" in assumed:
+            recipient = BridgeAgent.PRIME
+        elif "loyal" in assumed:
+            recipient = BridgeAgent.CODEX
+        else:
+            return []
+
+        artifact = read_for_recipient(project_root, recipient)
+        section_md = format_orient_section(artifact)
+        if not section_md:
+            return []
+        return [section_md, ""]
+    except Exception:
+        return []
+
+
 def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
     """Format the pending-decisions list for the startup disclosure.
 
@@ -3489,7 +3532,7 @@ def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
 def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path) -> str:
     """Render the startup report markdown.
 
-    Per bridge/generator-hardening-001-003.md §4.5 + Codex -004 GO:
+    Per bridge/generator-hardening-001-003.md Â§4.5 + Codex -004 GO:
     project_root is now a required parameter (was: model lacked
     project_root, so the function read PROJECT_ROOT global directly).
     """
@@ -3531,7 +3574,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
 
     return "\n".join(
         [
-            "# Agent Red / GT-KB Fresh Session Startup",
+            "# GroundTruth-KB Fresh Session Startup",
             "",
             f"Generated: {model['generated_at']}",
             "",
@@ -3549,9 +3592,9 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "",
             "### Live Project Dashboard",
             "",
-            f"- Dashboard: Agent Red Project Dashboard: {dashboard_link}",
+            f"- Dashboard: GroundTruth-KB Project Dashboard: {dashboard_link}",
             f"- Browser opening: use the harness-controlled browser for live dashboard inspection; startup open request: {dashboard_open_requested}; current mode: `{dashboard_open_mode}`. Startup hooks must not launch the operating system default browser unless explicitly configured with `dashboard_open_mode: system_default_browser`.",
-            "- KPI coverage: Agent Red backlog, MemBase work items, Deliberation Archive records, tests, specifications, drift, regression, contention, and tokens consumed at session start before user input.",
+            "- KPI coverage: GT-KB backlog, MemBase work items, Deliberation Archive records, tests, specifications, drift, regression, contention, and tokens consumed at session start before user input.",
             f"- Dashboard scope: {model['dashboard_requirements']['scope_note']}",
             f"- Token measurement status: {metrics['tokens']['measurement_status']}",
             f"- Tokens consumed before user input: {token_count_text}",
@@ -3569,6 +3612,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
                 include_counterpart=True,
             ),
             "",
+            *_render_smart_poller_section(project_root, role),
             *pending_decisions_section,
             "### Session Overlay Status (Non-Authoritative)",
             "",
@@ -3597,7 +3641,7 @@ def render_wrapup_notice(model: dict[str, Any], dashboard_link: str) -> str:
 
     return "\n".join(
         [
-            "# Agent Red / GT-KB Proactive Session Wrap-Up",
+            "# GroundTruth-KB Proactive Session Wrap-Up",
             "",
             f"Generated: {model['generated_at']}",
             "",
@@ -3610,7 +3654,7 @@ def render_wrapup_notice(model: dict[str, Any], dashboard_link: str) -> str:
             "## Wrap-Up Procedure Entry Point",
             "",
             "- Procedure skill: `.claude/skills/kb-session-wrap/SKILL.md`",
-            f"- Dashboard: Agent Red Project Dashboard: {dashboard_link}",
+            f"- Dashboard: GroundTruth-KB Project Dashboard: {dashboard_link}",
             "- Safe automatic action: this report is generated without mutating MemBase, git history, or external infrastructure.",
             "- Mutating wrap-up actions still require the applicable approval, acknowledgement, or owner-authorized automation scope.",
             "",
@@ -4043,7 +4087,7 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Agent Red Project Dashboard</title>
+  <title>GroundTruth-KB Project Dashboard</title>
   <style>
     :root {{
       --bg: #f6f7f9;
@@ -4523,7 +4567,7 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
   <section class="dashboard-hero">
     <div class="hero-grid">
       <div>
-        <h1>Agent Red Project Dashboard</h1>
+        <h1>GroundTruth-KB Project Dashboard</h1>
         <p class="hero-meta">Generated: {html.escape(model["generated_at"])}</p>
         <p class="hero-meta">Branch: {html.escape(str(intelligence.get("data_freshness", {}).get("repo_branch")))} @ {html.escape(str(intelligence.get("data_freshness", {}).get("repo_short_sha")))}</p>
         <p>{html.escape(model["dashboard_requirements"]["scope_note"])}</p>
@@ -5155,7 +5199,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
     focus_option_count = len(_session_focus_options(model))
     return "\n".join(
         [
-            "# Agent Red / GT-KB Programmatic Startup Payload",
+            "# GroundTruth-KB Programmatic Startup Payload",
             "",
             f"- Contract: {STARTUP_SERVICE_CONTRACT_VERSION}",
             "- Source: `scripts/session_self_initialization.py`",
@@ -5272,7 +5316,7 @@ def _arm_startup_interaction_guard(
     }
     # Persist the active harness's current work subject so the counterpart
     # harness's detect_counterpart_state() can detect divergence against a
-    # live-populated durable source (Phase 7 §E live-wiring, per bridge -012).
+    # live-populated durable source (Phase 7 Â§E live-wiring, per bridge -012).
     if current_subject is not None:
         update["current_subject"] = current_subject
     state.update(update)
@@ -5300,7 +5344,7 @@ def _consume_startup_wrapup_guard(path: Path) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    # Per bridge/generator-hardening-001-003.md §4.6: dashboard-dir and
+    # Per bridge/generator-hardening-001-003.md Â§4.6: dashboard-dir and
     # history-path default to None; main() derives them from the resolved
     # --project-root post-parse. This means a caller passing only
     # --project-root <child-root> gets all output under <child-root>, not
@@ -5352,7 +5396,7 @@ def main(argv: list[str] | None = None) -> int:
             "--role-record-path / --lifecycle-guard-path. Used by the Slice 11 "
             "audit-hook lane to thread a sandbox-relative preferences path so "
             "the legacy generator does not read the canonical "
-            "applications/Agent_Red/harness-state/codex/session-startup-"
+            "harness-state/codex/session-startup-"
             "preferences.json from outside its sandbox. Per "
             "bridge/harness-state-preferences-path-cli-2026-04-28-002.md "
             "Codex GO. Implemented as a setdefault env-var bridge so the "
@@ -5462,7 +5506,7 @@ def main(argv: list[str] | None = None) -> int:
         bridge_maintenance = _run_verified_bridge_startup_maintenance(project_root)
     startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if startup_emit_requested else None
 
-    # Per bridge/generator-hardening-001-003.md §4.6: derive output paths
+    # Per bridge/generator-hardening-001-003.md Â§4.6: derive output paths
     # from resolved project_root when CLI args are omitted, so a caller
     # passing only --project-root <child> gets all output under <child>.
     dashboard_dir = (
