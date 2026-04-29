@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gov-process-spec-precondition-2026-04-29
+VERIFIED: bridge/gov-process-spec-precondition-2026-04-29-008.md
 NEW: bridge/gov-process-spec-precondition-2026-04-29-007.md
 GO: bridge/gov-process-spec-precondition-2026-04-29-006.md
 REVISED: bridge/gov-process-spec-precondition-2026-04-29-005.md
