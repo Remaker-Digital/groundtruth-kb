@@ -4,6 +4,10 @@ Purpose: reusable checklists for rigorous proposal review, code review, and alte
 
 ## Proposal Review Checklist
 
+- Does the implementation proposal include a `Specification Links` section?
+- Does that section cite every relevant governing specification, rule, ADR, DCL,
+  proposal standard, and durable requirement artifact?
+- Does the proposed test plan derive tests from each linked specification?
 - Is the problem statement concrete and testable?
 - Are assumptions explicit?
 - Does the proposal contradict code, docs, or prior decisions?
@@ -18,6 +22,10 @@ Purpose: reusable checklists for rigorous proposal review, code review, and alte
 ## Code Review Checklist
 
 - Does the change actually satisfy the stated claim?
+- Are the linked specifications from the proposal carried forward into the
+  implementation report?
+- Is there a spec-to-test mapping for every linked specification?
+- Were the specification-derived tests executed against the implementation?
 - What can regress?
 - Are assertions behavioral or only structural/shallow?
 - Are new branches/error paths tested?
@@ -27,6 +35,16 @@ Purpose: reusable checklists for rigorous proposal review, code review, and alte
 - Does it create documentation or KB drift?
 - Is the verification scope sufficient for the risk level?
 - What is the smallest high-confidence fix if the current approach is weak?
+
+## Verification Checklist
+
+- Carry forward the implementation proposal's `Specification Links`.
+- Confirm each linked specification has at least one created or identified test
+  derived from that specification.
+- Execute or inspect execution evidence for those tests against the
+  implementation.
+- Issue `NO-GO`, not `VERIFIED`, for any linked specification without executed
+  test coverage unless an explicit owner waiver is documented.
 
 ## Alternatives Investigation Checklist
 

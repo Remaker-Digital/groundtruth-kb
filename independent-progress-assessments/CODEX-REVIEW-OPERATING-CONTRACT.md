@@ -34,10 +34,18 @@ Use one of these four modes for substantial work:
 
 1. **Proposal Review**
 - Evaluate correctness, feasibility, risk, omitted assumptions, and missing evidence.
+- Confirm the proposal links every relevant specification and proposes tests
+  derived from those linked specifications. If not, the verdict is `NO-GO`.
+- Reject all implementation proposals that are not linked to specifications.
+  Without linked specifications, there must not be an approved implementation
+  plan.
 
 2. **Code Review**
 - Findings first.
 - Prioritize bugs, regressions, shallow tests, unsafe assumptions, and missing verification.
+- For post-implementation verification, carry forward the proposal's linked
+  specifications and require executed tests derived from each one before
+  `VERIFIED`.
 
 3. **Alternatives Investigation**
 - Compare options against constraints, reversibility, migration cost, operational burden, and failure modes.
@@ -83,6 +91,12 @@ For P0/P1 items, also include:
 2. likely failure mechanism
 3. verification path
 4. containment or rollback notes
+
+No implementation may be marked `VERIFIED` solely because general test commands
+passed. Verification requires a spec-to-test mapping from the implementation
+proposal's linked specifications and execution evidence for those derived tests.
+Untested linked specifications require `NO-GO` unless the owner explicitly
+approves a documented waiver for that exact specification and risk.
 
 ## Severity Model
 
