@@ -151,11 +151,6 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
 def test_project_settings_registers_bridge_visibility_hook() -> None:
     settings = json.loads(_read(".claude/settings.json"))
 
-    prompt_commands = [
-        hook["command"]
-        for group in settings["hooks"]["UserPromptSubmit"]
-        for hook in group["hooks"]
-    ]
     pre_tool_commands = [
         hook["command"]
         for group in settings["hooks"]["PreToolUse"]
