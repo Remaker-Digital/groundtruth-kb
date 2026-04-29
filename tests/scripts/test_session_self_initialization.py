@@ -551,7 +551,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
     assert "verified smart poller" in model["role"]["poller"]
     assert "retired OS poller remains disabled" in model["role"]["poller"]
-    assert model["role"]["role_mapping_source"] == ".claude/rules/operating-role.md"
+    assert model["role"]["role_mapping_source"] == "harness-state/claude/operating-role.md"
     assert "## Loyal Opposition Startup Task" in report
     assert "## Choose This Session's Focus" not in report
     assert "Commit and push to GitHub" not in report
@@ -1200,7 +1200,7 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in context
     assert "Poller: use verified smart poller when available and functioning" in context
     assert "retired OS poller remains disabled" in context
-    assert "Role mapping source: .claude/rules/operating-role.md" in context
+    assert "Role mapping source: harness-state/claude/operating-role.md" in context
     if discovered_role == "loyal-opposition":
         assert "## Loyal Opposition Startup Task" in context
         assert "## Choose This Session's Focus" not in context
@@ -1460,7 +1460,7 @@ def test_direct_script_execution_emits_startup_payload(tmp_path):
     assert "gtkb-startup-service-v2" in hook_output["additionalContext"]
 
 
-# ---- GTKB-ISOLATION-015 Slice 1 Ã‚Â§A integration coverage ----------------
+# ---- GTKB-ISOLATION-015 Slice 1 §A integration coverage ----------------
 
 
 def _minimal_model(
@@ -1547,11 +1547,11 @@ def test_render_current_project_state_permits_single_subject_green() -> None:
 
 
 def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_path, monkeypatch) -> None:
-    """Live-runtime Ã‚Â§E: writer persists current_subject into lifecycle guard.
+    """Live-runtime §E: writer persists current_subject into lifecycle guard.
 
     Exercises the real writer path introduced for bridge -012 P1 fix.
     The counterpart subject-divergence check in detect_counterpart_state()
-    then reads what the writer wrote Ã¢â‚¬â€ no synthetic fixture JSON.
+    then reads what the writer wrote — no synthetic fixture JSON.
     """
     session_module = _load_module()
     import importlib.util
@@ -1621,7 +1621,7 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_pa
 
 # ---------------------------------------------------------------------------
 # Pending-owner-decisions surfacing -- F1 fixture coverage
-# Per bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Ã‚Â§2.6
+# Per bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md §2.6
 # Codex GO -004 condition: visibility through this script, not a separate hook.
 # ---------------------------------------------------------------------------
 
@@ -2001,12 +2001,12 @@ def test_smart_poller_section_silent_on_doctor_exception_with_notification_prese
 
 # =====================================================================
 # REVISED-1 (S315): public-CLI partial-arg regression test
-# Per bridge/generator-hardening-001-003.md Ã‚Â§5.2 + Codex -004 GO
+# Per bridge/generator-hardening-001-003.md §5.2 + Codex -004 GO
 # =====================================================================
 
 
 def test_main_with_only_project_root_writes_under_that_root(tmp_path, monkeypatch, capsys) -> None:
-    """Per bridge/generator-hardening-001-003.md Ã‚Â§5.2 + Codex -004 GO:
+    """Per bridge/generator-hardening-001-003.md §5.2 + Codex -004 GO:
 
     `--project-root <tmp-root>` without explicit `--dashboard-dir` /
     `--history-path` MUST write all output under <tmp-root>, not under
