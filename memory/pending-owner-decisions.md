@@ -69,6 +69,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: ec8b749b83ff24db
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0087
+  asked_at: 2026-04-29T23:01:28.809266Z
+  question: "rectly remain at GO awaiting your direction on the next-step pr"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 785464f15c6de597
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
