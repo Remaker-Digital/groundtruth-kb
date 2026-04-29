@@ -767,6 +767,57 @@ def test_bridge_compliance_go_over_nogo(tmp_path):
     assert json.loads(result.stdout) == {}
 
 
+def test_bridge_compliance_blocks_bridge_proposal_without_spec_links(tmp_path):
+    """Direct bridge proposal writes require concrete Specification Links.
+
+    Verifies DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.A1: hook
+    MUST hard-block (emit_deny) — not advisory ask — bridge proposals lacking
+    concrete Specification Links. Per owner directive 2026-04-29 (S321) +
+    bridge/gov-process-spec-precondition-2026-04-29-005.md REVISED-2 GO at -006.
+    """
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/no-spec-links-001.md",
+                "content": "# Implementation Proposal\n\nChange source behavior.",
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    output = json.loads(result.stdout)
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "Specification Links" in output["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_bridge_compliance_blocks_verified_without_spec_to_test_evidence(tmp_path):
+    """VERIFIED reports require spec links plus spec-derived executed-test evidence.
+
+    Verifies DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001.A1: hook MUST
+    hard-block (emit_deny) VERIFIED bridge reports lacking spec-to-test
+    mapping or executed-test evidence. Per owner directive 2026-04-29 (S321).
+    """
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/verify-without-tests-002.md",
+                "content": "VERIFIED\n\n## Specification Links\n- SPEC-TEST-001\n\nNo command evidence.",
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    output = json.loads(result.stdout)
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "spec-to-test" in output["hookSpecificOutput"]["permissionDecisionReason"]
+
+
 def test_bridge_compliance_multi_doc_partial_match(tmp_path):
     """Two docs, one matching one not → only matching doc fires."""
     bridge_dir = tmp_path / "bridge"

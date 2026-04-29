@@ -23,6 +23,24 @@ from pathlib import Path
 
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
+SPEC_LINK_HEADING_RE = re.compile(
+    r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
+    re.IGNORECASE,
+)
+SPEC_LINK_TOKEN_RE = re.compile(
+    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\b"
+    r"|(?:^|[`(\s])(?:\.claude/rules|groundtruth-kb/docs|docs|bridge)/[^\s`)]+",
+    re.IGNORECASE | re.MULTILINE,
+)
+SPEC_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|none|n/a|not applicable|no relevant)\b", re.IGNORECASE)
+SPEC_TEST_HEADING_RE = re.compile(
+    r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
+    re.IGNORECASE,
+)
+COMMAND_EVIDENCE_RE = re.compile(
+    r"\b(?:python -m pytest|pytest|ruff|npm test|pnpm test|uv run|make test)\b",
+    re.IGNORECASE,
+)
 
 
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
@@ -52,6 +70,53 @@ def _parse_bridge_index(index_path: Path) -> dict[str, str]:
                     break
 
     return result
+
+
+def _first_nonblank_line(content: str) -> str:
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _is_bridge_markdown_file(file_path: str) -> bool:
+    normalized = file_path.replace("\\", "/")
+    if not normalized.endswith(".md"):
+        return False
+    return "/bridge/" in f"/{normalized}" and not normalized.endswith("/bridge/INDEX.md")
+
+
+def _has_concrete_spec_links(content: str) -> bool:
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if SPEC_LINK_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return False
+
+    section: list[str] = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            break
+        section.append(line)
+    section_text = "\n".join(section).strip()
+    return bool(
+        section_text
+        and not SPEC_PLACEHOLDER_RE.search(section_text)
+        and SPEC_LINK_TOKEN_RE.search(section_text)
+    )
+
+
+def _has_spec_derived_verification(content: str) -> bool:
+    return bool(
+        _has_concrete_spec_links(content)
+        and SPEC_TEST_HEADING_RE.search(content)
+        and COMMAND_EVIDENCE_RE.search(content)
+    )
 
 
 def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
@@ -110,7 +175,7 @@ def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
 
 def main() -> None:
     try:
-        from groundtruth_kb.governance.output import emit_ask, emit_pass
+        from groundtruth_kb.governance.output import emit_ask, emit_deny, emit_pass
     except ImportError:
 
         def emit_ask(event: str, reason: str) -> None:  # type: ignore[misc]
@@ -118,6 +183,17 @@ def main() -> None:
                 "hookSpecificOutput": {
                     "hookEventName": event,
                     "permissionDecision": "ask",
+                    "permissionDecisionReason": reason,
+                    "additionalContext": reason,
+                }
+            }
+            print(json.dumps(out))
+
+        def emit_deny(event: str, reason: str) -> None:  # type: ignore[misc]
+            out = {
+                "hookSpecificOutput": {
+                    "hookEventName": event,
+                    "permissionDecision": "deny",
                     "permissionDecisionReason": reason,
                     "additionalContext": reason,
                 }
@@ -152,6 +228,27 @@ def main() -> None:
     if not file_path:
         emit_pass()
         sys.exit(0)
+
+    content = str(tool_input.get("content", ""))
+    if _is_bridge_markdown_file(file_path) and content:
+        first_line = _first_nonblank_line(content)
+        if first_line == "VERIFIED" and not _has_spec_derived_verification(content):
+            emit_deny(
+                "PreToolUse",
+                "[Governance] VERIFIED bridge reports must carry Specification Links, "
+                "a spec-to-test mapping, and executed test command evidence. "
+                "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
+                "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)",
+            )
+            sys.exit(0)
+        if not first_line.startswith(("GO", "NO-GO", "VERIFIED")) and not _has_concrete_spec_links(content):
+            emit_deny(
+                "PreToolUse",
+                "[Governance] Implementation proposals must include concrete Specification Links "
+                "before bridge submission. "
+                "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)",
+            )
+            sys.exit(0)
 
     index_path = Path(cwd) / BRIDGE_INDEX_FILENAME
     if not index_path.exists():
