@@ -5,7 +5,16 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gov-process-spec-precondition-2026-04-29
+NEW: bridge/gov-process-spec-precondition-2026-04-29-001.md
+
+
+Document: spec-smart-poller-auto-trigger-2026-04-29
+NEW: bridge/spec-smart-poller-auto-trigger-2026-04-29-001.md
+
+
 Document: gtkb-platform-spec-coverage-architecture-2026-04-29
+NO-GO: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-002.md
 NEW: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-001.md
 
 
