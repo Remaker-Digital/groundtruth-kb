@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: active-workspace-declaration-architecture-2026-04-29
+NEW: bridge/active-workspace-declaration-architecture-2026-04-29-001.md
+
 Document: gtkb-membase-effective-use-recovery-2026-04-29
 GO: bridge/gtkb-membase-effective-use-recovery-2026-04-29-002.md
 NEW: bridge/gtkb-membase-effective-use-recovery-2026-04-29-001.md
