@@ -445,3 +445,24 @@ harness-state/*/session-lifecycle-guard.json
 # is already preserved in git history at the commit before the trim;
 # tracking the backup file is redundant and creates noise on future trims.
 memory/MEMORY.md.backup-*
+
+# =============================================================================
+# Smart-poller runtime state (added 2026-04-29 S321)
+# =============================================================================
+# Per bridge/session-hygiene-drift-triage-s321-2026-04-29-003.md §2.4 +
+# Codex NO-GO -002 "Additional Notes": .gtkb-state/ is the smart-poller's
+# runtime state directory written every 15s by the active scheduled task
+# (audit.jsonl, checkpoint.json, notifications/, poller-runs/). Pure runtime
+# state — never a tracking candidate. Missed in S320 activation work.
+.gtkb-state/
+
+# =============================================================================
+# Formal-artifact-approval session-state packets (added 2026-04-29 S321)
+# =============================================================================
+# Per bridge/session-hygiene-drift-triage-s321-2026-04-29-003.md §2.3 +
+# acting-prime-builder.md "Formal Artifact Approval And Audit Principle":
+# these JSON packets are governance approval evidence consumed by the
+# formal-artifact-approval-gate.py PreToolUse hook. After harvest into the
+# Deliberation Archive (groundtruth.db), the JSON is redundant. Tracking
+# would duplicate KB state and create per-session diff noise.
+.groundtruth/formal-artifact-approvals/
