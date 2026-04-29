@@ -1344,6 +1344,40 @@ DA_HARVEST_COVERAGE_WARN_THRESHOLD = 95.0
 DA_HARVEST_COVERAGE_ERROR_THRESHOLD = 80.0
 
 
+def _recent_audit_run_ids(target: Path, *, tail_count: int = 6) -> set[str]:
+    """Parse the last `tail_count` audit events and return the set of distinct run_ids.
+
+    Per smart-poller-notify-activation -010 Finding 2: when multiple poller
+    chains run against the same state dir, they interleave writes to the
+    audit log. Distinct run_ids in a recent window indicate duplicate
+    pollers and a broken single-writer assumption.
+
+    Returns an empty set if the audit log is absent or unreadable. The
+    caller treats `len(result) > 1` as the duplicate-runner signal.
+    """
+    audit_path = target / _SMART_POLLER_STATE_REL / "audit.jsonl"
+    if not audit_path.is_file():
+        return set()
+    try:
+        with audit_path.open("r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return set()
+    run_ids: set[str] = set()
+    for line in lines[-tail_count:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rid = entry.get("run_id")
+        if isinstance(rid, str) and rid:
+            run_ids.add(rid)
+    return run_ids
+
+
 def _check_smart_bridge_poller(target: Path) -> ToolCheck:
     """Check the smart-poller activation surface end-to-end.
 
@@ -1592,6 +1626,30 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
                 f"smart-poller task registered but most recent audit event is "
                 f"{int(audit_age)}s old (> {_SMART_POLLER_FRESH_SECS}s threshold). "
                 f"Task may be stuck — inspect Task Scheduler"
+            ),
+        )
+
+    # 7b. Duplicate-runner detection (per -010 Finding 2). When multiple
+    # poller chains run against the same state directory, they interleave
+    # writes to the audit log, checkpoint, and notification files. The
+    # single-writer assumption breaks. Detection: parse the last ~6 audit
+    # events (~90 seconds at 15s cadence) and count distinct run_ids.
+    # If more than 1, surface fail with cleanup instructions.
+    distinct_run_ids = _recent_audit_run_ids(target)
+    if len(distinct_run_ids) > 1:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"smart-poller has {len(distinct_run_ids)} concurrent poller chains writing "
+                f"to .gtkb-state/bridge-poller/ in the last ~90s (run_ids: "
+                f"{', '.join(sorted(distinct_run_ids))[:200]}). The single-writer assumption "
+                f"is broken. Identify and stop all but one chain via "
+                f"`Get-WmiObject Win32_Process | Where-Object {{$_.CommandLine -like "
+                f"'*bridge_poller_runner*'}} | Stop-Process -Force` (then re-start the "
+                f"scheduled task)."
             ),
         )
 

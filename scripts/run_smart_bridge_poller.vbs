@@ -25,25 +25,65 @@
 Option Explicit
 
 Dim fso, scriptDir, projectRoot, runnerPath, shell, command, exitCode
-Dim args, i, validateOnly, intervalSeconds, argLower, argValue
+Dim args, i, validateOnly, intervalSeconds, argLower, argValue, argBasename
+Dim recognized
 
 Set args = WScript.Arguments
 validateOnly = False
 intervalSeconds = 15
 
+' Fail-closed argument parser (per smart-poller-notify-activation -010
+' Finding 1). Git Bash / MSYS path-converts arguments starting with `/`
+' so `cscript ... /Validate` becomes `cscript ... "C:/Program Files/Git/Validate"`
+' on a Git-Bash-launched invocation. The earlier permissive parser
+' (only matched exact `/validate`) silently fell through to daemon mode
+' and started a duplicate poller. Now: any argument we don't recognize
+' is a fatal error, AND we recognize multiple validation flag variants
+' including the MSYS-converted basename.
+'
+' Recognized validation forms:
+'   /validate          (PowerShell/CMD/cscript native)
+'   --validate         (POSIX-style; future-friendly)
+'   anything whose basename (case-insensitive) is "validate" — covers
+'   the MSYS-converted "C:/Program Files/Git/Validate" case
+'
+' Recognized daemon-mode forms:
+'   /interval:N        (PowerShell/CMD; passes interval to pythonw)
+'   --interval:N       (POSIX-style; same)
+'
+' Anything else: WScript.Quit 2 (unrecognized argument).
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+
 For i = 0 To args.Count - 1
   argLower = LCase(args(i))
-  If argLower = "/validate" Then
+  argBasename = LCase(fso.GetFileName(args(i)))
+  recognized = False
+
+  If argLower = "/validate" Or argLower = "--validate" Or argBasename = "validate" Then
     validateOnly = True
-  ElseIf Left(argLower, 10) = "/interval:" Then
-    argValue = Mid(args(i), 11)
+    recognized = True
+  ElseIf Left(argLower, 10) = "/interval:" Or Left(argLower, 11) = "--interval:" Then
+    If Left(argLower, 11) = "--interval:" Then
+      argValue = Mid(args(i), 12)
+    Else
+      argValue = Mid(args(i), 11)
+    End If
     If IsNumeric(argValue) Then
       intervalSeconds = CInt(argValue)
+      recognized = True
     End If
+  End If
+
+  If Not recognized Then
+    WScript.Echo "Unrecognized argument: " & args(i) & " — refusing to start daemon. " & _
+                 "Supported: /validate, --validate, /interval:N, --interval:N. " & _
+                 "Note: Git Bash / MSYS may path-convert /-prefixed args; the parser " & _
+                 "treats basename 'validate' as validation mode for that case."
+    WScript.Quit 2
   End If
 Next
 
-Set fso = CreateObject("Scripting.FileSystemObject")
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 projectRoot = fso.GetParentFolderName(scriptDir)
 

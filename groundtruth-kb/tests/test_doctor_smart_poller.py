@@ -320,6 +320,42 @@ def test_full_healthy_state_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert "smart-poller active" in result.message
 
 
+# --- Test 8b: duplicate run_ids in recent audit → fail (per -010 Finding 2) -
+
+
+def test_duplicate_run_ids_in_audit_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Per -010 Finding 2: doctor must detect when multiple poller chains
+    interleave writes to .gtkb-state/bridge-poller/audit.jsonl. Two distinct
+    run_ids in the last ~6 events means concurrent pollers and a broken
+    single-writer assumption."""
+    project = _make_project(tmp_path)
+    _make_audit(project, age_seconds=2.0)  # poller-runs/ entry for freshness check
+    # Now write audit.jsonl with interleaved run_ids (mimicking the duplicate-
+    # poller scenario from -010 evidence).
+    audit_path = project / ".gtkb-state" / "bridge-poller" / "audit.jsonl"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    import json
+
+    lines = []
+    for i in range(3):
+        lines.append(json.dumps({"kind": "scan", "run_id": "run-A-aaaaaa", "iteration": i}))
+        lines.append(json.dumps({"kind": "scan", "run_id": "run-B-bbbbbb", "iteration": i}))
+    audit_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    fake_task_xml = (
+        '\nExecute: wscript.exe\nArguments: "E:\\GT-KB\\scripts\\run_smart_bridge_poller.vbs" /Interval:15\n'
+    )
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(task_xml=fake_task_xml),
+    )
+    result = _check_smart_bridge_poller(project)
+    assert result.status == "fail"
+    assert "concurrent poller chains" in result.message
+    assert "single-writer assumption" in result.message
+
+
 # --- Test 9: stale notification (file present but old) → fail --------------
 
 
