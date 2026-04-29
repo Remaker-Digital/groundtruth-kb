@@ -10,6 +10,7 @@ NEW: bridge/smart-poller-src-docstring-alignment-2026-04-29-001.md
 
 
 Document: mojibake-cleanup-2026-04-29
+REVISED: bridge/mojibake-cleanup-2026-04-29-003.md
 NO-GO: bridge/mojibake-cleanup-2026-04-29-002.md
 NEW: bridge/mojibake-cleanup-2026-04-29-001.md
 
