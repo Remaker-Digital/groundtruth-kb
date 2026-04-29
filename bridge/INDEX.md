@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29
+NEW: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-001.md
+
 Document: gtkb-spec-lifecycle-schema-2026-04-29
 GO: bridge/gtkb-spec-lifecycle-schema-2026-04-29-004.md
 REVISED: bridge/gtkb-spec-lifecycle-schema-2026-04-29-003.md
@@ -12,6 +15,7 @@ NO-GO: bridge/gtkb-spec-lifecycle-schema-2026-04-29-002.md
 NEW: bridge/gtkb-spec-lifecycle-schema-2026-04-29-001.md
 
 Document: active-workspace-declaration-architecture-2026-04-29
+GO: bridge/active-workspace-declaration-architecture-2026-04-29-004.md
 REVISED: bridge/active-workspace-declaration-architecture-2026-04-29-003.md
 NO-GO: bridge/active-workspace-declaration-architecture-2026-04-29-002.md
 NEW: bridge/active-workspace-declaration-architecture-2026-04-29-001.md
