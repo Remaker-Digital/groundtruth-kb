@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import re
@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(r"E:\GT-KB")
-OUT_DIR = PROJECT_ROOT / ".codex" / "agent-red-hooks"
+OUT_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 LIFECYCLE_GUARD_PATH = OUT_DIR / "session-lifecycle-guard.json"
 HARNESS_NAME = "codex"
 # Parity marker: prime-builder role is discovered by session_self_initialization.py.
@@ -157,13 +157,13 @@ def main() -> int:
 
     if result.returncode != 0:
         context = (
-            "# Agent Red / GT-KB Wrap-Up Trigger Failed\n\n"
+            "# GroundTruth-KB Wrap-Up Trigger Failed\n\n"
             f"The explicit session wrap-up trigger matched, but wrap-up generation exited {result.returncode}.\n\n"
             f"Diagnostics: `{OUT_DIR / 'last-wrapup-trigger.err'}`"
         )
 
     directive = (
-        "# Agent Red / GT-KB Explicit Wrap-Up Trigger\n\n"
+        "# GroundTruth-KB Explicit Wrap-Up Trigger\n\n"
         "Mike used an explicit phrase indicating intent to begin a new session. "
         "Before normal task work, present the wrap-up report below and ask whether to proceed into fresh-session startup."
     )

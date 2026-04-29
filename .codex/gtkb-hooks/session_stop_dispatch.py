@@ -1,10 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(r"E:\GT-KB")
-OUT_DIR = PROJECT_ROOT / ".codex" / "agent-red-hooks"
+OUT_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 
 stdout = (OUT_DIR / "last-session-stop.json").open("w", encoding="utf-8")
 stderr = (OUT_DIR / "last-session-stop.err").open("w", encoding="utf-8")

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -8,9 +8,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(r"E:\GT-KB")
-OUT_DIR = PROJECT_ROOT / ".codex" / "agent-red-hooks"
+OUT_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
-STARTUP_FRESHNESS_CONTRACT_VERSION = "agent-red-startup-freshness-v1"
+STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
 HARNESS_NAME = "codex"
 # Parity marker for tests: Role: Prime Builder
 
@@ -53,14 +53,14 @@ def _fallback_context(reason: str) -> str:
     dashboard = "file:///E:/GT-KB/docs/gtkb-dashboard/index.html"
     return "\n".join(
         [
-            "# Agent Red / GT-KB Startup Service Degraded",
+            "# GroundTruth-KB Startup Service Degraded",
             "",
             f"Generated: {_now_iso()}",
             "",
             "The SessionStart hook could not retrieve the programmatic startup payload.",
             f"Reason: {reason}",
             "",
-            f"Dashboard: [Agent Red Project Dashboard]({dashboard})",
+            f"Dashboard: [GroundTruth-KB Project Dashboard]({dashboard})",
             "",
             "Use filesystem reads and the dashboard as the live authority before acting.",
         ]
