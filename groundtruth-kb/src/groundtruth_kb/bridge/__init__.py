@@ -42,6 +42,18 @@ from groundtruth_kb.bridge.detector import (
     parse_index,
 )
 from groundtruth_kb.bridge.handshake import run_handshake
+from groundtruth_kb.bridge.notify import (
+    ACTIONABLE_STATUSES_FOR_CODEX,
+    ACTIONABLE_STATUSES_FOR_PRIME,
+    NOTIFY_SCHEMA_VERSION,
+    NOTIFY_SUBDIR,
+    ActionablePending,
+    NotificationArtifact,
+    clear_notification,
+    compute_actionable_pending,
+    read_notification,
+    update_notification,
+)
 from groundtruth_kb.bridge.paths import (
     GROUNDTRUTH_MARKER,
     PROJECT_ROOT_ENV_VAR,
@@ -132,6 +144,17 @@ __all__ = [
     "HarnessRegistration",
     "list_all_registrations",
     "register_harness",
+    # notify (smart-poller P3)
+    "ACTIONABLE_STATUSES_FOR_CODEX",
+    "ACTIONABLE_STATUSES_FOR_PRIME",
+    "NOTIFY_SCHEMA_VERSION",
+    "NOTIFY_SUBDIR",
+    "ActionablePending",
+    "NotificationArtifact",
+    "clear_notification",
+    "compute_actionable_pending",
+    "read_notification",
+    "update_notification",
     # legacy runtime
     "Agent",
     "PeerAgent",
