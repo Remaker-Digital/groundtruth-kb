@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: session-hygiene-drift-triage-s321-2026-04-29
+REVISED: bridge/session-hygiene-drift-triage-s321-2026-04-29-003.md
 NO-GO: bridge/session-hygiene-drift-triage-s321-2026-04-29-002.md
 NEW: bridge/session-hygiene-drift-triage-s321-2026-04-29-001.md
 
