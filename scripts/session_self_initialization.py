@@ -3452,14 +3452,26 @@ def _unquote_pending_value(value: str) -> str:
 
 
 def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> list[str]:
-    """Render the smart-poller notification section for the startup orient.
+    """Render the smart-poller orient section.
 
-    Fail-open per `bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md`
-    GO guardrail 1: any failure in import, canonical-API read, or formatting
-    returns an empty list. The startup orient never blocks on smart-poller
-    behavior; absent notifications and reader failures are both silent.
+    Order of operations (per ``bridge/smart-poller-orient-verification-2026-04-29-005.md``
+    carry-forward of ``-003 §3`` + GO at ``-006``):
 
-    Recipient is derived from the harness's assumed role:
+      1. Resolve recipient from ``role['assumed_role']``; unknown role
+         early-returns ``[]`` BEFORE the doctor runs.
+      2. Run ``_check_smart_bridge_poller``; if status is ``warning`` or
+         ``fail``, render a diagnostic section and return early
+         (notifications are skipped because they can't be trusted when the
+         poller itself is unhealthy).
+      3. Otherwise (``pass`` or doctor exception → silent) proceed with the
+         existing notification-render path.
+
+    Fail-open per ``bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md``
+    GO guardrail 1: any failure in import, canonical-API read, formatting,
+    or doctor invocation returns an empty list. The startup orient never
+    blocks on smart-poller behavior.
+
+    Recipient routing:
       - Prime Builder → BridgeAgent.PRIME (acts on GO/NO-GO)
       - Loyal Opposition → BridgeAgent.CODEX (reviews NEW/REVISED)
     """
@@ -3484,6 +3496,15 @@ def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> li
         else:
             return []
 
+        try:
+            from groundtruth_kb.project.doctor import _check_smart_bridge_poller
+            health = _check_smart_bridge_poller(project_root)
+        except Exception:
+            health = None
+
+        if health is not None and health.status in ("warning", "fail"):
+            return _render_diagnostic_section(health)
+
         artifact = read_for_recipient(project_root, recipient)
         section_md = format_orient_section(artifact)
         if not section_md:
@@ -3491,6 +3512,25 @@ def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> li
         return [section_md, ""]
     except Exception:
         return []
+
+
+def _render_diagnostic_section(health: Any) -> list[str]:
+    """Render a single-section diagnostic for an unhealthy smart poller.
+
+    Per ``bridge/smart-poller-orient-verification-2026-04-29-005.md`` (carry
+    forward of ``-003 §3-§4``) + GO at ``-006``: when the doctor reports
+    ``warning`` or ``fail``, the diagnostic supersedes notification rendering
+    because notifications cannot be trusted when the poller itself is
+    unhealthy. The doctor message is reused verbatim — it already contains
+    specific remediation hints (file paths, command strings).
+    """
+    icon = "⚠️" if health.status == "warning" else "❌"
+    return [
+        f"### Smart-poller diagnostic — {health.status.upper()}",
+        "",
+        f"{icon} {health.message}",
+        "",
+    ]
 
 
 def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:

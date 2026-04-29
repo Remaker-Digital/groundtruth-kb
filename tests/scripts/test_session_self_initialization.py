@@ -21,6 +21,30 @@ def _load_module():
     return module
 
 
+def _make_synthetic_doctor_check(status: str = "pass", message: str = "synthetic"):
+    """Return a function replacing ``_check_smart_bridge_poller`` for orient tests.
+
+    Per ``bridge/smart-poller-orient-verification-2026-04-29-005.md`` §3
+    (carry-forward of ``-003 §3.3``): most existing smart-poller orient tests
+    don't care about doctor state — they just need the doctor to return
+    ``pass`` so the notification path executes. New diagnostic tests use
+    ``status='warning'`` or ``'fail'`` to exercise the
+    diagnostic-supersedes-notification path.
+    """
+    from groundtruth_kb.project.doctor import ToolCheck
+
+    def _fn(target):
+        return ToolCheck(
+            name="Smart bridge poller",
+            required=False,
+            found=True,
+            status=status,
+            message=message,
+        )
+
+    return _fn
+
+
 def _panel_titles(panels: list[dict]) -> list[str]:
     titles: list[str] = []
     for panel in panels:
@@ -1689,16 +1713,34 @@ def test_render_pending_decisions_block_includes_id_question_options() -> None:
 # =====================================================================
 
 
-def test_smart_poller_section_empty_when_no_notification(tmp_path) -> None:
-    """Absent notification → empty list (no orient section)."""
+def test_smart_poller_section_empty_when_no_notification(tmp_path, monkeypatch) -> None:
+    """Absent notification → empty list (no orient section).
+
+    Doctor mocked to ``pass`` per ``-003 §3.4`` so the notification path
+    executes (otherwise the live doctor's verdict on ``tmp_path`` would
+    redirect into the diagnostic branch).
+    """
     module = _load_module()
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _make_synthetic_doctor_check("pass"),
+    )
     role = {"assumed_role": "Prime Builder"}
     assert module._render_smart_poller_section(tmp_path, role) == []
 
 
-def test_smart_poller_section_renders_when_notification_present(tmp_path) -> None:
-    """Notification with pending_actions → section list non-empty + contains markdown."""
+def test_smart_poller_section_renders_when_notification_present(tmp_path, monkeypatch) -> None:
+    """Notification with pending_actions → section list non-empty + contains markdown.
+
+    Doctor mocked to ``pass`` per ``-003 §3.4`` so the notification path
+    executes; without the mock, the live doctor on ``tmp_path`` would
+    return ``fail`` (no runner present) and render a diagnostic instead.
+    """
     module = _load_module()
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _make_synthetic_doctor_check("pass"),
+    )
     # Write a real notification via the canonical API.
     from groundtruth_kb.bridge.notify import ActionablePending, update_notification
     from groundtruth_kb.bridge.routing import BridgeAgent
@@ -1736,8 +1778,16 @@ def test_smart_poller_section_fail_open_on_reader_exception(tmp_path, monkeypatc
     Even if the reader module raises an unexpected exception, the orient
     must continue to render. This test forces an exception via monkeypatch
     and asserts the helper returns an empty list rather than propagating.
+
+    Doctor mocked to ``pass`` per ``-003 §3.4`` so doctor passes and the
+    code reaches the reader (which is monkeypatched to raise); the helper's
+    outer fail-open then swallows the reader exception and returns ``[]``.
     """
     module = _load_module()
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _make_synthetic_doctor_check("pass"),
+    )
 
     # Force an exception by replacing the imported function with a raiser.
     # The helper does its own try/except, so this should be swallowed.
@@ -1756,9 +1806,17 @@ def test_smart_poller_section_fail_open_on_reader_exception(tmp_path, monkeypatc
     assert module._render_smart_poller_section(tmp_path, role) == []
 
 
-def test_smart_poller_section_routes_loyal_opposition_to_codex(tmp_path) -> None:
-    """Loyal Opposition role reads codex notification (not prime)."""
+def test_smart_poller_section_routes_loyal_opposition_to_codex(tmp_path, monkeypatch) -> None:
+    """Loyal Opposition role reads codex notification (not prime).
+
+    Doctor mocked to ``pass`` per ``-003 §3.4`` so the notification path
+    executes for the LO recipient routing assertion.
+    """
     module = _load_module()
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _make_synthetic_doctor_check("pass"),
+    )
     from groundtruth_kb.bridge.notify import ActionablePending, update_notification
     from groundtruth_kb.bridge.routing import BridgeAgent
 
@@ -1781,6 +1839,116 @@ def test_smart_poller_section_routes_loyal_opposition_to_codex(tmp_path) -> None
     assert "Smart-poller notification" in section[0]
     assert "**REVISED**" in section[0]
     assert "`codex-thread`" in section[0]
+
+
+# =====================================================================
+# Orient-verification (-003 §3.5 + -005 carry-forward + -006 GO):
+# diagnostic supersedes notification when smart-poller is unhealthy.
+# Per bridge/smart-poller-orient-verification-2026-04-29-005.md
+# =====================================================================
+
+
+def test_smart_poller_section_renders_diagnostic_on_doctor_warning(tmp_path, monkeypatch) -> None:
+    """Doctor returns ``warning`` → diagnostic section with the doctor's message.
+
+    Per ``-001 §3.1`` / ``-003 §3.5``: warning state means the poller is
+    not healthy enough to trust notifications, so a single diagnostic
+    section is rendered carrying the doctor's remediation hint.
+    """
+    module = _load_module()
+    warning_msg = "smart-poller task 'GTKB-SmartBridgePoller' not registered — run scripts/install_smart_poller_task.ps1"
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _make_synthetic_doctor_check("warning", message=warning_msg),
+    )
+
+    role = {"assumed_role": "Prime Builder"}
+    section = module._render_smart_poller_section(tmp_path, role)
+    body = "\n".join(section)
+    assert "Smart-poller diagnostic — WARNING" in body
+    assert warning_msg in body
+
+
+def test_smart_poller_section_renders_diagnostic_on_doctor_fail(tmp_path, monkeypatch) -> None:
+    """Doctor returns ``fail`` → diagnostic section with the doctor's message.
+
+    Per ``-001 §3.1`` / ``-003 §3.5``: fail state means the poller is
+    actively broken; the diagnostic surfaces the failure detail directly
+    so the owner can investigate.
+    """
+    module = _load_module()
+    fail_msg = "smart-poller task registered but most recent audit event is 245s old (> 60s threshold)"
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _make_synthetic_doctor_check("fail", message=fail_msg),
+    )
+
+    role = {"assumed_role": "Prime Builder"}
+    section = module._render_smart_poller_section(tmp_path, role)
+    body = "\n".join(section)
+    assert "Smart-poller diagnostic — FAIL" in body
+    assert fail_msg in body
+
+
+def test_smart_poller_section_diagnostic_supersedes_notification(tmp_path, monkeypatch) -> None:
+    """Warning + present notification → diagnostic only; notification table NOT rendered.
+
+    Per ``-001 §3.1`` precedence and ``-003 §3.5``: notifications cannot
+    be trusted when the poller itself is unhealthy, so the diagnostic
+    branch returns early without reading the notification artifact.
+    """
+    module = _load_module()
+    warning_msg = "smart-poller task not registered"
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _make_synthetic_doctor_check("warning", message=warning_msg),
+    )
+
+    # Plant a real notification — it must NOT appear in the output.
+    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
+    from groundtruth_kb.bridge.routing import BridgeAgent
+
+    state = tmp_path / ".gtkb-state" / "bridge-poller"
+    state.mkdir(parents=True, exist_ok=True)
+    items = [
+        ActionablePending(
+            document_name="should-not-render",
+            top_status="GO",
+            top_file="bridge/should-not-render-001.md",
+            index_line_number=1,
+        )
+    ]
+    update_notification(state, BridgeAgent.PRIME, items, poller_run_id="test-run")
+
+    role = {"assumed_role": "Prime Builder"}
+    section = module._render_smart_poller_section(tmp_path, role)
+    body = "\n".join(section)
+    assert "Smart-poller diagnostic — WARNING" in body
+    assert warning_msg in body
+    assert "Smart-poller notification" not in body
+    assert "should-not-render" not in body
+
+
+def test_smart_poller_section_fail_open_on_doctor_exception(tmp_path, monkeypatch) -> None:
+    """Doctor itself raises → silent fail-open (helper returns ``[]``).
+
+    Per ``-001 §3.1`` doctor-exception row + ``-003 §3.5``: a doctor
+    exception sets ``health = None`` and falls through to the notification
+    path. With no notification on disk, the helper returns ``[]`` —
+    startup never blocks on doctor failures.
+    """
+    module = _load_module()
+
+    def _raise(target):
+        raise RuntimeError("simulated doctor failure")
+
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _raise,
+    )
+
+    role = {"assumed_role": "Prime Builder"}
+    assert module._render_smart_poller_section(tmp_path, role) == []
 
 
 # =====================================================================
