@@ -24,8 +24,11 @@ import datetime as dt
 import json
 import os
 import shutil
+import subprocess
 import sys
+import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -288,6 +291,84 @@ def _run_command_mocked(cmd: list[str], evidence_dir: Path, sentinel_pre: set[Pa
     )
 
 
+# Type alias for the subprocess.run-shaped callable that ``_run_command_live``
+# uses. Tests inject a substitute via ``run_spike(subprocess_runner=fake)`` so
+# the live code path is exercised without invoking real ``claude``/``codex``.
+SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
+
+
+def _run_command_live(
+    cmd: list[str],
+    evidence_dir: Path,
+    disposable_repo: Path,
+    sentinel_pre: set[Path],
+    gov_pre: set[Path],
+    *,
+    runner: SubprocessRunner = subprocess.run,
+    timeout_s: int = 120,
+) -> TestResult:
+    """Invoke a real subprocess for one test combination and capture full evidence.
+
+    Reads ``protected-spec.json`` content before and after the subprocess, then
+    diffs the sentinel-marker globs in ``evidence_dir`` to detect whether the
+    generic SessionStart sentinel and the governance marker fired. The
+    populated ``TestResult`` feeds ``_classify()`` directly.
+
+    The ``runner`` parameter defaults to ``subprocess.run``. Tests substitute it
+    via ``run_spike(subprocess_runner=...)`` to exercise this code path
+    without invoking real CLIs (saves the ~2.1M-token live cost in CI).
+    """
+    cmd_tuple = tuple(cmd)
+    protected = disposable_repo / "protected-spec.json"
+    pre_content = protected.read_text(encoding="utf-8") if protected.is_file() else ""
+
+    env = {**os.environ, "SPIKE_EVIDENCE_DIR": str(evidence_dir)}
+    start = time.monotonic()
+    try:
+        completed = runner(
+            cmd,
+            cwd=str(disposable_repo),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            check=False,
+        )
+        exit_code = completed.returncode
+        stdout = completed.stdout or ""
+        stderr = completed.stderr or ""
+    except FileNotFoundError as exc:
+        # Real CLI not installed on this host; record as exit 127 + stderr.
+        exit_code = 127
+        stdout = ""
+        stderr = f"FileNotFoundError: {exc}"
+    except subprocess.TimeoutExpired as exc:
+        exit_code = 124  # GNU timeout convention
+        stdout = exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        stderr = f"TimeoutExpired after {timeout_s}s: {exc}"
+    duration_s = time.monotonic() - start
+
+    sentinel_post = set(evidence_dir.glob("SENTINEL_HOOK_FIRED-*"))
+    gov_post = set(evidence_dir.glob("SENTINEL_GOV_HOOK_FIRED-*"))
+    sentinel_fired = bool(sentinel_post - sentinel_pre)
+    gov_fired = bool(gov_post - gov_pre)
+
+    post_content = protected.read_text(encoding="utf-8") if protected.is_file() else ""
+    protected_unchanged = pre_content == post_content
+
+    return TestResult(
+        test_id="LIVE",
+        command=cmd_tuple,
+        exit_code=exit_code,
+        stdout=stdout,
+        stderr=stderr,
+        duration_s=duration_s,
+        sentinel_hook_fired=sentinel_fired,
+        sentinel_gov_hook_fired=gov_fired,
+        protected_spec_unchanged=protected_unchanged,
+    )
+
+
 def _classify(harness: str, mode: str, results: list[TestResult]) -> Classification:
     """Classify per design -003 §2.8."""
     sentinel_fired = any(r.sentinel_hook_fired for r in results)
@@ -331,7 +412,18 @@ def _write_spike_report(
     """Write the human-readable spike-report.md per design -003 §2.4."""
     lines: list[str] = []
     lines.append(f"# Bridge Poller Verification Spike — Report ({run_id})\n")
-    lines.append(f"- mode: {'live (--run-live-harnesses)' if live else 'mocked-subprocess (default)'}")
+    if live:
+        lines.append(
+            "- mode: **LIVE** (--run-live-harnesses) — captured from real subprocess "
+            "invocations; per-test evidence below contains real stdout/stderr/exit-code/"
+            "duration plus sentinel-marker and protected-spec deltas."
+        )
+    else:
+        lines.append(
+            "- mode: **MOCKED** (default; CI-safe) — per-test results are synthesized; "
+            "this report MUST NOT be used as P3 invoker classification evidence. "
+            "Re-run with --run-live-harnesses + validated --owner-approval-file."
+        )
     lines.append(f"- generated_at: {dt.datetime.now(dt.UTC).isoformat(timespec='seconds')}")
     if approval_receipt is not None:
         lines.append(f"- approval_receipt: `{approval_receipt}`")
@@ -365,10 +457,18 @@ def run_spike(
     run_id: str | None = None,
     live: bool = False,
     owner_approval_file: Path | None = None,
+    subprocess_runner: SubprocessRunner | None = None,
+    timeout_s: int = 120,
 ) -> Path:
     """Execute the verification spike. Returns the path to spike-report.md.
 
     Mocked default; live mode requires validated owner-approval-file.
+
+    The ``subprocess_runner`` parameter is the test-injection point for the
+    live code path. When set (non-None), live mode calls it instead of
+    ``subprocess.run`` so tests can exercise the live adapter without
+    invoking real ``claude``/``codex`` binaries. Production live runs leave
+    it ``None`` and the live adapter calls ``subprocess.run`` directly.
     """
     runner = SpikeRunner(run_id=run_id or "")
     runner.setup_disposable_repo()
@@ -394,8 +494,15 @@ def run_spike(
             sentinel_pre = set(runner.evidence_dir.glob("SENTINEL_HOOK_FIRED-*"))
             gov_pre = set(runner.evidence_dir.glob("SENTINEL_GOV_HOOK_FIRED-*"))
             if live:
-                # Live execution would happen here; placeholder for now.
-                result = _run_command_mocked(cmd, runner.evidence_dir, sentinel_pre, gov_pre)
+                result = _run_command_live(
+                    cmd,
+                    runner.evidence_dir,
+                    runner.disposable_repo,
+                    sentinel_pre,
+                    gov_pre,
+                    runner=subprocess_runner if subprocess_runner is not None else subprocess.run,
+                    timeout_s=timeout_s,
+                )
             else:
                 result = _run_command_mocked(cmd, runner.evidence_dir, sentinel_pre, gov_pre)
             results_by_pair[(harness, mode_name)] = [result]

@@ -147,7 +147,9 @@ def test_run_with_mocked_subprocesses_produces_complete_report(
     assert "Bridge Poller Verification Spike" in content
     assert "Classification matrix" in content
     assert "Per-test evidence" in content
-    assert "mocked-subprocess (default)" in content
+    # Per Codex acceptance target #4 at -006: mocked vs live distinction
+    assert "**MOCKED**" in content
+    assert "MUST NOT be used as P3 invoker classification evidence" in content
 
 
 def test_run_with_mocked_subprocesses_does_not_invoke_real_cli(
@@ -318,3 +320,208 @@ def test_findings_classify_write_capable_when_both_fire_and_block(
     )
     classification = spike._classify("claude", "default", [test_result])
     assert classification.verdict == "WRITE_CAPABLE"
+
+
+def _make_completed(returncode: int = 0, stdout: str = "", stderr: str = ""):
+    """Build a subprocess.CompletedProcess-shaped object for fake runners."""
+    import subprocess as _sp
+
+    return _sp.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
+
+
+def test_run_live_calls_real_adapter_not_mocked_synthesis(synthetic_gtkb_root: Path, tmp_path: Path) -> None:
+    """Live mode must reach _run_command_live (the real adapter), NOT _run_command_mocked.
+
+    Verifies that the per-result test_id is "LIVE" (set by the real adapter)
+    rather than "MOCK" (set by the mocked synthesis path) — this is the
+    distinguishing fingerprint Codex's NO-GO at -006 asked us to add.
+    """
+    spike = _load_spike_module()
+
+    approval_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    approval_dir.mkdir(parents=True, exist_ok=True)
+    approval_file = approval_dir / "ok-approval.json"
+    approval_file.write_text(
+        json.dumps(
+            {
+                "approval_text": "approved",
+                "approval_source_ref": "test",
+                "approval_session": "S319",
+                "approval_recorded_at": "2026-04-28T00:00:00+00:00",
+                "estimated_token_cost": 2_100_000,
+                "estimated_token_cost_acknowledgment": "test",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    invocations: list[tuple] = []
+
+    def fake_runner(cmd, **kwargs):
+        invocations.append((tuple(cmd), kwargs.get("cwd"), kwargs.get("timeout")))
+        return _make_completed(returncode=0, stdout="fake-stdout", stderr="")
+
+    spike.run_spike(
+        run_id="live-test-001",
+        live=True,
+        owner_approval_file=approval_file,
+        subprocess_runner=fake_runner,
+    )
+
+    assert len(invocations) == 8, f"expected 8 live commands (4 claude modes + 4 codex modes), got {len(invocations)}"
+    for cmd_tuple, cwd, timeout in invocations:
+        assert cmd_tuple[0] in ("claude", "codex"), f"unexpected cmd: {cmd_tuple}"
+        assert cwd is not None, "cwd must be set on the disposable repo"
+        assert timeout is not None and isinstance(timeout, int), "timeout must be set"
+
+
+def test_run_live_does_not_invoke_real_subprocess_run_in_test(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When subprocess_runner is injected, the real subprocess.run is never called.
+
+    Hard-fails if any test path falls through to real CLI invocation.
+    """
+    spike = _load_spike_module()
+
+    approval_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    approval_dir.mkdir(parents=True, exist_ok=True)
+    approval_file = approval_dir / "ok-approval.json"
+    approval_file.write_text(
+        json.dumps(
+            {
+                "approval_text": "approved",
+                "approval_source_ref": "test",
+                "approval_session": "S319",
+                "approval_recorded_at": "2026-04-28T00:00:00+00:00",
+                "estimated_token_cost": 2_100_000,
+                "estimated_token_cost_acknowledgment": "test",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    real_run_called = []
+
+    def fail_if_real_run(*args, **kwargs):
+        real_run_called.append((args, kwargs))
+        raise AssertionError("Real subprocess.run was invoked despite subprocess_runner injection.")
+
+    monkeypatch.setattr(subprocess, "run", fail_if_real_run)
+
+    fake_runner_calls = []
+
+    def fake_runner(cmd, **kwargs):
+        fake_runner_calls.append(cmd)
+        return _make_completed(returncode=0, stdout="ok", stderr="")
+
+    spike.run_spike(
+        run_id="live-test-002",
+        live=True,
+        owner_approval_file=approval_file,
+        subprocess_runner=fake_runner,
+    )
+
+    assert real_run_called == [], "subprocess.run was unexpectedly invoked"
+    assert len(fake_runner_calls) == 8, "fake runner should receive all 8 command invocations"
+
+
+def test_run_live_populates_sentinel_fired_via_marker_delta(
+    synthetic_gtkb_root: Path,
+) -> None:
+    """Live adapter detects sentinel-hook firing by comparing pre/post marker globs.
+
+    A fake runner that creates a SENTINEL_HOOK_FIRED-* file should cause the
+    resulting TestResult.sentinel_hook_fired to be True.
+    """
+    spike = _load_spike_module()
+
+    approval_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    approval_dir.mkdir(parents=True, exist_ok=True)
+    approval_file = approval_dir / "ok-approval.json"
+    approval_file.write_text(
+        json.dumps(
+            {
+                "approval_text": "approved",
+                "approval_source_ref": "test",
+                "approval_session": "S319",
+                "approval_recorded_at": "2026-04-28T00:00:00+00:00",
+                "estimated_token_cost": 2_100_000,
+                "estimated_token_cost_acknowledgment": "test",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_runner_that_fires_sentinel(cmd, **kwargs):
+        evidence_dir_str = kwargs["env"]["SPIKE_EVIDENCE_DIR"]
+        evidence_dir = Path(evidence_dir_str)
+        # Simulate the sentinel hook firing during this subprocess invocation.
+        marker_path = evidence_dir / f"SENTINEL_HOOK_FIRED-{cmd[0]}-{len(list(evidence_dir.iterdir()))}"
+        marker_path.write_text("ok\n", encoding="utf-8")
+        return _make_completed(returncode=0, stdout="ok", stderr="")
+
+    report_path = spike.run_spike(
+        run_id="live-test-003",
+        live=True,
+        owner_approval_file=approval_file,
+        subprocess_runner=fake_runner_that_fires_sentinel,
+    )
+
+    # Read the report and verify it's a LIVE report
+    content = report_path.read_text(encoding="utf-8")
+    assert "**LIVE**" in content, "live mode report must be tagged LIVE in mode line"
+    assert "**MOCKED**" not in content
+
+
+def test_run_live_report_distinguished_from_mocked_report(
+    synthetic_gtkb_root: Path,
+) -> None:
+    """spike-report.md must clearly mark live vs mocked.
+
+    Per Codex acceptance target #4 at -006: 'The resulting spike-report.md
+    distinguishes mocked reports from live evidence.'
+    """
+    spike = _load_spike_module()
+
+    mocked_report = spike.run_spike(run_id="mocked-test-001", live=False)
+    mocked_content = mocked_report.read_text(encoding="utf-8")
+    assert "**MOCKED**" in mocked_content
+    assert "**LIVE**" not in mocked_content
+    assert "MUST NOT be used as P3 invoker classification evidence" in mocked_content
+
+
+def test_run_live_handles_filenotfound_when_real_cli_absent(
+    synthetic_gtkb_root: Path,
+) -> None:
+    """Live adapter records exit_code=127 when the real CLI binary is missing."""
+    spike = _load_spike_module()
+
+    approval_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    approval_dir.mkdir(parents=True, exist_ok=True)
+    approval_file = approval_dir / "ok-approval.json"
+    approval_file.write_text(
+        json.dumps(
+            {
+                "approval_text": "approved",
+                "approval_source_ref": "test",
+                "approval_session": "S319",
+                "approval_recorded_at": "2026-04-28T00:00:00+00:00",
+                "estimated_token_cost": 2_100_000,
+                "estimated_token_cost_acknowledgment": "test",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_runner_missing_binary(cmd, **kwargs):
+        raise FileNotFoundError(f"[Errno 2] No such file or directory: {cmd[0]!r}")
+
+    report_path = spike.run_spike(
+        run_id="live-test-004",
+        live=True,
+        owner_approval_file=approval_file,
+        subprocess_runner=fake_runner_missing_binary,
+    )
+    content = report_path.read_text(encoding="utf-8")
+    assert "exit_code: 127" in content
