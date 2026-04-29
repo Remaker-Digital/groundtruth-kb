@@ -1380,7 +1380,7 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
             ),
         )
 
-    # 2. Wrapper script present.
+    # 2. PS1 helper present (interactive use + doctor's -ValidateOnly mode).
     if not wrapper.is_file():
         return ToolCheck(
             name=check_name,
@@ -1388,8 +1388,24 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
             found=False,
             status="fail",
             message=(
-                f"smart-poller wrapper missing at {_SMART_POLLER_WRAPPER_REL.as_posix()} "
+                f"smart-poller PS1 helper missing at {_SMART_POLLER_WRAPPER_REL.as_posix()} "
                 f"— see {_BRIDGE_SCHEDULER_DOC} or scripts/install_smart_poller_task.ps1"
+            ),
+        )
+
+    # 2b. VBS daemon launcher present (per -008 Finding 1: doctor must
+    # validate the actual daemon launcher, not just a nearby helper).
+    vbs = target / _SMART_POLLER_VBS_REL
+    if not vbs.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="fail",
+            message=(
+                f"smart-poller VBS daemon launcher missing at {_SMART_POLLER_VBS_REL.as_posix()} "
+                f"— this is the actual file Task Scheduler executes; see "
+                f"scripts/install_smart_poller_task.ps1 for installation."
             ),
         )
 
@@ -1435,10 +1451,54 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
             found=True,
             status="fail",
             message=(
-                f"smart-poller wrapper -ValidateOnly resolved a different runner path: "
-                f"{validate_output.strip() or '(empty)'}. Expected wrapper to resolve "
+                f"smart-poller PS1 helper -ValidateOnly resolved a different runner path: "
+                f"{validate_output.strip() or '(empty)'}. Expected helper to resolve "
                 f"to {_SMART_POLLER_RUNNER_REL.as_posix()}; this likely indicates Phase 2 "
-                f"path rebase is in progress or wrapper has been customized."
+                f"path rebase is in progress or PS1 helper has been customized."
+            ),
+        )
+
+    # 3b. VBS daemon launcher /Validate (per -008 Finding 1). The daemon's
+    # ACTUAL effective path is in the VBS, not the PS1. Run the VBS in
+    # /Validate mode (echoes "OK runner=<path>" + exits 0 if resolution
+    # succeeds; exits 1 if runner missing). This is the load-bearing
+    # validation: a wrong VBS path here means Task Scheduler will fail
+    # when it tries to launch the daemon, regardless of PS1 helper state.
+    vbs_validate_ok, vbs_validate_output = _run_cmd(
+        [
+            "cscript.exe",
+            "//nologo",
+            str(vbs),
+            "/Validate",
+        ],
+        timeout=15,
+    )
+    if not vbs_validate_ok:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"smart-poller VBS /Validate failed to resolve runnerPath: "
+                f"{vbs_validate_output[:200] or '(no output)'}. This is the daemon's "
+                f"actual launch path — Task Scheduler will fail at startup. Phase 2 path "
+                f"rebase outstanding or VBS launcher customized — review "
+                f"{_SMART_POLLER_VBS_REL.as_posix()}."
+            ),
+        )
+    if expected_marker not in vbs_validate_output and _SMART_POLLER_RUNNER_REL.as_posix() not in vbs_validate_output:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"smart-poller VBS /Validate resolved a different runner path: "
+                f"{vbs_validate_output.strip() or '(empty)'}. Expected VBS to resolve "
+                f"to {_SMART_POLLER_RUNNER_REL.as_posix()}; this is the actual daemon path — "
+                f"Task Scheduler would launch the wrong runner. Phase 2 path rebase or "
+                f"VBS customization."
             ),
         )
 
@@ -1569,8 +1629,9 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
         found=True,
         status="pass",
         message=(
-            f"smart-poller active (task '{_SMART_POLLER_TASK_NAME}', wrapper "
-            f"-> runner verified, audit event {int(audit_age)}s old)"
+            f"smart-poller active (task '{_SMART_POLLER_TASK_NAME}', VBS daemon "
+            f"-> runner verified, PS1 helper -> runner verified, audit event "
+            f"{int(audit_age)}s old)"
         ),
     )
 

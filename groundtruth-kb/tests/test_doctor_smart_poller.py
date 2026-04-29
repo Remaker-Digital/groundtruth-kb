@@ -25,8 +25,8 @@ from groundtruth_kb.project import doctor as doctor_module
 from groundtruth_kb.project.doctor import _check_smart_bridge_poller
 
 
-def _make_project(tmp_path: Path, *, runner: bool = True, wrapper: bool = True) -> Path:
-    """Build a synthetic project root with optional runner + wrapper presence."""
+def _make_project(tmp_path: Path, *, runner: bool = True, wrapper: bool = True, vbs: bool = True) -> Path:
+    """Build a synthetic project root with optional runner + PS1 + VBS presence."""
     project = tmp_path / "project"
     (project / "groundtruth-kb" / "scripts").mkdir(parents=True, exist_ok=True)
     (project / "scripts").mkdir(parents=True, exist_ok=True)
@@ -39,24 +39,43 @@ def _make_project(tmp_path: Path, *, runner: bool = True, wrapper: bool = True) 
             '# wrapper\n$runnerPath = Join-Path $projectRoot "groundtruth-kb\\scripts\\bridge_poller_runner.py"\n',
             encoding="utf-8",
         )
+    if vbs:
+        (project / "scripts" / "run_smart_bridge_poller.vbs").write_text(
+            '\' VBS daemon launcher\nrunnerPath = projectRoot & "\\groundtruth-kb\\scripts\\bridge_poller_runner.py"\n',
+            encoding="utf-8",
+        )
     return project
 
 
-def _make_run_cmd_mock(*, validate_ok: bool = True, validate_output: str = "", task_xml: str = ""):
-    """Return a _run_cmd substitute that discriminates between ValidateOnly and Get-ScheduledTask calls.
+_DEFAULT_VALIDATE_OUTPUT = "OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py"
 
-    The doctor's smart-poller check shells out twice:
-      - powershell -File <wrapper> -ValidateOnly  (check 3)
-      - powershell -Command "Get-ScheduledTask ..."  (checks 5+6)
+
+def _make_run_cmd_mock(
+    *,
+    ps1_ok: bool = True,
+    ps1_output: str = _DEFAULT_VALIDATE_OUTPUT,
+    vbs_ok: bool = True,
+    vbs_output: str = _DEFAULT_VALIDATE_OUTPUT,
+    task_xml: str = "",
+):
+    """Return a _run_cmd substitute that routes between three call types.
+
+    The doctor's smart-poller check shells out three times (per -008 Finding 1
+    closure):
+      - powershell -File <wrapper>.ps1 -ValidateOnly  (check 3, PS1 helper)
+      - cscript.exe <vbs> /Validate                   (check 3b, VBS daemon)
+      - powershell -Command "Get-ScheduledTask ..."   (checks 5+6)
 
     Tests provide what each call should return; this builds a single mock that
-    routes based on whether '-ValidateOnly' or 'Get-ScheduledTask' appears in args.
+    routes based on the argv signature.
     """
 
     def _mock(cmd_args, **kwargs):
         joined = " ".join(str(a) for a in cmd_args)
         if "-ValidateOnly" in joined:
-            return (validate_ok, validate_output)
+            return (ps1_ok, ps1_output)
+        if "cscript" in joined.lower() and "/Validate" in joined:
+            return (vbs_ok, vbs_output)
         return (True, task_xml)
 
     return _mock
@@ -91,7 +110,7 @@ def test_wrapper_missing_fails(tmp_path: Path) -> None:
     project = _make_project(tmp_path, wrapper=False)
     result = _check_smart_bridge_poller(project)
     assert result.status == "fail"
-    assert "wrapper missing" in result.message
+    assert "PS1 helper missing" in result.message
 
 
 # --- Test 3: wrapper -ValidateOnly fails (Phase 2 rebase outstanding) -----
@@ -105,7 +124,7 @@ def test_wrapper_validate_only_fails(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         doctor_module,
         "_run_cmd",
-        _make_run_cmd_mock(validate_ok=False, validate_output="Smart-poller runner not found at C:\\bad\\path"),
+        _make_run_cmd_mock(ps1_ok=False, ps1_output="Smart-poller runner not found at C:\\bad\\path"),
     )
     result = _check_smart_bridge_poller(project)
     assert result.status == "fail"
@@ -122,11 +141,70 @@ def test_wrapper_resolves_different_runner_fails(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(
         doctor_module,
         "_run_cmd",
-        _make_run_cmd_mock(validate_ok=True, validate_output="OK runner=C:\\different\\custom\\runner.py"),
+        _make_run_cmd_mock(ps1_ok=True, ps1_output="OK runner=C:\\different\\custom\\runner.py"),
     )
     result = _check_smart_bridge_poller(project)
     assert result.status == "fail"
     assert "different runner path" in result.message
+
+
+# --- Test 3c: VBS daemon launcher missing → fail (per -008 Finding 1) -----
+
+
+def test_vbs_missing_fails(tmp_path: Path) -> None:
+    """Per -008 Finding 1: doctor must verify the VBS file exists, not just
+    rely on PS1 helper presence. Synthetic project without VBS file fails."""
+    project = _make_project(tmp_path, vbs=False)
+    result = _check_smart_bridge_poller(project)
+    assert result.status == "fail"
+    assert "VBS daemon launcher missing" in result.message
+
+
+# --- Test 3d: VBS /Validate fails (runnerPath doesn't resolve) ------------
+
+
+def test_vbs_validate_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Per -008 Finding 1: doctor must validate the VBS daemon launcher's
+    effective runnerPath, not just the PS1 helper. If VBS /Validate exits
+    non-zero (e.g., its runnerPath doesn't exist), doctor reports fail."""
+    project = _make_project(tmp_path)
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            vbs_ok=False,
+            vbs_output="Smart-poller runner not found at C:\\bad\\path",
+        ),
+    )
+    result = _check_smart_bridge_poller(project)
+    assert result.status == "fail"
+    assert "VBS /Validate failed" in result.message
+    assert "actual launch path" in result.message
+
+
+# --- Test 3e: VBS /Validate resolves DIFFERENT runner → fail --------------
+
+
+def test_vbs_resolves_different_runner_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Per -008 Finding 1 + 'PS1 validates but VBS path drift' regression
+    case: PS1 -ValidateOnly resolves the expected runner, but VBS /Validate
+    resolves a different path. The VBS is the daemon path; the doctor must
+    fail in this case (Phase 2 partial-rebase scenario)."""
+    project = _make_project(tmp_path)
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            ps1_ok=True,
+            ps1_output=_DEFAULT_VALIDATE_OUTPUT,  # PS1 helper still resolves correctly
+            vbs_ok=True,
+            vbs_output="OK runner=C:\\different\\vbs\\runner.py",  # VBS drifted
+        ),
+    )
+    result = _check_smart_bridge_poller(project)
+    assert result.status == "fail"
+    assert "VBS /Validate resolved a different runner path" in result.message
+    assert "actual daemon path" in result.message
 
 
 # --- Test 4: task not registered → warning (initial-install state) ---------
@@ -139,8 +217,8 @@ def test_task_not_registered_warns(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         doctor_module,
         "_run_cmd",
         _make_run_cmd_mock(
-            validate_ok=True,
-            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            ps1_ok=True,
+            ps1_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
             task_xml="",
         ),
     )
@@ -167,8 +245,8 @@ def test_task_target_does_not_include_wrapper_fails(tmp_path: Path, monkeypatch:
         doctor_module,
         "_run_cmd",
         _make_run_cmd_mock(
-            validate_ok=True,
-            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            ps1_ok=True,
+            ps1_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
             task_xml=bad_task_xml,
         ),
     )
@@ -188,8 +266,8 @@ def test_task_registered_no_audit_warns(tmp_path: Path, monkeypatch: pytest.Monk
         doctor_module,
         "_run_cmd",
         _make_run_cmd_mock(
-            validate_ok=True,
-            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            ps1_ok=True,
+            ps1_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
             task_xml=fake_task_xml,
         ),
     )
@@ -209,8 +287,8 @@ def test_stale_audit_event_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         doctor_module,
         "_run_cmd",
         _make_run_cmd_mock(
-            validate_ok=True,
-            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            ps1_ok=True,
+            ps1_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
             task_xml=fake_task_xml,
         ),
     )
@@ -232,8 +310,8 @@ def test_full_healthy_state_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         doctor_module,
         "_run_cmd",
         _make_run_cmd_mock(
-            validate_ok=True,
-            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            ps1_ok=True,
+            ps1_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
             task_xml=fake_task_xml,
         ),
     )
@@ -264,8 +342,8 @@ def test_stale_notification_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         doctor_module,
         "_run_cmd",
         _make_run_cmd_mock(
-            validate_ok=True,
-            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            ps1_ok=True,
+            ps1_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
             task_xml=fake_task_xml,
         ),
     )

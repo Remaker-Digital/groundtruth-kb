@@ -41,7 +41,7 @@ if (-not (Test-Path $vbsLauncherPath)) {
 # for the doctor check.
 $action = New-ScheduledTaskAction `
     -Execute "wscript.exe" `
-    -Argument "`"$vbsLauncherPath`"" `
+    -Argument "`"$vbsLauncherPath`" /Interval:$IntervalSeconds" `
     -WorkingDirectory $ProjectRoot
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
