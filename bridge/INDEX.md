@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: spawned-harness-role-defer-durable-record-2026-04-29
+REVISED: bridge/spawned-harness-role-defer-durable-record-2026-04-29-003.md
+NO-GO: bridge/spawned-harness-role-defer-durable-record-2026-04-29-002.md
 NEW: bridge/spawned-harness-role-defer-durable-record-2026-04-29-001.md
 
 
