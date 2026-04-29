@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: spawned-harness-role-defer-durable-record-2026-04-29
+NEW: bridge/spawned-harness-role-defer-durable-record-2026-04-29-001.md
+
+
 Document: gov-process-spec-precondition-2026-04-29
 VERIFIED: bridge/gov-process-spec-precondition-2026-04-29-008.md
 NEW: bridge/gov-process-spec-precondition-2026-04-29-007.md
