@@ -42,6 +42,26 @@ def _make_project(tmp_path: Path, *, runner: bool = True, wrapper: bool = True) 
     return project
 
 
+def _make_run_cmd_mock(*, validate_ok: bool = True, validate_output: str = "", task_xml: str = ""):
+    """Return a _run_cmd substitute that discriminates between ValidateOnly and Get-ScheduledTask calls.
+
+    The doctor's smart-poller check shells out twice:
+      - powershell -File <wrapper> -ValidateOnly  (check 3)
+      - powershell -Command "Get-ScheduledTask ..."  (checks 5+6)
+
+    Tests provide what each call should return; this builds a single mock that
+    routes based on whether '-ValidateOnly' or 'Get-ScheduledTask' appears in args.
+    """
+
+    def _mock(cmd_args, **kwargs):
+        joined = " ".join(str(a) for a in cmd_args)
+        if "-ValidateOnly" in joined:
+            return (validate_ok, validate_output)
+        return (True, task_xml)
+
+    return _mock
+
+
 def _make_audit(project: Path, *, age_seconds: float = 1.0) -> None:
     """Create an audit event file with the specified mtime age (in seconds)."""
     audit_dir = project / ".gtkb-state" / "bridge-poller" / "poller-runs"
@@ -74,18 +94,39 @@ def test_wrapper_missing_fails(tmp_path: Path) -> None:
     assert "wrapper missing" in result.message
 
 
-# --- Test 3: wrapper does not reference expected runner path → fail --------
+# --- Test 3: wrapper -ValidateOnly fails (Phase 2 rebase outstanding) -----
 
 
-def test_wrapper_path_mismatch_fails(tmp_path: Path) -> None:
+def test_wrapper_validate_only_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Doctor calls wrapper -ValidateOnly; if it returns non-zero (e.g., the
+    $runnerPath doesn't resolve), doctor reports fail with Phase-2-rebase hint."""
     project = _make_project(tmp_path)
-    # Overwrite wrapper with a path that doesn't match expected runner.
-    (project / "scripts" / "run_smart_bridge_poller.ps1").write_text(
-        '# wrapper\n$runnerPath = "C:\\some\\other\\runner.py"\n', encoding="utf-8"
+    # ValidateOnly returns failure (e.g., wrapper threw because runnerPath doesn't exist).
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(validate_ok=False, validate_output="Smart-poller runner not found at C:\\bad\\path"),
     )
     result = _check_smart_bridge_poller(project)
     assert result.status == "fail"
-    assert "Phase 2 path rebase outstanding" in result.message or "wrapper customized" in result.message
+    assert "ValidateOnly failed" in result.message
+
+
+# --- Test 3b: wrapper -ValidateOnly resolves DIFFERENT runner → fail ------
+
+
+def test_wrapper_resolves_different_runner_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If wrapper -ValidateOnly succeeds but resolves a runner path that's not
+    the expected one, doctor flags a customized/rebase-mid-flight wrapper."""
+    project = _make_project(tmp_path)
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(validate_ok=True, validate_output="OK runner=C:\\different\\custom\\runner.py"),
+    )
+    result = _check_smart_bridge_poller(project)
+    assert result.status == "fail"
+    assert "different runner path" in result.message
 
 
 # --- Test 4: task not registered → warning (initial-install state) ---------
@@ -93,8 +134,16 @@ def test_wrapper_path_mismatch_fails(tmp_path: Path) -> None:
 
 def test_task_not_registered_warns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = _make_project(tmp_path)
-    # Monkeypatch _run_cmd to return empty (task not found).
-    monkeypatch.setattr(doctor_module, "_run_cmd", lambda *args, **kwargs: (True, ""))
+    # ValidateOnly returns OK with expected runner path (mocked); Get-ScheduledTask returns empty.
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            validate_ok=True,
+            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            task_xml="",
+        ),
+    )
     result = _check_smart_bridge_poller(project)
     assert result.status == "warning"
     assert "not registered" in result.message
@@ -105,19 +154,27 @@ def test_task_not_registered_warns(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_task_target_does_not_include_wrapper_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Per -004 GO guardrail 2: doctor must inspect the actual action target,
-    not just the task name. If task points at the runner directly instead of
-    the wrapper, the Phase-2-stable activation pattern is broken."""
+    """Per -004 GO guardrail 2 + -006 follow-up: doctor must inspect the actual
+    action target. If task points at pythonw directly instead of the VBS
+    launcher, the Phase-2-stable activation pattern is broken."""
     project = _make_project(tmp_path)
-    # Task XML output that mentions the runner directly but NOT the wrapper.
-    fake_task_xml = """
-    Execute: python.exe
+    # Task XML output that mentions pythonw + runner directly but NOT the VBS.
+    bad_task_xml = """
+    Execute: pythonw.exe
     Arguments: "E:\\GT-KB\\groundtruth-kb\\scripts\\bridge_poller_runner.py" --interval 15
     """
-    monkeypatch.setattr(doctor_module, "_run_cmd", lambda *args, **kwargs: (True, fake_task_xml))
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            validate_ok=True,
+            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            task_xml=bad_task_xml,
+        ),
+    )
     result = _check_smart_bridge_poller(project)
     assert result.status == "fail"
-    assert "wrapper" in result.message.lower()
+    assert "VBS launcher" in result.message
     assert "Finding 1" in result.message  # cites -004 finding
 
 
@@ -126,13 +183,16 @@ def test_task_target_does_not_include_wrapper_fails(tmp_path: Path, monkeypatch:
 
 def test_task_registered_no_audit_warns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = _make_project(tmp_path)
-    fake_task_xml = (
-        "\nExecute: powershell.exe\n"
-        "Arguments: -NoProfile -ExecutionPolicy Bypass "
-        '-File "E:\\GT-KB\\scripts\\run_smart_bridge_poller.ps1" '
-        "-IntervalSeconds 15\n"
+    fake_task_xml = '\nExecute: wscript.exe\nArguments: "E:\\GT-KB\\scripts\\run_smart_bridge_poller.vbs"\n'
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            validate_ok=True,
+            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            task_xml=fake_task_xml,
+        ),
     )
-    monkeypatch.setattr(doctor_module, "_run_cmd", lambda *args, **kwargs: (True, fake_task_xml))
     result = _check_smart_bridge_poller(project)
     assert result.status == "warning"
     assert "no audit events" in result.message or "not have started" in result.message
@@ -144,13 +204,16 @@ def test_task_registered_no_audit_warns(tmp_path: Path, monkeypatch: pytest.Monk
 def test_stale_audit_event_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = _make_project(tmp_path)
     _make_audit(project, age_seconds=120.0)  # > 60s threshold
-    fake_task_xml = (
-        "\nExecute: powershell.exe\n"
-        "Arguments: -NoProfile -ExecutionPolicy Bypass "
-        '-File "E:\\GT-KB\\scripts\\run_smart_bridge_poller.ps1" '
-        "-IntervalSeconds 15\n"
+    fake_task_xml = '\nExecute: wscript.exe\nArguments: "E:\\GT-KB\\scripts\\run_smart_bridge_poller.vbs"\n'
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            validate_ok=True,
+            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            task_xml=fake_task_xml,
+        ),
     )
-    monkeypatch.setattr(doctor_module, "_run_cmd", lambda *args, **kwargs: (True, fake_task_xml))
     result = _check_smart_bridge_poller(project)
     assert result.status == "fail"
     assert "audit event" in result.message
@@ -164,13 +227,16 @@ def test_full_healthy_state_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     project = _make_project(tmp_path)
     _make_audit(project, age_seconds=5.0)
     # No notification files (steady state with no actionable pending work).
-    fake_task_xml = (
-        "\nExecute: powershell.exe\n"
-        "Arguments: -NoProfile -ExecutionPolicy Bypass "
-        '-File "E:\\GT-KB\\scripts\\run_smart_bridge_poller.ps1" '
-        "-IntervalSeconds 15\n"
+    fake_task_xml = '\nExecute: wscript.exe\nArguments: "E:\\GT-KB\\scripts\\run_smart_bridge_poller.vbs"\n'
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            validate_ok=True,
+            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            task_xml=fake_task_xml,
+        ),
     )
-    monkeypatch.setattr(doctor_module, "_run_cmd", lambda *args, **kwargs: (True, fake_task_xml))
     result = _check_smart_bridge_poller(project)
     assert result.status == "pass"
     assert "smart-poller active" in result.message
@@ -193,13 +259,16 @@ def test_stale_notification_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
     os.utime(fpath, (target_mtime, target_mtime))
 
-    fake_task_xml = (
-        "\nExecute: powershell.exe\n"
-        "Arguments: -NoProfile -ExecutionPolicy Bypass "
-        '-File "E:\\GT-KB\\scripts\\run_smart_bridge_poller.ps1" '
-        "-IntervalSeconds 15\n"
+    fake_task_xml = '\nExecute: wscript.exe\nArguments: "E:\\GT-KB\\scripts\\run_smart_bridge_poller.vbs"\n'
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_cmd",
+        _make_run_cmd_mock(
+            validate_ok=True,
+            validate_output="OK runner=groundtruth-kb\\scripts\\bridge_poller_runner.py",
+            task_xml=fake_task_xml,
+        ),
     )
-    monkeypatch.setattr(doctor_module, "_run_cmd", lambda *args, **kwargs: (True, fake_task_xml))
     result = _check_smart_bridge_poller(project)
     assert result.status == "fail"
     assert "notification stale" in result.message.lower()

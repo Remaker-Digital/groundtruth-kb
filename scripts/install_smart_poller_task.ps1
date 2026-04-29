@@ -23,14 +23,25 @@ $ErrorActionPreference = "Stop"
 
 $taskName = "GTKB-SmartBridgePoller"
 $wrapperPath = Join-Path $ProjectRoot "scripts\run_smart_bridge_poller.ps1"
+$vbsLauncherPath = Join-Path $ProjectRoot "scripts\run_smart_bridge_poller.vbs"
 
 if (-not (Test-Path $wrapperPath)) {
     throw "Wrapper script not found at $wrapperPath. Did you run installation before commits 1-3 landed?"
 }
+if (-not (Test-Path $vbsLauncherPath)) {
+    throw "VBS launcher not found at $vbsLauncherPath. Required to suppress visible PowerShell window on Windows 11 + Terminal."
+}
 
+# Per bridge/gtkb-bridge-poller-notify-activation-2026-04-29-006.md (reverification
+# of activation): on Windows 11 with Windows Terminal as the default console host,
+# `powershell.exe -WindowStyle Hidden` is NOT honored — Terminal renders the
+# hosted PowerShell window visibly anyway. The fix is a VBS launcher invoked via
+# wscript.exe (no console of its own) which spawns PowerShell with WshShell.Run
+# intWindowStyle=0 (truly hidden). The .ps1 wrapper retains its -ValidateOnly mode
+# for the doctor check.
 $action = New-ScheduledTaskAction `
-    -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$wrapperPath`" -IntervalSeconds $IntervalSeconds" `
+    -Execute "wscript.exe" `
+    -Argument "`"$vbsLauncherPath`"" `
     -WorkingDirectory $ProjectRoot
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME

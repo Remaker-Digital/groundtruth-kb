@@ -1142,6 +1142,7 @@ _BRIDGE_AUTH_DOC = "docs/troubleshooting/auth.md"
 # audit event, fresh notification.
 _SMART_POLLER_TASK_NAME = "GTKB-SmartBridgePoller"
 _SMART_POLLER_WRAPPER_REL = Path("scripts/run_smart_bridge_poller.ps1")
+_SMART_POLLER_VBS_REL = Path("scripts/run_smart_bridge_poller.vbs")
 _SMART_POLLER_RUNNER_REL = Path("groundtruth-kb/scripts/bridge_poller_runner.py")
 # Phase 2 will move the runner to scripts/bridge_poller_runner.py — the
 # wrapper internals will change in the same controlled surface; this check
@@ -1392,32 +1393,52 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
             ),
         )
 
-    # 3. Wrapper resolves runner path. Read $runnerPath from the wrapper and
-    # verify it's the same file we found above. Phase 2 will rewrite this
-    # line; mismatch indicates rebase is outstanding.
-    try:
-        wrapper_text = wrapper.read_text(encoding="utf-8")
-    except OSError as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"smart-poller wrapper unreadable: {exc}",
-        )
-    if (
-        str(_SMART_POLLER_RUNNER_REL).replace("/", "\\") not in wrapper_text
-        and str(_SMART_POLLER_RUNNER_REL).replace("\\", "/") not in wrapper_text
-    ):
+    # 3. Wrapper resolves runner path. Run the wrapper in -ValidateOnly mode
+    # which executes the actual $runnerPath assignment + Test-Path, then exits
+    # without starting the long-running poller. This validates the EFFECTIVE
+    # path the wrapper would invoke, not a substring in arbitrary file content
+    # (per smart-poller-notify-activation -006 Finding 2: a future edit could
+    # leave the comment intact while changing $runnerPath to a bad path under
+    # the substring approach).
+    validate_ok, validate_output = _run_cmd(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(wrapper),
+            "-ValidateOnly",
+        ],
+        timeout=15,
+    )
+    if not validate_ok:
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
             message=(
-                "smart-poller wrapper does NOT reference the expected runner path "
-                f"({_SMART_POLLER_RUNNER_REL.as_posix()}). Phase 2 path rebase outstanding "
-                f"or wrapper customized — review {_SMART_POLLER_WRAPPER_REL.as_posix()}."
+                "smart-poller wrapper -ValidateOnly failed to resolve $runnerPath: "
+                f"{validate_output[:200] or '(no output)'}. Phase 2 path rebase "
+                f"outstanding or wrapper customized — review {_SMART_POLLER_WRAPPER_REL.as_posix()}."
+            ),
+        )
+    # On success, the wrapper prints "OK runner=<path>". Confirm the resolved
+    # path matches our expectation (defensive: if a future wrapper edit
+    # silently aliased to a different runner, we want to know).
+    expected_marker = str(_SMART_POLLER_RUNNER_REL).replace("/", "\\")
+    if expected_marker not in validate_output and _SMART_POLLER_RUNNER_REL.as_posix() not in validate_output:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"smart-poller wrapper -ValidateOnly resolved a different runner path: "
+                f"{validate_output.strip() or '(empty)'}. Expected wrapper to resolve "
+                f"to {_SMART_POLLER_RUNNER_REL.as_posix()}; this likely indicates Phase 2 "
+                f"path rebase is in progress or wrapper has been customized."
             ),
         )
 
@@ -1456,9 +1477,11 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
             ),
         )
 
-    # 6. Task target points to the wrapper (per -004 guardrail 2).
-    wrapper_name = _SMART_POLLER_WRAPPER_REL.name  # run_smart_bridge_poller.ps1
-    if wrapper_name not in task_xml:
+    # 6. Task target points to the VBS launcher (per -004 guardrail 2 + -006
+    # follow-up: the daemon path uses the .vbs launcher, not the .ps1 directly,
+    # to suppress visible PowerShell windows on Windows 11 + Terminal).
+    vbs_name = _SMART_POLLER_VBS_REL.name  # run_smart_bridge_poller.vbs
+    if vbs_name not in task_xml:
         return ToolCheck(
             name=check_name,
             required=False,
@@ -1466,9 +1489,10 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
             status="fail",
             message=(
                 f"smart-poller task registered but action target does NOT include "
-                f"the wrapper '{wrapper_name}'. Re-install via "
+                f"the VBS launcher '{vbs_name}'. Re-install via "
                 f"scripts/install_smart_poller_task.ps1 to use the Phase-2-stable "
-                f"wrapper pattern (see -004 Finding 1)."
+                f"wrapper pattern (see -004 Finding 1 + -006 Windows 11 Terminal "
+                f"visibility follow-up)."
             ),
         )
 
