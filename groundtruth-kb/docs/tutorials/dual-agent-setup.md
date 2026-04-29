@@ -1,18 +1,14 @@
 # Dual-Agent Setup
 
-<!-- © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved. -->
-
 Configure a Prime Builder and a Loyal Opposition agent with a shared file
-bridge, start the OS-scheduler pollers, and walk through a complete
-proposal → review → VERIFIED cycle.
+bridge, use verified smart-poller automation when it is available, and walk
+through a complete proposal -> review -> VERIFIED cycle.
 
 ## Prerequisites
 
 - `groundtruth-kb` installed (`pip install groundtruth-kb`)
 - Claude Code (Prime Builder) and Codex (Loyal Opposition) available on your
   workstation
-
----
 
 ## Step 1: Scaffold a Dual-Agent Project
 
@@ -24,46 +20,42 @@ cd my-project
 The `dual-agent` profile generates:
 
 - `groundtruth.toml` + `groundtruth.db`
-- `CLAUDE.md` and `MEMORY.md` — session state templates
-- `AGENTS.md` — Loyal Opposition operating contract
-- `BRIDGE-INVENTORY.md` — bridge runtime inventory
-- `bridge-os-poller-setup-prompt.md` — prompt for configuring OS pollers
-- `bridge/INDEX.md` — the file bridge coordination file
-- `.claude/hooks/` and `.claude/rules/` — automation hooks and rules
-- `independent-progress-assessments/` — Codex report storage
+- `CLAUDE.md` and `MEMORY.md` - session state templates
+- `AGENTS.md` - Loyal Opposition operating contract
+- `BRIDGE-INVENTORY.md` - bridge runtime inventory
+- `bridge-os-poller-setup-prompt.md` - legacy filename; smart-poller setup prompt
+- `bridge/INDEX.md` - the file bridge coordination file
+- `.claude/hooks/` and `.claude/rules/` - automation hooks and rules
+- `independent-progress-assessments/` - Codex report storage
 
----
+## Step 2: Configure Bridge Automation
 
-## Step 2: Start the OS-Scheduler Bridge
+The file bridge uses `bridge/INDEX.md` as its authoritative queue. Use the
+verified smart poller when it is available and functioning. See
+[Bridge Smart Poller](bridge-smart-poller.md) for setup and health expectations.
 
-The file bridge uses OS-native scheduling to run Prime Builder and Loyal
-Opposition on a recurring interval. See
-[Bridge OS Scheduler](bridge-os-scheduler.md) for platform-specific setup
-(macOS/Linux cron, Windows Task Scheduler).
-
-The bridge poller script is generated at scaffold time from the
-`bridge-os-poller-setup-prompt.md` file in your project root. Use that
-prompt with Claude Code to configure the OS-scheduler pollers:
+The bridge smart-poller setup prompt is generated at scaffold time from the
+`bridge-os-poller-setup-prompt.md` file in your project root. The filename is
+retained for scaffold compatibility; the active content is smart-poller setup.
+Use that prompt with Claude Code or Codex to configure bridge automation:
 
 ```bash
 # Open bridge-os-poller-setup-prompt.md, fill in the placeholders,
-# then paste it into Claude Code to set up the pollers automatically.
+# then paste it into Claude Code or Codex to set up smart-poller automation.
 ```
 
-Once running, each poller:
+Once running, each smart-poller scan:
 
-1. Reads `bridge/INDEX.md` every 3 minutes
-2. Dispatches the agent only when actionable work exists
+1. Reads `bridge/INDEX.md` on the configured interval.
+2. Dispatches the agent only when actionable work exists.
 3. Writes a status file under
-   `independent-progress-assessments/bridge-automation/logs/`
+   `independent-progress-assessments/bridge-automation/logs/`.
 
 Check bridge health at any time:
 
 ```bash
 gt project doctor
 ```
-
----
 
 ## Step 3: Run a Proposal/Review Cycle
 
@@ -72,7 +64,7 @@ gt project doctor
 Create `bridge/my-feature-001.md`:
 
 ```markdown
-# My Feature — Implementation Proposal
+# My Feature - Implementation Proposal
 
 **Status:** NEW
 **WI:** WI-001
@@ -91,18 +83,18 @@ Add a list_tasks() function to src/tasks.py that filters by status.
 
 Register it in `bridge/INDEX.md`:
 
-```
+```text
 Document: my-feature
 NEW: bridge/my-feature-001.md
 ```
 
 ### Loyal Opposition reviews
 
-Codex will pick up the NEW entry within 3 minutes and write a review at
-`bridge/my-feature-002.md` with a GO or NO-GO verdict. The INDEX entry
-becomes:
+Codex will pick up the NEW entry when the smart poller runs, or during a manual
+bridge scan, and write a review at `bridge/my-feature-002.md` with a GO or
+NO-GO verdict. The INDEX entry becomes:
 
-```
+```text
 Document: my-feature
 GO: bridge/my-feature-002.md
 NEW: bridge/my-feature-001.md
@@ -110,10 +102,10 @@ NEW: bridge/my-feature-001.md
 
 ### Prime Builder implements
 
-On GO, implement the feature, run tests, and write a post-implementation
-report at `bridge/my-feature-003.md`. Update INDEX.md:
+On GO, implement the feature, run tests, and write a post-implementation report
+at `bridge/my-feature-003.md`. Update INDEX.md:
 
-```
+```text
 Document: my-feature
 NEW: bridge/my-feature-003.md
 GO: bridge/my-feature-002.md
@@ -122,10 +114,10 @@ NEW: bridge/my-feature-001.md
 
 ### Loyal Opposition verifies
 
-Codex reviews the post-implementation report and writes VERIFIED
-(or NO-GO) at `bridge/my-feature-004.md`:
+Codex reviews the post-implementation report and writes VERIFIED (or NO-GO) at
+`bridge/my-feature-004.md`:
 
-```
+```text
 Document: my-feature
 VERIFIED: bridge/my-feature-004.md
 NEW: bridge/my-feature-003.md
@@ -133,22 +125,17 @@ GO: bridge/my-feature-002.md
 NEW: bridge/my-feature-001.md
 ```
 
-VERIFIED is terminal — Prime Builder takes no further action on this entry.
-
----
+VERIFIED is terminal; Prime Builder takes no further action on this entry.
 
 ## Step 4: Auth Troubleshooting
 
-If the bridge poller reports `AUTH FAILURE`, see
+If bridge automation reports `AUTH FAILURE`, see
 [Auth Troubleshooting](../troubleshooting/auth.md) for provider-specific
 re-auth steps.
 
----
-
 ## What's Next
 
-- [Bridge OS Scheduler](bridge-os-scheduler.md) — platform-specific
-  cron and Task Scheduler setup
-- [Method: Dual-Agent](../method/06-dual-agent.md) — deeper explanation
-  of the Prime Builder / Loyal Opposition model
-- [Reference: CLI](../reference/cli.md) — full `gt project init` options
+- [Bridge Smart Poller](bridge-smart-poller.md) - smart-poller setup and health
+- [Method: Dual-Agent](../method/06-dual-agent.md) - deeper explanation of the
+  Prime Builder / Loyal Opposition model
+- [Reference: CLI](../reference/cli.md) - full `gt project init` options

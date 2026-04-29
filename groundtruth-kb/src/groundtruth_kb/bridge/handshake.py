@@ -2,7 +2,8 @@
 """Legacy Codex session-start handshake with Prime.
 
 This module uses the archived SQLite/MCP bridge runtime. New dual-agent
-projects should use the file bridge protocol and OS pollers instead.
+projects should use the file bridge protocol and the verified smart poller
+instead.
 """
 
 from __future__ import annotations

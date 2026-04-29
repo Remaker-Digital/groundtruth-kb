@@ -193,9 +193,9 @@ in `local-only` mode felt faster at the time, but in retrospect she shipped
 at least one bug (empty duration field) that a Loyal Opposition review
 would have caught in one pass.
 
-She would write the bridge poller setup on day one too. It is documented
-in [Bridge OS Scheduler](tutorials/bridge-os-scheduler.md) and takes
-ten minutes to install.
+She would configure bridge automation on day one too. It is documented in
+[Bridge Smart Poller](tutorials/bridge-smart-poller.md). If the verified smart
+poller is not available yet, manual bridge scans remain the fallback.
 
 ## Can I Use Different Tools for the Loyal Opposition?
 

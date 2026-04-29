@@ -4,7 +4,8 @@
 Per ``bridge/gtkb-bridge-poller-p3-notify-2026-04-29-008.md`` GO conditions:
 
 - AC #4-#7: --once / --interval / --max-iterations / bootstrap behavior
-- AC #9: no-subprocess invariant — runner does NOT invoke subprocess.run
+- Dispatch contract: automatic harness launch occurs only when work is pending
+  and the pending-action signature has not already been dispatched.
 - AC #14, #15, #17 (+LC14, LC15): current-state lifecycle + bootstrap suppression
 - AC #18 (+LC11-LC13): schema v2
 
@@ -84,24 +85,50 @@ def _seed_bridge(synth: Path, doc_name: str, top_status: str, top_version: int =
     index_path.write_text(text, encoding="utf-8")
 
 
-# --- AC #9: no-subprocess invariant -----------------------------------------
+# --- Dispatch contract -------------------------------------------------------
 
 
-def test_poller_loop_does_not_invoke_subprocess(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC #9: poller must NOT invoke any subprocess (no spawning).
-
-    Asserts via monkeypatch.setattr(subprocess, "run", ...) that the poller's
-    full multi-iteration loop completes without calling subprocess.run.
-    """
+def test_poller_loop_does_not_launch_harness_when_no_work_waits(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No actionable work means no harness launch and no token spend."""
     runner = _load_runner()
-    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+    _seed_bridge(synthetic_gtkb_root, "foo", "VERIFIED")
 
     def _fail_unconditionally(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("Poller invoked subprocess.run; no-spawn invariant violated.")
+        raise AssertionError("Poller launched a harness despite no actionable work.")
 
-    monkeypatch.setattr(subprocess, "run", _fail_unconditionally)
-    iterations = runner.main_loop(interval_s=0, max_iterations=3, quiet=True)
+    monkeypatch.setattr(subprocess, "Popen", _fail_unconditionally)
+    iterations = runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
     assert iterations == 3
+
+
+def test_poller_loop_launches_harness_once_for_pending_signature(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Actionable work triggers the recipient harness once; unchanged work does not relaunch."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    iterations = runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
+
+    assert iterations == 3
+    assert len(calls) == 1
+    assert calls[0][0:2] == ["codex", "exec"]
+    assert "--cd" in calls[0]
+    state_path = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["recipients"]["codex"]["pending_count"] == 1
+    assert state["recipients"]["codex"]["last_result"] == "unchanged"
 
 
 # --- AC #4: --once mode -----------------------------------------------------

@@ -246,7 +246,7 @@ def bootstrap_summary(target: Path, *, include_ci: bool, init_git: bool, seed_ex
         "  - groundtruth.toml",
         "  - groundtruth.db",
         "  - CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md",
-        "  - bridge-os-poller-setup-prompt.md",
+        "  - bridge-os-poller-setup-prompt.md (legacy filename; smart-poller setup)",
         "  - .claude/hooks and .claude/rules",
         f"  - CI workflows: {'yes' if include_ci else 'no'}",
         f"  - Git initialized: {'yes' if init_git else 'no'}",

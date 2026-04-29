@@ -2,8 +2,8 @@
 """Legacy bridge worker health-check and recovery fallback.
 
 This module belongs to the archived SQLite/MCP bridge runtime and is retained
-for compatibility. New dual-agent projects should use project-owned file bridge
-OS pollers instead.
+for compatibility. New dual-agent projects should use the file bridge protocol
+and the verified smart poller instead.
 
 When called from a SessionStart hook, this script:
 

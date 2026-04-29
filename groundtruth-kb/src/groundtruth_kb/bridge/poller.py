@@ -2,7 +2,8 @@
 """Legacy periodic notification poller for the SQLite/MCP bridge runtime.
 
 Retained for compatibility with older database-backed bridge deployments. New
-dual-agent projects should use project-owned file bridge OS pollers instead.
+dual-agent projects should use the file bridge protocol and the verified smart
+poller instead.
 """
 
 from __future__ import annotations

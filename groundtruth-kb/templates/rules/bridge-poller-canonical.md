@@ -1,6 +1,6 @@
-# Bridge Poller Canonical Instructions
+# Bridge Smart Poller Canonical Instructions
 
-This file is the canonical source of truth for file bridge poller behavior.
+This file is the canonical source of truth for file bridge smart-poller behavior.
 It applies to any automation, scheduled task, or wake prompt that keeps the
 Prime Builder <-> Loyal Opposition bridge operational.
 
@@ -49,12 +49,14 @@ Prime Builder pollers process only latest statuses:
 - Only surface a blocker to the owner when a true external decision is
   required, such as product direction, destructive action, or scope change.
 
-### 5. Use OS Scheduler State as the Reliability Boundary
+### 5. Use Smart-Poller State as the Reliability Boundary
 
-- Recurring bridge scans should run from an OS scheduler.
+- Use the verified smart poller when it is available and functioning.
+- Do not restore the retired OS poller implementation as the active automation
+  path.
 - App-native automations may be supplemental, but they are not authoritative
   unless they produce durable run records across sessions.
-- Each scheduled run should log clear scans as well as dispatched work.
+- Each smart-poller run should log clear scans as well as dispatched work.
 
 ## Guardrails
 
@@ -63,7 +65,7 @@ Prime Builder pollers process only latest statuses:
 - Do not reprocess `VERIFIED` entries.
 - Use a lock file so overlapping scheduled runs cannot create duplicate bridge
   documents.
-- Keep prompt text, CLI commands, scheduler names, logs, locks, and required
+- Keep prompt text, CLI commands, smart-poller registration names, logs, locks, and required
   plugins/skills documented in `BRIDGE-INVENTORY.md`.
 
 ## Output Expectations

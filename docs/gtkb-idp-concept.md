@@ -20,10 +20,11 @@ new definitions.
 **GT-KB (GroundTruth-KB) is an Internal Developer Platform (IDP)** for
 individual developers building and maintaining production software with AI
 assistance. Like any IDP, it provides shared project infrastructure,
-governance artifacts, runtime services, and conventions that applications
-consume. Unlike traditional org-scale IDPs, it is sized for a
-single-developer context and integrates multiple AI coding harnesses
-(Claude Code, Codex) under shared specifications, bridges, and protocols.
+governance artifacts, runtime services, and conventions that an active
+developed application consumes. Unlike traditional org-scale IDPs, it is
+sized for a single-developer context and integrates multiple AI coding
+harnesses (Claude Code, Codex) under shared specifications, bridges, and
+protocols.
 
 ## Industry Context
 
@@ -42,7 +43,14 @@ cross-cutting governance.
 GT-KB applies the same shape at individual-developer scale: a single
 developer consumes shared infrastructure (bridge protocol, artifact
 governance, knowledge database, canonical terminology, runtime services)
-while building one or more applications.
+while building one active application at a time.
+
+The platform/application boundary exists primarily for lifecycle isolation.
+GT-KB should be able to evolve, upgrade, and release on its own cadence without
+being locked to the application cadence. The host-directory model is not a
+multi-application development workspace: a GT-KB host supports only one
+developed application at a time. Additional applications are separate lifecycle
+subjects, not concurrent peers under the same active host.
 
 ## Distinctions From Related Terms
 
@@ -95,8 +103,9 @@ variant that preserves all three elements). Subsequent mentions may use
   VERIFIED implementation record for the upstream contract
 - `bridge/gtkb-idp-terminology-formalization-*.md` — this thread
 - `DELIB-0877` — GTKB-ISOLATION parent decision (adjacent context:
-  isolation restructures GT-KB into a parent IDP with applications as
-  subdirectories)
+  isolation restructures GT-KB into a parent IDP with application files under
+  `applications/`, while the active host supports only one developed
+  application at a time)
 
 ## Follow-On Work (Not Part of This Document)
 

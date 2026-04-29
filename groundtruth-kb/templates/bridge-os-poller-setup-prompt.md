@@ -1,4 +1,7 @@
-# File Bridge OS Poller Setup Prompt
+# File Bridge Smart Poller Setup Prompt
+
+This template keeps its legacy filename for scaffold compatibility. Its active
+content is the smart-poller setup contract, not the retired OS-poller directive.
 
 Use this prompt with Claude Code or Codex when a GroundTruth project needs a
 durable file bridge between Prime Builder and Loyal Opposition agents.
@@ -39,26 +42,24 @@ Bridge requirements:
 6. Prime Builder scans for latest GO or NO-GO entries and writes the next
    numbered bridge file with NEW or REVISED when a response is needed.
 7. VERIFIED is terminal and must not trigger Prime Builder action.
-8. Poll from the OS scheduler, not from manual prompting. App-native automation
-   may be optional responsiveness, but it is not the authoritative reliability
-   mechanism unless run records prove it dispatches across sessions.
-9. Create separate pollers for Prime Builder and Loyal Opposition.
-10. Each poller must parse bridge/INDEX.md, acquire a lock, skip dispatch when
-    no work exists, invoke its CLI only for real work, and append logs for both
-    clear scans and dispatched runs.
-11. Configure a recurring OS schedule for each poller at <POLL_INTERVAL>.
-12. On Windows, prefer Task Scheduler -> hidden launcher -> PowerShell scanner.
-    On Unix-like systems, use cron, systemd timers, or launchd with equivalent
-    background behavior.
-13. Store scripts, launchers, locks, logs, and prompt text under project-owned
-    paths such as independent-progress-assessments/bridge-automation/.
-13a. After every scan (clear or dispatched), write a JSON status file:
-     - Claude:  independent-progress-assessments/bridge-automation/logs/claude-scan-status.json
-     - Codex:   independent-progress-assessments/bridge-automation/logs/codex-scan-status.json
-     Schema: {"updatedAtUtc": "<ISO8601-UTC>", "state": "<clear|dispatched|error|...>", "message": "<summary>"}
-     The state field is free-form; gt project doctor displays it as-is.
+8. Use the verified smart poller when it is available and functioning. Do not
+   restore the retired OS poller implementation as the active automation path.
+9. If smart-poller automation is unavailable, manual bridge scans remain the
+   fallback until the smart poller is installed and healthy.
+10. The smart poller must parse bridge/INDEX.md, acquire a lock, skip dispatch
+    when no work exists, invoke the correct CLI only for real work, and append
+    durable run records for both clear scans and dispatched runs.
+11. Configure recurring execution only through the verified smart-poller
+    registration path, with health checks and cost controls enabled.
+12. Store scripts, launchers, locks, logs, and prompt text under project-owned
+    paths documented in BRIDGE-INVENTORY.md.
+13. After every scan (clear or dispatched), write a JSON status file:
+    - Prime Builder: <PRIME_STATUS_JSON>
+    - Loyal Opposition: <LOYAL_OPPOSITION_STATUS_JSON>
+    Schema: {"updatedAtUtc": "<ISO8601-UTC>", "state": "<clear|dispatched|error|...>", "message": "<summary>"}
+    The state field is free-form; doctor tooling displays it as-is.
 14. Capture the full setup in BRIDGE-INVENTORY.md, including:
-    - scheduler task names
+    - smart-poller registration name
     - script and launcher paths
     - lock and log paths
     - CLI commands and working directories
@@ -71,11 +72,12 @@ Bridge requirements:
     hooks, bridge files, or config without confirming ownership and scope.
 
 Deliverables:
-- Implement or update the poller scripts and scheduler definitions.
+- Implement or update smart-poller scripts and registration definitions.
 - Update BRIDGE-INVENTORY.md and any bridge protocol rule file needed by the
   agents.
-- Provide exact task names, commands, paths, logs, and health-check commands.
-- Verify with one no-work scan for each poller.
+- Provide exact names, commands, paths, logs, health-check commands, and
+  expected token/cost controls.
+- Verify with one no-work scan for each role.
 - If safe test bridge entries exist, verify one full Prime -> Loyal Opposition
   -> Prime status cycle.
 - Report unresolved owner decisions separately.

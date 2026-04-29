@@ -624,7 +624,7 @@ def _render_all_templates(
         "{{TEST_STATUS}}": "Not run yet",
         "{{BRIDGE_INVENTORY_PATH_OR_NA}}": ("BRIDGE-INVENTORY.md" if profile.includes_bridge else "N/A"),
         "{{AUTOMATION_SUMMARY_OR_NA}}": (
-            "File bridge inventory and setup prompt included; configure OS pollers per project"
+            "File bridge inventory and smart-poller setup prompt included"
             if profile.includes_bridge
             else "None configured yet"
         ),
@@ -633,14 +633,14 @@ def _render_all_templates(
         "{{RESPONSIBILITY}}": "Implementation, specs, and project bootstrap",
         "{{REVIEWER}}": ("codex (Loyal Opposition)" if profile.includes_bridge else "owner"),
         "{{NOTES}}": "Replace with your actual collaboration topology.",
-        "{{PATH_TO_ENTRYPOINT}}": ("bridge/INDEX.md + project-owned OS pollers" if profile.includes_bridge else "TBD"),
+        "{{PATH_TO_ENTRYPOINT}}": ("bridge/INDEX.md + verified smart poller" if profile.includes_bridge else "TBD"),
         "{{WHAT_IT_DOES}}": (
             "File bridge queue for Prime Builder and Loyal Opposition review handoffs"
             if profile.includes_bridge
             else "Document your bridge or automation entrypoint here."
         ),
         "{{HOW_IT_RUNS}}": (
-            "OS scheduler invokes project-owned scanner scripts"
+            "Verified smart poller invokes project-owned scanner scripts"
             if profile.includes_bridge
             else "Manual start or scheduled run"
         ),
@@ -648,10 +648,13 @@ def _render_all_templates(
         "{{KIND}}": "TBD",
         "{{PURPOSE}}": "Replace with the actual purpose for this control surface.",
         "{{WHEN_TO_UPDATE}}": "Whenever the runtime or coordination rules change.",
-        "{{AUTOMATION_NAME}}": "file-bridge-os-pollers",
-        "{{SCHEDULE}}": "Project-defined OS scheduler interval",
+        "{{AUTOMATION_NAME}}": "file-bridge-smart-poller",
+        "{{SCHEDULE}}": "Smart-poller registration interval or manual fallback",
         "{{EXECUTOR}}": "claude -p / codex exec via project-owned scanner scripts",
-        "{{SOURCE}}": "bridge-os-poller-setup-prompt.md and BRIDGE-INVENTORY.md",
+        "{{SOURCE}}": (
+            "bridge-os-poller-setup-prompt.md (legacy filename; smart-poller content) "
+            "and BRIDGE-INVENTORY.md"
+        ),
         "{{FAILURE_SIGNAL}}": "No recent scan logs or stale actionable bridge entries",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (
             "File-based latest-status queue in bridge/INDEX.md. Entries are newest-first."
@@ -808,7 +811,7 @@ ENVIRONMENT=development
 LOG_LEVEL=INFO
 
 # GroundTruth file bridge (dual-agent mode)
-# Configure project-owned OS pollers from bridge-os-poller-setup-prompt.md.
+# Use verified smart-poller automation when available; otherwise use manual bridge scans.
 
 # Azure OpenAI (if using AI features)
 # AZURE_OPENAI_ENDPOINT=
@@ -994,7 +997,7 @@ def scaffold_summary(target: Path, profile: str) -> str:
             [
                 "  - AGENTS.md (Loyal Opposition contract)",
                 "  - BRIDGE-INVENTORY.md",
-                "  - bridge-os-poller-setup-prompt.md",
+                "  - bridge-os-poller-setup-prompt.md (legacy filename; smart-poller setup)",
                 "  - Bridge rules and hooks",
                 "  - independent-progress-assessments/ (Codex reports)",
             ]
