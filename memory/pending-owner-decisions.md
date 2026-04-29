@@ -6,6 +6,70 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+- id: DECISION-0078
+  asked_at: 2026-04-29T18:14:32.418962Z
+  question: "rrent latest status awaiting your input."
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: cc189cee7a45fc45
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0079
+  asked_at: 2026-04-29T18:20:40.875069Z
+  question: "rrent latest status awaiting your input\"`). I'll wait for y"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: f225e9dd77617892
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0080
+  asked_at: 2026-04-29T18:31:01.168043Z
+  question: "ositives detecting \"awaiting your input\" in my own text. Re"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 6339ac11d703eefa
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0081
+  asked_at: 2026-04-29T18:38:22.768539Z
+  question: "ing-backlog item. **Should I (a) draft the Slice 2 upstream proposal now, (b) wait for your GOV-17 ack on DORA Track 1, or (c) advance whichever standing-backlog item you prioritize?**"
+  detected_via: prose:should_i_or
+  status: pending
+  question_hash: 3e326649019a3ecb
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0082
+  asked_at: 2026-04-29T18:53:30.651276Z
+  question: "ion picks them up.  Awaiting owner direction. No further action"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 9fedce014a91ac7f
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0083
+  asked_at: 2026-04-29T18:56:12.804524Z
+  question: "trail is preserved. Awaiting owner direction before filing any n"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 65a128ee76925b61
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0084
+  asked_at: 2026-04-29T19:04:22.711734Z
+  question: "───────────────`  **Awaiting your direction on next concrete st"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 3e50c72e86229ec4
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0085
+  asked_at: 2026-04-29T19:14:14.228092Z
+  question: "its on `develop`  **Awaiting your direction on next concrete st"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 280bbb2602c502f8
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0086
+  asked_at: 2026-04-29T19:43:59.907389Z
+  question: "ven session scope)  Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: ec8b749b83ff24db
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+
 ## Resolved
 
 - id: DECISION-0076
@@ -28,7 +92,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S320
   answer: "Real question (not FP) — Prime Builder asked owner whether to proceed with two pending follow-on tasks. Resolved organically: owner answered 'Proceed with both, please.' in next turn, authorizing REVISED-1 activation post-impl + REVISED-1 orient-verification proposal in parallel."
   notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T17:00:00Z (real question; resolved by owner explicit answer in same turn)"
-
 - id: DECISION-0075
   asked_at: 2026-04-29T07:37:40.802072Z
   question: "om prior turn still awaiting your `✓`/`✗` per-draft approval (not auto-inserted)"

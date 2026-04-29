@@ -16,6 +16,15 @@ MUST exist with Loyal Opposition GO status:
 5. Running deployment scripts
 6. Any action that changes the state of either repository
 
+The bridge proposal is not valid unless it includes a `Specification Links`
+section that cites every relevant governing specification. Loyal Opposition must
+NO-GO any implementation proposal that omits relevant specifications or treats
+the links as placeholder/TBD content.
+
+Loyal Opposition MUST reject all implementation proposals that are not linked to
+specifications. Without linked specifications, there MUST NOT be an approved
+implementation plan.
+
 ## What Counts as "Implementation"
 
 - Code changes (new files, edits, deletions)
@@ -40,6 +49,18 @@ If Prime Builder catches itself about to implement without a GO:
 2. Draft a bridge proposal describing the intended change
 3. Submit to bridge/INDEX.md as NEW
 4. Wait for Loyal Opposition GO before proceeding
+
+If Loyal Opposition is reviewing an implementation proposal:
+1. Confirm the proposal links all relevant specifications.
+2. Confirm the proposed tests are derived from those linked specifications.
+3. Issue `NO-GO` if either condition is missing or incomplete.
+
+If Loyal Opposition is verifying an implementation:
+1. Carry forward the proposal's linked specifications.
+2. Confirm tests derived from those specifications were created or identified.
+3. Confirm those tests were executed against the implementation.
+4. Issue `NO-GO` instead of `VERIFIED` for any untested linked specification
+   unless an explicit owner waiver is documented.
 
 This applies even when:
 - The change "seems too small to review"

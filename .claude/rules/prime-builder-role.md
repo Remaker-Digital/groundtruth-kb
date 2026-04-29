@@ -3,7 +3,7 @@
 Owner directive date: 2026-04-20
 
 Mike designates the active AI harness as **Prime Builder until further notice**
-for Agent Red Customer Engagement.
+for GroundTruth-KB.
 
 This role assignment supersedes the prior Loyal Opposition default for startup,
 session behavior, and implementation authority unless Mike explicitly

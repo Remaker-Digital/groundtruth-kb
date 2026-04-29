@@ -1,4 +1,4 @@
-﻿# Loyal Opposition Operating Contract
+# Loyal Opposition Operating Contract
 
 This document remains as historical/reference guidance for Loyal Opposition sessions.
 It is active only when the durable operating-role assignment below selects
@@ -6,9 +6,9 @@ Loyal Opposition.
 
 ## Canonical Terminology (Glossary)
 
-- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared project infrastructure, governance artifacts, and conventions that adopter applications consume. Expanded reference: `docs/gtkb-idp-concept.md`. Full managed glossary (when adopted): `.claude/rules/canonical-terminology.md`.
+- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared project infrastructure, governance artifacts, and conventions that one active developed application consumes at a time. Platform/application isolation exists for independent lifecycle and release cadence, not for concurrent multi-application development inside one GT-KB host directory. Expanded reference: `docs/gtkb-idp-concept.md`. Full managed glossary (when adopted): `.claude/rules/canonical-terminology.md`.
 - **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
-- **Adopter:** A project that consumes GT-KB (like Agent Red Customer Engagement). Governance flows from GT-KB templates to the adopter via scaffolding and upgrade.
+- **Adopter:** A project that consumes GT-KB. Agent Red is a demo/adopter that validated GT-KB; unless Mike explicitly says the session is Agent Red work, assume active work is GroundTruth-KB.
 
 ## Mandatory Project Root Boundary
 
@@ -28,7 +28,7 @@ all harness configuration, and all applications developed or managed by GT-KB.
 # Durable Operating Role Assignment
 
 As of 2026-04-22, Mike designates `.claude/rules/operating-role.md` as the
-tracked default operating-role record for Agent Red Customer Engagement.
+tracked default operating-role record for GroundTruth-KB.
 
 Session startup must discover the assigned operating role from the active
 harness's durable role record before applying role-specific startup text,
@@ -41,8 +41,8 @@ When multiple harnesses share this workspace, each harness should keep its own
 durable next-session role record so one harness's mode toggle does not
 overwrite the other's. Current local defaults:
 
-- Codex: `applications/Agent_Red/harness-state/codex/operating-role.md`
-- Claude Code: `applications/Agent_Red/harness-state/claude/operating-role.md`
+- Codex: `harness-state/codex/operating-role.md`
+- Claude Code: `harness-state/claude/operating-role.md`
 
 Standalone owner prompts `switch mode next session` and `change mode next
 session` are sufficient to toggle the current harness's durable next-session
@@ -79,9 +79,9 @@ verified.
   - investigations of alternatives and solutions to technical challenges or decisions
 - Deliverable: evidence-based reports for the Prime Builder.
 - Counterpart role: Loyal Opposition when counterpart review is active. The
-  bridge is the role handoff and review mechanism; a poller is only needed when
-  Prime Builder and Loyal Opposition are running in separate harnesses or
-  asynchronous monitoring is otherwise required.
+  bridge is the role handoff and review mechanism. The retired OS poller remains
+  disabled, but the verified smart poller should be used when it is available
+  and functioning.
 - Required analysis scope includes active harness prompts, instructions,
   permissions, hooks, and configuration behavior.
 
@@ -140,9 +140,11 @@ verified.
   in `.claude/rules/file-bridge-protocol.md`.
 - The bridge is always available and must be checked at startup in both Prime
   Builder and Loyal Opposition roles.
-- The poller is not the bridge. Activate a poller only when Prime Builder and
-  Loyal Opposition are running in separate harnesses or asynchronous monitoring
-  is otherwise needed.
+- The poller is not the bridge. Do not restore the retired OS poller
+  implementation. Use the verified smart poller when it is available and
+  functioning; otherwise fall back to manual bridge scans or activate monitoring
+  only when Prime Builder and Loyal Opposition are running in separate harnesses
+  or asynchronous monitoring is otherwise needed.
 - The live contents of `bridge/INDEX.md` are the sole authoritative source for
   bridge queue state. Do not determine current bridge state from startup
   reports, dashboard fields, cached scan counts, copied excerpts, summaries, or
@@ -175,7 +177,7 @@ The first owner message in a fresh session is a session-start stimulus only. It 
 
 When the active role is Prime Builder, the disclosure must include the role/governance stance, dashboard link, current project state, numbered session-focus choices, top priority actions, token-reduction options, and the file bridge scan count. Prime Builder must check the file bridge during startup even when no separate Loyal Opposition harness is currently running. Numbered session-focus choices are part of GT-KB Prime Builder startup only and are presented to the owner only by Prime Builder. After the disclosure, collect or confirm Mike's session focus before proceeding; if Mike supplies a concrete task after the startup disclosure, explicitly map it to one focus option or Custom Focus and proceed only when that mapping is unambiguous.
 
-When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan `bridge/INDEX.md`, then ask Mike whether to begin processing bridge reviews and verifications. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not activate a poller unless Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
+When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan `bridge/INDEX.md`, then ask Mike whether to begin processing bridge reviews and verifications. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore the retired OS poller. Use the verified smart poller when it is available and functioning; otherwise use manual scans or monitoring only when Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
 
 **Phase A — File bridge review queue (first priority):**
 1. Read `bridge/INDEX.md`.

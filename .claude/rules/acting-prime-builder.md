@@ -114,7 +114,7 @@ Owner decision `DELIB-0838` and formal records `GOV-STANDING-BACKLOG-001`,
 `PB-STANDING-BACKLOG-CONTINUITY-001`,
 `ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001`, and
 `DCL-STANDING-BACKLOG-SCHEMA-001` establish `memory/work_list.md` as the
-current human-readable standing backlog authority for Agent Red.
+current human-readable standing backlog authority for GroundTruth-KB.
 
 The standing backlog governance contract is treated like other formal
 GroundTruth-KB specifications: it is represented in MemBase, linked to a
@@ -138,7 +138,7 @@ Owner decision `DELIB-0840` and formal records
 `DCL-SESSION-STARTUP-TOKEN-BUDGET-001` establish the required fresh-session
 self-initialization experience.
 
-At the start of a fresh Agent Red / GroundTruth-KB session, the active AI
+At the start of a fresh GroundTruth-KB session, the active AI
 harness must present the role being assumed and the session governance stance,
 including the known active skills, plug-ins, directives, hooks, and role
 mapping that affect the session.
@@ -225,15 +225,15 @@ First concrete manifestation: `GTKB-ARTIFACT-RECORDER-CLI`
 plumbing behind a `gt <artifact-type> record` CLI; reduces AI surface
 by ~85%.
 
-## Current Agent Red Mapping
+## Current GroundTruth-KB Mapping
 
 - The owner-assigned active AI harness assumes the Prime Builder role until the
   owner explicitly assigns a different role.
 - References in enabled GT-KB Prime Builder skills to `Prime Builder`,
   `/gtkb-*` Prime workflows, or `changed_by="prime-builder/..."` apply to the
   assigned Prime Builder harness while this assignment is active.
-- This rule is a local Agent Red role override. It does not change the upstream
-  GroundTruth-KB canonical role model.
+- This rule is a local GroundTruth-KB role override. It does not change the
+  upstream GroundTruth-KB canonical role model.
 
 Operational requirements while this override is active:
 

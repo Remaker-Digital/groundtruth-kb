@@ -4,8 +4,8 @@ Owner directive date: 2026-04-23
 
 active_role: prime-builder
 
-This file is the tracked default fresh-session role record for Agent Red
-Customer Engagement. Session startup must resolve the active harness's durable
+This file is the tracked default fresh-session role record for GroundTruth-KB.
+Session startup must resolve the active harness's durable
 role record before applying role-specific permissions, restrictions, startup
 text, or hook behavior. When no harness-local durable role record is
 configured or present, startup falls back to this file.
@@ -21,8 +21,8 @@ vendor, or harness name. When multiple harnesses share this workspace, each
 harness should keep its own durable next-session role record so one harness's
 mode toggle does not overwrite the other's. Current local defaults:
 
-- Codex: `applications/Agent_Red/harness-state/codex/operating-role.md`
-- Claude Code: `applications/Agent_Red/harness-state/claude/operating-role.md`
+- Codex: `harness-state/codex/operating-role.md`
+- Claude Code: `harness-state/claude/operating-role.md`
 
 While Claude Code is unavailable, Codex may be assigned either Prime Builder or
 Loyal Opposition so the normal Prime Builder / Loyal Opposition process can
@@ -49,5 +49,7 @@ bridge first, and applies Loyal Opposition review and file-safety constraints.
 
 The file bridge is always available through `bridge/INDEX.md` as the role
 handoff and review mechanism. A poller is a separate monitoring/activation
-service and should be activated only when Prime Builder and Loyal Opposition are
-running in separate harnesses or asynchronous monitoring is otherwise needed.
+service. The retired OS poller remains disabled. The verified smart poller
+should be used when it is available and functioning; otherwise use manual scans
+or monitoring only when Prime Builder and Loyal Opposition are running in
+separate harnesses or asynchronous monitoring is otherwise needed.
