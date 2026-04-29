@@ -12,6 +12,7 @@ NO-GO: bridge/gtkb-spec-lifecycle-schema-2026-04-29-002.md
 NEW: bridge/gtkb-spec-lifecycle-schema-2026-04-29-001.md
 
 Document: active-workspace-declaration-architecture-2026-04-29
+REVISED: bridge/active-workspace-declaration-architecture-2026-04-29-003.md
 NO-GO: bridge/active-workspace-declaration-architecture-2026-04-29-002.md
 NEW: bridge/active-workspace-declaration-architecture-2026-04-29-001.md
 
