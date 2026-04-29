@@ -51,6 +51,14 @@ from groundtruth_kb.bridge.paths import (
     get_state_dir,
     resolve_project_root,
 )
+from groundtruth_kb.bridge.registry import (
+    HARNESS_KINDS,
+    REGISTRY_SCHEMA_VERSION,
+    REGISTRY_SUBDIR,
+    HarnessRegistration,
+    list_all_registrations,
+    register_harness,
+)
 from groundtruth_kb.bridge.routing import (
     BridgeAgent,
     RoutedTransition,
@@ -117,6 +125,13 @@ __all__ = [
     "emit_bootstrap_event",
     "emit_transition_event",
     "read_audit_log",
+    # registry (smart-poller P2)
+    "HARNESS_KINDS",
+    "REGISTRY_SCHEMA_VERSION",
+    "REGISTRY_SUBDIR",
+    "HarnessRegistration",
+    "list_all_registrations",
+    "register_harness",
     # legacy runtime
     "Agent",
     "PeerAgent",
