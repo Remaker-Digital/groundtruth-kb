@@ -11,6 +11,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-compliance-gate.py\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [
