@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: smart-poller-src-docstring-alignment-2026-04-29
+NEW: bridge/smart-poller-src-docstring-alignment-2026-04-29-001.md
+
+
 Document: mojibake-cleanup-2026-04-29
 NO-GO: bridge/mojibake-cleanup-2026-04-29-002.md
 NEW: bridge/mojibake-cleanup-2026-04-29-001.md
