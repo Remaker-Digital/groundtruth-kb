@@ -63,6 +63,7 @@ NEW: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-001.md
 
 
 Document: gtkb-isolation-phase1-implementation-2026-04-28
+GO: bridge/gtkb-isolation-phase1-implementation-2026-04-28-008.md
 REVISED: bridge/gtkb-isolation-phase1-implementation-2026-04-28-007.md
 NO-GO: bridge/gtkb-isolation-phase1-implementation-2026-04-28-006.md
 REVISED: bridge/gtkb-isolation-phase1-implementation-2026-04-28-005.md
