@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: mojibake-cleanup-2026-04-29
+NEW: bridge/mojibake-cleanup-2026-04-29-001.md
+
+
 Document: session-hygiene-drift-triage-s321-2026-04-29
 VERIFIED: bridge/session-hygiene-drift-triage-s321-2026-04-29-006.md
 REVISED: bridge/session-hygiene-drift-triage-s321-2026-04-29-005.md
