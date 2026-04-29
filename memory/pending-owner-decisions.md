@@ -6,10 +6,109 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
-
 ## Resolved
 
+- id: DECISION-0076
+  asked_at: 2026-04-29T09:13:55.418113Z
+  question: "awaiting GO/NO-GO)  Standing by for the next direction or bridge response."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: ef78be1749974faf
+  resolved_at: 2026-04-29T17:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0050). Captured fragment is from Prime Builder closing line ('Standing by for the next direction or bridge response.') after surfacing pending bridge state. Stimulus-response convention, not an owner question. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T17:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0077
+  asked_at: 2026-04-29T09:34:56.915759Z
+  question: "had to be repaired. Want me to proceed with both, or pause for your eyes-on first?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 9d64f60857a72ef2
+  resolved_at: 2026-04-29T17:00:00Z
+  resolved_in_session: S320
+  answer: "Real question (not FP) — Prime Builder asked owner whether to proceed with two pending follow-on tasks. Resolved organically: owner answered 'Proceed with both, please.' in next turn, authorizing REVISED-1 activation post-impl + REVISED-1 orient-verification proposal in parallel."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T17:00:00Z (real question; resolved by owner explicit answer in same turn)"
+
+- id: DECISION-0075
+  asked_at: 2026-04-29T07:37:40.802072Z
+  question: "om prior turn still awaiting your `✓`/`✗` per-draft approval (not auto-inserted)"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: cdcb5796126049b6
+  resolved_at: 2026-04-29T15:30:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0050). Captured fragment is from S320 bridge-scan closing 'Standing items' note describing the 4 DELIB drafts still awaiting per-draft approval. Status note about an outstanding artifact, not an owner question. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:30:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0068
+  asked_at: 2026-04-29T02:27:05.655517Z
+  question: "— paused per pivot  Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 8774063a8e56c1f4
+  resolved_at: 2026-04-29T15:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0050). Captured fragment is from Prime Builder closing acknowledgement line ('paused per pivot — Awaiting your direction'). Per fresh-session input semantics, the closing acknowledgement is a stimulus-response convention, not an owner question. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0069
+  asked_at: 2026-04-29T02:37:13.438454Z
+  question: "fragment of my own \"Awaiting your direction\" text). Not actiona"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: fda0a9adcab88a0d
+  resolved_at: 2026-04-29T15:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0050). Captured fragment is meta-text from Prime Builder analyzing its own prose triggering the detector — an FP discussing FPs, the canonical recursive-class evidence (same shape as DECISION-0009 and DECISION-0047). Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0070
+  asked_at: 2026-04-29T02:48:57.487789Z
+  question: "| \"paused per pivot Awaiting your direction.\" | Fragment of my"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: d4f283cfe29c4311
+  resolved_at: 2026-04-29T15:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0050). Captured fragment is markdown table-cell content quoting a prior FP fragment — table-cell context is a known guard candidate (same shape as DECISION-0005). Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0071
+  asked_at: 2026-04-29T05:22:46.409944Z
+  question: "archived earlier.  Standing by for your next direction. Reasonable next mo"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 8f28840996a803f8
+  resolved_at: 2026-04-29T15:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0050). Captured fragment is from Prime Builder closing line ('Standing by for your next direction. Reasonable next move...'). Per fresh-session input semantics, this is a stimulus-response convention, not an owner question. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0072
+  asked_at: 2026-04-29T06:32:44.405447Z
+  question: "by for direction\", \"awaiting your direction\") and treats my ack"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: eb9d79bae8478baf
+  resolved_at: 2026-04-29T15:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; canonical recursive-class FP. Captured fragment is from S320 orient-block insight text where Prime Builder DESCRIBED the FP detector pattern using the literal substrings the detector matches against ('standing by for direction', 'awaiting your direction'). The detector cannot distinguish meta-discussion from triggering use. Same shape as DECISION-0001, DECISION-0009, DECISION-0047. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0073
+  asked_at: 2026-04-29T06:32:44.405447Z
+  question: "own closing prose (\"standing by for direction\", \"awaiting your direction\") and treats my ack"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 37b5bff6c949ac57
+  resolved_at: 2026-04-29T15:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; canonical recursive-class FP — companion to DECISION-0072 (same prompt-block, different detector match). Captured fragment is from the S320 orient-block insight describing the detector behavior. Same shape as DECISION-0009 / DECISION-0047. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
+- id: DECISION-0074
+  asked_at: 2026-04-29T06:32:44.405447Z
+  question: "─────────────────`  Standing by for your direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 09e980f9d979f6f4
+  resolved_at: 2026-04-29T15:00:00Z
+  resolved_in_session: S320
+  answer: "doc-paragraph false positive; recurring class (same as DECISION-0029..0050). Captured fragment is the S320 orient-block closing line ('Standing by for your direction.') immediately following an Insight-block delimiter. Stimulus-response convention, not an owner question. Class-elimination tracked in GTKB-COMMAND-SURFACE."
+  notes: "Edited-by-prime-via-standing-pre-approval 2026-04-29T15:00:00Z (recurring FP class; bulk-resolution pattern from DECISION-0048)"
 - id: DECISION-0060
   asked_at: 2026-04-28T20:37:14.674192Z
   question: "\"GT-KB relocation.\" Should I include them as part of the cleanup pass or leave them?  - **I. Pre-existin"
@@ -20,8 +119,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S319
   answer: "Real two-part question (not FP) at end of GT-KB relocation clarifications: (H) include S311/S318 stale wrap-scan snapshot files in cleanup? — owner answered YES; (I) include scripts/deploy_pipeline.py pre-existing ruff E,F debt? — owner confirmed clean (do it). Both items will be handled as Phase 4 of the GT-KB relocation work."
   notes: "Edited-by-prime-via-standing-pre-approval 2026-04-28T20:40:00Z (real question; resolved by owner explicit answer 'H - Yes update' / 'I - Confirmed clean' in same turn)"
-
-
 - id: DECISION-0059
   asked_at: 2026-04-28T18:53:28.329598Z
   question: "y remaining blocker awaiting your explicit approval."
@@ -673,6 +770,69 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-04-28T14:41:26.074384Z
   answer: "User has answered your questions: \"Per Codex GO -002 condition 2 (telemetry-churn-policy thread), I need to run `git rm --cached` to remove 2 files from git tracking while preserving them on disk. The destructive-gate hook is blocking the bash form. The exact operation: `git rm --cached docs/gtkb-dashboard/dashboard-data.json memory/gtkb-dashboard-history.json` — removes from git index only, files stay on disk for runtime regen. Both files are auto-regen telemetry; no data loss. How should I proceed?\"=\"APPROVE: run `git rm --cached` on the 2 named files (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0061
+  asked_at: 2026-04-29T00:59:25.794557Z
+  question: "rlier MEMBASE work. Want me to address that next, or do you have other priorities first?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: b25e42f7e2a917bb
+  resolved_at: 2026-04-29T01:10:56.704448Z
+  answer: "pivoted to smart-poller; will return after smart-poller complete"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0062
+  asked_at: 2026-04-29T01:05:21.920957Z
+  question: "racker captured my \"Want me to address [Phase 1 NO-GO] next, or do you have other priorities first?\" as a pending quest"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 993edbc8ec94cf89
+  resolved_at: 2026-04-29T01:15:23.803777Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0063
+  asked_at: 2026-04-29T01:11:05.557160Z
+  question: "approval captured, awaiting your direction on whether to file"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 20f7612eab0d2605
+  resolved_at: 2026-04-29T01:15:23.803793Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0064
+  asked_at: 2026-04-29T01:11:05.557160Z
+  question: "duplicate answer.  Standing by for your next direction. The current state"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 5390f51281f3fc09
+  resolved_at: 2026-04-29T01:15:23.803796Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0065
+  asked_at: 2026-04-29T01:11:37.981497Z
+  question: "| DECISION-0062 | \"Want me to address [Phase 1 NO-GO] next, or do you have other priorities first?\" | My exploratory q"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 5f183bd12ba22855
+  resolved_at: 2026-04-29T01:15:23.803798Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0066
+  asked_at: 2026-04-29T01:11:37.981497Z
+  question: "\"approval captured, awaiting your direction on whether to file\""
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: cc1a3c29948e99e1
+  resolved_at: 2026-04-29T01:15:23.803800Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0067
+  asked_at: 2026-04-29T01:11:37.981497Z
+  question: "\"duplicate answer. Standing by for your next direction. The current state\""
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 934d23049ea26a59
+  resolved_at: 2026-04-29T01:15:23.803801Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 
