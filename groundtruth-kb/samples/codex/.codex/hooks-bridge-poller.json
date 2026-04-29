@@ -1,0 +1,12 @@
+{
+  "_verification_warning": "Codex hooks are not currently active on Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001. This sample is forward-compatible hook intent for non-Windows Codex runtimes. Mechanical adapter parity is verified by scripts/check_codex_hook_parity.py until Windows hooks are live.",
+  "_verification_warning_adr_ref": "ADR-CODEX-HOOK-PARITY-FALLBACK-001",
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python -m groundtruth_kb.bridge.registry register --harness-kind codex"
+      }
+    ]
+  }
+}

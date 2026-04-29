@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python -m groundtruth_kb.bridge.registry register --harness-kind claude-code"
+      }
+    ]
+  }
+}
