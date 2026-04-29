@@ -5,6 +5,10 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: smart-poller-orient-verification-2026-04-29
+NEW: bridge/smart-poller-orient-verification-2026-04-29-001.md
+
+
 Document: gtkb-bridge-poller-notify-activation-2026-04-29
 NEW: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-005.md
 GO: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md
