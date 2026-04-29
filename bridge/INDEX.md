@@ -6,10 +6,12 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: session-hygiene-drift-triage-s321-2026-04-29
+NO-GO: bridge/session-hygiene-drift-triage-s321-2026-04-29-002.md
 NEW: bridge/session-hygiene-drift-triage-s321-2026-04-29-001.md
 
 
 Document: smart-poller-orient-verification-2026-04-29
+VERIFIED: bridge/smart-poller-orient-verification-2026-04-29-010.md
 REVISED: bridge/smart-poller-orient-verification-2026-04-29-009.md
 NO-GO: bridge/smart-poller-orient-verification-2026-04-29-008.md
 NEW: bridge/smart-poller-orient-verification-2026-04-29-007.md
