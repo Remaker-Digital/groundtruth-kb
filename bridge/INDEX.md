@@ -5,7 +5,78 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-bridge-poller-p3-notify-2026-04-29
+REVISED: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-011.md
+NO-GO: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-010.md
+NEW: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-009.md
+GO: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-008.md
+REVISED: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-007.md
+NO-GO: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-006.md
+REVISED: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-005.md
+NO-GO: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-004.md
+REVISED: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-003.md
+NO-GO: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-002.md
+NEW: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-001.md
+
+
+Document: gtkb-bridge-poller-p2-5-spike-report-2026-04-29
+VERIFIED: bridge/gtkb-bridge-poller-p2-5-spike-report-2026-04-29-004.md
+REVISED: bridge/gtkb-bridge-poller-p2-5-spike-report-2026-04-29-003.md
+NO-GO: bridge/gtkb-bridge-poller-p2-5-spike-report-2026-04-29-002.md
+NEW: bridge/gtkb-bridge-poller-p2-5-spike-report-2026-04-29-001.md
+
+
+Document: gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28
+VERIFIED: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-008.md
+REVISED: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-007.md
+NO-GO: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-006.md
+NEW: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-005.md
+GO: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-004.md
+REVISED: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-003.md
+NO-GO: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-002.md
+NEW: bridge/gtkb-bridge-poller-p2-5-spike-machinery-implementation-2026-04-28-001.md
+
+
+Document: gtkb-bridge-poller-p2-registry-implementation-2026-04-28
+VERIFIED: bridge/gtkb-bridge-poller-p2-registry-implementation-2026-04-28-006.md
+NEW: bridge/gtkb-bridge-poller-p2-registry-implementation-2026-04-28-005.md
+GO: bridge/gtkb-bridge-poller-p2-registry-implementation-2026-04-28-004.md
+REVISED: bridge/gtkb-bridge-poller-p2-registry-implementation-2026-04-28-003.md
+NO-GO: bridge/gtkb-bridge-poller-p2-registry-implementation-2026-04-28-002.md
+NEW: bridge/gtkb-bridge-poller-p2-registry-implementation-2026-04-28-001.md
+
+
+Document: gtkb-bridge-poller-p1-detector-implementation-2026-04-28
+VERIFIED: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-012.md
+REVISED: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-011.md
+NO-GO: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-010.md
+NEW: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-009.md
+GO: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-008.md
+REVISED: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-007.md
+NO-GO: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-006.md
+REVISED: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-005.md
+NO-GO: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-004.md
+REVISED: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-003.md
+NO-GO: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-002.md
+NEW: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-001.md
+
+
+Document: gtkb-isolation-phase1-implementation-2026-04-28
+NO-GO: bridge/gtkb-isolation-phase1-implementation-2026-04-28-004.md
+REVISED: bridge/gtkb-isolation-phase1-implementation-2026-04-28-003.md
+NO-GO: bridge/gtkb-isolation-phase1-implementation-2026-04-28-002.md
+NEW: bridge/gtkb-isolation-phase1-implementation-2026-04-28-001.md
+
+
 Document: gtkb-isolation-completion-plan-2026-04-28
+GO: bridge/gtkb-isolation-completion-plan-2026-04-28-010.md
+REVISED: bridge/gtkb-isolation-completion-plan-2026-04-28-009.md
+NO-GO: bridge/gtkb-isolation-completion-plan-2026-04-28-008.md
+REVISED: bridge/gtkb-isolation-completion-plan-2026-04-28-007.md
+NO-GO: bridge/gtkb-isolation-completion-plan-2026-04-28-006.md
+REVISED: bridge/gtkb-isolation-completion-plan-2026-04-28-005.md
+REVISED: bridge/gtkb-isolation-completion-plan-2026-04-28-004.md
+NO-GO: bridge/gtkb-isolation-completion-plan-2026-04-28-003.md
 NEW: bridge/gtkb-isolation-completion-plan-2026-04-28-002.md
 NEW: bridge/gtkb-isolation-completion-plan-2026-04-28-001.md
 
