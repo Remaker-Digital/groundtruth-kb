@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-spec-lifecycle-schema-2026-04-29
+NO-GO: bridge/gtkb-spec-lifecycle-schema-2026-04-29-002.md
 NEW: bridge/gtkb-spec-lifecycle-schema-2026-04-29-001.md
 
 Document: active-workspace-declaration-architecture-2026-04-29
