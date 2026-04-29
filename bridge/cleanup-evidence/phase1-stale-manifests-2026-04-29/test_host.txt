@@ -1,0 +1,22 @@
+# Per-category preflight manifest for test_host/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+test_host/__init__.py
+test_host/cosmos_writer.py
+test_host/main.py
+test_host/runner.py
+test_host/suites.py
+
+## Untracked + ignored content (high-risk surface)
+
+(none)
+
+## Filesystem listing (top 50 paths by size)
+
+       28002  test_host\runner.py
+       11662  test_host\suites.py
+        8742  test_host\cosmos_writer.py
+        8257  test_host\main.py
+         367  test_host\__init__.py

@@ -1,0 +1,34 @@
+# Per-category preflight manifest for output/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! output/
+
+## Filesystem listing (top 50 paths by size)
+
+     2034407  output\imagegen\groundtruth-kb-logo\first-batch\004-use-case-logo-brand-asset-type-project-logo-exploration-prim.png
+     1407819  output\imagegen\groundtruth-kb-logo\first-batch\001-use-case-logo-brand-asset-type-project-logo-exploration-prim.png
+     1344750  output\imagegen\groundtruth-kb-logo\first-batch\002-use-case-logo-brand-asset-type-project-logo-exploration-prim.png
+     1341772  output\imagegen\groundtruth-kb-logo\first-batch\003-use-case-logo-brand-asset-type-project-logo-exploration-prim.png
+      104178  output\imagegen\groundtruth-kb-logo\images\image1.png
+      104178  output\imagegen\groundtruth-kb-logo\generated-logo-concepts-contact-sheet.png
+       74487  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark.png
+       72569  output\imagegen\groundtruth-kb-logo\datum-graph-mark\datum-graph-mark-final-preview.png
+       68936  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark-mono.png
+       46097  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-wordmark-lockup.png
+       35385  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark-512.png
+       17385  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark-256.png
+        8267  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark-128.png
+        3665  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark-64.png
+        1647  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark-32.png
+        1616  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-wordmark-lockup.svg
+        1518  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark.svg
+        1299  output\imagegen\groundtruth-kb-logo\manual-svg\groundtruth-kb-datum-mark.svg
+        1205  output\imagegen\groundtruth-kb-logo\datum-graph-mark\groundtruth-kb-datum-graph-mark-mono.svg
+        1133  output\imagegen\groundtruth-kb-logo\manual-svg\groundtruth-kb-wordmark-lockup.svg
+         913  output\imagegen\groundtruth-kb-logo\manual-svg\groundtruth-kb-gt-monogram.svg

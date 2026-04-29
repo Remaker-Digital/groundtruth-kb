@@ -1,0 +1,34 @@
+# Per-category preflight manifest for tmp/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! tmp/
+
+## Filesystem listing (top 50 paths by size)
+
+      370531  tmp\startup-pruning-check\index.html
+      370172  tmp\startup-pruning-check-2\index.html
+      370172  tmp\startup-output-debug\index.html
+      302996  tmp\startup-pruning-check\agent-red-project-dashboard.pdf
+      302996  tmp\startup-pruning-check-2\agent-red-project-dashboard.pdf
+      302995  tmp\startup-output-debug\agent-red-project-dashboard.pdf
+      229911  tmp\startup-pruning-check\dashboard-data.json
+      229346  tmp\startup-pruning-check-2\dashboard-data.json
+      229346  tmp\startup-output-debug\dashboard-data.json
+       36915  tmp\startup-pruning-check\history.json
+       36915  tmp\startup-pruning-check-2\history.json
+       36915  tmp\startup-output-debug\history.json
+        6683  tmp\startup-pruning-check\session-startup-report.md
+        6538  tmp\startup-pruning-check-2\session-startup-report.md
+        6535  tmp\startup-output-debug\session-startup-report.md
+        5185  tmp\codex-root-migration-verify-rerun-clean.txt
+        5161  tmp\codex-root-migration-verify-rerun.txt
+        1684  tmp\startup-pruning-check-2\session-wrapup-report.md
+        1682  tmp\startup-pruning-check\session-wrapup-report.md
+        1681  tmp\startup-output-debug\session-wrapup-report.md
+         555  tmp\rehearse-test-files.txt

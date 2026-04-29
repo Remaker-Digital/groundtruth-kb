@@ -1,0 +1,64 @@
+# Per-category preflight manifest for agent-red.wiki/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! agent-red.wiki/
+
+## Filesystem listing (top 50 paths by size)
+
+      540324  agent-red.wiki\images\gtkb-dashboard\delivery-timeline.png
+      375528  agent-red.wiki\.git\objects\pack\pack-1fe0132be510243ea11347f92848fc36d2fe1ae1.pack
+      249051  agent-red.wiki\.git\objects\pack\pack-abbc29d0cf046e9fe95ff3997dae2343f1559b59.pack
+      229814  agent-red.wiki\images\gtkb-dashboard\dashboard-top.png
+      210844  agent-red.wiki\images\gtkb-dashboard\session-focus-options.png
+      190162  agent-red.wiki\images\gtkb-dashboard\action-center.png
+      165566  agent-red.wiki\images\gtkb-dashboard\testing-integrations.png
+      122399  agent-red.wiki\Project-Context.md
+       77251  agent-red.wiki\QA-Comprehensive-Test-Plan.md
+       63807  agent-red.wiki\Research-Shopify-Partner-Program.md
+       59387  agent-red.wiki\Changelog.md
+       57920  agent-red.wiki\Research-Stripe-Platform.md
+       49423  agent-red.wiki\Architecture-E-Commerce-Platform-Evaluation.md
+       41835  agent-red.wiki\Research-Competitor-Documentation.md
+       39775  agent-red.wiki\Architecture-AI-Personalization-Research.md
+       38808  agent-red.wiki\Roadmap-planning.md
+       36806  agent-red.wiki\Architecture-Master-Plan-Review.md
+       34573  agent-red.wiki\Operations-Deployment-Runbook.md
+       34348  agent-red.wiki\Product-Features-RAG-Reference.md
+       33136  agent-red.wiki\Research-UI-UX-Competitive-Analysis.md
+       31399  agent-red.wiki\Product-Commercial-SaaS-Proposal.md
+       27337  agent-red.wiki\Website-Features.md
+       26611  agent-red.wiki\.git\objects\a7\79023ab5a59aaebf423bcba023995daf1b87cb
+       24669  agent-red.wiki\Website-Pricing.md
+       21559  agent-red.wiki\QA-Backlog-Work-Items.md
+       20582  agent-red.wiki\Operations-Project-Plan.md
+       20433  agent-red.wiki\Architecture-UI-UX-Decisions.md
+       19436  agent-red.wiki\Website-Integrations.md
+       19106  agent-red.wiki\Docs-How-It-Works.md
+       18974  agent-red.wiki\Shopify-App-Store-Listing.md
+       17218  agent-red.wiki\Legal-Terms-of-Service.md
+       17088  agent-red.wiki\Legal-Privacy-Policy.md
+       16882  agent-red.wiki\SPA-Operations-Guide.md
+       16723  agent-red.wiki\Architecture-Persistent-Memory-Metrics.md
+       16635  agent-red.wiki\Architecture.md
+       16512  agent-red.wiki\Legal-Data-Processing-Agreement.md
+       16399  agent-red.wiki\Co-Pilot-Agent.md
+       16283  agent-red.wiki\AGNTCY-Platform-Adoption.md
+       16205  agent-red.wiki\Entitlements-Enforcement.md
+       15274  agent-red.wiki\Scaling-Analysis.md
+       13999  agent-red.wiki\Website-Homepage.md
+       13922  agent-red.wiki\Specifications.md
+       13352  agent-red.wiki\Docs-Shopify-Integration.md
+       12659  agent-red.wiki\Shopify-App-Review-Preflight-Checklist.md
+       12377  agent-red.wiki\Operations-Release-Management.md
+       12046  agent-red.wiki\Development-Lifecycle.md
+       11995  agent-red.wiki\Knowledge-Database.md
+       11952  agent-red.wiki\Brand-Guidelines.md
+       11932  agent-red.wiki\Admin-Dashboard-Specification.md
+       11822  agent-red.wiki\Specification-Format-and-Template.md
+... (360 more files)

@@ -1,0 +1,14 @@
+# Per-category preflight manifest for 404.html
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+404.html
+
+## Untracked + ignored content (high-risk surface)
+
+(none)
+
+## Filesystem listing (top 50 paths by size)
+
+        9333  404.html

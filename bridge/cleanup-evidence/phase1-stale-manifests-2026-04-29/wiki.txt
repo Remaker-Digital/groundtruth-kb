@@ -1,0 +1,64 @@
+# Per-category preflight manifest for wiki/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! wiki/
+
+## Filesystem listing (top 50 paths by size)
+
+      122399  wiki\Project-Context.md
+      120253  wiki\.git\objects\pack\pack-b08a4f2d1cf5f639b59f4929317bf117f0bc87dc.pack
+       77251  wiki\QA-Comprehensive-Test-Plan.md
+       63807  wiki\Research-Shopify-Partner-Program.md
+       59387  wiki\Changelog.md
+       57920  wiki\Research-Stripe-Platform.md
+       50230  wiki\.git\objects\ff\16e9b9c1974665f77a0add82c6a21c0ce1f6fb
+       49423  wiki\Architecture-E-Commerce-Platform-Evaluation.md
+       41835  wiki\Research-Competitor-Documentation.md
+       39775  wiki\Architecture-AI-Personalization-Research.md
+       38808  wiki\Roadmap-planning.md
+       36806  wiki\Architecture-Master-Plan-Review.md
+       34573  wiki\Operations-Deployment-Runbook.md
+       34348  wiki\Product-Features-RAG-Reference.md
+       33136  wiki\Research-UI-UX-Competitive-Analysis.md
+       31399  wiki\Product-Commercial-SaaS-Proposal.md
+       27446  wiki\.git\objects\22\4a8ca8707a74b0176d5b99a53fe4057c9bdbfe
+       27337  wiki\Website-Features.md
+       26611  wiki\.git\objects\a7\79023ab5a59aaebf423bcba023995daf1b87cb
+       26169  wiki\.git\objects\79\9b7a3aad5d38fc6a47049fcbf6574508824caa
+       25649  wiki\.git\objects\0d\0b30d95db0cefe02758948987318589bebab57
+       25319  wiki\.git\objects\93\7e82a7db1e7e39503d867c7c7a8cfa712b9a95
+       24726  wiki\.git\objects\9b\3856a891f8c6fbd6da104e2b8558e108cae30b
+       24669  wiki\Website-Pricing.md
+       24201  wiki\.git\objects\d8\35e5429463ac930b381a070dc42e4cac7065c3
+       23794  wiki\.git\objects\e3\e3b3449658217b6e6fc0ae7dd240ab3495cbd8
+       23767  wiki\.git\objects\71\c23b4e980c8585f6d8623087901611b829f09b
+       22633  wiki\.git\objects\e2\43342183bc3291515165652cb424bdce3da988
+       21770  wiki\.git\objects\9f\64e2eb8aa8cfc8177e8328e414bf61a1d3736a
+       21559  wiki\QA-Backlog-Work-Items.md
+       20582  wiki\Operations-Project-Plan.md
+       20433  wiki\Architecture-UI-UX-Decisions.md
+       19436  wiki\Website-Integrations.md
+       19174  wiki\.git\objects\cf\8b2a6a5cb2b64e1a53773b2cd8929e26155afe
+       19106  wiki\Docs-How-It-Works.md
+       18974  wiki\Shopify-App-Store-Listing.md
+       18597  wiki\.git\objects\cb\f60e4e977fe916b2a5a42b89526b71702030ea
+       18573  wiki\.git\objects\68\053be6f222c45defcfccfa7d64f956a59eb6cd
+       17637  wiki\.git\objects\a9\116d7662fd34141a062e9686c4520535fe88e7
+       17218  wiki\Legal-Terms-of-Service.md
+       17088  wiki\Legal-Privacy-Policy.md
+       16882  wiki\SPA-Operations-Guide.md
+       16723  wiki\Architecture-Persistent-Memory-Metrics.md
+       16635  wiki\Architecture.md
+       16512  wiki\Legal-Data-Processing-Agreement.md
+       16399  wiki\Co-Pilot-Agent.md
+       16398  wiki\.git\objects\b4\1ee4c7ffca765622b1053285dbe2aa7c8e9b72
+       16283  wiki\AGNTCY-Platform-Adoption.md
+       16205  wiki\Entitlements-Enforcement.md
+       16069  wiki\.git\objects\1b\0ed010fb6885e452eb5f085d12a54553ebf5e5
+... (376 more files)

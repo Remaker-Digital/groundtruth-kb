@@ -1,0 +1,32 @@
+# Per-category preflight manifest for evaluation/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+evaluation/__init__.py
+evaluation/datasets/__init__.py
+evaluation/datasets/response_quality.json
+evaluation/deepeval_config.py
+evaluation/pilots/__init__.py
+evaluation/pilots/quality_pilot.py
+evaluation/results/quality-raw-2026-02-23.json
+evaluation/results/quality-report-2026-02-23.json
+evaluation/run_quality_live.py
+evaluation/seed_quality_kb.py
+
+## Untracked + ignored content (high-risk surface)
+
+(none)
+
+## Filesystem listing (top 50 paths by size)
+
+       19766  evaluation\datasets\response_quality.json
+       13732  evaluation\seed_quality_kb.py
+       13582  evaluation\results\quality-raw-2026-02-23.json
+       13371  evaluation\pilots\quality_pilot.py
+       10608  evaluation\run_quality_live.py
+        5901  evaluation\deepeval_config.py
+         842  evaluation\results\quality-report-2026-02-23.json
+         358  evaluation\__init__.py
+         157  evaluation\datasets\__init__.py
+         147  evaluation\pilots\__init__.py

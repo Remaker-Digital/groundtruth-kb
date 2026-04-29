@@ -1,0 +1,20 @@
+# Per-category preflight manifest for extensions/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+extensions/agent-red-chat/assets/agent-red-widget.iife.js
+extensions/agent-red-chat/blocks/agent-red-chat.liquid
+extensions/agent-red-chat/locales/en.default.json
+extensions/agent-red-chat/shopify.extension.toml
+
+## Untracked + ignored content (high-risk surface)
+
+(none)
+
+## Filesystem listing (top 50 paths by size)
+
+      103165  extensions\agent-red-chat\assets\agent-red-widget.iife.js
+        3549  extensions\agent-red-chat\blocks\agent-red-chat.liquid
+         706  extensions\agent-red-chat\shopify.extension.toml
+         134  extensions\agent-red-chat\locales\en.default.json

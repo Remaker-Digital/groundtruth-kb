@@ -1,0 +1,18 @@
+# Per-category preflight manifest for drafts/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+drafts/SPECIFICATION-TEMPLATE.md
+drafts/blog-claude-code-lessons.md
+drafts/blog-specification-first.md
+
+## Untracked + ignored content (high-risk surface)
+
+(none)
+
+## Filesystem listing (top 50 paths by size)
+
+       35064  drafts\blog-claude-code-lessons.md
+       16107  drafts\SPECIFICATION-TEMPLATE.md
+        9331  drafts\blog-specification-first.md

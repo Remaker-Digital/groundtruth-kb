@@ -1,0 +1,64 @@
+# Per-category preflight manifest for .tmp.driveupload/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! .tmp.driveupload/
+
+## Filesystem listing (top 50 paths by size)
+
+   274193192  .tmp.driveupload\1676965
+   274193192  .tmp.driveupload\1675683
+   271517752  .tmp.driveupload\1683804
+   271435366  .tmp.driveupload\1678857
+   216273135  .tmp.driveupload\1296891
+   215874584  .tmp.driveupload\1683620
+   215809450  .tmp.driveupload\1678673
+   215744753  .tmp.driveupload\1675499
+   185913059  .tmp.driveupload\1680916
+   185374565  .tmp.driveupload\1678549
+   176251804  .tmp.driveupload\1685490
+   175745484  .tmp.driveupload\1683496
+    33006301  .tmp.driveupload\1680918
+    33006285  .tmp.driveupload\1678551
+    32976558  .tmp.driveupload\1685508
+    32976487  .tmp.driveupload\1683524
+    27397872  .tmp.driveupload\1296889
+    27317554  .tmp.driveupload\1683584
+    27309275  .tmp.driveupload\1678619
+    27301042  .tmp.driveupload\1675481
+    18130312  .tmp.driveupload\1677063
+    18032429  .tmp.driveupload\1682434
+     1665218  .tmp.driveupload\1680762
+     1663222  .tmp.driveupload\1685226
+     1264268  .tmp.driveupload\1683308
+     1071688  .tmp.driveupload\1684622
+     1066285  .tmp.driveupload\1675909
+     1052287  .tmp.driveupload\1684974
+     1052016  .tmp.driveupload\1684422
+     1040337  .tmp.driveupload\1684780
+     1039190  .tmp.driveupload\1681498
+      522852  .tmp.driveupload\1296887
+      514399  .tmp.driveupload\1683574
+      514221  .tmp.driveupload\1678671
+      514046  .tmp.driveupload\1675491
+      203133  .tmp.driveupload\1681222
+      202902  .tmp.driveupload\1685678
+      201256  .tmp.driveupload\1680908
+      201066  .tmp.driveupload\1685330
+      195646  .tmp.driveupload\1678543
+      195493  .tmp.driveupload\1683398
+       83443  .tmp.driveupload\1685528
+       81030  .tmp.driveupload\1688451
+       74592  .tmp.driveupload\1296893
+       68203  .tmp.driveupload\1688992
+       68159  .tmp.driveupload\1686708
+       68151  .tmp.driveupload\1686642
+       68083  .tmp.driveupload\1688783
+       68068  .tmp.driveupload\1687999
+       67649  .tmp.driveupload\1686472
+... (6762 more files)

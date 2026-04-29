@@ -1,0 +1,325 @@
+{
+  "generated_at": "2026-04-29T15:45:00Z",
+  "session": "S320",
+  "phase": 1,
+  "categories": [
+    {
+      "path": ".codex_pydeps/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 22279,
+      "filesystem_bytes": 523895894,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! .codex_pydeps/"
+      ]
+    },
+    {
+      "path": ".hypothesis/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 3892,
+      "filesystem_bytes": 1850507,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! .hypothesis/"
+      ]
+    },
+    {
+      "path": ".nojekyll",
+      "kind": "file",
+      "tracked_count": 1,
+      "untracked_count": 0,
+      "filesystem_files": 1,
+      "filesystem_bytes": 0,
+      "tracked_sample": [
+        ".nojekyll"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": ".playwright-mcp/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 62,
+      "filesystem_bytes": 873709,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! .playwright-mcp/"
+      ]
+    },
+    {
+      "path": ".tmp.driveupload/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 6812,
+      "filesystem_bytes": 3024752214,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! .tmp.driveupload/"
+      ]
+    },
+    {
+      "path": "agent-red.wiki/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 410,
+      "filesystem_bytes": 4325458,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! agent-red.wiki/"
+      ]
+    },
+    {
+      "path": "drafts/",
+      "kind": "dir",
+      "tracked_count": 3,
+      "untracked_count": 0,
+      "filesystem_files": 3,
+      "filesystem_bytes": 60502,
+      "tracked_sample": [
+        "drafts/SPECIFICATION-TEMPLATE.md",
+        "drafts/blog-claude-code-lessons.md",
+        "drafts/blog-specification-first.md"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "evaluation/",
+      "kind": "dir",
+      "tracked_count": 10,
+      "untracked_count": 0,
+      "filesystem_files": 10,
+      "filesystem_bytes": 78464,
+      "tracked_sample": [
+        "evaluation/__init__.py",
+        "evaluation/datasets/__init__.py",
+        "evaluation/datasets/response_quality.json",
+        "evaluation/deepeval_config.py",
+        "evaluation/pilots/__init__.py"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "extensions/",
+      "kind": "dir",
+      "tracked_count": 4,
+      "untracked_count": 0,
+      "filesystem_files": 4,
+      "filesystem_bytes": 107554,
+      "tracked_sample": [
+        "extensions/agent-red-chat/assets/agent-red-widget.iife.js",
+        "extensions/agent-red-chat/blocks/agent-red-chat.liquid",
+        "extensions/agent-red-chat/locales/en.default.json",
+        "extensions/agent-red-chat/shopify.extension.toml"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "img/",
+      "kind": "dir",
+      "tracked_count": 9,
+      "untracked_count": 0,
+      "filesystem_files": 9,
+      "filesystem_bytes": 156700,
+      "tracked_sample": [
+        "img/agent-red-logo.svg",
+        "img/docusaurus-social-card.jpg",
+        "img/docusaurus.png",
+        "img/favicon.ico",
+        "img/logo-dark.svg"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "logs/",
+      "kind": "dir",
+      "tracked_count": 1,
+      "untracked_count": 1238,
+      "filesystem_files": 1239,
+      "filesystem_bytes": 9120521,
+      "tracked_sample": [
+        "logs/visual-evidence/S257-widget-visual-gate-staging.md"
+      ],
+      "untracked_sample": [
+        "!! logs/build-20260320-151416.log",
+        "!! logs/build-20260320-152832.log",
+        "!! logs/build-20260320-161625.log",
+        "!! logs/build-20260320-162253.log",
+        "!! logs/build-20260320-171248.log"
+      ]
+    },
+    {
+      "path": "output/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 21,
+      "filesystem_bytes": 6673226,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! output/"
+      ]
+    },
+    {
+      "path": "pacts/",
+      "kind": "dir",
+      "tracked_count": 1,
+      "untracked_count": 0,
+      "filesystem_files": 1,
+      "filesystem_bytes": 2895,
+      "tracked_sample": [
+        "pacts/widget-chat.json"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "prototype/",
+      "kind": "dir",
+      "tracked_count": 39,
+      "untracked_count": 2,
+      "filesystem_files": 21078,
+      "filesystem_bytes": 166356876,
+      "tracked_sample": [
+        "prototype/agent-red-dark-mode-mockup.png",
+        "prototype/agent-red-dark-mode-mockup.svg",
+        "prototype/index.html",
+        "prototype/package-lock.json",
+        "prototype/package.json"
+      ],
+      "untracked_sample": [
+        "!! prototype/dist/",
+        "!! prototype/node_modules/"
+      ]
+    },
+    {
+      "path": "test-results/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 0,
+      "filesystem_files": 0,
+      "filesystem_bytes": 0,
+      "tracked_sample": [],
+      "untracked_sample": []
+    },
+    {
+      "path": "test_host/",
+      "kind": "dir",
+      "tracked_count": 5,
+      "untracked_count": 0,
+      "filesystem_files": 5,
+      "filesystem_bytes": 57030,
+      "tracked_sample": [
+        "test_host/__init__.py",
+        "test_host/cosmos_writer.py",
+        "test_host/main.py",
+        "test_host/runner.py",
+        "test_host/suites.py"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "tmp/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 21,
+      "filesystem_bytes": 2854914,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! tmp/"
+      ]
+    },
+    {
+      "path": "website/",
+      "kind": "dir",
+      "tracked_count": 7,
+      "untracked_count": 0,
+      "filesystem_files": 7,
+      "filesystem_bytes": 108459,
+      "tracked_sample": [
+        "website/content/README.md",
+        "website/content/about.md",
+        "website/content/contact.md",
+        "website/content/features.md",
+        "website/content/homepage.md"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "wiki/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 1,
+      "filesystem_files": 426,
+      "filesystem_bytes": 3242742,
+      "tracked_sample": [],
+      "untracked_sample": [
+        "!! wiki/"
+      ]
+    },
+    {
+      "path": ".wiki/",
+      "kind": "dir",
+      "tracked_count": 0,
+      "untracked_count": 0,
+      "filesystem_files": 0,
+      "filesystem_bytes": 0,
+      "tracked_sample": [],
+      "untracked_sample": []
+    },
+    {
+      "path": "404.html",
+      "kind": "file",
+      "tracked_count": 1,
+      "untracked_count": 0,
+      "filesystem_files": 1,
+      "filesystem_bytes": 9333,
+      "tracked_sample": [
+        "404.html"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "index.html",
+      "kind": "file",
+      "tracked_count": 1,
+      "untracked_count": 0,
+      "filesystem_files": 1,
+      "filesystem_bytes": 3472,
+      "tracked_sample": [
+        "index.html"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "docs.html",
+      "kind": "file",
+      "tracked_count": 1,
+      "untracked_count": 0,
+      "filesystem_files": 1,
+      "filesystem_bytes": 27484,
+      "tracked_sample": [
+        "docs.html"
+      ],
+      "untracked_sample": []
+    },
+    {
+      "path": "CNAME",
+      "kind": "file",
+      "tracked_count": 1,
+      "untracked_count": 0,
+      "filesystem_files": 1,
+      "filesystem_bytes": 16,
+      "tracked_sample": [
+        "CNAME"
+      ],
+      "untracked_sample": []
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+# Per-category preflight manifest for .playwright-mcp/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! .playwright-mcp/
+
+## Filesystem listing (top 50 paths by size)
+
+      119884  .playwright-mcp\page-2026-04-05T20-31-05-331Z.yml
+      119884  .playwright-mcp\page-2026-04-05T20-29-21-371Z.yml
+       83397  .playwright-mcp\page-2026-04-05T20-31-09-949Z.yml
+       83397  .playwright-mcp\page-2026-04-05T20-29-34-711Z.yml
+       69064  .playwright-mcp\page-2026-04-03T20-42-54-381Z.png
+       55884  .playwright-mcp\page-2026-04-05T20-29-06-652Z.yml
+       54483  .playwright-mcp\page-2026-04-03T20-43-18-656Z.png
+       32234  .playwright-mcp\page-2026-04-05T20-29-44-258Z.yml
+       25712  .playwright-mcp\page-2026-04-03T22-08-41-945Z.png
+       23944  .playwright-mcp\page-2026-04-05T20-29-13-390Z.yml
+       21870  .playwright-mcp\page-2026-04-05T20-28-59-768Z.yml
+       21870  .playwright-mcp\page-2026-04-05T20-28-42-643Z.yml
+       21028  .playwright-mcp\page-2026-04-03T22-23-48-786Z.png
+       19389  .playwright-mcp\page-2026-04-05T20-28-32-890Z.yml
+       13710  .playwright-mcp\page-2026-04-03T22-14-23-455Z.png
+       12745  .playwright-mcp\page-2026-04-03T22-08-27-928Z.png
+       12207  .playwright-mcp\page-2026-04-03T17-58-05-869Z.yml
+        6864  .playwright-mcp\page-2026-04-03T17-58-13-569Z.yml
+        6647  .playwright-mcp\page-2026-04-03T17-58-02-528Z.yml
+        6647  .playwright-mcp\page-2026-04-03T17-57-56-252Z.yml
+        6546  .playwright-mcp\console-2026-04-10T06-52-54-129Z.log
+        6262  .playwright-mcp\page-2026-04-03T17-57-56-403Z.yml
+        4449  .playwright-mcp\page-2026-04-05T20-28-52-776Z.yml
+        4428  .playwright-mcp\console-2026-04-10T06-52-40-035Z.log
+        4150  .playwright-mcp\console-2026-04-03T17-57-13-929Z.log
+        3666  .playwright-mcp\console-2026-04-03T17-58-13-408Z.log
+        3666  .playwright-mcp\console-2026-04-03T17-58-02-340Z.log
+        3666  .playwright-mcp\console-2026-04-03T17-57-56-254Z.log
+        3666  .playwright-mcp\console-2026-04-03T17-57-56-055Z.log
+        2685  .playwright-mcp\console-2026-04-03T20-42-49-154Z.log
+        2482  .playwright-mcp\console-2026-04-03T22-07-05-594Z.log
+        1863  .playwright-mcp\page-2026-04-03T20-42-49-331Z.yml
+        1078  .playwright-mcp\page-2026-04-03T17-57-14-362Z.yml
+        1017  .playwright-mcp\page-2026-04-09T16-14-38-506Z.yml
+         995  .playwright-mcp\page-2026-04-22T08-54-21-295Z.yml
+         868  .playwright-mcp\console-2026-04-05T20-29-43-410Z.log
+         862  .playwright-mcp\console-2026-04-05T20-29-13-059Z.log
+         858  .playwright-mcp\console-2026-04-05T20-29-05-733Z.log
+         836  .playwright-mcp\console-2026-04-05T20-31-07-518Z.log
+         836  .playwright-mcp\console-2026-04-05T20-31-03-187Z.log
+         836  .playwright-mcp\console-2026-04-05T20-29-30-259Z.log
+         836  .playwright-mcp\console-2026-04-05T20-29-18-793Z.log
+         832  .playwright-mcp\console-2026-04-05T20-28-31-932Z.log
+         812  .playwright-mcp\console-2026-04-05T20-28-59-545Z.log
+         812  .playwright-mcp\console-2026-04-05T20-28-42-212Z.log
+         576  .playwright-mcp\page-2026-04-03T22-09-01-045Z.yml
+         389  .playwright-mcp\page-2026-04-03T22-08-35-753Z.yml
+         367  .playwright-mcp\console-2026-04-03T22-23-26-365Z.log
+         367  .playwright-mcp\console-2026-04-03T22-14-00-841Z.log
+         367  .playwright-mcp\console-2026-04-03T22-07-26-124Z.log
+... (12 more files)

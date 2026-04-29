@@ -1,0 +1,30 @@
+# Per-category preflight manifest for img/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+img/agent-red-logo.svg
+img/docusaurus-social-card.jpg
+img/docusaurus.png
+img/favicon.ico
+img/logo-dark.svg
+img/logo.svg
+img/undraw_docusaurus_mountain.svg
+img/undraw_docusaurus_react.svg
+img/undraw_docusaurus_tree.svg
+
+## Untracked + ignored content (high-risk surface)
+
+(none)
+
+## Filesystem listing (top 50 paths by size)
+
+       55746  img\docusaurus-social-card.jpg
+       36172  img\undraw_docusaurus_react.svg
+       31657  img\undraw_docusaurus_mountain.svg
+       11927  img\undraw_docusaurus_tree.svg
+        7370  img\agent-red-logo.svg
+        5142  img\docusaurus.png
+        3446  img\logo.svg
+        3446  img\logo-dark.svg
+        1794  img\favicon.ico

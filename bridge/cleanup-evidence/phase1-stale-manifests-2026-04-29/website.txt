@@ -1,0 +1,26 @@
+# Per-category preflight manifest for website/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+website/content/README.md
+website/content/about.md
+website/content/contact.md
+website/content/features.md
+website/content/homepage.md
+website/content/integrations.md
+website/content/pricing.md
+
+## Untracked + ignored content (high-risk surface)
+
+(none)
+
+## Filesystem listing (top 50 paths by size)
+
+       27337  website\content\features.md
+       24669  website\content\pricing.md
+       19436  website\content\integrations.md
+       13999  website\content\homepage.md
+        9888  website\content\about.md
+        6884  website\content\README.md
+        6246  website\content\contact.md

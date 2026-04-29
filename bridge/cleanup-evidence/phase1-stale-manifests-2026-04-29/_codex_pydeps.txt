@@ -1,0 +1,64 @@
+# Per-category preflight manifest for .codex_pydeps/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! .codex_pydeps/
+
+## Filesystem listing (top 50 paths by size)
+
+    33291776  .codex_pydeps\slim_bindings\_slim_bindings\slim_bindings.dll
+    25651200  .codex_pydeps\pymupdf\mupdfcpp64.dll
+    22476288  .codex_pydeps\pyarrow\arrow.dll
+    20407296  .codex_pydeps\numpy.libs\libscipy_openblas64_-4bb64bb73b19ae7523581172b5c4a821.dll
+    13401600  .codex_pydeps\pyarrow\arrow_flight.dll
+    12322304  .codex_pydeps\pymupdf\_mupdf.pyd
+    10606080  .codex_pydeps\grpc\_cython\cygrpc.cp314-win_amd64.pyd
+     9217536  .codex_pydeps\pyarrow\arrow_compute.dll
+     9110528  .codex_pydeps\cryptography\hazmat\bindings\_rust.pyd
+     8186880  .codex_pydeps\hf_xet\hf_xet.pyd
+     7833088  .codex_pydeps\PIL\_avif.cp314-win_amd64.pyd
+     7395328  .codex_pydeps\tokenizers\tokenizers.pyd
+     7121408  .codex_pydeps\pypdfium2_raw\pdfium.dll
+     6689792  .codex_pydeps\pyarrow\parquet.dll
+     5664848  .codex_pydeps\pythonwin\mfc140u.dll
+     5427712  .codex_pydeps\pydantic_core\_pydantic_core.cp314-win_amd64.pyd
+     4319076  .codex_pydeps\llama_index\core\_static\nltk_cache\tokenizers\punkt_tab.zip
+     4160000  .codex_pydeps\lxml\etree.cp314-win_amd64.pyd
+     4109818  .codex_pydeps\pyarrow\arrow.lib
+     3806382  .codex_pydeps\pymupdf\mupdf-devel\lib\mupdfcpp64.lib
+     3724800  .codex_pydeps\numpy\_core\_multiarray_umath.cp314-win_amd64.pyd
+     3613922  .codex_pydeps\llama_index\core\_static\tiktoken_cache\fb374d419588a4632f3f557e76b4b70aebbca790
+     3445248  .codex_pydeps\pyarrow\lib.cp314-win_amd64.pyd
+     2692608  .codex_pydeps\pyarrow\arrow_substrait.dll
+     2646502  .codex_pydeps\PyWin32.chm
+     2604453  .codex_pydeps\pymupdf\mupdf.py
+     2583040  .codex_pydeps\PIL\_imaging.cp314-win_amd64.pyd
+     2491392  .codex_pydeps\grpc_tools\_protoc_compiler.cp314-win_amd64.pyd
+     2308608  .codex_pydeps\tiktoken\_tiktoken.cp314-win_amd64.pyd
+     2166784  .codex_pydeps\PIL\_imagingft.cp314-win_amd64.pyd
+     2075136  .codex_pydeps\pandas\_libs\groupby.cp314-win_amd64.pyd
+     1801728  .codex_pydeps\pandas\_libs\hashtable.cp314-win_amd64.pyd
+     1763328  .codex_pydeps\lxml\objectify.cp314-win_amd64.pyd
+     1748992  .codex_pydeps\pandas\_libs\algos.cp314-win_amd64.pyd
+     1681126  .codex_pydeps\llama_index\core\_static\tiktoken_cache\9b5ad71b2ce5302211f9c61530b329a4922fc6a4
+     1500160  .codex_pydeps\pythonwin\scintilla.dll
+     1306624  .codex_pydeps\pyarrow\arrow_dataset.dll
+     1208832  .codex_pydeps\pyarrow\arrow_acero.dll
+     1202856  .codex_pydeps\locust\webui\dist\assets\index-Bl8icIRq.js
+     1189717  .codex_pydeps\llama_index\core\_static\nltk_cache\tokenizers\punkt_tab\finnish\ortho_context.tab
+     1173504  .codex_pydeps\pyarrow\arrow_python.dll
+     1066577  .codex_pydeps\llama_index\core\_static\nltk_cache\tokenizers\punkt_tab\polish\ortho_context.tab
+     1060352  .codex_pydeps\pandas\_libs\interval.cp314-win_amd64.pyd
+     1055744  .codex_pydeps\pandas\_libs\join.cp314-win_amd64.pyd
+     1052160  .codex_pydeps\pythonwin\win32ui.pyd
+      996352  .codex_pydeps\zmq\backend\cython\_zmq.pyd
+      943500  .codex_pydeps\llama_index\core\_static\nltk_cache\tokenizers\punkt_tab\german\ortho_context.tab
+      942035  .codex_pydeps\pymupdf\__init__.py
+      936992  .codex_pydeps\llama_index\core\_static\nltk_cache\tokenizers\punkt_tab\estonian\ortho_context.tab
+      904302  .codex_pydeps\locust\webui\dist\report.html
+... (22229 more files)

@@ -1,0 +1,103 @@
+# Per-category preflight manifest for prototype/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+prototype/agent-red-dark-mode-mockup.png
+prototype/agent-red-dark-mode-mockup.svg
+prototype/index.html
+prototype/package-lock.json
+prototype/package.json
+prototype/public/apple-touch-icon.png
+prototype/public/favicon.ico
+prototype/public/icon-192.png
+prototype/public/icon-512.png
+prototype/public/logo/icon-master.svg
+prototype/public/logo/primary-logo-dark.svg
+prototype/public/logo/primary-logo-light.svg
+prototype/public/logo/primary-logo-no-wordmark.svg
+prototype/public/logo/remaker-digital-logo.svg
+prototype/scripts/capture-page-to-svg.js
+prototype/scripts/dom-to-svg-browser.js
+prototype/scripts/dom-to-svg-runner.js
+prototype/src/data/mockData.ts
+prototype/src/main.tsx
+prototype/src/shopify/ShopifyApp.tsx
+prototype/src/shopify/pages/ShopifyAnalytics.tsx
+prototype/src/shopify/pages/ShopifyBilling.tsx
+prototype/src/shopify/pages/ShopifyConfig.tsx
+prototype/src/shopify/pages/ShopifyDashboard.tsx
+prototype/src/shopify/pages/ShopifyInbox.tsx
+prototype/src/shopify/pages/ShopifyKnowledge.tsx
+prototype/src/shopify/pages/ShopifyWidget.tsx
+prototype/src/standalone/StandaloneApp.tsx
+prototype/src/standalone/pages/AnalyticsPage.tsx
+prototype/src/standalone/pages/BillingPage.tsx
+prototype/src/standalone/pages/ConfigurationPage.tsx
+prototype/src/standalone/pages/DashboardPage.tsx
+prototype/src/standalone/pages/InboxPage.tsx
+prototype/src/standalone/pages/KnowledgeBasePage.tsx
+prototype/src/standalone/pages/OnboardingPage.tsx
+prototype/src/standalone/pages/TeamPage.tsx
+prototype/src/standalone/pages/WidgetConfigPage.tsx
+prototype/tsconfig.json
+prototype/vite.config.ts
+
+## Untracked + ignored content (high-risk surface)
+
+!! prototype/dist/
+!! prototype/node_modules/
+
+## Filesystem listing (top 50 paths by size)
+
+    10617344  prototype\node_modules\@esbuild\win32-x64\esbuild.exe
+     9112572  prototype\node_modules\typescript\lib\typescript.js
+     6213092  prototype\node_modules\typescript\lib\_tsc.js
+     4107659  prototype\node_modules\chromium-bidi\lib\iife\mapperTab.js.map
+     2584781  prototype\node_modules\.vite\deps\@shopify_polaris.js.map
+     2527232  prototype\node_modules\@rollup\rollup-win32-x64-msvc\rollup.win32-x64-msvc.node
+     2247140  prototype\node_modules\.vite\deps\recharts.js.map
+     2083953  prototype\node_modules\.vite\deps\chunk-WBGBYR6Y.js.map
+     1999060  prototype\node_modules\chromium-bidi\lib\esm\protocol-parser\generated\webdriver-bidi.d.ts
+     1999060  prototype\node_modules\chromium-bidi\lib\cjs\protocol-parser\generated\webdriver-bidi.d.ts
+     1972736  prototype\node_modules\@rollup\rollup-win32-x64-gnu\rollup.win32-x64-gnu.node
+     1874901  prototype\node_modules\typescript\lib\lib.dom.d.ts
+     1723633  prototype\node_modules\recharts\umd\Recharts.js.map
+     1641618  prototype\node_modules\.vite\deps\@shopify_polaris.js
+     1499847  prototype\node_modules\vite\dist\node\chunks\dep-D4NMHUTW.js
+     1492836  prototype\node_modules\.vite\deps\chunk-SVG7M4VJ.js.map
+     1442802  prototype\dist\assets\index-CvzZ4gk9.js
+     1432591  prototype\node_modules\@babel\parser\lib\index.js.map
+     1217753  prototype\node_modules\devtools-protocol\json\browser_protocol.json
+     1177909  prototype\node_modules\.vite\deps\recharts.js
+     1080227  prototype\node_modules\react-dom\umd\react-dom.development.js
+     1029622  prototype\node_modules\react-dom\cjs\react-dom.development.js
+      972349  prototype\node_modules\.vite\deps\chunk-WBGBYR6Y.js
+      932050  prototype\node_modules\rollup\dist\es\shared\node-entry.js
+      931834  prototype\node_modules\.vite\deps\chunk-SVG7M4VJ.js
+      931192  prototype\node_modules\rollup\dist\shared\rollup.js
+      894969  prototype\node_modules\csstype\index.d.ts
+      892746  prototype\node_modules\puppeteer-core\lib\es5-iife\puppeteer-core-browser.js
+      849504  prototype\node_modules\.vite\deps\@shopify_polaris-icons.js.map
+      754930  prototype\node_modules\chromium-bidi\lib\iife\mapperTab.js
+      666005  prototype\node_modules\@babel\types\lib\index.d.ts
+      661664  prototype\dist\assets\index-DrRFRX8X.css
+      660203  prototype\node_modules\@tootallnate\quickjs-emscripten\dist\generated\emscripten-module.WASM_RELEASE_SYNC.js.map
+      632760  prototype\node_modules\@tootallnate\quickjs-emscripten\dist\generated\emscripten-module.WASM_RELEASE_SYNC.js
+      628731  prototype\node_modules\devtools-protocol\types\protocol.d.ts
+      621419  prototype\node_modules\.vite\deps\@shopify_polaris-icons.js
+      609557  prototype\node_modules\typescript\lib\lib.webworker.d.ts
+      588085  prototype\node_modules\typescript\lib\typescript.d.ts
+      580820  prototype\node_modules\.vite\deps\react-router-dom.js.map
+      545267  prototype\node_modules\lodash\lodash.js
+      512056  prototype\node_modules\@babel\parser\lib\index.js
+      502946  prototype\node_modules\recharts\umd\Recharts.js
+      498069  prototype\node_modules\@shopify\polaris\build\esm\styles.css
+      455489  prototype\node_modules\devtools-protocol\pdl\browser_protocol.pdl
+      452542  prototype\node_modules\@remix-run\router\dist\router.umd.js.map
+      452532  prototype\node_modules\@remix-run\router\dist\router.cjs.js.map
+      449976  prototype\node_modules\@remix-run\router\dist\router.js.map
+      443587  prototype\node_modules\typescript\lib\ru\diagnosticMessages.generated.json
+      381398  prototype\node_modules\typescript\lib\ja\diagnosticMessages.generated.json
+      376319  prototype\node_modules\puppeteer-core\lib\cjs\third_party\rxjs\rxjs.js
+... (21028 more files)

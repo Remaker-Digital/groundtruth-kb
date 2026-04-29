@@ -1,0 +1,64 @@
+# Per-category preflight manifest for .hypothesis/
+# Generated 2026-04-29T15:50:00Z S320
+
+## Tracked content (recoverable via git restore if commit reverted)
+
+(none)
+
+## Untracked + ignored content (high-risk surface)
+
+!! .hypothesis/
+
+## Filesystem listing (top 50 paths by size)
+
+       22308  .hypothesis\unicode_data\16.0.0\charmap.json.gz
+       12171  .hypothesis\constants\22abf6058e5a6c79
+       12117  .hypothesis\constants\219385b4acf67710
+       10194  .hypothesis\constants\c6bbefcce72b4872
+       10166  .hypothesis\constants\9a70f8922d2f859c
+        7707  .hypothesis\constants\7dc392ff666a492c
+        6992  .hypothesis\constants\a50b9854be9f04e4
+        6964  .hypothesis\constants\deb2a5ad6794d180
+        6239  .hypothesis\constants\9b711ebe37b21ca4
+        5995  .hypothesis\constants\11a0944c56d8037b
+        5595  .hypothesis\constants\fa537b28fc393ef0
+        5567  .hypothesis\constants\631a6c3b584aa1de
+        5168  .hypothesis\constants\a43082d413cfc9fa
+        5022  .hypothesis\constants\55f11de0982c216b
+        4975  .hypothesis\constants\97c7480e2297d2ee
+        4918  .hypothesis\constants\1304b97d460e34da
+        4882  .hypothesis\constants\8901304de9ef47e4
+        4742  .hypothesis\constants\0ca0019866573400
+        4638  .hypothesis\constants\170b0f5ebe28a7fb
+        4637  .hypothesis\constants\b2952681e90c7b1b
+        4558  .hypothesis\constants\7de336c0909d29f7
+        4558  .hypothesis\constants\68389c2bbc87759a
+        4536  .hypothesis\constants\f37dbabdb957a078
+        4249  .hypothesis\constants\ae18a978819833d0
+        4249  .hypothesis\constants\6c0031cfe18dae94
+        4206  .hypothesis\constants\6e0b7bf94241ddc9
+        4147  .hypothesis\constants\a4cb4dba1139fd8b
+        3997  .hypothesis\constants\8e8fdff08c763872
+        3792  .hypothesis\constants\ee0d57fec378b094
+        3747  .hypothesis\constants\e72ca32ff911b862
+        3706  .hypothesis\constants\57bc030552b69e9b
+        3309  .hypothesis\constants\9953dcf81b6ab883
+        3308  .hypothesis\constants\291ed6cfda92fca8
+        3286  .hypothesis\constants\72e0e804b4c7fff1
+        3231  .hypothesis\constants\ceb6f874276b3ecb
+        3231  .hypothesis\constants\a239e44760af36f9
+        3231  .hypothesis\constants\5688e74fe1f1b404
+        3220  .hypothesis\constants\8d95333bfed76253
+        3092  .hypothesis\constants\436dbda2cbe55d81
+        3050  .hypothesis\constants\7318789d88470a72
+        3041  .hypothesis\constants\af457f602bc67c32
+        3006  .hypothesis\constants\89e412908c7b01fd
+        2948  .hypothesis\constants\6d6ce8808eae51fa
+        2944  .hypothesis\constants\18d47b4a947d6113
+        2772  .hypothesis\constants\344465b96c314d4c
+        2766  .hypothesis\constants\4bfe45f51ae15022
+        2749  .hypothesis\constants\b3d3a539fad00ced
+        2744  .hypothesis\constants\e6e33db42ca33fe9
+        2732  .hypothesis\constants\52578d2c32f7ab70
+        2694  .hypothesis\constants\8009b58d3c6fa3ee
+... (3842 more files)
