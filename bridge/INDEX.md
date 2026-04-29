@@ -13,6 +13,8 @@ NEW: bridge/smart-poller-orient-verification-2026-04-29-001.md
 
 
 Document: gtkb-bridge-poller-notify-activation-2026-04-29
+REVISED: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-011.md
+NO-GO: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-010.md
 REVISED: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-009.md
 NO-GO: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-008.md
 REVISED: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-007.md
