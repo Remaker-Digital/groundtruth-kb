@@ -1,14 +1,63 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Legacy SQLite/MCP inter-agent message bridge.
+"""GroundTruth-KB bridge package.
 
-This package is retained for compatibility with projects that still depend on
-the older database-backed Prime Bridge runtime. New GroundTruth dual-agent
-projects should use the file bridge pattern documented in
-docs/method/12-file-bridge-automation.md and should not use this package as
-their active coordination channel.
+The legacy SQLite/MCP message bridge is retained for compatibility with
+projects that still depend on the older database-backed Prime Bridge runtime.
+New GroundTruth dual-agent projects should use the file bridge pattern
+documented in ``docs/method/12-file-bridge-automation.md``.
+
+The smart-poller modules added by GTKB-BRIDGE-POLLER-001 P1 (paths, detector,
+checkpoint, routing, audit) sit alongside the legacy modules and provide
+detector/parser/checkpoint/routing/audit primitives for the file bridge
+protocol. P2 (registry), P2.5 (verification spike), and P3 (autonomous
+invoker) are separate work programs.
 """
 
+from groundtruth_kb.bridge.audit import (
+    AUDIT_FILENAME,
+    AuditEvent,
+    emit_audit_event,
+    emit_bootstrap_event,
+    emit_transition_event,
+    read_audit_log,
+)
+from groundtruth_kb.bridge.checkpoint import (
+    CHECKPOINT_FILENAME,
+    CHECKPOINT_SCHEMA_VERSION,
+    Checkpoint,
+    CheckpointEntry,
+    CheckpointLoadResult,
+    Transition,
+    diff_against_checkpoint,
+    load_checkpoint,
+    write_checkpoint,
+)
+from groundtruth_kb.bridge.detector import (
+    BridgeDocument,
+    BridgeStatus,
+    BridgeVersion,
+    ParseError,
+    ParseResult,
+    ParseWarning,
+    parse_index,
+)
 from groundtruth_kb.bridge.handshake import run_handshake
+from groundtruth_kb.bridge.paths import (
+    GROUNDTRUTH_MARKER,
+    PROJECT_ROOT_ENV_VAR,
+    STATE_DIR_ENV_VAR,
+    ProjectRootNotFoundError,
+    StateDirOutOfRootError,
+    get_state_dir,
+    resolve_project_root,
+)
+from groundtruth_kb.bridge.routing import (
+    BridgeAgent,
+    RoutedTransition,
+    TransitionOutcome,
+    route_transitions,
+    synthesize_bootstrap_outcomes,
+)
 from groundtruth_kb.bridge.runtime import (
     Agent,
     PeerAgent,
@@ -29,7 +78,46 @@ from groundtruth_kb.bridge.worker import (
 )
 
 __all__ = [
-    # runtime
+    # paths (smart-poller P1)
+    "GROUNDTRUTH_MARKER",
+    "PROJECT_ROOT_ENV_VAR",
+    "STATE_DIR_ENV_VAR",
+    "ProjectRootNotFoundError",
+    "StateDirOutOfRootError",
+    "get_state_dir",
+    "resolve_project_root",
+    # detector (smart-poller P1)
+    "BridgeDocument",
+    "BridgeStatus",
+    "BridgeVersion",
+    "ParseError",
+    "ParseResult",
+    "ParseWarning",
+    "parse_index",
+    # checkpoint (smart-poller P1)
+    "CHECKPOINT_FILENAME",
+    "CHECKPOINT_SCHEMA_VERSION",
+    "Checkpoint",
+    "CheckpointEntry",
+    "CheckpointLoadResult",
+    "Transition",
+    "diff_against_checkpoint",
+    "load_checkpoint",
+    "write_checkpoint",
+    # routing (smart-poller P1)
+    "BridgeAgent",
+    "RoutedTransition",
+    "TransitionOutcome",
+    "route_transitions",
+    "synthesize_bootstrap_outcomes",
+    # audit (smart-poller P1)
+    "AUDIT_FILENAME",
+    "AuditEvent",
+    "emit_audit_event",
+    "emit_bootstrap_event",
+    "emit_transition_event",
+    "read_audit_log",
+    # legacy runtime
     "Agent",
     "PeerAgent",
     "get_bridge_db",
@@ -38,11 +126,11 @@ __all__ = [
     "retry_pending_message",
     "send_message",
     "wait_for_notifications",
-    # worker
+    # legacy worker
     "resident_worker_is_healthy",
     "resident_worker_health_snapshot",
     "resident_worker_should_defer",
     "run_worker",
-    # handshake
+    # legacy handshake
     "run_handshake",
 ]

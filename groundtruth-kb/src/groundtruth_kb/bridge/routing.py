@@ -27,7 +27,7 @@ _PRIME_STATUSES = frozenset({"NEW", "REVISED"})
 _CODEX_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
 
 
-class Agent(StrEnum):
+class BridgeAgent(StrEnum):
     PRIME = "prime"
     CODEX = "codex"
 
@@ -44,24 +44,24 @@ class RoutedTransition:
 
     transition: Transition
     outcome: TransitionOutcome
-    authored_by: Agent | None  # author of the to_status, or None when unknown
-    recipient: Agent | None  # agent the invoker should hand off to, or None when unroutable
+    authored_by: BridgeAgent | None  # author of the to_status, or None when unknown
+    recipient: BridgeAgent | None  # agent the invoker should hand off to, or None when unroutable
     detail: str = ""
 
 
-def _author_from_status(status: str) -> Agent | None:
+def _author_from_status(status: str) -> BridgeAgent | None:
     if status in _PRIME_STATUSES:
-        return Agent.PRIME
+        return BridgeAgent.PRIME
     if status in _CODEX_STATUSES:
-        return Agent.CODEX
+        return BridgeAgent.CODEX
     return None
 
 
-def _recipient_for(author: Agent | None) -> Agent | None:
-    if author is Agent.PRIME:
-        return Agent.CODEX
-    if author is Agent.CODEX:
-        return Agent.PRIME
+def _recipient_for(author: BridgeAgent | None) -> BridgeAgent | None:
+    if author is BridgeAgent.PRIME:
+        return BridgeAgent.CODEX
+    if author is BridgeAgent.CODEX:
+        return BridgeAgent.PRIME
     return None
 
 
