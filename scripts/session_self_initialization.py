@@ -3455,16 +3455,23 @@ def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> li
     """Render the smart-poller orient section.
 
     Order of operations (per ``bridge/smart-poller-orient-verification-2026-04-29-005.md``
-    carry-forward of ``-003 §3`` + GO at ``-006``):
+    carry-forward of ``-003 §3`` + GO at ``-006``; matrix row 6 corrected
+    via ``-008 NO-GO`` REVISED-1 at ``-009``):
 
       1. Resolve recipient from ``role['assumed_role']``; unknown role
          early-returns ``[]`` BEFORE the doctor runs.
-      2. Run ``_check_smart_bridge_poller``; if status is ``warning`` or
-         ``fail``, render a diagnostic section and return early
+      2. Run ``_check_smart_bridge_poller``; doctor exceptions set
+         ``health = None``.
+      3. If ``health is None`` (doctor exception or import failure),
+         return ``[]`` regardless of notification state — per ``-001 §3.1``
+         matrix row 6 ("doctor exception | any notification | Silent"),
+         a stale notification cannot be trusted when the doctor itself is
+         broken.
+      4. If status is ``warning`` or ``fail``, render a diagnostic section
          (notifications are skipped because they can't be trusted when the
          poller itself is unhealthy).
-      3. Otherwise (``pass`` or doctor exception → silent) proceed with the
-         existing notification-render path.
+      5. Otherwise (status is ``pass``) proceed with the existing
+         notification-render path.
 
     Fail-open per ``bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md``
     GO guardrail 1: any failure in import, canonical-API read, formatting,
@@ -3502,7 +3509,10 @@ def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> li
         except Exception:
             health = None
 
-        if health is not None and health.status in ("warning", "fail"):
+        if health is None:
+            return []
+
+        if health.status in ("warning", "fail"):
             return _render_diagnostic_section(health)
 
         artifact = read_for_recipient(project_root, recipient)

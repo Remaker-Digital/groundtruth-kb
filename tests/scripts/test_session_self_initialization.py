@@ -1930,12 +1930,13 @@ def test_smart_poller_section_diagnostic_supersedes_notification(tmp_path, monke
 
 
 def test_smart_poller_section_fail_open_on_doctor_exception(tmp_path, monkeypatch) -> None:
-    """Doctor itself raises → silent fail-open (helper returns ``[]``).
+    """Doctor itself raises + notification absent → silent fail-open (returns ``[]``).
 
-    Per ``-001 §3.1`` doctor-exception row + ``-003 §3.5``: a doctor
-    exception sets ``health = None`` and falls through to the notification
-    path. With no notification on disk, the helper returns ``[]`` —
-    startup never blocks on doctor failures.
+    Per ``-001 §3.1`` doctor-exception row (notification = absent sub-case):
+    a doctor exception sets ``health = None`` and the helper returns ``[]``
+    immediately. The notification-present sub-case is covered separately by
+    ``test_smart_poller_section_silent_on_doctor_exception_with_notification_present``
+    (added per Codex ``-008`` NO-GO REVISED-1).
     """
     module = _load_module()
 
@@ -1946,6 +1947,53 @@ def test_smart_poller_section_fail_open_on_doctor_exception(tmp_path, monkeypatc
         "groundtruth_kb.project.doctor._check_smart_bridge_poller",
         _raise,
     )
+
+    role = {"assumed_role": "Prime Builder"}
+    assert module._render_smart_poller_section(tmp_path, role) == []
+
+
+def test_smart_poller_section_silent_on_doctor_exception_with_notification_present(
+    tmp_path, monkeypatch
+) -> None:
+    """Doctor raises + notification present → silent (notification NOT rendered).
+
+    Per ``-001 §3.1`` matrix row 6 ("doctor exception | any notification |
+    Silent") + Codex ``-008`` NO-GO Finding 1 + REVISED-1 implementation in
+    `_render_smart_poller_section`: when the doctor itself is broken, the
+    helper must return ``[]`` even if a stale notification exists on disk.
+    The notification cannot be trusted because the doctor — the verification
+    layer for the poller that produced it — is failing.
+
+    This is the regression that Codex ``-008`` Finding 1 specifically
+    required: prior implementation set ``health = None`` and fell through
+    to the notification render path, producing a section even when the
+    matrix said silent.
+    """
+    module = _load_module()
+
+    def _raise(target):
+        raise RuntimeError("simulated doctor failure")
+
+    monkeypatch.setattr(
+        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
+        _raise,
+    )
+
+    # Plant a notification — under the corrected contract it must NOT render.
+    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
+    from groundtruth_kb.bridge.routing import BridgeAgent
+
+    state = tmp_path / ".gtkb-state" / "bridge-poller"
+    state.mkdir(parents=True, exist_ok=True)
+    items = [
+        ActionablePending(
+            document_name="should-not-render-on-doctor-exception",
+            top_status="GO",
+            top_file="bridge/should-not-render-on-doctor-exception-001.md",
+            index_line_number=42,
+        )
+    ]
+    update_notification(state, BridgeAgent.PRIME, items, poller_run_id="test-run")
 
     role = {"assumed_role": "Prime Builder"}
     assert module._render_smart_poller_section(tmp_path, role) == []
