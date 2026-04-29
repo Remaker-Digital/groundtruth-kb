@@ -30,7 +30,7 @@ if (-not (Test-Path $wrapperPath)) {
 
 $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`" -IntervalSeconds $IntervalSeconds" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$wrapperPath`" -IntervalSeconds $IntervalSeconds" `
     -WorkingDirectory $ProjectRoot
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
