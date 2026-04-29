@@ -75,6 +75,19 @@ CREATE TABLE IF NOT EXISTS delivery_timeline_events (
     environment TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS incidents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    incident_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    caused_by_deploy_id TEXT NOT NULL DEFAULT '',
+    detected_at TEXT NOT NULL,
+    mitigated_at TEXT NOT NULL DEFAULT '',
+    closed_at TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS release_blockers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sort_order INTEGER NOT NULL,

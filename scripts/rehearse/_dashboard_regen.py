@@ -11,7 +11,7 @@ captures classification of any out-of-sandbox reads as audit-hook
 violations.
 
 Constraints (per Slice 11 GO ``-012``):
-  1. No recursive ``legacy_root/scripts`` allowance — the runner's
+  1. No recursive ``legacy_root/scripts`` allowance â€” the runner's
      allowlist enforces an exact-file code allowlist + per-prefix
      sandbox/Python-runtime/temp allowance only.
   2. Legacy originals of the 5 generator-consumed deployment files are
@@ -120,7 +120,7 @@ def _probe_generator(generator_path: Path) -> dict[str, Any]:
 def _probe_current_dashboard(legacy_root: Path) -> dict[str, Any]:
     """Probe current dashboard artifacts (presence + size only).
 
-    Per REVISED-3 §2.2 carry-forward: the lane MUST NOT parse HTML
+    Per REVISED-3 Â§2.2 carry-forward: the lane MUST NOT parse HTML
     or embed JSON content. Size + structural top-level-key probe is
     sufficient for the regen plan.
     """
@@ -155,7 +155,7 @@ def discover_deployment_dependencies() -> tuple[str, ...]:
     Per REVISED-5 ``-010`` Required Revision: this list is explicitly
     tracked (``_KNOWN_DEPLOYMENT_INPUTS``) as defense-in-depth against
     future static-analysis bugs. The static-analysis broadening described
-    in REVISED-5 §2.3 is provided here as the canonical anchor; a future
+    in REVISED-5 Â§2.3 is provided here as the canonical anchor; a future
     AST-based discovery mechanism can cross-validate against this list.
 
     Source-verified at ``scripts/session_self_initialization.py:1716-1721``.
@@ -189,7 +189,7 @@ def _copy_dir_real(src: Path, dst: Path) -> None:
 
 
 def _build_sandbox(legacy_root: Path, sandbox_root: Path, warnings: list[str]) -> tuple[dict[str, Any], list[str]]:
-    """Assemble sandbox tree per REVISED-5 §3.1-§3.4.
+    """Assemble sandbox tree per REVISED-5 Â§3.1-Â§3.4.
 
     Returns ``(summary, missing_required_paths)``. If ``missing_required``
     is non-empty, the lane fails before subprocess invocation.
@@ -331,12 +331,12 @@ def _verify_deployment_files(legacy_root: Path, sandbox_root: Path) -> dict[str,
 
 
 def _build_generator_argv(sandbox_root: Path) -> list[str]:
-    """Build argv for the legacy generator per REVISED-5 §2.3.
+    """Build argv for the legacy generator per REVISED-5 Â§2.3.
 
     The ``--user-preferences-path`` value points at a sandbox-relative
     location that intentionally does not exist; the generator's preference
     reader short-circuits on ``is_file() == False`` and never reads the
-    canonical ``applications/Agent_Red/harness-state/codex/session-startup-
+    canonical ``harness-state/codex/session-startup-
     preferences.json``. Per bridge/harness-state-preferences-path-cli-
     2026-04-28-002.md Codex GO conditions 4 and 5.
     """
@@ -449,7 +449,7 @@ def _quarantine_sample_render(sample_render_dir: Path, violation_count: int) -> 
     Subprocess termination via ``os._exit(99)`` already prevents the
     denied open() from completing (PEP 578 audit hooks fire pre-action).
     The partial sample_render contents at termination time contain only
-    sandbox-derived data — no leaked legacy content. The quarantine
+    sandbox-derived data â€” no leaked legacy content. The quarantine
     rename is defense-in-depth: it signals the artifacts are incomplete
     and should not be trusted, even though they're technically clean.
     """
@@ -477,7 +477,7 @@ def _build_audit_hook_proof(
     proc: subprocess.CompletedProcess[str] | None,
     deployment_evidence: dict[str, Any],
 ) -> dict[str, Any]:
-    """Build the audit_hook_proof block per REVISED-5 §5.1."""
+    """Build the audit_hook_proof block per REVISED-5 Â§5.1."""
     if not violations:
         verdict = "no_legacy_data_read_detected"
     else:
@@ -514,7 +514,7 @@ def _build_audit_hook_proof(
 
 
 def _build_regen_plan(legacy_root: Path) -> dict[str, str]:
-    """Per REVISED-5 §5.1 regen_plan block."""
+    """Per REVISED-5 Â§5.1 regen_plan block."""
     target_root = "applications/Agent_Red"
     return {
         "target_generator_path": f"{target_root}/scripts/session_self_initialization.py",
@@ -596,7 +596,7 @@ def _emit_preview_markdown(
         f"| `docs/gtkb-dashboard/grafana/` | `{plan['target_grafana_path']}` |\n",
         f"| `memory/gtkb-dashboard-history.json` | `{plan['target_history_path']}` |\n\n",
         "## Sandbox Boundary Proof\n\n",
-        "Audit hook installed: ✓ (before legacy-script import)\n",
+        "Audit hook installed: âœ“ (before legacy-script import)\n",
         "Events intercepted: open, subprocess.Popen\n",
         f"Violations: {len(violations)}\n",
         f"Verdict: **{'no legacy data read detected' if not violations else 'legacy data read detected'}**\n\n",
@@ -604,7 +604,7 @@ def _emit_preview_markdown(
     ]
     for entry in deployment_evidence["expected_inputs"]:
         if entry in deployment_evidence["copied_to_sandbox"]:
-            mark = "✓ copied"
+            mark = "âœ“ copied"
         elif entry in deployment_evidence["missing_from_legacy_source"]:
             mark = "(absent from legacy source)"
         else:
@@ -612,8 +612,8 @@ def _emit_preview_markdown(
                 (e for e in deployment_evidence["copy_errors"] if e["path"] == entry),
                 None,
             )
-            mark = f"✗ {err['reason']}" if err else "✗ unknown"
-        lines.append(f"- `{entry}` — {mark}\n")
+            mark = f"âœ— {err['reason']}" if err else "âœ— unknown"
+        lines.append(f"- `{entry}` â€” {mark}\n")
     if warnings:
         lines.append("\n## Warnings\n\n")
         for w in warnings:
@@ -632,7 +632,7 @@ def run(
     project_root: Path | None = None,
     subprocess_invoker: Callable[[list[str], Path], subprocess.CompletedProcess[str]] | None = None,
 ) -> dict[str, Any]:
-    """Wave 2 Stage C leaf lane. Per common contract Wave 2 ``-003`` §4.1.
+    """Wave 2 Stage C leaf lane. Per common contract Wave 2 ``-003`` Â§4.1.
 
     ``project_root`` overrides ``LEGACY_ROOT`` for fixture trees.
     ``subprocess_invoker`` allows tests to inject a fake subprocess
@@ -762,7 +762,7 @@ def run(
         )
         _quarantine_sample_render(sample_render_dir, len(violations))
     elif violations:
-        # Defense-in-depth: any non-empty violations list → error,
+        # Defense-in-depth: any non-empty violations list â†’ error,
         # even if subprocess didn't terminate (legacy fallback path).
         status = "error"
         warnings.append(f"legacy_data_read_detected: {len(violations)} violations")

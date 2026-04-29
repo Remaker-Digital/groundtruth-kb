@@ -11,7 +11,7 @@ apiVersion: 1
 groups:
   - orgId: 1
     name: agent-red-ci-health
-    folder: Agent Red GT-KB
+    folder: GroundTruth-KB
     interval: 1m
     rules:
       - uid: agent-red-failing-ci
@@ -62,7 +62,7 @@ groups:
                     params: []
                   type: query
         annotations:
-          summary: "Failing CI / testing integrations visible on Agent Red GT-KB dashboard."
+          summary: "Failing CI / testing integrations visible on GroundTruth-KB dashboard."
           source_metric_key: ci_testing_failing
           source_table: current_metrics
         labels:

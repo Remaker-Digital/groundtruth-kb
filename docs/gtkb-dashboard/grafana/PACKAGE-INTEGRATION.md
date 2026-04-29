@@ -8,7 +8,7 @@ post-install side effect. The package should provide:
 - `gtkb dashboard install`: installs local Grafana OSS into a user-local application data directory and installs
   the `frser-sqlite-datasource` plugin.
 - `gtkb dashboard start`: initializes or refreshes the dedicated SQLite dashboard database, starts the refresh
-  service, starts local Grafana, and opens `http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard`.
+  service, starts local Grafana, and opens `http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard`.
 - `gtkb dashboard stop`: stops the local Grafana and refresh-service processes started by GT-KB.
 
 The Agent Red implementation currently proves the required behavior with these repo-local scripts:

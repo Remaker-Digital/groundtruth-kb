@@ -32,7 +32,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "# Agent Red GT-KB Dashboard\n\nSQLite-backed project health, setup, delivery, and operations view.\n[Manual refresh](http://127.0.0.1:8766/) | `memory/gtkb-dashboard.sqlite` | `scripts\\gtkb_dashboard\\start_local_dashboard.ps1`"
+        "content": "# GroundTruth-KB Dashboard\n\nSQLite-backed project health, setup, delivery, and operations view.\n[Manual refresh](http://127.0.0.1:8766/) | `memory/gtkb-dashboard.sqlite` | `scripts\\gtkb_dashboard\\start_local_dashboard.ps1`"
       }
     },
     {
@@ -2841,8 +2841,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Agent Red GT-KB Dashboard",
-  "uid": "agent-red-gtkb",
+  "title": "GroundTruth-KB Dashboard",
+  "uid": "gtkb",
   "version": 4,
   "weekStart": ""
 }

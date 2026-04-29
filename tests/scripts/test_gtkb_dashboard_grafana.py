@@ -21,7 +21,7 @@ def _sample_model() -> dict:
     return {
         "generated_at": "2026-04-21T12:00:00+00:00",
         "role": {"assumed_role": "Prime Builder"},
-        "dashboard_requirements": {"scope_note": "Agent Red product/project dashboard."},
+        "dashboard_requirements": {"scope_note": "GroundTruth-KB project dashboard."},
         "metrics": {
             "contention": {"actionable_count": 0},
             "drift": {"changed_path_count": 1},
@@ -57,7 +57,7 @@ def _sample_model() -> dict:
                 "generated_at": "2026-04-21T12:00:00+00:00",
                 "repo_branch": "develop",
                 "repo_short_sha": "abc1234",
-                "scope_version": "agent_red_v1",
+                "scope_version": "gtkb_v1",
                 "sources": ["git", "local"],
             },
         },
@@ -152,7 +152,7 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "frser-sqlite-datasource" in datasource_text
     assert "$GTKB_DASHBOARD_SQLITE_PATH" in datasource_text
     assert "$GTKB_DASHBOARD_DASHBOARDS_PATH" in dashboard_provider_text
-    assert dashboard_json["uid"] == "agent-red-gtkb"
+    assert dashboard_json["uid"] == "gtkb"
     assert dashboard_json["links"] == []
     assert [panel["title"] for panel in dashboard_json["panels"][:10]] == [
         "GT-KB Dashboard",
@@ -203,9 +203,9 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
 
 
 def test_stat_panels_surface_per_panel_freshness_secondary_value() -> None:
-    """GTKB-DASHBOARD-001 §C: each value-bearing stat panel must emit a
+    """GTKB-DASHBOARD-001 Â§C: each value-bearing stat panel must emit a
     `last_refreshed_at` secondary value (target `F`) sourced from refresh_runs.
-    The Refresh Age panel itself is exempt — its primary value already is the
+    The Refresh Age panel itself is exempt â€” its primary value already is the
     freshness reading, so a second freshness target would be redundant."""
     dashboard = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
     dashboard_json = json.loads(dashboard.read_text(encoding="utf-8"))

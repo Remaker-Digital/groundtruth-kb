@@ -11,7 +11,7 @@ apiVersion: 1
 groups:
   - orgId: 1
     name: agent-red-release-readiness
-    folder: Agent Red GT-KB
+    folder: GroundTruth-KB
     interval: 1m
     rules:
       - uid: agent-red-release-blockers
@@ -62,7 +62,7 @@ groups:
                     params: []
                   type: query
         annotations:
-          summary: "Release blockers visible on Agent Red GT-KB dashboard."
+          summary: "Release blockers visible on GroundTruth-KB dashboard."
           source_metric_key: release_blockers
           source_table: current_metrics
         labels:

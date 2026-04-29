@@ -24,7 +24,7 @@ Start the local dashboard:
 .\scripts\gtkb_dashboard\start_local_dashboard.ps1
 ```
 
-The dashboard is available at `http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard`.
+The dashboard is available at `http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard`.
 
 The companion refresh service is available at `http://127.0.0.1:8766/` and requires
 `GTKB_DASHBOARD_REFRESH_TOKEN` from `.env.local` for manual refreshes. The service also refreshes

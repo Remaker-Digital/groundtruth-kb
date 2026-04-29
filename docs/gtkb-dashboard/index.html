@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Agent Red GT-KB Dashboard</title>
+  <title>GroundTruth-KB Dashboard</title>
   <style>
     :root {
       --bg: #f6f8fa;
@@ -173,7 +173,7 @@
 </head>
 <body>
   <header>
-    <h1>Agent Red GT-KB Dashboard</h1>
+    <h1>GroundTruth-KB Dashboard</h1>
     <p>Static landing. The live Grafana dashboard is available locally when the refresh stack is running.</p>
   </header>
   <main>
@@ -210,7 +210,7 @@
       <h2 id="live-heading">Open Live Dashboard</h2>
       <p>The live Grafana dashboard provides full panel rendering, alerting, and drill-downs. It runs locally on <code>127.0.0.1:3000</code>.</p>
       <div class="actions">
-        <a class="btn primary" href="http://127.0.0.1:3000/d/agent-red-gtkb/agent-red-gt-kb-dashboard">Open live dashboard</a>
+        <a class="btn primary" href="http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard">Open live dashboard</a>
         <a class="btn" href="http://127.0.0.1:8766/">Open refresh control</a>
       </div>
     </section>
@@ -251,7 +251,7 @@
       };
 
       var SUBJECT_LABELS = {
-        application: "Application (Agent Red)",
+        application: "GT-KB",
         gtkb_infrastructure: "GT-KB Infrastructure",
         all: "All subjects"
       };
@@ -423,7 +423,7 @@
           return;
         }
         var s = payload.summary || {};
-        summary.textContent = s.thread_count + " threads — open " + (s.open_count || 0)
+        summary.textContent = s.thread_count + " threads â€” open " + (s.open_count || 0)
           + ", awaiting Prime " + (s.awaiting_prime_count || 0)
           + ", awaiting LO " + (s.awaiting_lo_count || 0)
           + ", terminal " + (s.terminal_count || 0);
