@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-poller-p3-notify-2026-04-29
+VERIFIED: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-012.md
 REVISED: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-011.md
 NO-GO: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-010.md
 NEW: bridge/gtkb-bridge-poller-p3-notify-2026-04-29-009.md
@@ -62,6 +63,7 @@ NEW: bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-001.md
 
 
 Document: gtkb-isolation-phase1-implementation-2026-04-28
+REVISED: bridge/gtkb-isolation-phase1-implementation-2026-04-28-005.md
 NO-GO: bridge/gtkb-isolation-phase1-implementation-2026-04-28-004.md
 REVISED: bridge/gtkb-isolation-phase1-implementation-2026-04-28-003.md
 NO-GO: bridge/gtkb-isolation-phase1-implementation-2026-04-28-002.md
