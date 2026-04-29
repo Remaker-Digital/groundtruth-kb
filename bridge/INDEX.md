@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-poller-notify-activation-2026-04-29
+REVISED: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-003.md
+NO-GO: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-002.md
 NEW: bridge/gtkb-bridge-poller-notify-activation-2026-04-29-001.md
 
 
