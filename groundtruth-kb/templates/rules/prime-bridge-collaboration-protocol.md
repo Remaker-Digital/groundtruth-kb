@@ -33,9 +33,20 @@ The submission must include:
 
 - summary of work performed or proposed
 - artifact paths and relevant KB IDs
+- a `Specification Links` section citing every relevant governing specification,
+  rule, ADR, DCL, proposal standard, or durable specification artifact
+- a spec-to-test plan showing how tests are derived from the linked
+  specifications
 - verification already performed
 - specific review questions or acceptance criteria
 - known risks, gaps, or owner decisions needed
+
+Implementation proposals without complete specification linkage are invalid and
+must receive `NO-GO`.
+
+Loyal Opposition MUST reject all implementation proposals that are not linked to
+specifications. Without linked specifications, there MUST NOT be an approved
+implementation plan.
 
 ### Loyal Opposition to Prime Builder
 
@@ -48,6 +59,14 @@ next numbered bridge file with one of:
 
 Every verdict must include evidence inspected, findings, impact, recommended
 action, and verification performed.
+
+For proposal review, Loyal Opposition must verify that every relevant
+specification is linked and that proposed tests derive from those specifications.
+For post-implementation verification, Loyal Opposition must carry forward the
+linked specifications, confirm specification-derived tests were created or
+identified, execute or inspect execution of those tests against the
+implementation, and issue `NO-GO` instead of `VERIFIED` for any untested linked
+specification unless an explicit owner waiver is documented.
 
 ### Prime Builder Response
 

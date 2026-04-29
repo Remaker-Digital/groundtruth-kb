@@ -280,6 +280,20 @@ def _write_fresh_index(path: Path) -> None:
     path.write_text(_INDEX_HEADER, encoding="utf-8")
 
 
+def _proposal_body(text: str) -> str:
+    """Return a proposal body that satisfies the mandatory spec-link gate."""
+    return "\n".join(
+        [
+            text,
+            "",
+            "## Specification Links",
+            "- SPEC-TEST-BRIDGE-PROPOSE-001",
+            "- .claude/rules/file-bridge-protocol.md",
+            "",
+        ]
+    )
+
+
 def test_update_bridge_index_inserts_after_header_comments(tmp_path: Path) -> None:
     """Entry is inserted after the header comment region, not at byte 0."""
     helper = _load_helper()
@@ -411,7 +425,7 @@ def test_propose_bridge_writes_file_first_then_index(tmp_path: Path) -> None:
     bridge_dir.mkdir()
     _write_fresh_index(bridge_dir / "INDEX.md")
 
-    body = "Clean proposal body with no credentials."
+    body = _proposal_body("Clean proposal body with no credentials.")
     result_path = helper.propose_bridge(
         "clean-topic",
         body,
@@ -425,6 +439,45 @@ def test_propose_bridge_writes_file_first_then_index(tmp_path: Path) -> None:
     index_content = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
     assert "Document: clean-topic" in index_content
     assert "NEW: bridge/clean-topic-001.md" in index_content
+
+
+def test_propose_bridge_requires_specification_links(tmp_path: Path) -> None:
+    """Missing spec linkage blocks submission before any file or INDEX mutation."""
+    helper = _load_helper()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_fresh_index(bridge_dir / "INDEX.md")
+    original_index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
+
+    with pytest.raises(helper.SpecificationLinksMissingError):
+        helper.propose_bridge(
+            "missing-spec-links",
+            "Proposal body with no specification linkage.",
+            mode="abort",
+            bridge_dir=bridge_dir,
+        )
+
+    assert not (bridge_dir / "missing-spec-links-001.md").exists()
+    assert (bridge_dir / "INDEX.md").read_text(encoding="utf-8") == original_index
+
+
+def test_propose_bridge_rejects_placeholder_specification_links(tmp_path: Path) -> None:
+    """Placeholder-only spec sections do not satisfy the proposal gate."""
+    helper = _load_helper()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_fresh_index(bridge_dir / "INDEX.md")
+    body = "Proposal body.\n\n## Specification Links\n- TBD\n"
+
+    with pytest.raises(helper.SpecificationLinksMissingError):
+        helper.propose_bridge(
+            "placeholder-spec-links",
+            body,
+            mode="abort",
+            bridge_dir=bridge_dir,
+        )
+
+    assert not (bridge_dir / "placeholder-spec-links-001.md").exists()
 
 
 def test_propose_bridge_refuses_silent_overwrite(tmp_path: Path) -> None:
@@ -442,7 +495,7 @@ def test_propose_bridge_refuses_silent_overwrite(tmp_path: Path) -> None:
     with pytest.raises(helper.BridgeFileAlreadyExistsError) as excinfo:
         helper.propose_bridge(
             "occupied-topic",
-            "New body that should not be written.",
+            _proposal_body("New body that should not be written."),
             mode="abort",
             bridge_dir=bridge_dir,
         )
@@ -462,7 +515,7 @@ def test_propose_bridge_aborts_on_hits_when_mode_abort(tmp_path: Path) -> None:
     _write_fresh_index(bridge_dir / "INDEX.md")
     original_index = (bridge_dir / "INDEX.md").read_text(encoding="utf-8")
 
-    body = f"Forbidden content: {_synthetic_ar_live_key()}"
+    body = _proposal_body(f"Forbidden content: {_synthetic_ar_live_key()}")
     with pytest.raises(helper.CredentialHitsFoundError):
         helper.propose_bridge("abort-topic", body, mode="abort", bridge_dir=bridge_dir)
 
@@ -480,7 +533,7 @@ def test_propose_bridge_redacts_and_writes_when_mode_redact_and_clean(tmp_path: 
     _write_fresh_index(bridge_dir / "INDEX.md")
 
     synthetic = _synthetic_ar_live_key()
-    body = f"Rotate {synthetic} and report."
+    body = _proposal_body(f"Rotate {synthetic} and report.")
     result_path = helper.propose_bridge(
         "redact-topic",
         body,
@@ -520,7 +573,7 @@ def test_propose_bridge_succeeds_after_one_concurrent_mod(tmp_path: Path, monkey
     monkeypatch.setattr(helper, "_update_bridge_index", _retrying_update)
     result_path = helper.propose_bridge(
         "retry-topic",
-        "Retry-survival body.",
+        _proposal_body("Retry-survival body."),
         mode="abort",
         bridge_dir=bridge_dir,
     )
@@ -562,7 +615,7 @@ def test_propose_bridge_aborts_after_2_concurrent_mods(tmp_path: Path, monkeypat
     with pytest.raises(helper.BridgeIndexConflictError) as excinfo:
         helper.propose_bridge(
             "persistent-conflict-topic",
-            "Persistent-conflict body.",
+            _proposal_body("Persistent-conflict body."),
             mode="abort",
             bridge_dir=bridge_dir,
         )

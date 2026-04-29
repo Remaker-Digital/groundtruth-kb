@@ -8,6 +8,41 @@ of versioned markdown files governed by a single index file.
 `bridge/` at project root. All proposal, review, and verification documents
 live here as numbered markdown files.
 
+## Mandatory Specification Linkage Gate
+
+Every implementation proposal must include a `Specification Links` section
+before it can receive `GO`. The section must cite every relevant governing
+specification, rule, ADR, DCL, proposal standard, or other durable specification
+artifact that constrains the proposed implementation. A proposal with no linked
+specification surface is invalid and must receive `NO-GO`.
+
+Codex/Loyal Opposition MUST reject all implementation proposals that are not
+linked to specifications. Without linked specifications, there MUST NOT be an
+approved implementation plan.
+
+The proposal must also state how the proposed tests derive from those linked
+specifications. Codex/Loyal Opposition review must independently check the list
+for omissions. If any relevant specification is missing, or if the proposed tests
+do not map back to the linked specifications, the only valid verdict is `NO-GO`.
+
+## Mandatory Specification-Derived Verification Gate
+
+An implementation cannot receive `VERIFIED` unless the verification procedure
+creates or identifies tests derived from the specifications linked in the
+implementation proposal and executes those tests against the implementation.
+
+The post-implementation report must include:
+
+- the linked specifications carried forward from the proposal;
+- a spec-to-test mapping showing which tests cover which specification clauses
+  or acceptance criteria;
+- the exact commands used to execute those tests;
+- the observed results.
+
+If a linked specification has no executed test coverage, Codex/Loyal Opposition
+must issue `NO-GO` unless the owner explicitly approves a documented waiver for
+that specific specification and risk.
+
 ## File Naming
 
 `{descriptive-name}-{NNN}.md`

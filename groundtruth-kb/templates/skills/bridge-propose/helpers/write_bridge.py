@@ -85,6 +85,10 @@ class CredentialHitsFoundError(RuntimeError):
     """
 
 
+class SpecificationLinksMissingError(RuntimeError):
+    """Raised when a bridge proposal omits mandatory specification linkage."""
+
+
 # Credential-only catalog. Iterates ``CREDENTIAL_PATTERNS + BASH_EXTRAS``
 # directly — matching the scanner-safe-writer policy of excluding
 # ``PII_PATTERNS`` (phone, email, ipv4) so operators can reference
@@ -92,6 +96,52 @@ class CredentialHitsFoundError(RuntimeError):
 _SCAN_CATALOG: list[tuple[re.Pattern[str], str, str]] = [
     (spec.pattern, spec.name, spec.description) for spec in list(CREDENTIAL_PATTERNS) + list(BASH_EXTRAS)
 ]
+
+_SPEC_LINK_HEADING_RE = re.compile(
+    r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
+    re.IGNORECASE,
+)
+_SPEC_LINK_TOKEN_RE = re.compile(
+    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\b"
+    r"|(?:^|[`(\s])(?:\.claude/rules|groundtruth-kb/docs|docs|bridge)/[^\s`)]+",
+    re.IGNORECASE | re.MULTILINE,
+)
+_SPEC_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|none|n/a|not applicable|no relevant)\b", re.IGNORECASE)
+
+
+def _specification_links_section(body: str) -> str | None:
+    """Return the body of the mandatory specification-link section, if present."""
+    lines = body.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if _SPEC_LINK_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return None
+
+    section: list[str] = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            break
+        section.append(line)
+    return "\n".join(section).strip()
+
+
+def validate_specification_links(body: str) -> None:
+    """Require explicit links to the relevant governing specifications."""
+    section = _specification_links_section(body)
+    if section is None:
+        raise SpecificationLinksMissingError(
+            "Bridge implementation proposals must include a 'Specification Links' "
+            "section citing every relevant governing specification."
+        )
+    if _SPEC_PLACEHOLDER_RE.search(section) or not _SPEC_LINK_TOKEN_RE.search(section):
+        raise SpecificationLinksMissingError(
+            "The 'Specification Links' section must contain concrete spec IDs "
+            "or specification/rule file paths, not placeholders."
+        )
 
 
 def scan_credential_hits(content: str) -> list[dict[str, Any]]:
@@ -371,6 +421,10 @@ def propose_bridge(
 ) -> Path:
     """Create ``bridge/<topic_slug>-001.md`` and insert an INDEX entry.
 
+    Phase 0 - Specification linkage gate: require a ``Specification Links``
+    section with concrete spec/rule links before any bridge file or INDEX
+    mutation.
+
     Phase 1 — Pre-flight scan: iterate ``CREDENTIAL_PATTERNS +
     BASH_EXTRAS`` over ``body``. If hits are found, resolve per
     ``mode`` via :func:`handle_hits_abort_or_redact`.
@@ -400,6 +454,7 @@ def propose_bridge(
         Absolute path to the created bridge file.
 
     Raises:
+        SpecificationLinksMissingError: Mandatory specification linkage missing.
         CredentialHitsFoundError: ``mode='abort'`` and hits found.
         RedactionResidualError: Redaction failed the re-scan gate.
         BridgeFileAlreadyExistsError: Target file already on disk.
@@ -409,6 +464,9 @@ def propose_bridge(
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
     bridge_file = bridge_root / f"{topic_slug}-001.md"
     index_path = bridge_root / "INDEX.md"
+
+    # Phase 0: Implementation proposals must link relevant specifications.
+    validate_specification_links(body)
 
     # Phase 1: Pre-flight scan.
     hits = scan_credential_hits(body)
@@ -453,8 +511,10 @@ __all__ = [
     "BridgeIndexConflictError",
     "CredentialHitsFoundError",
     "RedactionResidualError",
+    "SpecificationLinksMissingError",
     "handle_hits_abort_or_redact",
     "propose_bridge",
     "redact_credential_hits",
     "scan_credential_hits",
+    "validate_specification_links",
 ]

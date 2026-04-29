@@ -18,6 +18,17 @@ PII excluded), writes ``bridge/<topic>-001.md``, and inserts a
 ``Document: <topic>`` + ``NEW: bridge/<topic>-001.md`` entry at the
 top of ``bridge/INDEX.md``.
 
+Every implementation proposal must include a ``Specification Links`` section
+before it can be submitted. The section must cite every relevant governing
+specification using concrete spec IDs or specification/rule file paths.
+Placeholder values such as ``TBD``, ``N/A``, or ``no relevant specs`` are hard
+errors: create or update the needed specification first, then submit the
+proposal.
+
+Loyal Opposition MUST reject all implementation proposals that are not linked to
+specifications. Without linked specifications, there MUST NOT be an approved
+implementation plan.
+
 Two options are offered on a credential hit:
 
 - **Abort** — no file is written, no INDEX entry is added.
@@ -59,6 +70,12 @@ Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
 caller-supplied ``topic_slug``, ``body``, and optional metadata.
 
 ### Phase 1 — Pre-flight scan
+
+Before credential scanning, ``validate_specification_links(body)`` requires a
+``Specification Links`` section with concrete spec IDs or specification/rule
+file paths. This gate runs before file writes, credential redaction, and INDEX
+mutation. It cannot prove the list is complete; Loyal Opposition still must
+review completeness and issue NO-GO if any relevant specification is omitted.
 
 ``scan_credential_hits(body)`` iterates ``CREDENTIAL_PATTERNS +
 BASH_EXTRAS`` (PII patterns are intentionally excluded, same policy
