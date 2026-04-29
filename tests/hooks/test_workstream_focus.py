@@ -56,20 +56,21 @@ def _isolate_state(monkeypatch, tmp_path: Path) -> tuple[Path, Path]:
     return canonical, legacy
 
 
-def test_default_work_subject_is_application_and_startup_lines_explain_commands(tmp_path, monkeypatch) -> None:
+def test_default_work_subject_is_gtkb_and_startup_lines_explain_commands(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
 
     state = module.load_state(REPO_ROOT)
     lines = module.render_startup_focus_lines(module.startup_focus_snapshot(REPO_ROOT))
 
-    assert state["default_focus"] == module.FOCUS_APPLICATION
-    assert state["current_focus"] == module.FOCUS_APPLICATION
-    assert state["current_subject"] == module.SUBJECT_APPLICATION
+    assert state["default_focus"] == module.FOCUS_GTKB_INFRASTRUCTURE
+    assert state["current_focus"] == module.FOCUS_GTKB_INFRASTRUCTURE
+    assert state["current_subject"] == module.SUBJECT_GTKB
     assert state["schema_version"] == module.SCHEMA_VERSION
     assert state["role_slot"] == module.ROLE_SLOT_DEFAULT
-    assert "Default work subject: Application Focus" in lines
-    assert "Current work subject: Application Focus" in lines
+    assert "Default work subject: GT-KB Infrastructure Focus" in lines
+    assert "Current work subject: GT-KB Infrastructure Focus" in lines
+    assert "GT-KB is the default work subject" in lines
     assert "`work subject application`" in lines
     assert "`work subject GT-KB`" in lines
     assert "`application mode`" in lines
@@ -203,7 +204,7 @@ def test_prompt_hook_sets_explicit_next_session_role(tmp_path, monkeypatch) -> N
 
 def test_prompt_hook_uses_harness_local_role_record_when_named(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    codex_dir = tmp_path / ".codex" / "agent-red-hooks"
+    codex_dir = tmp_path / ".codex" / "gtkb-hooks"
     codex_dir.mkdir(parents=True)
     role_path = codex_dir / "operating-role.md"
     role_path.write_text("active_role: loyal-opposition\n", encoding="utf-8")
@@ -311,6 +312,7 @@ def test_classify_root_4_categories(tmp_path, monkeypatch) -> None:
 def test_application_subject_blocks_gtkb_product_write(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
 
     gtkb_dir = tmp_path / "groundtruth-kb"
     (gtkb_dir / "src" / "groundtruth_kb").mkdir(parents=True)
@@ -333,6 +335,7 @@ def test_application_subject_allows_current_repo_bridge_or_governance_write(tmp_
 
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
 
     response = module.guard_tool_use(
         {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
@@ -345,6 +348,7 @@ def test_application_subject_allows_current_repo_bridge_or_governance_write(tmp_
 def test_application_subject_allows_application_write(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
 
     response = module.guard_tool_use(
         {"tool_name": "Write", "tool_input": {"file_path": "src/example.py"}},
@@ -415,6 +419,7 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
 def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
 
     gtkb_dir = tmp_path / "groundtruth-kb"
     (gtkb_dir / "src" / "groundtruth_kb").mkdir(parents=True)
@@ -450,7 +455,7 @@ def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeyp
     assert "work subject GT-KB" in gtkb_write_response["reason"]
 
 
-# ---- GTKB-ISOLATION-015 Slice 1 §A / §C / §E regression coverage ----------
+# ---- GTKB-ISOLATION-015 Slice 1 Â§A / Â§C / Â§E regression coverage ----------
 
 
 def test_startup_focus_lines_include_role_slot_topology_mode_stimulus_and_bridge_authority(
@@ -541,7 +546,7 @@ def test_detect_counterpart_state_no_counterpart_files_no_warning(tmp_path, monk
             "claude": tmp_path / ".claude" / "operating-role.md",
         },
     )
-    result = module.detect_counterpart_state(REPO_ROOT)
+    result = module.detect_counterpart_state()
     assert result["warnings"] == []
     assert result["counterpart_present"] is False
 
@@ -559,7 +564,7 @@ def test_detect_counterpart_state_same_role_warns(tmp_path, monkeypatch) -> None
         "HARNESS_ROLE_RECORDS",
         {"codex": codex_record, "claude": claude_record},
     )
-    result = module.detect_counterpart_state(REPO_ROOT)
+    result = module.detect_counterpart_state()
     assert result["same_role_slot"] is True
     assert result["counterpart_present"] is True
     assert any("prime-builder" in msg and "collide" in msg for msg in result["warnings"])
@@ -579,7 +584,7 @@ def test_detect_counterpart_state_different_role_warns(tmp_path, monkeypatch) ->
         "HARNESS_ROLE_RECORDS",
         {"codex": codex_record, "claude": claude_record},
     )
-    result = module.detect_counterpart_state(REPO_ROOT)
+    result = module.detect_counterpart_state()
     assert result["same_role_slot"] is False
     assert result["counterpart_present"] is True
     assert any("prime-builder" in msg and "loyal-opposition" in msg for msg in result["warnings"])
@@ -620,7 +625,7 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
     )
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
 
-    result = module.detect_counterpart_state(REPO_ROOT)
+    result = module.detect_counterpart_state()
     assert result["subject_mismatch"] is True
     assert any(
         module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg
@@ -631,14 +636,14 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
 def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
     tmp_path, monkeypatch
 ) -> None:
-    """Symmetric §E regression (bridge -014 P1).
+    """Symmetric Â§E regression (bridge -014 P1).
 
     Reproduces the live asymmetry Codex demonstrated: Codex on
     gtkb_infrastructure, Claude on application, shared canonical set to
     application. Before -014's fix, detect_counterpart_state() with
     GTKB_HARNESS_NAME=codex read our_subject from the shared canonical
     (application), compared against counterpart Claude guard (application),
-    and returned subject_mismatch=False — silently missing the split.
+    and returned subject_mismatch=False â€” silently missing the split.
 
     After the fix, our_subject is read from our own harness guard first, so
     Codex sees our_subject=gtkb_infrastructure and correctly warns.
@@ -662,7 +667,7 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
         json.dumps({"current_subject": module.FOCUS_GTKB_INFRASTRUCTURE}) + "\n",
         encoding="utf-8",
     )
-    # Claude's guard says application — matches shared canonical.
+    # Claude's guard says application â€” matches shared canonical.
     claude_guard.write_text(
         json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
         encoding="utf-8",
@@ -682,7 +687,7 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
     # application (ours) against application (claude's guard) and miss.
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
 
-    result = module.detect_counterpart_state(REPO_ROOT)
+    result = module.detect_counterpart_state()
     assert result["subject_mismatch"] is True, (
         "Codex-side must detect subject divergence against Claude's guard; "
         "pre-fix behavior silently missed this because our_subject came from "
@@ -726,7 +731,7 @@ def test_detect_counterpart_state_subject_match_no_warning(tmp_path, monkeypatch
     )
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
 
-    result = module.detect_counterpart_state(REPO_ROOT)
+    result = module.detect_counterpart_state()
     assert result["subject_mismatch"] is False
     assert not any("work subject" in msg for msg in result["warnings"])
 
@@ -745,7 +750,7 @@ def test_detect_counterpart_state_missing_counterpart_no_crash(tmp_path, monkeyp
             "claude": claude_record,
         },
     )
-    result = module.detect_counterpart_state(REPO_ROOT)
+    result = module.detect_counterpart_state()
     assert result["counterpart_present"] is False
     assert result["warnings"] == []
 
@@ -800,10 +805,10 @@ def test_harness_state_records_for_project_returns_sandbox_relative_paths(tmp_pa
     sandbox = tmp_path / "sandbox"
     role_records, lifecycle_guards = module._harness_state_records_for_project(sandbox)
 
-    assert role_records["codex"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "codex" / "operating-role.md"
-    assert role_records["claude"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "claude" / "operating-role.md"
-    assert lifecycle_guards["codex"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "codex" / "session-lifecycle-guard.json"
-    assert lifecycle_guards["claude"] == sandbox / "applications" / "Agent_Red" / "harness-state" / "claude" / "session-lifecycle-guard.json"
+    assert role_records["codex"] == sandbox / "harness-state" / "codex" / "operating-role.md"
+    assert role_records["claude"] == sandbox / "harness-state" / "claude" / "operating-role.md"
+    assert lifecycle_guards["codex"] == sandbox / "harness-state" / "codex" / "session-lifecycle-guard.json"
+    assert lifecycle_guards["claude"] == sandbox / "harness-state" / "claude" / "session-lifecycle-guard.json"
 
     # Helper paths must NOT match the canonical module-level constants when a
     # different project_root is supplied (the whole point of the class-level
@@ -840,11 +845,11 @@ def test_detect_counterpart_state_uses_project_root_paths_when_provided(tmp_path
     for path in recorded_paths:
         assert sandbox in path.parents, (
             f"role record path {path!r} should be under sandbox {sandbox!r} "
-            "but is not — class-level fix regressed"
+            "but is not â€” class-level fix regressed"
         )
         assert canonical_root not in path.parents, (
             f"role record path {path!r} should NOT be under canonical "
-            f"PROJECT_ROOT {canonical_root!r} — class-level fix regressed"
+            f"PROJECT_ROOT {canonical_root!r} â€” class-level fix regressed"
         )
 
 

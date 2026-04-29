@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Work-subject state, commands, and root-classification guardrails for Agent Red / GT-KB sessions.
+"""Work-subject state, commands, and root-classification guardrails for GroundTruth-KB sessions.
 
 Phase 7 foundation slice (DELIB-0876 / GTKB-ISOLATION-010): the module stores
 canonical runtime state at ``.claude/session/work-subject.json`` with a typed
@@ -20,22 +20,22 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-AGENT_RED_HARNESS_STATE_ROOT = PROJECT_ROOT / "applications" / "Agent_Red" / "harness-state"
+GTKB_HARNESS_STATE_ROOT = PROJECT_ROOT / "harness-state"
 
 # ---- Work-subject identity ----------------------------------------------
 FOCUS_APPLICATION = "application"
 FOCUS_GTKB_INFRASTRUCTURE = "gtkb_infrastructure"
-DEFAULT_FOCUS = FOCUS_APPLICATION
+DEFAULT_FOCUS = FOCUS_GTKB_INFRASTRUCTURE
 
 SUBJECT_APPLICATION = FOCUS_APPLICATION
 SUBJECT_GTKB = FOCUS_GTKB_INFRASTRUCTURE
-DEFAULT_SUBJECT = SUBJECT_APPLICATION
+DEFAULT_SUBJECT = SUBJECT_GTKB
 
 SCHEMA_VERSION = 1
 ROLE_SLOT_DEFAULT = "shared"
-DEFAULT_APPLICATION_LABEL = "Agent Red"
+DEFAULT_APPLICATION_LABEL = "Agent Red demo adopter"
 
-# Topology mode — whether GT-KB Prime Builder and Loyal Opposition run in one
+# Topology mode â€” whether GT-KB Prime Builder and Loyal Opposition run in one
 # harness (single) or split across two harnesses (multi). Drives counterpart
 # detection in ``detect_counterpart_state`` and the Active Work Subject block.
 TOPOLOGY_MODE_SINGLE = "single_harness"
@@ -52,15 +52,15 @@ OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
 STARTUP_REPORT_RELATIVE_PATH = Path("docs") / "gtkb-dashboard" / "session-startup-report.md"
 DEFAULT_DASHBOARD_PREFERENCES_PATH = (
-    AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
+    GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
 )
 HARNESS_ROLE_RECORDS = {
-    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
-    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
+    "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
+    "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
 }
 HARNESS_LIFECYCLE_GUARDS = {
-    "codex": AGENT_RED_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
-    "claude": AGENT_RED_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
+    "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
+    "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
 }
 
 # ---- Role profiles (unchanged from prior module) -----------------------
@@ -651,8 +651,8 @@ def render_startup_focus_lines(snapshot: dict[str, str | None] | None = None) ->
             f"- Application label: {app_label}",
             f"- Bridge role slot: `{role_slot}` (shared, prime-builder, or loyal-opposition).",
             f"- Harness topology: `{topology_mode}` (single_harness or multi_harness).",
-            "- Application work subject means owner direction is interpreted as work on the unique application being built with GroundTruth-KB.",
-            "- GT-KB Infrastructure work subject is active only when explicitly declared.",
+            "- GT-KB is the default work subject; owner direction is interpreted as GroundTruth-KB work unless Mike explicitly names an adopter application.",
+            "- Application work subject means owner direction is interpreted as work on a named adopter/demo application such as Agent Red.",
             "- Application work subject commands: `work subject application`, `application mode`, `app mode`, `agent red mode`.",
             "- GT-KB work subject commands: `work subject GT-KB`, `GT-KB mode`, `GT-KB infrastructure mode`, `GroundTruth-KB mode`.",
             "- Canonical state file: `.claude/session/work-subject.json` (legacy `.claude/hooks/.workstream-focus-state.json` migrated on next owner command).",
@@ -669,11 +669,11 @@ def render_active_work_subject(
     overlay_status: dict[str, Any] | None = None,
     include_counterpart: bool = True,
 ) -> str:
-    """Render the enriched Active Work Subject block (Slice 1 §A).
+    """Render the enriched Active Work Subject block (Slice 1 Â§A).
 
-    Composes ``render_startup_focus_lines`` with an overlay status line (§C)
+    Composes ``render_startup_focus_lines`` with an overlay status line (Â§C)
     and, when ``include_counterpart`` is True, a counterpart-state warning
-    summary (§E). Overlay and counterpart outputs are always informational —
+    summary (Â§E). Overlay and counterpart outputs are always informational â€”
     the startup report never treats them as canonical.
     """
 
@@ -683,20 +683,20 @@ def render_active_work_subject(
     if include_counterpart:
         counterpart = detect_counterpart_state(project_root)
         for warning in counterpart["warnings"]:
-            lines.append(f"- WARNING: counterpart harness — {warning}")
+            lines.append(f"- WARNING: counterpart harness â€” {warning}")
         if not counterpart["warnings"] and counterpart["counterpart_present"]:
             lines.append("- Counterpart harness detected; no role or subject conflicts.")
     return "\n".join(lines)
 
 
-# ---- §C Overlay-aware startup -------------------------------------------
+# ---- Â§C Overlay-aware startup -------------------------------------------
 
 
 def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
     """Map a session overlay status dict to a startup-block level + lines.
 
-    - Absent → informational note. No warning.
-    - Stale / root_mismatch / subject_mismatch / projection_diff → WARNING.
+    - Absent â†’ informational note. No warning.
+    - Stale / root_mismatch / subject_mismatch / projection_diff â†’ WARNING.
     - Overlays are never canonical for DA/MemBase/bridge/readiness decisions.
     """
 
@@ -743,7 +743,7 @@ def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# ---- §E Counterpart state detection -------------------------------------
+# ---- Â§E Counterpart state detection -------------------------------------
 
 
 def _read_active_role_from_file(path: Path) -> str | None:
@@ -784,7 +784,7 @@ def _harness_state_records_for_project(
     ``HARNESS_LIFECYCLE_GUARDS`` constants but builds them from a passed
     ``project_root`` rather than from this module's ``PROJECT_ROOT`` (which
     is computed from ``__file__`` at import time and resolves to the legacy
-    root when this module is imported from there — e.g., during the Slice 11
+    root when this module is imported from there â€” e.g., during the Slice 11
     rehearsal lane subprocess).
 
     Per bridge/harness-state-preferences-path-cli-2026-04-28-004.md Codex
@@ -792,7 +792,7 @@ def _harness_state_records_for_project(
     so ``detect_counterpart_state`` does not iterate canonical-bound
     module-level dictionaries when called with a sandbox project_root.
     """
-    state_root = project_root / "applications" / "Agent_Red" / "harness-state"
+    state_root = project_root / "harness-state"
     role_records: dict[str, Path] = {
         "codex": state_root / "codex" / "operating-role.md",
         "claude": state_root / "claude" / "operating-role.md",
@@ -805,7 +805,7 @@ def _harness_state_records_for_project(
 
 
 def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]:
-    """Detect role-slot and subject conflicts with the counterpart harness (§E).
+    """Detect role-slot and subject conflicts with the counterpart harness (Â§E).
 
     Returns ``{"counterpart_present", "same_role_slot", "subject_mismatch",
     "warnings"}``. Warnings are only emitted when counterpart state files are
@@ -846,7 +846,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
                 same_role_slot = True
                 warnings.append(
                     f"both `{current_harness}` and `{harness}` have active_role=`{role}` "
-                    "— counterpart bridge roles may collide; verify operating-role.md per harness."
+                    "â€” counterpart bridge roles may collide; verify operating-role.md per harness."
                 )
             elif role != our_role and role in TOGGLEABLE_ROLE_PROFILES and our_role in TOGGLEABLE_ROLE_PROFILES:
                 warnings.append(
@@ -884,7 +884,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
             subject_mismatch = True
             warnings.append(
                 f"counterpart `{harness}` records work subject=`{counterpart_subject}` "
-                f"while `{current_harness or 'local'}` is on `{our_subject}` — "
+                f"while `{current_harness or 'local'}` is on `{our_subject}` â€” "
                 "verify both harnesses intend this split."
             )
 
@@ -896,13 +896,13 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
     }
 
 
-# ---- §A Readiness hard-rejection ----------------------------------------
+# ---- Â§A Readiness hard-rejection ----------------------------------------
 
 
 class SubjectScopeError(RuntimeError):
     """Raised when a readiness/report output would emit a combined application + GT-KB
 
-    green claim without an explicit dual-scope declaration (§A hard rejection).
+    green claim without an explicit dual-scope declaration (Â§A hard rejection).
     """
 
 
@@ -923,7 +923,7 @@ def assert_readiness_subject_scope(
 
     if application_green and gtkb_green and not dual_scope_declared:
         raise SubjectScopeError(
-            f"{context}: combined application + GT-KB green claim rejected — "
+            f"{context}: combined application + GT-KB green claim rejected â€” "
             "caller must pass an explicit dual-scope declaration identifying "
             "both subjects (application and GT-KB) before emitting a combined "
             "green claim. Use `work subject application` or `work subject GT-KB` "
@@ -1063,8 +1063,8 @@ def classify_path(path_text: str, project_root: Path | None = None) -> str:
     """Legacy 3-value classifier kept for callers that rely on ``FOCUS_*`` strings.
 
     Maps the new 4-category classifier back to the pre-Phase-7 vocabulary:
-    ``gtkb_product`` or ``current_repo_bridge_or_governance`` → ``FOCUS_GTKB_INFRASTRUCTURE``;
-    ``application_product`` → ``FOCUS_APPLICATION``; ``neutral`` → ``"neutral"``.
+    ``gtkb_product`` or ``current_repo_bridge_or_governance`` â†’ ``FOCUS_GTKB_INFRASTRUCTURE``;
+    ``application_product`` â†’ ``FOCUS_APPLICATION``; ``neutral`` â†’ ``"neutral"``.
     """
 
     category = classify_root(path_text, project_root)
@@ -1078,7 +1078,7 @@ def classify_path(path_text: str, project_root: Path | None = None) -> str:
 def _path_mentions_from_command(command: str) -> list[str]:
     """Extract path-like mentions from a mutating shell command.
 
-    Finds both known-prefix substring matches (``bridge/``, ``src/``, …) and
+    Finds both known-prefix substring matches (``bridge/``, ``src/``, â€¦) and
     whitespace-separated tokens that look like filesystem paths (contain a
     slash or carry a drive-letter prefix). Token scanning is how absolute
     paths under ``GTKB_PRODUCT_ROOT`` (outside the current-repo prefix table)
@@ -1136,7 +1136,7 @@ def guard_tool_use(
     * ``gtkb_infrastructure`` subject blocks ``application_product`` targets.
 
     Current-repo bridge/governance surfaces (``current_repo_bridge_or_governance``)
-    are NOT blocked in either subject — they are workspace infrastructure, not
+    are NOT blocked in either subject â€” they are workspace infrastructure, not
     GT-KB product paths.
     """
 

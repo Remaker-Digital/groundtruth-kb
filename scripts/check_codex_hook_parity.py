@@ -19,7 +19,7 @@ OPERATING_ROLE_RECORD = ".claude/rules/operating-role.md"
 CODEX_CONFIG = ".codex/config.toml"
 CODEX_HOOKS = ".codex/hooks.json"
 CLAUDE_SETTINGS = ".claude/settings.json"
-CODEX_WRAPPER_DIR = PROJECT_ROOT / ".codex" / "agent-red-hooks"
+CODEX_WRAPPER_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 CODEX_FORMAL_APPROVAL_WRAPPER = CODEX_WRAPPER_DIR / "formal-artifact-approval.cmd"
 CODEX_WORKSTREAM_FOCUS_WRAPPER = CODEX_WRAPPER_DIR / "workstream-focus.cmd"
 CODEX_SESSION_START_WRAPPER = CODEX_WRAPPER_DIR / "session-start.cmd"
@@ -62,7 +62,7 @@ def _contains_hook_wrapper(command: str, wrapper_path: Path) -> bool:
     """Return true for the project-intended wrapper path across runner homes."""
     normalized_command = command.replace("\\", "/").lower()
     normalized_path = wrapper_path.as_posix().lower()
-    wrapper_fragment = f"agent-red-hooks/{wrapper_path.name.lower()}"
+    wrapper_fragment = f"gtkb-hooks/{wrapper_path.name.lower()}"
     return normalized_path in normalized_command or wrapper_fragment in normalized_command
 
 

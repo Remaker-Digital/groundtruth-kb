@@ -27,7 +27,7 @@ def main() -> None:
         json.dump(
             {
                 "systemMessage": (
-                    "GT-KB workstream focus hook error; default to Application Focus "
+                    "GT-KB workstream focus hook error; default to GT-KB work "
                     f"until the hook is repaired. Error: {exc}"
                 )
             },

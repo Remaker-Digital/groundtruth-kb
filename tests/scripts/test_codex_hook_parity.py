@@ -40,17 +40,17 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     codex_hooks = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
     claude_settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     assert any(
-        "agent-red-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
+        "gtkb-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
         for group in codex_hooks["hooks"]["SessionStart"]
         for hook in group["hooks"]
     )
     assert any(
-        "agent-red-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
+        "gtkb-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
         for group in codex_hooks["hooks"]["UserPromptSubmit"]
         for hook in group["hooks"]
     )
     assert any(
-        "agent-red-hooks" in hook["command"] and "workstream-focus.cmd" in hook["command"]
+        "gtkb-hooks" in hook["command"] and "workstream-focus.cmd" in hook["command"]
         for group in codex_hooks["hooks"]["UserPromptSubmit"]
         for hook in group["hooks"]
     )
@@ -59,7 +59,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in codex_hooks["hooks"]["PreToolUse"]
     )
     assert "Stop" not in codex_hooks["hooks"]
-    # Per bridge/gtkb-startup-enhancements-p1-003.md §2.4 (Codex GO at -004):
+    # Per bridge/gtkb-startup-enhancements-p1-003.md Â§2.4 (Codex GO at -004):
     # the previously-registered owner-decision-tracker-ups.cmd entry has been
     # removed because the wrapper file does not exist on disk, Codex hooks
     # are disabled on Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001, and the
@@ -107,21 +107,21 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert commands
     assert all("$(" not in command for command in commands)
     assert any(
-        "agent-red-hooks" in command and "session_start_dispatch.py" in command and command.startswith("python ")
+        "gtkb-hooks" in command and "session_start_dispatch.py" in command and command.startswith("python ")
         for command in commands
     )
     assert any(
-        "agent-red-hooks" in command
+        "gtkb-hooks" in command
         and "session_wrapup_trigger_dispatch.py" in command
         and command.startswith("python ")
         for command in commands
     )
     assert any(
-        "agent-red-hooks" in command and "workstream-focus.cmd" in command and command.startswith("cmd /d /s /c ")
+        "gtkb-hooks" in command and "workstream-focus.cmd" in command and command.startswith("cmd /d /s /c ")
         for command in commands
     )
 
-    start_dispatcher = REPO_ROOT / ".codex" / "agent-red-hooks" / "session_start_dispatch.py"
+    start_dispatcher = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
     if not start_dispatcher.is_file():
         assert os.environ.get("CI") == "true"
         return
@@ -157,7 +157,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "last-session-start.json" in start_text
     assert "last-session-start.err" in start_text
 
-    wrapup_dispatcher = REPO_ROOT / ".codex" / "agent-red-hooks" / "session_wrapup_trigger_dispatch.py"
+    wrapup_dispatcher = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_wrapup_trigger_dispatch.py"
     wrapup_text = wrapup_dispatcher.read_text(encoding="utf-8")
     assert "--emit-wrapup" in wrapup_text
     assert "--force-wrapup" in wrapup_text
@@ -183,7 +183,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "last-wrapup-trigger.err" in wrapup_text
     assert "last-wrapup-trigger-input.json" in wrapup_text
 
-    workstream_wrapper = REPO_ROOT / ".codex" / "agent-red-hooks" / "workstream-focus.cmd"
+    workstream_wrapper = REPO_ROOT / ".codex" / "gtkb-hooks" / "workstream-focus.cmd"
     workstream_text = workstream_wrapper.read_text(encoding="utf-8")
     assert "workstream-focus.py" in workstream_text
     assert "GTKB_HARNESS_NAME=codex" in workstream_text
