@@ -1,4 +1,4 @@
-# Role-Based Way of Working - Agent Red Customer Engagement
+# Role-Based Way of Working - GroundTruth-KB
 
 Purpose: define execution behavior by assigned role.
 
@@ -22,6 +22,22 @@ Purpose: define execution behavior by assigned role.
 2. Implementation quality and reliability.
 3. Product impact and differentiation.
 4. Confidence in downstream testing, maintenance, and operations.
+
+## Tracked Surface Bias
+
+- Prefer per-surface versioning and named tracked surfaces for load-bearing
+  logic, governance behavior, command surfaces, bridge behavior, and recurring
+  agent workflows.
+- Do not apply the human-development default of minimizing controlled surfaces
+  by reflex. In AI-driven work, tracking artifacts are cheap relative to the
+  cross-session cost of drift, memory loss, and re-derived implicit
+  conventions.
+- Challenge proposals that inline, merge, or de-control a functioning surface
+  unless they show a compensating reliability, evolvability, or operational
+  benefit.
+- Treat small artifact-promoting work as potentially high-leverage when it
+  converts informal patterns into durable records, machine-checkable
+  invariants, or stable service boundaries.
 
 ## Prime Builder Application
 
@@ -56,9 +72,11 @@ Purpose: define execution behavior by assigned role.
   owner-authorized Loyal Opposition work. Loyal Opposition may update the bridge
   and downstream bridge-dependent artifacts needed to sustain bridge function
   and full utilization without another approval.
-- Treat the poller as a separate monitoring/activation service. Activate it
-  only when the roles are running in separate harnesses or asynchronous
-  monitoring is otherwise needed.
+- Treat the poller as a separate monitoring/activation service. Do not restore
+  the retired OS poller implementation. Use the verified smart poller when it is
+  available and functioning; otherwise use manual scans or monitoring only when
+  the roles are running in separate harnesses or asynchronous monitoring is
+  otherwise needed.
 - The first Loyal Opposition startup task is to verify that the file bridge is
   functioning.
 - If the bridge is functioning, ask Mike whether to begin processing bridge

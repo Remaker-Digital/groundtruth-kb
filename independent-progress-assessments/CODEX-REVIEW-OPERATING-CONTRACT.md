@@ -1,4 +1,4 @@
-﻿# Review Operating Contract - Agent Red Customer Engagement
+# Review Operating Contract - GroundTruth-KB
 
 Purpose: define review, audit, and technical investigation behavior for the
 Loyal Opposition role.

@@ -1,4 +1,4 @@
-# Codex Decision Ledger - Agent Red Customer Engagement
+# Codex Decision Ledger - GroundTruth-KB
 
 Purpose: persistent record of owner decisions and standing operating choices that materially affect Codex review behavior.
 
@@ -9,6 +9,51 @@ Purpose: persistent record of owner decisions and standing operating choices tha
 - Include source, impact, and whether the decision is still active.
 
 ## Entries
+
+### 2026-04-29 - AI-driven work prefers tracked surfaces for load-bearing change
+
+- source:
+  Owner clarification in session on 2026-04-29.
+- decision:
+  GT-KB work should use per-surface versioning and named tracked surfaces
+  rather than a monolithic or implicit-control model, especially for
+  functioning subsystems and load-bearing components. Human-development
+  heuristics often minimize controlled surfaces because documentation and
+  tracking cost human time and attention. AI-driven development has the
+  opposite dominant cost: untracked surfaces create drift, lost memory, and
+  re-derived conventions across sessions. The default bias is therefore toward
+  modularity, explicit change control, and durable tracking unless the
+  per-surface ratchet cost exceeds the drift risk.
+- impact:
+  Future reviews should challenge "simplifying" changes that reduce named or
+  versioned surfaces without a clear evolutionary benefit. Small work items
+  that promote informal patterns into tracked artifacts can have higher
+  leverage than their visible scope suggests because they reduce future drift
+  exposure. Load-bearing helpers, command surfaces, bridge behavior,
+  governance flows, and recurring agent workflows should default toward
+  explicit tracked surfaces, machine-checkable invariants, and per-surface
+  versioning.
+- status:
+  Active
+
+### 2026-04-28 - GT-KB host supports one active developed application
+
+- source:
+  Owner clarification in session on 2026-04-28.
+- decision:
+  GT-KB and applications built using it are isolated for lifecycle reasons:
+  the GT-KB platform must be able to evolve independently of applications and
+  release on its own cadence. A GT-KB host directory supports only one active
+  developed application at a time; it is not expected to host concurrent
+  application-development work.
+- impact:
+  Future isolation, packaging, installer, bridge, and review proposals should
+  treat `applications/` as an application slot and lifecycle boundary, not as a
+  concurrent multi-application workspace. Findings should reject designs that add
+  unnecessary multi-app orchestration inside one GT-KB host unless Mike later
+  changes this constraint.
+- status:
+  Active
 
 ### 2026-03-25 - Codex primary role is review and investigation
 

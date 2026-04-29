@@ -51,7 +51,7 @@ Each finding must include:
 2. Process document entries whose latest status is `NEW` or `REVISED`.
 3. Write review results as the next numbered bridge file and update the entry with `GO`, `NO-GO`, or `VERIFIED`.
 
-**Phase B — Local bootstrap (after bridge obligations are clear):**
+**Phase B â€” Local bootstrap (after bridge obligations are clear):**
 4. Read `AGENTS.md`.
 5. Read `CODEX-WAY-OF-WORKING.md`.
 6. Read `CODEX-REVIEW-OPERATING-CONTRACT.md`.

@@ -1,4 +1,4 @@
-﻿# Codex Dead Ends And False Positives - Agent Red Customer Engagement
+# Codex Dead Ends And False Positives - GroundTruth-KB
 
 Purpose: preserve failed approaches, avoidable errors, and false positives so future review sessions do not repeat them.
 

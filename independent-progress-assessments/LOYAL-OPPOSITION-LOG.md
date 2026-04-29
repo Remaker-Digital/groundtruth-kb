@@ -1,4 +1,4 @@
-# Loyal Opposition Log - Agent Red Customer Experience
+# Loyal Opposition Log - GroundTruth-KB
 
 **Purpose:** Running log of Codex appraisals, evaluations, and questions (Loyal Opposition).
 **Location:** `independent-progress-assessments/`.
@@ -129,6 +129,16 @@
 |------|---------|-------------------|------------------|--------|
 | Process | E: deletion-readiness evidence is now verified for E: root siblings and `E:\Claude-Playground`, but verification is not deletion authorization. `E:\Claude-Playground` also contains 49 credential-like `.env*` files recorded by path/metadata only. | `bridge/e-drive-root-deletion-readiness-scan-008.md`; `bridge/e-drive-claude-playground-cleanup-manifest-010.md`; `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-27-19-37.md`. | Keep deletion and credential-exposure/rotation decisions owner-gated. In the next Prime session, present manifest-based owner choices rather than deleting automatically. | Open |
 | Technical | Agent Red app-root scaffold and registry are verified, but application isolation is not complete. `.env.local`, Shopify/PDF moves, release-gate DCL wiring, and formal DELIB/ADR/DCL writes remain future slices; `.vscode/settings.json` is still not git-trackable due `.gitignore`. | `bridge/application-isolation-contract-008.md`; `applications/Agent_Red/.gtkb-app-isolation.json`; `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-27-19-37.md`. | Continue with application-isolation sub-slices 2-6 and file a small gitignore-hygiene bridge before treating the VSCode placeholder as durable. | Open |
+
+---
+
+### 2026-04-28 - Loyal Opposition wrap-up for isolation, MemBase, and smart poller
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Phase 1 isolation implementation is not ready to merge because hook relocation wiring, runtime-file policy, bridge audit-trail coverage, and stale-delete preflight evidence are incomplete. | `bridge/gtkb-isolation-phase1-implementation-2026-04-28-002.md`; latest `NO-GO` in `bridge/INDEX.md`; wrap-up report `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-28-17-58.md`. | Prime Builder should revise the Phase 1 implementation package and return it through the bridge before merge/commit. | Open |
+| Process | MemBase is used seriously as governed state, but not effectively enough for the GT-KB owner-burden target because automatic capture, owner-visible event surfacing, foundational intake, and WI harvest controls are incomplete. | `CODEX-INSIGHT-DROPBOX/MEMBASE-EFFECTIVE-USE-ASSESSMENT-2026-04-29.md`; wrap-up report `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-28-17-58.md`. | Prime Builder should add a MemBase Effective Use recovery/implementation proposal to the backlog and bridge. | Open |
+| Technical | Smart-poller implementation is slice-ready, not end-to-end ready: P1/P2/P2.5 are GO, but P3 invoker/autonomous write-capable behavior remains gated on P2.5 evidence and owner-approved live harness execution. | `bridge/gtkb-bridge-poller-001-smart-poller-007.md`; `bridge/gtkb-bridge-poller-p2-5-verification-spike-004.md`; wrap-up report `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-04-28-17-58.md`. | Implement P1, P2, and non-live P2.5 spike machinery first; defer P3 until the spike report classifies allowed harness/mode behavior. | Open |
 
 ---
 

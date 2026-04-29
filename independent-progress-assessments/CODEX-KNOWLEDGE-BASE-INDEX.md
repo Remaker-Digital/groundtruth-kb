@@ -1,4 +1,4 @@
-# Codex Knowledge Base Index - Agent Red Customer Engagement
+# Codex Knowledge Base Index - GroundTruth-KB
 
 Purpose: index of Loyal Opposition artifacts maintained for Codex and Prime Builder handoff.
 

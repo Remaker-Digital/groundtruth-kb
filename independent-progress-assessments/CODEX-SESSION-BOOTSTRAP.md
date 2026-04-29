@@ -1,4 +1,4 @@
-﻿# Session Bootstrap - Agent Red Customer Engagement
+# Session Bootstrap - GroundTruth-KB
 
 Purpose: one short startup file that makes session behavior deterministic after
 restart.
@@ -33,9 +33,11 @@ this workspace and reads `AGENTS.md`:
   entry is included in the continuation scope for the prior session; those
   entries may be Loyal Opposition responses created in a separate previous
   session.
-- The poller is separate from the bridge. Activate a poller only when Prime
-  Builder and Loyal Opposition are running in separate harnesses or
-  asynchronous monitoring is otherwise needed.
+- The poller is separate from the bridge. The retired OS poller remains
+  disabled, but the verified smart poller should be used when it is available
+  and functioning. When smart-poller automation is unavailable, use manual scans
+  or activate monitoring only when Prime Builder and Loyal Opposition are
+  running in separate harnesses or asynchronous monitoring is otherwise needed.
 - Prime Builder startup presents the GT-KB numbered session-focus choices to the
   owner. Loyal Opposition startup does not present those choices.
 - The owner's first message in a fresh session is only a session-start stimulus,
@@ -112,7 +114,7 @@ Optional local environment overrides remain available:
 Use this at the start of a new session if needed:
 
 ```text
-Start in the Agent Red role recorded by `.claude/rules/operating-role.md`.
+Start in the GroundTruth-KB role recorded by `.claude/rules/operating-role.md`.
 Load AGENTS.md, the currently assigned role file,
 independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md,
 independent-progress-assessments/CODEX-STANDING-PRIORITIES.md,

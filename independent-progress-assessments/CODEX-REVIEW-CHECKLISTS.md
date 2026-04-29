@@ -1,4 +1,4 @@
-# Codex Review Checklists - Agent Red Customer Engagement
+# Codex Review Checklists - GroundTruth-KB
 
 Purpose: reusable checklists for rigorous proposal review, code review, and alternatives investigation.
 
