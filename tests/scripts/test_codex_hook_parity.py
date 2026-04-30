@@ -59,7 +59,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in codex_hooks["hooks"]["PreToolUse"]
     )
     assert "Stop" not in codex_hooks["hooks"]
-    # Per bridge/gtkb-startup-enhancements-p1-003.md Â§2.4 (Codex GO at -004):
+    # Per bridge/gtkb-startup-enhancements-p1-003.md §2.4 (Codex GO at -004):
     # the previously-registered owner-decision-tracker-ups.cmd entry has been
     # removed because the wrapper file does not exist on disk, Codex hooks
     # are disabled on Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001, and the

@@ -455,7 +455,7 @@ def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeyp
     assert "work subject GT-KB" in gtkb_write_response["reason"]
 
 
-# ---- GTKB-ISOLATION-015 Slice 1 Â§A / Â§C / Â§E regression coverage ----------
+# ---- GTKB-ISOLATION-015 Slice 1 §A / §C / §E regression coverage ----------
 
 
 def test_startup_focus_lines_include_role_slot_topology_mode_stimulus_and_bridge_authority(
@@ -636,14 +636,14 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
 def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
     tmp_path, monkeypatch
 ) -> None:
-    """Symmetric Â§E regression (bridge -014 P1).
+    """Symmetric §E regression (bridge -014 P1).
 
     Reproduces the live asymmetry Codex demonstrated: Codex on
     gtkb_infrastructure, Claude on application, shared canonical set to
     application. Before -014's fix, detect_counterpart_state() with
     GTKB_HARNESS_NAME=codex read our_subject from the shared canonical
     (application), compared against counterpart Claude guard (application),
-    and returned subject_mismatch=False â€” silently missing the split.
+    and returned subject_mismatch=False — silently missing the split.
 
     After the fix, our_subject is read from our own harness guard first, so
     Codex sees our_subject=gtkb_infrastructure and correctly warns.
@@ -667,7 +667,7 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
         json.dumps({"current_subject": module.FOCUS_GTKB_INFRASTRUCTURE}) + "\n",
         encoding="utf-8",
     )
-    # Claude's guard says application â€” matches shared canonical.
+    # Claude's guard says application — matches shared canonical.
     claude_guard.write_text(
         json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
         encoding="utf-8",
@@ -845,11 +845,11 @@ def test_detect_counterpart_state_uses_project_root_paths_when_provided(tmp_path
     for path in recorded_paths:
         assert sandbox in path.parents, (
             f"role record path {path!r} should be under sandbox {sandbox!r} "
-            "but is not â€” class-level fix regressed"
+            "but is not — class-level fix regressed"
         )
         assert canonical_root not in path.parents, (
             f"role record path {path!r} should NOT be under canonical "
-            f"PROJECT_ROOT {canonical_root!r} â€” class-level fix regressed"
+            f"PROJECT_ROOT {canonical_root!r} — class-level fix regressed"
         )
 
 

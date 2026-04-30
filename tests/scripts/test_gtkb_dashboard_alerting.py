@@ -1,4 +1,4 @@
-"""Tests for GTKB-DASHBOARD-001 Slice 1 Â§E alert-rule YAML skeleton.
+"""Tests for GTKB-DASHBOARD-001 Slice 1 §E alert-rule YAML skeleton.
 
 Enforces the three GO -006 conditions:
 
@@ -11,7 +11,7 @@ Enforces the three GO -006 conditions:
 3. Rules are schema-anchored: every table referenced in the alert SQL must
    exist in ``schema.sql``.
 
-Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def _raw_sql(rule: dict) -> str:
 
 
 def test_all_three_alert_yamls_present_and_parse() -> None:
-    """Proposal Â§E validator requirement #1 + #2: each YAML parses and carries
+    """Proposal §E validator requirement #1 + #2: each YAML parses and carries
     the required keys ``uid``, ``title``, ``condition``, ``data[0].model.rawSql``."""
     for name in ("release-blockers.yaml", "failing-ci.yaml", "stale-data.yaml"):
         path = ALERTING_DIR / name
@@ -86,12 +86,12 @@ def test_all_three_alert_yamls_present_and_parse() -> None:
         rule = _first_rule(doc)
         for key in ("uid", "title", "condition", "data"):
             assert key in rule, f"{name} rule missing required key {key!r}"
-        # Proposal Â§E specifies data[0].model.rawSql as a required key. The
+        # Proposal §E specifies data[0].model.rawSql as a required key. The
         # runtime reads rawQueryText (frser-sqlite-datasource), so we require
         # both to prevent the proposal-vs-runtime key from drifting apart.
         model = rule["data"][0]["model"]
         assert "rawSql" in model, (
-            f"{name} data[0].model missing required key 'rawSql' (proposal Â§E)"
+            f"{name} data[0].model missing required key 'rawSql' (proposal §E)"
         )
         assert "rawQueryText" in model, (
             f"{name} data[0].model missing 'rawQueryText' (frser-sqlite-datasource runtime key)"

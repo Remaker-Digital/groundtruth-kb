@@ -203,9 +203,9 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
 
 
 def test_stat_panels_surface_per_panel_freshness_secondary_value() -> None:
-    """GTKB-DASHBOARD-001 Â§C: each value-bearing stat panel must emit a
+    """GTKB-DASHBOARD-001 §C: each value-bearing stat panel must emit a
     `last_refreshed_at` secondary value (target `F`) sourced from refresh_runs.
-    The Refresh Age panel itself is exempt â€” its primary value already is the
+    The Refresh Age panel itself is exempt — its primary value already is the
     freshness reading, so a second freshness target would be redundant."""
     dashboard = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
     dashboard_json = json.loads(dashboard.read_text(encoding="utf-8"))

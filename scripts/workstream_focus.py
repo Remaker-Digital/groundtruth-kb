@@ -35,7 +35,7 @@ SCHEMA_VERSION = 1
 ROLE_SLOT_DEFAULT = "shared"
 DEFAULT_APPLICATION_LABEL = "Agent Red demo adopter"
 
-# Topology mode â€” whether GT-KB Prime Builder and Loyal Opposition run in one
+# Topology mode — whether GT-KB Prime Builder and Loyal Opposition run in one
 # harness (single) or split across two harnesses (multi). Drives counterpart
 # detection in ``detect_counterpart_state`` and the Active Work Subject block.
 TOPOLOGY_MODE_SINGLE = "single_harness"
@@ -669,11 +669,11 @@ def render_active_work_subject(
     overlay_status: dict[str, Any] | None = None,
     include_counterpart: bool = True,
 ) -> str:
-    """Render the enriched Active Work Subject block (Slice 1 Â§A).
+    """Render the enriched Active Work Subject block (Slice 1 §A).
 
-    Composes ``render_startup_focus_lines`` with an overlay status line (Â§C)
+    Composes ``render_startup_focus_lines`` with an overlay status line (§C)
     and, when ``include_counterpart`` is True, a counterpart-state warning
-    summary (Â§E). Overlay and counterpart outputs are always informational â€”
+    summary (§E). Overlay and counterpart outputs are always informational —
     the startup report never treats them as canonical.
     """
 
@@ -683,20 +683,20 @@ def render_active_work_subject(
     if include_counterpart:
         counterpart = detect_counterpart_state(project_root)
         for warning in counterpart["warnings"]:
-            lines.append(f"- WARNING: counterpart harness â€” {warning}")
+            lines.append(f"- WARNING: counterpart harness — {warning}")
         if not counterpart["warnings"] and counterpart["counterpart_present"]:
             lines.append("- Counterpart harness detected; no role or subject conflicts.")
     return "\n".join(lines)
 
 
-# ---- Â§C Overlay-aware startup -------------------------------------------
+# ---- §C Overlay-aware startup -------------------------------------------
 
 
 def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
     """Map a session overlay status dict to a startup-block level + lines.
 
-    - Absent â†’ informational note. No warning.
-    - Stale / root_mismatch / subject_mismatch / projection_diff â†’ WARNING.
+    - Absent → informational note. No warning.
+    - Stale / root_mismatch / subject_mismatch / projection_diff → WARNING.
     - Overlays are never canonical for DA/MemBase/bridge/readiness decisions.
     """
 
@@ -743,7 +743,7 @@ def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# ---- Â§E Counterpart state detection -------------------------------------
+# ---- §E Counterpart state detection -------------------------------------
 
 
 def _read_active_role_from_file(path: Path) -> str | None:
@@ -784,7 +784,7 @@ def _harness_state_records_for_project(
     ``HARNESS_LIFECYCLE_GUARDS`` constants but builds them from a passed
     ``project_root`` rather than from this module's ``PROJECT_ROOT`` (which
     is computed from ``__file__`` at import time and resolves to the legacy
-    root when this module is imported from there â€” e.g., during the Slice 11
+    root when this module is imported from there — e.g., during the Slice 11
     rehearsal lane subprocess).
 
     Per bridge/harness-state-preferences-path-cli-2026-04-28-004.md Codex
@@ -805,7 +805,7 @@ def _harness_state_records_for_project(
 
 
 def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]:
-    """Detect role-slot and subject conflicts with the counterpart harness (Â§E).
+    """Detect role-slot and subject conflicts with the counterpart harness (§E).
 
     Returns ``{"counterpart_present", "same_role_slot", "subject_mismatch",
     "warnings"}``. Warnings are only emitted when counterpart state files are
@@ -846,7 +846,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
                 same_role_slot = True
                 warnings.append(
                     f"both `{current_harness}` and `{harness}` have active_role=`{role}` "
-                    "â€” counterpart bridge roles may collide; verify operating-role.md per harness."
+                    "— counterpart bridge roles may collide; verify operating-role.md per harness."
                 )
             elif role != our_role and role in TOGGLEABLE_ROLE_PROFILES and our_role in TOGGLEABLE_ROLE_PROFILES:
                 warnings.append(
@@ -884,7 +884,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
             subject_mismatch = True
             warnings.append(
                 f"counterpart `{harness}` records work subject=`{counterpart_subject}` "
-                f"while `{current_harness or 'local'}` is on `{our_subject}` â€” "
+                f"while `{current_harness or 'local'}` is on `{our_subject}` — "
                 "verify both harnesses intend this split."
             )
 
@@ -896,13 +896,13 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
     }
 
 
-# ---- Â§A Readiness hard-rejection ----------------------------------------
+# ---- §A Readiness hard-rejection ----------------------------------------
 
 
 class SubjectScopeError(RuntimeError):
     """Raised when a readiness/report output would emit a combined application + GT-KB
 
-    green claim without an explicit dual-scope declaration (Â§A hard rejection).
+    green claim without an explicit dual-scope declaration (§A hard rejection).
     """
 
 
@@ -923,7 +923,7 @@ def assert_readiness_subject_scope(
 
     if application_green and gtkb_green and not dual_scope_declared:
         raise SubjectScopeError(
-            f"{context}: combined application + GT-KB green claim rejected â€” "
+            f"{context}: combined application + GT-KB green claim rejected — "
             "caller must pass an explicit dual-scope declaration identifying "
             "both subjects (application and GT-KB) before emitting a combined "
             "green claim. Use `work subject application` or `work subject GT-KB` "
@@ -1063,8 +1063,8 @@ def classify_path(path_text: str, project_root: Path | None = None) -> str:
     """Legacy 3-value classifier kept for callers that rely on ``FOCUS_*`` strings.
 
     Maps the new 4-category classifier back to the pre-Phase-7 vocabulary:
-    ``gtkb_product`` or ``current_repo_bridge_or_governance`` â†’ ``FOCUS_GTKB_INFRASTRUCTURE``;
-    ``application_product`` â†’ ``FOCUS_APPLICATION``; ``neutral`` â†’ ``"neutral"``.
+    ``gtkb_product`` or ``current_repo_bridge_or_governance`` → ``FOCUS_GTKB_INFRASTRUCTURE``;
+    ``application_product`` → ``FOCUS_APPLICATION``; ``neutral`` → ``"neutral"``.
     """
 
     category = classify_root(path_text, project_root)
@@ -1078,7 +1078,7 @@ def classify_path(path_text: str, project_root: Path | None = None) -> str:
 def _path_mentions_from_command(command: str) -> list[str]:
     """Extract path-like mentions from a mutating shell command.
 
-    Finds both known-prefix substring matches (``bridge/``, ``src/``, â€¦) and
+    Finds both known-prefix substring matches (``bridge/``, ``src/``, …) and
     whitespace-separated tokens that look like filesystem paths (contain a
     slash or carry a drive-letter prefix). Token scanning is how absolute
     paths under ``GTKB_PRODUCT_ROOT`` (outside the current-repo prefix table)
@@ -1136,7 +1136,7 @@ def guard_tool_use(
     * ``gtkb_infrastructure`` subject blocks ``application_product`` targets.
 
     Current-repo bridge/governance surfaces (``current_repo_bridge_or_governance``)
-    are NOT blocked in either subject â€” they are workspace infrastructure, not
+    are NOT blocked in either subject — they are workspace infrastructure, not
     GT-KB product paths.
     """
 

@@ -5,7 +5,7 @@ and ``-012`` (Codex GO with 6 implementation constraints).
 
 Lane tests use ``subprocess_invoker=`` callable injection so the runner
 subprocess is faked. Runner tests exercise ``build_is_allowed`` and
-``build_audit_hook`` factories directly via Python imports â€” proving the
+``build_audit_hook`` factories directly via Python imports — proving the
 audit-hook policy without spawning a real subprocess.
 """
 
@@ -108,7 +108,7 @@ def _read_plan(output_dir: Path) -> dict[str, Any]:
 
 
 # =====================================================================
-# Â§7.1 Core common-contract + plan tests (10 tests)
+# §7.1 Core common-contract + plan tests (10 tests)
 # =====================================================================
 
 
@@ -129,7 +129,7 @@ def test_run_probes_generator_existence(tmp_path: Path) -> None:
 
 
 def test_run_emits_warning_when_generator_absent(tmp_path: Path) -> None:
-    """Generator missing â†’ status='error'."""
+    """Generator missing → status='error'."""
     legacy = tmp_path / "legacy_empty"
     legacy.mkdir()
     result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
@@ -161,7 +161,7 @@ def test_run_probes_lifecycle_hooks(tmp_path: Path) -> None:
 
 
 def test_run_emits_relocation_plan_with_five_path_pairs(tmp_path: Path) -> None:
-    """Plan includes all 5 sourceâ†’target relocation entries."""
+    """Plan includes all 5 source→target relocation entries."""
     legacy = _make_minimal_legacy_root(tmp_path)
     _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
     plan = _read_plan(tmp_path / "output")
@@ -196,7 +196,7 @@ def test_run_writes_preview_markdown(tmp_path: Path) -> None:
 
 
 def test_run_writes_result_json_on_ok_path(tmp_path: Path) -> None:
-    """Per Wave 2 -003 Â§4.2 + Slice 4 -006 F2: result.json on ok path."""
+    """Per Wave 2 -003 §4.2 + Slice 4 -006 F2: result.json on ok path."""
     legacy = _make_minimal_legacy_root(tmp_path)
     result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
     assert result["status"] == "ok"
@@ -216,7 +216,7 @@ def test_run_writes_result_json_on_error_path(tmp_path: Path) -> None:
 
 
 # =====================================================================
-# Â§7.2 Audit-hook + sandbox-boundary tests (8 tests)
+# §7.2 Audit-hook + sandbox-boundary tests (8 tests)
 # =====================================================================
 
 
@@ -229,7 +229,7 @@ def test_run_status_ok_when_subprocess_returncode_zero_and_no_violations(tmp_pat
 
 
 def test_run_status_error_when_audit_hook_violations_nonempty(tmp_path: Path) -> None:
-    """Violations override returncode=0 â†’ status='error'."""
+    """Violations override returncode=0 → status='error'."""
     legacy = _make_minimal_legacy_root(tmp_path)
     invoker = _make_fake_invoker(returncode=1, violations=[{"event": "open", "path": str(legacy / ".env.local")}])
     result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=invoker)
@@ -238,7 +238,7 @@ def test_run_status_error_when_audit_hook_violations_nonempty(tmp_path: Path) ->
 
 
 def test_run_status_error_when_subprocess_returncode_nonzero(tmp_path: Path) -> None:
-    """Subprocess crash without violations â†’ status='error'."""
+    """Subprocess crash without violations → status='error'."""
     legacy = _make_minimal_legacy_root(tmp_path)
     result = _dashboard_regen.run(
         {},
@@ -251,7 +251,7 @@ def test_run_status_error_when_subprocess_returncode_nonzero(tmp_path: Path) -> 
 
 
 def test_run_status_error_on_subprocess_timeout(tmp_path: Path) -> None:
-    """Subprocess timeout â†’ status='error' with timeout warning."""
+    """Subprocess timeout → status='error' with timeout warning."""
     legacy = _make_minimal_legacy_root(tmp_path)
     result = _dashboard_regen.run(
         {}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker(raise_timeout=True)
@@ -323,7 +323,7 @@ def test_run_does_not_create_sentinel_files_in_legacy_root(tmp_path: Path) -> No
 
 
 # =====================================================================
-# Â§7.3 Sandbox composition tests (5 tests)
+# §7.3 Sandbox composition tests (5 tests)
 # =====================================================================
 
 
@@ -338,7 +338,7 @@ def test_run_copies_required_inputs_to_sandbox_as_real_files_not_symlinks(tmp_pa
 
 
 def test_run_warns_when_optional_input_missing_from_sandbox(tmp_path: Path) -> None:
-    """REVISED-5 Â§3.2 narrowed: optional non-deployment input missing â†’ warning, not error."""
+    """REVISED-5 §3.2 narrowed: optional non-deployment input missing → warning, not error."""
     legacy = _make_minimal_legacy_root(tmp_path)
     # src/api_versioning.py is OPTIONAL and NOT created in fixture.
     result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
@@ -347,7 +347,7 @@ def test_run_warns_when_optional_input_missing_from_sandbox(tmp_path: Path) -> N
 
 
 def test_run_returns_error_when_required_input_missing_from_sandbox(tmp_path: Path) -> None:
-    """Required input missing from legacy â†’ status='error'."""
+    """Required input missing from legacy → status='error'."""
     legacy = _make_minimal_legacy_root(tmp_path)
     (legacy / "groundtruth.db").unlink()
     result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
@@ -356,7 +356,7 @@ def test_run_returns_error_when_required_input_missing_from_sandbox(tmp_path: Pa
 
 
 def test_run_excludes_dotenv_local_from_sandbox(tmp_path: Path) -> None:
-    """Even if legacy has .env.local, sandbox MUST NOT contain it (per Â§3.5)."""
+    """Even if legacy has .env.local, sandbox MUST NOT contain it (per §3.5)."""
     legacy = _make_minimal_legacy_root(tmp_path)
     (legacy / ".env.local").write_text("SECRET=exposed", encoding="utf-8")
     _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
@@ -376,7 +376,7 @@ def test_run_writes_fresh_lifecycle_guard_in_sandbox(tmp_path: Path) -> None:
 
 
 # =====================================================================
-# Â§7.4 Subprocess invocation parameters (3 tests)
+# §7.4 Subprocess invocation parameters (3 tests)
 # =====================================================================
 
 
@@ -471,7 +471,7 @@ def test_run_subprocess_passes_sandbox_root_explicitly_to_runner(tmp_path: Path)
 
 
 # =====================================================================
-# Â§7.5 Boundary tightness (11 tests #27-37) â€” direct unit tests of build_is_allowed
+# §7.5 Boundary tightness (11 tests #27-37) — direct unit tests of build_is_allowed
 # =====================================================================
 
 
@@ -517,7 +517,7 @@ def test_audit_hook_allows_generator_try_block_imports(tmp_path: Path, module_na
 
 
 def test_audit_hook_rejects_legacy_deploy_py_read(tmp_path: Path) -> None:
-    """deploy.py at scripts/ top level â†’ glob-deny under legacy_root/scripts."""
+    """deploy.py at scripts/ top level → glob-deny under legacy_root/scripts."""
     legacy, sandbox = _setup_runner_fixture(tmp_path)
     target = legacy / "scripts" / "deploy.py"
     target.touch()
@@ -570,7 +570,7 @@ def test_audit_hook_rejects_legacy_memory_work_list_read(tmp_path: Path) -> None
 
 
 def test_audit_hook_rejects_path_traversal_via_dotdot(tmp_path: Path) -> None:
-    """`..` traversal is canonicalized away â†’ still denied."""
+    """`..` traversal is canonicalized away → still denied."""
     legacy, sandbox = _setup_runner_fixture(tmp_path)
     (legacy / "memory").mkdir()
     (legacy / "memory" / "work_list.md").write_text("x", encoding="utf-8")
@@ -581,7 +581,7 @@ def test_audit_hook_rejects_path_traversal_via_dotdot(tmp_path: Path) -> None:
 
 
 def test_audit_hook_rejects_symlink_to_legacy_data(tmp_path: Path) -> None:
-    """Symlink under sandbox pointing to legacy data â†’ resolved path canonicalization â†’ denied.
+    """Symlink under sandbox pointing to legacy data → resolved path canonicalization → denied.
 
     Skipped on Windows when symlink permissions are unavailable.
     """
@@ -595,12 +595,12 @@ def test_audit_hook_rejects_symlink_to_legacy_data(tmp_path: Path) -> None:
     except (OSError, NotImplementedError):
         pytest.skip("symlinks not supported in this environment")
     is_allowed = _dashboard_regen_runner.build_is_allowed(legacy, sandbox)
-    # Path.resolve() follows symlinks; the link resolves to legacy/memory/work_list.md â†’ denied.
+    # Path.resolve() follows symlinks; the link resolves to legacy/memory/work_list.md → denied.
     assert is_allowed(str(link_path)) is False
 
 
 def test_audit_hook_subprocess_popen_records_legacy_cwd_violation(tmp_path: Path) -> None:
-    """subprocess.Popen audit event with cwd=legacy â†’ recorded violation.
+    """subprocess.Popen audit event with cwd=legacy → recorded violation.
 
     Note: REVISED-1 of post-impl (Codex `-014` Finding 1 fix): production
     runner uses ``os._exit(99)`` to fail-closed on first violation. Tests
@@ -620,7 +620,7 @@ def test_audit_hook_subprocess_popen_records_legacy_cwd_violation(tmp_path: Path
 
 
 def test_audit_hook_terminates_subprocess_on_first_open_violation(tmp_path: Path) -> None:
-    """First denied open â†’ os._exit(99). Test injects a fake terminate.
+    """First denied open → os._exit(99). Test injects a fake terminate.
 
     Captures that the hook calls os._exit on the first violation when
     ``terminate_after_violation=True`` (default).
@@ -653,7 +653,7 @@ def test_audit_hook_terminates_subprocess_on_first_open_violation(tmp_path: Path
 
 
 def test_run_status_error_on_subprocess_returncode_99_quarantines_sample_render(tmp_path: Path) -> None:
-    """returncode=99 â†’ status='error' AND sample_render renamed to .QUARANTINED.
+    """returncode=99 → status='error' AND sample_render renamed to .QUARANTINED.
 
     Per Codex `-014` Required Revision: "Prevent preserved sample
     artifacts from containing content derived from denied legacy reads.
@@ -676,7 +676,7 @@ def test_run_status_error_on_subprocess_returncode_99_quarantines_sample_render(
 
 
 def test_run_quarantines_sample_render_even_on_violations_without_returncode_99(tmp_path: Path) -> None:
-    """Defense-in-depth: violations non-empty even with returncode=0 â†’ still quarantine.
+    """Defense-in-depth: violations non-empty even with returncode=0 → still quarantine.
 
     Covers the case where a future runner change might not terminate
     via os._exit (e.g., test-injected hook with ``terminate_after_violation=False``).
@@ -693,7 +693,7 @@ def test_run_quarantines_sample_render_even_on_violations_without_returncode_99(
 
 
 # =====================================================================
-# Â§7.6 Deployment-file pipeline tests (5 tests #38-42)
+# §7.6 Deployment-file pipeline tests (5 tests #38-42)
 # =====================================================================
 
 
@@ -755,7 +755,7 @@ def test_run_audit_hook_rejects_legacy_deployment_file_read(tmp_path: Path, depl
 
 
 def test_run_emits_deployment_evidence_incomplete_warning_when_file_missing_from_legacy(tmp_path: Path) -> None:
-    """One missing of 5 â†’ status='ok' with deployment_evidence_incomplete warning."""
+    """One missing of 5 → status='ok' with deployment_evidence_incomplete warning."""
     legacy = _make_minimal_legacy_root(tmp_path)
     (legacy / "scripts" / "deploy" / "upgrade.ps1").unlink()
     result = _dashboard_regen.run({}, tmp_path / "output", project_root=legacy, subprocess_invoker=_make_fake_invoker())
