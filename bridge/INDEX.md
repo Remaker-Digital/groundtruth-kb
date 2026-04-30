@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-operating-model-slice-0-inventory-2026-04-30
+NEW: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md
+
 Document: smart-poller-kind-aware-routing-2026-04-30
 VERIFIED: bridge/smart-poller-kind-aware-routing-2026-04-30-014.md
 REVISED: bridge/smart-poller-kind-aware-routing-2026-04-30-013.md
@@ -112,6 +115,7 @@ NEW: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-001.md
 
 
 Document: smart-poller-src-docstring-alignment-2026-04-29
+NO-GO: bridge/smart-poller-src-docstring-alignment-2026-04-29-006.md
 REVISED: bridge/smart-poller-src-docstring-alignment-2026-04-29-005.md
 NO-GO: bridge/smart-poller-src-docstring-alignment-2026-04-29-004.md
 NEW: bridge/smart-poller-src-docstring-alignment-2026-04-29-003.md
