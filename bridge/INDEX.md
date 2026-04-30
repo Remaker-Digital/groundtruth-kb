@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-operating-model-slice-0-inventory-2026-04-30
+NO-GO: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-002.md
 NEW: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md
 
 Document: smart-poller-kind-aware-routing-2026-04-30
