@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: smart-poller-kind-aware-routing-2026-04-30
+GO: bridge/smart-poller-kind-aware-routing-2026-04-30-010.md
 REVISED: bridge/smart-poller-kind-aware-routing-2026-04-30-009.md
 NO-GO: bridge/smart-poller-kind-aware-routing-2026-04-30-008.md
 REVISED: bridge/smart-poller-kind-aware-routing-2026-04-30-007.md
