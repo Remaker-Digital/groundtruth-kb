@@ -267,10 +267,20 @@ def _selected_items_for_prompt(items: list[object], max_items: int) -> list[obje
 
 def _dispatch_prompt(recipient: BridgeAgent, items: list[object], *, max_items: int) -> str:
     selected = _selected_items_for_prompt(items, max_items)
+    # Per DCL-SPAWNED-HARNESS-ROLE-DEFER-DURABLE-RECORD-001.A1: defer to the
+    # durable role record rather than hard-coding role assertions in the
+    # dispatch prompt. Per DCL-SMART-POLLER-AUTO-TRIGGER-001 + the existing
+    # ACTIONABLE_STATUSES_FOR_PRIME = {GO, NO-GO} contract in notify.py:
+    # VERIFIED is bridge closure for both roles and is not queue work.
     role_line = (
-        "You are Codex Loyal Opposition. Process latest NEW/REVISED bridge entries."
-        if recipient is BridgeAgent.CODEX
-        else "You are Prime Builder. Process latest GO/NO-GO bridge entries."
+        "Read your durable role from `.claude/rules/operating-role.md` "
+        "(or the harness-local override at `harness-state/{harness}/operating-role.md` "
+        "if present, which takes precedence per `.claude/rules/operating-role.md`). "
+        "Process the bridge entries selected below according to your declared role: "
+        "Loyal Opposition reviews latest NEW or REVISED entries; "
+        "Prime Builder acts on latest GO or NO-GO entries assigned to its harness. "
+        "Latest VERIFIED entries are bridge closure for both roles and are not "
+        "queue work; do not process them as actionable."
     )
     rows = [
         f"- {getattr(item, 'top_status')} {getattr(item, 'document_name')} {getattr(item, 'top_file')}"

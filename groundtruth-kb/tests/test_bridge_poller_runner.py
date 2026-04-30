@@ -830,3 +830,53 @@ def test_continuous_mode_default_dispatch_unchanged(synthetic_gtkb_root: Path, m
     assert rc == 0
     # Continuous mode dispatched once for the REVISED entry.
     assert len(calls) == 1
+
+
+def test_dispatch_prompt_defers_to_durable_role_record() -> None:
+    """Verifies DCL-SPAWNED-HARNESS-ROLE-DEFER-DURABLE-RECORD-001.A1 +
+    DCL-SMART-POLLER-AUTO-TRIGGER-001 actionable-status contract.
+
+    Dispatch prompt MUST contain the durable-record reference, MUST NOT
+    contain hard-coded role assertions, AND MUST NOT describe VERIFIED
+    as Prime-actionable. The same prompt is produced for both PRIME and
+    CODEX recipients because the role assignment is now deferred to the
+    durable role record at the receiving harness.
+    """
+    from groundtruth_kb.bridge.notify import ActionablePending
+    from groundtruth_kb.bridge.routing import BridgeAgent
+
+    runner = _load_runner()
+    items = [
+        ActionablePending(
+            document_name="example",
+            top_status="NEW",
+            top_file="bridge/example-001.md",
+            index_line_number=1,
+        )
+    ]
+    for recipient in (BridgeAgent.PRIME, BridgeAgent.CODEX):
+        prompt = runner._dispatch_prompt(recipient, items, max_items=2)
+
+        # DCL-SPAWNED-HARNESS-ROLE-DEFER-DURABLE-RECORD-001.A1:
+        # durable-record reference present.
+        assert ".claude/rules/operating-role.md" in prompt, (
+            f"Prompt for {recipient.value} missing durable-record reference"
+        )
+
+        # DCL-SPAWNED-HARNESS-ROLE-DEFER-DURABLE-RECORD-001.A1:
+        # no hard-coded role assertions.
+        assert "You are Prime Builder" not in prompt, (
+            f"Prompt for {recipient.value} contains hard-coded Prime Builder assertion"
+        )
+        assert "You are Codex Loyal Opposition" not in prompt, (
+            f"Prompt for {recipient.value} contains hard-coded Codex LO assertion"
+        )
+
+        # DCL-SMART-POLLER-AUTO-TRIGGER-001 actionable-status contract:
+        # VERIFIED is closure for both roles, never Prime-actionable.
+        assert "GO/NO-GO/VERIFIED" not in prompt, (
+            f"Prompt for {recipient.value} lists VERIFIED as Prime-actionable"
+        )
+        assert "GO or NO-GO or VERIFIED" not in prompt, (
+            f"Prompt for {recipient.value} lists VERIFIED as Prime-actionable"
+        )

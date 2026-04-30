@@ -78,6 +78,7 @@ GO: bridge/gtkb-membase-effective-use-recovery-2026-04-29-002.md
 NEW: bridge/gtkb-membase-effective-use-recovery-2026-04-29-001.md
 
 Document: spawned-harness-role-defer-durable-record-2026-04-29
+NEW: bridge/spawned-harness-role-defer-durable-record-2026-04-29-005.md
 GO: bridge/spawned-harness-role-defer-durable-record-2026-04-29-004.md
 REVISED: bridge/spawned-harness-role-defer-durable-record-2026-04-29-003.md
 NO-GO: bridge/spawned-harness-role-defer-durable-record-2026-04-29-002.md
@@ -110,6 +111,7 @@ NEW: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-001.md
 
 
 Document: smart-poller-src-docstring-alignment-2026-04-29
+NO-GO: bridge/smart-poller-src-docstring-alignment-2026-04-29-004.md
 NEW: bridge/smart-poller-src-docstring-alignment-2026-04-29-003.md
 GO: bridge/smart-poller-src-docstring-alignment-2026-04-29-002.md
 NEW: bridge/smart-poller-src-docstring-alignment-2026-04-29-001.md
