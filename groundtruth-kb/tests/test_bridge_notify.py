@@ -182,12 +182,16 @@ def test_update_notification_writes_v2_schema(tmp_path: Path) -> None:
     assert artifact is not None
     json_path = state_dir / "notifications" / "pending-bridge-action-codex.json"
     payload = json.loads(json_path.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == 2
+    # Schema v3 per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4.
+    assert payload["schema_version"] == 3
     assert "pending_actions" in payload
     assert "pending_transitions" not in payload
     assert payload["pending_actions"][0]["top_status"] == "REVISED"
     assert payload["pending_actions"][0]["top_file"] == "bridge/foo-002.md"
     assert payload["pending_actions"][0]["index_line_number"] == 8
+    # Schema-v3 fields are present and serialized.
+    assert "dispatchable" in payload["pending_actions"][0]
+    assert "classification" in payload["pending_actions"][0]
     # No v1 fields:
     assert "from_status" not in payload["pending_actions"][0]
     assert "from_file" not in payload["pending_actions"][0]
@@ -231,7 +235,8 @@ def test_read_notification_round_trip(tmp_path: Path) -> None:
     n.update_notification(state_dir, n.BridgeAgent.CODEX, items, poller_run_id="test-run-001")
     artifact = n.read_notification(state_dir, n.BridgeAgent.CODEX)
     assert artifact is not None
-    assert artifact.schema_version == 2
+    # Schema v3 per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4.
+    assert artifact.schema_version == 3
     assert artifact.recipient == "codex"
     assert artifact.poller_run_id == "test-run-001"
     assert len(artifact.pending_actions) == 1
@@ -442,3 +447,502 @@ def test_no_actionable_documents_means_files_absent(tmp_path: Path) -> None:
     n.update_notification(state_dir, n.BridgeAgent.CODEX, [])
     assert n.read_notification(state_dir, n.BridgeAgent.PRIME) is None
     assert n.read_notification(state_dir, n.BridgeAgent.CODEX) is None
+
+
+# ===========================================================================
+# Smart-poller kind-aware routing (per smart-poller-kind-aware-routing-2026-04-30
+# bridge thread; GO at -010). Tests below cover:
+# - _derive_dispatchable decision tree (status-aware)
+# - _extract_bridge_kind frontmatter parser
+# - find_operative_prime_version version traversal
+# - classify_document_dispatchability (kind tokens)
+# - compute_actionable_pending end-to-end with real bridge chains
+# - schema v3 markdown rendering ((terminal) prefix scoped to GO+terminal)
+# - GTKB_NOTIFY_KIND_AWARE_ROUTING feature flag
+# ===========================================================================
+
+
+def _kind_aware() -> SimpleNamespace:
+    """Lazy-import kind-aware routing helpers."""
+    from groundtruth_kb.bridge.detector import BridgeDocument, BridgeStatus, BridgeVersion
+    from groundtruth_kb.bridge.notify import (
+        KIND_AWARE_ROUTING_ENV_VAR,
+        _derive_dispatchable,
+        _extract_bridge_kind,
+        _kind_aware_routing_enabled,
+        classify_document_dispatchability,
+        find_operative_prime_version,
+    )
+
+    return SimpleNamespace(
+        BridgeDocument=BridgeDocument,
+        BridgeStatus=BridgeStatus,
+        BridgeVersion=BridgeVersion,
+        KIND_AWARE_ROUTING_ENV_VAR=KIND_AWARE_ROUTING_ENV_VAR,
+        _derive_dispatchable=_derive_dispatchable,
+        _extract_bridge_kind=_extract_bridge_kind,
+        _kind_aware_routing_enabled=_kind_aware_routing_enabled,
+        classify_document_dispatchability=classify_document_dispatchability,
+        find_operative_prime_version=find_operative_prime_version,
+    )
+
+
+def _make_doc(name: str, status_file_pairs: list[tuple[str, str]]) -> object:
+    """Build a BridgeDocument with versions in most-recent-first order.
+
+    status_file_pairs: list of (status_str, file_path) — order is the order
+    they appear in INDEX (most-recent first).
+    """
+    k = _kind_aware()
+    versions = tuple(
+        k.BridgeVersion(
+            status=k.BridgeStatus(status),
+            file_path=path,
+            line_number=10 + i,
+        )
+        for i, (status, path) in enumerate(status_file_pairs)
+    )
+    return k.BridgeDocument(name=name, versions=versions, line_number=9)
+
+
+def _seed_bridge_file(project_root: Path, file_path: str, content: str) -> None:
+    """Write a bridge file under project_root with the given content."""
+    full = project_root / file_path
+    full.parent.mkdir(parents=True, exist_ok=True)
+    full.write_text(content, encoding="utf-8")
+
+
+# --- _derive_dispatchable decision tree ----------------------------------
+
+
+def test_derive_dispatchable_NEW_returns_True_for_terminal_kind() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("NEW", "terminal") is True
+
+
+def test_derive_dispatchable_REVISED_returns_True_for_terminal_kind() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("REVISED", "terminal") is True
+
+
+def test_derive_dispatchable_NO_GO_returns_True_for_terminal_kind() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("NO-GO", "terminal") is True
+
+
+def test_derive_dispatchable_NO_GO_returns_True_for_dispatchable_kind() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("NO-GO", "dispatchable") is True
+
+
+def test_derive_dispatchable_GO_returns_False_for_terminal_kind() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("GO", "terminal") is False
+
+
+def test_derive_dispatchable_GO_returns_True_for_dispatchable_kind() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("GO", "dispatchable") is True
+
+
+def test_derive_dispatchable_GO_returns_True_for_ambiguous_kind() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("GO", "ambiguous") is True
+
+
+def test_derive_dispatchable_VERIFIED_returns_False() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("VERIFIED", "dispatchable") is False
+    assert k._derive_dispatchable("VERIFIED", "terminal") is False
+
+
+def test_derive_dispatchable_unknown_status_returns_False() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("UNKNOWN", "dispatchable") is False
+
+
+# --- _extract_bridge_kind frontmatter parser -------------------------------
+
+
+def test_extract_bridge_kind_extracts_value() -> None:
+    k = _kind_aware()
+    header = "Some preamble\nbridge_kind: implementation_proposal\nMore text"
+    assert k._extract_bridge_kind(header) == "implementation_proposal"
+
+
+def test_extract_bridge_kind_returns_None_when_missing() -> None:
+    k = _kind_aware()
+    assert k._extract_bridge_kind("# Header\n\nNo bridge_kind line here") is None
+
+
+def test_extract_bridge_kind_extracts_kebab_variant() -> None:
+    k = _kind_aware()
+    assert k._extract_bridge_kind("bridge_kind: post-implementation-report") == "post-implementation-report"
+
+
+# --- find_operative_prime_version version traversal -----------------------
+
+
+def test_find_operative_prime_version_returns_latest_REVISED() -> None:
+    k = _kind_aware()
+    doc = _make_doc(
+        "foo",
+        [
+            ("GO", "bridge/foo-004.md"),
+            ("REVISED", "bridge/foo-003.md"),
+            ("NO-GO", "bridge/foo-002.md"),
+            ("NEW", "bridge/foo-001.md"),
+        ],
+    )
+    operative = k.find_operative_prime_version(doc)
+    assert operative is not None
+    assert operative.file_path == "bridge/foo-003.md"
+    assert operative.status == k.BridgeStatus.REVISED
+
+
+def test_find_operative_prime_version_returns_latest_NEW_when_no_REVISED() -> None:
+    k = _kind_aware()
+    doc = _make_doc(
+        "foo",
+        [
+            ("GO", "bridge/foo-002.md"),
+            ("NEW", "bridge/foo-001.md"),
+        ],
+    )
+    operative = k.find_operative_prime_version(doc)
+    assert operative is not None
+    assert operative.file_path == "bridge/foo-001.md"
+
+
+def test_find_operative_prime_version_returns_None_when_no_NEW_or_REVISED() -> None:
+    k = _kind_aware()
+    # All Codex-authored versions (rare; a thread initialized by Codex).
+    doc = _make_doc(
+        "foo",
+        [
+            ("VERIFIED", "bridge/foo-002.md"),
+            ("GO", "bridge/foo-001.md"),
+        ],
+    )
+    assert k.find_operative_prime_version(doc) is None
+
+
+def test_find_operative_prime_version_skips_codex_authored_GO_NO_GO_VERIFIED() -> None:
+    k = _kind_aware()
+    # Mixed: GO/NO-GO/VERIFIED interleaved with REVISED → REVISED is operative.
+    doc = _make_doc(
+        "foo",
+        [
+            ("VERIFIED", "bridge/foo-005.md"),
+            ("GO", "bridge/foo-004.md"),
+            ("REVISED", "bridge/foo-003.md"),
+            ("NO-GO", "bridge/foo-002.md"),
+            ("NEW", "bridge/foo-001.md"),
+        ],
+    )
+    operative = k.find_operative_prime_version(doc)
+    assert operative is not None
+    assert operative.status == k.BridgeStatus.REVISED
+
+
+# --- classify_document_dispatchability (kind tokens) ----------------------
+
+
+def _classify_with_kind(tmp_path: Path, bridge_kind_value: str | None) -> str:
+    """Helper: build a doc + bridge file with the given bridge_kind, classify."""
+    k = _kind_aware()
+    doc_name = "synth"
+    file_path = f"bridge/{doc_name}-001.md"
+    if bridge_kind_value is None:
+        content = "# Synthetic\nNo bridge_kind here.\n"
+    else:
+        content = f"# Synthetic\nbridge_kind: {bridge_kind_value}\nMore text.\n"
+    _seed_bridge_file(tmp_path, file_path, content)
+    doc = _make_doc(doc_name, [("NEW", file_path)])
+    return k.classify_document_dispatchability(tmp_path, doc)
+
+
+def test_classify_terminal_scoping_kind(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, "implementation_scoping") == "terminal"
+    assert _classify_with_kind(tmp_path, "scoping_proposal") == "terminal"
+    assert _classify_with_kind(tmp_path, "governance_scoping_proposal") == "terminal"
+
+
+def test_classify_terminal_candidate_spec_intake_kind(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, "candidate_spec_intake") == "terminal"
+
+
+def test_classify_terminal_closure_kind(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, "closure") == "terminal"
+    assert _classify_with_kind(tmp_path, "parking_acknowledgement") == "terminal"
+    assert _classify_with_kind(tmp_path, "index_reconciliation") == "terminal"
+
+
+def test_classify_dispatchable_implementation_proposal_kind(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, "implementation_proposal") == "dispatchable"
+    assert _classify_with_kind(tmp_path, "implementation_slice") == "dispatchable"
+
+
+def test_classify_dispatchable_post_implementation_kind(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, "post_implementation_report") == "dispatchable"
+    assert _classify_with_kind(tmp_path, "post_implementation_report_revision") == "dispatchable"
+    assert _classify_with_kind(tmp_path, "post_impl_report") == "dispatchable"
+
+
+def test_classify_dispatchable_post_implementation_kebab_variant_kind(tmp_path: Path) -> None:
+    """Kebab-norm: post-implementation-report → post_implementation_report match."""
+    assert _classify_with_kind(tmp_path, "post-implementation-report") == "dispatchable"
+
+
+def test_classify_ambiguous_bare_proposal_kind(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, "proposal") == "ambiguous"
+
+
+def test_classify_ambiguous_review_kind(tmp_path: Path) -> None:
+    """`review` is ambiguous in REVISED-2 — dropped from terminal tokens for safety."""
+    assert _classify_with_kind(tmp_path, "review") == "ambiguous"
+
+
+def test_classify_ambiguous_verification_kind(tmp_path: Path) -> None:
+    """`verification` is ambiguous in REVISED-2 — dropped from terminal tokens for safety."""
+    assert _classify_with_kind(tmp_path, "verification") == "ambiguous"
+
+
+def test_classify_ambiguous_when_bridge_kind_field_missing(tmp_path: Path) -> None:
+    assert _classify_with_kind(tmp_path, None) == "ambiguous"
+
+
+def test_classify_ambiguous_when_no_operative_prime_version(tmp_path: Path) -> None:
+    """Document with only Codex-authored versions classifies as ambiguous."""
+    k = _kind_aware()
+    # Note: BridgeStatus uses NO_GO with underscore — but the value is "NO-GO".
+    doc = _make_doc("foo", [("VERIFIED", "bridge/foo-002.md"), ("GO", "bridge/foo-001.md")])
+    assert k.classify_document_dispatchability(tmp_path, doc) == "ambiguous"
+
+
+def test_classify_ambiguous_when_file_missing(tmp_path: Path) -> None:
+    """Operative version exists in BridgeDocument but the file is not on disk."""
+    k = _kind_aware()
+    doc = _make_doc("foo", [("REVISED", "bridge/foo-001.md")])
+    # Don't write the file
+    assert k.classify_document_dispatchability(tmp_path, doc) == "ambiguous"
+
+
+# --- compute_actionable_pending end-to-end with real bridge chains -------
+
+
+def _make_index_with_kind(
+    tmp_path: Path,
+    doc_name: str,
+    top_status: str,
+    operative_kind: str | None,
+    operative_status: str = "REVISED",
+    operative_version: int = 3,
+    top_version: int = 4,
+) -> tuple[str, Path]:
+    """Build a real INDEX text + on-disk verdict file + on-disk operative-Prime
+    file with the given bridge_kind. Returns (text, project_root).
+    """
+    project_root = tmp_path
+    bridge_dir = project_root / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    # Top file (Codex verdict) — no bridge_kind.
+    top_path = bridge_dir / f"{doc_name}-{top_version:03d}.md"
+    top_path.write_text(f"# {top_status} verdict on -{operative_version:03d}\n", encoding="utf-8")
+    # Operative Prime file — has bridge_kind.
+    op_path = bridge_dir / f"{doc_name}-{operative_version:03d}.md"
+    op_content = f"# {operative_status}\n"
+    if operative_kind is not None:
+        op_content += f"bridge_kind: {operative_kind}\n"
+    op_path.write_text(op_content, encoding="utf-8")
+    # Build INDEX text — top first (most recent), then operative.
+    text = (
+        f"Document: {doc_name}\n"
+        f"{top_status}: bridge/{doc_name}-{top_version:03d}.md\n"
+        f"{operative_status}: bridge/{doc_name}-{operative_version:03d}.md\n"
+    )
+    return text, project_root
+
+
+def test_compute_pending_codex_NEW_scoping_proposal_is_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NEW", "scoping_proposal", "NEW", operative_version=4, top_version=4)
+    parsed = n.parse_index(text)
+    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(codex) == 1
+    assert codex[0].dispatchable is True
+    assert codex[0].classification == "terminal"
+    assert codex[0].top_status == "NEW"
+
+
+def test_compute_pending_codex_NEW_candidate_spec_intake_is_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NEW", "candidate_spec_intake", "NEW", operative_version=4, top_version=4)
+    parsed = n.parse_index(text)
+    _, codex = n.compute_actionable_pending(parsed, project_root=root)
+    assert codex[0].dispatchable is True
+    assert codex[0].classification == "terminal"
+
+
+def test_compute_pending_codex_REVISED_terminal_kind_is_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "REVISED", "scoping_proposal", "REVISED", operative_version=3, top_version=3)
+    parsed = n.parse_index(text)
+    _, codex = n.compute_actionable_pending(parsed, project_root=root)
+    assert codex[0].dispatchable is True
+
+
+def test_compute_pending_prime_NO_GO_terminal_kind_is_dispatchable(tmp_path: Path) -> None:
+    """F1 fix from -008 NO-GO: terminal-kind NO-GO requires Prime revision."""
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NO-GO", "scoping_proposal")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(prime) == 1
+    assert prime[0].dispatchable is True
+    assert prime[0].classification == "terminal"
+    assert prime[0].top_status == "NO-GO"
+
+
+def test_compute_pending_prime_NO_GO_scoping_proposal_is_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NO-GO", "scoping_proposal")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert prime[0].dispatchable is True
+
+
+def test_compute_pending_prime_NO_GO_candidate_spec_intake_is_dispatchable(tmp_path: Path) -> None:
+    """The exact case Codex cited: candidate-spec-intake NO-GO needs Prime revision."""
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NO-GO", "candidate_spec_intake")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert prime[0].dispatchable is True
+
+
+def test_compute_pending_prime_GO_terminal_kind_is_NOT_dispatchable(tmp_path: Path) -> None:
+    """The core token-cost-reduction case: terminal-kind GO is suppressed."""
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "GO", "scoping_proposal")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(prime) == 1
+    assert prime[0].dispatchable is False
+    assert prime[0].classification == "terminal"
+    assert prime[0].top_status == "GO"
+
+
+def test_compute_pending_prime_GO_candidate_spec_intake_is_NOT_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "GO", "candidate_spec_intake")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert prime[0].dispatchable is False
+
+
+def test_compute_pending_prime_GO_implementation_proposal_is_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "GO", "implementation_proposal")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert prime[0].dispatchable is True
+    assert prime[0].classification == "dispatchable"
+
+
+def test_compute_pending_prime_GO_bare_proposal_is_dispatchable_via_ambiguous(tmp_path: Path) -> None:
+    """Legacy bare `bridge_kind: proposal` falls through to ambiguous → dispatchable."""
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "GO", "proposal")
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert prime[0].dispatchable is True
+    assert prime[0].classification == "ambiguous"
+
+
+def test_compute_pending_prime_GO_no_bridge_kind_is_dispatchable_via_ambiguous(tmp_path: Path) -> None:
+    """Legacy bridge with no bridge_kind: at all falls through to ambiguous → dispatchable."""
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "GO", None)
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert prime[0].dispatchable is True
+    assert prime[0].classification == "ambiguous"
+
+
+# --- Schema v3 markdown rendering ----------------------------------------
+
+
+def test_markdown_renders_dispatchable_and_classification_columns(tmp_path: Path) -> None:
+    """v3 columns are rendered."""
+    n = _notify()
+    state_dir = tmp_path / "state"
+    items = [
+        n.ActionablePending(
+            document_name="foo",
+            top_status="GO",
+            top_file="bridge/foo-002.md",
+            index_line_number=8,
+            dispatchable=True,
+            classification="dispatchable",
+        )
+    ]
+    n.update_notification(state_dir, n.BridgeAgent.PRIME, items)
+    md_path = state_dir / "notifications" / "pending-bridge-action-prime.md"
+    md_text = md_path.read_text(encoding="utf-8")
+    assert "Dispatchable" in md_text
+    assert "Classification" in md_text
+    assert "yes" in md_text  # dispatchable=True marker
+
+
+def test_markdown_renders_terminal_prefix_only_when_GO_and_terminal(tmp_path: Path) -> None:
+    """`(terminal)` prefix on GO+terminal rows; absent on NO-GO+terminal rows."""
+    n = _notify()
+    state_dir = tmp_path / "state"
+    # GO + terminal → prefix shown
+    go_terminal = n.ActionablePending(
+        document_name="scoping_thread",
+        top_status="GO",
+        top_file="bridge/scoping_thread-002.md",
+        index_line_number=5,
+        dispatchable=False,
+        classification="terminal",
+    )
+    # NO-GO + terminal → prefix NOT shown
+    no_go_terminal = n.ActionablePending(
+        document_name="intake_thread",
+        top_status="NO-GO",
+        top_file="bridge/intake_thread-002.md",
+        index_line_number=10,
+        dispatchable=True,
+        classification="terminal",
+    )
+    n.update_notification(state_dir, n.BridgeAgent.PRIME, [go_terminal, no_go_terminal])
+    md_path = state_dir / "notifications" / "pending-bridge-action-prime.md"
+    md_text = md_path.read_text(encoding="utf-8")
+    # GO row has prefix:
+    assert "(terminal) scoping_thread" in md_text
+    # NO-GO row does NOT have prefix:
+    assert "(terminal) intake_thread" not in md_text
+    assert "intake_thread" in md_text  # but the row is still there
+
+
+# --- Feature flag --------------------------------------------------------
+
+
+def test_kind_aware_routing_enabled_by_default_when_env_var_unset(monkeypatch) -> None:
+    k = _kind_aware()
+    monkeypatch.delenv(k.KIND_AWARE_ROUTING_ENV_VAR, raising=False)
+    assert k._kind_aware_routing_enabled() is True
+
+
+def test_kind_aware_routing_disabled_when_env_var_zero(monkeypatch) -> None:
+    k = _kind_aware()
+    monkeypatch.setenv(k.KIND_AWARE_ROUTING_ENV_VAR, "0")
+    assert k._kind_aware_routing_enabled() is False
+
+
+def test_kind_aware_routing_enabled_when_env_var_one(monkeypatch) -> None:
+    k = _kind_aware()
+    monkeypatch.setenv(k.KIND_AWARE_ROUTING_ENV_VAR, "1")
+    assert k._kind_aware_routing_enabled() is True

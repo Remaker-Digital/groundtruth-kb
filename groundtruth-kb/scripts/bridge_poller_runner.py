@@ -47,6 +47,7 @@ from groundtruth_kb.bridge.checkpoint import (
 )
 from groundtruth_kb.bridge.detector import parse_index
 from groundtruth_kb.bridge.notify import (
+    _kind_aware_routing_enabled,
     compute_actionable_pending,
     update_notification,
 )
@@ -280,18 +281,38 @@ def _dispatch_if_needed(
 
     now = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     results: dict[str, object] = {}
+    kind_aware = _kind_aware_routing_enabled()
     for recipient, items in pending_by_recipient.items():
-        signature = _pending_signature(items)
+        # Per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4 §1.5:
+        # filter items on dispatchable BEFORE signature check + spawn so terminal-
+        # kind GO verdicts don't spawn redundant Prime harnesses. Feature flag
+        # GTKB_NOTIFY_KIND_AWARE_ROUTING (default 1) gates the filter.
+        if kind_aware:
+            filtered_items = [it for it in items if getattr(it, "dispatchable", True)]
+        else:
+            filtered_items = list(items)
+        filtered_terminal_count = len(items) - len(filtered_items)
+
+        signature = _pending_signature(filtered_items)
         prior = recipients_state.get(recipient.value)
         prior_signature = prior.get("signature") if isinstance(prior, dict) else None
         recipient_state: dict[str, object] = {
             "signature": signature,
-            "pending_count": len(items),
+            "pending_count": len(filtered_items),
+            "raw_pending_count": len(items),
+            "filtered_terminal_count": filtered_terminal_count,
             "updated_at": now,
         }
-        if not items:
-            recipient_state["last_result"] = "no_pending"
-            results[recipient.value] = {"launched": False, "reason": "no_pending"}
+        if not filtered_items:
+            # Distinguish "raw list was empty" from "filter removed everything".
+            # The latter records the cumulative-token-cost reduction in the audit.
+            reason = "no_pending_after_filter" if items else "no_pending"
+            recipient_state["last_result"] = reason
+            results[recipient.value] = {
+                "launched": False,
+                "reason": reason,
+                "filtered_terminal_count": filtered_terminal_count,
+            }
         elif prior_signature == signature:
             recipient_state["last_result"] = "unchanged"
             results[recipient.value] = {"launched": False, "reason": "unchanged"}
@@ -300,7 +321,7 @@ def _dispatch_if_needed(
                 state_dir=state_dir,
                 project_root=project_root,
                 recipient=recipient,
-                items=items,
+                items=filtered_items,
                 poller_run_id=run_id,
                 max_items=max_items,
             )

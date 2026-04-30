@@ -180,7 +180,8 @@ def test_first_post_bootstrap_iteration_notifies_pre_existing_actionable_entries
     assert codex_json.is_file()
     assert codex_md.is_file()
     payload = json.loads(codex_json.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == 2
+    # Schema v3 per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4.
+    assert payload["schema_version"] == 3
     assert payload["pending_actions"][0]["top_status"] == "REVISED"
 
 
@@ -433,3 +434,179 @@ def test_main_loop_writes_transitions_count_to_jsonl_audit_log(synthetic_gtkb_ro
     assert "transitions_count" in scan_payloads[0]
     # Single-doc seed; first post-bootstrap scan against unchanged checkpoint → 0 transitions.
     assert scan_payloads[0]["transitions_count"] == 0
+
+
+# ===========================================================================
+# Smart-poller kind-aware routing dispatch filter — per smart-poller-kind-
+# aware-routing-2026-04-30 thread (GO at -010). The runner's _dispatch_if_
+# needed filters items on dispatchable BEFORE signature/spawn so terminal-kind
+# GO entries don't spawn redundant harnesses.
+# ===========================================================================
+
+
+def _seed_kind_bridge(
+    synth: Path,
+    doc_name: str,
+    top_status: str,
+    operative_kind: str | None,
+    operative_status: str = "REVISED",
+    operative_version: int = 3,
+    top_version: int = 4,
+) -> None:
+    """Seed an INDEX with a Codex-verdict top file (no bridge_kind) plus an
+    operative Prime version that carries bridge_kind."""
+    bridge_dir = synth / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    # Top file (verdict)
+    top_path = bridge_dir / f"{doc_name}-{top_version:03d}.md"
+    top_path.write_text(f"# {top_status} verdict\n", encoding="utf-8")
+    # Operative Prime version
+    op_path = bridge_dir / f"{doc_name}-{operative_version:03d}.md"
+    op_content = f"# Prime {operative_status}\n"
+    if operative_kind is not None:
+        op_content += f"bridge_kind: {operative_kind}\n"
+    op_path.write_text(op_content, encoding="utf-8")
+    # INDEX
+    index_path = bridge_dir / "INDEX.md"
+    text = (
+        f"# Bridge Index\n\n"
+        f"Document: {doc_name}\n"
+        f"{top_status}: bridge/{doc_name}-{top_version:03d}.md\n"
+        f"{operative_status}: bridge/{doc_name}-{operative_version:03d}.md\n"
+    )
+    index_path.write_text(text, encoding="utf-8")
+
+
+def test_dispatch_consumer_skips_terminal_prime_GO_entries(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The core token-cost-reduction case: a terminal-kind GO does NOT launch
+    a Prime harness."""
+    runner = _load_runner()
+    _seed_kind_bridge(synthetic_gtkb_root, "scoping_thread", "GO", "scoping_proposal")
+
+    def _fail_unconditionally(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("Dispatch consumer launched harness for terminal-kind GO entry.")
+
+    monkeypatch.setattr(subprocess, "Popen", _fail_unconditionally)
+    runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
+
+    state_path = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    # Filtered terminal count is recorded and the result is no_pending_after_filter.
+    assert state["recipients"]["prime"]["filtered_terminal_count"] == 1
+    assert state["recipients"]["prime"]["last_result"] == "no_pending_after_filter"
+    assert state["recipients"]["prime"]["pending_count"] == 0  # filtered to zero
+
+
+def test_dispatch_consumer_includes_terminal_prime_NO_GO_entries(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F1 fix from -008 NO-GO: terminal-kind NO-GO must dispatch Prime."""
+    runner = _load_runner()
+    _seed_kind_bridge(synthetic_gtkb_root, "intake_thread", "NO-GO", "candidate_spec_intake")
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
+
+    # Prime harness launched once for the NO-GO entry (terminal-kind didn't filter it).
+    assert len(calls) == 1
+
+
+def test_dispatch_consumer_includes_terminal_codex_entries(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F1 fix from -006 NO-GO: terminal-kind NEW must dispatch Codex review."""
+    runner = _load_runner()
+    _seed_kind_bridge(
+        synthetic_gtkb_root, "scoping_thread", "NEW", "scoping_proposal",
+        operative_status="NEW", operative_version=4, top_version=4,
+    )
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
+
+    # Codex harness launched once for the NEW entry.
+    assert len(calls) == 1
+
+
+def test_dispatch_consumer_includes_dispatchable_prime_GO(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Implementation-kind GO entries still dispatch Prime."""
+    runner = _load_runner()
+    _seed_kind_bridge(synthetic_gtkb_root, "impl_thread", "GO", "implementation_proposal")
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
+
+    assert len(calls) == 1
+
+
+def test_dispatch_consumer_includes_ambiguous_legacy_GO(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Legacy bridges with no bridge_kind: still dispatch (preserves current behavior)."""
+    runner = _load_runner()
+    _seed_kind_bridge(synthetic_gtkb_root, "legacy_thread", "GO", None)
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
+
+    assert len(calls) == 1
+
+
+def test_dispatch_consumer_disabled_via_env_var_bypasses_filter(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GTKB_NOTIFY_KIND_AWARE_ROUTING=0 reverts to pre-refinement spawn behavior:
+    even a terminal-kind GO triggers Prime harness launch."""
+    runner = _load_runner()
+    _seed_kind_bridge(synthetic_gtkb_root, "scoping_thread", "GO", "scoping_proposal")
+    monkeypatch.setenv("GTKB_NOTIFY_KIND_AWARE_ROUTING", "0")
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    runner.main_loop(interval_s=0, max_iterations=3, quiet=True, dispatch_enabled=True)
+
+    # With kind-aware filtering disabled, the terminal-kind GO still spawns.
+    assert len(calls) == 1

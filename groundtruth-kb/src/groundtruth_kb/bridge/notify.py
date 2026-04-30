@@ -2,12 +2,20 @@
 """Smart-poller notification artifacts (current-state).
 
 Per ``bridge/gtkb-bridge-poller-p3-notify-2026-04-29-008.md`` GO at REVISED-3,
-this module owns the current-state notification artifact lifecycle:
+this module owns the current-state notification artifact lifecycle.
+
+Per ``bridge/smart-poller-kind-aware-routing-2026-04-30-009.md`` REVISED-4
+(GO at -010), the routing is now kind-aware: each ``ActionablePending`` carries
+``dispatchable`` + ``classification`` fields, and dispatch consumers filter
+on ``dispatchable`` to suppress spurious harness spawns for terminal-kind GO
+verdicts (scoping/closure/parking/index_reconciliation/thread_reconciliation/
+operational_state_change/candidate_spec_intake).
 
 - ``compute_actionable_pending(parse_result, *, project_root)`` derives
   per-recipient actionable lists from the CURRENT TOP STATUSES of parsed
   ``BridgeDocument`` entries — NOT from checkpoint diffs. The checkpoint is
-  audit-only in the notify path.
+  audit-only in the notify path. Each entry now carries kind classification
+  + dispatch eligibility.
 - ``update_notification(state_dir, recipient, items)`` writes (non-empty) or
   removes (empty) the recipient's notification artifact under
   ``<state_dir>/notifications/pending-bridge-action-{recipient}.{json,md}``.
@@ -16,44 +24,214 @@ this module owns the current-state notification artifact lifecycle:
 - ``clear_notification(state_dir, recipient)`` removes both the JSON and
   markdown companion files.
 
-Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION):
+Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION
++ smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4):
 
 - ``NEW`` / ``REVISED`` top status → Codex (Loyal Opposition reviews).
-- ``GO`` / ``NO-GO`` top status → Prime Builder (Prime acts).
+  Always dispatchable; kind classification is informational only.
+- ``NO-GO`` top status → Prime Builder (Prime revises). Always dispatchable
+  because NO-GO is "proposal requires changes before approval", regardless
+  of bridge_kind.
+- ``GO`` top status → Prime Builder (Prime acts). Dispatchable iff the
+  bridge_kind classification is NOT terminal — terminal kinds (scoping,
+  closure, parking, index_reconciliation, thread_reconciliation,
+  operational_state_change, candidate_spec_intake) have no Prime follow-up
+  after a GO verdict.
 - ``VERIFIED`` top status → not actionable for either.
 
-Schema v2 with ``pending_actions[]``; v1's transition-shaped ``pending_transitions[]``
-is NOT produced or read.
+Schema v3 (bumped from v2 per kind-aware-routing slice): ``pending_actions[]``
+entries now carry ``dispatchable`` (bool) + ``classification`` (str:
+"dispatchable"/"terminal"/"ambiguous") fields in addition to the v2 fields.
+v1's transition-shaped ``pending_transitions[]`` is NOT produced or read.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import json
+import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from groundtruth_kb.bridge.detector import BridgeStatus, ParseResult
+from groundtruth_kb.bridge.detector import BridgeDocument, BridgeStatus, BridgeVersion, ParseResult
 from groundtruth_kb.bridge.routing import BridgeAgent
 
 NOTIFY_SUBDIR: Final[str] = "notifications"
-NOTIFY_SCHEMA_VERSION: Final[int] = 2
+NOTIFY_SCHEMA_VERSION: Final[int] = 3
 
 # Per AGENTS.md:153-159 + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION.
 # VERIFIED is closure for both Prime and Codex (not actionable).
 ACTIONABLE_STATUSES_FOR_PRIME: Final[frozenset[str]] = frozenset({BridgeStatus.GO.value, BridgeStatus.NO_GO.value})
 ACTIONABLE_STATUSES_FOR_CODEX: Final[frozenset[str]] = frozenset({BridgeStatus.NEW.value, BridgeStatus.REVISED.value})
 
+# Feature flag for kind-aware routing. =0 disables filtering and matches
+# pre-refinement behavior (all entries dispatchable=True via fallback).
+KIND_AWARE_ROUTING_ENV_VAR: Final[str] = "GTKB_NOTIFY_KIND_AWARE_ROUTING"
+
+# Bridge-kind substring tokens. Matched against the lowercased + kebab-to-snake-
+# normalized bridge_kind value. Order matters: terminal is checked first so the
+# more-specific tokens (e.g., "scoping" inside "implementation_scoping") win
+# before broader matches. Per smart-poller-kind-aware-routing-2026-04-30-009
+# REVISED-4 §1.1.
+_KIND_TERMINAL_TOKENS: Final[tuple[str, ...]] = (
+    "scoping",                  # implementation_scoping, governance_scoping_proposal, scoping_proposal, scoping_addendum
+    "closure",
+    "parking",                  # parking_acknowledgement
+    "index_reconciliation",
+    "thread_reconciliation",
+    "operational_state_change",
+    "candidate_spec_intake",
+)
+
+_KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
+    "implementation_proposal",
+    "implementation_slice",
+    "multiphase_implementation",
+    "fix",
+    "governance_proposal",
+    "architecture_proposal",
+    "post_implementation",      # catches post_implementation_report, post_implementation_report_revision, post-implementation-report (after kebab-norm)
+    "post_impl",                # catches post_impl_report
+    "implementation_report",
+)
+
+# Bare "proposal", "review", "verification", and unrecognized kinds → ambiguous
+# → status-only fallback. Ambiguous entries are dispatched on actionable
+# statuses (preserving legacy behavior for un-migrated bridges).
+
+# Frontmatter parser: bridge_kind: <value> at start-of-line, allows whitespace.
+_BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(r"^bridge_kind:\s*(\S+)", re.MULTILINE)
+
+# Header read budget (bytes). bridge_kind is always in the header section.
+_HEADER_READ_BUDGET_BYTES: Final[int] = 4096
+
+
+def _kind_aware_routing_enabled() -> bool:
+    """Return True if kind-aware routing is enabled via env var (default True).
+
+    `=0` disables filtering; any other value (or unset) enables. Matches
+    the safe-rollback contract from smart-poller-kind-aware-routing -009 §1.6.
+    """
+    return os.environ.get(KIND_AWARE_ROUTING_ENV_VAR, "1") != "0"
+
+
+def _extract_bridge_kind(header_text: str) -> str | None:
+    """Extract the value of ``bridge_kind: <value>`` from a markdown header.
+
+    Returns the trimmed value or None if not found. Tolerant of whitespace
+    and YAML-frontmatter or freeform-header placement.
+    """
+    match = _BRIDGE_KIND_RE.search(header_text)
+    return match.group(1).strip() if match else None
+
+
+def find_operative_prime_version(doc: BridgeDocument) -> BridgeVersion | None:
+    """Return the latest Prime-authored version (NEW or REVISED) in the document.
+
+    ``BridgeDocument.versions`` is ordered most-recent-first. NEW and REVISED
+    are Prime-authored; GO, NO-GO, VERIFIED are Codex-authored verdict files
+    that typically do NOT carry ``bridge_kind:`` metadata. Reading bridge_kind
+    requires finding the Prime proposal version — per
+    smart-poller-kind-aware-routing-2026-04-30-007 (REVISED-3) F1 fix.
+
+    Returns None if the document has no NEW/REVISED versions (rare).
+    """
+    for version in doc.versions:
+        if version.status in (BridgeStatus.NEW, BridgeStatus.REVISED):
+            return version
+    return None
+
+
+def classify_document_dispatchability(
+    project_root: Path,
+    doc: BridgeDocument,
+) -> str:
+    """Classify the document's bridge_kind into a routing category.
+
+    Reads ``bridge_kind:`` from the operative Prime proposal version (latest
+    NEW or REVISED), NOT from the top file (which is typically a Codex verdict
+    file without ``bridge_kind:``). Per smart-poller-kind-aware-routing-2026-04-30
+    -007 F1 fix.
+
+    Returns one of:
+    - "dispatchable" — bridge_kind matches a dispatchable token (impl proposals,
+      slices, fixes, governance/architecture proposals, post-impl reports)
+    - "terminal" — bridge_kind matches a terminal token (scoping, closure,
+      parking, index/thread reconciliation, operational state change, candidate
+      spec intake)
+    - "ambiguous" — bridge_kind missing, bare "proposal", "review",
+      "verification", or unrecognized; falls back to status-only routing
+      via the dispatchable invariant in `_derive_dispatchable`
+    """
+    operative = find_operative_prime_version(doc)
+    if operative is None:
+        return "ambiguous"
+
+    full_path = project_root / operative.file_path
+    try:
+        with full_path.open("r", encoding="utf-8") as fh:
+            head = fh.read(_HEADER_READ_BUDGET_BYTES)
+    except (OSError, UnicodeDecodeError):
+        return "ambiguous"
+
+    bridge_kind = _extract_bridge_kind(head)
+    if not bridge_kind:
+        return "ambiguous"
+
+    # Lowercase + kebab-to-snake normalization. Catches post-implementation-report
+    # (3 occurrences in inventory) which bare underscore matching would miss.
+    bk_normalized = bridge_kind.lower().replace("-", "_")
+
+    for token in _KIND_TERMINAL_TOKENS:
+        if token in bk_normalized:
+            return "terminal"
+
+    for token in _KIND_DISPATCHABLE_TOKENS:
+        if token in bk_normalized:
+            return "dispatchable"
+
+    return "ambiguous"
+
+
+def _derive_dispatchable(top_status: str, classification: str) -> bool:
+    """Compute whether this entry should be auto-dispatched given top status.
+
+    Per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4 §1.1:
+
+    - NEW / REVISED → True (Codex reviews regardless of kind classification;
+      terminal-kind means "no Prime follow-up", not "no Codex review")
+    - NO-GO → True (Prime revises regardless of kind, per
+      file-bridge-protocol.md:92,104-107: "proposal requires changes before
+      approval")
+    - GO → ``classification != "terminal"`` (Prime filters terminal kinds,
+      keeps everything else)
+    - VERIFIED + others → False (not actionable)
+    """
+    if top_status in ACTIONABLE_STATUSES_FOR_CODEX:
+        return True
+    if top_status == BridgeStatus.NO_GO.value:
+        return True
+    if top_status == BridgeStatus.GO.value:
+        return classification != "terminal"
+    return False
+
 
 @dataclass(frozen=True)
 class ActionablePending:
-    """One document's currently-actionable top status for a specific recipient."""
+    """One document's currently-actionable top status for a specific recipient.
+
+    Per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4: ``dispatchable``
+    + ``classification`` fields support kind-aware dispatch consumer filtering.
+    """
 
     document_name: str
     top_status: str
     top_file: str
     index_line_number: int
+    dispatchable: bool = True
+    classification: str = "ambiguous"
 
 
 @dataclass(frozen=True)
@@ -131,13 +309,23 @@ def compute_actionable_pending(
         top = doc.versions[0]
         if not (project_root / top.file_path).is_file():
             continue
+
+        # Kind-aware classification per smart-poller-kind-aware-routing
+        # -2026-04-30-009 REVISED-4. Read bridge_kind from the operative
+        # Prime proposal (latest NEW/REVISED), classify, then derive
+        # dispatchable from status + classification.
+        classification = classify_document_dispatchability(project_root, doc)
+        status_str = str(top.status.value)
+        dispatchable = _derive_dispatchable(status_str, classification)
+
         entry = ActionablePending(
             document_name=doc.name,
-            top_status=str(top.status.value),
+            top_status=status_str,
             top_file=top.file_path,
             index_line_number=top.line_number,
+            dispatchable=dispatchable,
+            classification=classification,
         )
-        status_str = str(top.status.value)
         if status_str in ACTIONABLE_STATUSES_FOR_PRIME:
             actionable_for_prime.append(entry)
         elif status_str in ACTIONABLE_STATUSES_FOR_CODEX:
@@ -172,10 +360,22 @@ def _render_markdown(artifact: NotificationArtifact) -> str:
     lines.append(f"Generated by smart poller at {artifact.written_at} (run `{artifact.poller_run_id}`).\n")
     lines.append(f"Summary: {artifact.summary}\n")
     if artifact.pending_actions:
-        lines.append("| Document | Top status | Top file | INDEX line |")
-        lines.append("|---|---|---|---|")
+        # Schema v3 columns: kind classification + dispatchability per
+        # smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4.
+        lines.append("| Document | Top status | Top file | INDEX line | Dispatchable | Classification |")
+        lines.append("|---|---|---|---|---|---|")
         for item in artifact.pending_actions:
-            lines.append(f"| {item.document_name} | {item.top_status} | {item.top_file} | {item.index_line_number} |")
+            dispatchable_marker = "yes" if item.dispatchable else "no"
+            # `(terminal)` prefix shown only when classification is terminal AND
+            # the entry's status is GO — i.e., where terminal classification
+            # actually suppresses Prime dispatch. NO-GO terminal-kind entries
+            # show classification in the column but no prefix because Prime
+            # revision is preserved.
+            prefix = "(terminal) " if item.classification == "terminal" and item.top_status == BridgeStatus.GO.value else ""
+            lines.append(
+                f"| {prefix}{item.document_name} | {item.top_status} | {item.top_file} | "
+                f"{item.index_line_number} | {dispatchable_marker} | {item.classification} |"
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -222,6 +422,8 @@ def update_notification(
                 "top_status": item.top_status,
                 "top_file": item.top_file,
                 "index_line_number": item.index_line_number,
+                "dispatchable": item.dispatchable,
+                "classification": item.classification,
             }
             for item in artifact.pending_actions
         ],
@@ -244,12 +446,16 @@ def read_notification(state_dir: Path, recipient: BridgeAgent | str) -> Notifica
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return None
+    # Read schema-v3 fields with backward-compatible defaults so a v2 artifact
+    # on disk (no production v2 instances; only test fixtures) still parses.
     actions = tuple(
         ActionablePending(
             document_name=str(a["document_name"]),
             top_status=str(a["top_status"]),
             top_file=str(a["top_file"]),
             index_line_number=int(a["index_line_number"]),
+            dispatchable=bool(a.get("dispatchable", True)),
+            classification=str(a.get("classification", "ambiguous")),
         )
         for a in raw.get("pending_actions", [])
     )

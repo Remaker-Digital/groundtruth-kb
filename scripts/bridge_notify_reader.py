@@ -69,11 +69,24 @@ def format_orient_section(artifact: NotificationArtifact | None) -> str:
         f"_Source: `.gtkb-state/bridge-poller/{NOTIFY_SUBDIR}/pending-bridge-action-{artifact.recipient}.json` "
         f"(schema v{artifact.schema_version}; written {artifact.written_at})_",
         "",
-        "| Document | Status | File | INDEX line |",
-        "|---|---|---|---|",
+        # Schema v3 columns per smart-poller-kind-aware-routing-2026-04-30-009
+        # REVISED-4: kind classification + dispatchability are unconditional
+        # observability (not gated by GTKB_NOTIFY_KIND_AWARE_ROUTING).
+        "| Document | Status | File | INDEX line | Dispatchable | Classification |",
+        "|---|---|---|---|---|---|",
     ]
     for item in artifact.pending_actions:
+        dispatchable_marker = "yes" if getattr(item, "dispatchable", True) else "no"
+        classification = getattr(item, "classification", "ambiguous")
+        # `(terminal)` prefix shown only when classification is terminal AND
+        # status is GO — i.e., where terminal classification actually
+        # suppresses Prime dispatch. NO-GO terminal-kind rows show
+        # classification in the column but no prefix because Prime revision
+        # is preserved per the bridge protocol.
+        prefix = "(terminal) " if classification == "terminal" and item.top_status == "GO" else ""
         lines.append(
-            f"| `{item.document_name}` | **{item.top_status}** | `{item.top_file}` | {item.index_line_number} |"
+            f"| `{prefix}{item.document_name}` | **{item.top_status}** | "
+            f"`{item.top_file}` | {item.index_line_number} | "
+            f"{dispatchable_marker} | {classification} |"
         )
     return "\n".join(lines)
