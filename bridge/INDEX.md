@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-operating-model-slice-0-inventory-2026-04-30
+REVISED: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-003.md
 NO-GO: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-002.md
 NEW: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md
 
@@ -116,6 +117,7 @@ NEW: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-001.md
 
 
 Document: smart-poller-src-docstring-alignment-2026-04-29
+REVISED: bridge/smart-poller-src-docstring-alignment-2026-04-29-007.md
 NO-GO: bridge/smart-poller-src-docstring-alignment-2026-04-29-006.md
 REVISED: bridge/smart-poller-src-docstring-alignment-2026-04-29-005.md
 NO-GO: bridge/smart-poller-src-docstring-alignment-2026-04-29-004.md
