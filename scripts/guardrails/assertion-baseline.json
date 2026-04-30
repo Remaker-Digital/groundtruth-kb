@@ -2,7 +2,7 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 24675,
+    "total_assertions": 24708,
     "total_files": 541
   },
   "baselines": {
@@ -128,7 +128,7 @@
     "tests/hooks/test_bridge_compliance_gate_hard_block_workspace.py": 17,
     "tests/hooks/test_credential_scan.py": 36,
     "tests/hooks/test_formal_artifact_approval_gate.py": 10,
-    "tests/hooks/test_owner_decision_tracker.py": 46,
+    "tests/hooks/test_owner_decision_tracker.py": 79,
     "tests/hooks/test_workstream_focus.py": 140,
     "tests/integration/test_agent_containers.py": 24,
     "tests/integration/test_azure_services.py": 45,

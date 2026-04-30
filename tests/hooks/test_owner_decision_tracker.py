@@ -150,12 +150,25 @@ def test_t2_stop_pending_question_appends_to_pending(tmp_path: Path) -> None:
     assert "Phase 8 rehearsal" in pending_body
 
 
-def test_t3_stop_prose_pattern_appends_with_no_systemmessage(tmp_path: Path) -> None:
-    """T3: prose anti-pattern detected; entry gets detected_via prose; stdout is empty (F3)."""
+def test_t3_stop_prose_pattern_appends_and_emits_block_decision(tmp_path: Path) -> None:
+    """T3: prose anti-pattern detected without AskUserQuestion → durable file
+    appends the entry AND Stop mode emits the bounded-exception block JSON.
+
+    F3 contract was revised by gtkb-decision-tracker-block-prose-ask-2026-04-29
+    -003 REVISED-1 (Codex GO at -004): Stop is silent for typical turns BUT
+    emits one ``{"decision": "block", "reason": "..."}`` JSON when the just-
+    completed turn contains at least one prose-decision-ask AND zero
+    AskUserQuestion tool_use entries. The fixture
+    ``turn_with_prose_decision.jsonl`` matches that hard condition.
+    """
     project = _setup_project(tmp_path)
     result = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
-    # F3 contract: Stop mode never writes to stdout.
-    assert result.stdout == "", f"Stop stdout must be empty per F3; got: {result.stdout!r}"
+    # F3 revision (bounded exception): block JSON written to stdout.
+    assert result.stdout, "Stop stdout must contain block JSON for hard condition (F3 revision)"
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "block"
+    assert "AskUserQuestion" in payload["reason"]
+    # Durable-file append behavior preserved.
     body = _read_pending_file(project)
     assert "detected_via: prose:" in body
 
@@ -452,3 +465,182 @@ def test_t16_multiple_askuserquestion_in_one_turn(tmp_path: Path) -> None:
     # Feature X question was answered "Yes" -> Resolved.
     assert "Should we enable feature X?" in resolved
     assert "answer: \"Yes\"" in resolved
+
+
+# ===========================================================================
+# F3 bounded exception: Stop-mode block-on-prose-ask
+# Per gtkb-decision-tracker-block-prose-ask-2026-04-29-003 REVISED-1 (Codex GO
+# at -004). Stop emits one `{"decision": "block", ...}` JSON when the just-
+# completed turn has a prose-decision-ask AND zero AskUserQuestion tool_use
+# entries. Gated by GTKB_BLOCK_ON_PROSE_DECISION_ASK (default 1; =0 disables
+# block JSON only — detection + durable-file appends are preserved).
+# ===========================================================================
+
+
+def _run_hook_with_env(mode: str, project_root: Path, stdin_text: str, extra_env: dict) -> subprocess.CompletedProcess:
+    """Variant of _run_hook that sets/overrides specific env vars."""
+    env = os.environ.copy()
+    env["CLAUDE_PROJECT_DIR"] = str(project_root)
+    env.update(extra_env)
+    return subprocess.run(
+        [sys.executable, str(HOOK), "--mode", mode],
+        input=stdin_text,
+        text=True,
+        capture_output=True,
+        env=env,
+        check=False,
+        timeout=10,
+    )
+
+
+def test_f3_stop_silent_for_typical_turn_without_prose_ask(tmp_path: Path) -> None:
+    """F3 revision: Stop remains silent for typical turns. Fixture has an
+    answered AskUserQuestion and no prose-ask -> no block emission."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_askuserquestion_answered.jsonl"))
+    assert result.returncode == 0
+    assert result.stdout == "", f"Stop stdout must be empty for typical turn; got: {result.stdout!r}"
+
+
+def test_f3_stop_silent_when_prose_ask_with_askuserquestion_in_same_turn(tmp_path: Path) -> None:
+    """F3 revision: prose-ask + AskUserQuestion in same turn -> no block.
+    The bounded exception only fires when zero AskUserQuestion calls happened."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_prose_and_askuserquestion.jsonl"))
+    assert result.returncode == 0
+    assert result.stdout == "", f"Stop stdout must be empty when AskUserQuestion is present; got: {result.stdout!r}"
+    body = _read_pending_file(project)
+    assert "File Slice 1 proposal first" in body or "ask_user_question" in body
+
+
+def test_f3_stop_emits_block_on_prose_ask_without_askuserquestion(tmp_path: Path) -> None:
+    """F3 bounded exception: prose-ask + zero AskUserQuestion -> emit block JSON."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    assert result.returncode == 0
+    assert result.stdout, "Stop stdout must contain block JSON for hard condition"
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "block"
+    assert "AskUserQuestion" in payload["reason"]
+
+
+def test_f3_stop_block_rate_limited_to_one_per_invocation(tmp_path: Path) -> None:
+    """F3: at most one block emission per Stop invocation; reason caps at 3 bullets."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_many_prose_decisions.jsonl"))
+    assert result.returncode == 0
+    payload = json.loads(result.stdout.strip())
+    assert payload["decision"] == "block"
+    bullet_lines = [line for line in payload["reason"].split("\n") if line.startswith("  - ")]
+    assert len(bullet_lines) == 3, f"Expected 3 displayed bullet lines (cap); got {len(bullet_lines)}"
+
+
+def test_f3_block_reason_caps_at_three_with_overflow_count(tmp_path: Path) -> None:
+    """Codex Q5: when more than 3 prose-asks match, reason text shows the first
+    3 plus a `(N additional matches)` suffix."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_many_prose_decisions.jsonl"))
+    assert result.returncode == 0
+    payload = json.loads(result.stdout.strip())
+    assert "additional matches)" in payload["reason"]
+
+
+def test_f3_block_emission_disabled_when_env_var_zero(tmp_path: Path) -> None:
+    """Codex -004 GO condition 3: GTKB_BLOCK_ON_PROSE_DECISION_ASK=0 suppresses
+    block JSON emission while preserving detection + durable-file appends."""
+    project = _setup_project(tmp_path)
+    result = _run_hook_with_env(
+        "stop",
+        project,
+        _stop_payload("turn_with_prose_decision.jsonl"),
+        {"GTKB_BLOCK_ON_PROSE_DECISION_ASK": "0"},
+    )
+    assert result.returncode == 0
+    assert result.stdout == "", f"Stdout must be empty when env var is 0; got: {result.stdout!r}"
+    body = _read_pending_file(project)
+    assert "detected_via: prose:" in body, "Detection must continue when block emission is disabled"
+
+
+def test_f3_block_emission_enabled_by_default_when_env_var_unset(tmp_path: Path) -> None:
+    """Default behavior: block emission is on without any env-var configuration."""
+    project = _setup_project(tmp_path)
+    env = os.environ.copy()
+    env["CLAUDE_PROJECT_DIR"] = str(project)
+    env.pop("GTKB_BLOCK_ON_PROSE_DECISION_ASK", None)
+    result = subprocess.run(
+        [sys.executable, str(HOOK), "--mode", "stop"],
+        input=_stop_payload("turn_with_prose_decision.jsonl"),
+        text=True,
+        capture_output=True,
+        env=env,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 0
+    payload = json.loads(result.stdout.strip())
+    assert payload["decision"] == "block"
+
+
+def test_f3_block_emission_handles_malformed_transcript_gracefully(tmp_path: Path) -> None:
+    """Graceful degradation: missing transcript must not crash."""
+    project = _setup_project(tmp_path)
+    payload = json.dumps({
+        "session_id": "test-session",
+        "transcript_path": str(FIXTURES / "nonexistent_fixture.jsonl"),
+        "cwd": str(REPO_ROOT),
+        "hook_event_name": "Stop",
+        "stop_hook_active": True,
+    })
+    result = _run_hook("stop", project, payload)
+    assert result.returncode == 0
+    assert result.stdout == "", "Malformed transcript should produce no block emission"
+
+
+def test_f3_block_reason_includes_resolution_path(tmp_path: Path) -> None:
+    """Reason text names the resolution (AskUserQuestion) so the agent knows what to do."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    payload = json.loads(result.stdout.strip())
+    assert "AskUserQuestion" in payload["reason"]
+    assert "Resolution" in payload["reason"]
+
+
+def test_f3_block_reason_includes_disable_path(tmp_path: Path) -> None:
+    """Reason text names the env-var disable path."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    payload = json.loads(result.stdout.strip())
+    assert "GTKB_BLOCK_ON_PROSE_DECISION_ASK" in payload["reason"]
+
+
+def test_f3_block_emission_does_not_corrupt_durable_file(tmp_path: Path) -> None:
+    """Block emission and durable-file append are independent code paths that both run."""
+    project = _setup_project(tmp_path)
+    initial_body = _read_pending_file(project)
+    assert "(none)" in initial_body
+    result = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    assert result.returncode == 0
+    body = _read_pending_file(project)
+    assert "detected_via: prose:" in body
+    assert result.stdout
+    payload = json.loads(result.stdout.strip())
+    assert payload["decision"] == "block"
+
+
+def test_f3_block_emission_returncode_zero_for_graceful_degradation(tmp_path: Path) -> None:
+    """Hook must always return exit code 0 even when emitting a block JSON.
+    The block control-flow signal is JSON on stdout, NOT a non-zero exit code."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    assert result.returncode == 0
+
+
+def test_f3_session_init_renders_pending_decisions_when_block_already_emitted(tmp_path: Path) -> None:
+    """Non-regression: after a block-emitting run, the pending durable file is
+    still readable + the prose entry is recorded for next-session surfacing."""
+    project = _setup_project(tmp_path)
+    _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    body = _read_pending_file(project)
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    n = pending.count("- id: DECISION-")
+    assert n >= 1, f"Expected at least 1 pending entry after block-emitting run; got {n}"

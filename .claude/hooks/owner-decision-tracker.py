@@ -10,10 +10,27 @@ Two modes:
 - Stop: parses the just-completed turn's JSONL transcript for
   AskUserQuestion tool_use entries and prose anti-pattern matches; appends
   unresolved questions to the durable file's `## Pending` section; moves
-  same-turn-answered questions directly to `## Resolved`. Writes nothing
-  to stdout (per Codex -004 GO condition F3 resolution: durable-file is
-  the sole Stop-mode output; visibility comes from next SessionStart's
-  startup disclosure and next UserPromptSubmit's nudge).
+  same-turn-answered questions directly to `## Resolved`. Stop mode is
+  silent for typical turns (durable-file remains the sole output; visibility
+  comes from next SessionStart's startup disclosure and next
+  UserPromptSubmit's nudge).
+
+  BOUNDED EXCEPTION (per gtkb-decision-tracker-block-prose-ask-2026-04-29-003
+  REVISED-1 §F3 Parent Bridge Contract Revision; Codex GO at -004): when the
+  just-completed turn contains at least one prose-decision-ask AND zero
+  AskUserQuestion tool_use entries, Stop mode emits a single
+  `{"decision": "block", "reason": "..."}` JSON to stdout. This is a control-
+  flow signal (prevents the agent from ending the turn so it can call
+  AskUserQuestion to formalize the decision), NOT nudge text. The block
+  emission is per-turn rate-limited to one and gated by env var
+  GTKB_BLOCK_ON_PROSE_DECISION_ASK (default 1; =0 disables block emission
+  while preserving detection + durable-file writes + graceful degradation).
+
+  This bounded exception revises the original Slice 1 F3 rule "Stop writes
+  durable state only" (parent GO at gtkb-gov-owner-decision-surfacing-slice1
+  -004.md). For all other cases — typical turns, false-positive-guarded
+  prose, prose-with-AskUserQuestion turns — Stop mode remains silent and
+  exits 0.
 
 - UserPromptSubmit: reads the durable file; if the user's prompt does NOT
   reference a pending decision (by DECISION-NNNN ID, decision keywords,
@@ -25,12 +42,18 @@ Two modes:
 
 Stdin: JSON hook event payload per
        https://code.claude.com/docs/en/hooks
-Stdout: empty (Stop mode) or markdown text (UserPromptSubmit mode)
-Exit:   Always 0 (graceful degradation; never blocks the agent)
+Stdout: empty (typical Stop), block-decision JSON (Stop hard-condition),
+        or markdown text (UserPromptSubmit mode)
+Exit:   Always 0 (graceful degradation; never crashes the agent). Note
+        that the hook control-flow signal `{"decision": "block"}` causes
+        the harness to refuse to end the turn — that is NOT the same as
+        a non-zero exit code.
 
 Authority:
 - bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md REVISED
-- bridge/gtkb-gov-owner-decision-surfacing-slice1-004.md GO
+- bridge/gtkb-gov-owner-decision-surfacing-slice1-004.md GO (parent F3 rule)
+- bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-003.md REVISED-1
+  (F3 bounded exception; Codex GO at -004)
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -98,6 +121,78 @@ PROSE_FALSE_POSITIVE_GUARDS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bin general,?\s+decisions?\b", re.IGNORECASE),
     re.compile(r"\babstract(?:ly)?,?\s+(?:about\s+)?decisions?\b", re.IGNORECASE),
 )
+
+# Block emission feature flag (Codex -004 GO condition 3).
+# Default '1' (enabled); '=0' suppresses block JSON only — detection,
+# durable-file appends, and graceful degradation are preserved.
+BLOCK_EMISSION_ENV_VAR = "GTKB_BLOCK_ON_PROSE_DECISION_ASK"
+
+# Per Codex -004 GO condition 4 + Q5 answer: cap displayed prose-pattern
+# matches in the block reason text at 3 entries; if more matches were detected,
+# include "(N additional matches)" suffix.
+BLOCK_REASON_DISPLAYED_MATCHES_CAP = 3
+
+# Maximum excerpt length per matched snippet in the block reason text.
+# Snippets longer than this get truncated with "..." to keep the
+# additionalContext block concise.
+BLOCK_REASON_EXCERPT_MAX_LEN = 80
+
+
+def _block_emission_enabled() -> bool:
+    """Return True when block JSON emission is enabled (env var unset or != '0').
+
+    Per Codex -004 GO condition 3: this flag suppresses ONLY the block JSON
+    emission; prose detection, durable-file appends, and graceful degradation
+    on malformed input are NOT suppressed.
+    """
+    return os.environ.get(BLOCK_EMISSION_ENV_VAR, "1") != "0"
+
+
+def _build_block_decision(matches: list[tuple[str, str]]) -> dict[str, str]:
+    """Construct the Stop-mode block-decision JSON.
+
+    Per gtkb-decision-tracker-block-prose-ask-2026-04-29-003 REVISED-1 §1.4
+    (output schema) + Codex -004 Q5 cap-at-3:
+
+    - Lists the first ``BLOCK_REASON_DISPLAYED_MATCHES_CAP`` matches with
+      pattern_id and a truncated excerpt.
+    - If extra matches were detected, includes a "(N additional matches)"
+      suffix so the count is visible.
+    - Names the resolution path (call AskUserQuestion).
+    - Names the disable path (env var ``GTKB_BLOCK_ON_PROSE_DECISION_ASK=0``).
+    """
+    displayed = matches[: BLOCK_REASON_DISPLAYED_MATCHES_CAP]
+    extra_count = len(matches) - len(displayed)
+
+    header = (
+        f"Matched patterns (showing first {len(displayed)} of {len(matches)}):"
+        if len(matches) > BLOCK_REASON_DISPLAYED_MATCHES_CAP
+        else "Matched patterns:"
+    )
+    lines = [
+        "Owner-decision-tracker: prose decision ask(s) detected without "
+        "AskUserQuestion call this turn.",
+        "",
+        header,
+    ]
+    for name, snippet in displayed:
+        excerpt = snippet[:BLOCK_REASON_EXCERPT_MAX_LEN]
+        if len(snippet) > BLOCK_REASON_EXCERPT_MAX_LEN:
+            excerpt = excerpt + "..."
+        lines.append(f"  - {name}: '{excerpt}'")
+    if extra_count > 0:
+        lines.append(f"  ({extra_count} additional matches)")
+    lines.extend([
+        "",
+        "Resolution: call AskUserQuestion with the detected questions "
+        "formalized as structured options. The dialog produces a clickable "
+        "popup the user can respond to inline; prose questions get lost in "
+        "chat scrollback.",
+        "",
+        f"Disable: set env var {BLOCK_EMISSION_ENV_VAR}=0 to suppress block "
+        f"emission while keeping detection + durable-file writes.",
+    ])
+    return {"decision": "block", "reason": "\n".join(lines)}
 
 
 # ---------------------------------------------------------------------------
@@ -554,23 +649,43 @@ def _scan_prose_decisions(turn_events: list[dict[str, Any]]) -> list[tuple[str, 
     return matches
 
 
-def _stop_handler(stdin_text: str) -> None:
+def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     """Stop mode entry point.
 
     Reads transcript, identifies turn boundary, scans AskUserQuestion +
-    prose patterns, mutates the durable file. Writes nothing to stdout
-    (per F3 resolution).
+    prose patterns, mutates the durable file.
+
+    Returns:
+        ``None`` for typical turns (Stop mode silent; durable-file is the
+        sole output).
+
+        A dict ``{"decision": "block", "reason": "..."}`` when ALL of the
+        following hold (per gtkb-decision-tracker-block-prose-ask-2026-04-29
+        -003 REVISED-1 §F3 Parent Bridge Contract Revision):
+
+        1. The just-completed turn contained at least one prose-decision-ask
+           matching one of the PROSE_DECISION_PATTERNS (after T14 false-positive
+           guards).
+        2. The same turn contained ZERO AskUserQuestion tool_use entries
+           (askuserquestion_count is per just-completed turn, not session-
+           cumulative — per Codex -004 Q1 answer).
+        3. The env var ``GTKB_BLOCK_ON_PROSE_DECISION_ASK`` is not '0'.
+
+        The block decision is per-turn rate-limited to one (single return
+        value; caller emits exactly one JSON to stdout). Detection +
+        durable-file appends + graceful degradation are preserved regardless
+        of the env-var setting.
     """
     payload = _parse_stop_payload(stdin_text)
     transcript_path_str = payload.get("transcript_path", "")
     if not transcript_path_str:
-        return  # No transcript; nothing to scan.
+        return None  # No transcript; nothing to scan.
 
     transcript_path = Path(transcript_path_str)
     events = _read_transcript_tail(transcript_path)
     turn_events = _find_just_completed_turn(events)
     if not turn_events:
-        return
+        return None
 
     pending_path = PROJECT_ROOT / PENDING_FILE_REL
     _ensure_pending_file(pending_path)
@@ -587,8 +702,11 @@ def _stop_handler(stdin_text: str) -> None:
     session_hint = _session_hint()
     mutated = False
 
-    # Scan A -- AskUserQuestion pairs.
+    # Scan A -- AskUserQuestion pairs. Track per-turn count for block-emission
+    # decision (per Codex -004 Q1: per just-completed turn, not session-cumulative).
+    askuserquestion_count = 0
     for pair in _scan_askuserquestion(turn_events):
+        askuserquestion_count += 1
         tu = pair["tool_use"]
         tu_input = tu.get("input") or {}
         questions = tu_input.get("questions") or []
@@ -629,8 +747,12 @@ def _stop_handler(stdin_text: str) -> None:
                 sections["pending"].append(entry)
             mutated = True
 
-    # Scan B -- prose anti-patterns.
+    # Scan B -- prose anti-patterns. Track all matches (including
+    # already-known hashes) for block-decision input; the durable-file append
+    # path uses idempotence to avoid duplicates.
+    prose_matches_this_turn: list[tuple[str, str]] = []
     for name, snippet in _scan_prose_decisions(turn_events):
+        prose_matches_this_turn.append((name, snippet))
         prose_hash = _question_hash(snippet, [])
         if prose_hash in existing_hashes:
             continue
@@ -664,6 +786,14 @@ def _stop_handler(stdin_text: str) -> None:
 
     if mutated:
         _write_pending_file(pending_path, sections)
+
+    # F3 bounded exception: emit block JSON when the hard condition holds AND
+    # the env-var feature flag is enabled. The flag suppresses ONLY this
+    # emission — detection (above) and durable-file appends (above) already
+    # ran regardless.
+    if prose_matches_this_turn and askuserquestion_count == 0 and _block_emission_enabled():
+        return _build_block_decision(prose_matches_this_turn)
+    return None
 
 
 def _extract_answer_text(tool_result: dict[str, Any]) -> str:
@@ -860,7 +990,16 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.mode == "stop":
-            _stop_handler(stdin_text)
+            block_decision = _stop_handler(stdin_text)
+            if block_decision is not None:
+                # F3 bounded exception per gtkb-decision-tracker-block-prose-ask
+                # -2026-04-29-003 REVISED-1: emit one JSON control-flow signal
+                # to stdout. Per-turn rate-limited (single emit). Hook control-
+                # flow blocks turn termination, agent receives reason text as
+                # additionalContext, and on next iteration can call
+                # AskUserQuestion to satisfy the requirement.
+                sys.stdout.write(json.dumps(block_decision))
+                sys.stdout.flush()
         elif args.mode == "user-prompt-submit":
             output = _user_prompt_handler(stdin_text)
             if output:
