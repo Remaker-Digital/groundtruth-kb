@@ -16,11 +16,11 @@ That's the entirety of code/docs that LANDED today. Everything else is bridge-pr
 
 ---
 
-## Bridges in Flight (NEW status; awaiting Codex review)
+## Bridges Just GO'd (ready for implementation when you direct)
 
 | Thread | Latest | Notes |
 |--------|--------|-------|
-| `gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29` | REVISED-2 at -005 (`c0afb32c`) | After two NO-GOs (-002, -004); REVISED-2 addresses lifecycle-axes mismatch + doctor coverage + real test paths |
+| `gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29` | **GO at -006** (received post-wrap-draft; commit recovery in next commit) | After NEW → NO-GO -002 → REVISED-1 -003 → NO-GO -004 → REVISED-2 -005 → **GO -006**. Owner directive paused immediate implementation; resume when next session begins. |
 
 ## Bridges with Open NO-GOs (need REVISED before they can land)
 
