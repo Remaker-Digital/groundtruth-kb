@@ -28,6 +28,7 @@ onwards writes notifications for all currently-actionable top statuses
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -38,6 +39,18 @@ import sys
 import time
 import uuid
 from pathlib import Path
+
+# Cross-platform exclusive file lock for single-instance runner enforcement.
+# Per smart-poller-kind-aware-routing-2026-04-30-012 F1 fix: two long-running
+# poller daemons sharing the same state directory race over dispatch-state.json
+# and trigger spurious Prime launches via signature churn.
+_USE_FCNTL = False
+try:
+    import fcntl
+
+    _USE_FCNTL = True
+except ImportError:
+    import msvcrt
 
 from groundtruth_kb.bridge.audit import emit_audit_event
 from groundtruth_kb.bridge.checkpoint import (
@@ -59,6 +72,92 @@ POLLER_RUNS_SUBDIR = "poller-runs"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 DISPATCH_STATE_FILENAME = "dispatch-state.json"
 INDEX_RELATIVE_PATH = ("bridge", "INDEX.md")
+
+# Single-instance enforcement lock file (per smart-poller-kind-aware-routing
+# -2026-04-30-012 F1 fix). Lives in the state directory; held for the lifetime
+# of one main_loop call.
+RUNNER_LOCK_FILENAME = "bridge-poller-runner.lock"
+
+# Exit code when another runner already holds the lock. Distinct from 0 so
+# scheduled-task health checks can detect the duplicate-instance case.
+EXIT_CODE_ALREADY_RUNNING = 75
+
+
+class RunnerAlreadyRunningError(RuntimeError):
+    """Raised when another bridge_poller_runner.py instance holds the runner lock.
+
+    Per smart-poller-kind-aware-routing-2026-04-30-012 F1 fix: prevents two
+    long-running daemons from racing over dispatch-state.json.
+    """
+
+
+def _acquire_runner_lock(state_dir: Path) -> int:
+    """Acquire exclusive non-blocking lock on the runner-instance lock file.
+
+    Returns the file descriptor on success (caller releases via
+    `_release_runner_lock`). Raises ``RunnerAlreadyRunningError`` if another
+    runner instance currently holds the lock.
+
+    The lock file is `<state_dir>/bridge-poller-runner.lock`. fcntl.flock on
+    POSIX, msvcrt.locking on Windows. Non-blocking — fails immediately rather
+    than queueing — so a duplicate launch is loud, not silent.
+    """
+    state_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = state_dir / RUNNER_LOCK_FILENAME
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        # Ensure file has at least 1 byte for msvcrt byte-range lock.
+        if os.fstat(fd).st_size == 0:
+            os.write(fd, b"\0")
+            os.lseek(fd, 0, 0)
+        if _USE_FCNTL:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                os.close(fd)
+                raise RunnerAlreadyRunningError(
+                    f"Another bridge_poller_runner is already running "
+                    f"(lock held at {lock_path})"
+                ) from exc
+        else:
+            os.lseek(fd, 0, 0)
+            try:
+                # LK_NBLCK: non-blocking exclusive lock
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            except OSError as exc:
+                os.close(fd)
+                raise RunnerAlreadyRunningError(
+                    f"Another bridge_poller_runner is already running "
+                    f"(lock held at {lock_path})"
+                ) from exc
+        # Write our PID to the lock file for diagnostics. Truncate first so
+        # we don't leave stale PID bytes from a prior holder past the new PID.
+        os.lseek(fd, 0, 0)
+        try:
+            os.ftruncate(fd, 0)
+        except OSError:
+            pass  # Some platforms restrict ftruncate on locked fd; ignore.
+        os.write(fd, f"{os.getpid()}\n".encode("ascii"))
+        return fd
+    except RunnerAlreadyRunningError:
+        raise
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        raise
+
+
+def _release_runner_lock(fd: int) -> None:
+    """Release and close the runner instance lock fd. Idempotent on errors."""
+    if _USE_FCNTL:
+        with contextlib.suppress(OSError):
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    else:
+        with contextlib.suppress(OSError):
+            os.lseek(fd, 0, 0)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    with contextlib.suppress(OSError):
+        os.close(fd)
 
 
 # Module-level shutdown flag toggled by SIGINT/SIGTERM handlers.
@@ -438,7 +537,10 @@ def main_loop(
 ) -> int:
     """Run the polling loop until ``max_iterations`` or SIGINT/SIGTERM.
 
-    Returns the iteration count actually completed (useful for tests).
+    Returns the iteration count actually completed (useful for tests). Raises
+    ``RunnerAlreadyRunningError`` if another runner instance currently holds
+    the single-instance lock at ``<state_dir>/bridge-poller-runner.lock`` (per
+    smart-poller-kind-aware-routing-2026-04-30-012 F1 fix).
     """
     global _shutdown_requested
     _shutdown_requested = False
@@ -446,59 +548,67 @@ def main_loop(
 
     resolved_state = state_dir if state_dir is not None else get_state_dir()
     resolved_root = project_root if project_root is not None else resolve_project_root()
+
+    # Single-instance enforcement: acquire the runner lock before any state
+    # mutation. Duplicate daemons would otherwise race over dispatch-state.json.
+    lock_fd = _acquire_runner_lock(resolved_state)
+
     run_id = _make_run_id()
     iteration = 0
 
-    while not _shutdown_requested:
-        if max_iterations is not None and iteration >= max_iterations:
-            break
-        try:
-            payload = run_one_iteration(
-                state_dir=resolved_state,
-                project_root=resolved_root,
-                run_id=run_id,
-                iteration=iteration,
-                dispatch_enabled=dispatch_enabled,
-                dispatch_max_items=dispatch_max_items,
-            )
-            _log_iteration(resolved_state, run_id, payload)
-            if not quiet:
-                sys.stdout.write(json.dumps(payload) + "\n")
-                sys.stdout.flush()
-        except Exception as exc:
-            err_payload: dict[str, object] = {
-                "kind": "error",
-                "run_id": run_id,
-                "iteration": iteration,
-                "error_type": type(exc).__name__,
-                "error_message": str(exc),
-            }
-            _log_iteration(resolved_state, run_id, err_payload)
-            if not quiet:
-                sys.stderr.write(json.dumps(err_payload) + "\n")
-                sys.stderr.flush()
-        iteration += 1
-        if max_iterations is None or iteration < max_iterations:
-            if _shutdown_requested:
+    try:
+        while not _shutdown_requested:
+            if max_iterations is not None and iteration >= max_iterations:
                 break
-            # Sleep responsively to SIGINT.
-            slept = 0.0
-            while slept < interval_s and not _shutdown_requested:
-                step = min(0.5, interval_s - slept)
-                time.sleep(step)
-                slept += step
+            try:
+                payload = run_one_iteration(
+                    state_dir=resolved_state,
+                    project_root=resolved_root,
+                    run_id=run_id,
+                    iteration=iteration,
+                    dispatch_enabled=dispatch_enabled,
+                    dispatch_max_items=dispatch_max_items,
+                )
+                _log_iteration(resolved_state, run_id, payload)
+                if not quiet:
+                    sys.stdout.write(json.dumps(payload) + "\n")
+                    sys.stdout.flush()
+            except Exception as exc:
+                err_payload: dict[str, object] = {
+                    "kind": "error",
+                    "run_id": run_id,
+                    "iteration": iteration,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                }
+                _log_iteration(resolved_state, run_id, err_payload)
+                if not quiet:
+                    sys.stderr.write(json.dumps(err_payload) + "\n")
+                    sys.stderr.flush()
+            iteration += 1
+            if max_iterations is None or iteration < max_iterations:
+                if _shutdown_requested:
+                    break
+                # Sleep responsively to SIGINT.
+                slept = 0.0
+                while slept < interval_s and not _shutdown_requested:
+                    step = min(0.5, interval_s - slept)
+                    time.sleep(step)
+                    slept += step
 
-    _log_iteration(
-        resolved_state,
-        run_id,
-        {
-            "kind": "shutdown",
-            "run_id": run_id,
-            "completed_iterations": iteration,
-            "shutdown_via_signal": _shutdown_requested,
-        },
-    )
-    return iteration
+        _log_iteration(
+            resolved_state,
+            run_id,
+            {
+                "kind": "shutdown",
+                "run_id": run_id,
+                "completed_iterations": iteration,
+                "shutdown_via_signal": _shutdown_requested,
+            },
+        )
+        return iteration
+    finally:
+        _release_runner_lock(lock_fd)
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -534,6 +644,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Write notifications but do not launch AI harnesses.",
     )
     parser.add_argument(
+        "--enable-dispatch",
+        action="store_true",
+        help=(
+            "Override the verification-safe default for --once. By default, "
+            "--once disables dispatch so notification-state checks don't launch "
+            "real harnesses. Pass --once --enable-dispatch to dispatch in one-shot mode. "
+            "Per smart-poller-kind-aware-routing-2026-04-30-012 F2 fix."
+        ),
+    )
+    parser.add_argument(
         "--dispatch-max-items",
         type=int,
         default=2,
@@ -548,13 +668,30 @@ def main(argv: list[str] | None = None) -> int:
     max_iterations = args.max_iterations
     if args.once:
         max_iterations = 1
-    main_loop(
-        interval_s=args.interval,
-        max_iterations=max_iterations,
-        quiet=args.quiet,
-        dispatch_enabled=not args.no_dispatch,
-        dispatch_max_items=args.dispatch_max_items,
-    )
+
+    # Per smart-poller-kind-aware-routing-2026-04-30-012 F2 fix:
+    # --once defaults to verification-safe (no dispatch). Continuous mode
+    # keeps the historical default of dispatch enabled unless --no-dispatch.
+    if args.once:
+        dispatch_enabled = args.enable_dispatch and not args.no_dispatch
+    else:
+        dispatch_enabled = not args.no_dispatch
+
+    try:
+        main_loop(
+            interval_s=args.interval,
+            max_iterations=max_iterations,
+            quiet=args.quiet,
+            dispatch_enabled=dispatch_enabled,
+            dispatch_max_items=args.dispatch_max_items,
+        )
+    except RunnerAlreadyRunningError as exc:
+        # Single-instance enforcement: another daemon already holds the lock.
+        # Per smart-poller-kind-aware-routing-2026-04-30-012 F1 fix.
+        if not args.quiet:
+            sys.stderr.write(f"{exc}\n")
+            sys.stderr.flush()
+        return EXIT_CODE_ALREADY_RUNNING
     return 0
 
 

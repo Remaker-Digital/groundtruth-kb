@@ -610,3 +610,223 @@ def test_dispatch_consumer_disabled_via_env_var_bypasses_filter(
 
     # With kind-aware filtering disabled, the terminal-kind GO still spawns.
     assert len(calls) == 1
+
+
+# ===========================================================================
+# Single-instance lock enforcement — per smart-poller-kind-aware-routing-2026-
+# 04-30-012 F1 fix. Two long-running poller daemons sharing the same state
+# directory race over dispatch-state.json and trigger spurious Prime launches
+# via signature churn. The fix is a non-blocking exclusive file lock on
+# <state_dir>/bridge-poller-runner.lock acquired at main_loop entry.
+# ===========================================================================
+
+
+def test_acquire_runner_lock_succeeds_when_no_other_holder(tmp_path: Path) -> None:
+    """First instance acquires the lock and gets a valid file descriptor.
+
+    Note: on Windows, msvcrt.locking is mandatory — the locked file cannot
+    be read via separate file handles while held. The PID content is a
+    diagnostic feature; only its existence is asserted here for portability.
+    """
+    runner = _load_runner()
+    state_dir = tmp_path / "state"
+    fd = runner._acquire_runner_lock(state_dir)
+    try:
+        assert fd >= 0
+        lock_path = state_dir / runner.RUNNER_LOCK_FILENAME
+        assert lock_path.is_file()
+    finally:
+        runner._release_runner_lock(fd)
+
+
+def test_acquire_runner_lock_writes_pid_readable_after_release(tmp_path: Path) -> None:
+    """The PID-diagnostic write to the lock file is readable AFTER release.
+
+    This validates the lock-file population without fighting Windows mandatory
+    lock semantics during the locked window.
+    """
+    runner = _load_runner()
+    state_dir = tmp_path / "state"
+    fd = runner._acquire_runner_lock(state_dir)
+    runner._release_runner_lock(fd)
+    lock_path = state_dir / runner.RUNNER_LOCK_FILENAME
+    content = lock_path.read_text(encoding="utf-8").strip()
+    import os as _os
+    assert content == str(_os.getpid())
+
+
+def test_acquire_runner_lock_raises_when_already_held(tmp_path: Path) -> None:
+    """Second acquisition attempt raises RunnerAlreadyRunningError."""
+    runner = _load_runner()
+    state_dir = tmp_path / "state"
+    fd1 = runner._acquire_runner_lock(state_dir)
+    try:
+        with pytest.raises(runner.RunnerAlreadyRunningError):
+            runner._acquire_runner_lock(state_dir)
+    finally:
+        runner._release_runner_lock(fd1)
+
+
+def test_release_runner_lock_allows_reacquisition(tmp_path: Path) -> None:
+    """After release, the lock can be acquired again (no leaked state)."""
+    runner = _load_runner()
+    state_dir = tmp_path / "state"
+    fd1 = runner._acquire_runner_lock(state_dir)
+    runner._release_runner_lock(fd1)
+    # Second acquisition must succeed.
+    fd2 = runner._acquire_runner_lock(state_dir)
+    try:
+        assert fd2 >= 0
+    finally:
+        runner._release_runner_lock(fd2)
+
+
+def test_main_loop_releases_lock_on_normal_completion(tmp_path: Path, synthetic_gtkb_root: Path) -> None:
+    """main_loop must release the lock when it completes naturally so a fresh
+    daemon can start without manual cleanup."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "VERIFIED")
+    runner.main_loop(interval_s=0, max_iterations=1, quiet=True)
+    # After main_loop returns, lock should be releasable.
+    state_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    fd = runner._acquire_runner_lock(state_dir)
+    try:
+        assert fd >= 0
+    finally:
+        runner._release_runner_lock(fd)
+
+
+def test_main_loop_releases_lock_on_exception_in_iteration(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If an iteration throws, the lock must still be released by the finally clause."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+
+    # Force an exception inside run_one_iteration so the lock-release finally must fire.
+    def _boom(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("forced test failure")
+
+    monkeypatch.setattr(runner, "run_one_iteration", _boom)
+    # main_loop swallows iteration errors; the loop completes after max_iterations.
+    runner.main_loop(interval_s=0, max_iterations=1, quiet=True)
+    # After completion, we should be able to re-acquire the lock.
+    state_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    fd = runner._acquire_runner_lock(state_dir)
+    try:
+        assert fd >= 0
+    finally:
+        runner._release_runner_lock(fd)
+
+
+def test_main_loop_raises_when_another_runner_holds_the_lock(synthetic_gtkb_root: Path) -> None:
+    """If another instance is holding the lock, main_loop raises RunnerAlreadyRunningError
+    instead of racing for state writes."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+    state_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    holder_fd = runner._acquire_runner_lock(state_dir)
+    try:
+        with pytest.raises(runner.RunnerAlreadyRunningError):
+            runner.main_loop(interval_s=0, max_iterations=1, quiet=True)
+    finally:
+        runner._release_runner_lock(holder_fd)
+
+
+def test_main_returns_exit_code_already_running_when_lock_held(synthetic_gtkb_root: Path) -> None:
+    """The CLI entry point converts RunnerAlreadyRunningError into a distinct
+    exit code so health checks can detect the duplicate-instance case."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+    state_dir = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    holder_fd = runner._acquire_runner_lock(state_dir)
+    try:
+        rc = runner.main(["--once", "--quiet"])
+        assert rc == runner.EXIT_CODE_ALREADY_RUNNING
+        assert runner.EXIT_CODE_ALREADY_RUNNING != 0  # distinct from success
+    finally:
+        runner._release_runner_lock(holder_fd)
+
+
+# ===========================================================================
+# CLI --once verification-safe default — per smart-poller-kind-aware-routing
+# -2026-04-30-012 F2 fix. --once now defaults to no-dispatch so verification
+# commands can't accidentally launch real harnesses.
+# ===========================================================================
+
+
+def test_once_defaults_to_no_dispatch(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--once without --enable-dispatch must NOT launch harnesses, even if work waits."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")  # actionable for Codex
+
+    def _fail_unconditionally(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("--once launched harness without --enable-dispatch (F2 regression).")
+
+    monkeypatch.setattr(subprocess, "Popen", _fail_unconditionally)
+    rc = runner.main(["--once", "--quiet"])
+    assert rc == 0
+
+
+def test_once_with_enable_dispatch_does_dispatch(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--once --enable-dispatch must launch harnesses (explicit opt-in)."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    rc = runner.main(["--once", "--enable-dispatch", "--quiet"])
+    assert rc == 0
+    # Dispatch should have launched the Codex review harness for the REVISED entry.
+    # Note: bootstrap iteration writes no notifications, so the first --once
+    # may not dispatch even with --enable-dispatch. This depends on whether the
+    # checkpoint already exists. For a freshly-seeded synthetic root with no
+    # prior checkpoint, the first iteration is bootstrap and produces no
+    # dispatch. Run again to exercise the post-bootstrap dispatch path.
+    rc2 = runner.main(["--once", "--enable-dispatch", "--quiet"])
+    assert rc2 == 0
+    assert len(calls) == 1, f"Expected exactly 1 harness launch across two --once runs; got {len(calls)}"
+
+
+def test_once_with_no_dispatch_explicit_does_not_dispatch(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--once --no-dispatch is the documented verification command after F2 fix."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+
+    def _fail_unconditionally(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("--once --no-dispatch launched harness (F2 regression).")
+
+    monkeypatch.setattr(subprocess, "Popen", _fail_unconditionally)
+    # --no-dispatch always wins over --enable-dispatch (defensive layering).
+    rc = runner.main(["--once", "--no-dispatch", "--enable-dispatch", "--quiet"])
+    assert rc == 0
+
+
+def test_continuous_mode_default_dispatch_unchanged(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Continuous mode (no --once) keeps the historical default of dispatch enabled.
+
+    This is non-regression for the daemon-launch path. Without --once, the
+    runner must still spawn harnesses for actionable work as before."""
+    runner = _load_runner()
+    _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    rc = runner.main(["--max-iterations", "3", "--interval", "0", "--quiet"])
+    assert rc == 0
+    # Continuous mode dispatched once for the REVISED entry.
+    assert len(calls) == 1
