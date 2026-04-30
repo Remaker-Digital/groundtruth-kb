@@ -30,12 +30,14 @@ NO-GO: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-002.md
 NEW: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-001.md
 
 Document: gtkb-candidate-spec-intake-six-statements-2026-04-29
+NEW: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-005.md
 GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-004.md
 REVISED: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-003.md
 NO-GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-002.md
 NEW: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-001.md
 
 Document: gtkb-platform-spec-coverage-verified-runner-2026-04-29
+NO-GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-006.md
 NEW: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-005.md
 GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-004.md
 REVISED: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-003.md
