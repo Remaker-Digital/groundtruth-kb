@@ -30,6 +30,7 @@ NO-GO: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-002.md
 NEW: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-001.md
 
 Document: gtkb-candidate-spec-intake-six-statements-2026-04-29
+VERIFIED: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-008.md
 REVISED: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-007.md
 NO-GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-006.md
 NEW: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-005.md
