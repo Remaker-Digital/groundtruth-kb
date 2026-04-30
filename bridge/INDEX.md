@@ -18,6 +18,7 @@ NO-GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-002.md
 NEW: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-001.md
 
 Document: gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29
+NO-GO: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-008.md
 NEW: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-007.md
 GO: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-006.md
 REVISED: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-005.md
