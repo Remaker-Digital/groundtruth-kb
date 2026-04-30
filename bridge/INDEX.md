@@ -110,6 +110,7 @@ NEW: bridge/gtkb-platform-spec-coverage-architecture-2026-04-29-001.md
 
 
 Document: smart-poller-src-docstring-alignment-2026-04-29
+NEW: bridge/smart-poller-src-docstring-alignment-2026-04-29-003.md
 GO: bridge/smart-poller-src-docstring-alignment-2026-04-29-002.md
 NEW: bridge/smart-poller-src-docstring-alignment-2026-04-29-001.md
 
