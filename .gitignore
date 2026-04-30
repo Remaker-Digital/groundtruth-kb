@@ -250,6 +250,7 @@ wiki/
 # so bridge-automation scripts can be re-included via negation.
 independent-progress-assessments/*
 !independent-progress-assessments/AGENT-RED-GO-STATE-*.md
+!independent-progress-assessments/OPERATING-MODEL-DRIFT-INVENTORY-*.md
 !independent-progress-assessments/CODEX-INSIGHT-DROPBOX/
 independent-progress-assessments/CODEX-INSIGHT-DROPBOX/*
 !independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-*.md

@@ -6,7 +6,7 @@
 
 **Baseline:** the **owner verbatim text** at `docs/operating-model-DRAFT-2026-04-30.md` §A is canonical. Drift findings measure existing artifacts against §A, with §B (Codex revision) as supplement.
 
-**Path:** filed at `docs/operating-model-drift-inventory-2026-04-30.md` (deviation from proposal §3.3 fallback). The proposal proposed `independent-progress-assessments/PRIME-INSIGHT-DROPBOX/...` with `independent-progress-assessments/` top-level as fallback; both are gitignored per `.gitignore` lines 251–260. Moved to `docs/` alongside the DRAFT artifact and terminology table to land in a tracked location. Same file, same content; only the path differs.
+**Path:** filed at `independent-progress-assessments/OPERATING-MODEL-DRIFT-INVENTORY-2026-04-30.md` per the proposal §3.3 approved fallback (top-level `independent-progress-assessments/`). Initial Slice 0 implementation filed this file at `docs/` due to a `.gitignore` conflict (caught by Codex `-006` F1 NO-GO); REVISED-2 (`-007`) closed F1 by adding a `!`-negation line to `.gitignore` (`!independent-progress-assessments/OPERATING-MODEL-DRIFT-INVENTORY-*.md`) and moving this file back to the approved path.
 
 **Severity model** per advisory:
 - **P0** Active misdirection — could cause an agent to take the wrong action, bypass approval, mutate the wrong source of truth, or miss a verification/release gate.
@@ -41,6 +41,20 @@
 - **evidence:** `CLAUDE.md` line 14 references `.claude/rules/canonical-terminology.md` as "Full managed glossary (when adopted)". `ls .claude/rules/` confirms the file does not exist. The reference is conditional ("when adopted") but reads as a current-state pointer.
 - **risk:** an agent following the reference will fail to find the file; "(when adopted)" qualifier is easy to miss in skim-reads. Could drive incorrect terminology assumptions.
 - **recommendation:** **clarify in Slice 1** (either remove the reference or mark it explicitly as "intended; not yet adopted" per `OM-DELTA-0030` current-vs-target-state discipline).
+
+### `DRIFT-0014` — `AGENTS.md` silent on owner-stated LO authority over requirements
+
+- **severity:** P0
+- **evidence:** `AGENTS.md` lines 76-86 define LO role as "inspect, critique, and analyze this project." Lines 88-128 define default working behavior. None reference the owner-stated authority for LO to "question the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections" (owner verbatim §A). Same gap as `DRIFT-0002` on `loyal-opposition.md`.
+- **risk:** combined with `DRIFT-0002` (loyal-opposition.md) and `prime-builder-role.md` line 39-43 (which assigns "actively question owner direction, specifications, and intent" to Prime), the requirement-questioning authority is systematically absent from LO control text and present in PB control text. An LO session reading only AGENTS.md + the rule files would not know it has owner-stated authority over requirements.
+- **recommendation:** **defer to Slice 1** (consolidated with `DRIFT-0002` and `OM-DELTA-0001` as one decision: owner explicitly chooses canonical placement of LO requirement-questioning authority, then both AGENTS.md and `loyal-opposition.md` are updated accordingly).
+
+### `DRIFT-0016` — `AGENTS.md` references non-existent `.claude/rules/canonical-terminology.md`
+
+- **severity:** P0
+- **evidence:** `AGENTS.md` line 9: "Full managed glossary (when adopted): `.claude/rules/canonical-terminology.md`". `ls .claude/rules/` confirms the file does not exist. Same drift as `DRIFT-0003` on `CLAUDE.md`.
+- **risk:** parallel to `DRIFT-0003`; an LO session following the reference will fail to find the file; the "(when adopted)" qualifier is easy to miss in skim-reads. Could drive incorrect terminology assumptions in Loyal Opposition reviews.
+- **recommendation:** **clarify in Slice 1** (consolidated remediation with `DRIFT-0003` — single canonical operating-model artifact corrects both refs together).
 
 ---
 
@@ -80,6 +94,13 @@
 - **evidence:** `memory/work_list.md` rows are presented in numbered sequence with TOP/priority annotations (more "ordered set"). Owner verbatim §A says backlog is "a roughly chronological stack of highest-to-lowest priority engineering work." The work_list doesn't appear chronological.
 - **risk:** if backlog ordering should be roughly chronological per owner intent, the current numbering scheme may mislead agents about priority semantics. This is `OM-DELTA-0004` materializing in the actual artifact.
 - **recommendation:** **defer to Slice 1** (canonical operating-model artifact resolves the chronology question; work_list ordering rules then follow from that decision).
+
+### `DRIFT-0015` — `AGENTS.md` uses "project" for adopter
+
+- **severity:** P1
+- **evidence:** `AGENTS.md` line 11: "Adopter: A project that consumes GT-KB. Agent Red is a demo/adopter that validated GT-KB". Per terminology table §1 + §2, an adopter would be an application (the lifecycle object), not a project (scoped work within an application). Same drift as `DRIFT-0004` on `CLAUDE.md`.
+- **risk:** parallel to `DRIFT-0004`; terminology drift between the operating-model baseline and AGENTS.md creates governance ambiguity for Loyal Opposition sessions reading AGENTS.md as the active role contract.
+- **recommendation:** **defer to Slice 1** (consolidated with `OM-DELTA-0003` and `DRIFT-0004` terminology cluster).
 
 ---
 
@@ -142,19 +163,26 @@ The following classes of stale-but-harmless references were observed and require
 
 | Severity | Count | Distribution |
 |---|---|---|
-| **P0** | 3 | DRIFT-0001 (CLAUDE.md name inconsistency), DRIFT-0002 (LO authority over requirements gap), DRIFT-0003 (non-existent file reference) |
-| **P1** | 5 | DRIFT-0004 (project term for application), DRIFT-0005 (Knowledge Database vs MemBase), DRIFT-0006 (severity scale), DRIFT-0007 (rule files vs CLAUDE.md alignment), DRIFT-0008 (backlog ordering semantics) |
+| **P0** | 5 | DRIFT-0001 (CLAUDE.md name inconsistency), DRIFT-0002 (LO authority over requirements gap in `loyal-opposition.md`), DRIFT-0003 (CLAUDE.md non-existent file reference), DRIFT-0014 (LO authority over requirements gap in `AGENTS.md`), DRIFT-0016 (AGENTS.md non-existent file reference) |
+| **P1** | 6 | DRIFT-0004 (CLAUDE.md "project" term for application), DRIFT-0005 (Knowledge Database vs MemBase), DRIFT-0006 (severity scale), DRIFT-0007 (rule files vs CLAUDE.md alignment), DRIFT-0008 (backlog ordering semantics), DRIFT-0015 (AGENTS.md "project" term for adopter) |
 | **P2** | 2 | DRIFT-0009 (dashboard overclaim), DRIFT-0010 (smart-poller conditional language) |
 | **P3** | 3 | DRIFT-0011 (implementation term), DRIFT-0012 (memory concepts), DRIFT-0013 (REVISED status ambiguity) |
-| **P4** | (multiple classes) | OS-poller history, AGENTS.md, pre-S320 bridges, work_list completed sections, retired-tasks references |
-| **Total actionable (P0+P1+P2+P3)** | **13** | — |
+| **P4** | (multiple classes) | OS-poller history, AGENTS.md historical-reference status, pre-S320 bridges, work_list completed sections, retired-tasks references |
+| **Total actionable (P0+P1+P2+P3)** | **16** | — |
 
 **Decision-threshold mapping** (per the GO'd proposal §3.4):
-- P0/P1 findings: 3 + 5 = **8 findings**.
-- Per the proposal §3.4 thresholds: <10 P0/P1 → "the program is NOT justified; recommend closing out and addressing drift incrementally as future sessions encounter it."
-- BUT: 4 of the 5 P1 findings + 2 of the 3 P0 findings are clustered around `OM-DELTA-0003` (terminology cluster). When weighted by **decision count** rather than **finding count**, this is closer to 3-4 substantive Slice 1+ decisions: (1) terminology cluster, (2) LO authority over requirements, (3) MemBase-vs-Knowledge-Database canonical name, (4) backlog ordering semantics.
+- P0/P1 findings: 5 + 6 = **11 findings**.
+- Per the proposal §3.4 thresholds: 10–29 P0/P1 → "the program is justified at reduced scope; recommend filing Slice 1 (operating-model + terminology baseline) only, then re-evaluate."
+- Cluster analysis: of the 11 P0/P1 findings, **9 cluster around the terminology + LO-authority decisions**. DRIFT-0001/0004/0007/0015 + parts of DRIFT-0002/0014 → terminology cluster (`OM-DELTA-0003` + `OM-DELTA-0001`). DRIFT-0003/0016 → non-existent canonical-terminology.md reference (single fix). DRIFT-0005 → MemBase canonical-name decision. DRIFT-0008 → backlog ordering semantics. DRIFT-0006 → severity scale extension. When weighted by **decision count** rather than finding count, this is **3–5 substantive Slice 1+ decisions**:
+  1. Terminology cluster (application/project/platform/hosted application + LO authority + adopter terminology) — single decision package addressing 7 findings.
+  2. Non-existent `canonical-terminology.md` references — single fix addressing 2 findings.
+  3. MemBase canonical name (DRIFT-0005).
+  4. Backlog ordering semantics (DRIFT-0008).
+  5. Severity scale extension to P0–P4 (DRIFT-0006).
 
-The 3-4 substantive decisions justify a **Slice 1 only** program (canonical operating-model artifact + terminology baseline) — not the maximalist Slice 1-5 program. This recommendation will be reflected in the §3.4 post-impl report.
+The 3-5 substantive decisions justify a **Slice 1 only** program (canonical operating-model artifact + terminology baseline + targeted clarifications) — not the maximalist Slice 1-5 program. This recommendation is reflected in the §3.4 post-impl report.
+
+Per Codex `-006` F2 closure: the literal threshold mapping (11 P0/P1 → "Slice 1 only") and the decision-count-weighted view (3-5 decisions → "Slice 1 only") agree. Both literal and weighted analyses recommend the same scope.
 
 ---
 
@@ -162,11 +190,11 @@ The 3-4 substantive decisions justify a **Slice 1 only** program (canonical oper
 
 The bounded corpus per proposal §3.3 was scanned. Coverage notes:
 
-- **`.claude/rules/**`** — read 4 rule files in full (`loyal-opposition.md`, `prime-builder-role.md`, `acting-prime-builder.md` excerpts, `bridge-essential.md` from session context). Targeted grep across all 10 rule files for terminology-drift patterns. **Complete.**
-- **`CLAUDE.md`** — read in full + targeted grep. **Complete.**
-- **`AGENTS.md`** — header inspection confirmed historical/reference status; full read deferred (P4 by class). **Complete to scope.**
-- **22 active `memory/work_list.md` rows** — sampled rows 1-21 + 19 in the inventory file from session context; spot-check found no additional P0/P1 drift beyond DRIFT-0008 (backlog semantics). **Complete to scope.**
-- **10 most-recent VERIFIED bridge files** — sampled most-recent VERIFIED entries in `bridge/INDEX.md` head; spot-check found no additional P0/P1 drift; the recent VERIFIED entries are well-aligned with the operating model because they trigger from owner-driven specs. **Complete to scope.**
+- **`.claude/rules/**`** — all 10 rule files (`acting-prime-builder.md`, `bridge-essential.md`, `codex-review-gate.md`, `deliberation-protocol.md`, `file-bridge-protocol.md`, `loyal-opposition.md`, `operating-role.md`, `prime-builder-role.md`, `project-root-boundary.md`, `report-depth-prime-builder-context.md`) loaded in full at session start via `claudeMd` system reminder; `loyal-opposition.md` and `prime-builder-role.md` re-read directly during Slice 0 inventory; targeted grep across all 10 rule files for terminology-drift patterns. **Read once: complete.**
+- **`CLAUDE.md`** — loaded in full at session start via system reminder; targeted grep + line-by-line spot-check during Slice 0 inventory. **Read once: complete.**
+- **`AGENTS.md`** — read in full during Slice 0 inventory REVISED-2 work. 3 additional findings surfaced: DRIFT-0014 (P0; LO authority gap parallel to DRIFT-0002), DRIFT-0015 (P1; "project" term for adopter parallel to DRIFT-0004), DRIFT-0016 (P0; non-existent `.claude/rules/canonical-terminology.md` reference parallel to DRIFT-0003). **Read once: complete.**
+- **22 active `memory/work_list.md` rows** — header read in full at session start (rows 1-15, 16-18 DONE, 19, 20 DONE, 21 added during S324). Section-header skim of the 100+ subsequent sections (mostly DONE-marked rows from earlier sessions classified as P4 historical context). The 1537-line file's structure was inspected end-to-end via `grep "^## \|^### "`. No additional P0/P1 drift surfaced beyond DRIFT-0008 (backlog ordering); subsequent DONE sections are P4 historical context. **Read once: complete.**
+- **10 most-recent VERIFIED bridge files** — enumerated via `grep "^VERIFIED:" bridge/INDEX.md | head -10`. The 10 are: `smart-poller-kind-aware-routing-2026-04-30-014`, `gtkb-decision-tracker-block-prose-ask-2026-04-29-006`, `gtkb-candidate-spec-intake-six-statements-2026-04-29-008` (read in full this session), `gtkb-platform-spec-coverage-verified-runner-2026-04-29-008` (read in full this session), `gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-010`, `spawned-harness-role-defer-durable-record-2026-04-29-006` (read in full this session), `gov-process-spec-precondition-2026-04-29-008`, `smart-poller-src-docstring-alignment-2026-04-29-008` (read in full this session), `mojibake-cleanup-2026-04-29-006`, `session-hygiene-drift-triage-s321-2026-04-29-006`. Heads of all 10 inspected; bodies of 4 read in full during this session's bridge work; structural patterns (`## Specification Links`, spec-to-test mapping, evidence presentation) verified consistent across all 10. No P0/P1 drift surfaced; recent VERIFIED entries demonstrate the bridge protocol is functioning as the operating-model text describes. **Read once: complete.**
 
 ---
 

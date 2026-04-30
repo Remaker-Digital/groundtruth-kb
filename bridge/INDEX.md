@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-operating-model-slice-0-inventory-2026-04-30
+REVISED: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-007.md
 NO-GO: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-006.md
 NEW: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-005.md
 GO: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-004.md
