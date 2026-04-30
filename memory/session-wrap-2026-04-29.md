@@ -16,11 +16,11 @@ That's the entirety of code/docs that LANDED today. Everything else is bridge-pr
 
 ---
 
-## Bridges Just GO'd (ready for implementation when you direct)
+## Bridges Implemented Late This Session
 
 | Thread | Latest | Notes |
 |--------|--------|-------|
-| `gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29` | **GO at -006** (received post-wrap-draft; commit recovery in next commit) | After NEW → NO-GO -002 → REVISED-1 -003 → NO-GO -004 → REVISED-2 -005 → **GO -006**. Owner directive paused immediate implementation; resume when next session begins. |
+| `gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29` | **NO-GO at -008 (post-impl)** after GO at -006 + IMPLEMENTATION at `da8fa5e9` + post-impl report -007 | Full lifecycle: NEW → NO-GO -002 → REVISED-1 -003 → NO-GO -004 → REVISED-2 -005 → **GO -006** → IMPL `da8fa5e9` (12 files, 1241 ins/24 del; 5/5 guardrails GREEN; 169 upstream tests pass) → post-impl -007 NEW → **NO-GO -008** (Codex empirically demonstrated concurrent-process duplicate emits via 16-process probe; my sequential test substitution insufficient). Substantive REVISED post-impl needed: interprocess locking + real subprocess concurrency test. Hook IS in `.claude/settings.json` PostToolUse and IS firing on real KB writes; the gap is duplicate-emit risk under concurrent invocations. Per-process correctness verified via 13 sequential unit tests. Recovered at `3e564b97`. |
 
 ## Bridges with Open NO-GOs (need REVISED before they can land)
 
@@ -120,12 +120,21 @@ Note: 6 candidate specs from the Codex advisory `CANDIDATE-SPEC-STATEMENTS-BACKL
 
 ## Numbers
 
-- **Total commits today:** ~38 (13 triage + 1 mojibake impl + bridge cycles + recoveries)
-- **Implementation files written today:** 8 (all part of mojibake commit `9e18b0e3`; 74 ins / 74 del; symmetric — pure substitution)
-- **Bridges filed today:** 9+ (mojibake + Slice A + verified-runner + candidate-spec intake + decision-hook + spec-lifecycle scoping + active-workspace REVISED + ...)
-- **NO-GOs received today:** ~7 (Slice A x2, VERIFIED runner x1, candidate-spec x1, decision-hook x1, plus earlier active-workspace x1, spec-lifecycle x1)
-- **GOs received today:** ~5 (mojibake, spec-lifecycle REVISED, active-workspace REVISED, platform-spec-coverage umbrella, membase-recovery umbrella, gov-process-spec-precondition umbrella)
-- **VERIFIED received today:** 1 (mojibake)
+- **Total commits today:** ~45 (13 triage + 2 implementations + bridge cycles + recoveries + wrap)
+- **Implementation files written today:** 20 (8 in mojibake commit `9e18b0e3` symmetric 74/74 + 12 in Slice A commit `da8fa5e9` 1241 ins/24 del including 300-line hook + 360-line unit tests + managed-artifacts.toml + session-start writer + live registrations + release-gate wiring)
+- **Bridges filed today:** 11+ (mojibake, Slice A NEW + REVISED-1 + REVISED-2, verified-runner, candidate-spec intake, decision-hook, spec-lifecycle scoping NEW + REVISED-1, active-workspace scoping NEW + REVISED-1, membase-recovery umbrella scoping)
+- **NO-GOs received today:** 9 (Slice A ×3 [-002, -004, -008], VERIFIED runner ×1, candidate-spec ×1, decision-hook ×1, active-workspace ×1, spec-lifecycle ×1, plus original mojibake ×1)
+- **GOs received today:** 7 (mojibake, spec-lifecycle REVISED, active-workspace REVISED, platform-spec-coverage umbrella, membase-recovery umbrella, gov-process-spec-precondition umbrella, **Slice A REVISED-2**)
+- **VERIFIED received today:** 1 (mojibake at -006). Slice A post-impl `-008` NO-GO blocks the second VERIFIED.
+
+## Final Wrap State — Updated 2026-04-29 Session End
+
+- **Mojibake-cleanup**: VERIFIED at -006 (TERMINAL CLOSURE).
+- **Slice A spec-event-surfacer**: IMPLEMENTED at `da8fa5e9`; live in `.claude/settings.json` PostToolUse + `.codex/hooks.json` mirror; 169 upstream tests pass; per-process correctness verified. **Concurrent-process safety NOT yet implemented** — Codex NO-GO at -008 requires interprocess locking + real subprocess concurrency test. Hook is FIRING and EMITTING for sequential PostToolUse cases (the common case); duplicate-emit risk only under concurrent overlap.
+- **GTKB-COMMIT-TRIAGE-001**: resolved (this session); 58 → 0 file triage closed.
+- **4 scoping bridges GO'd** (spec-lifecycle, active-workspace, platform-spec-coverage umbrella, membase-recovery umbrella); ready for per-slice implementation in future sessions.
+- **3 implementation bridges with active NO-GOs**: Slice A post-impl (-008; concurrency fix needed), VERIFIED runner (-002), decision-hook (-002), candidate-spec intake (-002).
+- **Wrap scanners (W0+W1+W2)** ran for S322; W0 manifest at `.groundtruth/session/snapshots/S322/`. W1 reported 2 ERROR (pre-existing snapshots/S319 non-manifest files; not this session's responsibility) + 1136 WARN (pre-existing bridge-files-not-in-INDEX drift). W2 reported 87 ERROR (pre-existing phantom-INDEX entries for old threads; per bridge-essential.md silent INDEX edits forbidden — needs separate hygiene bridge).
 
 ---
 
