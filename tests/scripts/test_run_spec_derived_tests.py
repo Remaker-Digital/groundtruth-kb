@@ -3,19 +3,20 @@
 
 Implements the verification required by bridge
 ``gtkb-platform-spec-coverage-verified-runner-2026-04-29-003.md`` REVISED-1
-(Codex GO at -004). Each test derives from one of the linked governing
-specifications:
+(Codex GO at -004); REVISED-2 closures per Codex `-006` NO-GO F1 + F2.
+
+Each test derives from one of the linked governing specifications:
 
 - ``DCL-VERIFIED-BRIDGE-HISTORY-001`` (A1 union accumulation, A2 removal-with-waiver)
 - ``DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`` (gate behavior consumed by Codex)
 - ``DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001`` (exit-code semantics IS the enforcement signal)
 - ``GOV-FILE-BRIDGE-AUTHORITY-001`` (no INDEX mutation; INDEX.md is canonical state)
 - ``ADR-CODEX-HOOK-PARITY-FALLBACK-001`` (JSON output schema consumable by Codex review skill)
+- ``DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE`` (deterministic CLI output across repeated invocations)
 
 Plus the linked rule files: ``.claude/rules/project-root-boundary.md``,
-``.claude/rules/file-bridge-protocol.md`` (review-only waiver),
-``.claude/rules/bridge-essential.md``, ``.claude/rules/codex-review-gate.md``
-(review-only waiver).
+``.claude/rules/file-bridge-protocol.md``,
+``.claude/rules/bridge-essential.md``, ``.claude/rules/codex-review-gate.md``.
 
 Test architecture: tests use synthesized INDEX + bridge file fixtures under
 ``tmp_path``; the runner module is loaded once via importlib because the
@@ -588,7 +589,10 @@ def test_runner_outputs_per_spec_execution_matrix_as_json(tmp_path: Path, monkey
 
 
 def test_runner_makes_zero_writes_to_bridge_index_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """GOV-FILE-BRIDGE-AUTHORITY-001: runner is read-only against bridge/INDEX.md."""
+    """GOV-FILE-BRIDGE-AUTHORITY-001 + ``.claude/rules/bridge-essential.md``:
+    the runner is read-only against ``bridge/INDEX.md``. ``bridge-essential.md``
+    states that ``INDEX.md`` is canonical state and must not be mutated by
+    readers; this test asserts mechanical compliance."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
     _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
@@ -627,7 +631,12 @@ def test_runner_output_is_deterministic_across_repeated_invocations(tmp_path: Pa
 
 
 def test_runner_json_output_schema_validates_against_consumer_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
-    """ADR-CODEX-HOOK-PARITY-FALLBACK-001: JSON output keys match the consumer contract."""
+    """ADR-CODEX-HOOK-PARITY-FALLBACK-001 + ``.claude/rules/codex-review-gate.md``:
+    JSON output keys match the consumer contract used by the Codex review
+    skill. ``codex-review-gate.md`` is the procedural rule that wires the
+    review skill to runner output; the runtime invariant the rule depends
+    on is the schema asserted here, so this test serves both linked
+    artifacts."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
     _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
@@ -725,4 +734,225 @@ def test_runner_cli_advisory_flag_propagates(tmp_path: Path, monkeypatch: pytest
     _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
     # No test file -> coverage gap; in advisory mode rc=0.
     rc = runner.main(["--bridge-id", "thread", "--advisory", "--json"])
+    assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Codex `-006` F1 — DELIB and rule-file path extraction + discovery
+# ---------------------------------------------------------------------------
+
+
+def test_runner_extracts_delib_ids_from_spec_links_section(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F1 closure: DELIB-* IDs cited in Specification Links must
+    be extracted into the runner matrix, not silently dropped because of a
+    too-narrow ID prefix regex."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    content = (
+        "## Specification Links\n\n"
+        "- `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` — deterministic CLI.\n"
+        "- `SPEC-FOO-001` — companion spec.\n"
+    )
+    extracted = runner._extract_spec_links_section(content)
+    assert "DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE" in extracted
+    assert "SPEC-FOO-001" in extracted
+
+
+def test_runner_extracts_rule_file_paths_from_spec_links_section(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F1 closure: `.claude/rules/*.md` paths cited in
+    Specification Links must be extracted into the runner matrix."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    content = (
+        "## Specification Links\n\n"
+        "- `.claude/rules/file-bridge-protocol.md` — bridge protocol.\n"
+        "- `.claude/rules/project-root-boundary.md` — root boundary.\n"
+    )
+    extracted = runner._extract_spec_links_section(content)
+    assert ".claude/rules/file-bridge-protocol.md" in extracted
+    assert ".claude/rules/project-root-boundary.md" in extracted
+
+
+def test_runner_discovers_tests_for_delib_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F1 closure: a test whose module docstring cites
+    DELIB-X is discoverable for that DELIB-X."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    _seed_test_file(tmp_path, "delib_match", ["DELIB-S999-EXAMPLE"], passing=True)
+    matches = runner._discover_derived_tests("DELIB-S999-EXAMPLE")
+    assert len(matches) == 1
+    assert "test_delib_match.py" in matches[0]
+
+
+def test_runner_discovers_tests_for_rule_file_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F1 closure: a test whose module docstring cites a
+    rule-file path (e.g. ``.claude/rules/example.md``) is discoverable for
+    that path. Word-boundary anchoring is omitted for paths because `.` and
+    `/` are non-word characters."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    _seed_test_file(tmp_path, "rule_match", [".claude/rules/example.md"], passing=True)
+    matches = runner._discover_derived_tests(".claude/rules/example.md")
+    assert len(matches) == 1
+    assert "test_rule_match.py" in matches[0]
+
+
+def test_runner_full_flow_includes_delib_and_rule_paths_in_matrix(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F1 closure: end-to-end — a thread that lists DELIB-*
+    and rule-path artifacts in Specification Links plus tests that cite
+    those artifacts in their docstrings exits 0 with all five entries
+    appearing in the matrix."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
+    _seed_bridge_file(
+        tmp_path,
+        "thread-001.md",
+        spec_links=[
+            "SPEC-A-001",
+            "DELIB-S888-EXAMPLE",
+            ".claude/rules/example-rule.md",
+        ],
+        status_header="NEW",
+    )
+    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
+    _seed_test_file(tmp_path, "delib_x", ["DELIB-S888-EXAMPLE"], passing=True)
+    _seed_test_file(tmp_path, "rule_x", [".claude/rules/example-rule.md"], passing=True)
+    rc = runner.run(bridge_id="thread", json_output=True)
+    assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Codex `-006` F2 — Waiver effective-version coherence
+# ---------------------------------------------------------------------------
+
+
+def test_waiver_validation_rejects_future_effective_waiver_when_removal_version_known(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F2 closure: a waiver with applies_from_version greater
+    than the version where the spec was removed is a future-effective waiver
+    that retroactively authorizes a removal before its own effective version.
+    It must be rejected with ``version_mismatch``.
+
+    Concrete example required by Codex `-006`: ``applies_from_version: 999``
+    on a version-002 removal."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    _seed_db(
+        tmp_path,
+        delibs=[{"id": "DELIB-700", "source_type": "owner_conversation",
+                 "outcome": "owner_decision", "content": "About SPEC-X-001"}],
+        delib_specs=[("DELIB-700", "SPEC-X-001")],
+    )
+    waiver = runner.Waiver(
+        spec_id="SPEC-X-001",
+        approved_by="DELIB-700",
+        applies_from_version=999,
+    )
+    err = runner._validate_waiver_evidence(waiver, removal_version=2)
+    assert err == "version_mismatch"
+
+
+def test_waiver_validation_accepts_waiver_effective_at_or_before_removal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F2 closure: a waiver with
+    applies_from_version <= removal_version is accepted (the waiver is
+    already effective at the time of removal)."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    _seed_db(
+        tmp_path,
+        delibs=[{"id": "DELIB-800", "source_type": "owner_conversation",
+                 "outcome": "owner_decision", "content": "About SPEC-X-001"}],
+        delib_specs=[("DELIB-800", "SPEC-X-001")],
+    )
+    # applies_from_version == removal_version: effective at removal.
+    waiver_at = runner.Waiver(
+        spec_id="SPEC-X-001",
+        approved_by="DELIB-800",
+        applies_from_version=2,
+    )
+    assert runner._validate_waiver_evidence(waiver_at, removal_version=2) is None
+    # applies_from_version < removal_version: effective before removal.
+    waiver_before = runner.Waiver(
+        spec_id="SPEC-X-001",
+        approved_by="DELIB-800",
+        applies_from_version=1,
+    )
+    assert runner._validate_waiver_evidence(waiver_before, removal_version=2) is None
+
+
+def test_runner_full_flow_rejects_removal_with_future_effective_waiver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F2 closure: end-to-end — a thread that removes a spec
+    in version 002 with a waiver claiming applies_from_version: 999 must
+    fail closed at exit code 4 (ERR_WAIVER_VERSION_MISMATCH)."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    _seed_db(
+        tmp_path,
+        delibs=[{"id": "DELIB-900", "source_type": "owner_conversation",
+                 "outcome": "owner_decision", "content": "About SPEC-A-001"}],
+        delib_specs=[("DELIB-900", "SPEC-A-001")],
+    )
+    _seed_index(tmp_path, "thread", [
+        ("REVISED", "thread-002.md"),
+        ("NEW", "thread-001.md"),
+    ])
+    _seed_bridge_file(
+        tmp_path,
+        "thread-001.md",
+        spec_links=["SPEC-A-001", "SPEC-B-001"],
+        status_header="NEW",
+    )
+    _seed_bridge_file(
+        tmp_path,
+        "thread-002.md",
+        spec_links=["SPEC-B-001"],
+        status_header="REVISED",
+        waivers=[{
+            "spec_id": "SPEC-A-001",
+            "approved_by": "DELIB-900",
+            "applies_from_version": 999,
+            "reason": "future-effective; should be rejected",
+        }],
+    )
+    _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"], passing=True)
+    rc = runner.run(bridge_id="thread")
+    assert rc == 4  # ERR_WAIVER_VERSION_MISMATCH
+
+
+def test_runner_full_flow_accepts_removal_with_effective_at_removal_waiver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex `-006` F2 closure: end-to-end positive — a thread that removes
+    a spec in version 002 with a waiver effective from version 002 (or
+    earlier) is accepted."""
+    runner = _load_runner()
+    _patch_paths(monkeypatch, tmp_path)
+    _seed_db(
+        tmp_path,
+        delibs=[{"id": "DELIB-1000", "source_type": "owner_conversation",
+                 "outcome": "owner_decision", "content": "About SPEC-A-001"}],
+        delib_specs=[("DELIB-1000", "SPEC-A-001")],
+    )
+    _seed_index(tmp_path, "thread", [
+        ("REVISED", "thread-002.md"),
+        ("NEW", "thread-001.md"),
+    ])
+    _seed_bridge_file(
+        tmp_path,
+        "thread-001.md",
+        spec_links=["SPEC-A-001", "SPEC-B-001"],
+        status_header="NEW",
+    )
+    _seed_bridge_file(
+        tmp_path,
+        "thread-002.md",
+        spec_links=["SPEC-B-001"],
+        status_header="REVISED",
+        waivers=[{
+            "spec_id": "SPEC-A-001",
+            "approved_by": "DELIB-1000",
+            "applies_from_version": 2,
+            "reason": "effective at removal",
+        }],
+    )
+    _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"], passing=True)
+    rc = runner.run(bridge_id="thread")
     assert rc == 0

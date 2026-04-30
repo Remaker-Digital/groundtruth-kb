@@ -38,6 +38,7 @@ NO-GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-002.md
 NEW: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-001.md
 
 Document: gtkb-platform-spec-coverage-verified-runner-2026-04-29
+REVISED: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-007.md
 NO-GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-006.md
 NEW: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-005.md
 GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-004.md

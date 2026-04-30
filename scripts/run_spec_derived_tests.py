@@ -60,9 +60,19 @@ DEFAULT_PYTEST_TIMEOUT_S: Final[int] = 120
 # Spec ID token pattern. Excludes `.` from the suffix so dotted assertion
 # references like "DCL-VERIFIED-BRIDGE-HISTORY-001.A1" match only the spec
 # ID portion ("DCL-VERIFIED-BRIDGE-HISTORY-001"), not the parent + the
-# assertion-suffix as one merged token.
+# assertion-suffix as one merged token. Includes DELIB per Codex
+# `-006` F1 NO-GO: linked deliberation records must appear in the
+# mechanical matrix, not only in narrative prose.
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(
-    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_-]*\b"
+    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b"
+)
+
+# Rule-file path pattern. Per Codex `-006` F1 NO-GO: linked rule files
+# (e.g. `.claude/rules/file-bridge-protocol.md`) must appear in the
+# mechanical matrix, not only in narrative prose. Path tokens lack a
+# leading word character so word-boundary anchoring is omitted.
+RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(
+    r"\.claude/rules/[a-z0-9_-]+\.md"
 )
 
 # Section heading patterns (start anchored only; trailing text tolerated).
@@ -162,11 +172,15 @@ def _strip_code_fences(lines: list[str]) -> list[str]:
 
 
 def _extract_spec_links_section(content: str) -> set[str]:
-    """Return the set of cited spec IDs in the file's Specification Links section.
+    """Return the set of cited spec IDs and rule-file paths in the file's
+    Specification Links section.
 
     Only the section between the `## Specification Links` heading and the next
-    heading is scanned. Spec IDs are SPEC-/GOV-/ADR-/DCL-/PB-/REQ- prefixed.
-    Code-fenced blocks are stripped (illustrative content, not authoritative).
+    heading is scanned. ID tokens are SPEC-/GOV-/ADR-/DCL-/PB-/REQ-/DELIB-
+    prefixed; rule-file tokens match `.claude/rules/*.md`. Per Codex `-006`
+    F1 NO-GO: both classes of linked artifact must appear in the mechanical
+    matrix. Code-fenced blocks are stripped (illustrative content, not
+    authoritative).
     """
     lines = _strip_code_fences(content.splitlines())
     start: int | None = None
@@ -182,7 +196,9 @@ def _extract_spec_links_section(content: str) -> set[str]:
             break
         section_lines.append(line)
     section_text = "\n".join(section_lines)
-    return set(SPEC_ID_RE.findall(section_text))
+    spec_ids = set(SPEC_ID_RE.findall(section_text))
+    rule_paths = set(RULE_PATH_RE.findall(section_text))
+    return spec_ids | rule_paths
 
 
 def _extract_waivers_section(content: str) -> dict[str, Waiver]:
@@ -246,8 +262,16 @@ def _delib_references_spec(conn: sqlite3.Connection, delib_id: str, spec_id: str
     return spec_id in (content or "")
 
 
-def _validate_waiver_evidence(waiver: Waiver) -> str | None:
-    """Return error code (per -003 §1.5) if waiver is invalid, else None."""
+def _validate_waiver_evidence(waiver: Waiver, removal_version: int | None = None) -> str | None:
+    """Return error code (per -003 §1.5) if waiver is invalid, else None.
+
+    ``removal_version`` is the bridge file version at which ``waiver.spec_id``
+    was removed from the cited-spec set (i.e. the first Prime-authored version
+    where the spec is no longer in Specification Links after having been there
+    in an earlier version). Per Codex `-006` F2 NO-GO: a waiver whose
+    ``applies_from_version`` is past the removal version retroactively
+    authorizes a removal before its own effective version, and must be rejected.
+    """
     if not waiver.approved_by:
         return "malformed"
     # Version coherence (Codex Q2: applies_from_version: 0 acceptable as
@@ -255,6 +279,9 @@ def _validate_waiver_evidence(waiver: Waiver) -> str | None:
     if waiver.applies_from_version is None:
         return "version_mismatch"
     if not isinstance(waiver.applies_from_version, int) or waiver.applies_from_version < 0:
+        return "version_mismatch"
+    # F2 fix: future-effective waivers cannot retroactively authorize removal.
+    if removal_version is not None and waiver.applies_from_version > removal_version:
         return "version_mismatch"
 
     if waiver.approved_by.startswith("DELIB-"):
@@ -307,9 +334,18 @@ def _discover_derived_tests(spec_id: str) -> list[str]:
 
     CONSERVATIVE per -003 §1.3: only module-level docstrings are scanned.
     Returns relative paths (str) for stable JSON output.
+
+    For ID tokens (SPEC/GOV/etc.), the search is anchored with `\\b` to
+    prevent substring matches on longer IDs. For file-path tokens (e.g.
+    ``.claude/rules/file-bridge-protocol.md``), word boundaries are omitted
+    because the leading `.` and embedded `/` are non-word characters that
+    would never sit at a word boundary.
     """
     matches: list[Path] = []
-    pattern = re.compile(rf"\b{re.escape(spec_id)}\b")
+    if "/" in spec_id or spec_id.startswith("."):
+        pattern = re.compile(re.escape(spec_id))
+    else:
+        pattern = re.compile(rf"\b{re.escape(spec_id)}\b")
     for test_dir in TEST_DIRS:
         if not test_dir.is_dir():
             continue
@@ -475,20 +511,36 @@ def run(bridge_id: str, json_output: bool = False, advisory: bool = False,
 
     # A2 enforcement: detect specs cited in earlier Prime versions but not
     # the most-recent Prime version, without an approved waiver. Latest =
-    # highest version_number among Prime-authored entries.
+    # highest version_number among Prime-authored entries. Also compute the
+    # removal_version per spec (first Prime version where spec is no longer
+    # cited) for F2 future-effective-waiver validation.
     latest_v = max(cited_history.keys()) if cited_history else 0
     latest_specs = cited_history.get(latest_v, set())
+    sorted_prime_versions = sorted(cited_history.keys())
+    removal_versions: dict[str, int] = {}
     for spec_id in cited_specs - latest_specs:
+        last_cited_v = max(
+            (v for v, specs in cited_history.items() if spec_id in specs),
+            default=0,
+        )
+        next_prime_after_last_cited = [
+            v for v in sorted_prime_versions if v > last_cited_v
+        ]
+        removal_versions[spec_id] = (
+            next_prime_after_last_cited[0] if next_prime_after_last_cited
+            else last_cited_v + 1
+        )
         if spec_id not in waivers:
             msg = (f"ERR_REMOVAL_WITHOUT_WAIVER: spec_id={spec_id} cited in earlier "
                    f"version but not version {latest_v} of {bridge_id}")
             sys.stderr.write(msg + "\n")
             return 0 if advisory else 3
 
-    # F3 step: validate waiver evidence.
+    # F3 step: validate waiver evidence. Per F2 (Codex `-006`): pass the
+    # spec's removal_version so future-effective waivers are rejected.
     waiver_errors: dict[str, str] = {}
     for spec_id, waiver in waivers.items():
-        err = _validate_waiver_evidence(waiver)
+        err = _validate_waiver_evidence(waiver, removal_versions.get(spec_id))
         if err:
             waiver_errors[spec_id] = err
             sys.stderr.write(
