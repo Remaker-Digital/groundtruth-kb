@@ -22,6 +22,7 @@ NO-GO: bridge/smart-poller-kind-aware-routing-2026-04-30-002.md
 NEW: bridge/smart-poller-kind-aware-routing-2026-04-30-001.md
 
 Document: gtkb-decision-tracker-block-prose-ask-2026-04-29
+VERIFIED: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-006.md
 NEW: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-005.md
 GO: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-004.md
 REVISED: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-003.md
@@ -35,6 +36,7 @@ NO-GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-002.md
 NEW: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-001.md
 
 Document: gtkb-platform-spec-coverage-verified-runner-2026-04-29
+NEW: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-005.md
 GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-004.md
 REVISED: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-003.md
 NO-GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-002.md

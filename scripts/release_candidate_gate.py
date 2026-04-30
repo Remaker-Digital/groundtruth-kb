@@ -113,6 +113,7 @@ def _python_gates() -> None:
             "tests/scripts/test_session_self_initialization.py",
             "tests/scripts/test_groundtruth_governance_adoption.py",
             "tests/scripts/test_codex_hook_parity.py",
+            "tests/scripts/test_run_spec_derived_tests.py",
             "tests/scripts/test_memory_md_ceiling.py",
             "tests/scripts/test_command_registry_tracking.py",
             "tests/scripts/test_wrap_capture_transcript.py",
