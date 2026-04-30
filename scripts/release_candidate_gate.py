@@ -139,6 +139,34 @@ def _python_gates() -> None:
         timeout=180,
     )
 
+    # Per Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY (bridge -006 GO):
+    # spec-event-surfacer hook + supporting upstream tests for managed-artifact
+    # registry, scaffold, upgrade, and doctor coverage of the new hook entries.
+    # Run in a separate pytest invocation with --rootdir so the upstream
+    # `groundtruth-kb/tests/conftest.py` doesn't collide with `tests/conftest.py`,
+    # and so the project-root pyproject.toml `testpaths=["tests"]` doesn't
+    # exclude these paths from collection.
+    upstream_root = PROJECT_ROOT / "groundtruth-kb"
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            f"--rootdir={upstream_root}",
+            "--override-ini=testpaths=tests",
+            str(upstream_root / "tests" / "test_spec_event_surfacer.py"),
+            str(upstream_root / "tests" / "test_managed_registry.py"),
+            str(upstream_root / "tests" / "test_scaffold_settings.py"),
+            str(upstream_root / "tests" / "test_scaffold_project.py"),
+            str(upstream_root / "tests" / "test_upgrade.py"),
+            str(upstream_root / "tests" / "test_settings_merge_drift.py"),
+            str(upstream_root / "tests" / "test_doctor.py"),
+            "-q",
+            "--tb=short",
+        ],
+        timeout=180,
+    )
+
 
 def _frontend_gates() -> None:
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm") or shutil.which("npm")

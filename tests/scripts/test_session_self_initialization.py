@@ -2188,3 +2188,47 @@ def test_git_checkout_info_returns_degraded_when_outside_project_root(tmp_path, 
     assert result["error"] == "checkout_outside_project_root"
     assert "scope_diagnostic" in result
     assert "outside" in result["scope_diagnostic"].lower()
+
+
+def test_session_self_initialization_writes_session_start_json(tmp_path) -> None:
+    """Per Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY (bridge -006 GO):
+    SessionStart writes ``.claude/session/session-start.json`` so the
+    spec-event-surfacer hook has a per-session timestamp lower bound.
+    """
+    module = _load_module()
+
+    request_started_at = "2026-04-29T18:30:00.000000+00:00"
+    module._write_session_start_json(
+        project_root=tmp_path,
+        request_started_at=request_started_at,
+        harness="test-harness",
+    )
+
+    target = tmp_path / ".claude" / "session" / "session-start.json"
+    assert target.exists(), "session-start.json must be written by the writer"
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["session_started_at"] == request_started_at
+    assert payload["harness"] == "test-harness"
+    assert "session_id" in payload
+
+
+def test_write_session_start_json_handles_filesystem_errors_gracefully(tmp_path, monkeypatch) -> None:
+    """Per F2 fix: graceful degradation. The surfacer's now() - 1 hour
+    fallback is the safety net when the writer fails."""
+    module = _load_module()
+
+    # Point at a path that cannot be created (e.g., a file masquerading as dir)
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not-a-directory", encoding="utf-8")
+    fake_root = blocker  # using a regular file as project_root will make .claude/session/ creation fail
+
+    # Should NOT raise
+    module._write_session_start_json(
+        project_root=fake_root,
+        request_started_at="2026-04-29T18:30:00.000000+00:00",
+        harness="test",
+    )
+
+    # File doesn't exist (write failed gracefully)
+    target = fake_root / ".claude" / "session" / "session-start.json"
+    assert not target.exists()

@@ -2,7 +2,7 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 51 records = 19 hooks + 10 rules + 6 skills + 15 settings-hook-registrations + 1 gitignore-pattern.
+# 56 records = 20 hooks + 10 rules + 6 skills + 16 settings-hook-registrations + 4 gitignore-patterns.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -140,6 +140,22 @@ target_path = ".claude/hooks/delib-search-tracker.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = []
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+# Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
+# Lifecycle axes match the paired settings-hook-registration below to satisfy
+# F1 fix from -004 NO-GO (avoid inert-hook risk where upgrade delivers
+# registration without paired hook file).
+class = "hook"
+id = "hook.spec-event-surfacer"
+template_path = "hooks/spec-event-surfacer.py"
+target_path = ".claude/hooks/spec-event-surfacer.py"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
@@ -527,6 +543,22 @@ target_settings_path = ".claude/settings.json"
 initial_profiles = ["dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "structured-merge"
+adopter_divergence_policy = "warn"
+
+[[artifacts]]
+# Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
+# Lifecycle axes match the paired hook artifact above (managed_profiles +
+# doctor_required_profiles BOTH = bridge profiles) per F1+F2 fixes from -004 NO-GO.
+class = "settings-hook-registration"
+id = "settings.hook.spec-event-surfacer.posttooluse"
+event = "PostToolUse"
+hook_filename = "spec-event-surfacer.py"
+target_settings_path = ".claude/settings.json"
+initial_profiles = ["dual-agent", "dual-agent-webapp"]
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"

@@ -53,6 +53,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.claude\\hooks\\spec-event-surfacer.py",
+            "statusMessage": "Surfacing in-session KB spec events",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

@@ -5285,6 +5285,15 @@ def _emit_startup_service_payload(result: dict[str, Any], *, request_started_at:
         payload_emitted_at=payload_emitted_at,
         report_origin="in_memory_model_render",
     )
+    # Per Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY (bridge -006 GO):
+    # write the per-session timestamp lower bound that the spec-event-surfacer
+    # hook reads. Without this file the surfacer falls back to now() - 1 hour
+    # which is correct but emits a stderr warning.
+    _write_session_start_json(
+        project_root=Path(result["project_root"]),
+        request_started_at=request_started_at,
+        harness=_resolved_harness_name(None) or "claude",
+    )
     print(
         json.dumps(
             {
@@ -5297,6 +5306,37 @@ def _emit_startup_service_payload(result: dict[str, Any], *, request_started_at:
             ensure_ascii=False,
         )
     )
+
+
+def _write_session_start_json(
+    *,
+    project_root: Path,
+    request_started_at: str,
+    harness: str,
+) -> None:
+    """Write ``.claude/session/session-start.json`` for the spec-event-surfacer.
+
+    Per bridge ``gtkb-membase-effective-use-recovery-slice-a-event-surfacer-
+    2026-04-29-005`` REVISED-2 §1.3 + Codex GO at -006: the surfacer hook
+    reads ``session_started_at`` from this file as the lower bound for
+    "in-session" spec rows. Atomic-rename pattern; graceful degradation on
+    filesystem errors (the surfacer's fallback to ``now() - 1 hour`` is the
+    safety net per F2 fix).
+    """
+    target = project_root / ".claude" / "session" / "session-start.json"
+    payload = {
+        "session_started_at": request_started_at,
+        "session_id": os.environ.get("GTKB_STARTUP_GUARD_ID", request_started_at),
+        "harness": harness,
+    }
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_name(f"{target.name}.tmp.{os.getpid()}")
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
+        os.replace(tmp, target)
+    except OSError:
+        # Graceful degradation: surfacer's fallback handles missing file.
+        pass
 
 
 def _emit_no_hook_context() -> None:

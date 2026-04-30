@@ -99,8 +99,15 @@ def test_settings_json_exact_event_placement(tmp_project):
         ]
     )
 
-    # PostToolUse hooks: tracker + owner-decision-capture (governance-completeness).
-    assert _hook_names_for_event("PostToolUse") == sorted(["delib-search-tracker.py", "owner-decision-capture.py"])
+    # PostToolUse hooks: tracker + owner-decision-capture (governance-completeness)
+    # + spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY).
+    assert _hook_names_for_event("PostToolUse") == sorted(
+        [
+            "delib-search-tracker.py",
+            "owner-decision-capture.py",
+            "spec-event-surfacer.py",
+        ]
+    )
 
     # PreToolUse hooks
     pretooluse = _hook_names_for_event("PreToolUse")
