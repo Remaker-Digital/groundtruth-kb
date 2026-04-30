@@ -32,17 +32,37 @@ All rights reserved.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sqlite3
 import sys
+import time
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+# Cross-platform interprocess locking. Per bridge -008 F1 required action:
+# the prior atomic-rename pattern was insufficient because two processes
+# could independently load the ledger, query the DB, and decide to emit
+# the same rows before either had written. fcntl.flock (POSIX) and
+# msvcrt.locking (Windows) provide an interprocess exclusive lock.
+_USE_FCNTL = False
+try:
+    import fcntl
+
+    _USE_FCNTL = True
+except ImportError:
+    import msvcrt
+
 # Per-session ledger location. New session implies fresh ledger; the hook
 # initializes the file lazily on first invocation if absent.
 LEDGER_REL_PATH = ".claude/session/spec-events-seen.jsonl"
+
+# Lock file lives next to the ledger. NEVER deleted; deletion would race
+# with lock acquisition by other processes.
+LOCK_SUFFIX = ".lock"
 
 # Session-start timestamp source written by the SessionStart hook.
 SESSION_START_REL_PATH = ".claude/session/session-start.json"
@@ -53,6 +73,15 @@ SESSION_START_REL_PATH = ".claude/session/session-start.json"
 # (NOT current_time, which would silently suppress already-created rows).
 FALLBACK_LOOKBACK = timedelta(hours=1)
 
+# Maximum total wall-clock budget for acquiring the ledger lock on Windows.
+# msvcrt.locking has its own ~10s internal retry; this bounds the overall
+# wait if many concurrent processes contend for the same lock.
+LOCK_MAX_WAIT_SECONDS = 30.0
+
+# Sleep between Windows retry attempts after msvcrt.locking exhausts its
+# internal wait without acquiring.
+LOCK_RETRY_SLEEP_SECONDS = 0.05
+
 # Database location relative to project root.
 DB_REL_PATH = "groundtruth.db"
 
@@ -61,6 +90,59 @@ EVENT_FORMAT = (
     "[KB-SPEC-EVENT] {spec_id} v{version} -- {kind} -- {title} "
     "[type={type} status={status} section={section}]"
 )
+
+
+@contextlib.contextmanager
+def _ledger_lock(cwd: Path) -> Iterator[None]:
+    """Acquire an exclusive interprocess lock for the load+query+append section.
+
+    POSIX uses fcntl.flock; Windows uses msvcrt.locking. The lock target is
+    `<ledger>.lock` next to the ledger. Lock acquisition blocks until the
+    lock is available (subject to LOCK_MAX_WAIT_SECONDS on Windows).
+
+    On lock failure (timeout, FS error) the OSError propagates so main() can
+    fall through to the silent-pass graceful-degradation path. Better to
+    miss a turn's emit than to risk duplicate emission.
+    """
+    ledger_path = cwd / LEDGER_REL_PATH
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = ledger_path.with_name(f"{ledger_path.name}{LOCK_SUFFIX}")
+
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        try:
+            if os.fstat(fd).st_size == 0:
+                os.write(fd, b"\0")
+                os.lseek(fd, 0, 0)
+        except OSError:
+            pass
+
+        if _USE_FCNTL:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        else:
+            os.lseek(fd, 0, 0)
+            deadline = time.monotonic() + LOCK_MAX_WAIT_SECONDS
+            while True:
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise
+                    time.sleep(LOCK_RETRY_SLEEP_SECONDS)
+        try:
+            yield
+        finally:
+            if _USE_FCNTL:
+                with contextlib.suppress(OSError):
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            else:
+                os.lseek(fd, 0, 0)
+                with contextlib.suppress(OSError):
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    finally:
+        with contextlib.suppress(OSError):
+            os.close(fd)
 
 
 def _resolve_session_started_at(cwd: Path) -> tuple[str, bool]:
@@ -275,22 +357,28 @@ def main() -> None:
     cwd_str = payload.get("cwd", ".")
     cwd = Path(cwd_str).resolve()
 
-    # Resolve lower-bound timestamp + load ledger
-    session_started_at, used_fallback = _resolve_session_started_at(cwd)
-    seen = _load_ledger(cwd)
-
-    # Query new spec rows
-    new_rows = _query_new_spec_rows(cwd, session_started_at, seen)
+    # Per bridge -008 F1 required action: load + query + append must execute
+    # under an exclusive interprocess lock so two concurrent PostToolUse hooks
+    # cannot both decide to emit the same rows. Lock failure (Windows timeout
+    # or filesystem error) takes the silent-pass path; missing one turn's
+    # emit is preferable to risking duplicate emission.
+    new_rows: list[dict[str, Any]] = []
+    used_fallback = False
+    try:
+        with _ledger_lock(cwd):
+            session_started_at, used_fallback = _resolve_session_started_at(cwd)
+            seen = _load_ledger(cwd)
+            new_rows = _query_new_spec_rows(cwd, session_started_at, seen)
+            if new_rows:
+                _append_to_ledger(cwd, new_rows)
+    except OSError:
+        emit_pass()
+        sys.exit(0)
 
     if not new_rows:
         emit_pass()
         sys.exit(0)
 
-    # Append to ledger BEFORE emit so a crash mid-emit doesn't cause
-    # re-emission on the next invocation.
-    _append_to_ledger(cwd, new_rows)
-
-    # Emit chat-visible event message
     message = _build_event_message(new_rows, used_fallback)
     emit_additional_context("PostToolUse", message)
     sys.exit(0)

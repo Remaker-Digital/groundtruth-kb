@@ -17,6 +17,7 @@ import importlib.util
 import io
 import json
 import sqlite3
+import subprocess
 import sys
 import threading
 import time
@@ -289,6 +290,137 @@ def test_atomic_ledger_write_recovers_from_partial_state(tmp_path: Path) -> None
     assert len(contents) == 1
     entry = json.loads(contents[0])
     assert entry["spec_id"] == "SPEC-RECOVER-001"
+
+
+def test_concurrent_invocations_do_not_double_emit(tmp_path: Path) -> None:
+    """F1 fix from bridge -008 NO-GO: under N simultaneous PostToolUse hook
+    invocations against the same KB state, every spec row must be emitted
+    exactly once across the union of process outputs, the ledger must contain
+    exactly one entry per (spec_id, version), and a sequential invocation
+    after the concurrent run must be silent.
+
+    Codex's -008 parallel-process probe at 16 procs over 1000 rows yielded
+    emit_count=8 / ledger_line_count=2000. The fix is interprocess locking
+    around load+query+append. This test reproduces that probe at smaller
+    scale (16 procs, 100 rows) so it remains tractable in CI; larger
+    fixtures behave identically when the lock is correct.
+    """
+    hook_path = _HOOK_PATH
+    assert hook_path.exists(), f"hook not found at {hook_path}"
+
+    db_path = tmp_path / "groundtruth.db"
+    _init_specs_db(db_path)
+    session_start = (datetime.now(UTC) - timedelta(minutes=10)).isoformat(timespec="microseconds")
+    _write_session_start(tmp_path, session_start)
+
+    NUM_SPECS = 100
+    spec_change_ts = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="microseconds")
+    conn = sqlite3.connect(db_path)
+    for i in range(NUM_SPECS):
+        conn.execute(
+            "INSERT INTO current_specifications "
+            "(id, version, title, type, status, section, changed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                f"SPEC-CONCUR-{i:04d}",
+                1,
+                f"Concurrency fixture spec {i}",
+                "requirement",
+                "specified",
+                "concurrency-test",
+                spec_change_ts,
+            ),
+        )
+    conn.commit()
+    conn.close()
+
+    payload = json.dumps(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo test"},
+            "cwd": str(tmp_path),
+        }
+    ).encode("utf-8")
+
+    NUM_PROCS = 16
+
+    procs: list[subprocess.Popen[bytes]] = [
+        subprocess.Popen(
+            [sys.executable, str(hook_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        for _ in range(NUM_PROCS)
+    ]
+
+    for p in procs:
+        assert p.stdin is not None
+        p.stdin.write(payload)
+        p.stdin.close()
+
+    outputs: list[str] = []
+    for p in procs:
+        out, _err = p.communicate(timeout=60)
+        outputs.append(out.decode("utf-8"))
+
+    emit_count_per_spec: dict[tuple[str, int], int] = {}
+    for raw in outputs:
+        out = raw.strip()
+        if not out or out == "{}":
+            continue
+        envelope = json.loads(out)
+        ctx = envelope.get("hookSpecificOutput", {}).get("additionalContext", "")
+        for line in ctx.splitlines():
+            line = line.strip()
+            if not line.startswith("[KB-SPEC-EVENT]") or "WARN:" in line:
+                continue
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            spec_id = parts[1]
+            try:
+                version = int(parts[2][1:])  # "v1" -> 1
+            except (IndexError, ValueError):
+                continue
+            key = (spec_id, version)
+            emit_count_per_spec[key] = emit_count_per_spec.get(key, 0) + 1
+
+    duplicate_emits = {k: v for k, v in emit_count_per_spec.items() if v > 1}
+    assert not duplicate_emits, (
+        f"Duplicate owner-visible emits across {NUM_PROCS} concurrent processes: {duplicate_emits}"
+    )
+
+    assert len(emit_count_per_spec) == NUM_SPECS, (
+        f"Expected {NUM_SPECS} unique emits across the union of process outputs; "
+        f"got {len(emit_count_per_spec)}"
+    )
+
+    ledger_path = tmp_path / ".claude" / "session" / "spec-events-seen.jsonl"
+    assert ledger_path.exists(), "ledger file was not created"
+    with ledger_path.open(encoding="utf-8") as fh:
+        ledger_lines = [line for line in fh if line.strip()]
+    assert len(ledger_lines) == NUM_SPECS, (
+        f"Expected {NUM_SPECS} ledger entries; got {len(ledger_lines)}"
+    )
+
+    seen_keys: set[tuple[str, int]] = set()
+    for line in ledger_lines:
+        entry = json.loads(line)
+        key = (entry["spec_id"], entry["version"])
+        assert key not in seen_keys, f"Duplicate ledger entry for {key}"
+        seen_keys.add(key)
+
+    result = subprocess.run(
+        [sys.executable, str(hook_path)],
+        input=payload,
+        capture_output=True,
+        timeout=10,
+    )
+    final_out = result.stdout.decode("utf-8").strip()
+    assert final_out == "{}", (
+        f"Expected silent emit on sequential invocation after concurrent run; got: {final_out!r}"
+    )
 
 
 def test_surfacer_runtime_under_200ms_for_typical_turn_transcript(tmp_path: Path) -> None:
