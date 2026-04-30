@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-operating-model-slice-1-canonical-artifact-2026-04-30
+NEW: bridge/gtkb-operating-model-slice-1-canonical-artifact-2026-04-30-001.md
+
 Document: gtkb-operating-model-slice-0-inventory-2026-04-30
 VERIFIED: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-010.md
 REVISED: bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-009.md
