@@ -67,30 +67,120 @@ Captured from `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/OPERATING-
 
 ---
 
-## §C. Owner-vs-Codex revision-delta annotations (in progress; Slice 0 §3.5 deliverable)
+## §C. Owner-vs-Codex revision-delta annotations (Slice 0 §3.5 deliverable)
 
-This section will receive complete delta annotations as part of Slice 0 implementation. As of 2026-04-30 S324, one initial spot-check NARROW delta has been identified:
+Complete delta inventory comparing §A (owner verbatim) against §B (Codex revision). 37 deltas identified across 5 types: 10 ADD, 13 EXPAND, 4 REMOVE, 2 REPHRASE, 8 NARROW. Aggregate observation: Codex's revision encodes existing GT-KB governance conventions (`GOV-ARTIFACT-APPROVAL-001`, `DCL-VERIFIED-BRIDGE-HISTORY-001`, `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, current-vs-target-state discipline) that are not in the owner's prose. Most are reasonable refinements but several are substantive interpretive additions or narrowings that should be owner-reviewed before any Slice 1+ proposal designates a canonical operating-model artifact.
 
-### Delta `OM-DELTA-0001` — NARROW
+### Highest-risk deltas (NARROW + REMOVE)
 
-- **delta_type:** NARROW (silent restriction of stated capability/authority).
+#### `OM-DELTA-0001` — NARROW (Loyal Opposition authority over requirements)
+
 - **owner_text** (§A): "The Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal **and questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections**."
-- **codex_text** (§B): "Loyal Opposition does not change owner intent. It identifies ambiguity or defects and requests clarification, correction, or revision when needed."
-- **delta:** Codex's revision drops the explicit owner-stated authority for Loyal Opposition to "question the cited requirements to disambiguate the owner's intent" and replaces it with the narrower "Loyal Opposition does not change owner intent." The owner's text grants LO active-investigation authority over requirements; Codex's revision restricts LO to reactive defect-flagging.
-- **owner_action_recommended:** revisit-in-slice-1 (this is a substantive authority question; the owner should explicitly choose between the two framings before any canonical artifact designates LO's authority over requirement disambiguation).
-- **risk_if_accepted_silently:** Codex's narrower framing would restrict LO from challenging the framing of owner-stated requirements in subsequent reviews, even when those requirements appear ambiguous or internally inconsistent. The owner's broader framing would preserve LO's role as a substantive critic of requirements, not just of implementation.
+- **codex_text** (§B P7): "Loyal Opposition does not change owner intent. It identifies ambiguity or defects and requests clarification, correction, or revision when needed."
+- **delta:** Codex drops owner-stated authority for LO to "question the cited requirements to disambiguate the owner's intent" and replaces it with the narrower "LO does not change owner intent." Owner grants LO active-investigation authority over requirements; Codex restricts LO to reactive defect-flagging.
+- **owner_action_recommended:** revisit-in-slice-1.
+- **risk_if_accepted_silently:** would restrict LO from challenging requirement framings in subsequent reviews even when ambiguous or internally inconsistent.
 
-### Remaining delta annotations (placeholder)
+#### `OM-DELTA-0004` — NARROW (backlog chronology)
 
-The following delta categories will be enumerated in subsequent Slice 0 implementation:
+- **owner_text** (§A): "The backlog is a roughly chronological stack of highest-to-lowest priority engineering work."
+- **codex_text** (§B P3): "The backlog is an ordered set... shaped by priority, dependencies, readiness, owner decisions, and current system state. Chronology is preserved in the audit trail, but backlog order is not merely chronological."
+- **delta:** Owner's text treats chronology as primary structure with priority as modifier ("roughly chronological stack"); Codex's revision treats chronology as audit-trail metadata only and emphasizes order is "not merely chronological."
+- **owner_action_recommended:** revisit-in-slice-1.
+- **risk_if_accepted_silently:** would shift backlog-ordering behavior away from owner-stated chronological-with-priority semantics; existing artifacts that assume rough chronological order may diverge silently.
 
-- **ADD** deltas (Codex introduced clarifications/distinctions/frameworks not in the owner text). Examples to inventory: explicit application/project distinction; "VERIFIED is dated evidence, not a mere assertion"; the implicit P0–P4 severity model framework when read alongside the advisory.
-- **REMOVE** deltas (Codex dropped content present in owner text). Spot-check finds none yet; full inventory pending.
-- **REPHRASE** deltas (same content, different words). Most common; usually low-risk.
-- **NARROW** deltas (additional silent restrictions of stated capability/authority). One identified above (`OM-DELTA-0001`); full inventory pending.
-- **EXPAND** deltas (Codex broadened scope/authority of stated capability/actor). Spot-check: GT-KB lifecycle operations list expanded ("testing, deployment, upgrades, rollback, release readiness, remediation, root-cause diagnosis, and triage"); full review pending whether each addition is consistent with owner intent.
+#### `OM-DELTA-0006` — REMOVE (stand-alone urgent work items)
 
-The complete §C will be filed in a follow-up Slice 0 commit per the GO'd proposal `bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md` §3.5.
+- **owner_text** (§A): "...some work items are stand-alone, high priority or urgent work items."
+- **codex_text** (§B P3): (no equivalent — concept dropped).
+- **delta:** Owner explicitly recognizes a class of stand-alone urgent work items separate from project-grouped work. Codex's revision implicitly assumes all work items are within projects.
+- **owner_action_recommended:** accept-with-modification (restore the stand-alone urgent class explicitly in any canonical artifact).
+- **risk_if_accepted_silently:** stand-alone urgent items might be forced into synthetic projects, adding governance overhead to fast-path work.
+
+#### `OM-DELTA-0007` — NARROW (reordering triggers)
+
+- **owner_text** (§A): "Reordering of the backlog is interactive and typically happens when the application has changed substantially and prior work items and their respective priorities need reassessment."
+- **codex_text** (§B P3): "Reordering is interactive and typically occurs when substantial implementation progress, new requirements, defects, or changed owner priorities make the previous ordering stale."
+- **delta:** Codex enumerates specific triggers; owner just says "the application has changed substantially." Enumeration may exclude triggers the owner had in mind (e.g., environment changes, third-party integration changes).
+- **owner_action_recommended:** accept-with-modification (preserve owner's broader "application has changed substantially" framing alongside Codex's enumerated examples).
+- **risk_if_accepted_silently:** reordering might be denied for triggers outside Codex's enumeration.
+
+#### `OM-DELTA-0031` — REMOVE (3rd party service status in dashboard)
+
+- **owner_text** (§A): "...display of current configuration, operating state, the status of 3rd party services, computed project KPI..."
+- **codex_text** (§B P17): "...current configuration, operating state, bridge queue, release blockers, requirements and test status..."
+- **delta:** Owner explicitly lists "the status of 3rd party services" as a dashboard surface. Codex omits.
+- **owner_action_recommended:** accept (likely just streamlining; restore in canonical artifact if 3rd-party-service status remains a dashboard requirement).
+- **risk_if_accepted_silently:** dashboard implementation might deprioritize 3rd-party-service status surface.
+
+#### `OM-DELTA-0032` — REMOVE (interactive MemBase access in dashboard)
+
+- **owner_text** (§A): "...interactive access to MemBase, test results, and GT-KB inventory..."
+- **codex_text** (§B P17): "...requirements and test status, implementation evidence, inventory, historical release data, and relevant KPIs."
+- **delta:** Owner explicitly lists "interactive access to MemBase" as a dashboard capability. Codex omits the interactive framing.
+- **owner_action_recommended:** revisit-in-slice-1 (interactive MemBase access vs. read-only is a substantive capability question).
+- **risk_if_accepted_silently:** dashboard might be implemented as read-only views without interactive MemBase write paths the owner intended.
+
+#### `OM-DELTA-0035` — REMOVE (outage/defect framing for harvest)
+
+- **owner_text** (§A): "...for use during remediation, root cause diagnosis, triage and correction of applications which experience outages or defects while in service."
+- **codex_text** (§B P18): "...when doing so improves diagnosis or reduces owner burden."
+- **delta:** Codex removes the specific in-service outage/defect framing and replaces with general "improves diagnosis or reduces owner burden."
+- **owner_action_recommended:** accept-with-modification (preserve owner's explicit in-service-outage framing in canonical artifact; harvest is specifically an in-service-incident capability per owner intent).
+- **risk_if_accepted_silently:** harvest capability might be invoked outside the in-service-incident context the owner specified, creating unnecessary load.
+
+### ADD deltas (Codex introduced content not in owner text)
+
+| ID | Codex addition (§B paragraph) | Risk class | Owner action |
+|---|---|---|---|
+| `OM-DELTA-0002` | Opening framing: "GT-KB is an Internal Developer Platform for AI-assisted software development. It exists to reduce the owner's routine role to specifications, clarifications, and decisions" (§B P1) | Low (helpful summary) | accept-with-modification (verify alignment with owner intent for "reduce owner's routine role" framing) |
+| `OM-DELTA-0003` | Application/project terminology distinction with examples (§B P2) | Medium (terminology choice ripples across artifacts) | revisit-in-slice-1 |
+| `OM-DELTA-0010` | "Candidate requirements must not silently become formal requirements" (§B P5) | Low (consistent with `GOV-ARTIFACT-APPROVAL-001`) | accept |
+| `OM-DELTA-0012` | "approval evidence" requirement for spec creation (§B P5) | Low (encodes `GOV-ARTIFACT-APPROVAL-001`) | accept |
+| `OM-DELTA-0013` | Implementation-proposal content requirements: cite governing specs/decisions/constraints/prior deliberations + identify tests (§B P6) | Low (encodes existing bridge gates) | accept |
+| `OM-DELTA-0014` | LO review checklist: spec linkage, ambiguity, omitted constraints, test adequacy, operational risk, consistency with owner intent (§B P7) | Low (encodes bridge protocol) | accept |
+| `OM-DELTA-0016` | "Tests must be derived from the linked specifications" (§B P9) | Low (encodes `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`) | accept |
+| `OM-DELTA-0017` | Implementation-report content requirements: carry forward spec links, describe changes, identify tests run, report results (§B P9) | Low (encodes `DCL-VERIFIED-BRIDGE-HISTORY-001`) | accept |
+| `OM-DELTA-0018` | "VERIFIED is the dated evidence... not a mere assertion that a specification exists or has been claimed" (§B P10) | Low (response to phantom-VERIFIED incidents; consistent with owner intent) | accept |
+| `OM-DELTA-0023` | "MemBase records must distinguish current state from historical versions and must avoid fields that encode misleading lifecycle concepts" (§B P12) | Low (encodes existing schema-discipline concerns) | accept |
+| `OM-DELTA-0025` | Current-vs-target-state discipline: "artifacts should state the gap plainly rather than implying the capability is complete" (§B P13) | Low (substantive governance addition; aligns with `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`) | accept |
+| `OM-DELTA-0030` | "Claims about dashboard capabilities must distinguish implemented surfaces from intended surfaces" (§B P17) | Low (consistent with delta 0025) | accept |
+
+### EXPAND deltas (Codex broadened stated capability/actor scope)
+
+| ID | Owner text (§A) | Codex expansion (§B) | Owner action |
+|---|---|---|---|
+| `OM-DELTA-0005` | backlog "highest-to-lowest priority engineering work" | adds "active and candidate" + "owner decisions, and current system state" (§B P3) | accept |
+| `OM-DELTA-0008` | projects respond to "new requirement specifications or changes" | adds "defects, governance needs, architectural decisions, operational findings, or discovered drift" (§B P4) | accept |
+| `OM-DELTA-0009` | project formulation begins with "core set of related requirements" | adds "and decisions" as project-defining input (§B P4) | accept |
+| `OM-DELTA-0011` | "functional and non-functional" specifications | adds "architecture decisions, design constraints, protected behaviors, and governance rules" as specification surfaces (§B P5) | accept (matches existing GT-KB types) |
+| `OM-DELTA-0015` | "annotated Implementation Proposal, either affirming that it is ready to implement (GO) or requires another revision and resubmission (NO-GO)" | adds "numbered bridge verdict" framing and "within the approved scope" qualifier (§B P8) | accept |
+| `OM-DELTA-0019` | LO "evaluates the tests which were created" | broadens to "inspects the relevant code, tests, artifacts, and evidence" (§B P10) | accept |
+| `OM-DELTA-0020` | DA captures "chat exchanges, Implementation Reports and Proposals, advisory reports, Prime Builder insights, and Loyal Opposition insights" | adds "decisions, trade-offs, and rationale" + "capture threshold" concept from `DELIB-0874` (§B P11) | accept |
+| `OM-DELTA-0021` | MemBase contains "requirement specifications" + "tests" | adds "work items, procedures, documents, environment configuration, test coverage, and backlog snapshots" (§B P12) | accept (matches existing GT-KB usage) |
+| `OM-DELTA-0024` | bias toward "artifact creation and maintenance, implementation modularity, and extensive version control" | adds "traceability, versioned interfaces, automated checks, and release evidence" (§B P13) | accept |
+| `OM-DELTA-0026` | owner commands disambiguate "decisions and directives" | adds "active workspace, role assignment, project focus, or operating state" (§B P14) | accept |
+| `OM-DELTA-0027` | CLI surfaces include "assignment of Loyal Opposition and Prime Builder roles, configuration management, health checks and operating state reports" | adds "project initialization, upgrade, configuration inspection, role-support surfaces" (§B P14) | accept |
+| `OM-DELTA-0028` | integrations cover "testing, publication and deployment" | adds "observability, and release evidence" + governance discipline ("explicit configuration, health checks, evidence capture, and failure modes") (§B P16) | accept |
+| `OM-DELTA-0029` | dashboard scope: "current configuration, operating state, the status of 3rd party services, computed project KPI..." | adds "bridge queue" and "release blockers" (§B P17) | accept |
+| `OM-DELTA-0033` | lifecycle ops: "deployment, upgrades, and testing" | adds "rollback, release readiness, remediation, root-cause diagnosis, and triage" (§B P18) | accept (matches in-service capability owner mentions later) |
+| `OM-DELTA-0034` | harvest: "log files, reports and test results" | adds "release evidence, and operational artifacts" (§B P18) | accept |
+| `OM-DELTA-0036` | upgrade-independence: "does not force existing applications to make changes in order to continue operating" | adds owner-controlled exception clause ("except where the owner explicitly accepts a migration, compatibility break, or governed remediation") (§B P19) | accept (preserves owner-controlled escape valve) |
+
+### REPHRASE deltas (same content, different words)
+
+| ID | Owner phrasing | Codex phrasing | Risk |
+|---|---|---|---|
+| `OM-DELTA-0022` | "Requirement specifications, both functional and non-functional, are recorded in the MemBase append-only database" | Adds "Derived semantic indexes may assist retrieval, but they are not authoritative stores" (§B P12) — clarification, treated as REPHRASE because it disambiguates the same concept | None |
+| `OM-DELTA-0037` | "to the latest release" | "of existing GT-KB installations" (§B P19) | None |
+
+### Summary
+
+- **High-risk deltas requiring owner review:** 4 (OM-DELTA-0001, 0004, 0007, 0032).
+- **Medium-risk deltas requiring owner review:** 1 (OM-DELTA-0003 — application/project terminology choice).
+- **Low-risk deltas (Codex encodes existing GT-KB governance):** 32.
+
+Slice 1+ scope decision (per the GO'd proposal §3.4 thresholds) should consider that the owner-vs-Codex revision is more interpretive than purely refactoring: ~14% of deltas (5 of 37) are substantive enough that the canonical artifact decision should not silently adopt Codex's framing. The other ~86% are reasonable encodings of existing governance.
 
 ---
 
