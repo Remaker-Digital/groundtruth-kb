@@ -5,17 +5,23 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: smart-poller-kind-aware-routing-2026-04-30
+NEW: bridge/smart-poller-kind-aware-routing-2026-04-30-001.md
+
 Document: gtkb-decision-tracker-block-prose-ask-2026-04-29
+GO: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-004.md
 REVISED: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-003.md
 NO-GO: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-002.md
 NEW: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-001.md
 
 Document: gtkb-candidate-spec-intake-six-statements-2026-04-29
+GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-004.md
 REVISED: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-003.md
 NO-GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-002.md
 NEW: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-001.md
 
 Document: gtkb-platform-spec-coverage-verified-runner-2026-04-29
+GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-004.md
 REVISED: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-003.md
 NO-GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-002.md
 NEW: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-001.md
