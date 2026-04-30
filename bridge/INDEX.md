@@ -6,18 +6,22 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-decision-tracker-block-prose-ask-2026-04-29
+REVISED: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-003.md
 NO-GO: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-002.md
 NEW: bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-001.md
 
 Document: gtkb-candidate-spec-intake-six-statements-2026-04-29
+REVISED: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-003.md
 NO-GO: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-002.md
 NEW: bridge/gtkb-candidate-spec-intake-six-statements-2026-04-29-001.md
 
 Document: gtkb-platform-spec-coverage-verified-runner-2026-04-29
+REVISED: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-003.md
 NO-GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-002.md
 NEW: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-001.md
 
 Document: gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29
+VERIFIED: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-010.md
 REVISED: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-009.md
 NO-GO: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-008.md
 NEW: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-007.md
