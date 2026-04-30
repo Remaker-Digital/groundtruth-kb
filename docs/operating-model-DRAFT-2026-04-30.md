@@ -1,0 +1,97 @@
+# OPERATING MODEL — DRAFT (NOT CANONICAL)
+
+**Status:** DRAFT.
+
+**Authority:** none. This file is NOT cited by any rule, hook, test, or canonical governance artifact. It exists only as a tracked draft to inform the `GTKB-OPERATING-MODEL-ALIGNMENT-REMEDIATION` program (Slice 0 deliverable §3.1 per `bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md` REVISED-1 GO at `-004`).
+
+**Promotion path:** an owner-approved Slice 1 proposal designates a canonical operating-model artifact and authority level (potentially at `.claude/rules/operating-model.md` or a managed-template path). At promotion time, this draft is either elevated, modified, or retired based on the Slice 0 inventory findings and any owner direction given in the Slice 1 deliberation.
+
+**Slice 0 status (2026-04-30 S324):**
+- §A below contains the owner's verbatim operating-model text. This is the canonical Slice 0 baseline; drift findings in the Slice 0 inventory measure against §A.
+- §B below contains Codex Loyal Opposition's revised text from `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/OPERATING-MODEL-ALIGNMENT-REMEDIATION-ADVISORY-2026-04-30.md` §"Revised Operating-Model Text". §B is **annotated proposed clarifications**, NOT canonical.
+- §C below contains the start of the §3.5 owner-vs-Codex revision-delta annotations (one initial NARROW delta spot-checked at proposal time; full delta inventory is a Slice 0 deliverable in progress).
+
+---
+
+## §A. Owner verbatim text (canonical Slice 0 baseline)
+
+Captured from S324 owner conversation (2026-04-30). Verbatim quote; no edits.
+
+> "Application development progresses when the user and the Prime Builder agent select work items, which are usually within projects, from the backlog. The backlog is a roughly chronological stack of highest-to-lowest priority engineering work. Projects often contain multiple distinct work items which have interdependencies and whose implementation requires specific knowledge in context, which affects their place in the order. Some projects and their respective work items are interleaved with other projects which are progressing in parallel, and some work items are stand-alone, high priority or urgent work items. Reordering of the backlog is interactive and typically happens when the application has changed substantially and prior work items and their respective priorities need reassessment before the next batch of prioritized work begins. Projects are a response to the introduction of new requirement specifications or changes to existing related specifications. The identification of requirements in user chat is guided by the Prime Builder agent, and the formalization of new requirements specifications is performed via a mechanically enforced dialog with the owner in the interactive session. Formulation of new projects is interactive with the owner, beginning with establishment of a core set of related requirements for that project. Once the requirements specifications which articulate the objective of the project have been identified or created, the owner and the Prime Builder agent agree on the definition and relative priority of work items within the scope of that project. In some cases, work items are dependent on completion of work items logically within other projects, leading to interleaving of projects in the backlog. Prime Builder reviews and investigates the implementation options for meeting the project's requirements and creates a detailed implementation proposal. The implementation proposal is conveyed to the Loyal Opposition agent for review. The Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal and questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. The Loyal Opposition agent responds to the Prime Builder agent with the annotated Implementation Proposal, either affirming that it is ready to implement (GO) or requires another revision and resubmission (NO-GO). When the Prime Builder receives a GO to implement a proposal, it proceeds as specified, first by creating tests which will show that the implementation meets the specification, then by implementing the specified work, and finally creates an Implementation Report which is conveyed to the Loyal Opposition agent for verification. If Prime Builder receives a NO-GO, it makes changes and re-submits to Loyal Opposition. The loyal opposition investigates the Implementation Report conveyed by the Prime Builder, evaluates the tests which were created, and provides the Prime Builder with a report detailing errors or omissions in the tests and the implementation, if any. When Prime Builder receives a response to an Implementation Report, it addresses the issues in the report and re-submits an updated Implementation Report to the Loyal Opposition and the cycle continues until the Loyal Opposition is satisfied and records the final Implementation Report as VERIFIED. Topical chat exchanges between Prime Builder and the owner, Implementation Reports and Proposals, advisory reports, Prime Builder insights, and Loyal Opposition insights are recorded in the Deliberation Archive. The Deliberation Archive is used to disambiguate owner expectations and requirement specification wording, phrasing and intent. Requirement specifications, both functional and non-functional, are recorded in the MemBase append-only database. MemBase also contains details of the tests which are used to confirm that the implementation of each specification is correct and has not inadvertently been changed because of ongoing development work. The system is strongly biased toward artifact creation and maintenance, implementation modularity, and extensive version control over interfaces and objects. The progress of application implementation is tracked using comprehensive system contents inventory records, which include version information, test results, reports on requirements specifications, references to implementation reports and originating deliberations. The system provides commands which may be entered by the owner during interactive sessions which disambiguate owner decisions and directives. The system also provides a Command Line Interface which allows the owner to manage aspects of the GroundTruth-KB system, including assignment of Loyal Opposition and Prime Builder roles, configuration management, health checks and operating state reports. The system includes automations which integrate with external 3rd party services which provide testing, publication and deployment capabilities. GroundTruth-KB includes a graphical dashboard with an underlying database that provides the owner with centralized access to information about the state of the project, including display of current configuration, operating state, the status of 3rd party services, computed project KPI, reports and interactive access to MemBase, test results, and GT-KB inventory, including directory structure and contents, artifact version numbers, and details of historical releases. GT-KB includes capabilities which assist the user in executing application lifecycle operations, such as deployment, upgrades, and testing/ GT-KB also includes capabilities which harvest information about the environment and state of the application, such as log files, reports and test results, for use during remediation, root cause diagnosis, triage and correction of applications which experience outages or defects while in service. GT-KB is distributed as an installable bundle which may be used to create fresh installs or to upgrade existing GT-KB installs to the latest release. Upgrafing GT-KB does not force existing applications to make changes in order to continue operating in service."
+
+This text is also captured in the bridge audit trail at `bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md` §10.
+
+DA archival as `DELIB-S324-OPERATING-MODEL-OWNER-VERBATIM` is pending session-wrap or earlier follow-on bridge requirement.
+
+---
+
+## §B. Codex proposed revision (annotated; NOT canonical)
+
+Captured from `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/OPERATING-MODEL-ALIGNMENT-REMEDIATION-ADVISORY-2026-04-30.md` §"Revised Operating-Model Text". Verbatim quote; no edits.
+
+> GT-KB (GroundTruth-KB) is an Internal Developer Platform for AI-assisted software development. It exists to reduce the owner's routine role to specifications, clarifications, and decisions, while the platform and AI agents preserve durable artifacts, create tests, implement approved work, verify outcomes, and maintain release-readiness evidence.
+>
+> In GT-KB terminology, an **application** is the lifecycle object managed by GT-KB. A **project** is scoped implementation work inside the active application or GT-KB platform, such as a subsystem, feature area, remediation effort, governance improvement, or cross-cutting change. A project is not the hosted application itself. In the current work, GT-KB is both the platform and the active application, but the same application/project distinction applies.
+>
+> Application development progresses through backlog selection. The backlog is an ordered set of active and candidate work, shaped by priority, dependencies, readiness, owner decisions, and current system state. Chronology is preserved in the audit trail, but backlog order is not merely chronological. Projects often contain multiple work items whose dependencies and required context affect execution order. Work items from different projects may be interleaved when dependencies, urgency, or readiness require it. Reordering is interactive and typically occurs when substantial implementation progress, new requirements, defects, or changed owner priorities make the previous ordering stale.
+>
+> Projects normally arise from new requirements, changed requirements, defects, governance needs, architectural decisions, operational findings, or discovered drift. Project formulation is interactive with the owner. It begins by identifying the related requirements and decisions that define the objective. The owner and Prime Builder then identify work items within that scope and place them in the backlog according to priority, dependency, and readiness.
+>
+> Requirement identification in owner chat is assisted by Prime Builder and by GT-KB's artifact-oriented governance. Candidate requirements must not silently become formal requirements. Formal specification creation or update requires an owner-visible confirmation path and the applicable approval evidence. Functional requirements, non-functional requirements, architecture decisions, design constraints, protected behaviors, and governance rules are specification surfaces when they constrain implementation or verification.
+>
+> Prime Builder investigates implementation options for approved or selected work and prepares an implementation proposal. The proposal must cite the governing specifications, decisions, constraints, and prior deliberations that shape the work. It must also identify the tests or verification procedures that will show whether the implementation satisfies those specifications.
+>
+> The implementation proposal is conveyed to Loyal Opposition through the file bridge. Loyal Opposition investigates, critiques, and evaluates the proposal. It checks specification linkage, ambiguity, omitted constraints, test adequacy, operational risk, and consistency with owner intent. Loyal Opposition does not change owner intent. It identifies ambiguity or defects and requests clarification, correction, or revision when needed.
+>
+> Loyal Opposition responds with a numbered bridge verdict. `GO` means the proposal is ready for Prime Builder implementation within the approved scope. `NO-GO` means the proposal requires revision before implementation. If Prime Builder receives `NO-GO`, it revises and resubmits. If Prime Builder receives `GO`, it proceeds according to the approved proposal.
+>
+> Implementation begins with test or verification creation where the approved proposal requires it. Tests must be derived from the linked specifications and must be capable of showing whether the implementation satisfies the requirements. Prime Builder then implements the work and files an implementation report through the bridge. The report must carry forward the specification links, describe the implemented changes, identify the tests run, and report observed results.
+>
+> Loyal Opposition reviews the implementation report, inspects the relevant code, tests, artifacts, and evidence, and responds with findings. If errors, omissions, inadequate tests, or implementation gaps remain, Loyal Opposition issues `NO-GO` and Prime Builder corrects and resubmits. The cycle continues until Loyal Opposition can record `VERIFIED`. `VERIFIED` is the dated evidence that the implementation has been verified; it is not a mere assertion that a specification exists or has been claimed.
+>
+> Topical owner exchanges, implementation proposals, implementation reports, advisory reports, Prime Builder insights, Loyal Opposition insights, decisions, trade-offs, and rationale should be preserved in the Deliberation Archive when they cross the capture threshold from brainstorming into requirements, decisions, plans, risks, procedures, review findings, or accepted future work. The Deliberation Archive is used to disambiguate owner expectations, specification wording, phrasing, and intent.
+>
+> MemBase is the authoritative append-only/versioned knowledge database for governed records such as specifications, tests, work items, procedures, documents, environment configuration, test coverage, and backlog snapshots. Derived semantic indexes may assist retrieval, but they are not authoritative stores. MemBase records must distinguish current state from historical versions and must avoid fields that encode misleading lifecycle concepts.
+>
+> GT-KB is strongly biased toward durable artifacts, traceability, modular implementation, versioned interfaces, automated checks, and release evidence. It should maintain inventories and reports that connect requirements, deliberations, work items, implementation reports, tests, configuration, artifact versions, releases, and operating state. Where current implementation does not yet provide that coverage, artifacts should state the gap plainly rather than implying the capability is complete.
+>
+> The owner may enter interactive commands that clarify decisions, directives, active workspace, role assignment, project focus, or operating state. GT-KB also provides CLI surfaces for platform lifecycle operations such as project initialization, upgrade, health checks, configuration inspection, role-support surfaces, and operating-state reports.
+>
+> GT-KB may integrate with third-party services for testing, publication, deployment, observability, and release evidence. Those integrations should be governed as platform capabilities with explicit configuration, health checks, evidence capture, and failure modes.
+>
+> GT-KB includes dashboard and reporting surfaces that should give the owner centralized visibility into the state of the active application and platform: current configuration, operating state, bridge queue, release blockers, requirements and test status, implementation evidence, inventory, historical release data, and relevant KPIs. Claims about dashboard capabilities must distinguish implemented surfaces from intended surfaces.
+>
+> GT-KB should assist with application lifecycle operations such as testing, deployment, upgrades, rollback, release readiness, remediation, root-cause diagnosis, and triage. It should harvest relevant environment and application state, such as logs, reports, test results, release evidence, and operational artifacts, when doing so improves diagnosis or reduces owner burden.
+>
+> GT-KB is distributed as an installable and upgradeable platform bundle. It should support fresh installs and upgrades of existing GT-KB installations. Upgrading GT-KB should preserve application lifecycle independence: an upgrade to the platform should not force the active application to change merely to continue operating, except where the owner explicitly accepts a migration, compatibility break, or governed remediation.
+
+---
+
+## §C. Owner-vs-Codex revision-delta annotations (in progress; Slice 0 §3.5 deliverable)
+
+This section will receive complete delta annotations as part of Slice 0 implementation. As of 2026-04-30 S324, one initial spot-check NARROW delta has been identified:
+
+### Delta `OM-DELTA-0001` — NARROW
+
+- **delta_type:** NARROW (silent restriction of stated capability/authority).
+- **owner_text** (§A): "The Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal **and questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections**."
+- **codex_text** (§B): "Loyal Opposition does not change owner intent. It identifies ambiguity or defects and requests clarification, correction, or revision when needed."
+- **delta:** Codex's revision drops the explicit owner-stated authority for Loyal Opposition to "question the cited requirements to disambiguate the owner's intent" and replaces it with the narrower "Loyal Opposition does not change owner intent." The owner's text grants LO active-investigation authority over requirements; Codex's revision restricts LO to reactive defect-flagging.
+- **owner_action_recommended:** revisit-in-slice-1 (this is a substantive authority question; the owner should explicitly choose between the two framings before any canonical artifact designates LO's authority over requirement disambiguation).
+- **risk_if_accepted_silently:** Codex's narrower framing would restrict LO from challenging the framing of owner-stated requirements in subsequent reviews, even when those requirements appear ambiguous or internally inconsistent. The owner's broader framing would preserve LO's role as a substantive critic of requirements, not just of implementation.
+
+### Remaining delta annotations (placeholder)
+
+The following delta categories will be enumerated in subsequent Slice 0 implementation:
+
+- **ADD** deltas (Codex introduced clarifications/distinctions/frameworks not in the owner text). Examples to inventory: explicit application/project distinction; "VERIFIED is dated evidence, not a mere assertion"; the implicit P0–P4 severity model framework when read alongside the advisory.
+- **REMOVE** deltas (Codex dropped content present in owner text). Spot-check finds none yet; full inventory pending.
+- **REPHRASE** deltas (same content, different words). Most common; usually low-risk.
+- **NARROW** deltas (additional silent restrictions of stated capability/authority). One identified above (`OM-DELTA-0001`); full inventory pending.
+- **EXPAND** deltas (Codex broadened scope/authority of stated capability/actor). Spot-check: GT-KB lifecycle operations list expanded ("testing, deployment, upgrades, rollback, release readiness, remediation, root-cause diagnosis, and triage"); full review pending whether each addition is consistent with owner intent.
+
+The complete §C will be filed in a follow-up Slice 0 commit per the GO'd proposal `bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md` §3.5.
+
+---
+
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
