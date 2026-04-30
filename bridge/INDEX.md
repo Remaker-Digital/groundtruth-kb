@@ -6,9 +6,11 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-platform-spec-coverage-verified-runner-2026-04-29
+NO-GO: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-002.md
 NEW: bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-001.md
 
 Document: gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29
+REVISED: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-003.md
 NO-GO: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-002.md
 NEW: bridge/gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29-001.md
 
