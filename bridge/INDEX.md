@@ -20,6 +20,7 @@ NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-002.md
 NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-001.md
 
 Document: gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30
+NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-008.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-007.md
 GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-006.md
 REVISED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-005.md
