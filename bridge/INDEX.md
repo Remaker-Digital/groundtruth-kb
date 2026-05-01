@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-016-phase8-wave3-execution
+REVISED: bridge/gtkb-isolation-016-phase8-wave3-execution-003.md
+NO-GO: bridge/gtkb-isolation-016-phase8-wave3-execution-002.md
 NEW: bridge/gtkb-isolation-016-phase8-wave3-execution-001.md
 
 Document: gtkb-phantom-index-cleanup-2026-04-30
