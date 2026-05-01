@@ -10,16 +10,56 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0182
+  asked_at: 2026-05-01T05:16:37.566781Z
+  question: "idge files written. Awaiting owner direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 5905132ffcd99c98
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169/0175/0177. Truncated prose-detector capture. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0184
+  asked_at: 2026-05-01T05:18:32.505373Z
+  question: "idge files written. Awaiting owner direction.\") — auto-detected"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 85257539e70d75d8
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input meta-discussion). Detector caught Claude's own description of DECISION-0182's false-positive class. Same recursive-meta pattern as DECISION-0080/0090/0092/0114/0160. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0186
+  asked_at: 2026-05-01T05:20:20.224132Z
+  question: "idge files written. Awaiting owner direction.\"). Not real owner"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 8891b782903e6515
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input recursive-meta). Same class as DECISION-0184. Detector caught Claude's discussion of the discussion of the false-positive pattern. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0188
+  asked_at: 2026-05-01T05:20:51.597297Z
+  question: "ode mutations made. Awaiting your direction on next move."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: d5ad3acea9790ec0
+  resolved_at: 2026-05-01T05:25:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Truncated prose fragment from a status report. Same class as DECISION-0182. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0177
   asked_at: 2026-05-01T05:04:50.340526Z
   question: "reserved unchanged. Awaiting owner direction on whether to surfa"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: b9252b35f96bac2a
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T05:15:00.000000Z
   resolved_in_session: S324
   answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169/0175. Truncated prose-detector capture from a status report. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0175
   asked_at: 2026-05-01T04:54:11.171778Z
   question: "sory-only feedback. Awaiting owner direction on whether to: - (a"
@@ -2044,6 +2084,46 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: resolved
   question_hash: f370a00999261c2f
   resolved_at: 2026-05-01T05:09:08.761676Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0183
+  asked_at: 2026-05-01T05:16:58.025039Z
+  question: "How should I dispose of the two dispatched plan-level GO entries (gtkb-command-surface-004, gtkb-incident-response-006)?"
+  options:
+    - "Leave as-is (Recommended)"
+    - "File closure markers"
+    - "Backlog: smart-poller plan-GO filter"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2917a72719cf1b7c
+  resolved_at: 2026-05-01T05:16:58.025039Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0185
+  asked_at: 2026-05-01T05:18:52.451156Z
+  question: "How should the two stale umbrella GO bridge threads (gtkb-command-surface-004 and gtkb-incident-response-006) be handled? Both are architecture/plan-level GOs whose downstream slices (CS-1.5, IR-0.1) are already VERIFIED."
+  options:
+    - "File close-out post-impls"
+    - "Leave both open"
+    - "Add poller filter proposal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b7e57e373b7fb448
+  resolved_at: 2026-05-01T05:18:52.451156Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0187
+  asked_at: 2026-05-01T05:20:51.597297Z
+  question: "Both dispatched GOs are stale (umbrella plans whose sub-threads already VERIFIED). What should Prime Builder do next?"
+  options:
+    - "Address live NO-GO"
+    - "File CS-2 sub-proposal"
+    - "Triage DECISION-0182/0184"
+    - "Stand down + standing backlog"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d7f7cff763870a4c
+  resolved_at: 2026-05-01T05:20:51.597297Z
   answer: "Answer questions?"
   notes: ""
 
