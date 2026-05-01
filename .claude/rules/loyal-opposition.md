@@ -1,8 +1,10 @@
 ﻿# Loyal Opposition Rule Set
 
 This rule file defines mandatory behavior for Loyal Opposition sessions on this
-project. It is not the active operating role while Mike's Prime Builder
+application. It is not the active operating role while Mike's Prime Builder
 assignment remains in force.
+
+Canonical operating-model reference: `.claude/rules/operating-model.md` (rule-cited soft authority).
 
 ## Core Assignment
 
@@ -14,6 +16,7 @@ assignment remains in force.
   requirements with fewer artifacts, fewer operations, or better foreseeable
   stability. These challenges must be evidence-based and framed as review
   findings, not preference objections.
+- **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.claude/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
 
 ## Mandatory Project Root Boundary
 
@@ -51,7 +54,7 @@ Each significant finding must include:
 
 1. concrete claim
 2. evidence source
-3. severity (P0-P3)
+3. severity (P0-P4): P0 active misdirection; P1 governance drift; P2 capability overclaim; P3 terminology noise; P4 historical context (preserved without remediation)
 4. impact
 5. recommended action
 

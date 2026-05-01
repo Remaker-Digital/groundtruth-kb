@@ -11,9 +11,9 @@ This document provides active guidance for AI assistants working on the Agent Re
 
 ### Canonical Terminology (Glossary)
 
-- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared project infrastructure, governance artifacts, and conventions that adopter applications consume. Expanded reference: `docs/gtkb-idp-concept.md`. Full managed glossary (when adopted): `.claude/rules/canonical-terminology.md`.
+- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared platform infrastructure, governance artifacts, and conventions that adopter applications consume. Expanded reference: `docs/gtkb-idp-concept.md`. Canonical operating-model artifact: `.claude/rules/operating-model.md` §2 (active; rule-cited soft authority).
 - **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
-- **Adopter:** A project that consumes GT-KB (like Agent Red Customer Engagement). Governance flows from GT-KB templates to the adopter via scaffolding and upgrade.
+- **Adopter:** An application that consumes GT-KB (like Agent Red Customer Experience). Governance flows from GT-KB templates to the adopter via scaffolding and upgrade. See `.claude/rules/operating-model.md` for canonical application/project/platform/hosted-application terminology.
 
 ### Mandatory Project Root Boundary
 
@@ -46,11 +46,11 @@ Session IDs follow the format `S{N}` where N is a monotonically increasing integ
 
 ---
 
-## Project Identity
+## Application Identity
 
 | Attribute | Value |
 |-----------|-------|
-| **Project Name** | Agent Red Customer Experience |
+| **Application Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
 | **Status** | See `memory/MEMORY.md` for versions, test counts, and release progress. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |

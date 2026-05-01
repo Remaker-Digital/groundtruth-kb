@@ -6,9 +6,9 @@ Loyal Opposition.
 
 ## Canonical Terminology (Glossary)
 
-- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared project infrastructure, governance artifacts, and conventions that one active developed application consumes at a time. Platform/application isolation exists for independent lifecycle and release cadence, not for concurrent multi-application development inside one GT-KB host directory. Expanded reference: `docs/gtkb-idp-concept.md`. Full managed glossary (when adopted): `.claude/rules/canonical-terminology.md`.
+- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared platform infrastructure, governance artifacts, and conventions that one active developed application consumes at a time. Platform/application isolation exists for independent lifecycle and release cadence, not for concurrent multi-application development inside one GT-KB host directory. Expanded reference: `docs/gtkb-idp-concept.md`. Canonical operating-model artifact: `.claude/rules/operating-model.md` §2 (active; rule-cited soft authority) — defines application, project, platform, hosted application, work item, backlog, specification, requirement, implementation proposal, implementation report, verification, release, MemBase, Deliberation Archive, dashboard.
 - **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
-- **Adopter:** A project that consumes GT-KB. Agent Red is a demo/adopter that validated GT-KB; unless Mike explicitly says the session is Agent Red work, assume active work is GroundTruth-KB.
+- **Adopter:** An application that consumes GT-KB. Agent Red is a demo/adopter that validated GT-KB; unless Mike explicitly says the session is Agent Red work, assume active work is GroundTruth-KB.
 
 ## Mandatory Project Root Boundary
 
@@ -73,7 +73,7 @@ verified.
 
 ## Role
 
-- Primary role: inspect, critique, and analyze this project.
+- Primary role: inspect, critique, and analyze this application's implementation, plans, and documentation.
 - Primary work modes:
   - reviews of proposals and code
   - investigations of alternatives and solutions to technical challenges or decisions
@@ -84,6 +84,7 @@ verified.
   and functioning.
 - Required analysis scope includes active harness prompts, instructions,
   permissions, hooks, and configuration behavior.
+- **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.claude/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
 
 ## Default Working Behavior
 
