@@ -10,6 +10,16 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0189
+  asked_at: 2026-05-01T05:28:09.181538Z
+  question: "s its own session.  Want me to begin #1 (dashboard-link parent close-out) now, or hold for explicit direction?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 3aa6e3014809c813
+  resolved_at: 2026-05-01T05:35:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (offering_or_choice). The same prose ask was formalized via AskUserQuestion in the same turn; detector caught the prose form anyway. Owner answered \"Yes, begin #1 now\" via the structured dialog. Not a missed decision. Same false-positive class as DECISION-0164 etc. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0182
   asked_at: 2026-05-01T05:16:37.566781Z
   question: "idge files written. Awaiting owner direction."
@@ -2125,6 +2135,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: d7f7cff763870a4c
   resolved_at: 2026-05-01T05:20:51.597297Z
   answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0190
+  asked_at: 2026-05-01T05:31:48.388130Z
+  question: "Should I begin #1 (dashboard-link parent close-out) now?"
+  options:
+    - "Yes, begin #1 now"
+    - "Hold; pick a different item"
+    - "Hold; await Codex on S0"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 18f78c903f9d56e5
+  resolved_at: 2026-05-01T05:31:48.388130Z
+  answer: "User has answered your questions: \"Should I begin #1 (dashboard-link parent close-out) now?\"=\"Yes, begin #1 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0191
+  asked_at: 2026-05-01T05:31:48.388130Z
+  question: "Should I author S0 REVISED-1 -003 now to address the two blocking findings?"
+  options:
+    - "Yes, author REVISED-1 now"
+    - "Hold; wait for dashboard-link VERIFIED first"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f56c27bc14d6ff1a
+  resolved_at: 2026-05-01T05:31:48.388130Z
+  answer: "User has answered your questions: \"Should I author S0 REVISED-1 -003 now to address the two blocking findings?\"=\"Hold; wait for dashboard-link VERIFIED first\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
