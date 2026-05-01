@@ -16,6 +16,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S324
   answer: "S324 triage: false positive (awaiting_input). Persistently re-flagged across multiple turns by auto-tracker (resolved at 256daf8b but the hook re-detected from new prose mentioning the decision id). Same class as 12 other false-positives this session."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0199
+  asked_at: 2026-05-01T14:04:33.278107Z
+  question: "the auto-tracker — awaiting owner direction. No action from me"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 47439deba4564083
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0201
+  asked_at: 2026-05-01T14:04:56.476808Z
+  question: "Acknowledged — awaiting your direction. No bridge files wr"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 98ec195ea72760c1
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -2239,6 +2253,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: b6c6b25740d3ee55
   resolved_at: 2026-05-01T06:01:24.052446Z
   answer: "User has answered your questions: \"The wrap-scan exit code 2 says mutating wrap shouldn't proceed without explicit owner override. All 22 errors are pre-existing prior-session debt, not S324-caused. How do you want to handle this?\"=\"Stop wrap; address phantom-INDEX errors first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0200
+  asked_at: 2026-05-01T14:04:56.476808Z
+  question: "Both bridge GOs (gtkb-command-surface-004, gtkb-incident-response-006) are plan-level only and do not authorize implementation. Which next step should Prime advance?"
+  options:
+    - "File CS-1.5 NEW proposal (Recommended)"
+    - "File CS-1 NEW proposal"
+    - "Verify ADR-supersession landing"
+    - "Defer / different priority"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e4b091b4241025bd
+  resolved_at: 2026-05-01T14:04:56.476808Z
+  answer: "Answer questions?"
   notes: ""
 
 ## History
