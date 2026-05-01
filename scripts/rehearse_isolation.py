@@ -46,6 +46,7 @@ DISPATCH_TABLE: tuple[tuple[str, str, str], ...] = (
     ("rewrite", "rehearse._path_rewrite", "run"),
     ("ci", "rehearse._ci_inventory", "run"),
     ("membase", "rehearse._membase_export", "run"),
+    ("db-filter-dryrun", "rehearse._db_filter_dryrun", "run"),
     ("chromadb", "rehearse._chromadb_regen", "run"),
     ("dashboard", "rehearse._dashboard_regen", "run"),
     ("bridge-split", "rehearse._bridge_split", "run"),
@@ -54,6 +55,24 @@ DISPATCH_TABLE: tuple[tuple[str, str, str], ...] = (
     ("production", "rehearse._production_effects", "run"),
     ("rollback", "rehearse._rollback", "run"),
 )
+
+# Phase-to-wave mapping per bridge/gtkb-isolation-016-phase8-wave3-execution-007.md.
+# Phases that consume Wave 3 manifest fields require wave=3 manifest validation.
+_WAVE_3_PHASES: frozenset[str] = frozenset({"db-filter-dryrun"})
+
+
+def _wave_for_phase(phase: str) -> int:
+    """Return the manifest wave required for a given --phase value.
+
+    --phase all is treated as wave=3 because all runs every lane including
+    Wave 3 phases. --phase verify and individual Wave 2 phases stay at wave=2.
+    """
+    if phase in _WAVE_3_PHASES:
+        return 3
+    if phase == "all":
+        return 3 if _WAVE_3_PHASES else 2
+    return 2
+
 
 PHASE_CHOICES: tuple[str, ...] = tuple(p[0] for p in DISPATCH_TABLE) + ("verify", "all")
 
@@ -238,7 +257,8 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_REFUSE
 
     try:
-        manifest = load_manifest(args.manifest, wave=2)
+        wave = _wave_for_phase(args.phase)
+        manifest = load_manifest(args.manifest, wave=wave)
     except ManifestError as exc:
         print(f"rehearse_isolation: manifest error — {exc}", file=sys.stderr)
         return EXIT_USAGE

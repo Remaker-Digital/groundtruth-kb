@@ -153,9 +153,11 @@ def test_hash_set_walk_skips_ignored_top_level(tmp_path: Path) -> None:
 # ============================================================================
 
 
-def test_dispatch_table_has_eleven_lanes() -> None:
-    """T-LANE-COVERAGE: 11 sub-script lanes per `-013` §2.2."""
-    assert len(driver.DISPATCH_TABLE) == 11
+def test_dispatch_table_has_twelve_lanes() -> None:
+    """T-LANE-COVERAGE: 11 Wave 2 sub-script lanes per `-013` §2.2 + 1 Wave 3 lane
+    (db-filter-dryrun) per bridge/gtkb-isolation-016-phase8-wave3-execution-007.md.
+    """
+    assert len(driver.DISPATCH_TABLE) == 12
 
 
 def test_dispatch_table_all_lanes_unique() -> None:
@@ -170,6 +172,7 @@ def test_dispatch_table_contains_required_lanes() -> None:
         "rewrite",
         "ci",
         "membase",
+        "db-filter-dryrun",
         "chromadb",
         "dashboard",
         "bridge-split",
@@ -249,8 +252,13 @@ def _slice3_skip_if_no_production_manifest():
 # ----- F1: --execute opt-in semantics -----
 
 
-def test_main_loads_manifest_at_wave2(monkeypatch: pytest.MonkeyPatch) -> None:
-    """main() calls load_manifest with wave=2."""
+def test_main_loads_manifest_at_wave2_for_verify_phase(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Phase-to-wave mapping: --phase verify still loads at wave=2 (Wave 2 phases unchanged).
+
+    Per bridge/gtkb-isolation-016-phase8-wave3-execution-007.md F2 fix:
+    only db-filter-dryrun and --phase all promote to wave=3; everything else
+    stays at wave=2 to preserve Wave 2 backward compatibility.
+    """
     _slice3_skip_if_no_production_manifest()
     captured: dict = {}
 
@@ -268,6 +276,63 @@ def test_main_loads_manifest_at_wave2(monkeypatch: pytest.MonkeyPatch) -> None:
     rc = _driver.main(["--phase", "verify"])
     assert rc == _driver.EXIT_OK
     assert captured["wave"] == 2
+
+
+# ----- T18: phase-to-wave mapping for db-filter-dryrun -----
+
+
+def test_main_loads_manifest_at_wave_3_when_db_filter_dryrun_phase_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T18 (per -005 F2 fix): --phase db-filter-dryrun selects wave=3."""
+    _slice3_skip_if_no_production_manifest()
+    captured: dict = {}
+
+    def _spy_load(path, *, wave=1, is_runtime_manifest=False):
+        captured["wave"] = wave
+        return {
+            "target_root": str((LEGACY_ROOT / "applications" / "Agent_Red").as_posix()),
+            "legacy_root": str(LEGACY_ROOT.as_posix()),
+            "applications_namespace": str((LEGACY_ROOT / "applications").as_posix()),
+            "output_dir": "C:/temp/agent-red-rehearsal",
+        }
+
+    monkeypatch.setattr(_driver, "load_manifest", _spy_load)
+    _driver.main(["--phase", "db-filter-dryrun"])
+    assert captured["wave"] == 3, "db-filter-dryrun must trigger wave=3 manifest validation"
+
+
+# ----- T19: CLI rejects unresolved db_reconciliation_strategy -----
+
+
+def test_main_rejects_unresolved_db_reconciliation_strategy_via_cli_when_db_filter_dryrun_requested(
+    tmp_path: Path,
+) -> None:
+    """T19 (per -005 F2 fix): CLI must enforce M1/M6 end-to-end at wave=3."""
+    # Build a manifest with the placeholder still in place.
+    manifest_path = tmp_path / "manifest.toml"
+    manifest_path.write_text(
+        "\n".join(
+            [
+                f'target_root = "{(LEGACY_ROOT / "applications" / "Agent_Red").as_posix()}"',
+                f'legacy_root = "{LEGACY_ROOT.as_posix()}"',
+                f'applications_namespace = "{(LEGACY_ROOT / "applications").as_posix()}"',
+                'output_dir = "C:/temp/agent-red-rehearsal-test"',
+                'git_strategy = "clone_with_history_filter"',
+                'git_filter_command_template = "git filter-repo --path '
+                "<agent-red-paths-from-_path_rewrite> --path-rename "
+                '<each-source>:applications/Agent_Red/<each-target>"',
+                'phase_1_authority_matrix_path = "independent-progress-assessments/'
+                'CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"',
+                'db_reconciliation_strategy = "OWNER_DECISION_REQUIRED"',
+                'unclassified_disposition = "leave_behind_with_warning"',
+                "[surface_treatments]",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    rc = _driver.main(["--phase", "db-filter-dryrun", "--manifest", str(manifest_path)])
+    assert rc == _driver.EXIT_USAGE, "CLI must reject unresolved db_reconciliation_strategy at wave=3"
 
 
 def test_execute_flag_enables_real_run() -> None:

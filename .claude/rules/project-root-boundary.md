@@ -32,3 +32,22 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 - Any migration of application code must move toward
   `E:\GT-KB\applications\<application-name>\`; new application files must not be
   added outside `E:\GT-KB\applications\`.
+
+## Sandbox Output Exception
+
+GT-KB rehearsal-class operations may emit runtime output to a path outside `E:\GT-KB` when ALL of the following hold:
+
+1. The path is declared in an owner-approved manifest field (currently `output_dir` in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/rehearsal/manifest.toml`).
+2. The path matches a sandbox-allowlist pattern enforced by Rule M2 in `scripts/rehearse/_common.py`. Current allowlist (per `_OUTPUT_DIR_ALLOWLIST_DESC` source constant): "C:/temp/agent-red-rehearsal* or /tmp/agent-red-rehearsal* (extend _OUTPUT_DIR_ALLOWLIST_PATTERNS for additional sandbox paths)".
+3. The output is regenerable evidence (preview artifacts, classification manifests, dry-run DBs), not canonical project state.
+4. The output is documented in the bridge proposal that authorizes the operation, and the bridge passes Codex review with the path explicit.
+
+Source: `DELIB-S325-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` and the manifest §3.3 owner decision recorded at S311 (commit `12538b97` context). Rationale: rehearsal output must avoid cloud-sync corruption (Google Drive currently syncs `E:`); the in-root `.driveignore` mechanism per commit `12538b97` adds a per-path enumeration burden that does not scale with rehearsal cardinality.
+
+Outputs covered by this exception remain outside the scope of GT-KB canonical state, audit history, release evidence, regression tests (except as preview-evidence inputs), and dependency closure.
+
+Owner approval is per-manifest, not per-run; adding new sandbox paths requires:
+
+1. A code change to `_OUTPUT_DIR_ALLOWLIST_PATTERNS` in `scripts/rehearse/_common.py` (which extends the executable allowlist).
+2. An owner-approved manifest update through the bridge protocol (which exercises the new pattern under owner review).
+3. Synchronized update of this rule's allowlist citation to keep rule text and source code aligned (verified by tests/scripts/test_rehearse_isolation.py asserting `_OUTPUT_DIR_ALLOWLIST_DESC` equals the rule-text quotation).

@@ -31,9 +31,21 @@ output_dir = "C:/temp/agent-red-rehearsal"
 git_strategy = "clone_with_history_filter"
 git_filter_command_template = "git filter-repo --path <agent-red-paths-from-_path_rewrite> --path-rename <each-source>:applications/Agent_Red/<each-target>"
 
-# §3.6 OWNER DECISION REQUIRED — Concurrent-session DB reconciliation.
-# Surfaces at Wave 3 verification matrix boundary; not blocking Wave 2.
-db_reconciliation_strategy = "OWNER_DECISION_REQUIRED"
+# §3.6 owner decision 2026-05-01 (S325): manifest_driven_filter strategy.
+# Per DELIB-S325-DB-RECONCILIATION-STRATEGY-CHOICE and
+# bridge/gtkb-isolation-016-phase8-wave3-execution-007.md (REVISED-3, GO -008).
+# Selected over four alternatives (replay log, read-only deferral,
+# service-backed split, snapshot+freeze without filter); reuses Slice 8's
+# row-level partition manifest and the new _db_filter_dryrun.py consumer.
+db_reconciliation_strategy = "manifest_driven_filter"
+
+# §3.7 owner decision 2026-05-01 (S325): leave_behind_with_warning default.
+# Per DELIB-S325-UNCLASSIFIED-DISPOSITION-CHOICE.
+# Rows the Slice 8 classifier cannot disambiguate are emitted as warnings
+# and excluded from the filtered preview DB. ISOLATION-018 cutover reads
+# the warning list as the manual-reclassification queue. Preserves
+# Slice 8 Constraint 4 (silent default to adopter is rejected).
+unclassified_disposition = "leave_behind_with_warning"
 
 # Authority matrix path corrected per Codex
 # bridge/gtkb-isolation-016-phase8-wave2-implementation-002.md NO-GO:

@@ -38,6 +38,23 @@ _OUTPUT_DIR_ALLOWLIST_DESC: str = (
 
 _VALID_GIT_STRATEGIES: frozenset[str] = frozenset({"fresh_repo", "clone_with_history_filter", "clean_worktree"})
 
+# Wave 3 validation constants per
+# bridge/gtkb-isolation-016-phase8-wave3-execution-007.md (REVISED-3, GO -008).
+# Encodes DELIB-S325-DB-RECONCILIATION-STRATEGY-CHOICE and
+# DELIB-S325-UNCLASSIFIED-DISPOSITION-CHOICE.
+_VALID_DB_RECONCILIATION_STRATEGIES: frozenset[str] = frozenset(
+    {
+        "manifest_driven_filter",
+    }
+)
+_VALID_UNCLASSIFIED_DISPOSITIONS: frozenset[str] = frozenset(
+    {
+        "leave_behind_with_warning",
+        "carry_forward_to_adopter",
+        "manual_review_gate",
+    }
+)
+
 _CLONE_FILTER_REQUIRED_PLACEHOLDERS: tuple[str, ...] = (
     "<agent-red-paths-from-_path_rewrite>",
     "<each-source>",
@@ -335,6 +352,23 @@ def load_manifest(
                     "M1: manifest.db_reconciliation_strategy = "
                     "'OWNER_DECISION_REQUIRED' blocks Wave 3; resolve §3.6 "
                     "owner decision before re-running."
+                )
+
+            # Rule M6 — db_reconciliation_strategy and unclassified_disposition
+            # positive validation. Rejects any value not in the known set, not
+            # just the OWNER_DECISION_REQUIRED placeholder. Per
+            # bridge/gtkb-isolation-016-phase8-wave3-execution-007.md.
+            strategy = data.get("db_reconciliation_strategy")
+            if strategy not in _VALID_DB_RECONCILIATION_STRATEGIES:
+                raise ManifestValidationError(
+                    f"M6: manifest.db_reconciliation_strategy = {strategy!r} "
+                    f"not in {sorted(_VALID_DB_RECONCILIATION_STRATEGIES)}."
+                )
+            disposition = data.get("unclassified_disposition")
+            if disposition not in _VALID_UNCLASSIFIED_DISPOSITIONS:
+                raise ManifestValidationError(
+                    f"M6: manifest.unclassified_disposition = {disposition!r} "
+                    f"not in {sorted(_VALID_UNCLASSIFIED_DISPOSITIONS)}."
                 )
 
         # Rule M2 — output_dir safety: must not be under LEGACY_ROOT or
