@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: dashboard-link-localhost-correction-2026-04-30
+REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-005.md
+NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-004.md
 REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-003.md
 NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-002.md
 NEW: bridge/dashboard-link-localhost-correction-2026-04-30-001.md

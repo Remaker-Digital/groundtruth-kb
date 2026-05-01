@@ -10,498 +10,506 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0164
+  asked_at: 2026-05-01T00:57:21.983194Z
+  question: "operational state. Want me to wait or do you want to trigger Codex manually?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 750ff2e1bdfd58d8
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-05-01T01:05:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (offering_or_choice). Same class as the 5 false_positive_meta entries from earlier this session. Detector caught Claude's own closing prose at the end of a status report; owner gave direction in the next turn (manual bridge scan + relay of Codex NO-GO -004 findings) which made the prose-ask irrelevant. Resolved inline as part of the same Full triage authorization."
 - id: DECISION-0078
   asked_at: 2026-04-29T18:14:32.418962Z
   question: "rrent latest status awaiting your input."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: cc189cee7a45fc45
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0079
   asked_at: 2026-04-29T18:20:40.875069Z
   question: "rrent latest status awaiting your input\"`). I'll wait for y"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: f225e9dd77617892
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0080
   asked_at: 2026-04-29T18:31:01.168043Z
   question: "ositives detecting \"awaiting your input\" in my own text. Re"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 6339ac11d703eefa
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0081
   asked_at: 2026-04-29T18:38:22.768539Z
   question: "ing-backlog item. **Should I (a) draft the Slice 2 upstream proposal now, (b) wait for your GOV-17 ack on DORA Track 1, or (c) advance whichever standing-backlog item you prioritize?**"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: 3e326649019a3ecb
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0082
   asked_at: 2026-04-29T18:53:30.651276Z
   question: "ion picks them up.  Awaiting owner direction. No further action"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 9fedce014a91ac7f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0083
   asked_at: 2026-04-29T18:56:12.804524Z
   question: "trail is preserved. Awaiting owner direction before filing any n"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 65a128ee76925b61
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0084
   asked_at: 2026-04-29T19:04:22.711734Z
   question: "───────────────`  **Awaiting your direction on next concrete st"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 3e50c72e86229ec4
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0085
   asked_at: 2026-04-29T19:14:14.228092Z
   question: "its on `develop`  **Awaiting your direction on next concrete st"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 280bbb2602c502f8
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0086
   asked_at: 2026-04-29T19:43:59.907389Z
   question: "ven session scope)  Awaiting your direction."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: ec8b749b83ff24db
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0087
   asked_at: 2026-04-29T23:01:28.809266Z
   question: "rectly remain at GO awaiting your direction on the next-step pr"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 785464f15c6de597
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0088
   asked_at: 2026-04-29T23:14:09.337671Z
   question: "uality Slice 2:** - Should I draft the Slice 2 implementation proposal now, or defer? It is substantial d"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: b992e452fdd0e770
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0089
   asked_at: 2026-04-29T23:14:09.337671Z
   question: "their audit trail. Awaiting owner direction."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: c0030a1977bb112f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0090
   asked_at: 2026-04-29T23:14:17.725451Z
   question: "ose anti-patterns (\"awaiting your input\", etc.) from the ow"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 7e898284f06ee356
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0091
   asked_at: 2026-04-29T23:16:55.765092Z
   question: "W following a GO).  Awaiting owner direction on items 1–3."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 78d3b4edf6e529f9
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0092
   asked_at: 2026-04-29T23:16:59.982350Z
   question: "discussion *about* \"awaiting your input\" prose as an instance of \"awaiting your input\" prose. This is the"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 4ba3a6d491d45e1b
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0093
   asked_at: 2026-04-29T23:16:59.982350Z
   question: "lla; high impact).  Want me to (a) recover the NO-GO immediately, (b) draft the spec-lifecycle REVISED-1 addressing F1-F3, or (c) something else?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: c71860b45bd7fb67
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0094
   asked_at: 2026-04-29T23:32:04.175320Z
   question: "— another dimension awaiting owner direction. - Acting now would"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: a495fa4d63b10703
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0095
   asked_at: 2026-04-29T23:36:01.193872Z
   question: "──────────────`  ## Your decision  How would you like me to handle row 7?  1. **Approve the e"
   detected_via: prose:your_decision_q
   status: resolved
   question_hash: afbc90239b6f3e9e
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0096
   asked_at: 2026-04-30T00:22:57.160878Z
   question: "says \"awaits GO\"). Awaiting your approval to apply.  **No bri"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 5fbe22f9484ee92d
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0102
   asked_at: 2026-04-30T02:09:58.752306Z
   question: "written.) - **Or** should I instead defer one or both — for example, the dora `-008` GO is purely a confirmation of an already-GO'd contract, so an alternative is to mark this thread closed without a `-009` report and rely on the existing audit trail?  Please confirm how"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: 4f21ef356e77d170
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0103
   asked_at: 2026-04-30T03:21:24.898715Z
   question: "pending) records: *\"Should I (a) draft the Slice 2 upstream proposal now, (b) wait for your GOV-17 ack on DORA Track 1, or (c) advance whichever standing-backlog item you prioritize?\"*  GOV-17 for DORA-"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: e070f3ddd1dbf13f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0104
   asked_at: 2026-04-30T03:21:24.898715Z
   question: "dit trail intact. - Awaiting owner choice on DECISION-0081 (Track 1 vs. S"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 797760def434b877
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0105
   asked_at: 2026-04-30T03:34:41.657186Z
   question: "e any code change.  Want me to pick one autonomously per the standing pre-approval, or hold for your direction?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 3d6f78992db59303
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0106
   asked_at: 2026-04-30T03:42:05.375231Z
   question: "less you redirect.  Want me to keep watching for Codex's verdict, or address something else while waiting?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: f60d0ca5320c8d75
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0107
   asked_at: 2026-04-30T03:42:57.404940Z
   question: "utations performed. Awaiting your direction on items 1–3."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 08c0f755897d88f8
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0108
   asked_at: 2026-04-30T03:51:48.959041Z
   question: "INDEX.md untouched. Awaiting your direction on (A)/(B)/(C)."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 94aaf77bfee5c038
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0109
   asked_at: 2026-04-30T03:53:05.074876Z
   question: "o audit-trail gaps. Awaiting your direction before opening eith"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 835c10f9897697b5
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0110
   asked_at: 2026-04-30T05:16:57.742153Z
   question: "h in-root routing.\" Want me to draft that Slice 2 proposal now, or defer it (it has no deadline pressure and trades focus against ISOLATION-016 Phase 8 / MEMBASE-EFFECTIVE-USE-RECOVERY Slice A which are higher-priority on row 19 and row 2)?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: f6435363bf07b581
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0111
   asked_at: 2026-04-30T05:57:32.324453Z
   question: "nsumed parent GOs.  Awaiting your direction. No bridge-modifyin"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: e5d975b4cf44a588
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0112
   asked_at: 2026-04-30T05:58:50.516680Z
   question: "ction of their own. Awaiting owner direction on (1) vs (2). No b"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 25ff2dc2960b8fa3
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0113
   asked_at: 2026-04-30T05:59:08.094056Z
   question: "eady-VERIFIED work. Should I treat acknowledgement as sufficient (no new bridge entry, no commit), or do you want a formal Prime ack version filed? 2. **Slice 2 of cod"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: 797ba9a652b4917e
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0114
   asked_at: 2026-04-30T13:20:59.954720Z
   question: "te prose-asks like \"should I do A or B?\" without calling As"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: 8aecd2322bee3154
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0121
   asked_at: 2026-04-30T16:43:51.105853Z
   question: "ge-swimlane.json`.  Want me to take up the candidate-spec-intake NO-GO next, or pause for Codex to review `-007`?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 1ccfcbaa8dd4b456
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0122
   asked_at: 2026-04-30T16:47:19.099540Z
   question: ".  Which way do you want me to go — stand down, write closure acknowledgements, or file the dispatcher-refinement backlog item?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 554d97bd502f0498
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0126
   asked_at: 2026-04-30T17:01:33.376347Z
   question: "ment ADR for IR-0). Want me to pick one and propose, or should I move to a different priority?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: f0a5ea21d8c502b6
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0128
   asked_at: 2026-04-30T17:38:10.779982Z
   question: "overnance ceremony. Want me to file Option 2, or accept Option 1 and update the smart poller's kind-aware routing instead?  `★ Insight ───────"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 3582211e16491da9
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0130
   asked_at: 2026-04-30T17:46:19.502879Z
   question: "it trail preserved. Awaiting your decision on disposition."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 456b4c626d8c4506
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0133
   asked_at: 2026-04-30T18:19:13.710794Z
   question: "onfirm direction:** Should I draft the CS-2 dispatcher bridge proposal now (option 1), or is there a different priority you want me to pick up first?  I have **not** mod"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: 97d5bd095f33023f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0135
   asked_at: 2026-04-30T18:19:45.956417Z
   question: "alog was dismissed. Awaiting your direction on which thread to"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 34f172c168664f7c
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0137
   asked_at: 2026-04-30T18:26:25.333888Z
   question: "04-29-006.md` (GO)  Want me to pivot to the Slice 0 inventory (today's GO) or one of the others? Per the one-decisio"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: cf19ea44de1b2985
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0140
   asked_at: 2026-04-30T18:28:49.589162Z
   question: "actionable queue.  Want me to file the CS-2 slice bridge, the membase Slice A bridge, or a different work item?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 135f1fc995da2999
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0146
   asked_at: 2026-04-30T19:19:54.614551Z
   question: "for this dispatch.  Standing by for next owner direction or `Bridge` scan."
   detected_via: prose:standing_by_for
   status: resolved
   question_hash: 6f19f0d496039d2c
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0150
   asked_at: 2026-04-30T19:32:57.647885Z
   question: "ace beyond CS-1.5.  Should I draft either of these as a NEW bridge proposal, or stand down and wait for explicit direction on which (if either) is the next priority? I would not start e"
   detected_via: prose:should_i_or
   status: resolved
   question_hash: 6fe18c134f778a54
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0152
   asked_at: 2026-04-30T19:33:25.870870Z
   question: "ithout a selection. Standing by for explicit direction — no implementation"
   detected_via: prose:standing_by_for
   status: resolved
   question_hash: 296eb601df7e7be2
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0153
   asked_at: 2026-04-30T19:35:31.167005Z
   question: "for owner review.  Awaiting your direction."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 9bc4977d8e200b33
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0157
   asked_at: 2026-05-01T00:10:02.827410Z
   question: "matter). Otherwise, awaiting your next direction."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 1009b183ef5e37b6
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0159
   asked_at: 2026-05-01T00:10:24.471794Z
   question: "Question canceled. Awaiting your direction on the next move."
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: c6446374385ca835
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0160
   asked_at: 2026-05-01T00:26:58.594263Z
   question: "ositives detecting 'awaiting your input' in my own text\"* — the hook caught a sentence describing the false-positive problem itself; DECISION-0092 is even more m"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: e0a6a1f8e850ae91
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: false positive. Detector caught Claude's meta-discussion of the patterns it watches for (e.g., describing the prose anti-pattern itself), not a real owner question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0161
   asked_at: 2026-05-01T00:37:57.113964Z
   question: "a REVISED proposal. Want me to proceed with that, or do you want a fresh CS-2 / CS-3 / IR follow-up slice proposal drafted instead?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 31a99acfe2bfe5d7
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-
   resolved_at: 2026-05-01T00:50:25.116555Z
   resolved_in_session: S324
   answer: "S324 triage: superseded-stale. Real prose-ask from a prior session where owner direction was supplied via subsequent flow (typically AskUserQuestion answer or inline directive) but the auto-tracker did not capture the resolution because the answer did not use the `resolve DECISION-NNNN: <answer>` syntax. No outstanding action; subsequent session work has moved past the question. Owner authorization: AskUserQuestion answer \"Full triage (resolve each)\" in S324."
-
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0076
   asked_at: 2026-04-29T09:13:55.418113Z
   question: "awaiting GO/NO-GO)  Standing by for the next direction or bridge response."
@@ -1809,6 +1817,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: e96e801984284dba
   resolved_at: 2026-05-01T00:38:15.970499Z
   answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0163
+  asked_at: 2026-05-01T00:57:21.983194Z
+  question: "How should the 47 entries in memory/pending-owner-decisions.md be disposed?"
+  options:
+    - "clear pending (bulk dismiss)"
+    - "defer all (acknowledge, keep)"
+    - "Sample 10 entries, then decide"
+    - "Full triage (resolve each)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9adb3f19306b2efb
+  resolved_at: 2026-05-01T00:57:21.983194Z
+  answer: "User has answered your questions: \"How should the 47 entries in memory/pending-owner-decisions.md be disposed?\"=\"Full triage (resolve each)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
