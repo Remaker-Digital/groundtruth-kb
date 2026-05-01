@@ -48,7 +48,37 @@ from pathlib import Path
 from typing import Any
 
 from rehearse._common import LEGACY_ROOT
+from rehearse._membase_export import (
+    _EXCLUDED_TELEMETRY_POLICY,
+    _EXPECTED_VERSIONED_ARTIFACT_TABLES,
+    _PER_SESSION_TABLES,
+    _RELATIONSHIP_TABLES,
+)
 from rehearse._split_helper import emit_result
+
+# Approved per-table category enum from the GO'd Output Layout schema.
+_VALID_TABLE_CATEGORIES: frozenset[str] = frozenset(
+    {"versioned_artifact", "relationship", "excluded_telemetry", "per_session"}
+)
+
+
+def _classify_table_by_closed_set(table: str) -> str | None:
+    """Return the canonical category for a discovered table, or None if unknown.
+
+    Closed-set membership per Slice 8 (`_membase_export.py`). Unknown tables
+    return None and propagate as a lane error per Slice 8 Constraint 1
+    ("unknown tables must not silently default").
+    """
+    if table in _EXPECTED_VERSIONED_ARTIFACT_TABLES:
+        return "versioned_artifact"
+    if table in _RELATIONSHIP_TABLES:
+        return "relationship"
+    if table in _EXCLUDED_TELEMETRY_POLICY:
+        return "excluded_telemetry"
+    if table in _PER_SESSION_TABLES:
+        return "per_session"
+    return None
+
 
 _LANE_NAME = "db-filter-dryrun"
 _LANE_SUBDIR = "db-filter-dryrun"
@@ -170,14 +200,15 @@ def _filter_versioned_table(
     warnings_lines: list[str],
     rejects_lines: list[str],
     counters: dict[str, int],
-) -> int:
+) -> dict[str, int]:
     """Copy adopter-classified rows; skip framework; warn-and-skip unclassified.
 
-    Returns count of rows inserted into target.
+    Returns per-table classification counts {adopter, framework, unclassified}.
     """
+    per_table = {"adopter": 0, "framework": 0, "unclassified": 0}
     cols = _table_columns(legacy, table)
     if not cols or "id" not in cols or "version" not in cols:
-        return 0
+        return per_table
     placeholders = ",".join(["?"] * len(cols))
     col_list = ",".join(cols)
     insert_sql = f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
@@ -185,7 +216,6 @@ def _filter_versioned_table(
     cur.execute(f"SELECT {col_list} FROM {table}")
     id_idx = cols.index("id")
     ver_idx = cols.index("version")
-    inserted = 0
     for row in cur.fetchall():
         row_id = row[id_idx]
         row_ver = row[ver_idx]
@@ -196,21 +226,23 @@ def _filter_versioned_table(
         classification = classify_map.get((str(row_id), ver_int), "unclassified")
         if classification == "adopter":
             target.execute(insert_sql, row)
-            inserted += 1
+            per_table["adopter"] += 1
             counters["adopter_inserted"] = counters.get("adopter_inserted", 0) + 1
         elif classification == "framework":
             rejects_lines.append(f"{table} | id={row_id} | version={row_ver}")
+            per_table["framework"] += 1
             counters["framework_excluded"] = counters.get("framework_excluded", 0) + 1
         else:
             if disposition == "leave_behind_with_warning":
                 warnings_lines.append(f"unclassified: {table} | id={row_id} | version={row_ver}")
+                per_table["unclassified"] += 1
                 counters["unclassified_warned"] = counters.get("unclassified_warned", 0) + 1
             else:
                 raise NotImplementedError(
                     f"unclassified_disposition={disposition!r} not implemented in this Wave 3 commit; "
                     f"only 'leave_behind_with_warning' is supported."
                 )
-    return inserted
+    return per_table
 
 
 def _filter_relationship_table(
@@ -221,34 +253,39 @@ def _filter_relationship_table(
     *,
     warnings_lines: list[str],
     counters: dict[str, int],
-) -> int:
-    """Copy relationship rows whose classification (per Slice 8) is adopter."""
+) -> dict[str, int]:
+    """Copy relationship rows whose classification (per Slice 8) is adopter.
+
+    Returns per-table classification counts {adopter, framework, unclassified}.
+    """
+    per_table = {"adopter": 0, "framework": 0, "unclassified": 0}
     cols = _table_columns(legacy, table)
     key_cols = _RELATIONSHIP_KEY_COLUMNS.get(table)
     if not cols or key_cols is None or not all(c in cols for c in key_cols):
-        return 0
+        return per_table
     placeholders = ",".join(["?"] * len(cols))
     col_list = ",".join(cols)
     insert_sql = f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
     cur = legacy.cursor()
     cur.execute(f"SELECT {col_list} FROM {table}")
     key_idxs = [cols.index(c) for c in key_cols]
-    inserted = 0
     for row in cur.fetchall():
         key_tuple = tuple(str(row[i]) if row[i] is not None else "None" for i in key_idxs)
         classification = classify_map.get(key_tuple, "unclassified")
         if classification == "adopter":
             target.execute(insert_sql, row)
-            inserted += 1
+            per_table["adopter"] += 1
         elif classification == "framework":
+            per_table["framework"] += 1
             counters["framework_excluded"] = counters.get("framework_excluded", 0) + 1
         else:
+            per_table["unclassified"] += 1
             warnings_lines.append(
                 f"orphan_relationship: {table} | "
                 + " | ".join(f"{c}={k}" for c, k in zip(key_cols, key_tuple, strict=False))
             )
             counters["orphan_relationship_warned"] = counters.get("orphan_relationship_warned", 0) + 1
-    return inserted
+    return per_table
 
 
 def _filter_per_session_table(
@@ -258,26 +295,35 @@ def _filter_per_session_table(
     session_classify_map: dict[str, str],
     *,
     counters: dict[str, int],
-) -> int:
-    """Copy per-session rows whose session_id is classified adopter by Slice 8."""
+) -> dict[str, int]:
+    """Copy per-session rows whose session_id is classified adopter by Slice 8.
+
+    Returns per-table classification counts {adopter, framework, unclassified}.
+    """
+    per_table = {"adopter": 0, "framework": 0, "unclassified": 0}
     cols = _table_columns(legacy, table)
     if not cols or "session_id" not in cols:
-        return 0
+        return per_table
     placeholders = ",".join(["?"] * len(cols))
     col_list = ",".join(cols)
     insert_sql = f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
     cur = legacy.cursor()
     cur.execute(f"SELECT {col_list} FROM {table}")
     sid_idx = cols.index("session_id")
-    inserted = 0
     for row in cur.fetchall():
         sid = str(row[sid_idx]) if row[sid_idx] is not None else ""
         classification = session_classify_map.get(sid, "unclassified")
         if classification == "adopter":
             target.execute(insert_sql, row)
-            inserted += 1
+            per_table["adopter"] += 1
             counters["adopter_inserted"] = counters.get("adopter_inserted", 0) + 1
-    return inserted
+        elif classification == "framework":
+            per_table["framework"] += 1
+            counters["framework_excluded"] = counters.get("framework_excluded", 0) + 1
+        else:
+            per_table["unclassified"] += 1
+            counters["unclassified_warned"] = counters.get("unclassified_warned", 0) + 1
+    return per_table
 
 
 def run(
@@ -373,48 +419,60 @@ def run(
         versioned_index = _build_versioned_index(partition_manifest)
         relationship_index = _build_relationship_index(partition_manifest)
         per_session_index = _build_per_session_index(partition_manifest)
-        excluded_telemetry_names = _excluded_telemetry_table_names(partition_manifest)
 
+        unknown_tables: list[str] = []
         for table in copied_tables:
-            if table in excluded_telemetry_names:
-                table_counts[table] = {"category": "excluded_telemetry", "rows_inserted": 0}
+            category = _classify_table_by_closed_set(table)
+            if category is None:
+                # Per Slice 8 Constraint 1: unknown tables → propagate as
+                # error rather than silent default. Collect for fail-fast
+                # after the loop so we still emit a partial summary for
+                # forensics.
+                unknown_tables.append(table)
+                continue
+            if category == "excluded_telemetry":
+                table_counts[table] = {
+                    "category": "excluded_telemetry",
+                    "adopter": 0,
+                    "framework": 0,
+                    "unclassified": 0,
+                }
                 counters["telemetry_skipped"] = counters.get("telemetry_skipped", 0) + 1
                 continue
-            if table in versioned_index:
-                inserted = _filter_versioned_table(
+            if category == "versioned_artifact":
+                per_table = _filter_versioned_table(
                     legacy,
                     target,
                     table,
-                    versioned_index[table],
+                    versioned_index.get(table, {}),
                     disposition=disposition,
                     warnings_lines=warnings_lines,
                     rejects_lines=rejects_lines,
                     counters=counters,
                 )
-                table_counts[table] = {"category": "versioned_artifact", "rows_inserted": inserted}
+                table_counts[table] = {"category": "versioned_artifact", **per_table}
                 continue
-            if table in relationship_index:
-                inserted = _filter_relationship_table(
+            if category == "relationship":
+                per_table = _filter_relationship_table(
                     legacy,
                     target,
                     table,
-                    relationship_index[table],
+                    relationship_index.get(table, {}),
                     warnings_lines=warnings_lines,
                     counters=counters,
                 )
-                table_counts[table] = {"category": "relationship", "rows_inserted": inserted}
+                table_counts[table] = {"category": "relationship", **per_table}
                 continue
-            if table in per_session_index:
-                inserted = _filter_per_session_table(
+            if category == "per_session":
+                per_table = _filter_per_session_table(
                     legacy,
                     target,
                     table,
-                    per_session_index[table],
+                    per_session_index.get(table, {}),
                     counters=counters,
                 )
-                table_counts[table] = {"category": "per_session", "rows_inserted": inserted}
+                table_counts[table] = {"category": "per_session", **per_table}
                 continue
-            table_counts[table] = {"category": "unhandled", "rows_inserted": 0}
 
         target.commit()
         integrity_cur = target.cursor()
@@ -454,6 +512,19 @@ def run(
     rejects_path.write_text("\n".join(rejects_lines) + ("\n" if rejects_lines else ""), encoding="utf-8")
 
     output_files = [str(output_db_path), str(summary_path), str(warnings_path), str(rejects_path)]
+
+    if unknown_tables:
+        # Per Slice 8 Constraint 1: unknown tables must propagate as error
+        # rather than silent default. Forensic summary still written above.
+        return emit_result(
+            lane_dir,
+            {
+                "status": "error",
+                "output_files": output_files,
+                "metrics": summary["row_counts"],
+                "warnings": [f"unknown_tables_in_legacy_db: {sorted(unknown_tables)}"],
+            },
+        )
 
     if not integrity_ok:
         return emit_result(

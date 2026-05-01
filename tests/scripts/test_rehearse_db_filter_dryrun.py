@@ -391,9 +391,11 @@ def test_load_manifest_wave_2_still_accepts_owner_decision_required_for_db_recon
 def test_db_filter_summary_json_has_required_keys(
     tmp_path: Path, fixture_legacy_db: Path, fixture_partition_manifest: Path, base_manifest_dict: dict
 ) -> None:
-    """T16: derives from Output Layout schema."""
+    """T16: derives from Output Layout schema (top-level + per-table enum)."""
     _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     summary = json.loads((tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(encoding="utf-8"))
+
+    # Top-level schema
     required = {
         "lane",
         "manifest_input_path",
@@ -406,6 +408,22 @@ def test_db_filter_summary_json_has_required_keys(
         "elapsed_seconds",
     }
     assert required.issubset(summary.keys()), f"missing: {required - set(summary.keys())}"
+
+    # Per-table schema: every entry must have category (in approved enum) +
+    # adopter, framework, unclassified counts. Per Output Layout schema in
+    # the GO-approved proposal, and the F1 fix in -010.
+    valid_categories = {"versioned_artifact", "relationship", "excluded_telemetry", "per_session"}
+    required_table_keys = {"category", "adopter", "framework", "unclassified"}
+    for table_name, info in summary["tables"].items():
+        assert required_table_keys.issubset(info.keys()), (
+            f"table {table_name} missing required keys: {required_table_keys - set(info.keys())}"
+        )
+        assert info["category"] in valid_categories, (
+            f"table {table_name} has unapproved category {info['category']!r}; "
+            f"must be one of {sorted(valid_categories)}"
+        )
+        for k in ("adopter", "framework", "unclassified"):
+            assert isinstance(info[k], int), f"table {table_name}.{k} must be int, got {type(info[k])}"
 
 
 # ----- T17: NotImplementedError for non-default dispositions -----
