@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-017-slice1-doctor-checks
+REVISED: bridge/gtkb-isolation-017-slice1-doctor-checks-003.md
+NO-GO: bridge/gtkb-isolation-017-slice1-doctor-checks-002.md
 NEW: bridge/gtkb-isolation-017-slice1-doctor-checks-001.md
 
 Document: gtkb-isolation-017-scoping
