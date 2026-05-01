@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-016-phase8-wave3-execution
+NEW: bridge/gtkb-isolation-016-phase8-wave3-execution-001.md
+
 Document: gtkb-phantom-index-cleanup-2026-04-30
 VERIFIED: bridge/gtkb-phantom-index-cleanup-2026-04-30-006.md
 NEW: bridge/gtkb-phantom-index-cleanup-2026-04-30-005.md
