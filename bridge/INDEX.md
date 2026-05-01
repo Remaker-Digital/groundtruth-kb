@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-017-scoping
+NEW: bridge/gtkb-isolation-017-scoping-001.md
+
 Document: gtkb-isolation-016-phase8-wave3-execution
 VERIFIED: bridge/gtkb-isolation-016-phase8-wave3-execution-012.md
 REVISED: bridge/gtkb-isolation-016-phase8-wave3-execution-011.md
