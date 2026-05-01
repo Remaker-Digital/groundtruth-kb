@@ -10,36 +10,46 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0175
+  asked_at: 2026-05-01T04:54:11.171778Z
+  question: "sory-only feedback. Awaiting owner direction on whether to: - (a"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 1993ed8371b77b88
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-05-01T05:00:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169. Detector caught Claude's prose fragment from a status report. Resolved inline per Full triage authorization."
 - id: DECISION-0165
   asked_at: 2026-05-01T02:17:46.535439Z
   question: "g-or-choice prose (\"Want me to wait or do you want to trigger Codex manually?\") — same false-posi"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 0272f03b5d22c089
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T04:30:00.000000Z
   resolved_in_session: S324
   answer: "S324 triage: false positive (offering_or_choice meta-discussion). The detector caught Claude's own description of DECISION-0164's false-positive class — quoting the prior false-positive prose to discuss it. Same recursive-meta pattern as DECISION-0080, 0090, 0092, 0114, 0160. Not a real owner question. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0166
   asked_at: 2026-05-01T02:18:26.151555Z
   question: "wrap`, `::bridge`). Want me to file that proposal, or do you have a different next priority?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: 47c664d8cda0e80d
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T04:30:00.000000Z
   resolved_in_session: S324
   answer: "S324 triage: false positive (offering_or_choice). Detector caught Claude's prose offering paths-from-here at end of status report. Same class as DECISION-0164. Owner answered subsequently via AskUserQuestion (Full triage / Implement dashboard-link / etc.); the prose-ask was rhetorical-closing, not a real decision request. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0169
   asked_at: 2026-05-01T03:54:14.743710Z
   question: "dispatcher logic.  Want me to draft the option-2 closure proposals, the option-3 dispatcher backlog entry, both, or neither?"
   detected_via: prose:offering_or_choice
   status: resolved
   question_hash: d714cda96b4b142e
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T04:30:00.000000Z
   resolved_in_session: S324
   answer: "S324 triage: false positive (offering_or_choice). Same class as DECISION-0165, 0166, 0164. Detector caught Claude's status-report prose. Resolved inline."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0164
   asked_at: 2026-05-01T00:57:21.983194Z
   question: "operational state. Want me to wait or do you want to trigger Codex manually?"
@@ -1902,6 +1912,74 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: resolved
   question_hash: 96e1aaaf86fbd771
   resolved_at: 2026-05-01T03:54:39.922159Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0171
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "How should the F2 (failing-test waiver) finding be addressed?"
+  options:
+    - "Grant explicit waiver"
+    - "Narrow verification scope"
+    - "Fix the failing test"
+    - "File separate hotfix bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5f73761aa9ea65cf
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"How should the F2 (failing-test waiver) finding be addressed?\"=\"Fix the failing test\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0172
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "The release-gate fails on 3 unrelated pre-existing ruff errors in tests/scripts/test_run_spec_derived_tests.py (workstream gtkb-platform-spec-coverage-verified-runner, currently VERIFIED). How do I proceed?"
+  options:
+    - "Fix the 3 ruff errors in this thread"
+    - "Document as out-of-scope; cite drift in REVISED post-impl"
+    - "File separate hotfix bridge for ruff drift first"
+    - "Skip release-gate in this thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dfa5183b024ce913
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"The release-gate fails on 3 unrelated pre-existing ruff errors in tests/scripts/test_run_spec_derived_tests.py (workstream gtkb-platform-spec-coverage-verified-runner, currently VERIFIED). How do I proceed?\"=\"Fix the 3 ruff errors in this thread\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0173
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "How do I proceed with the release-gate's broken hardcoded test reference?"
+  options:
+    - "Stop scope expansion; narrow verification surface"
+    - "Fix the gate's hardcoded list too"
+    - "File separate hotfix bridge for the gate"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4adc545ec657d101
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"How do I proceed with the release-gate's broken hardcoded test reference?\"=\"Fix the gate's hardcoded list too\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0174
+  asked_at: 2026-05-01T04:44:03.698046Z
+  question: "The release-gate has at least 2 more pre-existing problems blocking a clean run (internal test failure + 180s timeout vs. >180s suite). How do I proceed?"
+  options:
+    - "STOP cascade. Narrow verification surface."
+    - "Keep going"
+    - "Park dashboard-link, file release-gate hotfix bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 846f3ab0d62f7438
+  resolved_at: 2026-05-01T04:44:03.698046Z
+  answer: "User has answered your questions: \"The release-gate has at least 2 more pre-existing problems blocking a clean run (internal test failure + 180s timeout vs. >180s suite). How do I proceed?\"=\"STOP cascade. Narrow verification surface.\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0176
+  asked_at: 2026-05-01T04:54:32.154553Z
+  question: "Both auto-dispatched GO entries (gtkb-command-surface-004, gtkb-incident-response-006) are stale plan-level GOs whose follow-on slices are already VERIFIED. What should Prime Builder pick up next?"
+  options:
+    - "Revise dashboard-link NO-GO -010"
+    - "Revise ADR-eval-enforcement NO-GO -002"
+    - "Propose next CS slice"
+    - "Advance work_list.md item"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 10da0e5a56c14ab6
+  resolved_at: 2026-05-01T04:54:32.154553Z
   answer: "Answer questions?"
   notes: ""
 
