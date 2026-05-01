@@ -18,6 +18,7 @@ NO-GO: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-002.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-001.md
 
 Document: dashboard-link-localhost-correction-2026-04-30
+VERIFIED: bridge/dashboard-link-localhost-correction-2026-04-30-012.md
 REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-011.md
 NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-010.md
 REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-009.md
