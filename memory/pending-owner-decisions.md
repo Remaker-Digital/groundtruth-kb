@@ -6,7 +6,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-0196
+  asked_at: 2026-05-01T05:51:39.702417Z
+  question: "(not Prime's turn)  Awaiting owner direction on whether to (a) r"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 08fb30c7f58c7285
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -2188,6 +2194,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: resolved
   question_hash: 3f96b23b326a4b3d
   resolved_at: 2026-05-01T05:44:09.138702Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0195
+  asked_at: 2026-05-01T05:50:19.026378Z
+  question: "Should I file S0 REVISED-2 -005 now to close the -004 NO-GO?"
+  options:
+    - "Yes, file REVISED-2 now"
+    - "Hold; pivot to row 24 hygiene first"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6c4cb4b460d035f0
+  resolved_at: 2026-05-01T05:50:19.026378Z
+  answer: "User has answered your questions: \"Should I file S0 REVISED-2 -005 now to close the -004 NO-GO?\"=\"Hold; pivot to row 24 hygiene first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0197
+  asked_at: 2026-05-01T05:52:09.826829Z
+  question: "Both auto-dispatched GOs are stale (plan-level, already actioned via slice sub-bridges). What should Prime Builder do next?"
+  options:
+    - "Revise s0-audit NO-GO"
+    - "Propose next CS slice"
+    - "Propose IR-1 phase"
+    - "Pick from work_list.md"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 152680b2ee6616aa
+  resolved_at: 2026-05-01T05:52:09.826829Z
   answer: "Answer questions?"
   notes: ""
 
