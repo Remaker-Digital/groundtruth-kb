@@ -184,24 +184,4 @@ NO-GO: bridge/gtkb-dora-001b-authoritative-deployment-source-002.md
 NEW: bridge/gtkb-dora-001b-authoritative-deployment-source-001.md
 
 
-Document: gtkb-root-directory-migration
-VERIFIED: bridge/gtkb-root-directory-migration-018.md
-NEW: bridge/gtkb-root-directory-migration-017.md
-GO: bridge/gtkb-root-directory-migration-016.md
-REVISED: bridge/gtkb-root-directory-migration-015.md
-NO-GO: bridge/gtkb-root-directory-migration-014.md
-NEW: bridge/gtkb-root-directory-migration-013.md
-GO: bridge/gtkb-root-directory-migration-012.md
-REVISED: bridge/gtkb-root-directory-migration-011.md
-NO-GO: bridge/gtkb-root-directory-migration-010.md
-REVISED: bridge/gtkb-root-directory-migration-009.md
-NO-GO: bridge/gtkb-root-directory-migration-008.md
-REVISED: bridge/gtkb-root-directory-migration-007.md
-NO-GO: bridge/gtkb-root-directory-migration-006.md
-REVISED: bridge/gtkb-root-directory-migration-005.md
-NO-GO: bridge/gtkb-root-directory-migration-004.md
-REVISED: bridge/gtkb-root-directory-migration-003.md
-NO-GO: bridge/gtkb-root-directory-migration-002.md
-NEW: bridge/gtkb-root-directory-migration-001.md
 
-<!-- S317 phantom-INDEX (per bridge/gtkb-bridge-index-phantom-verified-references-2026-04-27): -012 absent from disk + git history. Latest on-disk version is -003; thread appears stalled; reopen is per-thread follow-up out of scope here. -->
