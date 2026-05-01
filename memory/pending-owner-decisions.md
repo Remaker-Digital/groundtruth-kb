@@ -6,7 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(no pending entries)
+(none)
 
 ## Resolved
 
@@ -2162,6 +2162,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: f56c27bc14d6ff1a
   resolved_at: 2026-05-01T05:31:48.388130Z
   answer: "User has answered your questions: \"Should I author S0 REVISED-1 -003 now to address the two blocking findings?\"=\"Hold; wait for dashboard-link VERIFIED first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0193
+  asked_at: 2026-05-01T05:43:28.784250Z
+  question: "What's the next move now that dashboard-link is VERIFIED-terminal?"
+  options:
+    - "File S0 REVISED-1 -003 now"
+    - "Pivot to a different top-10 item"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 032e6ab9135b5d5b
+  resolved_at: 2026-05-01T05:43:28.784250Z
+  answer: "User has answered your questions: \"What's the next move now that dashboard-link is VERIFIED-terminal?\"=\"File S0 REVISED-1 -003 now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0194
+  asked_at: 2026-05-01T05:44:09.138702Z
+  question: "Both auto-dispatch GO entries (gtkb-command-surface, gtkb-incident-response) are plan-level approvals that don't authorize code directly. Which next move would you like Prime Builder to take? (DECISION-0192)"
+  options:
+    - "Draft CS-1.5 slice proposal (Recommended)"
+    - "Advance ADR-isolation post-impl"
+    - "Pick a different work_list item"
+    - "Hold; brief me first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f96b23b326a4b3d
+  resolved_at: 2026-05-01T05:44:09.138702Z
+  answer: "Answer questions?"
   notes: ""
 
 ## History
