@@ -10,16 +10,26 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0177
+  asked_at: 2026-05-01T05:04:50.340526Z
+  question: "reserved unchanged. Awaiting owner direction on whether to surfa"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: b9252b35f96bac2a
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-05-01T05:15:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169/0175. Truncated prose-detector capture from a status report. Resolved inline per Full triage authorization."
 - id: DECISION-0175
   asked_at: 2026-05-01T04:54:11.171778Z
   question: "sory-only feedback. Awaiting owner direction on whether to: - (a"
   detected_via: prose:awaiting_input
   status: resolved
   question_hash: 1993ed8371b77b88
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
   resolved_at: 2026-05-01T05:00:00.000000Z
   resolved_in_session: S324
   answer: "S324 triage: false positive (awaiting_input). Same class as DECISION-0164/0165/0166/0169. Detector caught Claude's prose fragment from a status report. Resolved inline per Full triage authorization."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0165
   asked_at: 2026-05-01T02:17:46.535439Z
   question: "g-or-choice prose (\"Want me to wait or do you want to trigger Codex manually?\") — same false-posi"
@@ -1980,6 +1990,60 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: resolved
   question_hash: 10da0e5a56c14ab6
   resolved_at: 2026-05-01T04:54:32.154553Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0178
+  asked_at: 2026-05-01T05:05:07.547262Z
+  question: "Both umbrella GOs are acknowledged with their first sub-slices VERIFIED. What next?"
+  options:
+    - "Stand down"
+    - "Surface CS shortlist"
+    - "Surface IR shortlist"
+    - "Surface both shortlists"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6375e76f8f4ba228
+  resolved_at: 2026-05-01T05:05:07.547262Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0179
+  asked_at: 2026-05-01T05:06:46.274366Z
+  question: "How should I close the dashboard-link F1 (cascade scope outside -006 GO)?"
+  options:
+    - "Supplemental REVISED in same thread"
+    - "Separate cascade bridge"
+    - "Formal bridge-protocol waiver"
+    - "Revert the cascade entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2e50ef97aa1c286c
+  resolved_at: 2026-05-01T05:06:46.274366Z
+  answer: "User has answered your questions: \"How should I close the dashboard-link F1 (cascade scope outside -006 GO)?\"=\"Separate cascade bridge\", \"For ADR-eval REVISED-2, how should S1's originating DA record be sourced?\"=\"Archive S324 directive as owner_conversation DA\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0180
+  asked_at: 2026-05-01T05:06:46.274366Z
+  question: "For ADR-eval REVISED-2, how should S1's originating DA record be sourced?"
+  options:
+    - "Archive S324 directive as owner_conversation DA"
+    - "Generate a fresh owner statement"
+    - "Defer DA archival to S1 bridge time"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1de07ad96e7d135f
+  resolved_at: 2026-05-01T05:06:46.274366Z
+  answer: "User has answered your questions: \"How should I close the dashboard-link F1 (cascade scope outside -006 GO)?\"=\"Separate cascade bridge\", \"For ADR-eval REVISED-2, how should S1's originating DA record be sourced?\"=\"Archive S324 directive as owner_conversation DA\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0181
+  asked_at: 2026-05-01T05:09:08.761676Z
+  question: "DECISION-0177 in pending-owner-decisions.md is a truncated prose-detector capture ('reserved unchanged. Awaiting owner direction on whether to surfa') with no real recoverable question. How should I dispose of it?"
+  options:
+    - "Clear pending (dismiss)"
+    - "Defer all"
+    - "Investigate source"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f370a00999261c2f
+  resolved_at: 2026-05-01T05:09:08.761676Z
   answer: "Answer questions?"
   notes: ""
 
