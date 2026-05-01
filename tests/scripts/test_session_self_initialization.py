@@ -57,7 +57,7 @@ def test_user_local_preference_controls_startup_dashboard_open(tmp_path, monkeyp
     module = _load_module()
     preference_path = tmp_path / "session-startup-preferences.json"
     opened: list[str] = []
-    dashboard_url = "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard"
+    dashboard_url = "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard"
 
     monkeypatch.setenv("GTKB_STARTUP_PREFERENCES_PATH", str(preference_path))
     monkeypatch.delenv("GTKB_OPEN_DASHBOARD_ON_SESSION_START", raising=False)
@@ -229,7 +229,7 @@ def test_startup_model_discovers_durable_operating_role() -> None:
     assert discovered_role in module.ROLE_PROFILES
 
     model = module.build_startup_model(REPO_ROOT)
-    report = module.render_report(model, "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
+    report = module.render_report(model, "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
 
     assert model["role_profile"] == discovered_role
     assert model["role"]["assumed_role"] == module.ROLE_PROFILES[discovered_role]["assumed_role"]
@@ -462,7 +462,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     prime_model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
     prime_report = module.render_report(
         prime_model,
-        "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard",
+        "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard",
         REPO_ROOT,
     )
 
@@ -477,7 +477,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     loyal_model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
     loyal_report = module.render_report(
         loyal_model,
-        "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard",
+        "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard",
         REPO_ROOT,
     )
 
@@ -502,7 +502,7 @@ def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(tmp
     assert isinstance(overlay.get("notes"), list)
     assert any("non-authoritative" in note or "no current session overlay" in note for note in overlay["notes"])
 
-    report = module.render_report(model, "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
+    report = module.render_report(model, "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
     assert "### Session Overlay Status (Non-Authoritative)" in report
     assert "non-authoritative by construction" in report
     # The overlay section must appear before the input-semantics section so
@@ -544,7 +544,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     module = _load_module()
 
     model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
-    report = module.render_report(model, "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
+    report = module.render_report(model, "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
 
     assert model["role"]["assumed_role"] == "Loyal Opposition"
     assert model["role"]["role_assignment"] == "active AI harness assigned by owner for counterpart review"
@@ -671,7 +671,7 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     legacy_static_dashboard = dashboard_dir / "index.html"
     assert dashboard.name == "gtkb-dashboard.json"
     assert dashboard.is_file()
-    assert result["dashboard_url"] == "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard"
+    assert result["dashboard_url"] == "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard"
     assert not legacy_static_dashboard.exists()
     assert data.is_file()
     assert report.is_file()
@@ -758,10 +758,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "retired OS poller remains disabled" in report_text
     assert "Startup Disclosure" in report_text
     assert "GroundTruth-KB Project Dashboard" in report_text
-    assert "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard" in report_text
+    assert "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard" in report_text
     assert "Browser opening: use the harness-controlled browser" in report_text
     assert "system_default_browser" in report_text
-    assert "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard" in wrapup_text
+    assert "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard" in wrapup_text
     assert str(dashboard.resolve()) not in report_text
     assert "file:///" not in report_text
     assert "file:///" not in wrapup_text

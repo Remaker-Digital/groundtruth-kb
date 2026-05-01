@@ -96,7 +96,7 @@ GTKB_HARNESS_STATE_ROOT = PROJECT_ROOT / "harness-state"
 # Codex GO -004 implementation constraint (i): PROJECT_ROOT only as CLI
 # fallback for --project-root, never as internal output/read-path fallback.
 DEFAULT_USER_STARTUP_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
-GRAFANA_DASHBOARD_URL = "http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard"
+GRAFANA_DASHBOARD_URL = "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard"
 DASHBOARD_OPEN_MODE_HARNESS = "harness_browser"
 DASHBOARD_OPEN_MODE_SYSTEM = "system_default_browser"
 PDF_EXPORT_FILENAME = "groundtruth-kb-project-dashboard.pdf"
@@ -3505,6 +3505,7 @@ def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> li
 
         try:
             from groundtruth_kb.project.doctor import _check_smart_bridge_poller
+
             health = _check_smart_bridge_poller(project_root)
         except Exception:
             health = None
@@ -3627,6 +3628,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "# GroundTruth-KB Fresh Session Startup",
             "",
             f"Generated: {model['generated_at']}",
+            f"Dashboard: GroundTruth-KB Project Dashboard: {dashboard_link}",
             "",
             "## Startup Disclosure",
             "",

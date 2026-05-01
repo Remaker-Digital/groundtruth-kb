@@ -377,6 +377,7 @@ docs/gtkb-dashboard/dashboard-data.json
 memory/gtkb-dashboard-history.json
 docs/gtkb-dashboard/session-startup-report.md
 docs/gtkb-dashboard/session-wrapup-report.md
+docs/gtkb-dashboard/bridge-swimlane.json
 
 # =============================================================================
 # Drive-sync staging directory (added 2026-04-27 S317 working-tree triage)
