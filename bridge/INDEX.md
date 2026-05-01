@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-017-slice1-doctor-checks
+NEW: bridge/gtkb-isolation-017-slice1-doctor-checks-001.md
+
 Document: gtkb-isolation-017-scoping
 GO: bridge/gtkb-isolation-017-scoping-004.md
 REVISED: bridge/gtkb-isolation-017-scoping-003.md
