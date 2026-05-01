@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30
+REVISED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-003.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-002.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-001.md
 
@@ -16,20 +17,6 @@ NO-GO: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-004.md
 REVISED: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-003.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-002.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-001.md
-
-Document: dashboard-link-localhost-correction-2026-04-30
-VERIFIED: bridge/dashboard-link-localhost-correction-2026-04-30-012.md
-REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-011.md
-NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-010.md
-REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-009.md
-NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-008.md
-NEW: bridge/dashboard-link-localhost-correction-2026-04-30-007.md
-GO: bridge/dashboard-link-localhost-correction-2026-04-30-006.md
-REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-005.md
-NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-004.md
-REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-003.md
-NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-002.md
-NEW: bridge/dashboard-link-localhost-correction-2026-04-30-001.md
 
 Document: gtkb-spec-lifecycle-schema-2026-04-29
 GO: bridge/gtkb-spec-lifecycle-schema-2026-04-29-004.md
