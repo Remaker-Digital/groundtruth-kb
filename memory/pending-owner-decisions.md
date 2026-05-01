@@ -2223,6 +2223,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-01T05:52:09.826829Z
   answer: "Answer questions?"
   notes: ""
+- id: DECISION-0198
+  asked_at: 2026-05-01T06:01:24.052446Z
+  question: "The wrap-scan exit code 2 says mutating wrap shouldn't proceed without explicit owner override. All 22 errors are pre-existing prior-session debt, not S324-caused. How do you want to handle this?"
+  options:
+    - "Override and proceed with mutating wrap"
+    - "Stop wrap; address phantom-INDEX errors first"
+    - "Stop wrap; just proceed manually"
+    - "Review reports first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b6c6b25740d3ee55
+  resolved_at: 2026-05-01T06:01:24.052446Z
+  answer: "User has answered your questions: \"The wrap-scan exit code 2 says mutating wrap shouldn't proceed without explicit owner override. All 22 errors are pre-existing prior-session debt, not S324-caused. How do you want to handle this?\"=\"Stop wrap; address phantom-INDEX errors first\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 
