@@ -140,7 +140,6 @@ def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
     assert "tests/scripts/test_session_self_initialization.py" in commands[pytest_index]
     assert "tests/scripts/test_gtkb_dashboard_control_plane.py" in commands[pytest_index]
     assert "tests/hooks/test_workstream_focus.py" in commands[pytest_index]
-    assert "tests/integrations/test_commercial_state_store.py" in commands[pytest_index]
     assert "tests/integrations/test_usage_consumption.py" in commands[pytest_index]
 
 

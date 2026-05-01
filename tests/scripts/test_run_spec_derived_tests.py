@@ -33,9 +33,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import sqlite3
-import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -214,9 +212,7 @@ def test_runner_unions_specs_across_all_versions(tmp_path: Path, monkeypatch: py
     _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"])
     _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"])
     rc = runner.run(bridge_id="thread", json_output=True, advisory=True)
-    captured = sys.stdout
-    # We need to capture stdout. Re-run with capsys-style approach via subprocess.
-    # Skip subprocess for unit-level coverage; the test counts what the runner returns.
+    # The test counts what the runner returns; stdout capture not needed for unit coverage.
     assert rc == 0  # advisory always 0
 
 

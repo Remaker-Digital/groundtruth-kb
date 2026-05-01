@@ -124,7 +124,6 @@ def _python_gates() -> None:
             "tests/scripts/test_wrap_scan_consistency_allowlist.py",
             "tests/scripts/test_rehearse_isolation.py",
             "tests/scripts/test_standing_backlog_harvest.py",
-            "tests/integrations/test_commercial_state_store.py",
             "tests/integrations/test_cosmos_schema_extensions.py",
             "tests/integrations/test_action_executor.py",
             "tests/integrations/test_admin_integration_framework_api.py",

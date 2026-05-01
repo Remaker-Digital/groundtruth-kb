@@ -543,7 +543,7 @@ def test_workflow_run_can_prefer_release_branch_over_newer_pr_run() -> None:
 def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     module = _load_module()
 
-    model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
+    model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition", harness_name="claude")
     report = module.render_report(model, "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
 
     assert model["role"]["assumed_role"] == "Loyal Opposition"
