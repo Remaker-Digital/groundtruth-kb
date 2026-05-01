@@ -6,10 +6,13 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-adr-evaluation-enforcement-2026-04-30
+NO-GO: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-004.md
+REVISED: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-003.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-002.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-001.md
 
 Document: dashboard-link-localhost-correction-2026-04-30
+NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-010.md
 REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-009.md
 NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-008.md
 NEW: bridge/dashboard-link-localhost-correction-2026-04-30-007.md
