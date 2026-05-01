@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-adr-evaluation-enforcement-2026-04-30
+NEW: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-001.md
+
 Document: dashboard-link-localhost-correction-2026-04-30
 GO: bridge/dashboard-link-localhost-correction-2026-04-30-006.md
 REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-005.md
