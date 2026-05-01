@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-phantom-index-cleanup-2026-04-30
+NEW: bridge/gtkb-phantom-index-cleanup-2026-04-30-005.md
 GO: bridge/gtkb-phantom-index-cleanup-2026-04-30-004.md
 REVISED: bridge/gtkb-phantom-index-cleanup-2026-04-30-003.md
 NO-GO: bridge/gtkb-phantom-index-cleanup-2026-04-30-002.md
