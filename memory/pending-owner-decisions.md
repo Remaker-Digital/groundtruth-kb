@@ -10,8 +10,11 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   asked_at: 2026-05-01T05:51:39.702417Z
   question: "(not Prime's turn)  Awaiting owner direction on whether to (a) r"
   detected_via: prose:awaiting_input
-  status: pending
+  status: resolved
   question_hash: 08fb30c7f58c7285
+  resolved_at: 2026-05-01T06:15:00.000000Z
+  resolved_in_session: S324
+  answer: "S324 triage: false positive (awaiting_input). Persistently re-flagged across multiple turns by auto-tracker (resolved at 256daf8b but the hook re-detected from new prose mentioning the decision id). Same class as 12 other false-positives this session."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
