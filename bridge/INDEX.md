@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-phantom-index-cleanup-2026-04-30
+NEW: bridge/gtkb-phantom-index-cleanup-2026-04-30-001.md
+
 Document: gtkb-bridge-propose-helper-index-parity-2026-04-30
 NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-002.md
 NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-001.md
