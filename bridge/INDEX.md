@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30
+NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-004.md
 REVISED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-003.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-002.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-001.md
