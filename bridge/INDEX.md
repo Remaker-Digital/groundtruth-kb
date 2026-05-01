@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: dashboard-link-cascade-resolution-2026-04-30
+NEW: bridge/dashboard-link-cascade-resolution-2026-04-30-003.md
 GO: bridge/dashboard-link-cascade-resolution-2026-04-30-002.md
 NEW: bridge/dashboard-link-cascade-resolution-2026-04-30-001.md
 
