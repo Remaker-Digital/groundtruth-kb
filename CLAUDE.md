@@ -9,11 +9,9 @@ This document provides active guidance for AI assistants working on the Agent Re
 > **📁 Historical archive** (session logs, technical decisions): `CLAUDE_ARCHIVE.md` — read when investigating historical decisions.
 > **📁 Session memory** (operational patterns, lessons): `memory/MEMORY.md` — active GT-KB memory must resolve inside `E:\GT-KB`, not a home-directory mirror or legacy project path.
 
-### Canonical Terminology (Glossary)
+### Canonical Terminology
 
-- **GT-KB (GroundTruth-KB) / Internal Developer Platform (IDP):** GT-KB is an Internal Developer Platform for individual developers building production software with AI assistance; it provides shared platform infrastructure, governance artifacts, and conventions that adopter applications consume. Expanded reference: `docs/gtkb-idp-concept.md`. Canonical operating-model artifact: `.claude/rules/operating-model.md` §2 (active; rule-cited soft authority).
-- **AI coding harness:** A concrete AI-assisted development environment (e.g., Claude Code, Codex CLI). Roles (Prime Builder, Loyal Opposition) attach to harnesses by owner assignment, not by vendor.
-- **Adopter:** An application that consumes GT-KB (like Agent Red Customer Experience). Governance flows from GT-KB templates to the adopter via scaffolding and upgrade. See `.claude/rules/operating-model.md` for canonical application/project/platform/hosted-application terminology.
+Canonical glossary lives at `.claude/rules/operating-model.md` §2 (active; rule-cited soft authority). It defines `application`, `project`, `platform`, `hosted application`, `work item`, `backlog`, `specification`, `requirement`, `implementation proposal`, `implementation report`, `verification`, `release`, `MemBase`, `Deliberation Archive`, and `dashboard`. **Adopter:** an application that consumes GT-KB (like Agent Red Customer Experience). **AI coding harness:** a concrete AI-assisted development environment (e.g., Claude Code, Codex CLI); roles attach to harnesses by owner assignment, not by vendor.
 
 ### Mandatory Project Root Boundary
 
@@ -33,16 +31,11 @@ managed by GT-KB.
 
 ### CLAUDE.md vs MEMORY.md Boundary
 
-| File | Role | Content | Update frequency |
-|------|------|---------|-----------------|
-| **CLAUDE.md** | Rules & behavior | How to work: procedures, mandates, evaluation criteria. | Rarely — only when rules change. |
-| **MEMORY.md** | State & bootstrap | What has been done, how to connect to the DB and artifacts. | Every session — updated during wrap-up. |
-
-**Rule of thumb:** If it tells Claude *what to do*, it goes in CLAUDE.md. If it tells Claude *what has been done* or *how to access something*, it goes in MEMORY.md. Version numbers, image tags, and environment values go in MEMORY.md only. **All project knowledge lives in the Knowledge Database** — not in markdown files.
+CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely). MEMORY.md = state & bootstrap (what has been done, how to access artifacts; updated every session). **All project knowledge lives in MemBase** (`groundtruth.db` per `.claude/rules/operating-model.md` §2) — not markdown files. Version numbers, image tags, and environment values go in MEMORY.md only.
 
 ### Session ID Convention
 
-Session IDs follow the format `S{N}` where N is a monotonically increasing integer. Derived by reading MEMORY.md's "Recent Sessions" section and incrementing the highest session number by 1.
+`S{N}` format; N is a monotonically increasing integer derived by reading MEMORY.md's "Recent Sessions" section.
 
 ---
 
@@ -303,6 +296,4 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 
 ---
 
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-04-07*
-*Version: 66.0.0*
+*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved. Last Updated: 2026-04-30 (S324). Version: 66.1.0.*
