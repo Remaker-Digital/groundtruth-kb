@@ -5,7 +5,11 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30
+NEW: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-001.md
+
 Document: dashboard-link-cascade-resolution-2026-04-30
+VERIFIED: bridge/dashboard-link-cascade-resolution-2026-04-30-004.md
 NEW: bridge/dashboard-link-cascade-resolution-2026-04-30-003.md
 GO: bridge/dashboard-link-cascade-resolution-2026-04-30-002.md
 NEW: bridge/dashboard-link-cascade-resolution-2026-04-30-001.md
