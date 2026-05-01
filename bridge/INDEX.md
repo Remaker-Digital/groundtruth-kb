@@ -9,6 +9,7 @@ Document: gtkb-adr-evaluation-enforcement-2026-04-30
 NEW: bridge/gtkb-adr-evaluation-enforcement-2026-04-30-001.md
 
 Document: dashboard-link-localhost-correction-2026-04-30
+NEW: bridge/dashboard-link-localhost-correction-2026-04-30-007.md
 GO: bridge/dashboard-link-localhost-correction-2026-04-30-006.md
 REVISED: bridge/dashboard-link-localhost-correction-2026-04-30-005.md
 NO-GO: bridge/dashboard-link-localhost-correction-2026-04-30-004.md
