@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-phantom-index-cleanup-2026-04-30
+VERIFIED: bridge/gtkb-phantom-index-cleanup-2026-04-30-006.md
 NEW: bridge/gtkb-phantom-index-cleanup-2026-04-30-005.md
 GO: bridge/gtkb-phantom-index-cleanup-2026-04-30-004.md
 REVISED: bridge/gtkb-phantom-index-cleanup-2026-04-30-003.md
@@ -19,6 +20,7 @@ NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-002.md
 NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-001.md
 
 Document: gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30
+NEW: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-007.md
 GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-006.md
 REVISED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-005.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-004.md
