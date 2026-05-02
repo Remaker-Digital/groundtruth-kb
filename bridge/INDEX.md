@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-017-slice2-5-rationale-schema-extension
+REVISED: bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-003.md
+NO-GO: bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-002.md
 NEW: bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-001.md
 
 Document: gtkb-bridge-propose-helper-index-parity-2026-05-02
