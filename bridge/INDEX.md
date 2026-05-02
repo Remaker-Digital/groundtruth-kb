@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-propose-helper-index-parity-2026-05-02
+NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-006.md
 REVISED: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-005.md
 NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-004.md
 REVISED: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-003.md
