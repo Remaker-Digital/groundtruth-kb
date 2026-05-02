@@ -124,12 +124,18 @@ class OwnershipMeta:
 
     ``adopter_divergence_policy`` is ``None`` iff ``upgrade_policy`` is one of
     ``preserve`` / ``transient``. Enforced by :func:`_extract_ownership_block`.
+
+    ``notes`` carries per-row rationale text per GTKB-ISOLATION-017 Slice 2.5
+    (`bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-006.md`).
+    Defaults to empty for backward-compat; T2 enforces non-empty notes for
+    `gt-kb-managed` and `gt-kb-scaffolded` records.
     """
 
     ownership: OwnershipEnum
     upgrade_policy: UpgradePolicyEnum
     adopter_divergence_policy: DivergencePolicyEnum | None
     workflow_targets: tuple[str, ...] = ()
+    notes: str = ""
 
 
 @dataclass(frozen=True)
@@ -386,6 +392,7 @@ def _extract_ownership_block(record: dict[str, Any], class_: str) -> OwnershipMe
             upgrade_policy=cast(UpgradePolicyEnum, default_upgrade),
             adopter_divergence_policy=cast(DivergencePolicyEnum, default_divergence),
             workflow_targets=_coerce_workflow_targets(record.get("workflow_targets"), record_id),
+            notes=_coerce_notes(record.get("notes"), record_id),
         )
 
     # C1: at least one ownership key is present → validate the whole block.
@@ -442,7 +449,21 @@ def _extract_ownership_block(record: dict[str, Any], class_: str) -> OwnershipMe
         upgrade_policy=cast(UpgradePolicyEnum, upgrade_policy_val),
         adopter_divergence_policy=(cast(DivergencePolicyEnum, divergence_val) if divergence_val is not None else None),
         workflow_targets=_coerce_workflow_targets(record.get("workflow_targets"), record_id),
+        notes=_coerce_notes(record.get("notes"), record_id),
     )
+
+
+def _coerce_notes(raw: Any, record_id: str) -> str:
+    """Coerce optional ``notes`` field to str (per Slice 2.5 schema extension).
+
+    Defaults to empty string when absent, preserving backward-compat with
+    pre-Slice-2.5 TOML rows.
+    """
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise InvalidArtifactRecord(f"record {record_id!r}: notes must be str when present; got {type(raw).__name__}")
+    return raw
 
 
 def _coerce_workflow_targets(raw: Any, record_id: str) -> tuple[str, ...]:

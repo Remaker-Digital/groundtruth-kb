@@ -348,7 +348,7 @@ def _to_ownership_record(artifact: ManagedArtifact) -> OwnershipRecord:
         adopter_divergence_policy=reg_meta.adopter_divergence_policy,
         source_class=source_class,
         workflow_targets=reg_meta.workflow_targets,
-        notes="",
+        notes=reg_meta.notes,
         source=artifact,
         path_glob=None,
         priority=None,

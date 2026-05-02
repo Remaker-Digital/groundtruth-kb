@@ -97,6 +97,7 @@ upgrade_policy = "transient"
 # These rows deterministically surface Agent Red's stale v0.2.1 GT-KB pins as
 # owner-decision-pending entries in the classification report. See
 # `bridge/gtkb-artifact-ownership-matrix-004.md` §C3.
+notes = "Transient staging directory for `gt project upgrade --apply`; product-managed because the staging-area contract is framework-defined."
 
 [[artifacts]]
 class = "ownership-glob"

@@ -35,6 +35,7 @@ doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "SessionStart assertion-catalog enforcement; product-managed because assertion semantics are framework-defined."
 
 [[artifacts]]
 class = "hook"
@@ -47,6 +48,7 @@ doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "UserPromptSubmit spec-language prompt classifier; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -59,6 +61,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "UserPromptSubmit owner-input intake classifier; product-managed because intake taxonomy is framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -71,6 +74,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PreToolUse destructive-op gate; product-managed framework safety policy."
 
 [[artifacts]]
 class = "hook"
@@ -83,6 +87,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PreToolUse credential-pattern scanner; product-managed because the credential catalog is shared framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -95,6 +100,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Scheduler hook placeholder; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -107,6 +113,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PreToolUse safe-writer for non-credential content; product-managed framework safety policy."
 
 [[artifacts]]
 class = "hook"
@@ -119,6 +126,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PreToolUse Write/Edit gate enforcing bridge-protocol compliance; product-managed because protocol contracts are framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -131,6 +139,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "UserPromptSubmit deliberation-search policy gate; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -143,6 +152,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PostToolUse deliberation-search-invocation tracker; product-managed framework observability policy."
 
 [[artifacts]]
 # Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
@@ -159,6 +169,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PostToolUse spec-mutation event surfacer; product-managed framework observability policy."
 
 [[artifacts]]
 class = "hook"
@@ -171,6 +182,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PreToolUse anti-drift gate ('KB lives in MemBase, not new markdown'); product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -183,6 +195,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Session-health monitoring hook; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -195,6 +208,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "SessionStart governance dispatcher; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -212,6 +226,7 @@ adopter_divergence_policy = "warn"
 # §5.5-§5.9). Dual-agent-only. _delib_common is a shared helper module (no
 # settings-hook-registration). The other four are event hooks with matching
 # settings-hook-registration entries below.
+notes = "PreToolUse GOV-01 spec-first enforcement gate; product-managed framework governance policy."
 
 [[artifacts]]
 class = "hook"
@@ -224,6 +239,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Shared helper module for deliberation hooks; product-managed because the helper API is framework-defined."
 
 [[artifacts]]
 class = "hook"
@@ -236,6 +252,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "UserPromptSubmit turn-marker recorder; product-managed framework session-state policy."
 
 [[artifacts]]
 class = "hook"
@@ -248,6 +265,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "UserPromptSubmit gate enforcing pre-action deliberation search; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -260,6 +278,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "PostToolUse owner-decision archiver to Deliberation Archive; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -276,6 +295,7 @@ adopter_divergence_policy = "warn"
 # =========================================================================
 # RULES (10 records)
 # =========================================================================
+notes = "UserPromptSubmit GOV-09 specification-language classifier; product-managed framework governance policy."
 
 [[artifacts]]
 class = "rule"
@@ -288,6 +308,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Prime Builder role rule; product-managed because role contracts are framework-defined."
 
 [[artifacts]]
 class = "rule"
@@ -300,6 +321,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Loyal Opposition role rule; product-managed because role contracts are framework-defined."
 
 [[artifacts]]
 class = "rule"
@@ -312,6 +334,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Bridge-poller canonical-state rule; product-managed because poller protocol is framework-defined."
 
 [[artifacts]]
 class = "rule"
@@ -324,6 +347,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Prime/Bridge collaboration protocol; product-managed framework operating-mode rule."
 
 [[artifacts]]
 class = "rule"
@@ -336,6 +360,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Report-depth + Prime Builder context standard; product-managed framework reporting rule."
 
 [[artifacts]]
 class = "rule"
@@ -348,6 +373,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "File-bridge protocol contract; product-managed because bridge file/INDEX format is framework-defined."
 
 [[artifacts]]
 class = "rule"
@@ -360,6 +386,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Bridge-protocol essential rule (top-priority mandate); product-managed because bridge integrity is framework-critical."
 
 [[artifacts]]
 class = "rule"
@@ -377,6 +404,7 @@ adopter_divergence_policy = "warn"
 # SPEC-TERMINOLOGY-CONFIG-TOML). Presence/validity is enforced by the
 # composite ``_check_canonical_terminology()`` (not generic ``_check_rules()``
 # Markdown enumeration). ``doctor_required_profiles`` is intentionally empty.
+notes = "Deliberation Archive protocol rule; product-managed because DA semantics are framework-defined."
 [[artifacts]]
 class = "rule"
 id = "rule.canonical-terminology"
@@ -388,6 +416,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Canonical terminology guidance rule; product-managed because the term set is framework-defined."
 
 [[artifacts]]
 class = "rule"
@@ -404,6 +433,7 @@ adopter_divergence_policy = "warn"
 # =========================================================================
 # SKILLS (6 records)
 # =========================================================================
+notes = "Canonical-terminology TOML config; product-managed because the term/file matrix is framework policy."
 
 [[artifacts]]
 class = "skill"
@@ -416,6 +446,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "decision-capture SKILL.md manifest; product-managed because skill contract is framework-defined."
 
 [[artifacts]]
 class = "skill"
@@ -428,6 +459,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "decision-capture helper module; product-managed because Deliberation Archive write contracts are framework-defined."
 
 [[artifacts]]
 class = "skill"
@@ -440,6 +472,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "bridge-propose SKILL.md manifest; product-managed because skill contract is framework-defined."
 
 [[artifacts]]
 class = "skill"
@@ -452,6 +485,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "bridge-propose write_bridge.py helper; product-managed because bridge-creation contracts are framework-defined."
 
 [[artifacts]]
 class = "skill"
@@ -464,6 +498,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "spec-intake SKILL.md manifest; product-managed because skill contract is framework-defined."
 
 [[artifacts]]
 class = "skill"
@@ -481,6 +516,7 @@ adopter_divergence_policy = "warn"
 # SETTINGS-HOOK-REGISTRATION (15 records — 11 original + 4 governance hook
 # registrations per gtkb-da-governance-completeness-implementation-016)
 # =========================================================================
+notes = "spec-intake helper module; product-managed because spec-intake contract is framework-defined."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -494,6 +530,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers session-start-governance on SessionStart; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -507,6 +544,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers assertion-check hook on SessionStart; product-managed because the registration is part of the framework hook contract."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -520,6 +558,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers delib-search-gate on UserPromptSubmit; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -533,6 +572,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers intake-classifier on UserPromptSubmit; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -546,6 +586,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers delib-search-tracker on PostToolUse; product-managed framework registration."
 
 [[artifacts]]
 # Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
@@ -562,6 +603,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers spec-event-surfacer on PostToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -575,6 +617,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers spec-before-code on PreToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -588,6 +631,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers bridge-compliance-gate on PreToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -601,6 +645,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers kb-not-markdown on PreToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -614,6 +659,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers destructive-gate on PreToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -627,6 +673,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers credential-scan on PreToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -645,6 +692,7 @@ adopter_divergence_policy = "warn"
 # gtkb-da-governance-completeness-implementation-015 §A). First rows to opt
 # in to BOTH upgrade enforcement AND doctor enforcement. Registry order
 # below is the authoritative target order for the structured-merge.
+notes = "Registers scanner-safe-writer on PreToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -658,6 +706,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers turn-marker on UserPromptSubmit; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -671,6 +720,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers delib-preflight-gate on UserPromptSubmit; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -684,6 +734,7 @@ doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Registers gov09-capture on UserPromptSubmit; product-managed framework registration."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -702,6 +753,7 @@ adopter_divergence_policy = "warn"
 # GITIGNORE-PATTERN (4 records — 1 original + 3 adopter-critical per
 # gtkb-settings-merge C4)
 # =========================================================================
+notes = "Registers owner-decision-capture on PostToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "gitignore-pattern"
@@ -714,6 +766,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Ignore hook log files; product-managed because hook log paths are framework convention."
 
 [[artifacts]]
 class = "gitignore-pattern"
@@ -726,6 +779,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Ignore groundtruth.db (large runtime SQLite); product-managed framework gitignore policy."
 
 [[artifacts]]
 class = "gitignore-pattern"
@@ -738,6 +792,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Ignore .groundtruth-chroma working directory; product-managed framework gitignore policy."
 
 [[artifacts]]
 class = "gitignore-pattern"
@@ -750,4 +805,5 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
+notes = "Ignore .claude/settings.local.json adopter overrides; product-managed framework gitignore policy."
 
