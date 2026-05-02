@@ -6,9 +6,15 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02
+NEW: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-005.md
+GO: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-004.md
+REVISED: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-003.md
+NO-GO: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-002.md
 NEW: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-001.md
 
 Document: gtkb-isolation-017-slice2-registry-isolation
+NEW: bridge/gtkb-isolation-017-slice2-registry-isolation-005.md
+GO: bridge/gtkb-isolation-017-slice2-registry-isolation-004.md
 REVISED: bridge/gtkb-isolation-017-slice2-registry-isolation-003.md
 NO-GO: bridge/gtkb-isolation-017-slice2-registry-isolation-002.md
 NEW: bridge/gtkb-isolation-017-slice2-registry-isolation-001.md

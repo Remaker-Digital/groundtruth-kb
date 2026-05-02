@@ -280,7 +280,7 @@ def main(argv: list[str] | None = None) -> int:
         DISPATCH_TABLE if args.phase == "all" else tuple(entry for entry in DISPATCH_TABLE if entry[0] == args.phase)
     )
 
-    print(f"rehearse_isolation: Wave 2 dispatch — {len(selected)} phase(s)")
+    print(f"rehearse_isolation: Wave {wave} dispatch — {len(selected)} phase(s)")
     print(f"  output_dir: {output_dir}")
     print(f"  manifest:   {args.manifest}")
     print(f"  dry_run:    {dry_run}")

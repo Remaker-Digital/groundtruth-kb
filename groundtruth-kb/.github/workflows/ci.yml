@@ -17,6 +17,16 @@ on:
 #   Cross-platform smoke (Codex condition): Ubuntu + Windows + macOS
 #   in base/no-search state, plus a targeted CLI subset to catch path
 #   and SQLite edge cases.
+#
+# GTKB-ISOLATION-017 Slice 2 (AST gate + registry drift detection):
+#   The four registry-isolation tests live under tests/ and are CI-collected
+#   by this test-base lane without bespoke workflow steps. They enforce
+#   Phase 9 §"Regression Visibility" lines 405-407 (AST gate + drift):
+#     - tests/test_registry_ast_coverage.py
+#     - tests/test_registry_drift_detection.py
+#     - tests/test_registry_target_path_round_trip.py
+#     - tests/test_registry_schema_and_ci.py
+#   See bridge/gtkb-isolation-017-slice2-registry-isolation-004.md (GO).
 
 jobs:
   # test-base: full pytest in the base install state (no search extra)

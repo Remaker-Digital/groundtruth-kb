@@ -1,0 +1,71 @@
+# GTKB-ISOLATION-017 Slice 2 registry-id-set golden snapshot.
+# Regenerate with:
+#   cd E:/GT-KB && python -c "from groundtruth_kb.project.ownership import OwnershipResolver; print(chr(10).join(sorted(r.id for r in OwnershipResolver().all_records())))" > groundtruth-kb/tests/fixtures/registry-id-set.txt
+# (then prepend this comment block).
+#
+# Per Codex GO -004: snapshot regeneration is a deliberate dev step;
+# T4 in test_registry_drift_detection.py asserts no diff vs this file.
+adopter-bridge-files
+adopter-groundtruth-db
+adopter-groundtruth-toml
+adopter-memory-files
+adopter-requirements-local-txt
+adopter-requirements-test-txt
+adopter-webapp
+gitignore.hook-logs
+gitignore.kb-database
+gitignore.kb-working-dir
+gitignore.settings-local
+gt-kb-staging
+hook._delib_common
+hook.assertion-check
+hook.bridge-compliance-gate
+hook.credential-scan
+hook.delib-preflight-gate
+hook.delib-search-gate
+hook.delib-search-tracker
+hook.destructive-gate
+hook.gov09-capture
+hook.intake-classifier
+hook.kb-not-markdown
+hook.owner-decision-capture
+hook.scanner-safe-writer
+hook.scheduler
+hook.session-health
+hook.session-start-governance
+hook.spec-before-code
+hook.spec-classifier
+hook.spec-event-surfacer
+hook.turn-marker
+rule.bridge-essential
+rule.bridge-poller-canonical
+rule.canonical-terminology
+rule.canonical-terminology-config
+rule.deliberation-protocol
+rule.file-bridge-protocol
+rule.loyal-opposition
+rule.prime-bridge-collaboration-protocol
+rule.prime-builder
+rule.report-depth
+settings.hook.assertion-check.sessionstart
+settings.hook.bridge-compliance-gate.pretooluse
+settings.hook.credential-scan.pretooluse
+settings.hook.delib-preflight-gate.userpromptsubmit
+settings.hook.delib-search-gate.userpromptsubmit
+settings.hook.delib-search-tracker.posttooluse
+settings.hook.destructive-gate.pretooluse
+settings.hook.gov09-capture.userpromptsubmit
+settings.hook.intake-classifier.userpromptsubmit
+settings.hook.kb-not-markdown.pretooluse
+settings.hook.owner-decision-capture.posttooluse
+settings.hook.scanner-safe-writer.pretooluse
+settings.hook.session-start-governance.sessionstart
+settings.hook.spec-before-code.pretooluse
+settings.hook.spec-event-surfacer.posttooluse
+settings.hook.turn-marker.userpromptsubmit
+skill.bridge-propose.helper
+skill.bridge-propose.skill-md
+skill.decision-capture.helper
+skill.decision-capture.skill-md
+skill.spec-intake.helper
+skill.spec-intake.skill-md
