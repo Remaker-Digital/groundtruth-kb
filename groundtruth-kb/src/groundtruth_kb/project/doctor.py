@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
@@ -32,7 +32,7 @@ class ToolCheck:
     found: bool
     version: str | None = None
     min_version: str | None = None
-    status: Literal["pass", "fail", "warning"] = "pass"
+    status: Literal["pass", "fail", "warning", "info"] = "pass"
     message: str = ""
     auto_installable: bool = False
 
@@ -1832,6 +1832,14 @@ def run_doctor(
         checks.append(_check_smart_bridge_poller(target))
         checks.append(_check_da_harvest_coverage(target))
 
+    # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
+    # Local import avoids a circular dependency: doctor_isolation imports
+    # ToolCheck from this module.
+    from groundtruth_kb.project.doctor_isolation import run_isolation_checks
+
+    _PRODUCT_ROOT = Path(__file__).resolve().parents[3]
+    checks.extend(run_isolation_checks(target, profile, product_root=_PRODUCT_ROOT))
+
     # Auto-install pass
     if auto_install:
         checks = [_try_auto_install(c) for c in checks]
@@ -1850,7 +1858,7 @@ def format_doctor_report(report: DoctorReport) -> str:
         "",
     ]
 
-    status_icons = {"pass": "[OK]", "fail": "[FAIL]", "warning": "[WARN]"}
+    status_icons = {"pass": "[OK]", "fail": "[FAIL]", "warning": "[WARN]", "info": "[INFO]"}
 
     for check in report.checks:
         icon = status_icons[check.status]
@@ -1870,3 +1878,29 @@ def format_doctor_report(report: DoctorReport) -> str:
 
     lines.append("")
     return "\n".join(lines)
+
+
+def format_doctor_report_json(report: DoctorReport) -> dict[str, Any]:
+    """Machine-readable JSON shape for dashboard ingestion.
+
+    Per Phase 9 §4 line 226-228 (GTKB-ISOLATION-017 Slice 1): doctor output
+    is machine-readable JSON plus a human-readable summary; both feed the
+    adopter's dashboard per Phase 5. Schema is versioned for forward-compat.
+    """
+    return {
+        "schema_version": "1",
+        "profile": report.profile,
+        "overall": report.overall,
+        "checks": [
+            {
+                "name": c.name,
+                "required": c.required,
+                "found": c.found,
+                "version": c.version,
+                "min_version": c.min_version,
+                "status": c.status,
+                "message": c.message,
+            }
+            for c in report.checks
+        ],
+    }

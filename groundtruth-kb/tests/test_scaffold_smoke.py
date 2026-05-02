@@ -80,12 +80,19 @@ def test_smoke_local_only_no_leakage(tmp_path: Path) -> None:
 
 
 def test_smoke_local_only_doctor_not_fail(tmp_path: Path) -> None:
-    """local-only scaffold passes run_doctor() (no fail-level issues)."""
+    """local-only scaffold passes run_doctor() (no fail-level issues).
+
+    Scoped to non-isolation checks per GTKB-ISOLATION-017 Slice 1: the new
+    ``isolation:*`` checks measure post-isolation invariants (Phase 9 §4) that
+    fresh scaffolds legitimately do not yet satisfy. Isolation-check behavior
+    is asserted separately in tests/test_doctor_isolation.py.
+    """
     options = _make_options("local-only", tmp_path)
     scaffold_project(options)
     report = run_doctor(tmp_path / "project", "local-only")
-    assert report.overall != "fail", "Doctor returned fail for local-only. Checks:\n" + "\n".join(
-        f"  {c.status}: {c.message}" for c in report.checks
+    fails = [c for c in report.checks if c.status == "fail" and c.required and not c.name.startswith("isolation:")]
+    assert not fails, "Doctor returned fail for local-only. Checks:\n" + "\n".join(
+        f"  {c.status}: {c.message}" for c in fails
     )
 
 
@@ -116,12 +123,16 @@ def test_smoke_dual_agent_no_leakage(tmp_path: Path) -> None:
 
 
 def test_smoke_dual_agent_doctor_not_fail(tmp_path: Path) -> None:
-    """dual-agent scaffold passes run_doctor() (no fail-level issues)."""
+    """dual-agent scaffold passes run_doctor() (no fail-level issues).
+
+    Scoped to non-isolation checks per GTKB-ISOLATION-017 Slice 1.
+    """
     options = _make_options("dual-agent", tmp_path)
     scaffold_project(options)
     report = run_doctor(tmp_path / "project", "dual-agent")
-    assert report.overall != "fail", "Doctor returned fail for dual-agent. Checks:\n" + "\n".join(
-        f"  {c.status}: {c.message}" for c in report.checks
+    fails = [c for c in report.checks if c.status == "fail" and c.required and not c.name.startswith("isolation:")]
+    assert not fails, "Doctor returned fail for dual-agent. Checks:\n" + "\n".join(
+        f"  {c.status}: {c.message}" for c in fails
     )
 
 
@@ -167,10 +178,14 @@ def test_smoke_dual_agent_webapp_no_leakage(tmp_path: Path) -> None:
 
 
 def test_smoke_dual_agent_webapp_doctor_not_fail(tmp_path: Path) -> None:
-    """dual-agent-webapp scaffold passes run_doctor() (no fail-level issues)."""
+    """dual-agent-webapp scaffold passes run_doctor() (no fail-level issues).
+
+    Scoped to non-isolation checks per GTKB-ISOLATION-017 Slice 1.
+    """
     options = _make_options("dual-agent-webapp", tmp_path, cloud_provider="azure")
     scaffold_project(options)
     report = run_doctor(tmp_path / "project", "dual-agent-webapp")
-    assert report.overall != "fail", "Doctor returned fail for dual-agent-webapp. Checks:\n" + "\n".join(
-        f"  {c.status}: {c.message}" for c in report.checks
+    fails = [c for c in report.checks if c.status == "fail" and c.required and not c.name.startswith("isolation:")]
+    assert not fails, "Doctor returned fail for dual-agent-webapp. Checks:\n" + "\n".join(
+        f"  {c.status}: {c.message}" for c in fails
     )

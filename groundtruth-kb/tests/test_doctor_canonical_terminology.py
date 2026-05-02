@@ -213,10 +213,17 @@ def test_run_doctor_includes_canonical_terminology_check(tmp_path: Path, profile
 
 @pytest.mark.parametrize("profile", ["local-only", "dual-agent", "dual-agent-webapp"])
 def test_run_doctor_fresh_scaffold_zero_error(tmp_path: Path, profile: str) -> None:
-    """Fresh scaffold produces zero ERROR findings from run_doctor (per bridge -005 §Verification)."""
+    """Fresh scaffold produces zero ERROR findings from run_doctor.
+
+    Per bridge -005 §Verification. Scoped to non-isolation checks: GTKB-ISOLATION-017
+    Slice 1 added ``isolation:*`` checks that measure post-isolation invariants (Phase 9
+    §4 lines 199-228), which a pre-isolation fresh scaffold legitimately does not yet
+    satisfy (e.g., writable product hook paths). Isolation-check behavior is asserted
+    separately in tests/test_doctor_isolation.py.
+    """
     target = _scaffold(tmp_path, profile)
     report = run_doctor(target, profile)
-    errors = [c for c in report.checks if c.status == "fail"]
+    errors = [c for c in report.checks if c.status == "fail" and c.required and not c.name.startswith("isolation:")]
     assert not errors, f"profile {profile}: fresh scaffold produced ERROR findings: " + "; ".join(
         f"{c.name}: {c.message}" for c in errors
     )
