@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-bridge-propose-helper-index-parity-2026-05-02
+NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-001.md
+
 Document: gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02
 NEW: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-005.md
 GO: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-004.md
