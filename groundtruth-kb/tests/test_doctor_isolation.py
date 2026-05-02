@@ -80,6 +80,22 @@ def test_check_isolation_service_endpoint_passes_on_scoped_service_url(tmp_path:
     assert result.status == "pass"
 
 
+def test_check_isolation_service_endpoint_fails_on_sqlite_raw_db_url(tmp_path: Path) -> None:
+    """T3b per Codex `-010` F1 fix: `sqlite:///*.db` is a raw-DB endpoint class.
+
+    The approved `-001` proposal classified both `*.db` and `sqlite:///*.db` as
+    raw-DB patterns that must fail. The original landed code evaluated the
+    scoped-URL regex first, so `sqlite:` (a scheme prefix) wrongly matched and
+    a raw `sqlite:///tmp/groundtruth.db` endpoint passed silently. The fix
+    reorders Check 2 to evaluate the raw-DB pattern first.
+    """
+    toml = tmp_path / "groundtruth.toml"
+    toml.write_text('[service]\nendpoint = "sqlite:///tmp/groundtruth.db"\n', encoding="utf-8")
+    result = _check_isolation_service_endpoint_not_raw_db(tmp_path)
+    assert result.status == "fail"
+    assert "raw DB path" in result.message
+
+
 # ---------------------------------------------------------------------------
 # T5, T6, T-DEF, T-COMPAT: durable-work-subject (Phase 9 §4 check 3 + Phase 7)
 # ---------------------------------------------------------------------------

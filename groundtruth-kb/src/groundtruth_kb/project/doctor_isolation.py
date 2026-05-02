@@ -106,14 +106,10 @@ def _check_isolation_service_endpoint_not_raw_db(target: Path) -> ToolCheck:
             status="info",
             message="[service].endpoint absent; not configured",
         )
-    if _SCOPED_SERVICE_URL_RE.match(str(endpoint)):
-        return ToolCheck(
-            name="isolation:service-endpoint",
-            required=True,
-            found=True,
-            status="pass",
-            message=f"service endpoint is a scoped service URL: {endpoint}",
-        )
+    # Raw-DB pattern must be evaluated BEFORE the generic scoped-URL pattern
+    # because both `*.db` and `sqlite:///*.db` are explicit raw-DB classes per
+    # the approved -001 proposal. Otherwise the scheme-prefix scoped-URL rule
+    # would wrongly accept `sqlite:///path/to.db`. Per Codex `-010` F1 fix.
     if _RAW_DB_ENDPOINT_RE.match(str(endpoint)):
         return ToolCheck(
             name="isolation:service-endpoint",
@@ -125,6 +121,14 @@ def _check_isolation_service_endpoint_not_raw_db(target: Path) -> ToolCheck:
                 f"per Phase 9 line 206-207 the application must talk to a "
                 f"scoped service, not the raw groundtruth.db"
             ),
+        )
+    if _SCOPED_SERVICE_URL_RE.match(str(endpoint)):
+        return ToolCheck(
+            name="isolation:service-endpoint",
+            required=True,
+            found=True,
+            status="pass",
+            message=f"service endpoint is a scoped service URL: {endpoint}",
         )
     return ToolCheck(
         name="isolation:service-endpoint",
