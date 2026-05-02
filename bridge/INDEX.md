@@ -5,7 +5,11 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-017-slice2-registry-isolation
+NEW: bridge/gtkb-isolation-017-slice2-registry-isolation-001.md
+
 Document: gtkb-isolation-017-slice1-doctor-checks
+VERIFIED: bridge/gtkb-isolation-017-slice1-doctor-checks-012.md
 REVISED: bridge/gtkb-isolation-017-slice1-doctor-checks-011.md
 NO-GO: bridge/gtkb-isolation-017-slice1-doctor-checks-010.md
 NEW: bridge/gtkb-isolation-017-slice1-doctor-checks-009.md
