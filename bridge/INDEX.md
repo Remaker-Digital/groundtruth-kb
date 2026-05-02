@@ -6,9 +6,11 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-propose-helper-index-parity-2026-05-02
+NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-002.md
 NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-001.md
 
 Document: gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02
+NO-GO: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-006.md
 NEW: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-005.md
 GO: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-004.md
 REVISED: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-003.md
@@ -16,6 +18,7 @@ NO-GO: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-002.md
 NEW: bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-05-02-001.md
 
 Document: gtkb-isolation-017-slice2-registry-isolation
+NO-GO: bridge/gtkb-isolation-017-slice2-registry-isolation-006.md
 NEW: bridge/gtkb-isolation-017-slice2-registry-isolation-005.md
 GO: bridge/gtkb-isolation-017-slice2-registry-isolation-004.md
 REVISED: bridge/gtkb-isolation-017-slice2-registry-isolation-003.md

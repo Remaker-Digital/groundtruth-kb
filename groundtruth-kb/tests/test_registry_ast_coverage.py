@@ -43,21 +43,24 @@ _NON_SCAFFOLDED_TEMPLATE_FILES: frozenset[str] = frozenset(
     }
 )
 
-# Scaffolded template files that are NOT YET in the registry. Tracked here
-# to keep the AST gate green while their registration is owned by a
-# follow-on slice. Per Slice 2 disclosure (`bridge/gtkb-isolation-017-
-# slice2-registry-isolation-003.md` §"Risk / Impact Delta"): registry
-# growth is owned by Slice 3 (`gt project init` adopter-subject defaults +
-# scaffold deliverables) and Slice 2.5 (rationale schema extension).
-# Each entry below is documented in the post-implementation report so the
-# drift remains visible until the owning slice retires it.
+# Owner-approved Slice 3 deferral, authorized at S326 in
+# bridge/gtkb-isolation-017-slice2-registry-isolation-007.md
+# (Codex `-006` F1 fix).
 #
-# Removal contract: when Slice 3 or Slice 2.5 adds a registry row for any
-# of these paths, the corresponding entry must be removed from this list
-# in the same commit. T1b will fail otherwise.
-_KNOWN_DRIFT_PENDING_REGISTRATION: frozenset[str] = frozenset(
+# These 22 scaffolded template files do not have FILE-class registry
+# rows yet because adding them requires extending the file-class enum
+# (`Literal["hook","rule","skill",...]`) with new categories. That work
+# is owned by Slice 3 (`gt project init` adopter-subject defaults +
+# scaffold deliverables) per scoping bridge `-003` lines 95-115.
+#
+# Retire-by gate: GTKB-ISOLATION-017 closeout requires this list to be
+# empty. Slice 3 NO-GO if it ships without registering all 22.
+#
+# T-DEFERRAL asserts every path in this list exists under templates/
+# (catches accidental deletions that would silently retire a deferral).
+_OWNER_APPROVED_SLICE3_DEFERRAL: frozenset[str] = frozenset(
     {
-        # CI templates (Slice 3 scaffold-deliverable scope).
+        # CI templates (10 files; Slice 3 scaffold-deliverable scope).
         "ci/build.yml",
         "ci/deploy.yml",
         "ci/test.yml",
@@ -68,7 +71,7 @@ _KNOWN_DRIFT_PENDING_REGISTRATION: frozenset[str] = frozenset(
         "ci/standard/test.yml",
         "ci/integrations/.coderabbitai.yaml",
         "ci/integrations/dependabot.yml",
-        # Project-root scaffold templates (Slice 3 scope).
+        # Project-root scaffold templates (8 files; Slice 3 scope).
         "project/.editorconfig",
         "project/.pre-commit-config.yaml",
         "project/AGENTS.md",
@@ -77,7 +80,7 @@ _KNOWN_DRIFT_PENDING_REGISTRATION: frozenset[str] = frozenset(
         "project/docker-compose.yml",
         "project/env.example",
         "project/settings.local.json",
-        # Codex bootstrap docs (Slice 3 dual-agent scope).
+        # Codex bootstrap docs (4 files; Slice 3 dual-agent scope).
         "project/codex-bootstrap/CODEX-REVIEW-OPERATING-CONTRACT.md",
         "project/codex-bootstrap/CODEX-SESSION-BOOTSTRAP.md",
         "project/codex-bootstrap/CODEX-WAY-OF-WORKING.md",
@@ -152,7 +155,7 @@ def test_every_template_source_file_has_registry_coverage() -> None:
         rel = path.relative_to(templates_root).as_posix()
         if rel in _NON_SCAFFOLDED_TEMPLATE_FILES or path.name in _NON_SCAFFOLDED_TEMPLATE_FILES:
             continue
-        if rel in _KNOWN_DRIFT_PENDING_REGISTRATION:
+        if rel in _OWNER_APPROVED_SLICE3_DEFERRAL:
             continue
         if rel not in registered_template_paths:
             unregistered.append(rel)
@@ -164,4 +167,25 @@ def test_every_template_source_file_has_registry_coverage() -> None:
         f"templates/managed-artifacts.toml, OR add to the explicit "
         f"_NON_SCAFFOLDED_TEMPLATE_FILES allowlist if the file is "
         f"intentionally template-only (documentation, README)."
+    )
+
+
+def test_owner_approved_slice3_deferral_paths_exist() -> None:
+    """T-DEFERRAL per Codex `-006` F1 fix: every deferral allowlist entry
+    must correspond to a real template file under groundtruth-kb/templates/.
+
+    Catches accidental deletions: if a file is removed from templates/ but
+    its entry remains in the deferral list, the deferral becomes meaningless
+    (we'd be deferring registration of a file that doesn't exist).
+    """
+    templates_root = _templates_dir()
+    missing: list[str] = []
+    for rel in _OWNER_APPROVED_SLICE3_DEFERRAL:
+        if not (templates_root / rel).is_file():
+            missing.append(rel)
+    assert not missing, (
+        f"{len(missing)} deferral entries reference missing files. "
+        f"First 5: {missing[:5]}. Either restore the template file or "
+        f"remove the entry from _OWNER_APPROVED_SLICE3_DEFERRAL "
+        f"(deferring registration of a nonexistent file is meaningless)."
     )
