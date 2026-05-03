@@ -13,6 +13,48 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: f744e229509cbaed
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0339
+  asked_at: 2026-05-03T15:10:22.679200Z
+  question: "d start regardless. Awaiting owner direction on whether to eleva"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: ff8b160d9a72fe60
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0341
+  asked_at: 2026-05-03T15:22:13.082307Z
+  question: "return a selection. Standing by for direction.  **Dispatch status"
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 7d088b8940d4b6f0
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0342
+  asked_at: 2026-05-03T15:23:06.011565Z
+  question: "ses to acknowledge. Standing by for owner direction (note: 2 pending ow"
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 6915fee7b16ac8e2
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0347
+  asked_at: 2026-05-03T15:37:31.641979Z
+  question: "ale plan-level GOs. Awaiting your direction on whether to proce"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: bf9c17f1d7ef7b64
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0351
+  asked_at: 2026-05-03T16:08:27.568209Z
+  question: "reaches VERIFIED.  Want me to take any of those, or are you triaging something else?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 4f63c89058953599
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0359
+  asked_at: 2026-05-03T16:57:20.108501Z
+  question: "read once GO lands. Awaiting your direction or Codex verdict."
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 5a01ac1f9eba886b
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -3917,6 +3959,223 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 8ed52a32660ca01c
   resolved_at: 2026-05-03T14:41:30.173367Z
   answer: "User has answered your questions: \"Should I commit the Slice 5 batch now?\"=\"Yes — single Slice-5-scoped commit (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0338
+  asked_at: 2026-05-03T15:07:41.992766Z
+  question: "Which priority should I take next?"
+  options:
+    - "Slice 6 — Phase 9 §6 documentation chapter (Recommended)"
+    - "Address open NO-GO governance bridges"
+    - "Slice 7 — Phase 9 §7 examples"
+    - "Survey + pick — do a project state probe first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f9ab65495a12813c
+  resolved_at: 2026-05-03T15:07:41.992766Z
+  answer: "User has answered your questions: \"Which priority should I take next?\"=\"Slice 6 — Phase 9 §6 documentation chapter (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0340
+  asked_at: 2026-05-03T15:22:13.082307Z
+  question: "Smart-poller dispatched two architectural-level GOs from 2026-04-26 (gtkb-command-surface, gtkb-incident-response). Both already drove downstream slice work that's been verified/closed. How do you want me to handle them?"
+  options:
+    - "Stand down, no action"
+    - "File rollup-VERIFIED closures"
+    - "Advance to CS-2 slice proposal"
+    - "Continue active slice6 docs work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: acc599a71ec9aecf
+  resolved_at: 2026-05-03T15:22:13.082307Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0343
+  asked_at: 2026-05-03T15:33:22.635858Z
+  question: "Should I commit + push the Slice 6 batch now?"
+  options:
+    - "Yes — commit and push (Recommended)"
+    - "Yes — commit only; hold push"
+    - "Hold — await further direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 744943f1fc041be8
+  resolved_at: 2026-05-03T15:33:22.635858Z
+  answer: "User has answered your questions: \"Should I commit + push the Slice 6 batch now?\"=\"Yes — commit and push (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0344
+  asked_at: 2026-05-03T15:33:22.635858Z
+  question: "Which priority should I take next?"
+  options:
+    - "Slice 7 — examples (Recommended)"
+    - "Address NO-GO governance bridges"
+    - "Slice 5.5 — overlay refresh + disposability"
+    - "Pause + survey project state"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a852cb346710b52d
+  resolved_at: 2026-05-03T15:33:22.635858Z
+  answer: "User has answered your questions: \"Which priority should I take next?\"=\"Slice 7 — examples (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0345
+  asked_at: 2026-05-03T15:33:22.635858Z
+  question: "Decision 6 — Should Slice 7 ship Agent Red as a 5th example?"
+  options:
+    - "No — ship 4 examples only (Recommended)"
+    - "Yes — minimized fixture only, no production paths/secrets"
+    - "Defer Decision 6 — ship 4 now, file Slice 7.5 for Agent Red later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bb55758a7d87b77e
+  resolved_at: 2026-05-03T15:33:22.635858Z
+  answer: "User has answered your questions: \"Decision 6 — Should Slice 7 ship Agent Red as a 5th example?\"=\"No — ship 4 examples only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0346
+  asked_at: 2026-05-03T15:37:31.641979Z
+  question: "Smart poller dispatched two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006, both 2026-04-26) that explicitly do NOT authorize implementation — they delegate to downstream slice proposals. Meanwhile, a fresh actionable GO sits at the top of INDEX: gtkb-isolation-017-slice7-examples-2026-05-03-002 (today). How should I proceed?"
+  options:
+    - "Act on Slice 7 GO (Recommended)"
+    - "Close stale GOs first"
+    - "Force-act on dispatcher selection"
+    - "Status report only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a8bc7e886a97f15c
+  resolved_at: 2026-05-03T15:37:31.641979Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0348
+  asked_at: 2026-05-03T16:06:39.068280Z
+  question: "Should I commit + push the Slice 7 batch now?"
+  options:
+    - "Yes — commit and push (Recommended)"
+    - "Yes — commit only; hold push"
+    - "Hold — await further direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3fa4797ba1df400f
+  resolved_at: 2026-05-03T16:06:39.068280Z
+  answer: "User has answered your questions: \"Should I commit + push the Slice 7 batch now?\"=\"Yes — commit and push (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0349
+  asked_at: 2026-05-03T16:06:39.068280Z
+  question: "Which priority should I take next?"
+  options:
+    - "Slice 8 — release ops + program closeout (Recommended)"
+    - "Address NO-GO governance bridges"
+    - "Pause + clear pending owner decisions + survey"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a23954f07ff11dd2
+  resolved_at: 2026-05-03T16:06:39.068280Z
+  answer: "User has answered your questions: \"Which priority should I take next?\"=\"Address NO-GO governance bridges\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0350
+  asked_at: 2026-05-03T16:06:39.068280Z
+  question: "How should I dispose the two NO-GO governance bridges?"
+  options:
+    - "Close both as superseded by gtkb_bridge_writer.py (Recommended)"
+    - "REVISED-3 each addressing Codex findings (rigorous)"
+    - "Park both in work_list with deferral notes"
+    - "Survey first — read the helper code + work_list before deciding"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 386545e8609ba589
+  resolved_at: 2026-05-03T16:06:39.068280Z
+  answer: "User has answered your questions: \"How should I dispose the two NO-GO governance bridges?\"=\"Close both as superseded by gtkb_bridge_writer.py (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0352
+  asked_at: 2026-05-03T16:16:00.125743Z
+  question: "Should I commit + push both closure threads now?"
+  options:
+    - "Yes — commit and push (Recommended)"
+    - "Yes — commit only; hold push"
+    - "Hold — await further direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2b925e66877d1ebd
+  resolved_at: 2026-05-03T16:16:00.125743Z
+  answer: "User has answered your questions: \"Should I commit + push both closure threads now?\"=\"Yes — commit and push (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0353
+  asked_at: 2026-05-03T16:16:00.125743Z
+  question: "Which priority should I take next?"
+  options:
+    - "Slice 8 — release ops + program closeout (Recommended)"
+    - "Slice 5.5 — overlay refresh + disposability"
+    - "Pause + clear pending decisions + survey"
+    - "Wrap session (no further implementation)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9d9627bea38b8d83
+  resolved_at: 2026-05-03T16:16:00.125743Z
+  answer: "User has answered your questions: \"Which priority should I take next?\"=\"Slice 8 — release ops + program closeout (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0354
+  asked_at: 2026-05-03T16:16:00.125743Z
+  question: "Decision 2 — What GT-KB release version does Slice 8 tag for the adopter tooling?"
+  options:
+    - "v0.7.0-rc1 — release candidate (Recommended)"
+    - "v0.7.0 — GA directly"
+    - "Explicit version other than 0.7.x"
+    - "Defer Decision 2 — don't tag in Slice 8"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4bcac6d1f2f3b5a7
+  resolved_at: 2026-05-03T16:16:00.125743Z
+  answer: "User has answered your questions: \"Decision 2 — What GT-KB release version does Slice 8 tag for the adopter tooling?\"=\"v0.7.0-rc1 — release candidate (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0355
+  asked_at: 2026-05-03T16:16:00.125743Z
+  question: "Decision 4 — Which publicity surfaces should Slice 8 produce / cite for v0.7.0-rc1?"
+  options:
+    - "Release notes — GT-KB CHANGELOG.md entry (Recommended)"
+    - "Docs chapter cite (Recommended)"
+    - "Example repos cite (Recommended)"
+    - "Standalone announcement — dedicated release-announcement doc"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a195e184cef60ffe
+  resolved_at: 2026-05-03T16:16:00.125743Z
+  answer: "User has answered your questions: \"Decision 4 — Which publicity surfaces should Slice 8 produce / cite for v0.7.0-rc1?\"=\"Release notes — GT-KB CHANGELOG.md entry (Recommended),Docs chapter cite (Recommended),Example repos cite (Recommended),Standalone announcement — dedicated release-announcement doc\", \"Decision 4 — Scheduling: when should the publicity surfaces appear?\"=\"Together — single release moment (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0356
+  asked_at: 2026-05-03T16:16:00.125743Z
+  question: "Decision 4 — Scheduling: when should the publicity surfaces appear?"
+  options:
+    - "Together — single release moment (Recommended)"
+    - "Staggered — release notes first, then announcement later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0fc018a3d5a704b6
+  resolved_at: 2026-05-03T16:16:00.125743Z
+  answer: "User has answered your questions: \"Decision 4 — Which publicity surfaces should Slice 8 produce / cite for v0.7.0-rc1?\"=\"Release notes — GT-KB CHANGELOG.md entry (Recommended),Docs chapter cite (Recommended),Example repos cite (Recommended),Standalone announcement — dedicated release-announcement doc\", \"Decision 4 — Scheduling: when should the publicity surfaces appear?\"=\"Together — single release moment (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0357
+  asked_at: 2026-05-03T16:16:00.125743Z
+  question: "Decision 5 — What evidence should declare ISOLATION-017 program complete?"
+  options:
+    - "Composite — all 7 slices VERIFIED + 4/4 examples pass doctor + release-readiness field updated (Recommended)"
+    - "release_readiness_field only — single textual marker"
+    - "doctor_pass_rate_on_sampled_adopters — mechanical CI check only"
+    - "Custom criterion — I'll describe what I want"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 20fed33d3e0506e5
+  resolved_at: 2026-05-03T16:16:00.125743Z
+  answer: "User has answered your questions: \"Decision 5 — What evidence should declare ISOLATION-017 program complete?\"=\"Composite — all 7 slices VERIFIED + 4/4 examples pass doctor + release-readiness field updated (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0358
+  asked_at: 2026-05-03T16:55:41.962862Z
+  question: "How should REVISED-1 of Slice 8 scope the dropped release-readiness blockers?"
+  options:
+    - "All blockers in scope (rigorous, ~3-5 hours session work) (Recommended)"
+    - "Hybrid — defer biggest blockers to Slice 8.5"
+    - "Quick wins only — defer all hardening to Slice 8.5"
+    - "Pause + survey before deciding"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5a67b4d862ac47e5
+  resolved_at: 2026-05-03T16:55:41.962862Z
+  answer: "User has answered your questions: \"How should REVISED-1 of Slice 8 scope the dropped release-readiness blockers?\"=\"All blockers in scope (rigorous, ~3-5 hours session work) (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
