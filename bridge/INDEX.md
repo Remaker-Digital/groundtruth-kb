@@ -5,6 +5,12 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-017-slice6-docs-2026-05-03
+VERIFIED: bridge/gtkb-isolation-017-slice6-docs-2026-05-03-004.md
+NEW: bridge/gtkb-isolation-017-slice6-docs-2026-05-03-003.md
+GO: bridge/gtkb-isolation-017-slice6-docs-2026-05-03-002.md
+NEW: bridge/gtkb-isolation-017-slice6-docs-2026-05-03-001.md
+
 Document: gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03
 VERIFIED: bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-006.md
 NEW: bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-005.md
