@@ -6,10 +6,86 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none — cleared by owner directive S327 end-of-session 2026-05-03)
+- id: DECISION-0336
+  asked_at: 2026-05-03T14:40:38.003400Z
+  question: "steps available** (awaiting owner direction): 1. **File CS-2 br"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: f744e229509cbaed
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
+- id: DECISION-0334
+  asked_at: 2026-05-03T07:55:56.048857Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 4a36306fdea42626
+  resolved_at: 2026-05-03T08:00:00.000000Z
+  resolved_in_session: S328
+  answer: "S328 clear pending: false positive of recurring class. Detector matched offering-or-choice language in agent text from a smart-poller-spawned Codex session output (not from Prime Builder agent text); noise from cross-agent transcript scanning. No actual owner-facing question pending from Prime. Root-cause fix tracked at memory/work_list.md row 29."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0332
+  asked_at: 2026-05-03T07:36:47.704449Z
+  question: ""
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 7d9e6931f83e54f9
+  resolved_at: 2026-05-03T07:40:00.000000Z
+  resolved_in_session: S328
+  answer: "S328 clear pending: false positive of recurring class. Detector matched standing-by language in a Slice 5 status-update prose paragraph; the actual question was already asked-and-answered earlier this session via AskUserQuestion (owner authorized 'proceed autonomously per work_list pre-approval'). Subsequent NEW filing at bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-001.md was the action; Codex returned NO-GO at -002 already (the in-flight bridge state). Root-cause fix tracked at memory/work_list.md row 29 (regex-tightening; deferred under freeze)."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0330
+  asked_at: 2026-05-03T06:20:05.571249Z
+  question: ""
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: ce7cc3c4965e1e5e
+  resolved_at: 2026-05-03T06:25:00.000000Z
+  resolved_in_session: S328
+  answer: "S328 clear pending: same false-positive class as DECISION-0319/0321/0327/0328. Detector matched a 40-char window in prior agent text describing bridge state or smart-poller routing. No owner-facing question pending. Bridge state at resolve: REVISED-3 filed at bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-007.md awaiting Codex re-review per codex-review-gate. Root-cause fix tracked at memory/work_list.md row 29; session-scoped block-disable via GTKB_BLOCK_ON_PROSE_DECISION_ASK=0 in .claude/settings.local.json::env."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0328
+  asked_at: 2026-05-03T04:37:04.336546Z
+  question: ""
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: b4e42ed094c41539
+  resolved_at: 2026-05-03T06:14:00.000000Z
+  resolved_in_session: S328
+  answer: "S328 clear pending: false positive of the same recursive class as DECISION-0327. Detector matched a 40-char window in agent text describing the regex behavior itself, not an owner-facing question. Workaround for remainder of S328: the block-disable env var added to .claude/settings.local.json::env. Root-cause fix tracked at memory/work_list.md row 29 (regex-tightening bridge; deferred under freeze)."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0327
+  asked_at: 2026-05-03T03:47:19.313283Z
+  question: "threads are closed. Awaiting your direction on whether to advan"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 752f968d3475ff65
+  resolved_at: 2026-05-03T03:50:00.000000Z
+  resolved_in_session: S328
+  answer: "S328 clear pending: false positive (awaiting_input). Regex matched a 40-char window in prior agent text; no actual owner-facing question pending. Substantive state at resolve time: REVISED-2 filed at bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-005.md awaiting Codex re-review per codex-review-gate. No Prime action required until Codex returns verdict."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0319
+  asked_at: 2026-05-03T02:44:40.113704Z
+  question: "sibling to row 28.  Want me to (a) take any of these actions, (b) verify with `find` whether other `harness-state/` files have similar Drive cross-links, or (c) draft the sibling backlog row for the out-of-root context-probe gap?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: e7b870fb5781ee7e
+  resolved_at: 2026-05-03T02:50:00.000000Z
+  resolved_in_session: S328
+  answer: "S328 clear pending: false positive (offering_or_choice). The same offering was immediately reformalized via AskUserQuestion in the next turn after the Stop hook block; owner answered 'Break the Codex role-file hardlink (Recommended)' and the action completed. No outstanding owner decision."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0321
+  asked_at: 2026-05-03T02:45:11.558759Z
+  question: "mory/work_list.md`. Awaiting your direction before I open that"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 4c8c2c5d89a6c0ac
+  resolved_at: 2026-05-03T02:50:00.000000Z
+  resolved_in_session: S328
+  answer: "S328 clear pending: false positive (awaiting_input). Regex matched a truncated text fragment that was not an owner-facing question. No missed owner decision."
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0318
   asked_at: 2026-05-03T01:12:07.715125Z
   question: "Acknowledged — standing by for direction."
@@ -40,7 +116,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S327
   answer: "S327 clear pending: false positive (awaiting_input). Truncated prose-detector capture during status report; the underlying decision was formalized via AskUserQuestion in the same turn."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-
 - id: DECISION-0307
   asked_at: 2026-05-02T22:58:23.641469Z
   question: "e correctly parked. Awaiting your next direction (ISOLATION-017 Slic"
@@ -3697,6 +3772,151 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: bcb52ce4c5488011
   resolved_at: 2026-05-03T01:12:07.715125Z
   answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0320
+  asked_at: 2026-05-03T02:45:11.558759Z
+  question: "How should I proceed from this dispatch notification?"
+  options:
+    - "Revise ISOLATION-017 Slice 4 (Recommended)"
+    - "Stand down; report only"
+    - "Triage other actionable bridge work"
+    - "Different work_list item"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 347c2d3d74708479
+  resolved_at: 2026-05-03T02:45:11.558759Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0322
+  asked_at: 2026-05-03T02:46:27.328621Z
+  question: "Which next action(s) should I take on the Codex out-of-root + hardlink findings?"
+  options:
+    - "Break the Codex role-file hardlink (Recommended)"
+    - "Audit all harness-state/ files for hardlinks"
+    - "Draft sibling backlog row for out-of-root context probe"
+    - "Wait for owner verification of screenshot cwd first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0ae420e80f2b7cc2
+  resolved_at: 2026-05-03T02:46:27.328621Z
+  answer: "User has answered your questions: \"Which next action(s) should I take on the Codex out-of-root + hardlink findings?\"=\"Break the Codex role-file hardlink (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0323
+  asked_at: 2026-05-03T03:04:09.421227Z
+  question: "Codex is stuck on a stale dispatch (read role file before the hardlink fix; stood down). Smart-poller won't re-dispatch automatically until bridge signature changes. How should I unstick Codex review of the Slice 4 proposal?"
+  options:
+    - "You'll trigger Codex review manually (Recommended)"
+    - "Reset smart-poller dispatch-state to force re-dispatch"
+    - "File a tiny no-op INDEX touch that changes the signature"
+    - "Wait for the next legitimate bridge change"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e6b1c60cf13b3b8c
+  resolved_at: 2026-05-03T03:04:09.421227Z
+  answer: "User has answered your questions: \"Codex is stuck on a stale dispatch (read role file before the hardlink fix; stood down). Smart-poller won't re-dispatch automatically until bridge signature changes. How should I unstick Codex review of the Slice 4 proposal?\"=\"Reset smart-poller dispatch-state to force re-dispatch\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0324
+  asked_at: 2026-05-03T03:43:15.102860Z
+  question: "Codex `-004` F2: how should `gt project upgrade --accept-migration` interact with `upgrade_policy=preserve` on adopter-owned files (`groundtruth.toml`, `memory/release-readiness.md`) that need isolation fixes?"
+  options:
+    - "--accept-migration overrides preserve for the isolation-fix surface (Recommended)"
+    - "Strict policy enforcement (refuse on preserve files)"
+    - "Hybrid: opt-in per-file via separate flags"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 02092de27f1cd847
+  resolved_at: 2026-05-03T03:43:15.102860Z
+  answer: "User has answered your questions: \"Codex `-004` F2: how should `gt project upgrade --accept-migration` interact with `upgrade_policy=preserve` on adopter-owned files (`groundtruth.toml`, `memory/release-readiness.md`) that need isolation fixes?\"=\"--accept-migration overrides preserve for the isolation-fix surface (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0325
+  asked_at: 2026-05-03T03:45:33.096586Z
+  question: "Smart poller dispatched two old plan-level GOs (gtkb-command-surface-004 and gtkb-incident-response-006, both from 2026-04-26). Neither authorizes implementation directly — both gate future slice proposals. Per durable memory `feedback_smart_poller_advisory_only`, treat as advisory. Which direction should I take?"
+  options:
+    - "Active S328 work first"
+    - "Draft next CS slice proposal"
+    - "Draft IR-0 sub-bridge"
+    - "Address NO-GO queue first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0699bd598136140b
+  resolved_at: 2026-05-03T03:45:33.096586Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0326
+  asked_at: 2026-05-03T03:47:19.313283Z
+  question: "The smart poller dispatched two stale 2026-04-26 plan-level GOs (gtkb-command-surface, gtkb-incident-response) that explicitly do NOT authorize implementation — each requires a follow-up slice/phase proposal. Meanwhile the index has 4 fresh 2026-05-02 NO-GO entries needing Prime revision (top-of-index gtkb-isolation-017-slice4-upgrade, gtkb-bridge-propose-helper-caller-migration, gtkb-bridge-propose-helper-index-parity, etc.). What should I do this turn?"
+  options:
+    - "Action newest NO-GOs first (Recommended)"
+    - "Open follow-up slice for command-surface"
+    - "Open IR-0 fallback proposal"
+    - "File 'plan-level GO closure' notes"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 44c6778a2a93fdb2
+  resolved_at: 2026-05-03T03:47:19.313283Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0329
+  asked_at: 2026-05-03T06:10:46.001765Z
+  question: "The Stop hook is now firing recursively — it matched text I wrote ABOUT the false-positive pattern (in the Insight block + the quoted DECISION-0327 fragment) as new instances of the same false-positive pattern. What's the right disposition for this session?"
+  options:
+    - "Disable the block this session via env var (Recommended)"
+    - "Keep block enabled; I'll avoid quoting matched fragments"
+    - "File a bridge to tighten the regex (post-freeze)"
+    - "All three"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4bcb35a93e3f5de2
+  resolved_at: 2026-05-03T06:10:46.001765Z
+  answer: "User has answered your questions: \"The Stop hook is now firing recursively — it matched text I wrote ABOUT the false-positive pattern (in the Insight block + the quoted DECISION-0327 fragment) as new instances of the same false-positive pattern. What's the right disposition for this session?\"=\"All three\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0331
+  asked_at: 2026-05-03T07:27:14.419668Z
+  question: "Codex `-010` NO-GO on Slice 4 post-impl: check #5 (`isolation:hooks-point-to-wrappers`) is currently classified auto-fixable but the fixer cannot clear all live warning modes (specifically adopter-owned non-wrapper hooks). Which remediation should I implement in REVISED-4?"
+  options:
+    - "Reclassify check #5 as needs-adopter-input (Recommended)"
+    - "Make the fixer aggressive (delete adopter non-wrapper hooks)"
+    - "Hybrid: reclassify by failure mode (auto-fix managed-only failures; refuse adopter-customization failures)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 795402dad3baebdb
+  resolved_at: 2026-05-03T07:27:14.419668Z
+  answer: "User has answered your questions: \"Codex `-010` NO-GO on Slice 4 post-impl: check #5 (`isolation:hooks-point-to-wrappers`) is currently classified auto-fixable but the fixer cannot clear all live warning modes (specifically adopter-owned non-wrapper hooks). Which remediation should I implement in REVISED-4?\"=\"Reclassify check #5 as needs-adopter-input (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0333
+  asked_at: 2026-05-03T07:52:14.975099Z
+  question: "Codex `-002` F1 NO-GO on Slice 5: the scoping bridge GO'd 3 Phase 6 overlay tests (refresh / stale-detection / disposability), but only stale-detection is implementable today (covered by Slice 1's check #9). Refresh + disposability need a user-facing chroma-regeneration API that doesn't exist in the codebase. How should I scope-resolve this for Slice 5 REVISED-1?"
+  options:
+    - "Implement stale-detection in Slice 5; defer refresh+disposability via owner-approved scoping revision (Recommended)"
+    - "Ship a minimum chroma-regen library API in Slice 5 + all 3 tests"
+    - "Defer entire Slice 5 scope-revision to a separate scoping bridge first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1b0f8f5793c09b56
+  resolved_at: 2026-05-03T07:52:14.975099Z
+  answer: "User has answered your questions: \"Codex `-002` F1 NO-GO on Slice 5: the scoping bridge GO'd 3 Phase 6 overlay tests (refresh / stale-detection / disposability), but only stale-detection is implementable today (covered by Slice 1's check #9). Refresh + disposability need a user-facing chroma-regeneration API that doesn't exist in the codebase. How should I scope-resolve this for Slice 5 REVISED-1?\"=\"Implement stale-detection in Slice 5; defer refresh+disposability via owner-approved scoping revision (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0335
+  asked_at: 2026-05-03T08:50:13.237627Z
+  question: "-response:** do you want me to draft IR-0 against the current isolation-017 application-placement reality (Agent Red is now at `applications/Agent_Red/` per the project-root-boundary rule), or park until isolation-017 completes?  Defaulting to \"par"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f72a12c6ff06863a
+  resolved_at: 2026-05-03T14:37:06.550457Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0337
+  asked_at: 2026-05-03T14:41:30.173367Z
+  question: "Should I commit the Slice 5 batch now?"
+  options:
+    - "Yes — single Slice-5-scoped commit (Recommended)"
+    - "Yes — but bundle with S328 carryover too"
+    - "Hold — survey project state first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8ed52a32660ca01c
+  resolved_at: 2026-05-03T14:41:30.173367Z
+  answer: "User has answered your questions: \"Should I commit the Slice 5 batch now?\"=\"Yes — single Slice-5-scoped commit (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
