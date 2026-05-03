@@ -184,8 +184,15 @@ created_at = "2026-01-01T00:00:00Z"
 
     # Pre-copy ALL local-only managed rule files so missing-file planner sees
     # the project as fully scaffolded at current version. Post-canonical-
-    # terminology (v0.6.1): local-only has 3 managed rules.
-    for rule in ["prime-builder.md", "canonical-terminology.md", "canonical-terminology.toml"]:
+    # terminology (v0.6.1): local-only has 3 managed rules. Post-Slice-1
+    # GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL (S327): 3 → 4 with the addition of
+    # canonical-terminology-policy.toml.
+    for rule in [
+        "prime-builder.md",
+        "canonical-terminology.md",
+        "canonical-terminology.toml",
+        "canonical-terminology-policy.toml",
+    ]:
         src = templates / "rules" / rule
         dst = tmp_path / ".claude" / "rules" / rule
         dst.parent.mkdir(parents=True, exist_ok=True)

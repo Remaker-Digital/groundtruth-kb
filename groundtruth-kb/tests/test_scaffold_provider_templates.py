@@ -172,8 +172,21 @@ def test_cli_lo_provider_with_prime_role_raises_usage_error(tmp_path: Path) -> N
     assert "prime" in result.output or "bridge_role" in result.output or "Error" in result.output
 
 
-def test_cli_default_providers_succeed(tmp_path: Path) -> None:
-    """Default providers (claude-code + codex) produce a successful scaffold."""
+def test_cli_default_providers_succeed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default providers (claude-code + codex) produce a successful scaffold.
+
+    Per ADR-ISOLATION-APPLICATION-PLACEMENT-001 (Slice 4 GTKB-ISOLATION-017),
+    application targets must live under ``<gt-kb-root>/applications/``. We
+    monkeypatch ``_GT_KB_HOST_ROOT`` (and the matching ``_resolve_gt_kb_host_root``
+    fast-path) to ``tmp_path`` so the test target ``tmp_path/applications/out``
+    satisfies the validation without polluting the live ``E:/GT-KB/applications/``.
+    """
+    from groundtruth_kb.project import scaffold as scaffold_mod
+
+    monkeypatch.setattr(scaffold_mod, "_GT_KB_HOST_ROOT", tmp_path)
+    target = tmp_path / "applications" / "out"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -184,10 +197,12 @@ def test_cli_default_providers_succeed(tmp_path: Path) -> None:
             "--profile",
             "dual-agent",
             "--dir",
-            str(tmp_path / "out"),
+            str(target),
+            "--gt-kb-root",
+            str(tmp_path),
             "--no-seed-example",
             "--no-include-ci",
         ],
     )
-    assert result.exit_code == 0
-    assert (tmp_path / "out" / "AGENTS.md").exists()
+    assert result.exit_code == 0, f"CLI failed: exit={result.exit_code}\noutput={result.output}"
+    assert (target / "AGENTS.md").exists()

@@ -696,7 +696,9 @@ def test_main_loop_releases_lock_on_normal_completion(tmp_path: Path, synthetic_
         runner._release_runner_lock(fd)
 
 
-def test_main_loop_releases_lock_on_exception_in_iteration(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_loop_releases_lock_on_exception_in_iteration(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """If an iteration throws, the lock must still be released by the finally clause."""
     runner = _load_runner()
     _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")
@@ -795,7 +797,9 @@ def test_once_with_enable_dispatch_does_dispatch(synthetic_gtkb_root: Path, monk
     assert len(calls) == 1, f"Expected exactly 1 harness launch across two --once runs; got {len(calls)}"
 
 
-def test_once_with_no_dispatch_explicit_does_not_dispatch(synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_once_with_no_dispatch_explicit_does_not_dispatch(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """--once --no-dispatch is the documented verification command after F2 fix."""
     runner = _load_runner()
     _seed_bridge(synthetic_gtkb_root, "foo", "REVISED")

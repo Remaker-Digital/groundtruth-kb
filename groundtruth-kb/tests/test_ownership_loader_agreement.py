@@ -234,21 +234,23 @@ def test_resolver_path_classification_excludes_settings_and_gitignore() -> None:
 def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     """With scaffold-ownership.toml present, artifacts_for_scaffold excludes ownership-glob rows.
 
-    Post-governance-completeness:
-    - local-only scaffolds 17 = 14 hooks + 3 rules (unchanged; 5 new
-      governance hooks are dual-agent-only).
-    - dual-agent scaffolds 54 = 19 hooks + 10 rules + 6 skills + 15 settings
-      + 4 gitignore (post-C4 gtkb-settings-merge).
+    Post-governance-completeness + Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL
+    + Slices 3+4 GTKB-ISOLATION-017:
+    - local-only scaffolds 21 = 14 hooks + 4 rules (incl. canonical-terminology-policy)
+      + 3 file-class records (Slice 3 README + release-readiness + Slice 4
+      upgrade-rehearsal-recipe).
+    - dual-agent scaffolds 60 = 20 hooks + 11 rules + 6 skills + 3 files
+      + 16 settings + 4 gitignore.
 
     The sibling file contains only ownership-glob records which are filtered
     out by the helper — the ownership-glob exclusion invariant is preserved.
     """
-    # local-only unchanged: 17 (14 original hooks + 3 rules)
+    # local-only post-Slice-1+3+4: 21 (14 hooks + 4 rules + 3 file-class)
     ids = {a.id for a in artifacts_for_scaffold("local-only")}
-    assert len(ids) == 17
-    # dual-agent scaffold: 54 rows post-C4 (51 → 54 via 3 new gitignore rows).
+    assert len(ids) == 21
+    # dual-agent scaffold: 60 rows post-Slice-1+3+4.
     ids_da = {a.id for a in artifacts_for_scaffold("dual-agent")}
-    assert len(ids_da) == 54
+    assert len(ids_da) == 60
     # None are ownership-glob.
     assert all("adopter-" not in i for i in ids_da), "ownership-glob leaked into scaffold"
 

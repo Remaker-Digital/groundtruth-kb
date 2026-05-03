@@ -766,7 +766,9 @@ def _make_index_with_kind(
 
 def test_compute_pending_codex_NEW_scoping_proposal_is_dispatchable(tmp_path: Path) -> None:
     n = _notify()
-    text, root = _make_index_with_kind(tmp_path, "foo", "NEW", "scoping_proposal", "NEW", operative_version=4, top_version=4)
+    text, root = _make_index_with_kind(
+        tmp_path, "foo", "NEW", "scoping_proposal", "NEW", operative_version=4, top_version=4
+    )
     parsed = n.parse_index(text)
     prime, codex = n.compute_actionable_pending(parsed, project_root=root)
     assert len(codex) == 1
@@ -777,7 +779,9 @@ def test_compute_pending_codex_NEW_scoping_proposal_is_dispatchable(tmp_path: Pa
 
 def test_compute_pending_codex_NEW_candidate_spec_intake_is_dispatchable(tmp_path: Path) -> None:
     n = _notify()
-    text, root = _make_index_with_kind(tmp_path, "foo", "NEW", "candidate_spec_intake", "NEW", operative_version=4, top_version=4)
+    text, root = _make_index_with_kind(
+        tmp_path, "foo", "NEW", "candidate_spec_intake", "NEW", operative_version=4, top_version=4
+    )
     parsed = n.parse_index(text)
     _, codex = n.compute_actionable_pending(parsed, project_root=root)
     assert codex[0].dispatchable is True
@@ -786,7 +790,9 @@ def test_compute_pending_codex_NEW_candidate_spec_intake_is_dispatchable(tmp_pat
 
 def test_compute_pending_codex_REVISED_terminal_kind_is_dispatchable(tmp_path: Path) -> None:
     n = _notify()
-    text, root = _make_index_with_kind(tmp_path, "foo", "REVISED", "scoping_proposal", "REVISED", operative_version=3, top_version=3)
+    text, root = _make_index_with_kind(
+        tmp_path, "foo", "REVISED", "scoping_proposal", "REVISED", operative_version=3, top_version=3
+    )
     parsed = n.parse_index(text)
     _, codex = n.compute_actionable_pending(parsed, project_root=root)
     assert codex[0].dispatchable is True

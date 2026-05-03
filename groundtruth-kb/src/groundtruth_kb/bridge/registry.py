@@ -213,7 +213,7 @@ def list_all_registrations(*, since_days: int | None = 7) -> list[HarnessRegistr
 
     try:
         registry_dir = _registry_dir()
-    except Exception:
+    except Exception:  # intentional-catch: registry-dir resolution may raise on missing config; degrade to empty list
         return []
 
     for path in registry_dir.glob("*.json"):

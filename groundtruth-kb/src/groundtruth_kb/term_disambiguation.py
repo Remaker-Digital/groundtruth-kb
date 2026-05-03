@@ -16,7 +16,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 Tier = Literal["A", "B", "C"]
 Severity = Literal["error", "warn"]
@@ -56,8 +56,8 @@ class PolicyConfig:
     root. Tests pass an explicit path.
     """
 
-    defaults: dict = field(default_factory=dict)
-    terms: dict[str, dict] = field(default_factory=dict)
+    defaults: dict[str, Any] = field(default_factory=dict)
+    terms: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, policy_path: Path) -> PolicyConfig:

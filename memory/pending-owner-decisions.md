@@ -6,54 +6,19 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0336
-  asked_at: 2026-05-03T14:40:38.003400Z
-  question: "steps available** (awaiting owner direction): 1. **File CS-2 br"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: f744e229509cbaed
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0339
-  asked_at: 2026-05-03T15:10:22.679200Z
-  question: "d start regardless. Awaiting owner direction on whether to eleva"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: ff8b160d9a72fe60
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0341
-  asked_at: 2026-05-03T15:22:13.082307Z
-  question: "return a selection. Standing by for direction.  **Dispatch status"
+- id: DECISION-0365
+  asked_at: 2026-05-03T20:07:03.934436Z
+  question: "ptures the GA fix.  Standing by for Codex's verdict on `-009` or further direction."
   detected_via: prose:standing_by_for
   status: pending
-  question_hash: 7d088b8940d4b6f0
+  question_hash: ee974136e1829c87
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0342
-  asked_at: 2026-05-03T15:23:06.011565Z
-  question: "ses to acknowledge. Standing by for owner direction (note: 2 pending ow"
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 6915fee7b16ac8e2
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0347
-  asked_at: 2026-05-03T15:37:31.641979Z
-  question: "ale plan-level GOs. Awaiting your direction on whether to proce"
+- id: DECISION-0366
+  asked_at: 2026-05-03T20:38:40.695895Z
+  question: "mended Next Action  Awaiting your direction on whether to: - **"
   detected_via: prose:awaiting_input
   status: pending
-  question_hash: bf9c17f1d7ef7b64
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0351
-  asked_at: 2026-05-03T16:08:27.568209Z
-  question: "reaches VERIFIED.  Want me to take any of those, or are you triaging something else?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 4f63c89058953599
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0359
-  asked_at: 2026-05-03T16:57:20.108501Z
-  question: "read once GO lands. Awaiting your direction or Codex verdict."
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: 5a01ac1f9eba886b
+  question_hash: 9c8f71b80feeda38
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
@@ -4176,6 +4141,126 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 5a67b4d862ac47e5
   resolved_at: 2026-05-03T16:55:41.962862Z
   answer: "User has answered your questions: \"How should REVISED-1 of Slice 8 scope the dropped release-readiness blockers?\"=\"All blockers in scope (rigorous, ~3-5 hours session work) (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0360
+  asked_at: 2026-05-03T17:30:34.353939Z
+  question: "How should ISOLATION-017 Slice 8 resolve the `-004` NO-GO on B6 (CI-green evidence vs bridge-VERIFIED-then-commit ordering)?"
+  options:
+    - "Split: Slice 8 + Slice 8.5 (Recommended)"
+    - "Owner-approved governed exception"
+    - "Draft PR / release-rc branch CI path"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f26bb9510c3ebc6c
+  resolved_at: 2026-05-03T17:30:34.353939Z
+  answer: "User has answered your questions: \"How should ISOLATION-017 Slice 8 resolve the `-004` NO-GO on B6 (CI-green evidence vs bridge-VERIFIED-then-commit ordering)?\"=\"Split: Slice 8 + Slice 8.5 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0361
+  asked_at: 2026-05-03T17:30:34.353939Z
+  question: "Approve insertion of the DELIB packet above as a canonical Deliberation Archive entry, then proceed with the immediate next steps (update work_list row 5; file Slice 8 REVISED `-005` implementing the split)?"
+  options:
+    - "Approve DELIB + proceed (Recommended)"
+    - "Approve DELIB only; pause before bridge file"
+    - "Refine DELIB content first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d261ec490dd5e9e4
+  resolved_at: 2026-05-03T17:30:34.353939Z
+  answer: "User has answered your questions: \"Approve insertion of the DELIB packet above as a canonical Deliberation Archive entry, then proceed with the immediate next steps (update work_list row 5; file Slice 8 REVISED `-005` implementing the split)?\"=\"Approve DELIB + proceed (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0336
+  asked_at: 2026-05-03T14:40:38.003400Z
+  question: "steps available** (awaiting owner direction): 1. **File CS-2 br"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: f744e229509cbaed
+  resolved_at: 2026-05-03T19:35:56.855854Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0339
+  asked_at: 2026-05-03T15:10:22.679200Z
+  question: "d start regardless. Awaiting owner direction on whether to eleva"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: ff8b160d9a72fe60
+  resolved_at: 2026-05-03T19:35:56.855876Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0341
+  asked_at: 2026-05-03T15:22:13.082307Z
+  question: "return a selection. Standing by for direction.  **Dispatch status"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 7d088b8940d4b6f0
+  resolved_at: 2026-05-03T19:35:56.855881Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0342
+  asked_at: 2026-05-03T15:23:06.011565Z
+  question: "ses to acknowledge. Standing by for owner direction (note: 2 pending ow"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 6915fee7b16ac8e2
+  resolved_at: 2026-05-03T19:35:56.855884Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0347
+  asked_at: 2026-05-03T15:37:31.641979Z
+  question: "ale plan-level GOs. Awaiting your direction on whether to proce"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: bf9c17f1d7ef7b64
+  resolved_at: 2026-05-03T19:35:56.855887Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0351
+  asked_at: 2026-05-03T16:08:27.568209Z
+  question: "reaches VERIFIED.  Want me to take any of those, or are you triaging something else?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 4f63c89058953599
+  resolved_at: 2026-05-03T19:35:56.855891Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0359
+  asked_at: 2026-05-03T16:57:20.108501Z
+  question: "read once GO lands. Awaiting your direction or Codex verdict."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 5a01ac1f9eba886b
+  resolved_at: 2026-05-03T19:35:56.855893Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0362
+  asked_at: 2026-05-03T17:31:34.022231Z
+  question: "e two surfaced GOs. Standing by for owner direction or Codex GO/NO-GO o"
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 696d6726e5c7ff2b
+  resolved_at: 2026-05-03T19:35:56.855896Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0363
+  asked_at: 2026-05-03T19:35:12.163548Z
+  question: "no INDEX mutation. Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 09ae9e1ba3689978
+  resolved_at: 2026-05-03T19:35:56.855898Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0364
+  asked_at: 2026-05-03T20:05:57.121835Z
+  question: "Codex `-008` NO-GO catches a real defect: the Slice 8 B5 install-smoke command (`gt project init <tmp>/test-app --profile local-only`) cannot succeed against an installed wheel because Slice 4 isolation enforcement requires the target to live under `<gt-kb-root>/applications/<name>/` AND requires `--gt-kb-root` to equal a path derived from the install location (which is meaningless for pip-installed wheels in a venv). The announcement's 'How to try it' command sequence has the same defect. How should Slice 8 resolve?"
+  options:
+    - "Path A: Narrow fix; acknowledge rc limitation (Recommended)"
+    - "Path B: Fix install UX in Slice 8 (~20 LOC scaffold.py change)"
+    - "Path C: File Slice 8.6 to fix Slice 4 install UX; Slice 8 gates on it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a5da084b0afbf175
+  resolved_at: 2026-05-03T20:05:57.121835Z
+  answer: "User has answered your questions: \"Codex `-008` NO-GO catches a real defect: the Slice 8 B5 install-smoke command (`gt project init <tmp>/test-app --profile local-only`) cannot succeed against an installed wheel because Slice 4 isolation enforcement requires the target to live under `<gt-kb-root>/applications/<name>/` AND requires `--gt-kb-root` to equal a path derived from the install location (which is meaningless for pip-installed wheels in a venv). The announcement's 'How to try it' command sequence has the same defect. How should Slice 8 resolve?\"=\"Path A: Narrow fix; acknowledge rc limitation (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

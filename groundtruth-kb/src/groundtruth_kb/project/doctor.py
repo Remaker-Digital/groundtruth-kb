@@ -1048,7 +1048,7 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
         str(primer_missing_severity_raw).upper() if primer_missing_severity_raw else "ERROR"
     )
     if required_primer_terms:
-        defaults_section: dict = {}
+        defaults_section: dict[str, Any] = {}
         try:
             cfg_section = config.get("config") if isinstance(config, dict) else None
             if isinstance(cfg_section, dict):

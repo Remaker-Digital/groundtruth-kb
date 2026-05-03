@@ -154,7 +154,13 @@ def test_execute_upgrade_applies_customized_skill_with_force(tmp_path: Path) -> 
 
     actions = plan_upgrade(tmp_path)
     _setup_git_for_upgrade(tmp_path)
-    execute_upgrade(tmp_path, actions, force=True)
+    # enforce_isolation=False uses the pre-Slice-4 plain-executor semantics,
+    # documented in execute_upgrade's docstring as the library-caller path for
+    # "pre-existing test fixtures that don't model an isolation-clean adopter."
+    # The minimal tmp_path fixture here does not satisfy the full Slice 4
+    # isolation contract; the test target is skill-customization-with-force, not
+    # isolation behavior.
+    execute_upgrade(tmp_path, actions, force=True, enforce_isolation=False)
 
     # Hash comparison avoids newline-translation false negatives on
     # Windows. execute_upgrade uses shutil.copy2 which preserves bytes.

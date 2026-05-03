@@ -52,20 +52,22 @@ try:
 except ImportError:
     import msvcrt
 
-from groundtruth_kb.bridge.audit import emit_audit_event
-from groundtruth_kb.bridge.checkpoint import (
+from groundtruth_kb.bridge.audit import (  # noqa: E402  - imports follow conditional fcntl/msvcrt block above
+    emit_audit_event,
+)
+from groundtruth_kb.bridge.checkpoint import (  # noqa: E402
     diff_against_checkpoint,
     load_checkpoint,
     write_checkpoint,
 )
-from groundtruth_kb.bridge.detector import parse_index
-from groundtruth_kb.bridge.notify import (
+from groundtruth_kb.bridge.detector import parse_index  # noqa: E402
+from groundtruth_kb.bridge.notify import (  # noqa: E402
     _kind_aware_routing_enabled,
     compute_actionable_pending,
     update_notification,
 )
-from groundtruth_kb.bridge.paths import get_state_dir, resolve_project_root
-from groundtruth_kb.bridge.routing import BridgeAgent
+from groundtruth_kb.bridge.paths import get_state_dir, resolve_project_root  # noqa: E402
+from groundtruth_kb.bridge.routing import BridgeAgent  # noqa: E402
 
 DEFAULT_INTERVAL_S = 15
 POLLER_RUNS_SUBDIR = "poller-runs"
@@ -133,10 +135,9 @@ def _acquire_runner_lock(state_dir: Path) -> int:
         # Write our PID to the lock file for diagnostics. Truncate first so
         # we don't leave stale PID bytes from a prior holder past the new PID.
         os.lseek(fd, 0, 0)
-        try:
+        # Some platforms restrict ftruncate on locked fd; ignore.
+        with contextlib.suppress(OSError):
             os.ftruncate(fd, 0)
-        except OSError:
-            pass  # Some platforms restrict ftruncate on locked fd; ignore.
         os.write(fd, f"{os.getpid()}\n".encode("ascii"))
         return fd
     except RunnerAlreadyRunningError:
@@ -216,10 +217,10 @@ def _write_dispatch_state(state_dir: Path, payload: dict[str, object]) -> None:
 def _pending_signature(items: list[object]) -> str:
     normalized = [
         {
-            "document_name": getattr(item, "document_name"),
-            "top_status": getattr(item, "top_status"),
-            "top_file": getattr(item, "top_file"),
-            "index_line_number": getattr(item, "index_line_number"),
+            "document_name": item.document_name,
+            "top_status": item.top_status,
+            "top_file": item.top_file,
+            "index_line_number": item.index_line_number,
         }
         for item in items
     ]
@@ -246,9 +247,12 @@ def _latest_template_for(harness_kind: str, project_root: Path) -> tuple[str, ..
         from groundtruth_kb.bridge.registry import list_all_registrations
 
         for record in list_all_registrations(since_days=7):
-            if record.harness_kind == harness_kind and Path(record.workspace_root).resolve() == project_root.resolve():
-                if record.invoke_command_template:
-                    return record.invoke_command_template
+            if (
+                record.harness_kind == harness_kind
+                and Path(record.workspace_root).resolve() == project_root.resolve()
+                and record.invoke_command_template
+            ):
+                return record.invoke_command_template
     except Exception:
         pass
     return _default_invoke_template(harness_kind)
@@ -283,7 +287,7 @@ def _dispatch_prompt(recipient: BridgeAgent, items: list[object], *, max_items: 
         "queue work; do not process them as actionable."
     )
     rows = [
-        f"- {getattr(item, 'top_status')} {getattr(item, 'document_name')} {getattr(item, 'top_file')}"
+        f"- {item.top_status} {item.document_name} {item.top_file}"
         for item in selected
     ]
     selected_text = "\n".join(rows) if rows else "- No selected entries."
@@ -396,10 +400,7 @@ def _dispatch_if_needed(
         # filter items on dispatchable BEFORE signature check + spawn so terminal-
         # kind GO verdicts don't spawn redundant Prime harnesses. Feature flag
         # GTKB_NOTIFY_KIND_AWARE_ROUTING (default 1) gates the filter.
-        if kind_aware:
-            filtered_items = [it for it in items if getattr(it, "dispatchable", True)]
-        else:
-            filtered_items = list(items)
+        filtered_items = [it for it in items if getattr(it, "dispatchable", True)] if kind_aware else list(items)
         filtered_terminal_count = len(items) - len(filtered_items)
 
         signature = _pending_signature(filtered_items)
@@ -682,10 +683,7 @@ def main(argv: list[str] | None = None) -> int:
     # Per smart-poller-kind-aware-routing-2026-04-30-012 F2 fix:
     # --once defaults to verification-safe (no dispatch). Continuous mode
     # keeps the historical default of dispatch enabled unless --no-dispatch.
-    if args.once:
-        dispatch_enabled = args.enable_dispatch and not args.no_dispatch
-    else:
-        dispatch_enabled = not args.no_dispatch
+    dispatch_enabled = (args.enable_dispatch and not args.no_dispatch) if args.once else (not args.no_dispatch)
 
     try:
         main_loop(

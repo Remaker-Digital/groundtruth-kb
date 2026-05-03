@@ -36,6 +36,39 @@ Last updated: 2026-05-02 (S327)
 
 Per S327 owner direction: NO new governance scope work until Slice 8 VERIFIED. The three governance programs landed in S327 (Backlog DB, Term Primer, Term Disambiguation) wait for the post-release window. Slice 1 deliverables are durable (committed at `5da729f8`) but Slices 2+ do not advance.
 
+## ISOLATION-017-CLOSEOUT (S330)
+
+Last updated: 2026-05-03 (S330)
+
+Slice 8 disposition resolved per `DELIB-S330-ISOLATION-017-SLICE8-DISPOSITION-CHOICE`: split into Slice 8 (release artifacts) + Slice 8.5 (CI-green capture). Authorizing bridge: `bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-005.md` (REVISED-2; Codex GO at `-006`).
+
+### Blocker outcomes (Slice 8)
+
+| Blocker | Outcome | Evidence |
+|---|---|---|
+| B1 — Version bump | DONE | `groundtruth-kb/src/groundtruth_kb/__init__.py` line 16 → `__version__ = "0.7.0rc1"`. Verified via `python -c "import groundtruth_kb; assert groundtruth_kb.__version__ == '0.7.0rc1'"`. |
+| B2 — Ruff resolution | DONE (NARROWED) | `ruff check groundtruth-kb/` exits 0. Scope narrowed to `groundtruth-kb/` package per `DELIB-S330-ISOLATION-017-SLICE8-B2-RUFF-SCOPE-CHOICE` (1,943 Agent Red product-code issues deferred to a separate Agent Red work item, not release-blocking for this rc). |
+| B3 — Pytest feasibility | DONE (GREEN) | `python -m pytest groundtruth-kb/tests/ -q` runs to completion in ~620s; all tests PASS. 13 stale-baseline + behavioral failures fixed in this slice per `DELIB-S330-ISOLATION-017-SLICE8-PYTEST-FIX-SCOPE-CHOICE`. Per-lane runtime breakdown documented in `release-notes-0.7.0-rc1.md`. |
+| B4 — Release notes file | DONE | `groundtruth-kb/release-notes-0.7.0-rc1.md` (~170 LOC) authored mirroring `release-notes-0.6.1.md` structure. Cross-references Slice 8.5 follow-on. |
+| B5 — Wheel/sdist install smoke | DONE | `scripts/_verify_slice8_closeout.py` `check_b5_wheel_smoke` runs full smoke: (a) `python -m build --wheel --sdist` from `groundtruth-kb/` produces `groundtruth_kb-0.7.0rc1-*.whl` + `groundtruth_kb-0.7.0rc1.tar.gz`; (b) `pip install` the wheel into a fresh tmp venv; (c) `gt --version` reports `0.7.0rc1`; (d) `gt project init SmokeApp --gt-kb-root <discovered_host_root> --dir <discovered_host_root>/applications/SmokeApp --profile local-only --no-include-ci --no-seed-example` succeeds; (e) scaffolded `groundtruth.toml` confirmed under target. The `--gt-kb-root` is discovered at runtime via `from groundtruth_kb.project.scaffold import _GT_KB_HOST_ROOT` per `DELIB-S330-ISOLATION-017-SLICE8-INSTALL-UX-LIMITATION-ACK` — the original `-005` plan's `gt project init <tmp>/test-app --profile local-only` command shape did NOT work for installed wheels under Slice 4 isolation. Pip-install adopter UX simplification tracked at row 36 (`GTKB-PIP-INSTALL-ADOPTER-UX-001`); not blocking for this rc. |
+| B6 — CI-green evidence | **DEFERRED to Slice 8.5** | Per `DELIB-S330-ISOLATION-017-SLICE8-DISPOSITION-CHOICE`. New bridge thread `bridge/gtkb-isolation-017-slice-8-5-ci-green-001.md` filed AFTER Slice 8 commit lands. Slice 8.5 captures GitHub Actions run URL + asserts final green status; gates `v0.7.0-rc1` tag authorization. |
+| B7 — Bridge terminal state | DONE | All 8 ISOLATION-017 slice bridges VERIFIED: Slice 1 (doctor checks), Slice 2 (registry isolation), Slice 2.5 (rationale schema), Slice 3 (init defaults), Slice 4 (upgrade), Slice 5 (clean-adopter tests), Slice 6 (docs), Slice 7 (examples). This Slice 8 closes via the post-impl REPORT. Standing-Backlog DB / Term Primer / Term Disambiguation Slice 1s landed in S327; Slices 2-7 deferred per `Feature Freeze` block above (lifts at v0.7.0-rc1 tag). |
+
+### Tag authorization gate
+
+`git tag -a v0.7.0-rc1` does NOT authorize until BOTH:
+
+1. Slice 8 (this thread) is VERIFIED + committed.
+2. Slice 8.5 (`bridge/gtkb-isolation-017-slice-8-5-ci-green-001.md`) is VERIFIED.
+
+Until both close, the rc has not been published; release-notes and announcement are author-ready but not authoritative.
+
+### Owner sub-decisions archived (S330)
+
+- `DELIB-S330-ISOLATION-017-SLICE8-DISPOSITION-CHOICE` — split into Slice 8 + Slice 8.5 per Codex F1 path 1.
+- `DELIB-S330-ISOLATION-017-SLICE8-B2-RUFF-SCOPE-CHOICE` — narrowed B2 to `groundtruth-kb/` package only (1,943 Agent Red issues deferred).
+- `DELIB-S330-ISOLATION-017-SLICE8-PYTEST-FIX-SCOPE-CHOICE` — added 13 pytest-baseline fixes to Slice 8 scope (within `-005` Risk 2 anticipated mitigation).
+
 ---
 
 ## Historical context: v0.6.x recovery

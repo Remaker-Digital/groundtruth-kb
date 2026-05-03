@@ -3,8 +3,6 @@
 #   cd E:/GT-KB && python -c "from groundtruth_kb.project.ownership import OwnershipResolver; print(chr(10).join(sorted(r.id for r in OwnershipResolver().all_records())))" > groundtruth-kb/tests/fixtures/registry-id-set.txt
 # (then prepend this comment block).
 #
-# Per Codex GO -004: snapshot regeneration is a deliberate dev step;
-# T4 in test_registry_drift_detection.py asserts no diff vs this file.
 adopter-bridge-files
 adopter-groundtruth-db
 adopter-groundtruth-toml
@@ -12,6 +10,9 @@ adopter-memory-files
 adopter-requirements-local-txt
 adopter-requirements-test-txt
 adopter-webapp
+file.readme-quickstart
+file.release-readiness-banner
+file.upgrade-rehearsal-recipe
 gitignore.hook-logs
 gitignore.kb-database
 gitignore.kb-working-dir
@@ -41,6 +42,7 @@ rule.bridge-essential
 rule.bridge-poller-canonical
 rule.canonical-terminology
 rule.canonical-terminology-config
+rule.canonical-terminology-policy
 rule.deliberation-protocol
 rule.file-bridge-protocol
 rule.loyal-opposition

@@ -6,6 +6,14 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-017-slice8-release-ops-2026-05-03
+VERIFIED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-012.md
+REVISED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-011.md
+NO-GO: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-010.md
+REVISED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-009.md
+NO-GO: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-008.md
+NEW: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-007.md
+GO: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-006.md
+REVISED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-005.md
 NO-GO: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-004.md
 REVISED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-003.md
 NO-GO: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-002.md

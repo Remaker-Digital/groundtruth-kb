@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0-rc1] - 2026-05-03
+
+Release candidate 1. Tag and PyPI publication gated on Slice 8.5 CI-green
+VERIFIED (separate post-VERIFIED bridge thread filed after the Slice 8 commit
+lands). Full release notes:
+[release-notes-0.7.0-rc1.md](release-notes-0.7.0-rc1.md).
+
+### Added — GTKB-ISOLATION-017 application/platform isolation
+
+- **12 isolation doctor checks** in `src/groundtruth_kb/project/doctor_isolation.py`:
+  `isolation:root-boundary`, `isolation:app-placement`,
+  `isolation:harness-placement`, `isolation:registry-strict`,
+  `isolation:no-cross-import`, `isolation:bridge-app-boundary`,
+  `isolation:db-app-boundary`, `isolation:chroma-regeneratable`, plus 4
+  additional boundary checks (Slice 1, VERIFIED `bridge/...slice1-doctor-checks-012.md`).
+- **Registry isolation enforcement** — managed-registry rows do not overlap
+  with application file globs; cross-load AST gate verifies the invariant
+  (Slice 2, VERIFIED `bridge/...slice2-registry-isolation-008.md`).
+- **Rationale schema extension** — `deliberations` table gains
+  `rationale_summary` field for concise citation in downstream artifacts
+  (Slice 2.5, VERIFIED `bridge/...slice2-5-rationale-schema-extension-008.md`).
+- **Managed-only init defaults** — `gt project init` defaults to
+  managed-only mode; `--include-app-tree` opt-in preserves legacy
+  mixed-tree behavior (Slice 3, VERIFIED
+  `bridge/...slice3-init-defaults-2026-05-02-014.md`).
+- **Isolation-aware upgrade + rollback** — `gt project upgrade --apply`
+  skips `preserve` / `transient` artifacts; `gt project upgrade --rollback`
+  reverses via journal (Slice 4, VERIFIED
+  `bridge/...slice4-upgrade-2026-05-02-012.md`; commit `61e50453`).
+- **Clean-adopter test suite** — 45 functions across 13 test files in
+  `tests/clean_adopter/` + 2 fixture trees + CI workflow integration
+  (Slice 5, VERIFIED
+  `bridge/...slice5-clean-adopter-tests-2026-05-03-006.md`; commit
+  `dc8e58f8`).
+- **Architecture chapter** — `docs/architecture/isolation.md` (314 LOC)
+  documents the isolation contract end-to-end (Slice 6, VERIFIED
+  `bridge/...slice6-docs-2026-05-03-004.md`; commit `9efd29bf`).
+- **Worked examples** — 4 example trees under `docs/examples/`:
+  `clean-adopter-minimal/`, `adopter-with-transport-tests/`,
+  `adopter-with-release-gate/`, `existing-adopter-migration/` (Slice 7,
+  VERIFIED `bridge/...slice7-examples-2026-05-03-004.md`; commit
+  `05774d6a`).
+
+### Changed — Init defaults
+
+- `gt project init` default mode is now **managed-only** (was mixed-tree
+  in v0.6.x). Adopter application code is added explicitly under
+  `applications/<app-name>/` rather than mixed into the managed tree.
+  `--include-app-tree` flag preserves legacy behavior for adopters not
+  yet migrated.
+
+### Changed — Doctor severity
+
+- The 12 isolation checks are ERROR-level by default. Adopter projects
+  with non-isolated layouts will fail `gt project doctor` until
+  `gt project upgrade --apply` is run, or until specific checks are
+  scoped down in the project's doctor config.
+
+### Deferred to v0.7.0 GA
+
+- **Slice 5.5** (overlay refresh + disposability + chroma-regen API):
+  deferred per
+  `DELIB-S328-ISOLATION-017-SLICE5-OVERLAY-SCOPE-REVISION-OWNER-DIRECTIVE`
+  v1; tracked at `memory/work_list.md` row 31.
+- **Slice 8.5** (CI-green evidence): filed AFTER Slice 8 commit lands;
+  gates `v0.7.0-rc1` tag authorization.
+- **Application-side ruff cleanup** (1,943 issues in adopter `tests/`,
+  `scripts/`, `src/`): tracked as separate Agent Red release-hardening
+  work item per `DELIB-S330-ISOLATION-017-SLICE8-B2-RUFF-SCOPE-CHOICE`.
+
 ## [0.6.1] - 2026-04-17
 
 ### Added — Canonical terminology surface

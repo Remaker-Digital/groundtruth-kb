@@ -250,7 +250,7 @@ def _check_isolation_state(target: Path, profile_name: str, product_root: Path |
     rows: list[UpgradeAction] = []
     try:
         checks = run_isolation_checks(target, profile_name, product_root=product_root)
-    except Exception as exc:  # noqa: BLE001 - graceful degradation; surface as info
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: graceful degradation; surface as info
         return [
             UpgradeAction(
                 file="<isolation-preflight>",

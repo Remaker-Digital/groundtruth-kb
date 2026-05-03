@@ -84,7 +84,9 @@ def test_registry_total_is_fifty_six_records() -> None:
     # release-readiness banner). Total: 56 + 2 = 58.
     # GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL Slice 1 (S327): 1 new rule
     # (canonical-terminology-policy). Total: 58 + 1 = 59.
-    assert len(records) == 59, f"expected 59 total registry records; got {len(records)}"
+    # GTKB-ISOLATION-017 Slice 4 (S328): 1 new file-class record
+    # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
+    assert len(records) == 60, f"expected 60 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
@@ -101,7 +103,7 @@ def test_registry_class_counts_match_proposal() -> None:
         "hook": 20,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
         "skill": 6,
-        "file": 2,
+        "file": 3,  # GTKB-ISOLATION-017 Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
         "settings-hook-registration": 16,
         "gitignore-pattern": 4,
     }
@@ -265,7 +267,7 @@ def test_scaffold_dual_agent_copies_everything() -> None:
         "hook": 20,
         "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
         "skill": 6,
-        "file": 2,  # GTKB-ISOLATION-017 Slice 3: README + release-readiness
+        "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
         "settings-hook-registration": 16,
         "gitignore-pattern": 4,
     }
@@ -463,7 +465,9 @@ def test_settings_upgrade_managed_set_post_c4() -> None:
     0 scaffolded .claude/settings.json registrations remain unrepairable.
     """
     managed = artifacts_for_upgrade("dual-agent", class_="settings-hook-registration")
-    assert len(managed) == 16, f"expected 16 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
+    assert len(managed) == 16, (
+        f"expected 16 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
+    )
     by_filename = {r.hook_filename: r.event for r in managed if isinstance(r, SettingsHookRegistration)}
     assert by_filename == {
         # SessionStart (promoted in C4)
@@ -574,17 +578,18 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 59 records (post-Slice-3 file class + Slice-1 policy):
-    # 20 hooks + 11 rules + 6 skills + 2 files + 16 settings + 4 gitignore.
-    assert len(dual_agent) == 59
+    # dual-agent sees all 60 records (post-Slice-3+4 file class + Slice-1 policy):
+    # 20 hooks + 11 rules + 6 skills + 3 files + 16 settings + 4 gitignore.
+    assert len(dual_agent) == 60
 
     local_only = load_managed_artifacts("local-only")
     # local-only sees all 14 ORIGINAL hooks + rule.prime-builder + 2
     # canonical-terminology rules + 1 canonical-terminology-policy
-    # (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL) + 2 file-class
-    # records (Slice 3) = 20. The 5 new governance hooks are
-    # dual-agent-only, and the 3 new gitignore rows are dual-agent-only.
-    assert len(local_only) == 20
+    # (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL) + 3 file-class
+    # records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 21. The 5 new
+    # governance hooks are dual-agent-only, and the 3 new gitignore rows
+    # are dual-agent-only.
+    assert len(local_only) == 21
 
 
 def test_find_artifact_by_id_raises_on_unknown() -> None:

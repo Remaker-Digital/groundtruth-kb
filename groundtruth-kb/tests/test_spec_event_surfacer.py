@@ -13,19 +13,16 @@ start timestamp source, ledger location, duplicate-suppression behavior).
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import io
 import json
 import sqlite3
 import subprocess
 import sys
-import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
-
-import pytest
 
 # The hook lives in templates/hooks/; load it as a module by file path so
 # tests can exercise the same code adopters install via gt project upgrade.
@@ -118,10 +115,8 @@ def _run_hook(cwd: Path, payload: dict | None = None) -> dict:
     sys.stdin = io.StringIO(json.dumps(payload))
     sys.stdout = captured_stdout
     try:
-        try:
+        with contextlib.suppress(SystemExit):
             module.main()
-        except SystemExit:
-            pass
     finally:
         sys.stdin = old_stdin
         sys.stdout = old_stdout
@@ -472,10 +467,8 @@ def test_surfacer_handles_malformed_payload_gracefully(tmp_path: Path) -> None:
     sys.stdin = io.StringIO("not-valid-json{")
     sys.stdout = captured_stdout
     try:
-        try:
+        with contextlib.suppress(SystemExit):
             module.main()
-        except SystemExit:
-            pass
     finally:
         sys.stdin = old_stdin
         sys.stdout = old_stdout
@@ -511,7 +504,6 @@ def test_surfacer_makes_zero_kb_writes(tmp_path: Path) -> None:
     _write_session_start(tmp_path, session_start)
     _insert_spec(db_path, "SPEC-READONLY-001")
 
-    mtime_before = db_path.stat().st_mtime
     conn = sqlite3.connect(db_path)
     count_before = conn.execute("SELECT COUNT(*) FROM current_specifications").fetchone()[0]
     conn.close()
