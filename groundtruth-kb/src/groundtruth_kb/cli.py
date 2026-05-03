@@ -899,6 +899,41 @@ def project_doctor(auto_install: bool, profile: str | None, target_dir: str) -> 
         raise SystemExit(1)
 
 
+_REHEARSAL_RECIPE_BLOCK = """
+========================================================================
+ISOLATION MIGRATION RECIPE (Phase 8 rehearsal — out-of-band)
+========================================================================
+Before running `gt project upgrade --apply --accept-migration`, run the
+rehearsal driver to preview the migration outcome:
+
+  python scripts/rehearse_isolation.py --execute \\
+      --output-dir <sandbox-path>
+
+The sandbox path must be outside the GT-KB project root per
+DELIB-S324-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE (e.g.,
+C:/temp/agent-red-rehearsal* on Windows or /tmp/agent-red-rehearsal*
+on POSIX).
+
+After reviewing the rehearsal preview, re-run:
+
+  gt project upgrade --apply --accept-migration
+
+This will run the 4 isolation auto-fixers (service-endpoint, work-subject,
+workstream-focus-hook-absent, release-readiness-app-subject-header) inside
+a payload branch. A rollback receipt is written; `gt project rollback`
+reverses any failed migration.
+
+Needs-adopter-input checks (no-writable-product-paths,
+hooks-point-to-wrappers, work-list-no-product-entries, chroma-regeneratable)
+require manual inspection — upgrade refuses these even with
+--accept-migration. For hooks-point-to-wrappers: inspect
+.claude/settings.json for hook commands that aren't wrapper-shaped (i.e.,
+not under .claude/hooks/, not invoking groundtruth_kb, not using
+${CLAUDE_PLUGIN_ROOT}); either delete the customization or rewrap it.
+========================================================================
+""".strip()
+
+
 @project.command("upgrade")
 @click.option("--dry-run/--apply", default=True, help="Preview changes without writing (default: dry-run).")
 @click.option("--force", is_flag=True, default=False, help="Overwrite customized files.")
@@ -909,11 +944,24 @@ def project_doctor(auto_install: bool, profile: str | None, target_dir: str) -> 
     default=False,
     help="Suppress the 'bridge in-flight' pre-flight warning (automation).",
 )
+@click.option(
+    "--accept-migration",
+    is_flag=True,
+    default=False,
+    help=(
+        "GTKB-ISOLATION-017 Slice 4: opt in to one-shot isolation migration of "
+        "auto-fixable in-place defects (service endpoint, work_subject, "
+        "workstream-focus deletion, release-readiness banner). Required when "
+        "isolation doctor checks fail; without it the upgrade refuses with the "
+        "rehearsal recipe. Per DELIB-S328 mandatory_at_upgrade decision."
+    ),
+)
 def project_upgrade(
     dry_run: bool,
     force: bool,
     target_dir: str,
     ignore_inflight_bridges: bool,
+    accept_migration: bool,
 ) -> None:
     """Update scaffold files to match the current GroundTruth version.
 
@@ -926,10 +974,21 @@ def project_upgrade(
     for in-flight bridges; ``[INFORMATIONAL]`` for scaffold-coverage
     delta). Those rows are filtered out before apply so pre-flight
     reporting never triggers git or file writes, even with ``--force``.
+
+    GTKB-ISOLATION-017 Slice 4: ``--apply`` refuses when isolation doctor
+    checks fail unless ``--accept-migration`` is set. With the flag, the
+    five in-place auto-fixers run inside the same payload branch + rollback
+    receipt. Adopter-root-placement violations (check #1) refuse
+    unconditionally. Needs-adopter-input checks (#4 / #7 / #9) refuse even
+    with ``--accept-migration``.
     """
     from groundtruth_kb.project.upgrade import (
         _NON_MUTATING_ACTION_KINDS,
         DirtyWorkingTreeError,
+        IsolationLocationFailureError,
+        IsolationMigrationRequiredError,
+        IsolationNonAutoFixableError,
+        IsolationPolicyOverrideViolation,
         MalformedSettingsError,
         MergeFailedError,
         NotAGitRepositoryError,
@@ -972,10 +1031,26 @@ def project_upgrade(
 
     if not mutating_actions:
         click.echo("\nPre-flight only — no mutating actions to apply.")
-        return
+        # Slice 4: even without mutating routine actions, isolation gating may
+        # still need to run via execute_upgrade if accept_migration was set.
+        # However, if isolation pre-flight is clean too (already covered by
+        # informational [ISOLATION] all-checks-pass row), there's nothing to do.
+        # Detection of failing isolation rows in `actions` indicates work needed.
+        has_isolation_warning = any(
+            a.action == "warning" and a.file.startswith("<isolation:") for a in actions
+        )
+        if not has_isolation_warning:
+            return
+        # Fall through to execute_upgrade with empty mutating_actions so the
+        # isolation pre-flight gating + auto-fixer dispatch path runs.
 
     try:
-        results = execute_upgrade(target, mutating_actions, force=force)
+        results = execute_upgrade(
+            target,
+            mutating_actions,
+            force=force,
+            accept_migration=accept_migration,
+        )
     except MalformedSettingsError as exc:
         click.echo(f"\nError: {exc}", err=True)
         raise SystemExit(4) from exc
@@ -988,6 +1063,30 @@ def project_upgrade(
     except MergeFailedError as exc:
         click.echo(f"\nError: {exc}", err=True)
         raise SystemExit(3) from exc
+    except IsolationLocationFailureError as exc:
+        click.echo(f"\nError: {exc}", err=True)
+        click.echo(
+            "\nThis check cannot be auto-fixed by `gt project upgrade`. "
+            "Relocate the adopter directory to <gt-kb-root>/applications/<name>/.",
+            err=True,
+        )
+        raise SystemExit(5) from exc
+    except IsolationMigrationRequiredError as exc:
+        click.echo(f"\nError: {exc}", err=True)
+        click.echo(f"\n{_REHEARSAL_RECIPE_BLOCK}", err=True)
+        raise SystemExit(5) from exc
+    except IsolationNonAutoFixableError as exc:
+        click.echo(f"\nError: {exc}", err=True)
+        click.echo(
+            "\nNeeds-adopter-input checks require manual inspection. "
+            "See each check's reported message for the offending file/state.",
+            err=True,
+        )
+        raise SystemExit(5) from exc
+    except IsolationPolicyOverrideViolation as exc:
+        # Defense-in-depth signal — should never fire in production.
+        click.echo(f"\nInternal error (please report): {exc}", err=True)
+        raise SystemExit(5) from exc
 
     for msg in results:
         click.echo(f"  {msg}")

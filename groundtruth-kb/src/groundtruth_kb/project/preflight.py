@@ -223,3 +223,58 @@ def _check_scaffold_coverage(target: Path, profile_name: str) -> list[UpgradeAct
         )
         for path in uncovered
     ]
+
+
+def _check_isolation_state(target: Path, profile_name: str, product_root: Path | None = None) -> list[UpgradeAction]:
+    """Slice 4: surface isolation-doctor failures as non-mutating diagnostic rows.
+
+    Per bridge ``gtkb-isolation-017-slice4-upgrade-2026-05-02-007.md`` §"In-scope"
+    and `-008` GO. Each failing isolation check (``status in {"fail", "warning"}``)
+    produces one ``warning`` UpgradeAction row prefixed ``[ISOLATION]`` so dry-run
+    output surfaces the gap. The CLI filters ``warning``/``informational`` rows
+    out of the list passed to ``execute_upgrade`` so these never trigger git or
+    file mutation. The actual gating + auto-fix invocation happens in
+    ``execute_upgrade`` via ``_run_isolation_preflight`` + ``_run_isolation_fixers``.
+
+    Args:
+        target: Adopter project root.
+        profile_name: Profile (e.g., ``"dual-agent"``) for ``run_isolation_checks``.
+        product_root: GT-KB product root. Defaults to
+            ``Path(__file__).resolve().parents[3]`` (matches ``doctor.py``).
+    """
+    from groundtruth_kb.project.doctor_isolation import run_isolation_checks
+
+    if product_root is None:
+        product_root = Path(__file__).resolve().parents[3]
+
+    rows: list[UpgradeAction] = []
+    try:
+        checks = run_isolation_checks(target, profile_name, product_root=product_root)
+    except Exception as exc:  # noqa: BLE001 - graceful degradation; surface as info
+        return [
+            UpgradeAction(
+                file="<isolation-preflight>",
+                action="informational",
+                reason=f"Isolation pre-flight skipped (exception: {exc}); execute_upgrade gating still applies.",
+            )
+        ]
+
+    failing = [c for c in checks if c.status in ("fail", "warning")]
+    if not failing:
+        return [
+            UpgradeAction(
+                file="<isolation-preflight>",
+                action="informational",
+                reason="Isolation: all 9 checks pass.",
+            )
+        ]
+
+    for check in failing:
+        rows.append(
+            UpgradeAction(
+                file=f"<{check.name}>",
+                action="warning",
+                reason=f"[ISOLATION] {check.name}: {check.message}",
+            )
+        )
+    return rows

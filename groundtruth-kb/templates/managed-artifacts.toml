@@ -856,3 +856,15 @@ ownership = "adopter-owned"
 upgrade_policy = "preserve"
 notes = "Application-subject release-readiness banner per Phase 9 section 1 lines 123-125 (GTKB-ISOLATION-017 Slice 3); adopter populates with release evidence, platform does not overwrite."
 
+[[artifacts]]
+class = "file"
+id = "file.upgrade-rehearsal-recipe"
+template_path = "project/upgrade-rehearsal-recipe.md"
+target_path = "docs/upgrade-rehearsal-recipe.md"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "gt-kb-scaffolded"
+upgrade_policy = "preserve"
+notes = "Adopter-facing isolation-migration rehearsal recipe per GTKB-ISOLATION-017 Slice 4 (bridge -008 GO). Documents the out-of-band rehearsal recipe per DELIB-S328 decision 7 (out_of_band_recipe_only). Scaffolded once at init; adopter may customize after; upgrade does not overwrite."
+

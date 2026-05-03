@@ -15,12 +15,15 @@ import json
 import shutil
 import subprocess
 import uuid
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
 from groundtruth_kb import __version__, get_templates_dir
+from groundtruth_kb.project.doctor import ToolCheck
+from groundtruth_kb.project.doctor_isolation import run_isolation_checks
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -42,6 +45,483 @@ from groundtruth_kb.project.rollback import (
 # parser). All 40 current-HEAD registry rows have ``upgrade_policy`` in
 # ``{overwrite, structured-merge}`` and are unaffected by this filter.
 _NO_UPGRADE_ACTION_POLICIES: frozenset[str] = frozenset({"preserve", "transient", "adopter-opt-in"})
+
+
+# ---------------------------------------------------------------------------
+# GTKB-ISOLATION-017 Slice 4 — isolation pre-flight + auto-fixer dispatch.
+# Authority: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-008.md (GO).
+# Prior decisions: DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE
+# (mandatory_at_upgrade / one_shot_migration_at_upgrade / out_of_band_recipe_only)
+# + S328 owner AskUserQuestion answer authorizing --accept-migration override of
+# upgrade_policy=preserve for the bounded isolation-fix surface.
+# ---------------------------------------------------------------------------
+
+# Live-probed partition of the 9 isolation doctor checks per
+# ``run_isolation_checks()`` (see bridge -011 §"Live-probed partition + surface").
+# Total: 1 + 4 + 4 = 9 = the live check universe (T11 enforces).
+# Check #5 (`isolation:hooks-point-to-wrappers`) reclassified from
+# auto-fixable to needs-adopter-input in REVISED-4 (`-011`) per Codex
+# `-010` NO-GO + S328 owner reclassify decision.
+_PARTITION_HARD_REFUSE: frozenset[str] = frozenset({
+    "isolation:adopter-root-placement",
+})
+_PARTITION_AUTO_FIXABLE: frozenset[str] = frozenset({
+    "isolation:service-endpoint",
+    "isolation:work-subject",
+    "isolation:workstream-focus-hook-absent",
+    "isolation:release-readiness-app-subject-header",
+})
+# Per Codex `-010` NO-GO + S328 owner remediation choice (reclassify, not
+# aggressive-fixer): isolation:hooks-point-to-wrappers moved here from
+# auto-fixable. The `_compute_target_event_list` machinery cannot reliably
+# clear all live check-#5 warning modes (specifically adopter-owned
+# non-wrapper hooks); rather than deleting adopter customizations
+# destructively, the upgrade refuses with adopter-input guidance.
+_PARTITION_NEEDS_ADOPTER_INPUT: frozenset[str] = frozenset({
+    "isolation:no-writable-product-paths",
+    "isolation:hooks-point-to-wrappers",
+    "isolation:work-list-no-product-entries",
+    "isolation:chroma-regeneratable",
+})
+
+# The exact relative paths the 4 isolation auto-fixers may touch. Defense in
+# depth against scope creep: each helper asserts its target file is in this
+# set before mutating. Owner decision required to extend; see DELIB-S328.
+#
+# Live-probe correction (post-impl S328): check #3 reads
+# .claude/session/work-subject.json (canonical Phase 7 durable state),
+# NOT the TOML's [durable_state] block. The fixer therefore writes the
+# JSON file and the TOML's `work_subject = "application"` is no longer
+# the authority. Same defect class as -006 F1.
+_ISOLATION_FIX_SURFACE_FILES: frozenset[str] = frozenset({
+    "groundtruth.toml",                       # touched by check #2 (service endpoint)
+    ".claude/session/work-subject.json",      # touched by check #3 (work subject)
+    ".claude/hooks/workstream-focus.py",      # touched by check #6 (DELETED, not modified)
+    "memory/release-readiness.md",            # touched by check #8
+})
+# Note: `.claude/settings.json` previously listed for check #5 was removed in
+# REVISED-4 (`-011`) when check #5 reclassified to needs-adopter-input per
+# Codex `-010` NO-GO + S328 owner choice.
+
+# Files in the isolation-fix surface whose `upgrade_policy=preserve` is
+# overridden ONLY when --accept-migration is set. Recorded in the rollback
+# receipt's `prior_policy` field for adopter audit.
+_ISOLATION_FIX_PRESERVE_OVERRIDE_FILES: frozenset[str] = frozenset({
+    "groundtruth.toml",
+    "memory/release-readiness.md",
+})
+
+
+@dataclass
+class IsolationPreflightResult:
+    """Output of :func:`_run_isolation_preflight` — partitioned failing checks.
+
+    Only checks with ``status in {"fail", "warning"}`` are included; ``pass``
+    and ``info`` are dropped (no work to do). The partition is exhaustive over
+    the live check universe per the partition-contract test (T11).
+    """
+
+    hard_refuse: list[ToolCheck] = field(default_factory=list)
+    auto_fixable: list[ToolCheck] = field(default_factory=list)
+    needs_adopter_input: list[ToolCheck] = field(default_factory=list)
+
+
+@dataclass
+class IsolationFixerResult:
+    """One auto-fixer's outcome — passed back from the typed dispatcher.
+
+    Recorded in the rollback receipt's ``isolation_migration.auto_fixed``
+    list per the F2 audit-trail contract.
+    """
+
+    check_name: str
+    file: str
+    outcome: Literal["fixed", "skipped", "no-op"]
+    reason: str
+    prior_policy: str  # e.g., "preserve" / "unregistered" / "settings-hook-registration"
+
+
+class IsolationLocationFailureError(RuntimeError):
+    """Raised when the adopter root is under the product root (check #1).
+
+    Cannot be fixed by ``gt project upgrade``. The adopter must relocate the
+    application directory to comply with ADR-ISOLATION-APPLICATION-PLACEMENT-001
+    (``<gt-kb-root>/applications/<name>/``). Refused regardless of
+    ``--accept-migration``.
+    """
+
+    def __init__(self, target: Path, hard_refuse_checks: list[ToolCheck]) -> None:
+        names = ", ".join(c.name for c in hard_refuse_checks)
+        super().__init__(
+            f"Cannot upgrade: adopter at {target} fails isolation-location check(s): "
+            f"{names}. Per ADR-ISOLATION-APPLICATION-PLACEMENT-001 adopters must "
+            f"live at <gt-kb-root>/applications/<name>/. Relocate the adopter "
+            f"directory and re-run."
+        )
+        self.target = target
+        self.hard_refuse_checks = hard_refuse_checks
+
+
+class IsolationMigrationRequiredError(RuntimeError):
+    """Raised when isolation checks fail AND ``--accept-migration`` is not set.
+
+    The adopter must opt in to one-shot migration via ``--accept-migration``
+    after running the rehearsal recipe out-of-band.
+    """
+
+    def __init__(self, target: Path, failing_checks: list[ToolCheck]) -> None:
+        names = ", ".join(c.name for c in failing_checks)
+        super().__init__(
+            f"Isolation migration required at {target}: failing check(s) {names}. "
+            f"Run the rehearsal recipe (see CLI output) then re-run with "
+            f"--accept-migration to opt in to one-shot migration."
+        )
+        self.target = target
+        self.failing_checks = failing_checks
+
+
+class IsolationNonAutoFixableError(RuntimeError):
+    """Raised when needs-adopter-input checks fail AND ``--accept-migration`` IS set.
+
+    These checks (``isolation:no-writable-product-paths``,
+    ``isolation:work-list-no-product-entries``,
+    ``isolation:chroma-regeneratable``) require adopter judgment on
+    disposition; the upgrade refuses with per-check guidance.
+    """
+
+    def __init__(self, target: Path, needs_adopter_input_checks: list[ToolCheck]) -> None:
+        names = ", ".join(c.name for c in needs_adopter_input_checks)
+        super().__init__(
+            f"Isolation migration cannot complete at {target}: check(s) {names} "
+            f"require adopter input. Inspect each check's reported file and "
+            f"resolve manually, then re-run."
+        )
+        self.target = target
+        self.needs_adopter_input_checks = needs_adopter_input_checks
+
+
+class IsolationPolicyOverrideViolation(RuntimeError):
+    """Raised if a fixer attempts to mutate a path outside ``_ISOLATION_FIX_SURFACE_FILES``.
+
+    Defense in depth: each fixer asserts its target file is in the surface
+    set before mutating. This exception fires only on a bug in the fixer
+    helper itself, not on adopter state.
+    """
+
+    def __init__(self, attempted_path: str) -> None:
+        super().__init__(
+            f"IsolationPolicyOverrideViolation: fixer attempted to mutate "
+            f"{attempted_path!r}, which is not in _ISOLATION_FIX_SURFACE_FILES. "
+            f"Extending the surface requires an owner decision; see DELIB-S328."
+        )
+        self.attempted_path = attempted_path
+
+
+def _run_isolation_preflight(
+    target: Path,
+    profile: str,
+    product_root: Path,
+) -> IsolationPreflightResult:
+    """Partition the 9 live isolation doctor checks into hard-refuse / auto-fixable / needs-adopter-input.
+
+    Only checks with ``status in {"fail", "warning"}`` are included in the
+    returned partition. Pass + info checks are dropped (no work to do).
+
+    Per bridge ``-007`` §"Live-Probed Partition", the three partition
+    constants together cover every live check name; ``T11`` enforces this
+    invariant against ``run_isolation_checks()``'s actual return.
+    """
+    result = IsolationPreflightResult()
+    checks = run_isolation_checks(target, profile, product_root=product_root)
+    for check in checks:
+        if check.status not in ("fail", "warning"):
+            continue
+        if check.name in _PARTITION_HARD_REFUSE:
+            result.hard_refuse.append(check)
+        elif check.name in _PARTITION_AUTO_FIXABLE:
+            result.auto_fixable.append(check)
+        elif check.name in _PARTITION_NEEDS_ADOPTER_INPUT:
+            result.needs_adopter_input.append(check)
+        # Unknown check names: silently dropped here. T11 catches at test time
+        # by failing if the live check universe contains a name not in any
+        # partition constant.
+    return result
+
+
+def _assert_in_isolation_surface(file_path: str) -> None:
+    """Defense-in-depth assertion for isolation fixers.
+
+    Each fixer calls this before mutating. Raises
+    :class:`IsolationPolicyOverrideViolation` if the path is outside the
+    bounded surface. This catches helper bugs at runtime.
+    """
+    if file_path not in _ISOLATION_FIX_SURFACE_FILES:
+        raise IsolationPolicyOverrideViolation(file_path)
+
+
+def _prior_policy_for(file_path: str) -> str:
+    """Return the prior_policy label for receipt audit recording.
+
+    Used by every isolation fixer to populate
+    ``IsolationFixerResult.prior_policy``. The value goes into the rollback
+    receipt's ``isolation_migration.auto_fixed`` entries so adopters can audit
+    what was changed under the ``--accept-migration`` governed override.
+    """
+    if file_path in (".claude/hooks/workstream-focus.py", ".claude/session/work-subject.json"):
+        return "unregistered"
+    if file_path in _ISOLATION_FIX_PRESERVE_OVERRIDE_FILES:
+        return "preserve"
+    return "unknown"
+
+
+def _fix_isolation_service_endpoint(target: Path) -> IsolationFixerResult:
+    """Rewrite the [service] endpoint in groundtruth.toml to a scoped URL form.
+
+    Per check #2 (``isolation:service-endpoint``). The check fails when the
+    endpoint matches the raw-DB-path pattern; this fixer replaces it with the
+    scoped-service-URL placeholder Slice 3 scaffolds.
+    """
+    rel = "groundtruth.toml"
+    _assert_in_isolation_surface(rel)
+    toml_path = target / rel
+    if not toml_path.exists():
+        return IsolationFixerResult(
+            check_name="isolation:service-endpoint",
+            file=rel,
+            outcome="no-op",
+            reason="groundtruth.toml absent; nothing to rewrite",
+            prior_policy=_prior_policy_for(rel),
+        )
+    text = toml_path.read_text(encoding="utf-8")
+    placeholder = 'endpoint = "configure-me://placeholder/v1"'
+    if placeholder in text:
+        return IsolationFixerResult(
+            check_name="isolation:service-endpoint",
+            file=rel,
+            outcome="no-op",
+            reason="endpoint already at scoped placeholder",
+            prior_policy=_prior_policy_for(rel),
+        )
+    # Naive replacement: locate any line beginning with "endpoint =" within
+    # a [service] section, or append a new [service] block. Adopter-side
+    # raw-DB endpoints take many shapes; the scaffold's bracketed-section
+    # rewrite gives a deterministic post-state.
+    lines = text.splitlines(keepends=False)
+    out: list[str] = []
+    in_service_section = False
+    endpoint_replaced = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_service_section = stripped == "[service]"
+            out.append(line)
+            continue
+        if in_service_section and stripped.startswith("endpoint"):
+            out.append(placeholder)
+            endpoint_replaced = True
+            continue
+        out.append(line)
+    if not endpoint_replaced:
+        # No [service] block at all — append one.
+        out.extend(["", "[service]", placeholder])
+    toml_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    return IsolationFixerResult(
+        check_name="isolation:service-endpoint",
+        file=rel,
+        outcome="fixed",
+        reason="endpoint rewritten to scoped placeholder; preserve policy overridden under --accept-migration",
+        prior_policy=_prior_policy_for(rel),
+    )
+
+
+def _fix_isolation_work_subject(target: Path) -> IsolationFixerResult:
+    """Write canonical Phase 7 durable state at .claude/session/work-subject.json.
+
+    Per check #3 (``isolation:work-subject``). The doctor check reads
+    ``<target>/.claude/session/work-subject.json`` (canonical) or
+    ``<target>/.claude/hooks/.workstream-focus-state.json`` (legacy
+    fallback) per Phase 7 §"Durable State Contract" lines 120-164. The
+    check passes when ``current_subject == "application"``.
+
+    This fixer writes the canonical JSON file. The legacy fallback is
+    NOT touched; if it exists it remains as adopter-owned migration
+    history (check passes via the canonical file taking precedence).
+    """
+    rel = ".claude/session/work-subject.json"
+    _assert_in_isolation_surface(rel)
+    state_path = target / rel
+    payload = {
+        "current_subject": "application",
+        "application_root": str(target.resolve()).replace("\\", "/"),
+        "set_by": "gt project upgrade --accept-migration",
+        "set_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+    }
+    # Idempotent: if the file already says current_subject="application" and
+    # the application_root resolves to target, no-op.
+    if state_path.exists():
+        try:
+            existing = json.loads(state_path.read_text(encoding="utf-8"))
+            if (
+                existing.get("current_subject") == "application"
+                and existing.get("application_root")
+                and Path(existing["application_root"]).resolve() == target.resolve()
+            ):
+                return IsolationFixerResult(
+                    check_name="isolation:work-subject",
+                    file=rel,
+                    outcome="no-op",
+                    reason="work-subject.json already at canonical state",
+                    prior_policy=_prior_policy_for(rel),
+                )
+        except (OSError, json.JSONDecodeError):
+            pass  # Fall through to overwrite.
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return IsolationFixerResult(
+        check_name="isolation:work-subject",
+        file=rel,
+        outcome="fixed",
+        reason="wrote canonical Phase 7 work-subject.json with current_subject='application'",
+        prior_policy=_prior_policy_for(rel),
+    )
+
+
+# Note: `_fix_isolation_hook_paths` (formerly check #5 fixer) was removed in
+# REVISED-4 (`-011`) when `isolation:hooks-point-to-wrappers` was reclassified
+# to needs-adopter-input per Codex `-010` NO-GO + S328 owner choice. The
+# existing `_compute_target_event_list` machinery in `_execute_merge_event_hooks`
+# (used by routine upgrade actions) continues to refresh registry-managed hook
+# entries; the isolation-specific dispatcher no longer mutates settings.json.
+
+
+def _fix_isolation_remove_workstream_focus_hook(target: Path) -> IsolationFixerResult:
+    """Delete the deprecated .claude/hooks/workstream-focus.py hook file if present.
+
+    Per check #6 (``isolation:workstream-focus-hook-absent``). Per Phase 9 §4
+    line 410 + ADR-ISOLATION-APPLICATION-PLACEMENT-001, the legacy hook is
+    deprecated; the doctor warns if it reappears. The file is unregistered
+    (out-of-matrix) so deletion is authorized without preserve-override
+    expansion.
+    """
+    rel = ".claude/hooks/workstream-focus.py"
+    _assert_in_isolation_surface(rel)
+    legacy_hook = target / rel
+    if not legacy_hook.exists():
+        return IsolationFixerResult(
+            check_name="isolation:workstream-focus-hook-absent",
+            file=rel,
+            outcome="no-op",
+            reason="legacy hook already absent",
+            prior_policy=_prior_policy_for(rel),
+        )
+    legacy_hook.unlink()
+    return IsolationFixerResult(
+        check_name="isolation:workstream-focus-hook-absent",
+        file=rel,
+        outcome="fixed",
+        reason="deleted deprecated workstream-focus.py per ADR-ISOLATION-APPLICATION-PLACEMENT-001",
+        prior_policy=_prior_policy_for(rel),
+    )
+
+
+_RELEASE_READINESS_BANNER = (
+    "# Application release-readiness — application subject\n\n"
+    "_This file is the application's release-readiness record. Header asserts "
+    "application subject per Phase 9 §4 lines 217–218. Do not combine GT-KB "
+    "(platform) status with application status._\n"
+)
+
+
+def _fix_isolation_release_readiness_banner(target: Path) -> IsolationFixerResult:
+    """Rewrite the first non-blank line of memory/release-readiness.md to assert application subject.
+
+    Per check #8 (``isolation:release-readiness-app-subject-header``). The
+    doctor check fails when the first non-blank line does not mention
+    "application" or when GT-KB subject is combined with green keywords.
+    """
+    rel = "memory/release-readiness.md"
+    _assert_in_isolation_surface(rel)
+    rr_path = target / rel
+    if not rr_path.exists():
+        # Create with the canonical banner.
+        rr_path.parent.mkdir(parents=True, exist_ok=True)
+        rr_path.write_text(_RELEASE_READINESS_BANNER, encoding="utf-8")
+        return IsolationFixerResult(
+            check_name="isolation:release-readiness-app-subject-header",
+            file=rel,
+            outcome="fixed",
+            reason="created release-readiness.md with application-subject banner",
+            prior_policy=_prior_policy_for(rel),
+        )
+    text = rr_path.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=False)
+    # Find first non-blank line index.
+    first_idx = next((i for i, ln in enumerate(lines) if ln.strip()), -1)
+    canonical_header = "# Application release-readiness — application subject"
+    if first_idx >= 0 and lines[first_idx].strip() == canonical_header:
+        return IsolationFixerResult(
+            check_name="isolation:release-readiness-app-subject-header",
+            file=rel,
+            outcome="no-op",
+            reason="header already asserts application subject",
+            prior_policy=_prior_policy_for(rel),
+        )
+    if first_idx >= 0:
+        lines[first_idx] = canonical_header
+    else:
+        lines = [canonical_header]
+    rr_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return IsolationFixerResult(
+        check_name="isolation:release-readiness-app-subject-header",
+        file=rel,
+        outcome="fixed",
+        reason=(
+            "rewrote first non-blank line to assert application subject; "
+            "preserve policy overridden under --accept-migration"
+        ),
+        prior_policy=_prior_policy_for(rel),
+    )
+
+
+# Single source of truth for the dispatcher mapping. T13 asserts this contains
+# exactly the 5 check names in _PARTITION_AUTO_FIXABLE (no missing keys, no
+# extras) and that each helper is invoked when its check is dispatched.
+_ISOLATION_FIXER_MAP: dict[str, Callable[[Path], IsolationFixerResult]] = {
+    "isolation:service-endpoint": _fix_isolation_service_endpoint,
+    "isolation:work-subject": _fix_isolation_work_subject,
+    "isolation:workstream-focus-hook-absent": _fix_isolation_remove_workstream_focus_hook,
+    "isolation:release-readiness-app-subject-header": _fix_isolation_release_readiness_banner,
+}
+
+
+def _run_isolation_fixers(
+    target: Path,
+    profile: str,
+    auto_fixable_checks: list[ToolCheck],
+) -> list[IsolationFixerResult]:
+    """Typed dispatcher: invoke the helper for each auto-fixable check.
+
+    Per F1 fix in bridge -005 / -007: isolation fixers are NOT ``UpgradeAction``
+    rows; they are a sibling typed code path within ``execute_upgrade()`` that
+    runs inside the payload branch.
+
+    Raises:
+        RuntimeError: if a check's name has no helper in
+            :data:`_ISOLATION_FIXER_MAP` (defensive — partition contract test
+            T11 + dispatcher contract test T13 ensure this never fires in
+            practice).
+    """
+    results: list[IsolationFixerResult] = []
+    for check in auto_fixable_checks:
+        helper = _ISOLATION_FIXER_MAP.get(check.name)
+        if helper is None:
+            raise RuntimeError(
+                f"_ISOLATION_FIXER_MAP missing helper for {check.name!r}; "
+                f"this is a partition/dispatcher contract bug. "
+                f"Ensure _ISOLATION_FIXER_MAP keys equal _PARTITION_AUTO_FIXABLE."
+            )
+        results.append(helper(target))
+    return results
 
 
 @dataclass
@@ -676,11 +1156,19 @@ def plan_upgrade(target: Path, *, ignore_inflight_bridges: bool = False) -> list
     # ``execute_upgrade`` pre-pre-flight scan for ``MalformedSettingsError``.
     from groundtruth_kb.project.preflight import (
         _check_bridge_inflight,
+        _check_isolation_state,
         _check_scaffold_coverage,
     )
 
     actions.extend(_check_bridge_inflight(target, ignore=ignore_inflight_bridges))
     actions.extend(_check_scaffold_coverage(target, profile.name))
+    # GTKB-ISOLATION-017 Slice 4: surface isolation-doctor failures as
+    # non-mutating diagnostic rows so dry-run reports show them. The CLI
+    # filters warning/informational rows out before execute_upgrade so these
+    # never trigger git or file mutation. The actual gating + auto-fix
+    # invocation happens in execute_upgrade via _run_isolation_preflight +
+    # _run_isolation_fixers.
+    actions.extend(_check_isolation_state(target, profile.name))
 
     # Drift checks run unconditionally (even at current scaffold version)
     # so that missing managed files, missing PreToolUse registrations,
@@ -706,29 +1194,44 @@ def execute_upgrade(
     actions: list[UpgradeAction],
     *,
     force: bool = False,
+    accept_migration: bool = False,
+    product_root: Path | None = None,
+    enforce_isolation: bool = True,
 ) -> list[str]:
     """Execute planned upgrade actions via a payload-branch-and-merge flow.
 
-    The flow (per ``bridge/gtkb-rollback-receipts-014.md`` GO):
+    The flow (per ``bridge/gtkb-rollback-receipts-014.md`` GO + bridge
+    ``gtkb-isolation-017-slice4-upgrade-2026-05-02-008.md`` GO):
 
-    1. Pre-flight: verify git work tree + clean tree; resolve receipt mode
-       from the adopter's current ``.gitignore`` state.
-    2. Create and switch to a short-lived ``gt-upgrade-payload-<id>`` branch.
-    3. Apply file actions on the payload branch (NO ``.bak`` backups — git
-       history is the audit trail).
-    4. Commit the payload. If nothing changed, abort cleanly without a
-       merge or receipt.
-    5. Switch back to the target branch and ``git merge --no-ff`` the
-       payload branch, producing a real merge commit.
-    6. Write the rollback receipt post-merge. In tracked mode the receipt
-       lands in a SEPARATE post-merge commit at HEAD; the merge commit is
-       at HEAD~1 and its tree does not contain the receipt, so
-       ``git revert -m 1 <merge_commit>`` rolls back only the payload.
+    1. Pre-pre-flight: malformed-settings halt + GTKB-ISOLATION-017 isolation
+       gating (per Slice 4). Hard-refuse on adopter-root-placement violations
+       regardless of ``accept_migration``. Refuse on any failing isolation
+       check unless ``accept_migration=True``. Refuse on needs-adopter-input
+       checks even when ``accept_migration=True``.
+    2. Pre-flight: verify git work tree + clean tree; resolve receipt mode.
+    3. Create and switch to a short-lived ``gt-upgrade-payload-<id>`` branch.
+    4. Run isolation auto-fixers (Slice 4) — only when ``accept_migration=True``
+       AND the auto-fixable partition is non-empty. Fixer outcomes recorded
+       in the rollback receipt's ``isolation_migration`` block.
+    5. Apply file actions on the payload branch (existing flow).
+    6. Commit the payload, merge with ``--no-ff``, write rollback receipt.
+
+    Args:
+        target: Adopter project root.
+        force: Overwrite customized files (passes through to file-action executor).
+        accept_migration: Slice 4 — explicit opt-in to one-shot isolation
+            migration. Required to run isolation auto-fixers; without it,
+            isolation failures cause refusal. Per
+            ``DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE``.
+        product_root: Slice 4 — GT-KB product root for isolation pre-flight
+            (used to detect adopter-under-product-root placement violation).
+            Defaults to ``Path(__file__).resolve().parents[3]`` when not set.
 
     Raises:
-        MalformedSettingsError: the plan contains a malformed-settings skip
-            action (``.claude/settings.json`` is not valid JSON); refused
-            before any git or file work runs.
+        MalformedSettingsError: malformed ``.claude/settings.json``.
+        IsolationLocationFailureError: adopter root under product root (check #1).
+        IsolationMigrationRequiredError: isolation checks fail and ``accept_migration`` not set.
+        IsolationNonAutoFixableError: needs-adopter-input checks fail with ``accept_migration`` set.
         NotAGitRepositoryError: ``target`` is not inside a git work tree.
         DirtyWorkingTreeError: uncommitted changes present before upgrade.
         MergeFailedError: ``git merge --no-ff`` of the payload failed.
@@ -739,6 +1242,28 @@ def execute_upgrade(
     malformed = _has_malformed_settings_skip(actions)
     if malformed is not None:
         raise MalformedSettingsError(malformed)
+
+    # Slice 4: isolation pre-flight + gating. Runs BEFORE git checks so refusal
+    # paths surface cleanly without leaving the adopter in mixed state.
+    # ``enforce_isolation`` defaults True (production CLI path); library callers
+    # that want the pre-Slice-4 plain-executor semantics can pass False (e.g.,
+    # pre-existing test fixtures that don't model an isolation-clean adopter).
+    isolation_result: IsolationPreflightResult = IsolationPreflightResult()
+    profile_name_for_iso = "dual-agent"
+    if enforce_isolation:
+        if product_root is None:
+            # Match doctor.py:_PRODUCT_ROOT computation: parents[3] from this file.
+            product_root = Path(__file__).resolve().parents[3]
+        manifest_for_profile = read_manifest(target / "groundtruth.toml")
+        profile_name_for_iso = manifest_for_profile.profile if manifest_for_profile else "dual-agent"
+        isolation_result = _run_isolation_preflight(target, profile_name_for_iso, product_root)
+        if isolation_result.hard_refuse:
+            raise IsolationLocationFailureError(target, isolation_result.hard_refuse)
+        failing = isolation_result.auto_fixable + isolation_result.needs_adopter_input
+        if failing and not accept_migration:
+            raise IsolationMigrationRequiredError(target, failing)
+        if isolation_result.needs_adopter_input and accept_migration:
+            raise IsolationNonAutoFixableError(target, isolation_result.needs_adopter_input)
 
     _require_git_repo(target)
     _require_clean_tree(target)
@@ -763,7 +1288,27 @@ def execute_upgrade(
     on_payload_branch = True
 
     try:
+        # Slice 4: invoke isolation fixers BEFORE _apply_file_actions so the
+        # payload commit captures both the isolation migration AND the routine
+        # upgrade actions. Single payload + single receipt + single revert path.
+        isolation_fixer_results: list[IsolationFixerResult] = []
+        if accept_migration and isolation_result.auto_fixable:
+            isolation_fixer_results = _run_isolation_fixers(
+                target, profile_name_for_iso, isolation_result.auto_fixable
+            )
+            for fr in isolation_fixer_results:
+                tag = "FIXED" if fr.outcome == "fixed" else fr.outcome.upper()
+                # Use append rather than prepend; results list ordering is informational.
+                # Initial empty list — populated by _apply_file_actions below.
+                # Track in a separate buffer; merged into results after _apply.
+                pass  # noqa: PIE790
+
         results = _apply_file_actions(target, actions, force=force)
+
+        # Surface isolation-fixer rows in the result log for adopter visibility.
+        for fr in isolation_fixer_results:
+            tag = "FIXED" if fr.outcome == "fixed" else fr.outcome.upper()
+            results.insert(0, f"[ISOLATION] {tag} {fr.file} ({fr.check_name}) — {fr.reason}")
 
         payload_commit = _commit_payload(target, f"gt: upgrade payload to {__version__}")
         if payload_commit is None:
@@ -794,6 +1339,29 @@ def execute_upgrade(
             "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "artifact_classes_touched": _artifact_classes_touched(actions),
         }
+        # Slice 4: optional isolation_migration audit block. Only present when
+        # accept_migration was set AND fixers ran. Per F2 audit-trail contract.
+        if accept_migration and (isolation_fixer_results or isolation_result.auto_fixable):
+            receipt["isolation_migration"] = {
+                "auto_fixed": [
+                    {
+                        "check_name": fr.check_name,
+                        "file": fr.file,
+                        "outcome": fr.outcome,
+                        "prior_policy": fr.prior_policy,
+                        "reason": fr.reason,
+                    }
+                    for fr in isolation_fixer_results
+                ],
+                "left_for_adopter": [
+                    {"check_name": c.name, "message": c.message}
+                    for c in isolation_result.needs_adopter_input
+                ],
+                "preserve_override_authority": (
+                    "DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE "
+                    "+ S328 owner --accept-migration preserve-override authorization"
+                ),
+            }
         receipt_outcome = write_receipt(resolved, receipt)
         if resolved.mode == "tracked":
             results.append(f"RECEIPT tracked @ {receipt_outcome[:10]} ({resolved.receipt_path.name})")

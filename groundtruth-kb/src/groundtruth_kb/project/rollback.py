@@ -34,7 +34,7 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 ReceiptMode = Literal["tracked", "filesystem"]
 
@@ -81,6 +81,11 @@ class ReceiptJSON(TypedDict):
     mode: ReceiptMode
     created_at: str
     artifact_classes_touched: list[str]
+    # GTKB-ISOLATION-017 Slice 4: optional audit block recording isolation
+    # auto-fixer outcomes when --accept-migration is set. Absent for routine
+    # upgrades where no isolation fixers ran. Per bridge -007 §"Implementation
+    # Plan" §8 and the F2 audit-trail contract.
+    isolation_migration: NotRequired[dict[str, Any]]
 
 
 @dataclass

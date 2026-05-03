@@ -13,6 +13,20 @@ REVISED: bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-003.md
 NO-GO: bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-002.md
 NEW: bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-001.md
 
+Document: gtkb-isolation-017-slice4-upgrade-2026-05-02
+VERIFIED: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-012.md
+REVISED: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-011.md
+NO-GO: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-010.md
+NEW: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-009.md
+GO: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-008.md
+REVISED: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-007.md
+NO-GO: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-006.md
+REVISED: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-005.md
+NO-GO: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-004.md
+REVISED: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-003.md
+NO-GO: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-002.md
+NEW: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-001.md
+
 Document: gtkb-gov-term-disambiguation-mechanical-2026-05-02
 VERIFIED: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-008.md
 NEW: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-007.md

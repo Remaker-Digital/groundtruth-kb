@@ -171,7 +171,7 @@ def test_execute_upgrade_skip_without_force(tmp_path: Path) -> None:
     _write_minimal_toml(tmp_path, version="0.0.1")
     action = UpgradeAction(file="some-file.py", action="skip", reason="customized")
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=False)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("SKIPPED" in r for r in results)
 
 
@@ -187,7 +187,7 @@ def test_execute_upgrade_add_action_copies_template(tmp_path: Path) -> None:
 
     action = UpgradeAction(file=".claude/hooks/assertion-check.py", action="add", reason="New managed file")
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=False)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("UPDATED" in r for r in results)
     assert (tmp_path / ".claude" / "hooks" / "assertion-check.py").exists()
 
@@ -197,7 +197,7 @@ def test_execute_upgrade_template_not_found_skips(tmp_path: Path) -> None:
     _write_minimal_toml(tmp_path, version="0.0.1")
     action = UpgradeAction(file=".claude/hooks/nonexistent-hook.py", action="add", reason="New managed file")
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=False)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("SKIPPED" in r for r in results)
 
 
@@ -222,7 +222,7 @@ def test_execute_upgrade_no_bak_files_created(tmp_path: Path) -> None:
 
     action = UpgradeAction(file=".claude/hooks/assertion-check.py", action="skip", reason="customized")
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=True)
+    results = execute_upgrade(tmp_path, [action], force=True, enforce_isolation=False)
 
     # Forcing the skip should update the file in-place (UPDATED in results).
     assert any("UPDATED" in r for r in results), results
@@ -240,7 +240,7 @@ def test_execute_upgrade_updates_manifest_version(tmp_path: Path) -> None:
 
     _write_minimal_toml(tmp_path, version="0.0.1")
     _setup_git_for_upgrade(tmp_path)
-    execute_upgrade(tmp_path, [], force=False)
+    execute_upgrade(tmp_path, [], force=False, enforce_isolation=False)
     manifest = read_manifest(tmp_path / "groundtruth.toml")
     assert manifest is not None
     assert manifest.scaffold_version == __version__
@@ -343,7 +343,7 @@ def test_execute_creates_missing_hook_file_at_same_version(tmp_path: Path) -> No
 
     actions = plan_upgrade(tmp_path)
     _setup_git_for_upgrade(tmp_path)
-    execute_upgrade(tmp_path, actions, force=False)
+    execute_upgrade(tmp_path, actions, force=False, enforce_isolation=False)
 
     assert hook_path.exists(), "scanner-safe-writer.py should be copied by execute_upgrade at same version"
     # Template content check — non-empty, contains expected marker
@@ -415,7 +415,7 @@ def test_execute_merge_event_hooks_preserves_unmanaged_entries(tmp_path: Path) -
         event="PreToolUse",
     )
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=False)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("MERGED" in r and "PreToolUse rebuilt" in r for r in results), results
     data = json.loads(settings_path.read_text(encoding="utf-8"))
     commands = [h["command"] for entry in data["hooks"]["PreToolUse"] for h in entry["hooks"]]
@@ -441,13 +441,13 @@ def test_execute_merge_event_hooks_is_idempotent(tmp_path: Path) -> None:
         event="PreToolUse",
     )
     _setup_git_for_upgrade(tmp_path)
-    first = execute_upgrade(tmp_path, [action], force=False)
+    first = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("MERGED" in r and "PreToolUse rebuilt" in r for r in first), first
     # Reset version so the noop execute doesn't cascade into other file work.
     # The rewrite is idempotent at value level, so git sees no diff and the
     # second execute still runs against a clean tree.
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
-    second = execute_upgrade(tmp_path, [action], force=False)
+    second = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("already at registry order" in r for r in second), second
 
 
@@ -590,7 +590,7 @@ def test_plan_apply_userpromptsubmit_interleaved_unmanaged(tmp_path: Path) -> No
         f"interleaved UserPromptSubmit must produce exactly one merge action; got {ups_actions}"
     )
 
-    results = execute_upgrade(tmp_path, ups_actions, force=False)
+    results = execute_upgrade(tmp_path, ups_actions, force=False, enforce_isolation=False)
     registry_filenames = [
         getattr(art, "hook_filename", None)
         for art in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
@@ -638,7 +638,7 @@ def test_plan_apply_posttooluse_interleaved_unmanaged(tmp_path: Path) -> None:
     pto_actions = [a for a in actions if a.action == "merge-event-hooks" and a.event == "PostToolUse"]
     assert len(pto_actions) == 1, f"interleaved PostToolUse must produce exactly one merge action; got {pto_actions}"
 
-    results = execute_upgrade(tmp_path, pto_actions, force=False)
+    results = execute_upgrade(tmp_path, pto_actions, force=False, enforce_isolation=False)
     registry_filenames = [
         getattr(art, "hook_filename", None)
         for art in artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
@@ -686,7 +686,7 @@ def test_execute_append_gitignore_preserves_existing_content(tmp_path: Path) -> 
         payload=".claude/hooks/*.log",
     )
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=False)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("APPENDED .claude/hooks/*.log" in r for r in results), results
     content = (tmp_path / ".gitignore").read_text(encoding="utf-8")
     for line in original_lines:
@@ -708,7 +708,7 @@ def test_execute_append_gitignore_is_idempotent(tmp_path: Path) -> None:
     )
     before = (tmp_path / ".gitignore").read_text(encoding="utf-8")
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=False)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     after = (tmp_path / ".gitignore").read_text(encoding="utf-8")
     assert any("already present" in r for r in results), results
     assert before == after, "idempotent call must not modify .gitignore"
@@ -797,7 +797,7 @@ def test_upgrade_creates_gitignore_if_missing(tmp_path: Path) -> None:
         payload=".claude/hooks/*.log",
     )
     _setup_git_for_upgrade(tmp_path)
-    results = execute_upgrade(tmp_path, [action], force=False)
+    results = execute_upgrade(tmp_path, [action], force=False, enforce_isolation=False)
     assert any("APPENDED .claude/hooks/*.log" in r for r in results), results
     assert gi.exists(), "execute_upgrade must create .gitignore"
     content = gi.read_text(encoding="utf-8")

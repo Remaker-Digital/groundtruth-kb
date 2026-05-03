@@ -136,8 +136,20 @@ def test_C1_execute_upgrade_never_called_for_warning_only_plan(tmp_path: Path) -
     runner = CliRunner()
     result = runner.invoke(main, ["project", "upgrade", "--apply", "--dir", str(tmp_path), "--force"])
 
-    assert result.exit_code == 0, f"exit code {result.exit_code}; output:\n{result.output}"
-    assert "Pre-flight only" in result.output
+    # Accept exit_code 0 (pre-flight only path, original C1 invariant) OR 5
+    # (Slice 4 isolation-refusal path, added 2026-05-02 per GTKB-ISOLATION-017
+    # Slice 4 GO at -008). Both satisfy the structural C1 claim: warning-only
+    # plan → no writes. The snapshot equality below is the load-bearing
+    # invariant; the exit code is the path indicator.
+    assert result.exit_code in (0, 5), f"exit code {result.exit_code}; output:\n{result.output}"
+    if result.exit_code == 0:
+        assert "Pre-flight only" in result.output
+    else:
+        # Slice 4 path: isolation gate fired before any write; rehearsal
+        # recipe block is present in CLI output. We don't assert the recipe
+        # text shape here (covered by Slice 4 tests) — only that no writes
+        # occurred, which the snapshot check below proves.
+        pass
     # File tree byte-identical after apply — proves zero writes.
     assert _snapshot_file_tree(tmp_path) == snapshot_before
 
@@ -160,7 +172,7 @@ def test_C1_apply_file_actions_is_no_op_for_warning_even_with_force(tmp_path: Pa
         reason="force a real payload",
         payload="test-payload/",
     )
-    results = execute_upgrade(tmp_path, [warning, mutating], force=True)
+    results = execute_upgrade(tmp_path, [warning, mutating], force=True, enforce_isolation=False)
 
     assert not (tmp_path / ".claude" / "hooks" / "attacker-would-love-this.py").exists()
     assert any("WARNING" in r and "attacker-would-love-this.py" in r for r in results)
@@ -219,7 +231,7 @@ def test_C2_execute_upgrade_raises_malformed_settings_before_any_git(tmp_path: P
     _write_minimal_toml(tmp_path, profile="dual-agent", version="0.0.1")
     actions = [_make_malformed_skip()]
     with pytest.raises(MalformedSettingsError) as excinfo:
-        execute_upgrade(tmp_path, actions, force=False)
+        execute_upgrade(tmp_path, actions, force=False, enforce_isolation=False)
     assert excinfo.value.action.file == ".claude/settings.json"
 
 
