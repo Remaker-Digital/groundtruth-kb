@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+groundtruth.db
+.groundtruth/
+.claude/settings.local.json
+
+# File bridge automation runtime state
+independent-progress-assessments/bridge-automation/logs/
+independent-progress-assessments/bridge-automation/*.lock
+independent-progress-assessments/bridge-automation/*.tmp
+
+# Operational hook logs
+.claude/hooks/*.log

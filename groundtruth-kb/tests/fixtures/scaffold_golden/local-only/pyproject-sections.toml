@@ -1,0 +1,33 @@
+# GroundTruth project tooling configuration
+# Copy these sections into your project's pyproject.toml.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers --timeout=30"
+markers = [
+    "unit: fast, isolated unit tests",
+    "integration: cross-module integration tests",
+    "e2e: end-to-end tests requiring full stack",
+    "slow: tests that take >2 seconds",
+    "security: adversarial and security-focused tests",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008", "SIM108", "UP007"]

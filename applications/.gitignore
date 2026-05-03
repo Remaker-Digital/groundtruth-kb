@@ -1,0 +1,5 @@
+# GTKB-ISOLATION-017 Slice 3: keep test sandbox application roots out of git.
+# Tests scaffold sandbox adopters at `_test_<uuid>/` for in-root integration
+# coverage and clean them up afterward; lingering sandboxes from interrupted
+# runs should not pollute git status.
+_test_*/

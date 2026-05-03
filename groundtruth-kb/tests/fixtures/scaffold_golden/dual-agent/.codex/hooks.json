@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "intent": "forward-compatible Codex hook registration",
+  "see": "ADR-CODEX-HOOK-PARITY-FALLBACK-001",
+  "hooks": []
+}

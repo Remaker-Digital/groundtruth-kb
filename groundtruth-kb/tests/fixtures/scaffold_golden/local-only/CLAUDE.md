@@ -1,0 +1,126 @@
+# CLAUDE.md — _test_golden_local_only
+
+This file provides active guidance for AI assistants working on _test_golden_local_only.
+It is loaded at the start of every session.
+
+> **Customize this template:** Replace `_test_golden_local_only`, `Copyright 2026 GoldenFixtureOwner. All rights reserved.`, and
+> other placeholders with your project's values. Remove sections that don't apply.
+
+This project follows ADR-0001: Three-Tier Memory Architecture (MemBase = canonical knowledge and specifications; MEMORY.md = operational notepad; Deliberation Archive (DA) = design-reasoning record).
+
+---
+
+## Canonical Terminology (ADR-0001 core vocabulary)
+
+| Term | Short definition |
+|------|-----------------|
+| **MemBase** | Canonical, authoritative store of specs and governed knowledge (`groundtruth.db`). |
+| **Deliberation Archive (DA)** | Design-reasoning tier — decisions, reviews, rejected alternatives. |
+| **MEMORY.md** | Operational notepad at repo root. Can coordinate work; cannot make anything true. |
+| **GroundTruth KB / GT-KB** | The product: MemBase + CLI + templates + doctor + bridge. |
+| **Prime Builder** | Implementing agent. Proposes, implements, tests. |
+| **Loyal Opposition** | Reviewing agent. Inspects, critiques, issues GO / NO-GO / VERIFIED. |
+
+Full glossary: `.claude/rules/canonical-terminology.md` (scaffolded). Record in MemBase.
+
+---
+
+## Project Identity
+
+| Attribute | Value |
+|-----------|-------|
+| **Project Name** | _test_golden_local_only |
+| **Type** | Local Only project |
+| **Status** | See MEMORY.md for current status |
+| **Owner** | GoldenFixtureOwner |
+
+### Copyright Notice
+
+All new work in this repository must include:
+
+```
+Copyright 2026 GoldenFixtureOwner. All rights reserved.
+```
+
+---
+
+## Roles
+
+**Owner role:** Provides direction (what to build) and decisions (specifications to approve).
+
+**Builder role (Claude / AI assistant):** Creates, manages, and maintains implementation artifacts.
+Proposes specifications, implements approved changes, runs tests, and keeps the system consistent.
+
+### GroundTruth Vision Filter
+
+The owner should primarily add or revise specifications, answer clarification
+questions, and make explicit trade-off decisions. When choosing implementation
+options, prefer approaches that reduce routine owner burden through
+specifications, automated checks, traceability, and deployment evidence.
+
+Decision filter: Does this reduce the owner's role to specifications,
+clarifications, and decisions?
+
+### Optional operational inventory
+
+If this project uses a bridge, multiple agents, scheduled pollers, or recurring
+automations, maintain `BRIDGE-INVENTORY.md` (or an equivalent project-owned
+inventory file) and keep it aligned with runtime entrypoints, schedules,
+directives, and role exceptions.
+
+---
+
+## Workflow: Specification → Work Item → Test → Implementation
+
+1. Owner requests change → record as specification(s) in MemBase (canonical knowledge and specifications)
+2. Identify implementation gaps → create work items
+3. Work item creation triggers test creation
+4. Add work items to backlog → prioritize
+5. Implement in backlog order
+6. Execute tests → PASS or FAIL
+7. FAIL → create new work item (verify spec → verify test → fix implementation)
+
+### Spec-First Rule
+
+When the owner describes what the system **must do**, **should do**, or states numbered criteria:
+1. Record or verify specifications in MemBase
+2. Create work items for any gaps
+3. Present the backlog for prioritization
+4. Only proceed to implementation after approval
+
+---
+
+## MemBase (Canonical Knowledge and Specifications)
+
+Access via Python API (`groundtruth_kb`) or CLI (`gt`). Web UI available via `gt serve`.
+
+**Key principle:** All canonical project knowledge lives in MemBase. MEMORY.md can coordinate work, but it cannot make anything true. Use `gt summary`
+to check current status. Use `gt assert` to verify specifications against the codebase.
+
+---
+
+## Working with This Project
+
+### Starting a New Session
+
+```
+Continue work on _test_golden_local_only.
+Key files: CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md (if used)
+Next: [describe task].
+```
+
+### Session Wrap-Up
+
+Before ending a session:
+1. Update MEMORY.md with what was done and what's next
+2. Run `gt assert` to confirm no regressions
+3. Commit with session ID in the message
+
+### Protected Behaviors
+
+Never remove code, tests, features, or specifications without explicit owner approval.
+If something looks wrong — ask rather than act.
+
+---
+
+*Copyright 2026 GoldenFixtureOwner. All rights reserved.*
