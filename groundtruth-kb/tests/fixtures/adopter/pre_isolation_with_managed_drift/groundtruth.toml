@@ -1,0 +1,14 @@
+[groundtruth]
+db_path = "groundtruth.db"
+
+[project]
+project_name = "Pre-Isolation With Managed Drift Fixture"
+owner = "Slice5Tester"
+profile = "dual-agent"
+copyright_notice = ""
+cloud_provider = "none"
+scaffold_version = "0.6.0"
+created_at = "2026-01-01T00:00:00Z"
+
+[service]
+endpoint = "groundtruth.db"
