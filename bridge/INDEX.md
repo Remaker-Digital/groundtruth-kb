@@ -77,6 +77,8 @@ NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-002.md
 NEW: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-001.md
 
 Document: gtkb-bridge-propose-helper-caller-migration-2026-05-02
+VERIFIED: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-008.md
+NEW: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-007.md
 NO-GO: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-006.md
 REVISED: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-005.md
 NO-GO: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-004.md
@@ -121,6 +123,8 @@ NO-GO: bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-002.md
 NEW: bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-001.md
 
 Document: gtkb-bridge-propose-helper-index-parity-2026-05-02
+VERIFIED: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-008.md
+NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-007.md
 NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-006.md
 REVISED: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-005.md
 NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-004.md
