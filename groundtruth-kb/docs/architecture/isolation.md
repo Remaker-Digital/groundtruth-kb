@@ -308,6 +308,9 @@ operation outside the GT-KB CLI surface.
 - [product-split.md](product-split.md) — the GT-KB layer architecture (Layer 1
   Core KB, Layer 2 Project Scaffold, Layer 3 Workstation Doctor) that this
   isolation chapter sits inside.
+- [examples/](../../examples/) — 4 example adopter trees demonstrating the
+  isolation contract end-to-end: clean-adopter-minimal, adopter-with-transport-tests,
+  adopter-with-release-gate, existing-adopter-migration.
 
 ---
 

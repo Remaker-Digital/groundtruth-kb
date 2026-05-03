@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.local
+.groundtruth-chroma/
+.claude/upgrade-receipts/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/

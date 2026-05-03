@@ -1,0 +1,24 @@
+# GroundTruth KB project configuration — clean-adopter-minimal example.
+# See docs/architecture/isolation.md for the isolation contract this example satisfies.
+
+[groundtruth]
+db_path = "./groundtruth.db"
+project_root = "."
+app_title = "clean-adopter-minimal"
+brand_mark = "GT"
+brand_color = "#2563eb"
+legal_footer = "Copyright placeholder"
+
+[service]
+# Phase 4 service-endpoint contract per ADR-ISOLATION-APPLICATION-PLACEMENT-001.
+# Override per environment to point at a real GT-KB service.
+endpoint = "configure-me://placeholder/v1"
+
+[project]
+project_name = "clean-adopter-minimal"
+owner = "Slice7Example"
+profile = "local-only"
+copyright_notice = "Copyright placeholder"
+cloud_provider = "none"
+scaffold_version = "0.7.0-rc1"
+created_at = "2026-05-03T00:00:00Z"

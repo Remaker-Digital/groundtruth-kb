@@ -1,0 +1,11 @@
+[project]
+name = "adopter-with-transport-tests"
+version = "0.0.1"
+description = "GTKB-ISOLATION-017 Slice 7 example: adopter with transport contract tests."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# Scoped to this example only; the platform's pytest lane does not descend
+# here because examples/ is outside groundtruth-kb/tests/.
+testpaths = ["tests"]
+addopts = "-ra"

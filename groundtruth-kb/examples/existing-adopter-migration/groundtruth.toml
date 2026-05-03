@@ -1,0 +1,25 @@
+# GroundTruth KB project configuration — existing-adopter-migration example.
+# This is a PRE-ISOLATION shape that DELIBERATELY fails several isolation:*
+# doctor checks. The walkthrough at WALKTHROUGH.md documents the migration.
+
+[groundtruth]
+db_path = "./groundtruth.db"
+project_root = "."
+app_title = "existing-adopter-migration"
+brand_mark = "GT"
+brand_color = "#2563eb"
+legal_footer = "Copyright placeholder"
+
+[service]
+# Intentionally raw-DB to trigger isolation:service-endpoint (#2).
+endpoint = "groundtruth.db"
+
+[project]
+project_name = "existing-adopter-migration"
+owner = "Slice7Example"
+profile = "dual-agent"
+copyright_notice = "Copyright placeholder"
+cloud_provider = "none"
+# Older scaffold version triggers the upgrade-required path.
+scaffold_version = "0.6.0"
+created_at = "2026-01-01T00:00:00Z"

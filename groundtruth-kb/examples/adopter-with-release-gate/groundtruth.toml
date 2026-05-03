@@ -1,0 +1,21 @@
+# GroundTruth KB project configuration — adopter-with-release-gate example.
+
+[groundtruth]
+db_path = "./groundtruth.db"
+project_root = "."
+app_title = "adopter-with-release-gate"
+brand_mark = "GT"
+brand_color = "#2563eb"
+legal_footer = "Copyright placeholder"
+
+[service]
+endpoint = "configure-me://placeholder/v1"
+
+[project]
+project_name = "adopter-with-release-gate"
+owner = "Slice7Example"
+profile = "dual-agent"
+copyright_notice = "Copyright placeholder"
+cloud_provider = "none"
+scaffold_version = "0.7.0-rc1"
+created_at = "2026-05-03T00:00:00Z"

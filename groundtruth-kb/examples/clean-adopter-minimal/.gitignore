@@ -1,0 +1,21 @@
+# clean-adopter-minimal example — adopter-side gitignore.
+# Mirrors the scaffold output produced by `gt project init`.
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.env
+.env.local
+
+# Adopter-scope chroma overlay (regeneratable from groundtruth.db)
+.groundtruth-chroma/
+
+# Upgrade receipts (filesystem mode)
+.claude/upgrade-receipts/
+
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
