@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-S327-TERM-PRIMER-STARTUP-OWNER-DIRECTIVE",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-05-02-S327-term-primer-startup-directive",
+  "full_content": "Owner directive S327 (third turn): load canonical-terminology primer at session start.\n\nSlice 1 deliverables: TOML required_primer_terms field added (21 generic in template; 22 in GT-KB self-install with Agent Red); MD primer extended with 15 new term entries; doctor _check_canonical_terminology() extended; .claude/rules/canonical-terminology.{md,toml} dogfood install in GT-KB checkout; 5 new tests; 84/84 pass.\n\nPer Codex GO at bridge/gtkb-gov-term-primer-startup-2026-05-02-006.md.",
+  "full_content_sha256": "a1e6e85059d7a10dd616a72f0f1fb4aa62ae9466a81ae8c76894cef14e894efc",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner approved Primer Slice 1 implementation including DELIB archival via AskUserQuestion at S327. Owner answer: 'Approve plan + proceed (Recommended)'.",
+  "changed_by": "prime-builder/claude-code",
+  "change_reason": "Archive S327 owner directive driving GTKB-GOV-TERM-PRIMER-STARTUP per .claude/rules/deliberation-protocol.md.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

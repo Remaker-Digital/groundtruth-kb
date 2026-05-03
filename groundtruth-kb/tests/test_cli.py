@@ -360,34 +360,47 @@ class TestBootstrapDesktop:
         finally:
             db.close()
 
-    def test_project_init_dual_agent_uses_file_bridge_defaults(self, runner: CliRunner, tmp_path: Path) -> None:
-        target = tmp_path / "dual-agent-project"
-        result = runner.invoke(
-            main,
-            [
-                "project",
-                "init",
-                "dual-agent-project",
-                "--profile",
-                "dual-agent",
-                "--dir",
-                str(target),
-                "--owner",
-                "Acme Labs",
-                "--no-include-ci",
-            ],
-        )
-        assert result.exit_code == 0
-        assert (target / "BRIDGE-INVENTORY.md").exists()
-        assert (target / "bridge-os-poller-setup-prompt.md").exists()
+    def test_project_init_dual_agent_uses_file_bridge_defaults(self, runner: CliRunner) -> None:
+        # GTKB-ISOLATION-017 Slice 3 binds gt project init to the literal
+        # in-root host root; this test migrates to the in-root sandbox pattern
+        # (`applications/_test_<uuid>/`) per Codex `-008.md` GO conditions.
+        import shutil
+        import uuid
 
-        bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
-        gitignore_text = (target / ".gitignore").read_text(encoding="utf-8")
-        assert "bridge/INDEX.md" in bridge_text
-        assert "gt bridge serve" not in bridge_text
-        assert "groundtruth_kb.bridge.worker" not in bridge_text
-        assert "bridge.db" not in gitignore_text
-        assert "bridge-automation/logs" in gitignore_text
+        from groundtruth_kb.project.scaffold import _GT_KB_HOST_ROOT
+
+        sandbox_name = f"_test_dual_{uuid.uuid4().hex[:8]}"
+        target = _GT_KB_HOST_ROOT / "applications" / sandbox_name
+        try:
+            result = runner.invoke(
+                main,
+                [
+                    "project",
+                    "init",
+                    sandbox_name,
+                    "--profile",
+                    "dual-agent",
+                    "--owner",
+                    "Acme Labs",
+                    "--no-include-ci",
+                ],
+            )
+            assert result.exit_code == 0, (
+                f"init failed: output={result.output!r} exc={result.exception!r}"
+            )
+            assert (target / "BRIDGE-INVENTORY.md").exists()
+            assert (target / "bridge-os-poller-setup-prompt.md").exists()
+
+            bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
+            gitignore_text = (target / ".gitignore").read_text(encoding="utf-8")
+            assert "bridge/INDEX.md" in bridge_text
+            assert "gt bridge serve" not in bridge_text
+            assert "groundtruth_kb.bridge.worker" not in bridge_text
+            assert "bridge.db" not in gitignore_text
+            assert "bridge-automation/logs" in gitignore_text
+        finally:
+            if target.exists():
+                shutil.rmtree(target, ignore_errors=True)
 
     def test_bootstrap_desktop_rejects_non_empty_target(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "occupied"

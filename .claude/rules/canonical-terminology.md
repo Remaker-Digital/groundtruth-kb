@@ -1,11 +1,11 @@
-# Canonical Terminology — {{PROJECT_NAME}}
+# Canonical Terminology — GroundTruth-KB
 
 This file is the scaffolded glossary of canonical vocabulary for projects built
 on GroundTruth KB. It is loaded alongside CLAUDE.md and AGENTS.md at session
 start so fresh agent sessions immediately know the project's vocabulary.
 
 **Status:** scaffolded — customize the project-specific rows (marked
-`{{PROJECT_NAME}}` or in the per-project section) but DO NOT remove the
+`GroundTruth-KB` or in the per-project section) but DO NOT remove the
 canonical rows above without replacing them. Doctor will flag missing terms.
 
 **Ties to ADR-0001: Three-Tier Memory Architecture** — MemBase (canonical
@@ -229,6 +229,16 @@ of an application (vs. the lifecycle record managed by GT-KB).
 (GT-KB itself).
 
 **Source:** `.claude/rules/operating-model.md` §2 "hosted application".
+
+### Agent Red
+
+**Canonical full name:** Agent Red Customer Experience.
+
+**Definition:** A specific application (instance) under GT-KB lifecycle
+governance. Used in this GT-KB checkout as the running example of an adopter
+application. Adopter scaffolds use their own project_name in this slot.
+
+**Source:** `CLAUDE.md` § "Application Identity".
 
 ### adopter
 

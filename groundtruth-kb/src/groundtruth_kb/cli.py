@@ -783,6 +783,17 @@ def project() -> None:
     show_default=True,
     help="Python version for generated CI workflows.",
 )
+@click.option(
+    "--gt-kb-root",
+    "gt_kb_root_arg",
+    default=None,
+    help=(
+        "GT-KB host root path (must resolve to the active workspace root). "
+        "When omitted, the active workspace root is auto-derived. Per "
+        "ADR-ISOLATION-APPLICATION-PLACEMENT-001, applications are created "
+        "at <gt-kb-root>/applications/<project_name>/."
+    ),
+)
 def project_init(
     project_name: str,
     profile: str,
@@ -797,9 +808,15 @@ def project_init(
     lo_provider: str,
     integrations: bool,
     python_version: str,
+    gt_kb_root_arg: str | None,
 ) -> None:
     """Scaffold a new GroundTruth project with the selected profile."""
-    from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project, scaffold_summary
+    from groundtruth_kb.project.scaffold import (
+        ScaffoldOptions,
+        _resolve_gt_kb_host_root,
+        scaffold_project,
+        scaffold_summary,
+    )
     from groundtruth_kb.providers.schema import get_provider
 
     # Validate provider IDs and bridge roles
@@ -823,7 +840,18 @@ def project_init(
             " but --lo-provider requires bridge_role='loyal-opposition'"
         )
 
-    target = Path(target_dir) if target_dir else Path.cwd() / project_name
+    # GTKB-ISOLATION-017 Slice 3: bind gt-kb-root to literal in-root workspace
+    # path. Resolution rejects mismatched explicit roots. The resolved value is
+    # then threaded into ScaffoldOptions to enforce
+    # _validate_application_target at scaffold time.
+    explicit_root = Path(gt_kb_root_arg) if gt_kb_root_arg else None
+    try:
+        host_root = _resolve_gt_kb_host_root(explicit_root)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+
+    target = Path(target_dir) if target_dir else host_root / "applications" / project_name
+
     options = ScaffoldOptions(
         project_name=project_name,
         profile=profile,
@@ -838,8 +866,12 @@ def project_init(
         lo_provider_id=lo_provider,
         integrations=integrations,
         python_version=python_version,
+        gt_kb_root=host_root,
     )
-    result = scaffold_project(options)
+    try:
+        result = scaffold_project(options)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
     click.echo(scaffold_summary(result, profile))
 
 

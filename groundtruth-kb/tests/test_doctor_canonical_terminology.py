@@ -227,3 +227,204 @@ def test_run_doctor_fresh_scaffold_zero_error(tmp_path: Path, profile: str) -> N
     assert not errors, f"profile {profile}: fresh scaffold produced ERROR findings: " + "; ".join(
         f"{c.name}: {c.message}" for c in errors
     )
+
+
+# ---------------------------------------------------------------------------
+# GTKB-GOV-TERM-PRIMER-STARTUP Slice 1 (S327, 2026-05-02): primer-content
+# coverage contract (`required_primer_terms` evaluated against the primer
+# file, distinct from `required_startup_terms` evaluated against required_files).
+# Per Codex `gtkb-gov-term-primer-startup-2026-05-02-004.md` F1 option 1.
+# ---------------------------------------------------------------------------
+
+
+# Adopter-template required_primer_terms covers 21 generic terms (per S327 + smoke-test
+# leakage rule). "Agent Red" is GT-KB-checkout-only and added post-template-render to
+# the GT-KB self-install (`.claude/rules/canonical-terminology.{md,toml}`); it does NOT
+# appear in adopter scaffolds.
+_TEMPLATE_REQUIRED_21_TERMS = [
+    "MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition",
+    "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
+    "adopter", "project", "work item", "backlog", "specification",
+    "requirement", "implementation proposal", "implementation report", "verification",
+    "dashboard", "bridge",
+]
+
+
+@pytest.mark.parametrize("profile", ["local-only", "dual-agent", "dual-agent-webapp", "harness-memory"])
+def test_required_primer_terms_cover_21_template_minimum(tmp_path: Path, profile: str) -> None:
+    """T2 (template): every profile in the canonical-terminology.toml TEMPLATE has
+    `required_primer_terms` covering the 21 generic owner-required terms verbatim
+    per S327 directive. "Agent Red" is intentionally NOT in the template (smoke
+    test enforces no Agent Red leakage in adopter scaffolds); it lives only in
+    the GT-KB checkout self-install.
+    """
+    import tomllib
+
+    toml_path = Path(__file__).resolve().parents[1] / "templates" / "rules" / "canonical-terminology.toml"
+    config = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    profile_cfg = _resolve_profile_config(config, profile)
+    assert profile_cfg is not None, f"profile {profile} not configured"
+    primer_terms = profile_cfg.get("required_primer_terms", [])
+    assert isinstance(primer_terms, list), f"profile {profile}: required_primer_terms must be a list"
+    missing = [t for t in _TEMPLATE_REQUIRED_21_TERMS if t not in primer_terms]
+    assert not missing, (
+        f"profile {profile}: required_primer_terms missing {len(missing)} owner-required term(s): {missing}"
+    )
+    # Inverse check: "Agent Red" must NOT be in the adopter template.
+    assert "Agent Red" not in primer_terms, (
+        f"profile {profile}: 'Agent Red' must not appear in adopter template "
+        "(GT-KB-self-install only)"
+    )
+
+
+def test_doctor_passes_when_primer_contains_all_required_primer_terms(tmp_path: Path) -> None:
+    """T5: fresh dual-agent scaffold passes the canonical-terminology check
+    on both contracts (required_startup_terms in required_files AND
+    required_primer_terms in primer file).
+    """
+    target = _scaffold(tmp_path, "dual-agent")
+    primer = target / ".claude" / "rules" / "canonical-terminology.md"
+    assert primer.exists(), "scaffold must install primer file at .claude/rules/canonical-terminology.md"
+    primer_text = primer.read_text(encoding="utf-8")
+    for term in _TEMPLATE_REQUIRED_21_TERMS:
+        assert term in primer_text, f"primer missing owner-required term {term!r}"
+    check = _check_canonical_terminology(target, "dual-agent")
+    assert check.status == "pass", f"expected pass, got {check.status}: {check.message}"
+
+
+def test_doctor_fails_when_primer_missing_a_required_term(tmp_path: Path) -> None:
+    """T6: removing a primer-required term from the primer file causes the
+    canonical-terminology check to FAIL with primer_missing_severity (ERROR).
+    """
+    target = _scaffold(tmp_path, "dual-agent")
+    primer = target / ".claude" / "rules" / "canonical-terminology.md"
+    text = primer.read_text(encoding="utf-8")
+    # Strip every occurrence of "GTKB" (a primer-required term that's not in
+    # required_startup_terms; ensures the failure is attributable to the new
+    # primer-content contract, not the existing startup-term contract).
+    primer.write_text(text.replace("GTKB", "REDACTED"), encoding="utf-8")
+    check = _check_canonical_terminology(target, "dual-agent")
+    assert check.status == "fail", f"expected fail, got {check.status}: {check.message}"
+    assert "GTKB" in check.message, (
+        f"failure message should cite the missing primer term; got: {check.message}"
+    )
+    assert "primer term" in check.message, (
+        f"failure message should distinguish primer-term failures from startup-term failures; got: {check.message}"
+    )
+
+
+def test_doctor_does_not_force_22_terms_into_startup_files(tmp_path: Path) -> None:
+    """T6b (Codex `-004.md` F1 acceptance): the failure mode being avoided.
+    Removing all primer-only terms (those NOT in required_startup_terms) from
+    CLAUDE.md must NOT cause the doctor to fail. Existing required_startup_terms
+    semantics preserved.
+    """
+    target = _scaffold(tmp_path, "dual-agent")
+    claude_md = target / "CLAUDE.md"
+    text = claude_md.read_text(encoding="utf-8")
+    # Strip primer-only terms (NOT in dual-agent required_startup_terms).
+    primer_only = [
+        "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
+        "adopter", "project", "work item", "backlog", "specification",
+        "requirement", "implementation proposal", "implementation report", "verification",
+        "dashboard", "bridge",
+    ]
+    for term in primer_only:
+        text = text.replace(term, "REDACTED")
+    claude_md.write_text(text, encoding="utf-8")
+    check = _check_canonical_terminology(target, "dual-agent")
+    # Must still pass: required_startup_terms evaluated only against required_files
+    # which is the (now-stripped) CLAUDE.md, but only the 5 startup terms matter.
+    # MemBase / Deliberation Archive / MEMORY.md / Prime Builder / Loyal Opposition
+    # were not in the strip list, so they remain present.
+    assert check.status == "pass", (
+        f"primer-only terms removed from CLAUDE.md must NOT fail the doctor "
+        f"(existing required_startup_terms semantics preserved); got: {check.status}: {check.message}"
+    )
+
+
+def test_doctor_fails_when_primer_file_missing(tmp_path: Path) -> None:
+    """Removing the primer file entirely causes the canonical-terminology check
+    to FAIL — but at the existing 'glossary file missing' branch (not the new
+    primer-term branch). This existing behavior is preserved by Slice 1.
+    """
+    target = _scaffold(tmp_path, "dual-agent")
+    primer = target / ".claude" / "rules" / "canonical-terminology.md"
+    primer.unlink()
+    check = _check_canonical_terminology(target, "dual-agent")
+    assert check.status == "fail", f"expected fail, got {check.status}: {check.message}"
+    # Existing glossary-missing branch fires first.
+    assert "canonical-terminology.md missing" in check.message
+
+
+def test_gt_kb_self_doctor_passes_canonical_terminology() -> None:
+    """Codex `-013.md` F1 acceptance: `gt project doctor` against the GT-KB
+    checkout itself must report OK on the canonical-terminology check via the
+    public `dual-agent` profile (the only valid project profile applicable
+    to GT-KB's bridge-using layout per `profiles.py::PROFILES`).
+
+    The fix path per Codex `-011.md` recommended action 1: GT-KB has a small
+    root `MEMORY.md` redirect doc carrying the 5 canonical-startup-term
+    content strings; the actual operational notepad lives at
+    `memory/MEMORY.md`. AGENTS.md and `.claude/rules/deliberation-protocol.md`
+    also carry the canonical-term content per REVISED-2.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    check = _check_canonical_terminology(repo_root, "dual-agent")
+    assert check.status == "pass", (
+        f"GT-KB self-doctor canonical-terminology check must pass under "
+        f"dual-agent profile. Got status={check.status}: {check.message}"
+    )
+
+
+def test_primer_severity_independent_of_startup_severity(tmp_path: Path) -> None:
+    """Codex `-008.md` F1 acceptance: missing_severity and primer_missing_severity
+    are independent contracts. Setting startup=WARN and primer=ERROR, then
+    removing a primer-only term, must produce status=fail (driven by the primer
+    contract's ERROR severity), not warning.
+
+    This test specifically guards against the regression Codex identified: the
+    initial Slice 1 implementation collapsed both contracts into a single
+    missing_report and used only missing_severity for status, making
+    primer_missing_severity decorative.
+    """
+    target = _scaffold(tmp_path, "dual-agent")
+
+    # Override the dual-agent profile's missing_severity to WARN via regex-based
+    # rewrite (keeps primer_missing_severity at ERROR; targets only the dual-agent
+    # block to avoid disturbing other profiles).
+    import re as _re
+
+    toml_path = target / ".claude" / "rules" / "canonical-terminology.toml"
+    text = toml_path.read_text(encoding="utf-8")
+    # Match: [config.profiles.dual-agent] block, then lazily match anything
+    # (DOTALL) until the FIRST `missing_severity` (with \b to exclude
+    # primer_missing_severity, which has `_` adjacency).
+    pattern = _re.compile(
+        r"(\[config\.profiles\.dual-agent\].*?)\bmissing_severity\s*=\s*\"ERROR\"",
+        _re.DOTALL,
+    )
+    new_text, sub_count = pattern.subn(
+        r'\1missing_severity = "WARN"', text, count=1
+    )
+    assert sub_count == 1, (
+        "differential-severity setup must override exactly one dual-agent missing_severity"
+    )
+    toml_path.write_text(new_text, encoding="utf-8")
+
+    # Remove a primer-only term from the primer file. "GTKB" is in primer_terms
+    # but NOT in required_startup_terms, so its absence affects only contract 2.
+    primer = target / ".claude" / "rules" / "canonical-terminology.md"
+    primer_text = primer.read_text(encoding="utf-8")
+    primer.write_text(primer_text.replace("GTKB", "REDACTED"), encoding="utf-8")
+
+    check = _check_canonical_terminology(target, "dual-agent")
+    # Primer contract is ERROR, so status must be fail (not warning, which would
+    # indicate the doctor is using missing_severity for the primer contract).
+    assert check.status == "fail", (
+        f"primer_missing_severity=ERROR with missing primer term must produce status=fail "
+        f"regardless of startup-side missing_severity (which is now WARN). "
+        f"Got status={check.status}: {check.message}"
+    )
+    # The failure must cite the primer term, not a startup-file term.
+    assert "missing primer term" in check.message and "GTKB" in check.message

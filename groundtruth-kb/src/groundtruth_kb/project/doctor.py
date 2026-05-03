@@ -1012,8 +1012,10 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
             message=(".claude/rules/canonical-terminology.md missing — run `gt project upgrade --apply` to restore."),
         )
 
-    # For each required file, verify each required term is present in it.
-    missing_report: list[str] = []
+    # CONTRACT 1 (preserved): required_startup_terms must appear in every required_files entry.
+    # Track startup-file misses SEPARATELY from primer-file misses per Codex
+    # `gtkb-gov-term-primer-startup-2026-05-02-008.md` F1 — each contract emits at its own severity.
+    startup_missing: list[str] = []
     for rel in required_files:
         # harness-memory profile: MEMORY.md is out-of-repo; skip content check for it.
         if rel == "MEMORY.md" and memory_md_location == "harness":
@@ -1021,31 +1023,86 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
 
         abs_path = target / rel
         if not abs_path.exists():
-            missing_report.append(f"{rel}: file missing")
+            startup_missing.append(f"{rel}: file missing")
             continue
         try:
             text = abs_path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
-            missing_report.append(f"{rel}: unreadable ({exc})")
+            startup_missing.append(f"{rel}: unreadable ({exc})")
             continue
 
         for term in required_terms:
             if term not in text:
-                missing_report.append(f"{rel}: missing term {term!r}")
+                startup_missing.append(f"{rel}: missing term {term!r}")
 
-    if missing_report:
-        status: Literal["pass", "fail", "warning"]
-        if missing_severity == "ERROR":
-            status = "fail"
-        elif missing_severity == "WARN":
-            status = "warning"
+    # CONTRACT 2 (Slice 1 of GTKB-GOV-TERM-PRIMER-STARTUP, S327):
+    # required_primer_terms must appear in the primer file (not in required_files).
+    # Per Codex `-004.md` F1 option 1 + `-008.md` F1: independent severity contract.
+    primer_missing: list[str] = []
+    raw_primer_terms = profile_cfg.get("required_primer_terms", [])
+    required_primer_terms: list[str] = (
+        [t for t in raw_primer_terms if isinstance(t, str)] if isinstance(raw_primer_terms, list) else []
+    )
+    primer_missing_severity_raw = profile_cfg.get("primer_missing_severity", missing_severity_raw)
+    primer_missing_severity = (
+        str(primer_missing_severity_raw).upper() if primer_missing_severity_raw else "ERROR"
+    )
+    if required_primer_terms:
+        defaults_section: dict = {}
+        try:
+            cfg_section = config.get("config") if isinstance(config, dict) else None
+            if isinstance(cfg_section, dict):
+                ds = cfg_section.get("defaults")
+                if isinstance(ds, dict):
+                    defaults_section = ds
+        except AttributeError:
+            defaults_section = {}
+        primer_path_str = (
+            profile_cfg.get("primer_path")
+            or defaults_section.get("primer_path")
+            or ".claude/rules/canonical-terminology.md"
+        )
+        primer_abs = target / str(primer_path_str)
+        if not primer_abs.exists():
+            primer_missing.append(f"{primer_path_str}: primer file missing")
         else:
-            status = "warning"
+            try:
+                primer_text = primer_abs.read_text(encoding="utf-8", errors="replace")
+                for term in required_primer_terms:
+                    if term not in primer_text:
+                        primer_missing.append(f"{primer_path_str}: missing primer term {term!r}")
+            except OSError as exc:
+                primer_missing.append(f"{primer_path_str}: unreadable ({exc})")
+
+    # Per Codex `-008.md` F1: apply each contract's severity independently;
+    # combine results with fail > warning > pass precedence.
+    def _severity_to_status(sev: str) -> Literal["pass", "fail", "warning"]:
+        if sev == "ERROR":
+            return "fail"
+        if sev == "WARN":
+            return "warning"
+        return "warning"
+
+    statuses: list[Literal["pass", "fail", "warning"]] = []
+    if startup_missing:
+        statuses.append(_severity_to_status(missing_severity))
+    if primer_missing:
+        statuses.append(_severity_to_status(primer_missing_severity))
+
+    if statuses:
+        # fail > warning > pass precedence.
+        if "fail" in statuses:
+            combined: Literal["pass", "fail", "warning"] = "fail"
+        elif "warning" in statuses:
+            combined = "warning"
+        else:
+            combined = "warning"
+        missing_report = startup_missing + primer_missing
         return ToolCheck(
             name="canonical terminology",
             required=True,
             found=True,
-            status=status,
+            status=combined,
             message=(
                 f"Missing canonical terms in profile {profile_name!r} "
                 f"required files: {'; '.join(missing_report[:6])}" + ("; ..." if len(missing_report) > 6 else "")
@@ -1124,10 +1181,8 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
 
 # -- Bridge smart-poller liveness --------------------------------------
 
-_BRIDGE_STATUS_PATHS = {
-    "claude": Path("independent-progress-assessments/bridge-automation/logs/claude-scan-status.json"),
-    "codex": Path("independent-progress-assessments/bridge-automation/logs/codex-scan-status.json"),
-}
+_BRIDGE_DISPATCH_STATE_PATH = Path(".gtkb-state/bridge-poller/dispatch-state.json")
+_BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime", "codex": "codex"}
 
 _BRIDGE_FRESH_SECS = 4 * 60  # < 4 min → OK
 _BRIDGE_WARN_SECS = 10 * 60  # 4–10 min → WARN; > 10 min → ALARM
@@ -1154,21 +1209,23 @@ _SMART_POLLER_FRESH_SECS = 60
 
 
 def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
-    """Check file bridge poller liveness for *agent* (``'claude'`` or ``'codex'``).
+    """Check file bridge smart-poller liveness for *agent* (``'claude'`` or ``'codex'``).
 
-    Reads the JSON status file written by the smart poller and
-    computes staleness against the freshness thresholds:
+    Reads ``recipients[role].updated_at`` from the smart-poller's
+    ``dispatch-state.json`` and computes staleness against the freshness
+    thresholds:
 
     - ``< 4 min``  → OK
     - ``4–10 min`` → WARN
     - ``> 10 min`` → ALARM
     - File absent  → not started (WARN)
-    - Missing / unparseable ``updatedAtUtc`` → ALARM
+    - Missing / unparseable ``recipients[role].updated_at`` → ALARM
     """
-    status_path = target / _BRIDGE_STATUS_PATHS[agent]
+    state_path = target / _BRIDGE_DISPATCH_STATE_PATH
+    role = _BRIDGE_AGENT_TO_RECIPIENT.get(agent, agent)
     check_name = f"{agent.title()} bridge poller"
 
-    if not status_path.exists():
+    if not state_path.exists():
         return ToolCheck(
             name=check_name,
             required=False,
@@ -1180,15 +1237,15 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
         )
 
     try:
-        raw = status_path.read_text(encoding="utf-8")
+        raw = state_path.read_bytes().decode("utf-8-sig")
         data: object = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
-            message=f"{agent} bridge status file unreadable: {exc}",
+            message=f"{agent} bridge dispatch-state file unreadable: {exc}",
         )
 
     if not isinstance(data, dict):
@@ -1197,12 +1254,37 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
             required=False,
             found=True,
             status="fail",
-            message=f"{agent} bridge status file is not a JSON object",
+            message=f"{agent} bridge dispatch-state file is not a JSON object",
         )
 
-    updated_at_raw = data.get("updatedAtUtc")
-    state_raw = data.get("state", "")
-    state_display = str(state_raw) if state_raw else "unknown"
+    recipients = data.get("recipients")
+    if not isinstance(recipients, dict):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"{agent} bridge dispatch-state missing 'recipients' map — ALARM. See {_BRIDGE_AUTH_DOC}"
+            ),
+        )
+
+    recipient_state = recipients.get(role)
+    if not isinstance(recipient_state, dict):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"{agent} bridge dispatch-state missing 'recipients.{role}' entry — ALARM. See {_BRIDGE_AUTH_DOC}"
+            ),
+        )
+
+    updated_at_raw = recipient_state.get("updated_at")
+    last_result = recipient_state.get("last_result", "unknown")
+    pending_count = recipient_state.get("pending_count", 0)
+    state_display = f"{last_result}, pending: {pending_count}"
 
     if not isinstance(updated_at_raw, str) or not updated_at_raw.strip():
         return ToolCheck(
@@ -1210,7 +1292,9 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
             required=False,
             found=True,
             status="fail",
-            message=(f"{agent} bridge status file missing updatedAtUtc — ALARM. See {_BRIDGE_AUTH_DOC}"),
+            message=(
+                f"{agent} bridge dispatch-state missing recipients.{role}.updated_at — ALARM. See {_BRIDGE_AUTH_DOC}"
+            ),
         )
 
     try:
@@ -1222,7 +1306,7 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
             found=True,
             status="fail",
             message=(
-                f"{agent} bridge status file has unparseable updatedAtUtc "
+                f"{agent} bridge dispatch-state has unparseable updated_at "
                 f"{updated_at_raw!r} — ALARM. See {_BRIDGE_AUTH_DOC}"
             ),
         )

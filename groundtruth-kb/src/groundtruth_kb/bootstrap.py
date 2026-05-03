@@ -112,6 +112,14 @@ legal_footer = "{escaped_footer}"
 [gates]
 # Plug-in governance gates (dotted import paths)
 # plugins = ["my_package.gates:MyCustomGate"]
+
+[service]
+# Phase 4 service-endpoint template (GTKB-ISOLATION-017 Slice 3).
+# Override per environment. Per ADR-ISOLATION-APPLICATION-PLACEMENT-001,
+# applications consume GT-KB through a service endpoint, not by mounting the
+# product DB directly.
+# endpoint = "https://gtkb.example.com/v1"
+endpoint = "configure-me://placeholder/v1"
 """
     toml_path.write_text(toml_content, encoding="utf-8")
 

@@ -32,7 +32,7 @@ missing_severity = "ERROR"
 required_primer_terms = [
     "MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition",
     "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
-    "adopter", "project", "work item", "backlog", "specification",
+    "Agent Red", "adopter", "project", "work item", "backlog", "specification",
     "requirement", "implementation proposal", "implementation report", "verification",
     "dashboard", "bridge",
 ]
@@ -45,7 +45,7 @@ missing_severity = "ERROR"
 required_primer_terms = [
     "MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition",
     "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
-    "adopter", "project", "work item", "backlog", "specification",
+    "Agent Red", "adopter", "project", "work item", "backlog", "specification",
     "requirement", "implementation proposal", "implementation report", "verification",
     "dashboard", "bridge",
 ]
@@ -60,7 +60,7 @@ missing_severity = "ERROR"
 required_primer_terms = [
     "MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition",
     "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
-    "adopter", "project", "work item", "backlog", "specification",
+    "Agent Red", "adopter", "project", "work item", "backlog", "specification",
     "requirement", "implementation proposal", "implementation report", "verification",
     "dashboard", "bridge",
 ]
@@ -79,7 +79,7 @@ missing_severity = "ERROR"
 required_primer_terms = [
     "MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition",
     "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
-    "adopter", "project", "work item", "backlog", "specification",
+    "Agent Red", "adopter", "project", "work item", "backlog", "specification",
     "requirement", "implementation proposal", "implementation report", "verification",
     "dashboard", "bridge",
 ]

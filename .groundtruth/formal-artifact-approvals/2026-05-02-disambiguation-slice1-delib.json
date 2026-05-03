@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-S327-TERM-DISAMBIGUATION-MECHANICAL-OWNER-DIRECTIVE",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-05-02-S327-term-disambiguation-mechanical-directive",
+  "full_content": "Owner directive S327 (fourth turn): structural mechanical fix for chronically vague term usage.\n\nSlice 1 deliverables: new managed-rule policy template templates/rules/canonical-terminology-policy.toml (21 generic terms + 7 pinned defaults + 8 Tier A + 13 Tier B); new shared library groundtruth_kb/term_disambiguation.py (API surface + policy load + file-level disable marker honoring; Tier-specific lint logic deferred to Slices 2-3); new registry row rule.canonical-terminology-policy in managed-artifacts.toml; T1 test (8 sub-tests); 95/95 broader sweep passes; ruff clean.\n\nPer Codex GO at bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-006.md.",
+  "full_content_sha256": "8dccd449395eb3f5188d9205b1443aab413c56e9e08d5bee3794033ec4d46c44",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner approved Disambiguation Slice 1 implementation including DELIB archival via AskUserQuestion at S327. Owner answer: 'Approve plan + proceed (Recommended)'.",
+  "changed_by": "prime-builder/claude-code",
+  "change_reason": "Archive S327 owner directive driving GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL per .claude/rules/deliberation-protocol.md.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

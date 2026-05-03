@@ -37,6 +37,7 @@ ArtifactClass = Literal[
     "hook",
     "rule",
     "skill",
+    "file",
     "settings-hook-registration",
     "gitignore-pattern",
     "ownership-glob",
@@ -77,6 +78,7 @@ _VALID_ARTIFACT_CLASSES: frozenset[str] = frozenset(
         "hook",
         "rule",
         "skill",
+        "file",
         "settings-hook-registration",
         "gitignore-pattern",
         "ownership-glob",
@@ -85,7 +87,7 @@ _VALID_ARTIFACT_CLASSES: frozenset[str] = frozenset(
 
 _VALID_SETTINGS_EVENTS: frozenset[str] = frozenset({"SessionStart", "UserPromptSubmit", "PostToolUse", "PreToolUse"})
 
-_FILE_CLASSES: frozenset[str] = frozenset({"hook", "rule", "skill"})
+_FILE_CLASSES: frozenset[str] = frozenset({"hook", "rule", "skill", "file"})
 
 _VALID_OWNERSHIP_VALUES: frozenset[str] = frozenset(
     {"gt-kb-managed", "gt-kb-scaffolded", "shared-structured", "adopter-owned", "legacy-exception"}
@@ -113,6 +115,11 @@ _CLASS_OWNERSHIP_DEFAULTS: dict[str, tuple[str, str, str]] = {
     "hook": ("gt-kb-managed", "overwrite", "warn"),
     "rule": ("gt-kb-managed", "overwrite", "warn"),
     "skill": ("gt-kb-managed", "overwrite", "warn"),
+    # GTKB-ISOLATION-017 Slice 3: "file" class for general scaffolded files
+    # (READMEs, banners, etc.). Default to adopter-owned + preserve upgrade
+    # policy. Per Phase 9 §1, these are adopter-facing artifacts that the
+    # adopter customizes and the platform should not overwrite by default.
+    "file": ("adopter-owned", "preserve", "warn"),
     "settings-hook-registration": ("gt-kb-managed", "structured-merge", "warn"),
     "gitignore-pattern": ("gt-kb-managed", "structured-merge", "warn"),
 }
@@ -145,7 +152,7 @@ class FileArtifact:
     Class value is stored in ``class_`` because ``class`` is a Python keyword.
     """
 
-    class_: Literal["hook", "rule", "skill"]
+    class_: Literal["hook", "rule", "skill", "file"]
     id: str
     template_path: str
     target_path: str
@@ -240,6 +247,10 @@ _CLASS_REQUIRED_KEYS: dict[str, frozenset[str]] = {
     "hook": frozenset(_REQUIRED_COMMON_KEYS | {"template_path", "target_path"}),
     "rule": frozenset(_REQUIRED_COMMON_KEYS | {"template_path", "target_path"}),
     "skill": frozenset(_REQUIRED_COMMON_KEYS | {"template_path", "target_path"}),
+    # GTKB-ISOLATION-017 Slice 3: "file" class shares the file-artifact key
+    # contract (template_path + target_path); behavior at scaffold time is the
+    # same copy-from-template flow used by hook/rule/skill.
+    "file": frozenset(_REQUIRED_COMMON_KEYS | {"template_path", "target_path"}),
     "settings-hook-registration": frozenset(_REQUIRED_COMMON_KEYS | {"event", "hook_filename", "target_settings_path"}),
     "gitignore-pattern": frozenset(_REQUIRED_COMMON_KEYS | {"pattern", "comment"}),
     # ownership-glob rows must carry the full ownership triple inline (no defaults).
@@ -254,6 +265,9 @@ _CLASS_FORBIDDEN_KEYS: dict[str, frozenset[str]] = {
         {"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment", "path_glob", "priority"}
     ),
     "skill": frozenset(
+        {"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment", "path_glob", "priority"}
+    ),
+    "file": frozenset(
         {"profiles", "event", "hook_filename", "target_settings_path", "pattern", "comment", "path_glob", "priority"}
     ),
     "settings-hook-registration": frozenset(
@@ -504,7 +518,7 @@ def _build_file_artifact(record: dict[str, Any]) -> FileArtifact:
     _validate_lifecycle_invariants(record_id, initial, managed, doctor_required)
     ownership_meta = _extract_ownership_block(record, class_raw)
     # Narrow class_raw for mypy via cast — schema validation above guarantees the value.
-    class_literal = cast(Literal["hook", "rule", "skill"], class_raw)
+    class_literal = cast(Literal["hook", "rule", "skill", "file"], class_raw)
     return FileArtifact(
         class_=class_literal,
         id=record_id,

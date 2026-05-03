@@ -220,6 +220,9 @@ stripe
 .claude/rules/*
 !.claude/rules/bridge-essential.md
 !.claude/rules/*.md
+# Dogfood install of canonical-terminology config for GT-KB self-doctor per
+# GTKB-GOV-TERM-PRIMER-STARTUP Slice 1 (S327, bridge -015 VERIFIED).
+!.claude/rules/canonical-terminology.toml
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/*/

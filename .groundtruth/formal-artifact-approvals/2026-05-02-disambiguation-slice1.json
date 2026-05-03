@@ -1,0 +1,16 @@
+{
+  "artifact_type": "managed_rule_template_batch",
+  "artifact_id": "DISAMBIGUATION-SLICE1-BATCH-2026-05-02",
+  "action": "create-batch",
+  "source_ref": "owner_conversation:2026-05-02-S327-disambiguation-slice1-approved",
+  "full_content": "Slice 1 of GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL per bridge gtkb-gov-term-disambiguation-mechanical-2026-05-02-006.md (Codex GO).\n\nFiles affected:\n1. groundtruth-kb/templates/rules/canonical-terminology-policy.toml (new managed-rule template; 21 generic terms + 7 pinned defaults).\n2. groundtruth-kb/src/groundtruth_kb/term_disambiguation.py (new shared library; API surface + policy load).\n3. groundtruth-kb/templates/managed-artifacts.toml (new registry row rule.canonical-terminology-policy).\n4. groundtruth-kb/tests/test_term_disambiguation.py (T1).\n\nOwner approval via AskUserQuestion at S327: Approve plan + proceed (Recommended).",
+  "full_content_sha256": "cfdba16c1a7d59f5448e1c1ef564b18a737bd13a73571dd6d94c33a3577f6200",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner approved Disambiguation Slice 1 via AskUserQuestion at S327. Owner answer: 'Approve plan + proceed (Recommended)'.",
+  "changed_by": "prime-builder/claude-code",
+  "change_reason": "Slice 1 of GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL per bridge -006 GO; new managed-rule policy template + shared library + registry row + T1 test.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

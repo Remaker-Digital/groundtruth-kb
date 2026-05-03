@@ -31,6 +31,50 @@ from groundtruth_kb.project.profiles import ProjectProfile, get_profile
 from groundtruth_kb.providers.schema import CLAUDE_CODE, CODEX, AgentProvider, get_provider
 from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
 
+# -- GTKB-ISOLATION-017 Slice 3: host-root binding --------------------------
+# Per ADR-ISOLATION-APPLICATION-PLACEMENT-001 +
+# .claude/rules/project-root-boundary.md: adopter applications live at
+# <gt-kb-root>/applications/<name>/. The host root binds to the literal
+# in-root workspace path for this checkout (E:\GT-KB). Same precedent as
+# groundtruth-kb/src/groundtruth_kb/project/doctor.py:1867's _PRODUCT_ROOT,
+# walked one additional level up to the workspace root.
+_GT_KB_HOST_ROOT: Path = Path(__file__).resolve().parents[4]
+
+
+def _resolve_gt_kb_host_root(explicit: Path | None) -> Path:
+    """Return the bound GT-KB host root or raise if explicit value mismatches."""
+    if explicit is None:
+        return _GT_KB_HOST_ROOT
+    resolved = explicit.resolve()
+    if resolved != _GT_KB_HOST_ROOT:
+        raise ValueError(
+            f"--gt-kb-root must resolve to the active GT-KB host root "
+            f"({_GT_KB_HOST_ROOT}); got {resolved}. See "
+            f".claude/rules/project-root-boundary.md."
+        )
+    return resolved
+
+
+def _validate_application_target(target: Path, host_root: Path) -> None:
+    """Refuse targets outside ``<host_root>/applications/`` or existing adopters.
+
+    Refusal A: ``target.parent.resolve() != (host_root / "applications").resolve()``.
+    Refusal B: ``target / "groundtruth.toml"`` already exists.
+    """
+    target_resolved = target.resolve()
+    expected_parent = (host_root / "applications").resolve()
+    if target_resolved.parent != expected_parent:
+        raise ValueError(
+            f"Application target {target} must live directly under "
+            f"{expected_parent}; per ADR-ISOLATION-APPLICATION-PLACEMENT-001 "
+            f"adopter applications are placed at <gt-kb-root>/applications/<name>/."
+        )
+    if (target / "groundtruth.toml").exists():
+        raise ValueError(
+            f"Existing adopter detected at {target} (groundtruth.toml present); "
+            f"run `gt project upgrade` instead."
+        )
+
 
 @dataclass(frozen=True)
 class ScaffoldOptions:
@@ -62,6 +106,12 @@ class ScaffoldOptions:
     lo_provider_id: str = "codex"
     python_version: str = "3.11"
     integrations: bool = False
+    # GTKB-ISOLATION-017 Slice 3: host-root binding. When set, the literal-path
+    # contract from ADR-ISOLATION-APPLICATION-PLACEMENT-001 is enforced: target
+    # must live under ``gt_kb_root/applications/``. When omitted (legacy library
+    # callers and existing tests), the binding is skipped — only ``gt project
+    # init`` (CLI) sets this to enforce the user-facing contract.
+    gt_kb_root: Path | None = None
 
 
 def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none") -> list[str]:
@@ -118,6 +168,12 @@ def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none
             "Makefile",
             ".pre-commit-config.yaml",
             "pyproject.toml",
+            # GTKB-ISOLATION-017 Slice 3: Phase 9 §1 scaffold artifacts
+            "README.md",
+            "memory/work_list.md",
+            "memory/release-readiness.md",
+            ".codex/hooks.json",
+            ".groundtruth/formal-artifact-approvals/.gitkeep",
         }
     )
 
@@ -172,6 +228,12 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
     """Create a complete project scaffold based on the selected profile."""
     profile = get_profile(options.profile)
     target = options.target_dir.resolve()
+    # GTKB-ISOLATION-017 Slice 3: enforce literal host-root binding when caller
+    # supplies gt_kb_root (CLI surface always supplies it). Library callers
+    # that omit gt_kb_root preserve legacy behavior.
+    if options.gt_kb_root is not None:
+        host_root = _resolve_gt_kb_host_root(options.gt_kb_root)
+        _validate_application_target(target, host_root)
     _validate_target(target)
     target.mkdir(parents=True, exist_ok=True)
 
@@ -230,6 +292,13 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
         profile=profile,
         prime_provider=prime_provider,
         lo_provider=lo_provider,
+    )
+
+    # ── GTKB-ISOLATION-017 Slice 3: Phase 9 §1 scaffold artifacts ─────
+    _emit_slice3_artifacts(
+        target=target,
+        project_name=options.project_name,
+        copyright_notice=copyright_notice,
     )
 
     # ── Seed governance data ──────────────────────────────────────────
@@ -315,6 +384,81 @@ def _copy_base_templates(target: Path) -> None:
 
     # Generate base pyproject sections
     _write_pyproject_sections(target)
+
+
+def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: str) -> None:
+    """Emit the Phase 9 §1 scaffold artifacts owned by GTKB-ISOLATION-017 Slice 3.
+
+    Writes:
+
+    - ``README.md`` — adopter-facing quickstart block (Phase 9 §1 line 105).
+    - ``memory/release-readiness.md`` — application-subject banner
+      (Phase 9 §1 lines 123–125).
+    - ``.codex/hooks.json`` — forward-compat intent (Phase 9 §1 lines 129–130;
+      consistent with ADR-CODEX-HOOK-PARITY-FALLBACK-001).
+    - ``.groundtruth/formal-artifact-approvals/.gitkeep``
+      (Phase 9 §1 lines 131–132).
+
+    ``memory/work_list.md`` is also seeded with a placeholder per Phase 9 §1
+    lines 120–122 if it does not already exist (other emitters may write a
+    fuller version).
+    """
+    templates = get_templates_dir()
+
+    def _render(text: str) -> str:
+        return (
+            text
+            .replace("{{PROJECT_NAME}}", project_name)
+            .replace("{{COPYRIGHT_NOTICE}}", copyright_notice)
+        )
+
+    readme_src = templates / "project" / "README-quickstart.md"
+    if readme_src.exists():
+        (target / "README.md").write_text(
+            _render(readme_src.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
+
+    banner_src = templates / "project" / "release-readiness-banner.md"
+    if banner_src.exists():
+        memory_dir = target / "memory"
+        memory_dir.mkdir(parents=True, exist_ok=True)
+        (memory_dir / "release-readiness.md").write_text(
+            _render(banner_src.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
+
+    work_list_path = target / "memory" / "work_list.md"
+    if not work_list_path.exists():
+        work_list_path.parent.mkdir(parents=True, exist_ok=True)
+        work_list_path.write_text(
+            "# Active Work List\n\n"
+            "<!-- Adopter-owned backlog. The single placeholder below documents\n"
+            "     the convention; replace it with your first work item. Items\n"
+            "     are processed top-down by priority. -->\n\n"
+            "- [ ] _placeholder — replace with your first scoped work item._\n",
+            encoding="utf-8",
+        )
+
+    codex_dir = target / ".codex"
+    codex_dir.mkdir(parents=True, exist_ok=True)
+    (codex_dir / "hooks.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "intent": "forward-compatible Codex hook registration",
+                "see": "ADR-CODEX-HOOK-PARITY-FALLBACK-001",
+                "hooks": [],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    approvals_dir = target / ".groundtruth" / "formal-artifact-approvals"
+    approvals_dir.mkdir(parents=True, exist_ok=True)
+    (approvals_dir / ".gitkeep").write_text("", encoding="utf-8")
 
 
 def _generate_bridge_index(project_name: str) -> str:

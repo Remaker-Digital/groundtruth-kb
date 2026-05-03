@@ -429,11 +429,29 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
+notes = "Canonical-terminology TOML config; product-managed because the term/file matrix is framework policy."
+
+# GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL Slice 1 (S327): canonical-terminology
+# disambiguation policy template. Sibling to canonical-terminology.{md,toml};
+# composes with the existing surface without modifying its schema. Slice 2
+# wires this into the term-disambiguation-precheck PreToolUse hook; Slice 3
+# wires the PostToolUse audit hook.
+[[artifacts]]
+class = "rule"
+id = "rule.canonical-terminology-policy"
+template_path = "rules/canonical-terminology-policy.toml"
+target_path = ".claude/rules/canonical-terminology-policy.toml"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "Canonical-terminology disambiguation policy; product-managed because the per-term Tier A/B/C policy is framework-defined."
 
 # =========================================================================
 # SKILLS (6 records)
 # =========================================================================
-notes = "Canonical-terminology TOML config; product-managed because the term/file matrix is framework policy."
 
 [[artifacts]]
 class = "skill"
@@ -806,4 +824,35 @@ ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
 notes = "Ignore .claude/settings.local.json adopter overrides; product-managed framework gitignore policy."
+
+# =========================================================================
+# FILE (2 records — Slice 3 adopter-facing scaffold artifacts per
+# bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-007.md GO -008.
+# These are adopter-owned files with preserve upgrade policy: the platform
+# scaffolds them on init but does not overwrite them on upgrade.)
+# =========================================================================
+
+[[artifacts]]
+class = "file"
+id = "file.readme-quickstart"
+template_path = "project/README-quickstart.md"
+target_path = "README.md"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "adopter-owned"
+upgrade_policy = "preserve"
+notes = "Adopter-facing README quickstart per Phase 9 section 1 line 105 (GTKB-ISOLATION-017 Slice 3); adopter customizes after init, platform does not overwrite."
+
+[[artifacts]]
+class = "file"
+id = "file.release-readiness-banner"
+template_path = "project/release-readiness-banner.md"
+target_path = "memory/release-readiness.md"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = []
+doctor_required_profiles = []
+ownership = "adopter-owned"
+upgrade_policy = "preserve"
+notes = "Application-subject release-readiness banner per Phase 9 section 1 lines 123-125 (GTKB-ISOLATION-017 Slice 3); adopter populates with release evidence, platform does not overwrite."
 

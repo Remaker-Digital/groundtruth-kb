@@ -6,6 +6,19 @@ Opposition when interacting with the Deliberation Archive (SPEC-2098).
 The active AI harness loads this file via AGENTS.md startup checklist item 15a
 or via `.claude/rules/` auto-load.
 
+## Canonical Terminology Anchored Here
+
+The Deliberation Archive (DA) is one tier of ADR-0001's Three-Tier Memory
+Architecture: **MemBase** (canonical knowledge and specifications;
+`groundtruth.db`) / **MEMORY.md** (operational notepad; `memory/MEMORY.md` in
+the GT-KB checkout, repo-root in scaffolded adopter projects per the
+harness-memory vs dual-agent profile distinction) / **Deliberation Archive**
+(this file's subject — design-reasoning record). Canonical-term references
+to MemBase, MEMORY.md, and Deliberation Archive must use these exact forms;
+see `.claude/rules/canonical-terminology.md` for the full glossary. Doctor's
+canonical-terminology check enforces these strings in this rule file as part
+of the dual-agent / harness-memory `required_files` contract.
+
 ## When To Search Deliberations
 
 Both agents MUST search deliberations before starting substantive work:

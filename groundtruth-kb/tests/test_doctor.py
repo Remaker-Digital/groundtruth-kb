@@ -299,16 +299,57 @@ def test_run_doctor_returns_fail_for_missing_db(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_status_file(tmp_path: Path, agent: str, updated_at: str, state: str = "clear") -> Path:
-    """Write a bridge scan-status JSON file for *agent* under the standard path."""
-    logs_dir = tmp_path / "independent-progress-assessments" / "bridge-automation" / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    status_path = logs_dir / f"{agent}-scan-status.json"
-    status_path.write_text(
-        json.dumps({"updatedAtUtc": updated_at, "state": state, "message": "test scan"}),
-        encoding="utf-8",
-    )
-    return status_path
+_DISPATCH_STATE_REL = Path(".gtkb-state/bridge-poller/dispatch-state.json")
+
+
+def _agent_to_role(agent: str) -> str:
+    return {"claude": "prime", "codex": "codex"}.get(agent, agent)
+
+
+def _make_status_file(
+    tmp_path: Path,
+    agent: str,
+    updated_at: str,
+    state: str = "no_pending",
+) -> Path:
+    """Write a smart-poller dispatch-state JSON file under the new path.
+
+    The smart poller writes a single ``dispatch-state.json`` containing all
+    recipients. To make existing per-agent tests still meaningful, this
+    helper writes both ``prime`` and ``codex`` entries; the agent under
+    test gets the supplied ``updated_at`` and ``last_result``, and the
+    other recipient gets a fresh sentinel timestamp so cross-agent isolation
+    is exercised.
+    """
+    role = _agent_to_role(agent)
+    other_role = "codex" if role == "prime" else "prime"
+    state_path = tmp_path / _DISPATCH_STATE_REL
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    fresh_iso = _utc_now_minus_seconds(0)
+    payload = {
+        "schema_version": 1,
+        "updated_at": fresh_iso,
+        "recipients": {
+            role: {
+                "updated_at": updated_at,
+                "last_result": state,
+                "pending_count": 0,
+                "raw_pending_count": 0,
+                "filtered_terminal_count": 0,
+                "signature": "test-fixture",
+            },
+            other_role: {
+                "updated_at": fresh_iso,
+                "last_result": "no_pending",
+                "pending_count": 0,
+                "raw_pending_count": 0,
+                "filtered_terminal_count": 0,
+                "signature": "test-fixture-other",
+            },
+        },
+    }
+    state_path.write_text(json.dumps(payload), encoding="utf-8")
+    return state_path
 
 
 def _utc_now_minus_seconds(seconds: int) -> str:
@@ -319,56 +360,73 @@ def _utc_now_minus_seconds(seconds: int) -> str:
     return t.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# -- Helper-level supplemental coverage (non-substituting per GOV-19-A1) -----
+# The primary public-surface (``run_doctor``) coverage lives in
+# tests/test_doctor_bridge_poller.py per
+# bridge/gtkb-bridge-poller-doctor-path-2026-05-02-003.md TP1-TP7. The
+# tests below remain as helper-level regression coverage on the internal
+# ``_check_bridge_poller`` contract; they do not substitute for the
+# public-surface tests.
+
+
 def test_bridge_poller_fresh_file_ok(tmp_path: Path) -> None:
-    """Status file updated < 4 min ago → OK."""
-    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(60), state="clear")
+    """dispatch-state recipient updated < 4 min ago → OK."""
+    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(60))
     result = _check_bridge_poller(tmp_path, "claude")
     assert result.status == "pass", f"Expected pass, got {result.status}: {result.message}"
     assert "OK" in result.message
 
 
 def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
-    """Status file updated 5 min ago → WARN."""
-    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10), state="clear")
+    """dispatch-state recipient updated 5 min ago → WARN."""
+    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10))
     result = _check_bridge_poller(tmp_path, "codex")
     assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
     assert "WARN" in result.message
 
 
 def test_bridge_poller_15_min_old_alarm(tmp_path: Path) -> None:
-    """Status file updated 15 min ago → ALARM."""
-    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60), state="clear")
+    """dispatch-state recipient updated 15 min ago → ALARM."""
+    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60))
     result = _check_bridge_poller(tmp_path, "claude")
     assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
     assert "ALARM" in result.message
 
 
 def test_bridge_poller_missing_file_not_started(tmp_path: Path) -> None:
-    """Missing status file → not started (WARN)."""
+    """Missing dispatch-state file → not started (WARN)."""
     result = _check_bridge_poller(tmp_path, "codex")
     assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
     assert "not started" in result.message.lower()
 
 
 def test_bridge_poller_missing_updated_at_field_alarm(tmp_path: Path) -> None:
-    """Status file with missing updatedAtUtc → ALARM."""
-    logs_dir = tmp_path / "independent-progress-assessments" / "bridge-automation" / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    (logs_dir / "claude-scan-status.json").write_text(
-        json.dumps({"state": "clear", "message": "no timestamp"}),
+    """dispatch-state with missing recipients[role].updated_at → ALARM."""
+    state_path = tmp_path / _DISPATCH_STATE_REL
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recipients": {
+                    "prime": {"last_result": "no_pending", "pending_count": 0},
+                    "codex": {"last_result": "no_pending", "pending_count": 0},
+                },
+            }
+        ),
         encoding="utf-8",
     )
     result = _check_bridge_poller(tmp_path, "claude")
     assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
-    assert "ALARM" in result.message or "updatedAtUtc" in result.message
+    assert "ALARM" in result.message or "updated_at" in result.message
 
 
-def test_bridge_poller_unknown_state_no_error(tmp_path: Path) -> None:
-    """Unknown state values are displayed as-is without raising an error."""
+def test_bridge_poller_unknown_last_result_no_error(tmp_path: Path) -> None:
+    """Unknown last_result values are displayed as-is without raising an error."""
     for state in ("running", "completed", "custom-state-42"):
         _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(30), state=state)
         result = _check_bridge_poller(tmp_path, "claude")
-        # Should not raise; must return a ToolCheck with the state visible
+        # Should not raise; must return a ToolCheck with the last_result value visible
         assert isinstance(result, ToolCheck)
         assert state in result.message
 
