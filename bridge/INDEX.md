@@ -5,6 +5,77 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-gov-term-disambiguation-mechanical-2026-05-02
+VERIFIED: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-008.md
+NEW: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-007.md
+GO: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-006.md
+REVISED: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-005.md
+NO-GO: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-004.md
+REVISED: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-003.md
+NO-GO: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-002.md
+NEW: bridge/gtkb-gov-term-disambiguation-mechanical-2026-05-02-001.md
+
+Document: gtkb-gov-term-primer-startup-2026-05-02
+VERIFIED: bridge/gtkb-gov-term-primer-startup-2026-05-02-015.md
+REVISED: bridge/gtkb-gov-term-primer-startup-2026-05-02-014.md
+NO-GO: bridge/gtkb-gov-term-primer-startup-2026-05-02-013.md
+REVISED: bridge/gtkb-gov-term-primer-startup-2026-05-02-012.md
+NO-GO: bridge/gtkb-gov-term-primer-startup-2026-05-02-011.md
+VERIFIED: bridge/gtkb-gov-term-primer-startup-2026-05-02-010.md
+REVISED: bridge/gtkb-gov-term-primer-startup-2026-05-02-009.md
+NO-GO: bridge/gtkb-gov-term-primer-startup-2026-05-02-008.md
+NEW: bridge/gtkb-gov-term-primer-startup-2026-05-02-007.md
+GO: bridge/gtkb-gov-term-primer-startup-2026-05-02-006.md
+REVISED: bridge/gtkb-gov-term-primer-startup-2026-05-02-005.md
+NO-GO: bridge/gtkb-gov-term-primer-startup-2026-05-02-004.md
+REVISED: bridge/gtkb-gov-term-primer-startup-2026-05-02-003.md
+NO-GO: bridge/gtkb-gov-term-primer-startup-2026-05-02-002.md
+NEW: bridge/gtkb-gov-term-primer-startup-2026-05-02-001.md
+
+Document: gtkb-gov-backlog-source-of-truth-2026-05-02
+VERIFIED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-008.md
+NEW: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-007.md
+GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-006.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-005.md
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-004.md
+REVISED: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-003.md
+NO-GO: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-002.md
+NEW: bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-001.md
+
+Document: gtkb-bridge-propose-helper-caller-migration-2026-05-02
+NO-GO: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-006.md
+REVISED: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-005.md
+NO-GO: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-004.md
+REVISED: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-003.md
+NO-GO: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-002.md
+NEW: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-001.md
+
+Document: gtkb-bridge-poller-doctor-path-2026-05-02
+VERIFIED: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-008.md
+REVISED: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-007.md
+NO-GO: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-006.md
+NEW: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-005.md
+GO: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-004.md
+REVISED: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-003.md
+NO-GO: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-002.md
+NEW: bridge/gtkb-bridge-poller-doctor-path-2026-05-02-001.md
+
+Document: gtkb-isolation-017-slice3-init-defaults-2026-05-02
+VERIFIED: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-014.md
+REVISED: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-013.md
+NO-GO: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-012.md
+REVISED: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-011.md
+NO-GO: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-010.md
+NEW: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-009.md
+GO: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-008.md
+REVISED: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-007.md
+NO-GO: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-006.md
+REVISED: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-005.md
+NO-GO: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-004.md
+REVISED: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-003.md
+NO-GO: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-002.md
+NEW: bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-001.md
+
 Document: gtkb-isolation-017-slice2-5-rationale-schema-extension
 VERIFIED: bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-008.md
 NEW: bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-007.md

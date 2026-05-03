@@ -20,10 +20,10 @@ permanently in force. Any proposal, refactor, or cleanup that would weaken the
 protocol's audit trail, GO/NO-GO discipline, or INDEX.md as canonical state must
 be rejected.
 
-## Operational Mode (current as of 2026-04-28)
+## Operational Mode (current as of 2026-05-02)
 
-**The retired OS bridge pollers remain disabled. The verified smart poller
-should be used when it is available and functioning.**
+**The retired OS bridge pollers remain disabled. The smart poller is active
+and is the canonical bridge automation path while it remains healthy.**
 
 The owner directive that halted pollers on 2026-04-25 applied to the former
 token-heavy implementation: Windows scheduled tasks
@@ -33,18 +33,30 @@ token-heavy implementation: Windows scheduled tasks
 `Agent Red Bridge Monitor` watchdog startup shortcut. Those retired mechanisms
 must not be restored as the active automation path.
 
-That directive does **not** prohibit the new smart poller. When the smart poller
-implementation is present, verified, and reported healthy by the relevant doctor
-or verification check, it is the preferred bridge automation path and should be
-enabled. Until the smart poller is available and functioning, bridge scans remain
-manual in both directions.
+That directive does **not** prohibit the new smart poller, and the smart
+poller is now active. Activation is verified end-to-end by the
+`_check_smart_bridge_poller` doctor check (Windows scheduled task
+`GTKB-SmartBridgePoller`, VBS daemon `scripts/run_smart_bridge_poller.vbs`,
+runner `groundtruth-kb/scripts/bridge_poller_runner.py`, single-instance lock
+at `.gtkb-state/bridge-poller/bridge-poller-runner.lock`, audit log under
+`.gtkb-state/bridge-poller/poller-runs/`). Per-recipient liveness is verified
+by the `_check_bridge_poller` doctor check, which reads
+`recipients[role].updated_at` from `.gtkb-state/bridge-poller/dispatch-state.json`
+and applies the standard fresh/warn/alarm thresholds. The doctor is the
+canonical predicate for the §"Poller Enablement Contract" condition 3.
 
-Owner triggers a manual Prime bridge scan with a brief prompt such as `Bridge` or
-`Bridge scan`. Prime then reads `bridge/INDEX.md`, identifies any NEW/REVISED
-entries that need Prime action (responding to a Codex GO -> implement;
-responding to a Codex NO-GO -> revise) or any GO/NO-GO entries that need Prime
-acknowledgement, and acts. Codex bridge scans are similarly owner-triggered in
-the Codex harness when smart-poller automation is not active.
+When the smart poller is healthy, it scans `bridge/INDEX.md` every 15 seconds
+and dispatches the appropriate harness when a recipient's actionable queue
+signature changes (Codex on latest NEW or REVISED; Prime on latest GO or
+NO-GO). VERIFIED is terminal and not dispatched. The poller is monitoring
+and dispatch infrastructure only; `bridge/INDEX.md` remains the canonical
+workflow state.
+
+Manual fallback remains available when the smart poller is unhealthy (per
+the doctor predicate above) or intentionally stopped: the owner triggers a
+Prime bridge scan with a brief prompt such as `Bridge` or `Bridge scan`,
+Prime then reads `bridge/INDEX.md` and acts on actionable entries. Codex
+bridge scans are similarly owner-triggered in the Codex harness.
 
 The 2026-04-25 halt was made after the former OS Claude poller (activated
 ~2026-04-23) drove a ~10x session token-cost regression: 173 Claude

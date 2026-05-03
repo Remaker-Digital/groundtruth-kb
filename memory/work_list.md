@@ -43,6 +43,7 @@ Updated: 2026-04-28 (S319) — **DRIFT TRIAGE + DORA-001b TRACK 1 CLOSED + MEMBA
 | 24 | `GTKB-BRIDGE-PROPOSE-HELPER-INDEX-PARITY` | **DEFERRED 2026-05-02 S326 after 4 NO-GOs; re-scoping needed.** Codex `-006` F1: the helper API proposed in `bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-{001,003,005}.md` is the same governance-bypassing raw-status-inserter design rejected in the prior 2026-04-30 thread (`bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-{001..004}.md`); I missed that thread because INDEX entry was at lines 78-82. **More important:** `scripts/gtkb_bridge_writer.py` already implements atomic INDEX write + role/transition validation (lines 22-27, 152-176). The right path is NOT another helper — it's migrating callers to that existing tool. Re-scope when picked up: (a) cite both prior NO-GO threads; (b) propose caller-migration scope (replace direct `Edit` of INDEX with `gtkb_bridge_writer.py` calls), not a new helper; (c) include role-slot disambiguation per prior threads. Meaningful re-scope, not a quick revision. | Owner directive S324 (after observed pattern): "Promoting INDEX edits exclusively through the bridge-propose helper (which has 2-attempt retry semantics) would eliminate this pattern. Adding helper-mediated INDEX update for VERIFIED line additions is a candidate hygiene item. ... This should be tracked and completed at the next opportunity." **Gap:** `.claude/skills/bridge-propose/helpers/write_bridge.py:propose_bridge()` only handles the initial `Document: <slug>` + `NEW: bridge/<slug>-001.md` insertion case (atomic file-first write + INDEX retry-safe insertion with 2-attempt retry budget). Prime also routinely needs to insert REVISED, NEW (post-impl), and audit-trail-landing GO/NO-GO/VERIFIED lines into existing entries; currently this is done via direct `Edit` tool calls on `bridge/INDEX.md`, which race the smart-poller's atomic `os.replace` and lose every time the poller writes within the read→write window. Empirical evidence S324: at least 5 retroactive INDEX commits this session due to lost races (`a87fc24f`, `3efa04b3`, `2deb054e`, `f83a66a5`-followup, `2e995711`); each costs ~1 commit + 1 quality-gate run + diagnostic tokens. **Proposed surface:** extend `write_bridge.py` with a sibling function (e.g., `add_status_line(topic_slug, status, version, *, mode='abort')`) that uses the same atomic-temp-file + 2-attempt-retry pattern as `propose_bridge()`'s INDEX update phase. Call sites: bridge-propose skill, Prime's REVISED/post-impl filings, and (where appropriate) Prime-side audit-trail landings of LO verdicts. VERIFIED line additions by Codex's runner remain unchanged (smart-poller-runner has its own atomic write). **Sequencing:** non-blocking; "next opportunity" per owner direction. Most natural insertion: pair with any subsequent bridge-propose skill enhancement, or as a standalone tiny bridge thread when a low-token-cost session window opens. **Risk:** Low. Pure additive helper extension; no behavior change to existing `propose_bridge()`. | Next: file scoping bridge `bridge/gtkb-bridge-propose-helper-index-parity-2026-MM-DD-001.md` when next opportunity arises. Owner has pre-approved at the program-level ("This should be tracked and completed at the next opportunity"); standard NEW → review → GO → impl → post-impl → VERIFIED bridge cycle still applies. |
 | 25 | `GTKB-REHEARSE-DRIVER-WAVE-BANNER-COSMETIC` | **cosmetic follow-on; tracked from VERIFIED non-blocker** (added 2026-05-01 S325) | Codex non-blocking observation in `bridge/gtkb-isolation-016-phase8-wave3-execution-012.md` §"Non-Blocking Observation": `scripts/rehearse_isolation.py:283` always prints `rehearse_isolation: Wave 2 dispatch` even when `--phase db-filter-dryrun` (Wave 3) is selected. The actual Wave 3 manifest validation works correctly (T18+T19 prove this); only the banner text is stale. **Fix scope:** one-line change replacing literal "Wave 2" with f"Wave {wave}" where `wave` is the value already computed by `_wave_for_phase(args.phase)` at line 260. **Risk:** Trivial. Pure display-text change; no behavior impact. **Sequencing:** non-blocking; bundle with any future rehearse_isolation.py edit. | File `bridge/gtkb-rehearse-driver-wave-banner-cosmetic-2026-MM-DD-001.md` when natural opportunity arises (e.g., bundled with `GTKB-ROLE-ENHANCEMENT` post-isolation work or a focused cleanup pass). Owner has implicit pre-approval via the work_list autonomous-execution clause; standard bridge cycle applies. |
 | 26 | `GTKB-ISOLATION-017-SLICE-2.5` (registry rationale schema extension) | **carry-forward from Slice 2 GO -004** (added 2026-05-02 S326) | Codex GO at `bridge/gtkb-isolation-017-slice2-registry-isolation-004.md` §"Carry-forward condition": "Slice 2.5 rationale/migration-note work must be recorded after Slice 2 is VERIFIED, as promised in the proposal, so the deferred scoping acceptance items remain visible before final GTKB-ISOLATION-017 closeout." **Scope:** extend `OwnershipMeta` in `groundtruth-kb/src/groundtruth_kb/project/managed_registry.py` with an optional `notes: str = ""` field; update the loader (`_extract_ownership_block`), the TOML rows (`templates/managed-artifacts.toml` ~36 file-class rows), the `_to_ownership_record()` projection in `ownership.py`, and schema validation. After landing, T2 (rationale discipline: every gt-kb-managed/gt-kb-scaffolded record has non-empty notes) and T3 (migration-note discipline: ownership flips require paired notes citing prior value) become implementable and would be added in this same slice. Per `gtkb-isolation-017-slice2-registry-isolation-003.md` §"Replacement To `-001` Schema Survey table" — these were deferred from Slice 2 because FILE-class records currently project to `OwnershipRecord(notes="")` and `OwnershipMeta` has no notes field. **Sequencing:** non-blocking parallel to Slices 3-8; should land before GTKB-ISOLATION-017 closeout so the original Phase 9 acceptance items (per-entry rationale + migration-note discipline from scoping `-003` lines 84, 87) are not dropped on the floor. **Composition:** owns its own bridge thread; standard NEW → review → GO → impl → post-impl → VERIFIED cycle. Estimated envelope: ~80 LOC source (schema field + loader + projection + validation) + ~120 LOC tests (T2 + T3 + 2-3 schema invariants) + per-row TOML notes additions (rationale capture for ~36 rows). | Next: file scoping bridge `bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-001.md` after Slice 2 VERIFIED. Owner pre-approval via work_list autonomous-execution clause; standard bridge cycle applies. |
+| 27 | `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` | **owner-directed 2026-05-02 S326; source-of-truth migration proposed; not yet filed** | Owner clarified that the current backlog is not adequately formal. This item supersedes/absorbs the markdown-linter direction in `GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1` and the snapshot-only harvest direction in `GTKB-GOV-004` where those would preserve fragmentation. Required direction: implement a canonical append-only/versioned MemBase `backlog_items` table with unique backlog item name, unique sub-project name, creation/update timestamps, long-form relevance/intent description, related deliberation query/relations, specifications known at creation time, sequential implementation-order priority, bridge threads, dependencies, acceptance/regression visibility, completion evidence, and status lifecycle. `memory/work_list.md` becomes generated view or temporary compatibility surface, not the canonical source. Sequencing: high priority after the active `GTKB-ISOLATION-017` -> `GTKB-ISOLATION-018` -> `GTKB-ISOLATION-019` critical path unless owner explicitly elevates. | Next: file `bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-001.md` before implementation. Proposal must include schema DDL, migration plan from current `memory/work_list.md`, generated-view behavior, CLI/doctor/dashboard/startup integration, bridge citation behavior, ordering/reorder semantics, and regression tests proving no backlog items are lost or split across sources. |
 
 **Completed in S308 (2026-04-25), removed from active table:**
 
@@ -809,7 +810,80 @@ preserve the row cap as the primary bound; document the new env knobs in
 **Regression visibility:** boundary test proves snapshots within the
 retention window are preserved exactly and older ones are removed.
 
+### GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH - Canonical backlog table and generated backlog views (upstream-routed)
+
+**Priority:** owner-directed 2026-05-02. High priority after the active
+`GTKB-ISOLATION-017` -> `GTKB-ISOLATION-018` -> `GTKB-ISOLATION-019`
+critical path unless owner explicitly elevates it. This item supersedes and
+absorbs the markdown-schema-linter direction in
+`GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`; linter/citation hooks should be
+reframed as compatibility checks around the canonical table, not as the
+primary backlog source of truth.
+
+**Problem statement:** the backlog is currently spread across
+`memory/work_list.md`, MemBase `work_items`, `backlog_snapshots`, bridge
+threads, generated dashboard/startup reports, and audit scripts. The markdown
+file is human-readable but not a sufficient source-of-truth database: its
+ordering is not mechanically enforced, dates and dependencies are mostly prose,
+and items can be buried, duplicated, or lost when follow-ons are recorded in
+parent narratives.
+
+**Required canonical table direction:** add an append-only/versioned MemBase
+`backlog_items` table and `current_backlog_items` view. The proposal should
+define exact DDL, but the row model must include at least:
+
+- `id`, `version`, `backlog_item_name`, `subproject_name`
+- `implementation_order` as the presumed sequential backlog position
+- `status` lifecycle for proposed/active/blocked/in-progress/verified/
+  superseded/deferred states
+- `created_at`, `updated_at`, `created_by`, `updated_by`, `change_reason`
+- long-form `description` capturing the work item's relevance and intent
+- `source_owner_directive` or source-reference fields when owner direction
+  created the item
+- `source_deliberation_query` plus relation rows or JSON fields for
+  deliberations known at creation time
+- `related_spec_ids_at_creation`, explicitly historical and not an exhaustive
+  applicability claim at implementation-review time
+- `related_bridge_threads`, `depends_on_backlog_items`,
+  `blocks_backlog_items`, `acceptance_summary`, `regression_visibility`,
+  `completion_evidence`, `supersedes`, and `superseded_by`
+
+**Required behavior:** `memory/work_list.md` becomes a generated view or
+temporary compatibility surface. Startup, dashboard, bridge citation checks,
+standing-backlog harvest, and doctor/readiness checks must read the canonical
+table. Manual markdown backlog edits should either be rejected, ignored as
+non-authoritative, or surfaced as drift until migrated through the structured
+backlog writer.
+
+**Migration scope:** migrate active and candidate rows from
+`memory/work_list.md` into `backlog_items`, preserving sequential order,
+existing status prose, known bridge references, known deliberations, and known
+spec references. Existing `work_items` and `backlog_snapshots` should remain
+historical/related artifacts unless the proposal explicitly proves a safe
+unification path.
+
+**Regression visibility:** tests must prove unique active
+`backlog_item_name`, stable append-only version history, deterministic
+`implementation_order`, no duplicate active item names, no unresolved
+dependency references, no lost migrated rows, generated markdown parity for
+the active table, dashboard/startup visibility, bridge citation resolution
+against the table, and doctor failure when actionable backlog state exists
+only in markdown.
+
+**Next step:** file
+`bridge/gtkb-gov-backlog-source-of-truth-2026-05-02-001.md` before any source
+changes. The proposal must explicitly reconcile this item with
+`GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1`, `GTKB-GOV-004`, and `GTKB-GOV-010` so
+the backlog-governance program has one source-of-truth path.
+
 ### GTKB-GOV-BACKLOG-DISCIPLINE-SLICE1 - Backlog schema linter + bridge→backlog citation gate (upstream-routed)
+
+**Supersession note (2026-05-02):** this slice should not proceed as a
+markdown-first linter design. Its useful pieces -- bridge citation enforcement,
+schema validation, and drift detection -- should be folded into
+`GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` against the canonical `backlog_items`
+table. Retain this section as historical scoping evidence until the new bridge
+proposal formally resolves or rewrites the slice plan.
 
 **Priority:** file after the current S306 governance bundle
 (`GTKB-GOV-PROPOSAL-STANDARDS` + `GTKB-GOV-DA-ENFORCEMENT`) has at least
