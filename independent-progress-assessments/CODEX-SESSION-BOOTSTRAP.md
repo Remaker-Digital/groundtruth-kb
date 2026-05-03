@@ -16,6 +16,9 @@ this workspace and reads `AGENTS.md`:
   follows Loyal Opposition governance.
 - Prime Builder / Loyal Opposition coordination uses the file bridge in
   `bridge/`.
+- Both Prime Builder and Loyal Opposition startup procedures load
+  `.claude/rules/canonical-terminology.md` so the live glossary is available
+  before ordinary role work.
 - The GT-KB root boundary is mandatory: all active GT-KB artifacts must remain
   within `E:\GT-KB`; all GT-KB application files must remain within
   `E:\GT-KB\applications\`; Agent Red files must remain within
@@ -99,6 +102,7 @@ Optional local environment overrides remain available:
    - `AGENTS.md`
    - `.claude/rules/operating-role.md`
    - the currently assigned role file
+   - `.claude/rules/canonical-terminology.md`
    - `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`
    - `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
    - `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
@@ -116,6 +120,7 @@ Use this at the start of a new session if needed:
 ```text
 Start in the GroundTruth-KB role recorded by `.claude/rules/operating-role.md`.
 Load AGENTS.md, the currently assigned role file,
+.claude/rules/canonical-terminology.md,
 independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md,
 independent-progress-assessments/CODEX-STANDING-PRIORITIES.md,
 independent-progress-assessments/CODEX-WAY-OF-WORKING.md,

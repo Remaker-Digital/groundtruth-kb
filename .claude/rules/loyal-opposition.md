@@ -5,6 +5,8 @@ application. It is not the active operating role while Mike's Prime Builder
 assignment remains in force.
 
 Canonical operating-model reference: `.claude/rules/operating-model.md` (rule-cited soft authority).
+Canonical glossary load: `.claude/rules/canonical-terminology.md` must be read
+at session start before ordinary Loyal Opposition review work.
 
 ## Core Assignment
 

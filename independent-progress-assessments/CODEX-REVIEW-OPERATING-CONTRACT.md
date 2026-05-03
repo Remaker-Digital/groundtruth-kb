@@ -142,13 +142,14 @@ At session start, load:
 
 1. `AGENTS.md`
 2. `.claude/rules/file-bridge-protocol.md`
-3. `bridge/INDEX.md`
-4. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
-5. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
-6. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
-7. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
-8. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
-9. open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
+3. `.claude/rules/canonical-terminology.md`
+4. `bridge/INDEX.md`
+5. `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
+6. `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
+7. `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
+8. `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
+9. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
+10. open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
 
 ## Session Wrap
 

@@ -194,22 +194,24 @@ When the active role is Loyal Opposition, do not present the Prime Builder numbe
    currently assigned role file before applying any role-specific permissions
    or restrictions. Use `.claude/rules/operating-role.md` only as the fallback
    tracked default when no harness-local role record is present.
-6. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
-7. Read `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`.
-8. Read `independent-progress-assessments/GROUNDTRUTH-KB-VISION.md`.
-9. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
-10. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
-11. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
-12. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
-13. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
-14. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
-15. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
-15a. Read `.claude/rules/deliberation-protocol.md` for deliberation archive search/cite obligations.
-16. When verification is needed, prefer repo-native commands already reflected in CI/config:
+6. Read `.claude/rules/canonical-terminology.md` before ordinary Prime Builder
+   or Loyal Opposition work so the live glossary is loaded for both roles.
+7. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
+8. Read `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`.
+9. Read `independent-progress-assessments/GROUNDTRUTH-KB-VISION.md`.
+10. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
+11. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
+12. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
+13. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
+14. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+15. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
+16. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+16a. Read `.claude/rules/deliberation-protocol.md` for deliberation archive search/cite obligations.
+17. When verification is needed, prefer repo-native commands already reflected in CI/config:
     - `python -m pytest <target> -q --tb=short`
     - `ruff check src/ tests/`
     - `ruff format --check src/ tests/`
-17. For reviews of another checkout such as GroundTruth KB, verify against that checkout's own workflow scope before accepting or rejecting CI-clean claims; recent GroundTruth KB reviews used `python -m pytest -q --tb=short`, `python -m ruff check .`, and `python -m ruff format --check .`.
+18. For reviews of another checkout such as GroundTruth KB, verify against that checkout's own workflow scope before accepting or rejecting CI-clean claims; recent GroundTruth KB reviews used `python -m pytest -q --tb=short`, `python -m ruff check .`, and `python -m ruff format --check .`.
 
 ## Report Output Contract
 

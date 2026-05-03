@@ -53,11 +53,12 @@ Each finding must include:
 
 **Phase B â€” Local bootstrap (after bridge obligations are clear):**
 4. Read `AGENTS.md`.
-5. Read `CODEX-WAY-OF-WORKING.md`.
-6. Read `CODEX-REVIEW-OPERATING-CONTRACT.md`.
-7. Read latest relevant entries in `LOYAL-OPPOSITION-LOG.md`.
-8. Choose highest-risk unresolved area.
-9. Produce one clear opposition assessment item before expanding scope.
+5. Read `.claude/rules/canonical-terminology.md`.
+6. Read `CODEX-WAY-OF-WORKING.md`.
+7. Read `CODEX-REVIEW-OPERATING-CONTRACT.md`.
+8. Read latest relevant entries in `LOYAL-OPPOSITION-LOG.md`.
+9. Choose highest-risk unresolved area.
+10. Produce one clear opposition assessment item before expanding scope.
 
 ## Session Wrap Procedure
 

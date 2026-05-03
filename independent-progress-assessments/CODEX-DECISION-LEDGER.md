@@ -10,6 +10,68 @@ Purpose: persistent record of owner decisions and standing operating choices tha
 
 ## Entries
 
+### 2026-05-02 - Canonical terminology loads at startup for both roles
+
+- source:
+  Owner directive in session on 2026-05-02.
+- decision:
+  `.claude/rules/canonical-terminology.md` must be included in the session
+  start procedure for both Loyal Opposition and Prime Builder roles.
+- impact:
+  Future Prime Builder and Loyal Opposition sessions should load the live
+  canonical glossary before ordinary role work, not rely only on pasted
+  startup text, cached summaries, or the operating-model excerpt.
+- status:
+  Active
+
+### 2026-05-02 - Bare question mark requests status update
+
+- source:
+  Owner directive in session on 2026-05-02.
+- decision:
+  A question mark as input, with no other accompanying text, (`?`) should be
+  interpreted as a request for an update on Codex's current and recent
+  activity.
+- impact:
+  Future Codex sessions should answer a bare `?` with concise status: what
+  Codex is doing now, what it recently did, whether anything is running or
+  blocked, and what input or next step is needed if idle. Codex should not
+  treat a bare `?` as an invalid or non-actionable prompt.
+- status:
+  Active
+
+### 2026-05-03 - Status updates must refresh bridge and sub-agent state
+
+- source:
+  Owner directive in session on 2026-05-03.
+- decision:
+  When Codex provides a status update, including in response to a bare `?`,
+  Codex must first load and examine the live `bridge/INDEX.md` and examine the
+  state of all active sub-agents.
+- impact:
+  Status updates should report current bridge state from the authoritative
+  index, not cached summaries or earlier reads. If no sub-agents are active,
+  say so. If sub-agents are active, include their current state and whether
+  their work affects the next step.
+- status:
+  Active
+
+### 2026-05-03 - Loyal Opposition proceeds directly on actionable bridge items
+
+- source:
+  Owner directive in session on 2026-05-03.
+- decision:
+  If Loyal Opposition is aware of a bridge item that needs LO attention, it
+  should proceed directly without asking for owner input.
+- impact:
+  Latest `NEW` or `REVISED` bridge entries are sufficient authorization for
+  Loyal Opposition review/verification work. Codex should read the live
+  `bridge/INDEX.md`, process the actionable item under the file bridge
+  protocol, and only stop for owner input when a necessary owner decision
+  blocks the review itself.
+- status:
+  Active
+
 ### 2026-04-29 - AI-driven work prefers tracked surfaces for load-bearing change
 
 - source:

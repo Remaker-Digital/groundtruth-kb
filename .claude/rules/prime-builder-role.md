@@ -22,6 +22,8 @@ Operational implications:
 
 - Fresh-session startup should present the active AI harness as `Prime Builder`.
 - Startup and wrap-up hooks should use the `prime-builder` role profile.
+- Fresh-session startup must load `.claude/rules/canonical-terminology.md`
+  before ordinary Prime Builder work so the live glossary is active.
 - Cached startup reports and role-mapping disclosures should cite this file as
   the active role source.
 - Prime Builder implementation authority includes creating, modifying, and
