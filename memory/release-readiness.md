@@ -1,4 +1,46 @@
-# Release Readiness Recovery
+# Release Readiness — v0.7.0-rc1 Path (S327 owner direction)
+
+Last updated: 2026-05-02 (S327)
+
+## Active Release Target: v0.7.0-rc1
+
+**Owner directive 2026-05-02 (S327, end-of-session):** the next release opportunity is AFTER `GTKB-ISOLATION-017` closes. Goal: **complete clean-adopter productization**. Recorded as `DELIB-S327-RELEASE-PATH-CLEAN-ADOPTER-PRODUCTIZATION`. Version choice `v0.7.0-rc1` (not `0.6.2` — too small a label for clean-adopter productization).
+
+## ISOLATION-017 Status as of S327 close
+
+| Slice | Description | Status |
+|---|---|---|
+| 1 | Doctor checks for isolation invariants | VERIFIED |
+| 2 | Registry isolation | VERIFIED |
+| 2.5 | Rationale/migration-note schema extension | VERIFIED |
+| 3 | `gt project init` defaults + host-root binding | VERIFIED *(S327 commit `bdf154b3`)* |
+| **4** | **`gt project upgrade` isolation + migration/rollback** | **NEXT** |
+| 5 | Clean-adopter test suite + fixtures | After Slice 4 |
+| 6 | Docs for application/product isolation + migration | Parallel after Slice 5 |
+| 7 | Examples | Parallel after Slice 5 |
+| 8 | Release-version gate + closeout | Final |
+
+## Release-Hardening Blockers (address during Slice 8 closeout)
+
+- **Dirty worktree** — RESOLVED 2026-05-02 S327 (commit `44ecb46f`); 5 commits landed; tree clean.
+- **`ruff check .`** — red across full repo. Governance hardening verified ruff-clean only on touched files. Slice 8 scope: full-repo ruff resolution.
+- **`pytest` full sweep** — timed out locally. Slice 8 scope: scope/parallelize slow lanes for CI feasibility.
+- **Package version** — `groundtruth-kb/pyproject.toml` still produces `0.6.1`. Slice 8 scope: bump to `0.7.0-rc1`.
+- **Release notes** — most recent at `release-notes-0.6.1.md`. Slice 8 scope: write `release-notes-0.7.0-rc1.md`.
+- **Wheel/sdist + install smoke** — Slice 8 scope: verify `pip install groundtruth-kb==0.7.0rc1` produces a working `gt project init`.
+- **Clean-adopter proof** — Slice 5's deliverable; Slice 8 verifies acceptance.
+- **CI green** — Slice 8 scope: GitHub Actions full sweep + release-candidate-gate.yml workflow green.
+- **Bridge terminal state** — Slice 8 scope: all ISOLATION-017 Slices VERIFIED; standing-Backlog/Primer/Disambiguation deferred status documented.
+
+## Feature Freeze
+
+Per S327 owner direction: NO new governance scope work until Slice 8 VERIFIED. The three governance programs landed in S327 (Backlog DB, Term Primer, Term Disambiguation) wait for the post-release window. Slice 1 deliverables are durable (committed at `5da729f8`) but Slices 2+ do not advance.
+
+---
+
+## Historical context: v0.6.x recovery
+
+Original content below preserved as historical evidence for traceability.
 
 Last updated: 2026-04-21 18:25 America/Los_Angeles
 

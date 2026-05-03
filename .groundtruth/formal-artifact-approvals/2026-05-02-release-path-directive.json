@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-S327-RELEASE-PATH-CLEAN-ADOPTER-PRODUCTIZATION",
+  "action": "insert",
+  "source_ref": "owner_conversation:2026-05-02-S327-release-path-directive",
+  "full_content": "Owner directive S327 (end-of-session): release path for clean-adopter productization.\n\nThe next release opportunity is AFTER GTKB-ISOLATION-017 closes, not now. v0.7.0-rc1 target (not 0.6.2 — too small a label for complete clean-adopter productization).\n\nSequence (do not skip, do not parallelize before Slice 5):\n1. ISOLATION-017 Slice 4 (gt project upgrade + migration/rollback) — NEXT, dependency hinge.\n2. Slice 5 (clean-adopter test suite + fixtures) — productization proof.\n3. Slice 6 + Slice 7 (docs + examples) — parallel after Slice 5.\n4. Slice 8 (release-version gate + closeout) — release-candidate gate.\n5. Release hardening: ruff full-repo, pytest scope/parallel, version bump, release notes, wheel/sdist smoke.\n6. v0.7.0-rc1 push to GitHub + PyPI.\n\nFeature freeze in effect: no new governance scope work until Slice 8 VERIFIED. The three S327 governance Slice 1s (Backlog DB, Term Primer, Term Disambiguation) sit at idle; their Slices 2+ do not advance until v0.7.0-rc1 ships.\n\nPer owner: \"Term primer, backlog DB, and disambiguation were useful governance hardening, but the release path now needs a feature freeze except for ISOLATION-017 and release blockers.\"",
+  "full_content_sha256": "a09fe14df68f861c337fe4d3e157f23aec50dabca4c43cfdec49ee2d28888397",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner explicitly stated the release path at S327 turn-end: target v0.7.0-rc1 after ISOLATION-017 Slice 8 VERIFIED; Slice 4 (gt project upgrade isolation + migration/rollback) is the next implementation target; feature freeze on governance hardening; current release-hardening blockers enumerated (ruff red full-repo, pytest timeout, version 0.6.1, release notes stale).",
+  "changed_by": "prime-builder/claude-code",
+  "change_reason": "Archive S327 owner release-path directive driving the next-release sequence (ISOLATION-017 Slices 4-8 → v0.7.0-rc1) per .claude/rules/deliberation-protocol.md.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

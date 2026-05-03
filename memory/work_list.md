@@ -7,6 +7,31 @@ Do not wait for owner approval between items. Continue unsupervised.
 
 ---
 
+## TOP — S327 RELEASE PATH: Clean-adopter productization → v0.7.0-rc1
+
+**Owner directive 2026-05-02 (S327, end-of-session):** the next release opportunity is AFTER GTKB-ISOLATION-017 closes — not now. Goal is **complete clean-adopter productization**. Recorded as `DELIB-S327-RELEASE-PATH-CLEAN-ADOPTER-PRODUCTIZATION`.
+
+**Feature freeze in effect:** No new governance scope work until ISOLATION-017 Slice 8 VERIFIED. The three governance Slice 1s landed in S327 (Backlog DB, Term Primer, Term Disambiguation) sit at idle; their Slices 2-7 do NOT advance until v0.7.0-rc1 ships. The standing Backlog DB, Primer, and Disambiguation work_list rows below remain captured but marked deferred for the duration of the release path.
+
+**Sequence (do not skip, do not parallelize before Slice 5):**
+
+1. **ISOLATION-017 Slice 4** — `gt project upgrade` isolation + migration/rollback behavior. Dependency hinge for productization: clean-adopter productization is not credible until upgrade/migration converges existing adopter trees safely. **NEXT.**
+2. **ISOLATION-017 Slice 5** — clean-adopter test suite + fixtures. The real productization proof: a fresh install behaves correctly from an adopter root without GT-KB product leakage. Run **immediately** after Slice 4.
+3. **ISOLATION-017 Slice 6 + Slice 7 (parallel after Slice 5)** — docs for application/product isolation and migration (Slice 6); examples (Slice 7). Do not lead implementation; docs written before final test contract drift.
+4. **ISOLATION-017 Slice 8** — release-version gate + closeout. Defines and satisfies the acceptance gate: version choice (v0.7.0-rc1), release notes, install smoke, wheel/sdist check, clean-adopter proof, CI green, bridge terminal state.
+5. **Release hardening** — known blockers to address before push:
+   - Dirty worktree triage (DONE 2026-05-02 S327 — 5 commits landed; tree clean post-44ecb46f).
+   - `ruff check .` red across full repo (governance hardening only verified ruff-clean on touched files).
+   - Full `pytest` timed out locally (need to scope/parallelize slow lanes for CI).
+   - Package version still pinned at `0.6.1` in `groundtruth-kb/pyproject.toml`.
+   - Release notes / changelog need next-version (`0.7.0-rc1`) update.
+6. **v0.7.0-rc1 release** — push to GitHub as installable release; PyPI publish.
+
+**Deferred during release path (capture only; do not advance):**
+- Backlog source-of-truth Slices 2-7 (DDL migration, CLI, render generator, etc.). Specs at `ADR-STANDING-BACKLOG-DB-AUTHORITY-001` + `DCL-STANDING-BACKLOG-DB-SCHEMA-001` ready when work resumes.
+- Primer Slices 2-5 (regenerate CLI, smart-poller dispatch, AGENTS.md reconciliation, release-gate integration). Slice 1 dogfood install live in `.claude/rules/canonical-terminology.{md,toml}`.
+- Disambiguation Slices 2-7 (PreToolUse hook, PostToolUse audit, bridge-compliance-gate extension, dispatch integration, backfill audit, doctor check). Slice 1 policy file + library skeleton live in `templates/rules/canonical-terminology-policy.toml` + `groundtruth_kb/term_disambiguation.py`.
+
 ## Next Actionable Items (hand-maintained; automation tracked under GTKB-GOV-BACKLOG-DISCIPLINE)
 
 **S325 ISOLATION-016 CLOSED (2026-05-01):** GTKB-ISOLATION-016 Wave 3 VERIFIED at `bridge/gtkb-isolation-016-phase8-wave3-execution-012.md` (no blocking findings; one cosmetic non-blocker on driver banner tracked as follow-on row 25). Implementation at commit `ef78c0db` + REVISED-1 fix at `bb683bc0`. Manifest now carries `db_reconciliation_strategy = manifest_driven_filter` and `unclassified_disposition = leave_behind_with_warning`. Per Wave 3, the rehearsal end-to-end produces a filtered preview DB with 24,544 adopter rows / 120 framework excluded / telemetry-empty / integrity_check ok against the live 1.0 GB KB.

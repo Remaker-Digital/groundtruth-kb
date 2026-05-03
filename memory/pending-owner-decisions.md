@@ -6,29 +6,40 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0311
-  asked_at: 2026-05-03T00:04:55.801137Z
-  question: "modified any files. Awaiting your direction on disposition. Per"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: 224e08512b8da08b
+(none — cleared by owner directive S327 end-of-session 2026-05-03)
+
+## Resolved
+
+- id: DECISION-0318
+  asked_at: 2026-05-03T01:12:07.715125Z
+  question: "Acknowledged — standing by for direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: e9b975059747b688
+  resolved_at: 2026-05-03T01:30:00.000000Z
+  resolved_in_session: S327
+  answer: "S327 clear pending: false positive (standing_by_for). Detector self-triggered on a status acknowledgement following the S327 release-path directive. No missed owner decision."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0314
   asked_at: 2026-05-03T00:15:01.450441Z
   question: "auto-detected from \"Awaiting your direction on disposition\" pro"
   detected_via: prose:awaiting_input
-  status: pending
+  status: resolved
   question_hash: b3bf19e8da3ab116
+  resolved_at: 2026-05-03T01:30:00.000000Z
+  resolved_in_session: S327
+  answer: "S327 clear pending: false positive — detector self-triggered on my own meta-prose where I was DESCRIBING the prose-detection behavior. No missed owner decision."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0318
-  asked_at: 2026-05-03T01:12:07.715125Z
-  question: "Acknowledged — standing by for direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: e9b975059747b688
+- id: DECISION-0311
+  asked_at: 2026-05-03T00:04:55.801137Z
+  question: "modified any files. Awaiting your direction on disposition. Per"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 224e08512b8da08b
+  resolved_at: 2026-05-03T01:30:00.000000Z
+  resolved_in_session: S327
+  answer: "S327 clear pending: false positive (awaiting_input). Truncated prose-detector capture during status report; the underlying decision was formalized via AskUserQuestion in the same turn."
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-
-## Resolved
 
 - id: DECISION-0307
   asked_at: 2026-05-02T22:58:23.641469Z
