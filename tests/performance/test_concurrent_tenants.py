@@ -82,6 +82,14 @@ class TestSingleTenantBaseline:
         elapsed = time.perf_counter() - start
         assert elapsed < 1.0, f"1000 serializations took {elapsed:.3f}s"
 
+    @pytest.mark.skip(
+        reason="waived per DELIB-S330-SLICE-8-6-PHASE-3-G-EVALUATION-MODULE-WAIVER: "
+        "evaluation/ module deleted at S320 c9fc7216 (Phase 1 isolation cleanup); "
+        "this test still imports from it. Scope = this test + test_perf_04. "
+        "Expiry = evaluation module restored OR test rewritten "
+        "(backlog: GTKB-EVALUATION-MODULE-RESTORATION-001). "
+        "Residual risk: golden-dataset performance gate not exercised in CI."
+    )
     def test_perf_03_golden_dataset_loads_under_100ms(self):
         """PERF-03: Golden evaluation dataset loads quickly."""
         from evaluation.pilots.quality_pilot import load_dataset
@@ -93,6 +101,14 @@ class TestSingleTenantBaseline:
         assert len(scenarios) >= 20
         assert elapsed < 0.1, f"Dataset load took {elapsed:.3f}s"
 
+    @pytest.mark.skip(
+        reason="waived per DELIB-S330-SLICE-8-6-PHASE-3-G-EVALUATION-MODULE-WAIVER: "
+        "evaluation/ module deleted at S320 c9fc7216 (Phase 1 isolation cleanup); "
+        "this test still imports from it. Scope = this test + test_perf_03. "
+        "Expiry = evaluation module restored OR test rewritten "
+        "(backlog: GTKB-EVALUATION-MODULE-RESTORATION-001). "
+        "Residual risk: pilot-evaluation performance gate not exercised in CI."
+    )
     def test_perf_04_quality_pilot_evaluation_under_500ms(self):
         """PERF-04: Full quality pilot evaluation completes quickly."""
         from evaluation.pilots.quality_pilot import load_dataset, run_pilot
