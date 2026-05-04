@@ -91,26 +91,31 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Pin pip to pre-CVE version
-        # Per DELIB-S330-SLICE-8-6-ROW-42-PIP-CVE-CHOICE (S330 owner directive):
-        # pip 26.x carries CVE-2026-3219 with no upstream fix. Pin to pip<26
-        # before installing dependencies or running pip-audit so the resolver
-        # itself does not trigger the CVE. Scope: pip dependency only;
-        # production deps are unaffected. Expiry: revisit at v0.7.0 GA when
-        # a fixed pip 26.x is available. Residual risk: lose pip 26.x
-        # features in CI (release-candidate gate environment only; production
-        # runtime image does not invoke pip).
-        run: python -m pip install --upgrade 'pip<26'
-
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run pip-audit
+      - name: Run pip-audit (waive CVE-2026-3219 only)
+        # Per DELIB-S330-SLICE-8-6-ROW-42-PIP-CVE-CHOICE (S330 owner directive,
+        # fallback path: "--ignore-vuln CVE-2026-3219 if no safe version
+        # exists"):
+        #
+        # CI environment ships pip 26.x (default for setup-python@v5 +
+        # python-version 3.12), which carries CVE-2026-3219 with no
+        # upstream fix. The original directive's primary path was to pin
+        # pip<26, but pip<26 reintroduces CVE-2026-1703 (fixed in 26.0+);
+        # pinning trades one CVE for another. Suppression by ID is the
+        # surviving cleanest path.
+        #
+        # Scope: CVE-2026-3219 ONLY. All other vulnerabilities still fail
+        # the gate. Expiry: revisit at v0.7.0 GA when a fixed pip is
+        # available. Residual risk: pip resolver attack surface in CI
+        # release-candidate gate environment only; production runtime
+        # image does not invoke pip.
         run: |
           pip install pip-audit
           mkdir -p .quality
-          pip-audit --format=json --output=.quality/pip-audit.json || true
-          pip-audit
+          pip-audit --ignore-vuln CVE-2026-3219 --format=json --output=.quality/pip-audit.json || true
+          pip-audit --ignore-vuln CVE-2026-3219
 
   scout:
     name: Docker Scout (container CVEs)
