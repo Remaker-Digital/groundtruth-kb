@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04
+REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-005.md
+NO-GO: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-004.md
 NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-003.md
 GO: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-002.md
 NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-001.md

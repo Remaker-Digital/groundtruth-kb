@@ -54,18 +54,25 @@ def main() -> int:
         _check_uncited_owner_input_bridges(target),
     ]
 
-    failed = [c for c in checks if c.status == "fail"]
+    # Block on anything other than status == "pass". Required release-gate
+    # metrics whose configuration or helper dependency is invalid (warning) or
+    # which fail outright (fail) are NOT clean — they are unverified. Treating
+    # warnings as PASS would let misconfigured cutoffs / missing helpers
+    # silently bypass the gate. Per Codex -004 F2.
+    blocking = [c for c in checks if c.status != "pass"]
     print("=== AUQ Release Governance Metrics ===")
     for c in checks:
         marker = "PASS" if c.status == "pass" else c.status.upper()
         print(f"[{marker}] {c.name}: {c.message}")
 
-    if failed:
+    if blocking:
         print("", file=sys.stderr)
-        print(f"FAIL: {len(failed)} of {len(checks)} release governance metrics failed.",
-              file=sys.stderr)
-        for c in failed:
-            print(f"  - {c.name}: {c.message}", file=sys.stderr)
+        print(
+            f"BLOCK: {len(blocking)} of {len(checks)} release governance metrics not clean (status != pass).",
+            file=sys.stderr,
+        )
+        for c in blocking:
+            print(f"  - [{c.status.upper()}] {c.name}: {c.message}", file=sys.stderr)
         return 1
 
     print("")

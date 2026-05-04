@@ -881,46 +881,77 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
     sys.modules["bridge_gate_doctor"] = module
     spec.loader.exec_module(module)
 
-    # Find latest VERIFIED line per Document in INDEX. Collect (filename) for those.
-    verified_files: list[Path] = []
+    # Per bridge protocol: a Document entry is a thread of versioned files,
+    # newest at top. The `VERIFIED:` status line points to Codex's verdict
+    # file; the actual Prime proposal/report carrying the Owner Decisions
+    # obligation is on `NEW:` or `REVISED:` lines in the same entry. The
+    # check must inspect the non-verdict files in each VERIFIED thread, not
+    # only the verdict file. Per Codex -004 F1.
+    threads: list[tuple[str, list[tuple[str, Path]]]] = []
     current_doc: str | None = None
+    current_files: list[tuple[str, Path]] = []
+    line_re = _re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s*(bridge/\S+\.md)\s*$")
     for line in index_path.read_text(encoding="utf-8").splitlines():
         s = line.strip()
         if s.startswith("Document:"):
+            if current_doc and current_files:
+                threads.append((current_doc, current_files))
             current_doc = s[len("Document:"):].strip()
+            current_files = []
             continue
-        m = _re.match(r"^VERIFIED:\s*(bridge/\S+\.md)\s*$", s)
+        m = line_re.match(s)
         if m and current_doc:
-            verified_files.append(target / m.group(1))
-            current_doc = None  # consume only the first (latest) VERIFIED line per Document
+            current_files.append((m.group(1), target / m.group(2)))
+    if current_doc and current_files:
+        threads.append((current_doc, current_files))
+
+    # Known historical offenders: bridge files filed before Sub-slice C's
+    # bridge-compliance-gate began enforcing the Owner Decisions / Input
+    # section requirement. Documented as accepted residuals per the umbrella's
+    # "document accepted residual" treatment pattern. New offenders not in
+    # this set fail the metric — the allowlist is sealed (no automatic growth).
+    known_historical_offenders: set[str] = {
+        # Sub-slice B's post-impl REPORT, filed before Sub-slice C VERIFIED
+        # introduced the Owner Decisions section gate.
+        "gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-005.md",
+        # ISOLATION-018 pending-migration-waiver REPORT, filed S330 prior to
+        # the gate landing.
+        "gtkb-isolation-018-pending-migration-waiver-005.md",
+    }
 
     offenders: list[str] = []
-    for vf in verified_files:
-        if not vf.exists():
+    for doc_name, files in threads:
+        # Latest status is the first listed file in the thread (insertion is at top).
+        if not files or files[0][0] != "VERIFIED":
             continue
-        try:
-            mtime = datetime.fromtimestamp(vf.stat().st_mtime, tz=timezone.utc)
-        except OSError:
-            continue
-        if mtime < cutoff:
-            continue
-        try:
-            content = vf.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        # Skip verdict files (GO/NO-GO/VERIFIED). Per bridge-compliance-gate.py:357
-        # the gate excludes verdict files from the Owner Decisions section
-        # requirement; this doctor check mirrors that exclusion.
-        first_line = next((ln for ln in content.splitlines() if ln.strip()), "")
-        if first_line.strip().startswith(("GO", "NO-GO", "VERIFIED")):
-            continue
-        try:
-            claims_owner = module._proposal_claims_owner_approval(content)
-            has_section = module._has_concrete_owner_decisions_section(content)
-        except AttributeError:
-            continue
-        if claims_owner and not has_section:
-            offenders.append(vf.name)
+        # For VERIFIED threads, inspect every non-verdict file in the thread.
+        # Verdict files start with GO/NO-GO/VERIFIED on first non-blank line;
+        # mirrors bridge-compliance-gate.py:357 exclusion.
+        for status, vf in files:
+            if not vf.exists():
+                continue
+            if vf.name in known_historical_offenders:
+                continue
+            try:
+                mtime = datetime.fromtimestamp(vf.stat().st_mtime, tz=timezone.utc)
+            except OSError:
+                continue
+            if mtime < cutoff:
+                continue
+            try:
+                content = vf.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            first_line = next((ln for ln in content.splitlines() if ln.strip()), "")
+            if first_line.strip().startswith(("GO", "NO-GO", "VERIFIED")):
+                continue
+            try:
+                claims_owner = module._proposal_claims_owner_approval(content)
+                has_section = module._has_concrete_owner_decisions_section(content)
+            except AttributeError:
+                continue
+            if claims_owner and not has_section:
+                offenders.append(vf.name)
 
     if not offenders:
         return ToolCheck(

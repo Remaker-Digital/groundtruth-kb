@@ -105,6 +105,45 @@ def _add_offending_verified_bridge(target: Path) -> None:
     os.utime(bridge_dir / fname, (ts, ts))
 
 
+def _add_realistic_verified_thread(target: Path) -> None:
+    """Adds a realistic VERIFIED thread: VERIFIED line points at LO verdict;
+    NEW line points at the Prime report claiming owner approval but missing
+    Owner Decisions / Input section. Per Codex -004 F1."""
+    bridge_dir = target / "bridge"
+    verdict_fname = "realistic-offender-002.md"
+    report_fname = "realistic-offender-001.md"
+    # LO verdict file (starts with VERIFIED first line — must be SKIPPED by check)
+    (bridge_dir / verdict_fname).write_text(
+        "VERIFIED\n\n"
+        "# Loyal Opposition Verification\n\nLooks fine.\n",
+        encoding="utf-8",
+    )
+    # Prime report (the actual offender — no verdict prefix; claims owner approval; missing section)
+    (bridge_dir / report_fname).write_text(
+        "NEW\n\n"
+        "# Prime Implementation Report\n\n"
+        "## Specification Links\n\n- SPEC-X\n\n"
+        "This report cites Sub-slice B's AUQ-only rule per "
+        "bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md "
+        "and asserts owner approval was obtained. But there is no Owner Decisions / Input section.\n",
+        encoding="utf-8",
+    )
+    # INDEX with realistic protocol topology: VERIFIED first, NEW underneath
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(
+        "# Bridge Index\n\n"
+        "Document: realistic-offender\n"
+        f"VERIFIED: bridge/{verdict_fname}\n"
+        f"NEW: bridge/{report_fname}\n",
+        encoding="utf-8",
+    )
+    import os
+    from datetime import datetime
+    ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
+    os.utime(bridge_dir / verdict_fname, (ts, ts))
+    os.utime(bridge_dir / report_fname, (ts, ts))
+
+
 def _run_doctor_check(target: Path, check_name: str):
     """Import doctor and run a single check function."""
     sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
@@ -197,4 +236,43 @@ def test_release_gate_script_exits_1_on_polluted_baseline(tmp_path, monkeypatch)
     assert result.returncode == 1, (
         f"Expected exit 1; got {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
-    assert "FAIL" in result.stderr
+    assert "BLOCK" in result.stderr or "FAIL" in result.stderr
+
+
+# ---- Codex -004 regression tests ----
+
+
+def test_check_uncited_owner_input_bridges_fail_on_realistic_verified_thread(tmp_path, monkeypatch):
+    """Per Codex -004 F1: VERIFIED thread topology is verdict file at top + Prime
+    report below. Check must inspect non-verdict files in VERIFIED threads, not
+    only the verdict file itself."""
+    target = _make_clean_fixture(tmp_path)
+    _add_realistic_verified_thread(target)
+    monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "2026-01-01")
+    r = _run_doctor_check(target, "_check_uncited_owner_input_bridges")
+    assert r.status == "fail", (
+        f"Realistic verified-thread topology must produce fail; got {r.status}: {r.message}"
+    )
+    assert "realistic-offender-001.md" in r.message, (
+        f"Offender Prime report (realistic-offender-001.md) must be flagged; got {r.message}"
+    )
+
+
+def test_release_gate_script_blocks_on_warning_status(tmp_path, monkeypatch):
+    """Per Codex -004 F2: invalid GTKB_AUQ_METRICS_CUTOFF_DATE produces warning
+    status for two checks; release script must block (exit 1), not exit 0
+    with 'all clean' message."""
+    target = _make_clean_fixture(tmp_path)
+    monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "not-a-date")
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--target", str(target)],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 1, (
+        f"Expected exit 1 on warning status; got {result.returncode}\n"
+        f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+    assert "all 3 release governance metrics clean" not in result.stdout, (
+        "Misconfiguration produced warnings but stdout claimed all-clean — false-pass path"
+    )
+    assert "BLOCK" in result.stderr, "Expected BLOCK message in stderr"

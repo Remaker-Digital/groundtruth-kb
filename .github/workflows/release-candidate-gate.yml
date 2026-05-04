@@ -11,6 +11,14 @@ on:
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.github/workflows/release-candidate-gate.yml'
+      # Sub-slice F release-metric implementation surface (per Codex -004 F3):
+      # ensure release-candidate gate runs when metric code, tests, evidence,
+      # or helper hooks change.
+      - 'groundtruth-kb/src/**'
+      - 'groundtruth-kb/tests/**'
+      - 'memory/**'
+      - 'bridge/**'
+      - '.claude/hooks/**'
   push:
     branches: [main, develop, 'hotfix/**']
     paths:
@@ -22,6 +30,11 @@ on:
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.github/workflows/release-candidate-gate.yml'
+      - 'groundtruth-kb/src/**'
+      - 'groundtruth-kb/tests/**'
+      - 'memory/**'
+      - 'bridge/**'
+      - '.claude/hooks/**'
   workflow_dispatch:
 
 concurrency:
