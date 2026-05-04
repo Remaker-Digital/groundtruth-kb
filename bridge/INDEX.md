@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-gov-askuserquestion-enforcement-stack-2026-05-04
+NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-001.md
+
 Document: gtkb-isolation-018-slice-b-pdf-cluster
 VERIFIED: bridge/gtkb-isolation-018-slice-b-pdf-cluster-012.md
 REVISED: bridge/gtkb-isolation-018-slice-b-pdf-cluster-011.md
