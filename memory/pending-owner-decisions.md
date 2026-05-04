@@ -20,6 +20,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: 9c8f71b80feeda38
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0369
+  asked_at: 2026-05-03T20:53:15.913830Z
+  question: "positive decisions. Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 53435b9f57c39df9
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0373
+  asked_at: 2026-05-03T21:15:56.717276Z
+  question: "ice 8 closure work. Want me to read those NO-GO verdicts and prepare REVISED proposals, or address one of the pending decisions first?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 3c6ee380a5645248
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0374
+  asked_at: 2026-05-03T21:24:01.486669Z
+  question: "───────────────`  **Awaiting your direction.** Should I proceed"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 5bc9559cc9ab5db2
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0380
+  asked_at: 2026-05-03T21:36:41.596153Z
+  question: "d but not grow it.  Standing by for owner direction or session close."
+  detected_via: prose:standing_by_for
+  status: pending
+  question_hash: 93bdbcacc4173f18
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -4261,6 +4289,137 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: a5da084b0afbf175
   resolved_at: 2026-05-03T20:05:57.121835Z
   answer: "User has answered your questions: \"Codex `-008` NO-GO catches a real defect: the Slice 8 B5 install-smoke command (`gt project init <tmp>/test-app --profile local-only`) cannot succeed against an installed wheel because Slice 4 isolation enforcement requires the target to live under `<gt-kb-root>/applications/<name>/` AND requires `--gt-kb-root` to equal a path derived from the install location (which is meaningless for pip-installed wheels in a venv). The announcement's 'How to try it' command sequence has the same defect. How should Slice 8 resolve?\"=\"Path A: Narrow fix; acknowledge rc limitation (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0367
+  asked_at: 2026-05-03T20:49:44.406467Z
+  question: "Slice 8 is VERIFIED. Per the bridge protocol's wait-for-VERIFIED-then-commit lifecycle and the -011/-012 Open Items, the next steps are: (a) commit Slice 8 to develop, (b) push to remote so CI runs, (c) file Slice 8.5 NEW capturing CI-green evidence on the Slice 8 commit. How should I proceed?"
+  options:
+    - "Commit + push + file Slice 8.5 NEW (Recommended)"
+    - "Commit only; pause before push so I can review the diff"
+    - "Hold; you want to review -012 + the cumulative diff first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a50b3d661695f908
+  resolved_at: 2026-05-03T20:49:44.406467Z
+  answer: "User has answered your questions: \"Slice 8 is VERIFIED. Per the bridge protocol's wait-for-VERIFIED-then-commit lifecycle and the -011/-012 Open Items, the next steps are: (a) commit Slice 8 to develop, (b) push to remote so CI runs, (c) file Slice 8.5 NEW capturing CI-green evidence on the Slice 8 commit. How should I proceed?\"=\"Commit + push + file Slice 8.5 NEW (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0368
+  asked_at: 2026-05-03T20:53:15.913830Z
+  question: "Smart-poller dispatched two stale GO entries (gtkb-command-surface-004 and gtkb-incident-response-006, both 2026-04-26 plan-level approvals with no implementation authorization). The freshest item is today's NO-GO on gtkb-isolation-017-slice-8-5-ci-green-002 with 3 blocking findings (full-SHA discovery, Python-Tests trigger ambiguity, B6 verifier contract). Which should I work on?"
+  options:
+    - "Revise slice-8-5 proposal (Recommended)"
+    - "Act on dispatched gtkb-command-surface GO"
+    - "Act on dispatched gtkb-incident-response GO"
+    - "Clear pending decisions first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: aca654efbe85cfc2
+  resolved_at: 2026-05-03T20:53:15.913830Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0370
+  asked_at: 2026-05-03T21:13:21.894351Z
+  question: "Codex `-002` F2 (blocking): release-readiness.md:32 says 'GitHub Actions full sweep + release-candidate-gate.yml workflow green'. But `python-tests.yml` runs Agent Red product tests (`tests/unit`, `tests/multi_tenant`, etc.) and is path-filtered to `src/**` + `tests/**`; it did NOT trigger for Slice 8 commit `b4346ab6` (which only touched `groundtruth-kb/**`, `bridge/**`, `memory/**`, `scripts/**`). There is no existing CI workflow that runs `groundtruth-kb/tests/`. How should Slice 8.5 handle this?"
+  options:
+    - "Owner waiver: python-tests.yml not required for this GT-KB-only rc (Recommended)"
+    - "Add groundtruth-kb/** path + new job to release-candidate-gate.yml"
+    - "Add new groundtruth-kb-tests.yml workflow"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ec83b458c83d112d
+  resolved_at: 2026-05-03T21:13:21.894351Z
+  answer: "User has answered your questions: \"Codex `-002` F2 (blocking): release-readiness.md:32 says 'GitHub Actions full sweep + release-candidate-gate.yml workflow green'. But `python-tests.yml` runs Agent Red product tests (`tests/unit`, `tests/multi_tenant`, etc.) and is path-filtered to `src/**` + `tests/**`; it did NOT trigger for Slice 8 commit `b4346ab6` (which only touched `groundtruth-kb/**`, `bridge/**`, `memory/**`, `scripts/**`). There is no existing CI workflow that runs `groundtruth-kb/tests/`. How should Slice 8.5 handle this?\"=\"Owner waiver: python-tests.yml not required for this GT-KB-only rc (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0371
+  asked_at: 2026-05-03T21:13:21.894351Z
+  question: "Slice 8.5 surfaced that CI on Slice 8 commit `b4346ab6` is RED on 2 of 4 triggered workflows: Release Candidate Gate (41 pre-existing test failures, none Slice 8-introduced) + Security Scan (pip CVE in CI environment). These predate Slice 8. v0.7.0-rc1 tag cannot authorize against red CI without compromising the rc claim. How should we proceed?"
+  options:
+    - "Pause rc1 path; file Slice 8.6 to triage + fix CI failures (Recommended)"
+    - "Audit failures via AskUserQuestion per category; waive what's acceptable; fix the rest"
+    - "Substantial scope shift: rc1 ships against red CI with explicit waivers"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 76ab9c8882f52ad8
+  resolved_at: 2026-05-03T21:13:21.894351Z
+  answer: "User has answered your questions: \"Slice 8.5 surfaced that CI on Slice 8 commit `b4346ab6` is RED on 2 of 4 triggered workflows: Release Candidate Gate (41 pre-existing test failures, none Slice 8-introduced) + Security Scan (pip CVE in CI environment). These predate Slice 8. v0.7.0-rc1 tag cannot authorize against red CI without compromising the rc claim. How should we proceed?\"=\"Pause rc1 path; file Slice 8.6 to triage + fix CI failures (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0372
+  asked_at: 2026-05-03T21:15:26.244849Z
+  question: "Smart-poller dispatched two old GO entries (`gtkb-incident-response-006`, `gtkb-command-surface-004`, both S310, ~7 days old). Both are functionally closed (IR via sub-bridge ir-0-1-010 VERIFIED + commit 195fc75c; CS via backlog row 12). They will keep re-dispatching until a follow-up version lands on each umbrella thread. How do you want to handle this?"
+  options:
+    - "File closure ack on both umbrellas (Recommended)"
+    - "Leave as-is; defer cleanup"
+    - "Resume the work itself"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0a75c299e8aef5b6
+  resolved_at: 2026-05-03T21:15:26.244849Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0375
+  asked_at: 2026-05-03T21:36:41.596153Z
+  question: "Slice 8.6 is GO'd at -004 (no blocking findings; non-blocking note: Phase 4 REPORT must name 5 specific Lint jobs by exact name). Per the -003 REVISED-1 plan, Phase 1 (triage 43 failures + classify each + one-at-a-time `OWNER ACTION REQUIRED` for ambiguous rows) is the next step (~1-2 sessions of work). How should I proceed?"
+  options:
+    - "Begin Phase 1 now in this session (Recommended)"
+    - "Pause; begin Phase 1 in a fresh session"
+    - "Begin Phase 1 with a narrow scope (e.g., catalog only the unambiguous rows first)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ad8557c09f173284
+  resolved_at: 2026-05-03T21:36:41.596153Z
+  answer: "User has answered your questions: \"Slice 8.6 is GO'd at -004 (no blocking findings; non-blocking note: Phase 4 REPORT must name 5 specific Lint jobs by exact name). Per the -003 REVISED-1 plan, Phase 1 (triage 43 failures + classify each + one-at-a-time `OWNER ACTION REQUIRED` for ambiguous rows) is the next step (~1-2 sessions of work). How should I proceed?\"=\"Begin Phase 1 now in this session (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0376
+  asked_at: 2026-05-03T21:36:41.596153Z
+  question: "Triage row 18 (`tests/scripts/test_memory_md_ceiling.py::test_memory_md_under_ceiling`): MEMORY.md is currently 90,029 bytes (~87.9 KiB), exceeding the documented 25,000-byte ceiling by ~360%. The test is a hygiene gate that fails the RC Gate workflow. How should Slice 8.6 classify this row?"
+  options:
+    - "fix-required: trim MEMORY.md to under 25KB (Recommended)"
+    - "waivable-for-rc1: waive with DELIB; defer trim to v0.7.0 GA"
+    - "fix-required: raise the ceiling instead of trimming"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1039c241bcc0bd74
+  resolved_at: 2026-05-03T21:36:41.596153Z
+  answer: "User has answered your questions: \"Triage row 18 (`tests/scripts/test_memory_md_ceiling.py::test_memory_md_under_ceiling`): MEMORY.md is currently 90,029 bytes (~87.9 KiB), exceeding the documented 25,000-byte ceiling by ~360%. The test is a hygiene gate that fails the RC Gate workflow. How should Slice 8.6 classify this row?\"=\"fix-required: trim MEMORY.md to under 25KB (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0377
+  asked_at: 2026-05-03T21:36:41.596153Z
+  question: "Triage row 42 (Security Scan / Dependency Audit job): `pip-audit` found that `pip 26.0.1` itself has CVE-2026-3219 with no fix version available. The vulnerability is in pip (the install tool that the GHA Python setup brings in), not in any project dependency. How should Slice 8.6 classify this row?"
+  options:
+    - "environmental: pin pip in CI to a pre-CVE version (Recommended)"
+    - "waivable-for-rc1: archive DELIB; expiry tied to upstream pip CVE fix"
+    - "fix-required: switch dependency audit tool entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 76e82000c92e4f0f
+  resolved_at: 2026-05-03T21:36:41.596153Z
+  answer: "User has answered your questions: \"Triage row 42 (Security Scan / Dependency Audit job): `pip-audit` found that `pip 26.0.1` itself has CVE-2026-3219 with no fix version available. The vulnerability is in pip (the install tool that the GHA Python setup brings in), not in any project dependency. How should Slice 8.6 classify this row?\"=\"environmental: pin pip in CI to a pre-CVE version (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0378
+  asked_at: 2026-05-03T21:36:41.596153Z
+  question: "Triage row 43 (Security Scan / Docker Scout job): Found 0 critical / **2 high** / 0 medium / 0 low container CVEs in the production Docker image: `CVE-2026-33845` in `gnutls28` and `CVE-2026-5435` in `glibc`. Both report 'Fixed version: not fixed'. Docker Scout is configured with `exit-code: true` + `only-severities: critical,high`, so any high+ CVE fails the workflow. How should Slice 8.6 classify this row?"
+  options:
+    - "waivable-for-rc1: archive DELIB; expiry tied to base-image rebuild (Recommended)"
+    - "fix-required: rebuild base image with newer Debian/Alpine variants"
+    - "fix-required: remove the affected packages from the image"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cb05f97494b90d9a
+  resolved_at: 2026-05-03T21:36:41.596153Z
+  answer: "User has answered your questions: \"Triage row 43 (Security Scan / Docker Scout job): Found 0 critical / **2 high** / 0 medium / 0 low container CVEs in the production Docker image: `CVE-2026-33845` in `gnutls28` and `CVE-2026-5435` in `glibc`. Both report 'Fixed version: not fixed'. Docker Scout is configured with `exit-code: true` + `only-severities: critical,high`, so any high+ CVE fails the workflow. How should Slice 8.6 classify this row?\"=\"waivable-for-rc1: archive DELIB; expiry tied to base-image rebuild (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0379
+  asked_at: 2026-05-03T21:36:41.596153Z
+  question: "Phase 1 owner-input is complete (40 of 43 rows classified; 3 remain as `awaiting-investigation` requiring code probes, no owner decisions). Phase 2 implementation (~3-5 sessions of fixing 37 `fix-required` + 1 `environmental` + 2 waiver mechanics) is the next major step. How should I proceed from here?"
+  options:
+    - "Wrap session here; next session resumes Phase 1 investigation + Phase 2 (Recommended)"
+    - "Continue with the 3 investigation probes in this session"
+    - "Continue with Phase 1 investigation AND begin Phase 2 fixes in this session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 76989d3d8b3c61b7
+  resolved_at: 2026-05-03T21:36:41.596153Z
+  answer: "User has answered your questions: \"Phase 1 owner-input is complete (40 of 43 rows classified; 3 remain as `awaiting-investigation` requiring code probes, no owner decisions). Phase 2 implementation (~3-5 sessions of fixing 37 `fix-required` + 1 `environmental` + 2 waiver mechanics) is the next major step. How should I proceed from here?\"=\"Wrap session here; next session resumes Phase 1 investigation + Phase 2 (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

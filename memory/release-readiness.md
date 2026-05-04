@@ -68,10 +68,133 @@ Until both close, the rc has not been published; release-notes and announcement 
 - `DELIB-S330-ISOLATION-017-SLICE8-DISPOSITION-CHOICE` — split into Slice 8 + Slice 8.5 per Codex F1 path 1.
 - `DELIB-S330-ISOLATION-017-SLICE8-B2-RUFF-SCOPE-CHOICE` — narrowed B2 to `groundtruth-kb/` package only (1,943 Agent Red issues deferred).
 - `DELIB-S330-ISOLATION-017-SLICE8-PYTEST-FIX-SCOPE-CHOICE` — added 13 pytest-baseline fixes to Slice 8 scope (within `-005` Risk 2 anticipated mitigation).
+- `DELIB-S330-ISOLATION-017-SLICE8-INSTALL-UX-LIMITATION-ACK` — Slice 8 -008 NO-GO disposition; Path A (narrow fix + rc1 install-UX limitation acknowledgement; row 36 added).
+- `DELIB-S330-ISOLATION-017-SLICE8-5-PYTHON-TESTS-WAIVER` — Slice 8.5 -002 F2 disposition; python-tests.yml waived for GT-KB-only commits; row 37 added.
+- `DELIB-S330-RC1-CI-RED-PAUSE-AND-SLICE-8-6-DISPOSITION` — RC1 CI-red discovery; pause Slice 8.5; Slice 8.6 fix-thread filed.
 
----
+## ISOLATION-017-CLOSEOUT-CI-TRIAGE (Slice 8.6 Phase 1)
 
-## Historical context: v0.6.x recovery
+**Last updated:** 2026-05-03 (S330 Phase 1 initial draft).
+**Authority:** `bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-003.md` REVISED-1 (Codex GO at `-004`).
+**Scope:** 43 catalog entries from Slice 8 commit `b4346ab690e937b80c5c99f776649f8bb8fa82b1` CI runs (RC Gate `25290378334` + Security Scan `25290378337`).
+
+### Initial classification
+
+Categories: `fix-required` (real defect; remediation is a code/config fix), `waivable-for-rc1` (testable invariant whose enforcement defers to v0.7.0 GA with documented residual risk; requires DELIB), `environmental` (failure due to CI environment not project code), `awaiting-owner-decision` (truly ambiguous; one-at-a-time OWNER ACTION REQUIRED per F4), `awaiting-investigation` (need code probe before classification).
+
+#### Release Candidate Gate failures (41)
+
+`tests/scripts/test_groundtruth_governance_adoption.py` (17):
+
+| # | Test | Initial Classification | Rationale | DELIB |
+|---|---|---|---|---|
+| 1 | `test_artifact_oriented_governance_records_are_in_membase` | `fix-required` | Test asserts `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` exists in MemBase; the spec record SHOULD exist (referenced in S327 work_list). Insert via `insert_spec` under formal-artifact-approval gate. | — |
+| 2 | `test_artifact_oriented_governance_decision_is_archived` | `fix-required` | Test asserts the parent DELIB exists. Insert. | — |
+| 3 | `test_bridge_authority_decision_is_archived` | `fix-required` | DELIB missing; insert. | — |
+| 4 | `test_bridge_authority_governance_records_are_in_membase` | `fix-required` | GOV record missing; insert. | — |
+| 5 | `test_codex_hook_limitation_decision_is_archived` | `fix-required` | DELIB missing; insert. | — |
+| 6 | `test_core_spec_intake_phase0_decision_is_archived` | `fix-required` | DELIB missing; insert. | — |
+| 7 | `test_core_spec_intake_phase0_records_are_in_membase` | `fix-required` | `SPEC-CORE-INTAKE-001` missing; insert. | — |
+| 8 | `test_formal_artifact_approval_records_are_in_membase` | `fix-required` | `GOV-ARTIFACT-APPROVAL-001` missing; insert (the GOV that mandates the formal-artifact-approval gate Slice 8 used 5 times). | — |
+| 9 | `test_groundtruth_governance_artifacts_are_present_and_not_ignored` | `waivable-for-rc1` | Tests that `docs/gtkb-dashboard/dashboard-data.json` + `memory/gtkb-dashboard-history.json` exist. Dashboard files are deferred per row 30 (`GTKB-DASHBOARD-002`) to v0.7.0 GA. Waiver scope = those 2 files; expiry = v0.7.0 GA (or row 30 completion); residual risk = adopters can't see the dashboard until then. | (to be archived) |
+| 10 | `test_session_formalization_audit_is_archived` | `fix-required` | DELIB missing; insert. | — |
+| 11 | `test_session_governance_principles_have_membase_records` | `fix-required` | `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` missing; insert. | — |
+| 12 | `test_session_lifecycle_engagement_decisions_are_archived` | `fix-required` | DELIB missing; insert. | — |
+| 13 | `test_session_lifecycle_engagement_records_are_in_membase` | `fix-required` | `GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001` missing; insert. | — |
+| 14 | `test_session_self_initialization_decision_is_archived` | `fix-required` | DELIB missing; insert. | — |
+| 15 | `test_session_self_initialization_records_are_in_membase` | `fix-required` | `GOV-SESSION-SELF-INITIALIZATION-001` missing; insert. | — |
+| 16 | `test_standing_backlog_decision_is_archived` | `fix-required` | DELIB missing; insert. | — |
+| 17 | `test_standing_backlog_is_formalized_as_governed_artifact` | `fix-required` | `GOV-STANDING-BACKLOG-001` missing; insert. | — |
+
+`tests/scripts/test_memory_md_ceiling.py` (1):
+
+| # | Test | Initial Classification | Rationale | DELIB |
+|---|---|---|---|---|
+| 18 | `test_memory_md_under_ceiling` | `fix-required` | Owner directive S330 (`DELIB-S330-SLICE-8-6-ROW-18-MEMORY-MD-TRIM-CHOICE`): trim MEMORY.md to <25KB per CLAUDE.md hook format. Phase 2 trim consolidates verbose multi-line entries into single-line hooks; detailed content moves to topic files in `memory/*.md`. | `DELIB-S330-SLICE-8-6-ROW-18-MEMORY-MD-TRIM-CHOICE` |
+
+`tests/scripts/test_rehearse_isolation.py` (5):
+
+| # | Test | Initial Classification | Rationale | DELIB |
+|---|---|---|---|---|
+| 19 | `test_execute_flag_enables_real_run` | `fix-required` | Driver returns exit 1 instead of 0; likely cascade from M2 path issue (#21). Investigate + fix together. | — |
+| 20 | `test_run_summary_not_written_when_all_lanes_skipped` | `fix-required` | Same cascade. | — |
+| 21 | `test_output_dir_override_in_sandbox_accepted` | `fix-required` | M2 path validation hardcodes Windows-style paths; rejects `/home/runner/work/...` Linux runner paths. Update regex to be platform-agnostic. | — |
+| 22 | `test_output_dir_override_non_allowlisted_rejected` | `fix-required` | Regex pattern mismatch; same root cause as #21. | — |
+| 23 | `test_run_summary_written_when_lane_returns_ok` | `fix-required` | Same cascade as #19. | — |
+
+`tests/scripts/test_session_self_initialization.py` (13):
+
+| # | Test | Initial Classification | Rationale | DELIB |
+|---|---|---|---|---|
+| 24 | `test_dashboard_and_report_are_written_with_time_series_kpi` | `fix-required` (BLOCKED on cross-cutting groundtruth.db CI gap) | **PROBED S330 Phase 1.** CI failure at line 850: `assert any(row["scope_confidence"] == "gtkb_inferred" for row in dashboard_data["history"])`. Root cause: `dashboard_data["history"]` is empty/lacks `gtkb_inferred` rows in CI. The `_inferred_history` function (`scripts/session_self_initialization.py:2890`) derives those rows from `groundtruth.db` version history. CI has no `groundtruth.db` (gitignored per `23a54af3` 2026-04-24 owner decision). Test PASSES locally where `groundtruth.db` is populated. Sub-classification: **same root cause as cross-cutting CI groundtruth.db gap (see §"Cross-cutting Phase 1.5 finding" below)**. | — |
+| 25 | `test_emit_startup_service_payload_returns_full_codex_session_start_contract` | `fix-required` (BLOCKED on cross-cutting groundtruth.db CI gap) | **PROBED S330 Phase 1.** CI failure at line 1024: `assert freshness["validation"]["startup_payload_fresh"] is True`. Root cause: `_startup_freshness_metadata` (`scripts/session_self_initialization.py:5151-5157`) requires 5 local sources to be `present`; one of them is `groundtruth.db`. CI has no `groundtruth.db`, so `required_local_sources_ok = False` → `startup_payload_fresh = False`. Test PASSES locally where `groundtruth.db` is populated. Sub-classification: **same root cause as #24 + the cross-cutting gap below**. | — |
+| 26-33 | 8× `test_smart_poller_section_*` | `fix-required` (root cause: stale CI dependency pin, NOT renamed function) | **PROBED S330 Phase 1.** All 8 fail with `AttributeError: module 'groundtruth_kb.project.doctor' has no attribute '_check_smart_bridge_poller'. Did you mean: '_check_bridge_poller'?`. The function DOES exist locally at `groundtruth-kb/src/groundtruth_kb/project/doctor.py:1465`, added at commit `931157f2`. Root cause: `requirements-test.txt` pins `groundtruth-kb @ git+https://...@v0.6.1`. v0.6.1 predates `_check_smart_bridge_poller` (added post-S320). CI installs v0.6.1, tests target the local checkout's expected API surface. **Fix:** update `requirements-test.txt` to install `-e ./groundtruth-kb[search]` (use local source). Single dependency-pin fix unblocks all 8. | — |
+| 34 | `test_smart_poller_section_diagnostic_supersedes_notification` (9th `_check_smart_bridge_poller`) | `fix-required` (same root cause as #26-33) | Same dependency-pin fix unblocks. | — |
+| 35 | `test_startup_model_contains_role_governance_and_kpi_inventory` | `fix-required` | `KeyError: 'raw_current_total'` — startup model missing a KPI key; add it. | — |
+| 36 | `test_top_priority_actions_come_from_standing_backlog` | `fix-required` (test-baseline drift) | **PROBED S330 Phase 1.** Local repro: `assert action_ids == ["GTKB-GOV-010"]` fails because `action_ids = ['GTKB-ENV-INVENTORY-001', 'GTKB-SYSTEMS-TERMINOLOGY-MAP-001', 'GTKB-GOV-010']`. Root cause: standing backlog has gained `GTKB-ENV-INVENTORY-001` and `GTKB-SYSTEMS-TERMINOLOGY-MAP-001` as active items above `GTKB-GOV-010`; production code returns top-3 (`scripts/session_self_initialization.py:934`). Test was written when `GTKB-GOV-010` was the sole top-priority. **Fix options:** (a) loosen test to `assert "GTKB-GOV-010" in action_ids` and `assert len(action_ids) <= 3`; (b) update the asserted list to match current backlog top-3; (c) reorder backlog. Recommend (a) — robust against future backlog evolution. NOT related to my S330 Slice 8 row 36/37 (`GTKB-PIP-INSTALL-ADOPTER-UX-001` / `GTKB-CI-COVERAGE-FOR-PLATFORM-001`); those IDs don't appear here. | — |
+
+`tests/scripts/test_standing_backlog_harvest.py` (3):
+
+| # | Test | Initial Classification | Rationale | DELIB |
+|---|---|---|---|---|
+| 37 | `test_standing_backlog_audit_finds_current_actionable_bridge_entries` | `fix-required` | Harvest tooling missing entry; investigate harvest logic. | — |
+| 38 | `test_standing_backlog_audit_summarizes_membase_work_items_and_release_blockers` | `fix-required` | `KeyError: 'open'` — harvest summary missing 'open' key. | — |
+| 39 | `test_standing_backlog_harvest_decision_is_archived` | `fix-required` | DELIB missing; insert. | — |
+
+`tests/scripts/test_wrap_scan_hygiene_skip_dirs.py` (2):
+
+| # | Test | Initial Classification | Rationale | DELIB |
+|---|---|---|---|---|
+| 40 | `test_scan_includes_claude_skills` | `fix-required` | `.claude/skills/` not in `SCAN_ROOTS`; extend scanner. | — |
+| 41 | `test_scan_includes_scripts_dir` | `fix-required` | `scripts/` not in `SCAN_ROOTS`; extend scanner (probably same fix as #40). | — |
+
+#### Security Scan failures (2)
+
+| # | Job | Initial Classification | Rationale | DELIB |
+|---|---|---|---|---|
+| 42 | `Dependency Audit` (pip-audit) | `environmental` | Owner directive S330 (`DELIB-S330-SLICE-8-6-ROW-42-PIP-CVE-CHOICE`): pin pip in CI to a pre-CVE version. Phase 2: modify `.github/workflows/security-scan.yml` to pin pip BEFORE pip-audit runs; fallback to `--ignore-vuln CVE-2026-3219` if no safe version exists. May need to apply pin to other workflows that use pip-audit downstream. | `DELIB-S330-SLICE-8-6-ROW-42-PIP-CVE-CHOICE` |
+| 43 | `Docker Scout (container CVEs)` | `waivable-for-rc1` | Owner directive S330 (`DELIB-S330-SLICE-8-6-ROW-43-DOCKER-SCOUT-WAIVER`): waive 2 specific CVE IDs (`CVE-2026-33845` gnutls28, `CVE-2026-5435` glibc). Scope: those 2 CVE IDs only; does not waive future CVEs. Expiry: base-image rebuild (soft v0.7.0 GA; hard v0.8.0). Residual risk: production-deployment hardening covers exposure. New backlog row at GA: `GTKB-DOCKER-SCOUT-CVE-WAIVER-EXPIRY-001`. | `DELIB-S330-SLICE-8-6-ROW-43-DOCKER-SCOUT-WAIVER` |
+
+### Updated summary (post-Phase-1 probes S330)
+
+- `fix-required`: 39 (16 governance_adoption + 5 rehearse_isolation + 10 session_self_init `_check_smart_bridge_poller`/KeyError + 1 row 24 + 1 row 25 + 1 row 36 + 3 standing_backlog_harvest + 2 wrap_scan_hygiene)
+- `waivable-for-rc1`: 1 (governance_adoption dashboard files; rationale tied to row 30)
+- `awaiting-investigation`: 0 (all 3 probes complete; rows 24/25/36 reclassified `fix-required`)
+- **`awaiting-owner-decision`**: 3 (rows 18, 42, 43 — already DELIB-archived per S330 entries above)
+- Total: 39 + 1 + 0 + 3 = 43 ✓
+
+### Cross-cutting Phase 1.5 finding (S330): 19 rows blocked on CI groundtruth.db gap
+
+**Discovery:** Phase 1 probes of rows 24, 25 revealed the same root cause that affects rows 1-17 (governance_adoption tests, except row 9 dashboard waiver): `groundtruth.db` was untracked from git per owner decision 2026-04-24 (commit `23a54af3` "chore: untrack groundtruth.db"). The CI workflow `release-candidate-gate.yml` does NOT seed `groundtruth.db` before running pytest. Empty/missing `groundtruth.db` → 19 tests fail in CI but pass locally:
+
+- Rows 1-8, 10-17 (16 governance_adoption tests asserting `GOV-*`, `SPEC-*`, `DELIB-*` records exist via `KnowledgeDB(REPO_ROOT / "groundtruth.db").get_spec(...)`)
+- Row 24 (`dashboard_data["history"]` derived from db version history)
+- Row 25 (`startup_payload_fresh` requires `groundtruth.db` as one of 5 mandatory local sources)
+
+**Original triage gap:** Catalog rows 1-17 classified as "fix-required: insert via `insert_spec` under formal-artifact-approval gate". Inserting records into the local (gitignored) `groundtruth.db` is **necessary but not sufficient** — CI cannot see those records.
+
+**Strategy options requiring owner decision:**
+
+- **Option A — CI seed step (recommended):** Add a `python scripts/seed_ci_membase.py` step in `release-candidate-gate.yml` BEFORE `release_candidate_gate.py`. Seed script reads canonical content from `.claude/rules/`, `AGENTS.md`, etc., and inserts the 16+ required records via `db.insert_spec()` / `db.insert_deliberation()`. Records derive from existing rule files (single source of truth preserved). Cost: ~1 new script + 1 workflow step.
+- **Option B — Test-level fixtures:** Refactor 19 tests to scaffold their own `tmp_path/groundtruth.db` with required records via fixtures. Decouples tests from `REPO_ROOT/groundtruth.db`. Cost: ~19 test refactorings + 1 shared fixture module.
+- **Option C — Minimal seed db fixture:** Create `tests/fixtures/groundtruth-seed.db` (small, tracked) with only the records the tests assert. Tests copy it to `REPO_ROOT/groundtruth.db` if not present. Cost: ~1 fixture file + 1 conftest step. Risk: fixture drift from production schema migrations.
+- **Option D — Track minimal records-only db (rejected by owner Apr 24):** Reverts the 23a54af3 decision. Not recommended.
+
+This decision is **escalated to owner via OWNER ACTION REQUIRED** before Phase 2 implementation begins for the 19 affected rows. Other 24 rows (smart-poller pin, M2 regex, scan-roots, harvest, security-scan) can proceed in parallel.
+
+**Owner decision S330 (Phase 1.5):** Selected **Option A — CI seed script**. Decision archived as `DELIB-S330-SLICE-8-6-PHASE-1-5-CI-DB-SEED-CHOICE` (formal MemBase insertion deferred to Phase 4 REPORT). Implementation plan: (1) Write `scripts/seed_ci_membase.py` that reads canonical content from `.claude/rules/*.md` and other source-of-truth files, then calls `db.insert_spec()` / `db.insert_deliberation()` for the required 16+ records. (2) Add a workflow step to `.github/workflows/release-candidate-gate.yml` that runs the seed script BEFORE `release_candidate_gate.py`. (3) Records inserted locally first to confirm test pass; then CI workflow updated. (4) Records to seed are derived from the catalog rows 1-8, 10-17 (16 records) plus implicitly any other records referenced by rows 24, 25 once db has any populated history. Single source of truth preserved (rule files); CI converges with local environment.
+
+### Phase 1 next steps
+
+Per Slice 8.6 -003 REVISED-1 §"Owner-Input Protocol (F4 fix — one decision at a time)":
+
+1. **Surface the FIRST `awaiting-owner-decision` row** via `OWNER ACTION REQUIRED` block (single question; stop turn). Order: row 18 (memory_md_ceiling) — the simplest decision, affects only documentation hygiene.
+2. After owner answers + DELIB archived, surface the 2nd: row 42 (Dependency Audit pip CVE).
+3. After owner answers + DELIB archived, surface the 3rd: row 43 (Docker Scout container CVEs).
+4. After all 3 owner decisions captured, probe the 3 `awaiting-investigation` rows; classify based on probe results (no owner involvement unless investigation reveals additional ambiguity).
+5. Phase 1 closes; Phase 2 (per-row fix/waive implementation) begins.
+
+
 
 Original content below preserved as historical evidence for traceability.
 
