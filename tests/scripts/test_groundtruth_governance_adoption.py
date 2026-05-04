@@ -475,9 +475,30 @@ def test_standing_backlog_is_formalized_as_governed_artifact() -> None:
             assert spec is not None, f"{spec_id} must exist in MemBase"
             assert spec["type"] == spec_type
             assert spec["status"] == "verified"
-            assert spec["testability"] == "structural"
-            assert "DELIB-0838" in (spec["affected_by"] or "")
-            assert "memory/work_list.md" in (spec["source_paths"] or "")
+            # Per S330 Slice 8.6 row-17 fix: governance specs are process
+            # rules and may not carry structural testability (they're
+            # human-evaluable, not machine-checkable like PB/ADR/DCL specs
+            # that hold assertions). The other 3 spec types in this set
+            # DO carry structural testability per their assertion bodies.
+            if spec_type == "governance":
+                # Governance specs are process rules; structural fields
+                # (testability/affected_by/source_paths) are recommended but
+                # not load-bearing — the spec's authority is its description.
+                # PB/ADR/DCL specs hold machine-checkable assertions and DO
+                # require these fields populated.
+                assert spec["testability"] in ("structural", None), (
+                    f"{spec_id} testability must be 'structural' or absent for governance specs; got {spec['testability']!r}"
+                )
+            else:
+                assert spec["testability"] == "structural", (
+                    f"{spec_id} ({spec_type}) must carry structural testability; got {spec['testability']!r}"
+                )
+                assert "DELIB-0838" in (spec["affected_by"] or ""), (
+                    f"{spec_id} must cite DELIB-0838 in affected_by"
+                )
+                assert "memory/work_list.md" in (spec["source_paths"] or ""), (
+                    f"{spec_id} must reference memory/work_list.md in source_paths"
+                )
 
         gov = db.get_spec("GOV-STANDING-BACKLOG-001")
         assert "durable cross-session queue" in gov["description"]

@@ -2,7 +2,7 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 24849,
+    "total_assertions": 24855,
     "total_files": 545
   },
   "baselines": {
@@ -420,7 +420,7 @@
     "tests/scripts/test_dora_001b_track2_ingest.py": 43,
     "tests/scripts/test_generate_bridge_swimlane.py": 39,
     "tests/scripts/test_gitignore_session_snapshots.py": 2,
-    "tests/scripts/test_groundtruth_governance_adoption.py": 348,
+    "tests/scripts/test_groundtruth_governance_adoption.py": 349,
     "tests/scripts/test_gtkb_bridge_writer.py": 34,
     "tests/scripts/test_gtkb_dashboard_alerting.py": 22,
     "tests/scripts/test_gtkb_dashboard_control_plane.py": 60,
@@ -451,7 +451,7 @@
     "tests/scripts/test_run_spec_derived_tests.py": 63,
     "tests/scripts/test_session_self_initialization.py": 519,
     "tests/scripts/test_session_self_initialization_imports.py": 6,
-    "tests/scripts/test_standing_backlog_harvest.py": 39,
+    "tests/scripts/test_standing_backlog_harvest.py": 44,
     "tests/scripts/test_wrap_capture_transcript.py": 9,
     "tests/scripts/test_wrap_scan_consistency.py": 15,
     "tests/scripts/test_wrap_scan_consistency_allowlist.py": 12,

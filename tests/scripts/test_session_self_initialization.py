@@ -1407,13 +1407,22 @@ def test_top_priority_actions_come_from_standing_backlog() -> None:
     model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
     action_ids = [item["id"] for item in model["top_priority_actions"]]
 
-    assert action_ids == ["GTKB-GOV-010"]
+    # Per S330 Slice 8.6 row-36 fix: assert top-priority discipline rather than
+    # exact list equality. Production code returns visible_items[:3] from the
+    # standing backlog (scripts/session_self_initialization.py:934). The
+    # original `action_ids == ["GTKB-GOV-010"]` strict equality assumed
+    # GTKB-GOV-010 was the sole active item; today the backlog contains
+    # additional active items above it. The invariants the test actually cares
+    # about: (a) GTKB-GOV-010 is among the top priorities, (b) the actions
+    # come from the active standing-backlog ordering, (c) historically-closed
+    # items don't reappear, and (d) the cap is at most 3.
+    assert "GTKB-GOV-010" in action_ids, f"GTKB-GOV-010 must remain a top priority; got {action_ids}"
+    assert len(action_ids) <= 3, f"top_priority_actions must cap at 3 (visible_items[:3]); got {action_ids}"
     assert "GTKB-ISOLATION-007" not in action_ids
     assert "GTKB-GOV-012" not in action_ids
     assert "GTKB-GOV-007" not in action_ids
     assert "GTKB-GOV-002" not in action_ids
     assert "GTKB-GOV-006" not in action_ids
-    assert "GTKB-GOV-010" in action_ids
 
 
 def test_direct_script_execution_emits_startup_payload(tmp_path):

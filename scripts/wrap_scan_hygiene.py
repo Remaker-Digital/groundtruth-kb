@@ -234,7 +234,18 @@ def check_hardcoded_old_project_root(project_root: Path) -> list[dict]:
             continue
         for glob in SCAN_GLOBS:
             for path in root_path.rglob(glob):
-                if any(part in SKIP_DIRS for part in path.parts):
+                # Only check parts BELOW project_root against SKIP_DIRS.
+                # Per S330 Slice 8.6 row-40/41 fix: on Linux CI, tmp_path is
+                # /tmp/pytest-of-runner/... — checking absolute parts caused
+                # the `tmp` SKIP_DIR to filter out every fixture-rooted scan,
+                # producing empty findings lists. Relative-parts check keeps
+                # SKIP_DIRS effective for in-repo skips while letting test
+                # fixtures live anywhere on disk.
+                try:
+                    rel_parts = path.relative_to(project_root).parts
+                except ValueError:
+                    rel_parts = path.parts
+                if any(part in SKIP_DIRS for part in rel_parts):
                     continue
                 if not path.is_file():
                     continue

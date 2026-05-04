@@ -335,6 +335,10 @@ def test_main_rejects_unresolved_db_reconciliation_strategy_via_cli_when_db_filt
     assert rc == _driver.EXIT_USAGE, "CLI must reject unresolved db_reconciliation_strategy at wave=3"
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="rehearse driver manifest hardcodes Windows paths (E:/GT-KB, C:/temp/...); driver is Windows-only by design",
+)
 def test_execute_flag_enables_real_run() -> None:
     """--execute does NOT trigger v1 hard refusal."""
     _slice3_skip_if_no_production_manifest()
@@ -360,6 +364,10 @@ def test_resolve_output_dir_default_appends_iso_timestamp() -> None:
     assert len(suffix) == 16 and suffix.endswith("Z") and "T" in suffix
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="hardcoded Windows path C:/temp/agent-red-rehearsal-custom; on Linux pathlib treats it as relative",
+)
 def test_output_dir_override_in_sandbox_accepted() -> None:
     manifest = {"output_dir": "C:/temp/agent-red-rehearsal"}
     override = Path("C:/temp/agent-red-rehearsal-custom")
@@ -381,6 +389,10 @@ def test_output_dir_override_under_target_root_rejected() -> None:
         _driver._resolve_output_dir(manifest, override=override)
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="hardcoded Windows path C:/Users/micha/OneDrive/foo; on Linux a different M2 error fires first",
+)
 def test_output_dir_override_non_allowlisted_rejected() -> None:
     manifest = {"output_dir": "C:/temp/agent-red-rehearsal"}
     override = Path("C:/Users/micha/OneDrive/foo")
@@ -462,6 +474,10 @@ def test_dispatch_unknown_phase_raises_valueerror() -> None:
 # ----- run-summary.json emission (per GO -004 implementation note) -----
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="rehearse driver loads production manifest with Windows-rooted paths; cannot validate on Linux",
+)
 def test_run_summary_written_when_lane_returns_ok(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Summary file appears when at least one lane returns ok."""
     _slice3_skip_if_no_production_manifest()
@@ -481,6 +497,10 @@ def test_run_summary_written_when_lane_returns_ok(monkeypatch: pytest.MonkeyPatc
     assert "inventory" in summary["results"]
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="rehearse driver loads production manifest with Windows-rooted paths; cannot validate on Linux",
+)
 def test_run_summary_not_written_when_all_lanes_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Summary file does NOT appear if every lane returned skipped."""
     _slice3_skip_if_no_production_manifest()
