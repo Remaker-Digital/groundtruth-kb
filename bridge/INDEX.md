@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit
+NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-001.md
+
 Document: gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate
 VERIFIED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-006.md
 NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-005.md
