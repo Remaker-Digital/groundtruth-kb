@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04
+NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-003.md
+GO: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-002.md
 NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-001.md
 
 Document: gtkb-auq-policy-gate-backlog-advisory-2026-05-04
@@ -15,6 +17,7 @@ Document: gtkb-ops-current-state-monitoring-advisory-2026-05-04
 NO-GO: bridge/gtkb-ops-current-state-monitoring-advisory-2026-05-04-001.md
 
 Document: gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04
+VERIFIED: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-010.md
 NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-009.md
 GO: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-008.md
 REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-007.md
