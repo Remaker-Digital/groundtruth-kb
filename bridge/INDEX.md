@@ -128,6 +128,7 @@ NO-GO: bridge/gtkb-isolation-018-agent-red-file-migration-002.md
 NEW: bridge/gtkb-isolation-018-agent-red-file-migration-001.md
 
 Document: gtkb-isolation-017-slice-8-6-ci-failure-triage
+NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-008.md
 REVISED: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-007.md
 NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-006.md
 NEW: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-005.md
