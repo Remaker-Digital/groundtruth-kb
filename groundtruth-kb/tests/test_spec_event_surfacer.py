@@ -349,14 +349,16 @@ def test_concurrent_invocations_do_not_double_emit(tmp_path: Path) -> None:
         for _ in range(NUM_PROCS)
     ]
 
-    for p in procs:
-        assert p.stdin is not None
-        p.stdin.write(payload)
-        p.stdin.close()
-
+    # Per S330 Slice 8.6 row-NEW fix (CI surfaced on commit 6fe7a5ba):
+    # don't pre-close stdin before communicate(); on Python 3.12+ Linux,
+    # subprocess.communicate() unconditionally calls self.stdin.flush()
+    # internally (subprocess.py:2067), which raises
+    # `ValueError: flush of closed file` if stdin was already closed by
+    # the test. Pass `payload` to communicate() so it handles write +
+    # close + flush atomically.
     outputs: list[str] = []
     for p in procs:
-        out, _err = p.communicate(timeout=60)
+        out, _err = p.communicate(input=payload, timeout=60)
         outputs.append(out.decode("utf-8"))
 
     emit_count_per_spec: dict[tuple[str, int], int] = {}
