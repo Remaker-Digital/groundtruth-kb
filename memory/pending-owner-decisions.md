@@ -4702,69 +4702,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-04T07:50:34.725245Z
   answer: "owner cleared without specific answer"
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0386
-  asked_at: 2026-05-04T05:11:10.684885Z
-  question: "pe**: dozens exist; should I delete them (they look like test fixtures left behind), move them somewhere, or leave them alone for this migration? 3. **Should I file"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 608076de985d2352
-  resolved_at: 2026-05-04T07:50:34.725249Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0391
-  asked_at: 2026-05-04T05:35:41.972737Z
-  question: "ll pending (queued, awaiting your direction on which to proceed first)  **Downstream artifacts each DELIB plans to spawn** (each requires its own approval packet):  | DELIB |"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: b0b7be1915659ed7
-  resolved_at: 2026-05-04T07:50:34.725255Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0392
-  asked_at: 2026-05-04T05:37:30.297682Z
-  question: "rose patterns like \"awaiting your direction\" / \"should I\" (per"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: de82a34210c9f03f
-  resolved_at: 2026-05-04T07:50:34.725267Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0401
-  asked_at: 2026-05-04T06:44:37.613898Z
-  question: "er direction. Which should I pick up — `isolation-018-agent-red-file-migration` revision, `slice-8-6-ci-failure-triage` revision, a CS-* sub-slice proposal, or IR-0 follow-up?"
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 262cd847f5d1d0c4
-  resolved_at: 2026-05-04T07:50:34.725271Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0403
-  asked_at: 2026-05-04T07:10:39.867308Z
-  question: "— needs revision)  Awaiting owner direction on which to take ne"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 40815fb06712b05d
-  resolved_at: 2026-05-04T07:50:34.725275Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0406
-  asked_at: 2026-05-04T07:35:05.418675Z
-  question: "erformed this turn. Awaiting owner direction on which actionable"
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 0d21202e4e41d4ec
-  resolved_at: 2026-05-04T07:50:34.725277Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0407
-  asked_at: 2026-05-04T07:39:21.902936Z
-  question: "new work to start. Awaiting owner direction or Codex verdict."
-  detected_via: prose:awaiting_input
-  status: resolved
-  question_hash: 45eeca24a3de4406
-  resolved_at: 2026-05-04T07:50:34.725281Z
-  answer: "owner cleared without specific answer"
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 - id: DECISION-0408
   asked_at: 2026-05-04T15:10:13.280009Z
   question: "Smart-poller dispatched two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006, both 2026-04-26). Neither authorizes implementation — both require new sub-slice NEW→GO cycles. Meanwhile the active AUQ workstream's Slice B Prime Rule was just filed as NEW and is blocked on Codex. Which should I work on?"
@@ -4890,4 +4827,66 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## History
 
-(none)
+- id: DECISION-0386
+  asked_at: 2026-05-04T05:11:10.684885Z
+  question: "pe**: dozens exist; should I delete them (they look like test fixtures left behind), move them somewhere, or leave them alone for this migration? 3. **Should I file"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 608076de985d2352
+  resolved_at: 2026-05-04T07:50:34.725249Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable | Moved to ## History by Sub-slice F baseline cleanup 2026-05-04 per umbrella -003 'document accepted residual via ## History move'; pre-Sub-slice-A-code-fence-guards-VERIFIED prose false positive."
+- id: DECISION-0391
+  asked_at: 2026-05-04T05:35:41.972737Z
+  question: "ll pending (queued, awaiting your direction on which to proceed first)  **Downstream artifacts each DELIB plans to spawn** (each requires its own approval packet):  | DELIB |"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: b0b7be1915659ed7
+  resolved_at: 2026-05-04T07:50:34.725255Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable | Moved to ## History by Sub-slice F baseline cleanup 2026-05-04 per umbrella -003 'document accepted residual via ## History move'; pre-Sub-slice-A-code-fence-guards-VERIFIED prose false positive."
+- id: DECISION-0392
+  asked_at: 2026-05-04T05:37:30.297682Z
+  question: "rose patterns like \"awaiting your direction\" / \"should I\" (per"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: de82a34210c9f03f
+  resolved_at: 2026-05-04T07:50:34.725267Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable | Moved to ## History by Sub-slice F baseline cleanup 2026-05-04 per umbrella -003 'document accepted residual via ## History move'; pre-Sub-slice-A-code-fence-guards-VERIFIED prose false positive."
+- id: DECISION-0401
+  asked_at: 2026-05-04T06:44:37.613898Z
+  question: "er direction. Which should I pick up — `isolation-018-agent-red-file-migration` revision, `slice-8-6-ci-failure-triage` revision, a CS-* sub-slice proposal, or IR-0 follow-up?"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 262cd847f5d1d0c4
+  resolved_at: 2026-05-04T07:50:34.725271Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable | Moved to ## History by Sub-slice F baseline cleanup 2026-05-04 per umbrella -003 'document accepted residual via ## History move'; pre-Sub-slice-A-code-fence-guards-VERIFIED prose false positive."
+- id: DECISION-0403
+  asked_at: 2026-05-04T07:10:39.867308Z
+  question: "— needs revision)  Awaiting owner direction on which to take ne"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 40815fb06712b05d
+  resolved_at: 2026-05-04T07:50:34.725275Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable | Moved to ## History by Sub-slice F baseline cleanup 2026-05-04 per umbrella -003 'document accepted residual via ## History move'; pre-Sub-slice-A-code-fence-guards-VERIFIED prose false positive."
+- id: DECISION-0406
+  asked_at: 2026-05-04T07:35:05.418675Z
+  question: "erformed this turn. Awaiting owner direction on which actionable"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 0d21202e4e41d4ec
+  resolved_at: 2026-05-04T07:50:34.725277Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable | Moved to ## History by Sub-slice F baseline cleanup 2026-05-04 per umbrella -003 'document accepted residual via ## History move'; pre-Sub-slice-A-code-fence-guards-VERIFIED prose false positive."
+- id: DECISION-0407
+  asked_at: 2026-05-04T07:39:21.902936Z
+  question: "new work to start. Awaiting owner direction or Codex verdict."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 45eeca24a3de4406
+  resolved_at: 2026-05-04T07:50:34.725281Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable | Moved to ## History by Sub-slice F baseline cleanup 2026-05-04 per umbrella -003 'document accepted residual via ## History move'; pre-Sub-slice-A-code-fence-guards-VERIFIED prose false positive."

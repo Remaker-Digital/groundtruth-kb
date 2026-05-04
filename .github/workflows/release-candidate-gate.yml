@@ -77,6 +77,13 @@ jobs:
       - name: Run release-candidate gate
         run: python scripts/release_candidate_gate.py --require-python 3.12 --skip-frontend
 
+      # Sub-slice F of GTKB-GOV-AUQ-ENFORCEMENT-STACK: release-metric gate.
+      # Enforces: GOV-OWNER-DECISION-SURFACING-001; GOV-REQUIREMENTS-COLLECTION-HOOK-001 v3
+      # (AUQ-only invariant); GOV-FILE-BRIDGE-AUTHORITY-001 (Owner Decisions section).
+      # See bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04 for approved scope.
+      - name: AUQ governance metrics gate
+        run: python scripts/release_governance_metrics.py
+
   frontend-gate:
     name: Frontend build and widget tests
     runs-on: windows-latest

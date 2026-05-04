@@ -633,6 +633,318 @@ def _check_spec_classifier_test_exists(target: Path) -> ToolCheck:
     )
 
 
+# Sub-slice F release-metric doctor invariants per umbrella -003.md:192-204.
+# Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v3 (AUQ-only invariant);
+#           GOV-OWNER-DECISION-SURFACING-001;
+#           GOV-FILE-BRIDGE-AUTHORITY-001 (Owner Decisions / Input section).
+# See bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04 for approved scope.
+
+# Cutoff for rolling-window metrics: entries asked_at before this date are
+# pre-enforcement-era and excluded from coverage calculations. Override via
+# env var GTKB_AUQ_METRICS_CUTOFF_DATE (ISO date format).
+_AUQ_METRICS_CUTOFF_DATE_DEFAULT = "2026-05-04"
+
+
+def _parse_pending_decisions_file(path: Path) -> dict[str, list[dict]]:
+    """Parse the pending-owner-decisions.md durable file via the canonical hook parser.
+
+    Copies to a tempfile first so the hook's corruption-rename behavior on
+    parse failure doesn't touch the live file. Per Sub-slice D pattern.
+    """
+    import importlib.util
+    import shutil
+    import sys
+    import tempfile
+
+    if not path.exists():
+        return {"pending": [], "resolved": [], "history": []}
+
+    hook_path = path.parents[1] / ".claude" / "hooks" / "owner-decision-tracker.py"
+    if not hook_path.exists():
+        return {"pending": [], "resolved": [], "history": []}
+
+    spec = importlib.util.spec_from_file_location("owner_decision_tracker_doctor", hook_path)
+    if not (spec and spec.loader):
+        return {"pending": [], "resolved": [], "history": []}
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["owner_decision_tracker_doctor"] = module
+    spec.loader.exec_module(module)
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    ) as tf:
+        tmp_path = Path(tf.name)
+    try:
+        shutil.copy2(path, tmp_path)
+        sections = module._read_pending_file(tmp_path)
+        # Convert DecisionEntry objects to plain dicts for downstream simplicity.
+        return {
+            section: [
+                {
+                    "id": e.id,
+                    "asked_at": e.asked_at,
+                    "detected_via": getattr(e, "detected_via", ""),
+                    "status": e.status,
+                    "notes": getattr(e, "notes", ""),
+                }
+                for e in entries
+            ]
+            for section, entries in sections.items()
+        }
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        for sibling in tmp_path.parent.glob(tmp_path.name + ".corrupted-*"):
+            try:
+                sibling.unlink()
+            except OSError:
+                pass
+
+
+def _check_untriaged_prose_decisions(target: Path) -> ToolCheck:
+    """Count `prose:*` entries in ## Pending; FAIL if > 0.
+
+    Per umbrella Sub-slice F item 1: untriaged prose-decision entries indicate
+    surfacing-transparency violations (an owner-decision-ask was detected in
+    agent prose but never converted to AskUserQuestion, leaving the candidate
+    untriaged). Pre-Sub-slice-A historical entries should already have been
+    cleaned via Sub-slice D's `--cleanup` mode; ## Pending should be empty.
+    """
+    pending_path = target / "memory" / "pending-owner-decisions.md"
+    sections = _parse_pending_decisions_file(pending_path)
+    pending = sections.get("pending", [])
+    prose_entries = [e for e in pending if (e.get("detected_via") or "").startswith("prose:")]
+
+    if not prose_entries:
+        return ToolCheck(
+            name="Untriaged prose decisions",
+            required=False,
+            found=True,
+            status="pass",
+            message=f"## Pending contains 0 prose:* entries (total pending: {len(pending)})",
+        )
+
+    sample_ids = [e["id"] for e in prose_entries[:5]]
+    suffix = "..." if len(prose_entries) > 5 else ""
+    return ToolCheck(
+        name="Untriaged prose decisions",
+        required=False,
+        found=True,
+        status="fail",
+        message=f"## Pending has {len(prose_entries)} prose:* entries: {sample_ids}{suffix}",
+    )
+
+
+def _check_auq_coverage(target: Path) -> ToolCheck:
+    """Percentage of recent owner decisions captured via detected_via=ask_user_question; FAIL if < 100%.
+
+    Rolling window: entries with asked_at >= GTKB_AUQ_METRICS_CUTOFF_DATE
+    (default 2026-05-04, the Sub-slice A -014 VERIFIED date which marked
+    detector-tightening + AUQ-only enforcement going live). Pre-cutoff
+    entries are excluded as historical; their classification reflected the
+    pre-tightening detector, not current AUQ-only contract.
+    """
+    import os
+    from datetime import datetime, timezone
+
+    cutoff_str = os.environ.get("GTKB_AUQ_METRICS_CUTOFF_DATE", _AUQ_METRICS_CUTOFF_DATE_DEFAULT)
+    try:
+        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return ToolCheck(
+            name="AUQ coverage",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Invalid GTKB_AUQ_METRICS_CUTOFF_DATE: {cutoff_str!r}",
+        )
+
+    pending_path = target / "memory" / "pending-owner-decisions.md"
+    sections = _parse_pending_decisions_file(pending_path)
+    # Exclude ## History — entries explicitly archived there are accepted
+    # residuals per the proposal's "document accepted residual via ## History
+    # move" pattern. Active compliance is measured over Pending + Resolved only.
+    active_entries = []
+    for section_name in ("pending", "resolved"):
+        active_entries.extend(sections.get(section_name, []))
+
+    in_window = []
+    for e in active_entries:
+        asked = e.get("asked_at") or ""
+        if not asked:
+            continue
+        try:
+            asked_str = asked.replace("Z", "+00:00") if asked.endswith("Z") else asked
+            dt = datetime.fromisoformat(asked_str)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            continue
+        if dt >= cutoff:
+            in_window.append(e)
+
+    if not in_window:
+        return ToolCheck(
+            name="AUQ coverage",
+            required=False,
+            found=True,
+            status="pass",
+            message=f"No entries in window (cutoff={cutoff.date().isoformat()})",
+        )
+
+    auq = [e for e in in_window if e.get("detected_via") == "ask_user_question"]
+    pct = (len(auq) / len(in_window)) * 100.0
+    if len(auq) == len(in_window):
+        return ToolCheck(
+            name="AUQ coverage",
+            required=False,
+            found=True,
+            status="pass",
+            message=f"AUQ coverage 100% over {len(in_window)} entries since {cutoff.date().isoformat()}",
+        )
+
+    non_auq_ids = [e["id"] for e in in_window if e.get("detected_via") != "ask_user_question"][:5]
+    return ToolCheck(
+        name="AUQ coverage",
+        required=False,
+        found=True,
+        status="fail",
+        message=(
+            f"AUQ coverage {pct:.1f}% ({len(auq)}/{len(in_window)}) since {cutoff.date().isoformat()}; "
+            f"non-AUQ sample: {non_auq_ids}"
+        ),
+    )
+
+
+def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
+    """Scan VERIFIED bridges; FAIL if any cite owner approval without an Owner Decisions / Input section.
+
+    Reuses bridge-compliance-gate's helper functions (proposal_claims_owner_approval +
+    has_concrete_owner_decisions_section) via importlib so the same logic
+    that gates Write-time also gates release-time.
+
+    Cutoff: only scans VERIFIED files dated on/after GTKB_AUQ_METRICS_CUTOFF_DATE
+    (default 2026-05-04, Sub-slice C -006 VERIFIED date). Pre-cutoff VERIFIED
+    bridges predate the Owner Decisions / Input requirement landing in the
+    bridge-compliance-gate hook.
+    """
+    import importlib.util
+    import os
+    import sys
+    import re as _re
+    from datetime import datetime, timezone
+
+    cutoff_str = os.environ.get("GTKB_AUQ_METRICS_CUTOFF_DATE", _AUQ_METRICS_CUTOFF_DATE_DEFAULT)
+    try:
+        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return ToolCheck(
+            name="Uncited owner-input bridges",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Invalid GTKB_AUQ_METRICS_CUTOFF_DATE: {cutoff_str!r}",
+        )
+
+    bridge_dir = target / "bridge"
+    index_path = bridge_dir / "INDEX.md"
+    if not index_path.exists():
+        return ToolCheck(
+            name="Uncited owner-input bridges",
+            required=False,
+            found=False,
+            status="warning",
+            message="bridge/INDEX.md not found",
+        )
+
+    gate_path = target / ".claude" / "hooks" / "bridge-compliance-gate.py"
+    if not gate_path.exists():
+        return ToolCheck(
+            name="Uncited owner-input bridges",
+            required=False,
+            found=True,
+            status="warning",
+            message="bridge-compliance-gate.py not found; cannot reuse helpers",
+        )
+    spec = importlib.util.spec_from_file_location("bridge_gate_doctor", gate_path)
+    if not (spec and spec.loader):
+        return ToolCheck(
+            name="Uncited owner-input bridges",
+            required=False,
+            found=True,
+            status="warning",
+            message="bridge-compliance-gate.py could not be loaded",
+        )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["bridge_gate_doctor"] = module
+    spec.loader.exec_module(module)
+
+    # Find latest VERIFIED line per Document in INDEX. Collect (filename) for those.
+    verified_files: list[Path] = []
+    current_doc: str | None = None
+    for line in index_path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if s.startswith("Document:"):
+            current_doc = s[len("Document:"):].strip()
+            continue
+        m = _re.match(r"^VERIFIED:\s*(bridge/\S+\.md)\s*$", s)
+        if m and current_doc:
+            verified_files.append(target / m.group(1))
+            current_doc = None  # consume only the first (latest) VERIFIED line per Document
+
+    offenders: list[str] = []
+    for vf in verified_files:
+        if not vf.exists():
+            continue
+        try:
+            mtime = datetime.fromtimestamp(vf.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            continue
+        if mtime < cutoff:
+            continue
+        try:
+            content = vf.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        # Skip verdict files (GO/NO-GO/VERIFIED). Per bridge-compliance-gate.py:357
+        # the gate excludes verdict files from the Owner Decisions section
+        # requirement; this doctor check mirrors that exclusion.
+        first_line = next((ln for ln in content.splitlines() if ln.strip()), "")
+        if first_line.strip().startswith(("GO", "NO-GO", "VERIFIED")):
+            continue
+        try:
+            claims_owner = module._proposal_claims_owner_approval(content)
+            has_section = module._has_concrete_owner_decisions_section(content)
+        except AttributeError:
+            continue
+        if claims_owner and not has_section:
+            offenders.append(vf.name)
+
+    if not offenders:
+        return ToolCheck(
+            name="Uncited owner-input bridges",
+            required=False,
+            found=True,
+            status="pass",
+            message=(
+                f"No VERIFIED bridges since {cutoff.date().isoformat()} "
+                f"claim owner approval without an Owner Decisions / Input section"
+            ),
+        )
+
+    sample = offenders[:5]
+    suffix = "..." if len(offenders) > 5 else ""
+    return ToolCheck(
+        name="Uncited owner-input bridges",
+        required=False,
+        found=True,
+        status="fail",
+        message=f"{len(offenders)} VERIFIED bridge(s) missing Owner Decisions section: {sample}{suffix}",
+    )
+
+
 def _required_bridge_rule_filenames(profile_name: str) -> tuple[str, ...]:
     """Return the basename set of rules whose doctor_required_profiles
     includes *profile_name*.
@@ -2050,6 +2362,9 @@ def run_doctor(
         checks.append(_check_spec_classifier_settings_registered(target))
         checks.append(_check_spec_classifier_codex_parity(target))
         checks.append(_check_spec_classifier_test_exists(target))
+        checks.append(_check_untriaged_prose_decisions(target))
+        checks.append(_check_auq_coverage(target))
+        checks.append(_check_uncited_owner_input_bridges(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))
