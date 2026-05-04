@@ -5,7 +5,37 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-ops-current-state-monitoring-advisory-2026-05-04
+NO-GO: bridge/gtkb-ops-current-state-monitoring-advisory-2026-05-04-001.md
+
+Document: gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04
+GO: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-008.md
+REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-007.md
+NO-GO: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-006.md
+REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-005.md
+NO-GO: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-004.md
+REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-003.md
+NO-GO: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-002.md
+NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04-001.md
+
+Document: gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04
+VERIFIED: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-008.md
+NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-007.md
+GO: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-006.md
+REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-005.md
+NO-GO: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-004.md
+REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-003.md
+NO-GO: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-002.md
+NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-a-followup-code-fence-guards-2026-05-04-001.md
+
 Document: gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit
+VERIFIED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-008.md
+REVISED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-007.md
+NO-GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-006.md
+NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-005.md
+GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-004.md
+REVISED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-003.md
+NO-GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-002.md
 NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-d-evidence-audit-001.md
 
 Document: gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate

@@ -4821,6 +4821,58 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-04T15:25:26.573475Z
   answer: "Answer questions?"
   notes: ""
+- id: DECISION-0412
+  asked_at: 2026-05-04T16:20:55.986845Z
+  question: "Which next-actionable work should I take up while Codex reviews Sub-slice D `-001`?"
+  options:
+    - "Sub-slice A follow-up (code-fence guards)"
+    - "ISOLATION-017 Slice 8.6 Phase 2"
+    - "Stand by only — read no further work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4248eaf2c7bbf4cd
+  resolved_at: 2026-05-04T16:20:55.986845Z
+  answer: "User has answered your questions: \"Which next-actionable work should I take up while Codex reviews Sub-slice D `-001`?\"=\"Sub-slice A follow-up (code-fence guards)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0413
+  asked_at: 2026-05-04T16:20:55.986845Z
+  question: "Sub-slice D NO-GO F3 (cleanup-scope) disposition — the umbrella approved a cleanup pass as part of D, but the prior-session Prime narrowed D to non-mutating. Which path should the REVISED-1 take?"
+  options:
+    - "Include bounded cleanup in D"
+    - "Formally defer cleanup"
+    - "Conditional no-op"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 35bf7270ea3665ee
+  resolved_at: 2026-05-04T16:20:55.986845Z
+  answer: "User has answered your questions: \"Sub-slice D NO-GO F3 (cleanup-scope) disposition — the umbrella approved a cleanup pass as part of D, but the prior-session Prime narrowed D to non-mutating. Which path should the REVISED-1 take?\"=\"Include bounded cleanup in D\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0414
+  asked_at: 2026-05-04T19:29:35.275071Z
+  question: "Both AUQ-enforcement-stack sub-slices in flight (A code-fence-guards + D evidence audit) are now VERIFIED and closed. Sub-slice E (requirements-collection hook impl) is next per autonomous-progression — it requires creating new MemBase artifacts (IPR + DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001), designing a classification hook, and substantial test coverage. Sub-slice F (release metrics + gate promotion) gates ISOLATION-018 18.C–18.L. How should I proceed?"
+  options:
+    - "Continue with Sub-slice E now"
+    - "Stop here at clean checkpoint"
+    - "Commit this session's work first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fc7a1164cf9bbd3f
+  resolved_at: 2026-05-04T19:29:35.275071Z
+  answer: "User has answered your questions: \"Both AUQ-enforcement-stack sub-slices in flight (A code-fence-guards + D evidence audit) are now VERIFIED and closed. Sub-slice E (requirements-collection hook impl) is next per autonomous-progression — it requires creating new MemBase artifacts (IPR + DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001), designing a classification hook, and substantial test coverage. Sub-slice F (release metrics + gate promotion) gates ISOLATION-018 18.C–18.L. How should I proceed?\"=\"Continue with Sub-slice E now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0415
+  asked_at: 2026-05-04T19:41:53.671895Z
+  question: "Sub-slice E disposition given owner's no-LLM directive + Codex `-002` NO-GO findings (phantom GOV-CHAT-DERIVED-SPEC-APPROVAL-001 citation + existing IPR-REQUIREMENTS-COLLECTION-HOOK-001). The live `DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001` and `GOV-REQUIREMENTS-COLLECTION-HOOK-001` both mandate LLM classification — honoring your directive requires amending those formal artifacts. How should I proceed?"
+  options:
+    - "Amend DCL+GOV; verify existing spec-classifier.py (Recommended)"
+    - "Defer Sub-slice E indefinitely"
+    - "Cancel Sub-slice E + retire GOV/DCL specs"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c4c98fd06df18d98
+  resolved_at: 2026-05-04T19:41:53.671895Z
+  answer: "User has answered your questions: \"Sub-slice E disposition given owner's no-LLM directive + Codex `-002` NO-GO findings (phantom GOV-CHAT-DERIVED-SPEC-APPROVAL-001 citation + existing IPR-REQUIREMENTS-COLLECTION-HOOK-001). The live `DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001` and `GOV-REQUIREMENTS-COLLECTION-HOOK-001` both mandate LLM classification — honoring your directive requires amending those formal artifacts. How should I proceed?\"=\"Amend DCL+GOV; verify existing spec-classifier.py (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 
