@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-018-slice-b-pdf-cluster
+REVISED: bridge/gtkb-isolation-018-slice-b-pdf-cluster-003.md
+NO-GO: bridge/gtkb-isolation-018-slice-b-pdf-cluster-002.md
 NEW: bridge/gtkb-isolation-018-slice-b-pdf-cluster-001.md
 
 Document: gtkb-pre-filing-preflight-hook
