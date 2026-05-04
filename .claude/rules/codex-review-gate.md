@@ -84,4 +84,12 @@ proposal. The change was correct (64 tests passing) but the governance gap
 was real — no audit trail, no independent verification, no opportunity to catch
 errors. The bridge protocol exists to prevent exactly this class of silent drift.
 
+## Owner Decisions / Input Section Requirement
+
+(Active per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`.)
+
+Bridge proposals/reports that claim dependence on owner approval — citing the AUQ-only rule (`bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md`), referencing AskUserQuestion answers, or otherwise indicating owner-decision scope — MUST include a non-empty `## Owner Decisions / Input` section enumerating the relevant AskUserQuestion evidence.
+
+Codex review checks for the section's presence and substantive content. Loyal Opposition issues NO-GO when applicable proposals/reports lack the section. The bridge-compliance-gate hook fails the Write before submission to prevent ambiguous packets from reaching review. Verdict files (GO/NO-GO/VERIFIED) are explicitly excluded.
+
 ## © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

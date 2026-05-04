@@ -69,4 +69,14 @@ Each significant finding must include:
   - `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`
   - `independent-progress-assessments/KNOWLEDGE-PROJECT.md`
 
+## Owner Decisions / Input Section NO-GO Obligation
+
+Per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK and `.claude/rules/file-bridge-protocol.md` "Mandatory Owner Decisions / Input Section Gate":
+
+When reviewing a bridge proposal/report that claims dependence on owner approval (cites the AUQ-only rule at `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md`, references AskUserQuestion answers, or otherwise indicates owner-decision scope), Loyal Opposition MUST issue NO-GO when the proposal/report lacks a non-empty `## Owner Decisions / Input` section.
+
+The bridge-compliance-gate hook fails the Write before submission, but Loyal Opposition's review is the second-line check. Section content must be substantive — placeholder text (`tbd`, `todo`, `n/a`, `none`, `not applicable`, `no relevant`) does not satisfy the requirement.
+
+Verdict files (lines starting with GO/NO-GO/VERIFIED) are explicitly excluded; they are evidence narratives, not approval claims.
+
 

@@ -171,3 +171,11 @@ corresponding bridge files remain on disk for historical reference.
 - If both agents write to INDEX.md simultaneously, the second writer must
   re-read and merge (simple append conflict resolution)
 - The index is the source of truth for workflow state — not the files themselves
+
+## Mandatory Owner Decisions / Input Section Gate
+
+Implementation proposals and reports that depend on owner approval — citing Sub-slice B's AUQ-only rule (`bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md`), referencing AskUserQuestion answers, or otherwise indicating owner-decision scope — MUST include a non-empty `Owner Decisions / Input` section enumerating the relevant AskUserQuestion evidence.
+
+The bridge-compliance-gate hook (`.claude/hooks/bridge-compliance-gate.py`) mechanically enforces this requirement at Write time. Loyal Opposition issues NO-GO when an applicable proposal/report lacks the section. Codex review checks the section's substance; placeholder content (`tbd`, `todo`, `n/a`, `none`, `not applicable`, `no relevant`) is rejected.
+
+The check fires conditionally — proposals that do NOT depend on owner approval (routine refactors, scaffold updates, etc.) are not affected. Loyal Opposition verdict files (lines starting with `GO`, `NO-GO`, or `VERIFIED`) are explicitly excluded because they are evidence narratives, not approval claims.

@@ -54,6 +54,28 @@ PREFLIGHT_MISSING_REQUIRED_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Owner Decisions / Input section gate (Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK).
+# Per bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md
+# (Codex GO at -004): conditional check that fires only when proposal/report content
+# indicates owner-approval scope. Verdict files (GO/NO-GO/VERIFIED first line) are
+# excluded — they are evidence narratives, not approval claims.
+OWNER_DECISIONS_HEADING_RE = re.compile(
+    r"^#{1,6}\s*Owner Decisions(?:\s*/\s*Input)?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+OWNER_APPROVAL_MARKER_RES = (
+    # Marker 1: cites Sub-slice B's VERIFIED rule (the AUQ-only rule)
+    re.compile(
+        r"gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006\.md",
+        re.IGNORECASE,
+    ),
+    # Marker 2: AUQ + decision-context phrase within ~200 chars
+    re.compile(
+        r"\b(?:AUQ|AskUserQuestion)\b[^.]{0,200}\b(?:answer|approval|decision|directive|authorize|authorization)\b",
+        re.IGNORECASE,
+    ),
+)
+
 
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
     """
@@ -129,6 +151,39 @@ def _has_spec_derived_verification(content: str) -> bool:
         and SPEC_TEST_HEADING_RE.search(content)
         and COMMAND_EVIDENCE_RE.search(content)
     )
+
+
+def _proposal_claims_owner_approval(content: str) -> bool:
+    """Return True when proposal content signals dependence on owner approval.
+
+    Self-citing (Owner Decisions / Input heading present) also counts as a
+    claim because the author invoked the contract. The hook then verifies
+    the section is substantive, not placeholder-only.
+    """
+    if OWNER_DECISIONS_HEADING_RE.search(content):
+        return True
+    return any(p.search(content) for p in OWNER_APPROVAL_MARKER_RES)
+
+
+def _has_concrete_owner_decisions_section(content: str) -> bool:
+    """Section heading present AND section text non-empty AND not placeholder-only."""
+    lines = content.splitlines()
+    start: int | None = None
+    for i, line in enumerate(lines):
+        if OWNER_DECISIONS_HEADING_RE.match(line.strip()):
+            start = i + 1
+            break
+    if start is None:
+        return False
+    section: list[str] = []
+    for line in lines[start:]:
+        if line.strip().startswith("#"):
+            break
+        section.append(line)
+    text = "\n".join(section).strip()
+    if not text:
+        return False
+    return not SPEC_PLACEHOLDER_RE.search(text)
 
 
 def _has_clean_applicability_preflight(content: str) -> bool:
@@ -292,6 +347,24 @@ def main() -> None:
                 "[Governance] Implementation proposals must include concrete Specification Links "
                 "before bridge submission. "
                 "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)",
+            )
+            sys.exit(0)
+        # Owner Decisions / Input gate (Sub-slice C). Conditional: fires only when
+        # proposal/report content indicates owner-approval scope, AND only on
+        # non-verdict files (verdict files are evidence narratives per Codex
+        # -004 GO condition).
+        if (
+            not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+            and _proposal_claims_owner_approval(content)
+            and not _has_concrete_owner_decisions_section(content)
+        ):
+            emit_deny(
+                "PreToolUse",
+                "[Governance] Bridge proposals/reports that claim owner-approval scope must "
+                "include a non-empty Owner Decisions / Input section enumerating the "
+                "AskUserQuestion answers that authorize the work. "
+                "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
+                "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)",
             )
             sys.exit(0)
 
