@@ -5,6 +5,16 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-017-slice-8-6-ci-failure-triage
+GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-004.md
+REVISED: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-003.md
+NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-002.md
+NEW: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-001.md
+
+Document: gtkb-isolation-017-slice-8-5-ci-green
+NO-GO: bridge/gtkb-isolation-017-slice-8-5-ci-green-002.md
+NEW: bridge/gtkb-isolation-017-slice-8-5-ci-green-001.md
+
 Document: gtkb-isolation-017-slice8-release-ops-2026-05-03
 VERIFIED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-012.md
 REVISED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-011.md
