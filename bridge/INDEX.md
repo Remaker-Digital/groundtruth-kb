@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule
+NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-005.md
 GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-004.md
 REVISED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-003.md
 NO-GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-002.md
