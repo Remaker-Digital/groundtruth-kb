@@ -6,6 +6,8 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-askuserquestion-enforcement-stack-2026-05-04
+REVISED: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-003.md
+NO-GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-002.md
 NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-001.md
 
 Document: gtkb-isolation-018-slice-b-pdf-cluster
