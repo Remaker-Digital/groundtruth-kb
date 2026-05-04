@@ -1,22 +1,17 @@
 #!/usr/bin/env python3
-"""
-Claude Code UserPromptSubmit hook — Specification Classifier.
+"""Claude Code UserPromptSubmit hook — Specification Classifier (regex gate).
 
-Detects owner input that contains specification-like language (requirements,
-business rules, "must/should/shall" directives) and injects a system message
-reminding Claude to follow the GOV-01 specification-first workflow:
+Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2; DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 v2.
+See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
+Source rationale: DELIB-S332-NO-LLM-API-PARALLEL-USE-DIRECTIVE; DELIB-S332-CANONICAL-TRIGGER-SET-INTUITIVE-CLARIFICATION.
 
-  1. Record or verify specifications in KB
-  2. Create work items for gaps
-  3. Add work items to backlog
-  4. Present backlog for owner prioritization
-  5. Only then proceed to implementation
+Detects owner input that contains canonical specification-language triggers
+and emits a reminder directing the AI agent to use AskUserQuestion to
+confirm any specification creation BEFORE proceeding. The hook is a regex
+gate, not an LLM classifier — owner uses explicit language to invoke it.
 
-This is a mechanical guardrail — it fires BEFORE Claude sees the message,
-ensuring the classification step cannot be skipped by action-oriented bias.
-
-Stdin:  JSON {"user_prompt": "...", "session_id": "...", ...}
-Stdout: JSON {"systemMessage": "..."} or {}
+Stdin:  JSON {"prompt": "...", "session_id": "...", "transcript_path": "...", ...}
+Stdout: JSON {"systemMessage": "..."} when a canonical trigger fires; "{}" otherwise
 Exit:   Always 0
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -27,31 +22,24 @@ import re
 import sys
 
 
-# ---------------------------------------------------------------------------
-# Detection patterns
-# ---------------------------------------------------------------------------
-
-# Phrases that signal the owner is stating requirements/specifications
-# (not just asking questions or giving simple instructions)
+# Canonical specification-language triggers. Owner-intuitive phrasings that
+# invoke the AUQ-only-spec-creation invariant. Pattern set is intentionally
+# small so the owner can remember + use them as a contract.
 SPEC_PATTERNS = [
-    # Modal verbs indicating requirements
-    r"\bmust\s+(include|have|support|provide|implement|ensure|validate|contain)\b",
-    r"\bshould\s+(include|have|support|provide|implement|ensure|validate|contain)\b",
-    r"\bshall\s+(include|have|support|provide|implement|ensure|validate|contain)\b",
-    r"\bneeds?\s+to\s+(include|have|support|provide|implement|ensure|validate|contain)\b",
-    # Numbered requirements lists (e.g., "1. Real API integration")
-    r"(?:^|\n)\s*\d+\.\s+\w.+(?:\n\s*\d+\.\s+\w.+){2,}",
-    # Explicit requirement language
-    r"\brequire(?:ment|d|s)?\b.*\b(?:must|shall|should)\b",
-    r"\bthe\s+(?:system|product|feature|test|widget|api|ui)\s+(?:must|shall|should)\b",
-    # Business decision language
-    r"\bwe\s+(?:need|want|require)\s+(?:it|the|this|our)\b",
-    r"\bfrom\s+now\s+on\b",
-    r"\balways\s+(?:use|do|require|include|ensure)\b",
-    r"\bnever\s+(?:use|do|allow|skip|omit)\b",
+    # Imperative artifact-creation triggers
+    r"\bcreate (?:a |the )?(?:spec|specification|requirement|GOV|ADR|DCL|PB|protected behavior)\b",
+    r"\b(?:specify|track|capture) (?:that|this|it)\b",
+    r"\b(?:make|add) (?:a |an )?(?:requirement|specification|spec|GOV|ADR|DCL)\b",
+    # Declarative artifact-classification triggers
+    r"\b(?:this|that) is (?:a |an )?(?:requirement|specification|spec|protected behavior)\b",
+    # Imperative modal verb triggers (preserved from prior pattern set)
+    r"\bthe (?:system|product|feature) (?:must|shall|should)\b",
+    # Standing-rule triggers (preserved from prior pattern set)
+    r"\b(?:from now on|always|never)\s+\S+(?:\s+\S+){0,4}\s+(?:use|do|require|include|ensure|allow|skip|omit)\b",
 ]
 
-# Phrases that indicate this is NOT a spec (commands, questions, simple tasks)
+# Anti-patterns: phrasings that look spec-like but are commands, questions,
+# or affirmations and should NOT fire the reminder.
 ANTI_PATTERNS = [
     r"^(?:stop|wait|pause|hold|cancel)\b",
     r"^(?:what|how|why|where|when|who|can you|do you|is there|are there)\b",
@@ -60,59 +48,50 @@ ANTI_PATTERNS = [
     r"^(?:yes|no|ok|sure|agreed|approved|proceed|continue|go ahead)\b",
 ]
 
-# Minimum prompt length to even consider (short messages are commands, not specs)
+# Minimum prompt length filter — short prompts are typically commands or
+# affirmations, not specification statements.
 MIN_SPEC_LENGTH = 40
 
 
 def detect_specification_language(prompt: str) -> bool:
-    """Return True if the prompt likely contains specification language."""
+    """Return True if the prompt matches a canonical specification-language trigger."""
     stripped = prompt.strip()
-
-    # Too short to be a specification
     if len(stripped) < MIN_SPEC_LENGTH:
         return False
-
-    # Check anti-patterns first (quick exit for commands/questions)
     first_line = stripped.split("\n")[0].strip().lower()
     for pattern in ANTI_PATTERNS:
         if re.search(pattern, first_line, re.IGNORECASE):
             return False
-
-    # Check for specification patterns
     for pattern in SPEC_PATTERNS:
         if re.search(pattern, stripped, re.IGNORECASE | re.MULTILINE):
             return True
-
     return False
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+# AUQ-only-spec-creation invariant reminder. Cited rules:
+# - GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2 (this hook's mandate)
+# - GOV-SPEC-CAPTURE-TRANSPARENCY-001 (surfacing transparency)
+# Per S332 owner directive: "no requirements specifications are created
+# without my explicit choice from an AskUserQuestion."
+REMINDER = """SPECIFICATION TRIGGER — Your message contains a canonical specification-language trigger.
 
-REMINDER = """⚠️ SPECIFICATION CLASSIFIER TRIGGER — The owner's message appears to contain specification-like language (requirements, "must include", numbered criteria). Before writing any code:
+Per GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2: do NOT create or promote any formal artifact (SPEC / REQ / GOV / ADR / DCL / PB / DELIB) without first issuing an AskUserQuestion to confirm the artifact's existence, scope, and approval.
 
-1. **Classify** the owner's statements as specifications (new or updates to existing).
-2. **Record** specifications in the Knowledge Database via `db.insert_spec()`.
-3. **Create work items** for any gap between current state and the specifications.
-4. **Present** the work items to the owner for prioritization.
-5. **Wait** for explicit prioritization approval before implementing.
-
-This is GOV-01: "Claude's first priority on any change request is creating/updating a specification." Do NOT skip to implementation."""
+Per GOV-SPEC-CAPTURE-TRANSPARENCY-001: surface the candidate to the owner immediately with classification, interpretation, and the artifact that would be created if approved. Wait for the AskUserQuestion answer before any KB mutation."""
 
 
 def main() -> None:
     try:
         data = json.loads(sys.stdin.read())
-        prompt = data.get("user_prompt", "")
-
+        # Accept both legacy "user_prompt" and current "prompt" field names
+        # per Claude Code UserPromptSubmit hook contract evolution.
+        prompt = data.get("prompt") or data.get("user_prompt") or ""
         if detect_specification_language(prompt):
             json.dump({"systemMessage": REMINDER}, sys.stdout)
         else:
             json.dump({}, sys.stdout)
-
     except Exception:
-        # Non-fatal — never block the user
+        # Non-fatal — never block the user prompt submission.
         json.dump({}, sys.stdout)
 
 

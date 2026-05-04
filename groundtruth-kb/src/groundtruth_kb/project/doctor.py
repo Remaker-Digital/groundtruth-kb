@@ -491,6 +491,148 @@ def _check_settings_classifiers(target: Path) -> ToolCheck:
     )
 
 
+# Sub-slice E doctor invariants per amended DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 v2.
+# Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2; DCL DOCTOR INVARIANTS section.
+# See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
+
+def _check_spec_classifier_canonical_path(target: Path) -> ToolCheck:
+    """Verify spec-classifier.py exists at the DCL-mandated canonical path."""
+    hook_path = target / ".claude" / "hooks" / "spec-classifier.py"
+    return ToolCheck(
+        name="spec-classifier hook canonical path",
+        required=False,
+        found=hook_path.exists(),
+        status="pass" if hook_path.exists() else "warning",
+        message=(
+            f"spec-classifier.py present at {hook_path.relative_to(target)}"
+            if hook_path.exists()
+            else f"spec-classifier.py missing from canonical path {hook_path.relative_to(target)}"
+        ),
+    )
+
+
+def _check_spec_classifier_settings_registered(target: Path) -> ToolCheck:
+    """Verify spec-classifier.py is registered in tracked .claude/settings.json.
+
+    Reads tracked settings (NOT settings.local.json) per Codex -004 F1.
+    Tracked registration ensures the hook fires for fresh clones and shared
+    harness contexts, not only on the current workstation.
+    """
+    import json as _json
+
+    settings_path = target / ".claude" / "settings.json"
+    if not settings_path.exists():
+        return ToolCheck(
+            name="spec-classifier tracked settings",
+            required=False,
+            found=False,
+            status="warning",
+            message=".claude/settings.json missing (tracked project settings)",
+        )
+
+    try:
+        data = _json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name="spec-classifier tracked settings",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Malformed tracked settings JSON: {exc}",
+        )
+
+    ups = (data.get("hooks") or {}).get("UserPromptSubmit") or []
+    for group in ups:
+        if not isinstance(group, dict):
+            continue
+        for h in group.get("hooks", []):
+            if isinstance(h, dict) and "spec-classifier.py" in (h.get("command") or ""):
+                return ToolCheck(
+                    name="spec-classifier tracked settings",
+                    required=False,
+                    found=True,
+                    status="pass",
+                    message="spec-classifier.py registered under UserPromptSubmit",
+                )
+
+    return ToolCheck(
+        name="spec-classifier tracked settings",
+        required=False,
+        found=True,
+        status="warning",
+        message="spec-classifier.py NOT registered in tracked .claude/settings.json UserPromptSubmit",
+    )
+
+
+def _check_spec_classifier_codex_parity(target: Path) -> ToolCheck:
+    """Verify spec-classifier.py is registered in .codex/hooks.json (forward-compatible parity).
+
+    Per ADR-CODEX-HOOK-PARITY-FALLBACK-001 + Codex -006 F1: parity entry is
+    forward-compatible intent (currently disabled on Windows; active when
+    Codex hook parity becomes live).
+    """
+    import json as _json
+
+    codex_path = target / ".codex" / "hooks.json"
+    if not codex_path.exists():
+        return ToolCheck(
+            name="spec-classifier Codex parity",
+            required=False,
+            found=False,
+            status="warning",
+            message=".codex/hooks.json missing (Codex parity not configured)",
+        )
+
+    try:
+        data = _json.loads(codex_path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name="spec-classifier Codex parity",
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Malformed .codex/hooks.json: {exc}",
+        )
+
+    ups = (data.get("hooks") or {}).get("UserPromptSubmit") or []
+    for group in ups:
+        if not isinstance(group, dict):
+            continue
+        for h in group.get("hooks", []):
+            if isinstance(h, dict) and "spec-classifier.py" in (h.get("command") or ""):
+                return ToolCheck(
+                    name="spec-classifier Codex parity",
+                    required=False,
+                    found=True,
+                    status="pass",
+                    message="spec-classifier.py parity entry present (forward-compatible)",
+                )
+
+    return ToolCheck(
+        name="spec-classifier Codex parity",
+        required=False,
+        found=True,
+        status="warning",
+        message="spec-classifier.py NOT registered in .codex/hooks.json UserPromptSubmit",
+    )
+
+
+def _check_spec_classifier_test_exists(target: Path) -> ToolCheck:
+    """Verify the canonical regression test for spec-classifier exists."""
+    test_path = target / "groundtruth-kb" / "tests" / "test_spec_classifier_canonical_triggers.py"
+    return ToolCheck(
+        name="spec-classifier test module",
+        required=False,
+        found=test_path.exists(),
+        status="pass" if test_path.exists() else "warning",
+        message=(
+            f"Test module present at {test_path.relative_to(target)}"
+            if test_path.exists()
+            else f"Test module missing at canonical path {test_path.relative_to(target)}"
+        ),
+    )
+
+
 def _required_bridge_rule_filenames(profile_name: str) -> tuple[str, ...]:
     """Return the basename set of rules whose doctor_required_profiles
     includes *profile_name*.
@@ -1904,6 +2046,10 @@ def run_doctor(
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
         checks.append(_check_settings_classifiers(target))
+        checks.append(_check_spec_classifier_canonical_path(target))
+        checks.append(_check_spec_classifier_settings_registered(target))
+        checks.append(_check_spec_classifier_codex_parity(target))
+        checks.append(_check_spec_classifier_test_exists(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))

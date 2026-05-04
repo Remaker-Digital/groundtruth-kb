@@ -26,6 +26,12 @@
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\session_wrapup_trigger_dispatch.py",
             "statusMessage": "Checking session lifecycle command",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.claude\\hooks\\spec-classifier.py",
+            "statusMessage": "Checking specification language",
+            "timeout": 5
           }
         ]
       }
