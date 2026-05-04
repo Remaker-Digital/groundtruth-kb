@@ -6,83 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0365
-  asked_at: 2026-05-03T20:07:03.934436Z
-  question: "ptures the GA fix.  Standing by for Codex's verdict on `-009` or further direction."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: ee974136e1829c87
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0366
-  asked_at: 2026-05-03T20:38:40.695895Z
-  question: "mended Next Action  Awaiting your direction on whether to: - **"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: 9c8f71b80feeda38
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0369
-  asked_at: 2026-05-03T20:53:15.913830Z
-  question: "positive decisions. Awaiting your direction."
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: 53435b9f57c39df9
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0373
-  asked_at: 2026-05-03T21:15:56.717276Z
-  question: "ice 8 closure work. Want me to read those NO-GO verdicts and prepare REVISED proposals, or address one of the pending decisions first?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 3c6ee380a5645248
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0374
-  asked_at: 2026-05-03T21:24:01.486669Z
-  question: "───────────────`  **Awaiting your direction.** Should I proceed"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: 5bc9559cc9ab5db2
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0380
-  asked_at: 2026-05-03T21:36:41.596153Z
-  question: "d but not grow it.  Standing by for owner direction or session close."
-  detected_via: prose:standing_by_for
-  status: pending
-  question_hash: 93bdbcacc4173f18
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0386
-  asked_at: 2026-05-04T05:11:10.684885Z
-  question: "pe**: dozens exist; should I delete them (they look like test fixtures left behind), move them somewhere, or leave them alone for this migration? 3. **Should I file"
-  detected_via: prose:should_i_or
-  status: pending
-  question_hash: 608076de985d2352
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0391
-  asked_at: 2026-05-04T05:35:41.972737Z
-  question: "ll pending (queued, awaiting your direction on which to proceed first)  **Downstream artifacts each DELIB plans to spawn** (each requires its own approval packet):  | DELIB |"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: b0b7be1915659ed7
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0392
-  asked_at: 2026-05-04T05:37:30.297682Z
-  question: "rose patterns like \"awaiting your direction\" / \"should I\" (per"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: de82a34210c9f03f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0401
-  asked_at: 2026-05-04T06:44:37.613898Z
-  question: "er direction. Which should I pick up — `isolation-018-agent-red-file-migration` revision, `slice-8-6-ci-failure-triage` revision, a CS-* sub-slice proposal, or IR-0 follow-up?"
-  detected_via: prose:should_i_or
-  status: pending
-  question_hash: 262cd847f5d1d0c4
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0403
-  asked_at: 2026-05-04T07:10:39.867308Z
-  question: "— needs revision)  Awaiting owner direction on which to take ne"
-  detected_via: prose:awaiting_input
-  status: pending
-  question_hash: 40815fb06712b05d
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -4710,6 +4634,137 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-04T07:15:01.538941Z
   answer: "Answer questions?"
   notes: ""
+- id: DECISION-0405
+  asked_at: 2026-05-04T07:35:05.418675Z
+  question: "Bridge auto-dispatch selected two stale plan-level GOs (gtkb-command-surface-004, gtkb-incident-response-006) from 2026-04-26. Which should I prioritize?"
+  options:
+    - "Newer NO-GO revisions first"
+    - "Per-slice CS proposal under -004"
+    - "Re-review incident-response under Agent Red separation"
+    - "Dismiss both dispatched entries as stale"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9e06be0185674845
+  resolved_at: 2026-05-04T07:35:05.418675Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0365
+  asked_at: 2026-05-03T20:07:03.934436Z
+  question: "ptures the GA fix.  Standing by for Codex's verdict on `-009` or further direction."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: ee974136e1829c87
+  resolved_at: 2026-05-04T07:50:34.725114Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0366
+  asked_at: 2026-05-03T20:38:40.695895Z
+  question: "mended Next Action  Awaiting your direction on whether to: - **"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 9c8f71b80feeda38
+  resolved_at: 2026-05-04T07:50:34.725222Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0369
+  asked_at: 2026-05-03T20:53:15.913830Z
+  question: "positive decisions. Awaiting your direction."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 53435b9f57c39df9
+  resolved_at: 2026-05-04T07:50:34.725232Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0373
+  asked_at: 2026-05-03T21:15:56.717276Z
+  question: "ice 8 closure work. Want me to read those NO-GO verdicts and prepare REVISED proposals, or address one of the pending decisions first?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 3c6ee380a5645248
+  resolved_at: 2026-05-04T07:50:34.725237Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0374
+  asked_at: 2026-05-03T21:24:01.486669Z
+  question: "───────────────`  **Awaiting your direction.** Should I proceed"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 5bc9559cc9ab5db2
+  resolved_at: 2026-05-04T07:50:34.725241Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0380
+  asked_at: 2026-05-03T21:36:41.596153Z
+  question: "d but not grow it.  Standing by for owner direction or session close."
+  detected_via: prose:standing_by_for
+  status: resolved
+  question_hash: 93bdbcacc4173f18
+  resolved_at: 2026-05-04T07:50:34.725245Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0386
+  asked_at: 2026-05-04T05:11:10.684885Z
+  question: "pe**: dozens exist; should I delete them (they look like test fixtures left behind), move them somewhere, or leave them alone for this migration? 3. **Should I file"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 608076de985d2352
+  resolved_at: 2026-05-04T07:50:34.725249Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0391
+  asked_at: 2026-05-04T05:35:41.972737Z
+  question: "ll pending (queued, awaiting your direction on which to proceed first)  **Downstream artifacts each DELIB plans to spawn** (each requires its own approval packet):  | DELIB |"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: b0b7be1915659ed7
+  resolved_at: 2026-05-04T07:50:34.725255Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0392
+  asked_at: 2026-05-04T05:37:30.297682Z
+  question: "rose patterns like \"awaiting your direction\" / \"should I\" (per"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: de82a34210c9f03f
+  resolved_at: 2026-05-04T07:50:34.725267Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0401
+  asked_at: 2026-05-04T06:44:37.613898Z
+  question: "er direction. Which should I pick up — `isolation-018-agent-red-file-migration` revision, `slice-8-6-ci-failure-triage` revision, a CS-* sub-slice proposal, or IR-0 follow-up?"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 262cd847f5d1d0c4
+  resolved_at: 2026-05-04T07:50:34.725271Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0403
+  asked_at: 2026-05-04T07:10:39.867308Z
+  question: "— needs revision)  Awaiting owner direction on which to take ne"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 40815fb06712b05d
+  resolved_at: 2026-05-04T07:50:34.725275Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0406
+  asked_at: 2026-05-04T07:35:05.418675Z
+  question: "erformed this turn. Awaiting owner direction on which actionable"
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 0d21202e4e41d4ec
+  resolved_at: 2026-05-04T07:50:34.725277Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0407
+  asked_at: 2026-05-04T07:39:21.902936Z
+  question: "new work to start. Awaiting owner direction or Codex verdict."
+  detected_via: prose:awaiting_input
+  status: resolved
+  question_hash: 45eeca24a3de4406
+  resolved_at: 2026-05-04T07:50:34.725281Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 
