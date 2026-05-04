@@ -6,6 +6,9 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-018-slice-b-pdf-cluster
+GO: bridge/gtkb-isolation-018-slice-b-pdf-cluster-008.md
+REVISED: bridge/gtkb-isolation-018-slice-b-pdf-cluster-007.md
+NO-GO: bridge/gtkb-isolation-018-slice-b-pdf-cluster-006.md
 REVISED: bridge/gtkb-isolation-018-slice-b-pdf-cluster-005.md
 NO-GO: bridge/gtkb-isolation-018-slice-b-pdf-cluster-004.md
 REVISED: bridge/gtkb-isolation-018-slice-b-pdf-cluster-003.md

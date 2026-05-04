@@ -3,7 +3,7 @@
   "application": "Agent_Red",
   "isolation_contract_adr": "ADR-APPLICATION-ISOLATION-CONTRACT-001 (proposed; pending sub-slice 6)",
   "minimization_principle_dcl": "DCL-APP-ROOT-MINIMIZATION-001 (proposed; pending sub-slice 6)",
-  "last_updated": "2026-04-27",
+  "last_updated": "2026-05-04",
   "established_by": "bridge/application-isolation-contract-006.md (GO) sub-slice 1",
   "top_level_artifacts": [
     {
@@ -52,6 +52,12 @@
       "type": "DIR",
       "bucket": "A",
       "purpose": "Agent Red incident-response artifacts (created S310 by IR-0.1 boundary work; pre-existing; in-scope of application-isolation-contract)"
+    },
+    {
+      "name": "pdf-tooling",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red PDF generation tooling and identity-report artifacts (migrated from GT-KB root in S331 sub-slice 18.B; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause)"
     }
   ],
   "validator_contract": {

@@ -168,13 +168,16 @@ temp_*
 
 # =============================================================================
 # PDF Generation (one-off scripts, not part of product)
+# Migrated to applications/Agent_Red/pdf-tooling/ in S331 sub-slice 18.B.
 # =============================================================================
-Generate-PDF-Report.ps1
-PDF-Generation-Instructions.md
-generate-pdf-report.js
-generate-pdf-report.py
-generate-pdf.bat
-package-pdf.json
+applications/Agent_Red/pdf-tooling/Generate-PDF-Report.ps1
+applications/Agent_Red/pdf-tooling/PDF-Generation-Instructions.md
+applications/Agent_Red/pdf-tooling/generate-pdf-report.js
+applications/Agent_Red/pdf-tooling/generate-pdf-report.py
+applications/Agent_Red/pdf-tooling/generate-pdf.bat
+applications/Agent_Red/pdf-tooling/package-pdf.json
+applications/Agent_Red/pdf-tooling/PRODUCTION-READINESS-ASSESSMENT.md
+applications/Agent_Red/pdf-tooling/PRODUCTION-READINESS-SUMMARY.txt
 scripts/generate-exec-summary-pdf.mjs
 
 # =============================================================================
@@ -363,8 +366,7 @@ scripts/pre-flight-results/
 .groundtruth/session/snapshots/
 
 # Ephemeral session/evaluation artifacts
-PRODUCTION-READINESS-ASSESSMENT.md
-PRODUCTION-READINESS-SUMMARY.txt
+# (PRODUCTION-READINESS-* files migrated to applications/Agent_Red/pdf-tooling/ in S331 sub-slice 18.B; patterns relocated to PDF Generation section above.)
 codex_session_prime_handshake.py
 scripts/_bridge_send_wi3030.py
 

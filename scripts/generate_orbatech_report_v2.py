@@ -15,6 +15,9 @@ import tempfile
 
 OUTPUT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "applications",
+    "Agent_Red",
+    "pdf-tooling",
     "OrbaTech-Technical-Evaluation-Report.docx"
 )
 

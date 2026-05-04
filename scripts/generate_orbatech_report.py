@@ -32,7 +32,7 @@ from docx.oxml import parse_xml
 from pathlib import Path
 BASE = str(Path(__file__).resolve().parent.parent)
 LOGO_PATH = os.path.join(BASE, "branding", "logo", "PNG", "NEW-BLOCK-LOGO-HORIZONTAL-LIGHT.png")
-OUTPUT_PATH = os.path.join(BASE, "OrbaTech-Technical-Evaluation-Report.docx")
+OUTPUT_PATH = os.path.join(BASE, "applications", "Agent_Red", "pdf-tooling", "OrbaTech-Technical-Evaluation-Report.docx")
 CHART_DIR = os.path.join(BASE, "scripts", "_report_charts")
 os.makedirs(CHART_DIR, exist_ok=True)
 
