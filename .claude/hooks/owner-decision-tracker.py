@@ -166,6 +166,64 @@ PROSE_FALSE_POSITIVE_GUARDS: tuple[re.Pattern[str], ...] = (
 # state alongside an unrelated genuine prose decision-ask.
 GUARD_LOCAL_WINDOW_CHARS = 200
 
+
+# Per Sub-slice A follow-up bridge -005 GO at -006 (code-fence-aware
+# structural FP guards): the negative-lookbehind in PROSE_DECISION_PATTERNS
+# is a single-character guard. It does not catch the same trigger phrases
+# embedded inside multi-line markdown structural contexts (fenced code
+# blocks, indented code blocks, blockquotes, HTML comments). With Stop-mode
+# block emission live as of Sub-slice A -014 VERIFIED, the cost of those
+# structural false positives is materially higher (turn-end refusal rather
+# than nudge). The structural pre-check below runs BEFORE the in-window
+# PROSE_FALSE_POSITIVE_GUARDS so the latter remain limited to in-window
+# semantic guards (Sub-slice A -007 §F1 invariant preserved).
+_FENCE_LINE_RE = re.compile(r"(?:^|\n)```")
+
+
+def _is_inside_structural_context(text: str, match_start: int) -> bool:
+    """Return True if ``match_start`` falls inside a markdown structural
+    context where a trigger pattern should be treated as documentation
+    rather than a real owner-decision-ask. Covers four contexts:
+
+    1. Triple-backtick fenced code block (line-anchored).
+    2. 4-space indented code block (line-prefix heuristic).
+    3. Markdown blockquote (line starts with ``> ``).
+    4. HTML comment (between unclosed ``<!--`` and the next ``-->``).
+    """
+    prefix = text[:match_start]
+
+    # 1. Triple-backtick fenced code block: count line-anchored fences in
+    # the prefix. Odd count means we are inside an open fence.
+    fence_count = len(_FENCE_LINE_RE.findall(prefix))
+    if fence_count % 2 == 1:
+        return True
+
+    # 2. HTML comment: if the most recent ``<!--`` is later than the most
+    # recent ``-->`` (or there is no closing ``-->`` at all), match is
+    # inside the comment.
+    last_open = prefix.rfind("<!--")
+    last_close = prefix.rfind("-->")
+    if last_open != -1 and last_open > last_close:
+        return True
+
+    # Identify the line containing match_start.
+    line_start = prefix.rfind("\n") + 1  # 0 if no preceding newline.
+    next_newline = text.find("\n", match_start)
+    line_full = text[line_start:] if next_newline == -1 else text[line_start:next_newline]
+
+    # 3. Markdown blockquote.
+    if line_full.startswith("> "):
+        return True
+
+    # 4. 4-space indented code block (heuristic: line prefix only; does
+    # not enforce the preceding-blank-line CommonMark requirement, since
+    # the false-positive cost of suppressing 4-space-indented prose is
+    # low and rare in our bridge corpus).
+    if line_full.startswith("    "):
+        return True
+
+    return False
+
 # Block emission feature flag (Codex -004 GO condition 3).
 # Default '1' (enabled); '=0' suppresses block JSON only — detection,
 # durable-file appends, and graceful degradation are preserved.
@@ -688,6 +746,12 @@ def _scan_prose_decisions(turn_events: list[dict[str, Any]]) -> list[tuple[str, 
         # them. T-mixed-event-1 + T-mixed-event-2 verify this behavior.
         for name, pattern in PROSE_DECISION_PATTERNS:
             for m in pattern.finditer(full_text):
+                # Structural pre-check (Sub-slice A follow-up -006 GO):
+                # skip matches inside fenced/indented/blockquoted/HTML-
+                # commented contexts. Runs before the in-window guards so
+                # the latter remain limited to semantic in-window checks.
+                if _is_inside_structural_context(full_text, m.start()):
+                    continue
                 window_start = max(0, m.start() - GUARD_LOCAL_WINDOW_CHARS)
                 window_end = min(len(full_text), m.end() + GUARD_LOCAL_WINDOW_CHARS)
                 window = full_text[window_start:window_end]
