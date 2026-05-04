@@ -226,9 +226,27 @@ def test_block_emission_end_to_end_stop_mode(tmp_path, monkeypatch):
     Per Codex -010 hint: transcript needs at least one real user event (type=user with
     non-tool_result content) followed by the assistant text event, because
     _find_just_completed_turn() looks backward for a real user boundary.
+
+    Per Codex -012 F1: hermetic isolation. The hook resolves PROJECT_ROOT from
+    CLAUDE_PROJECT_DIR env var (line 92-95); pointing it at tmp_path ensures
+    the live memory/pending-owner-decisions.md is NOT mutated. A byte-snapshot
+    assertion at the end confirms the live durable file is unchanged.
     """
+    import hashlib
     import subprocess
-    monkeypatch.delenv("GTKB_BLOCK_ON_PROSE_DECISION_ASK", raising=False)
+
+    # Byte-snapshot of live durable file BEFORE test (must equal AFTER value).
+    live_pending_path = REPO_ROOT / "memory" / "pending-owner-decisions.md"
+    pre_hash = hashlib.sha256(live_pending_path.read_bytes()).hexdigest() if live_pending_path.exists() else None
+
+    # Build hermetic project root in tmp_path.
+    project_root = tmp_path / "project"
+    (project_root / "memory").mkdir(parents=True)
+    (project_root / "memory" / "pending-owner-decisions.md").write_text(
+        "# Pending Owner Decisions\n\nThis file is owned by .claude/hooks/owner-decision-tracker.py.\n\n---\n\n## Pending\n\n## Resolved\n\n## History\n",
+        encoding="utf-8",
+    )
+
     transcript = [
         {"type": "user", "message": {"content": [{"type": "text", "text": "continue"}]}},
         {"type": "assistant", "message": {"content": [{"type": "text", "text": "Should I commit the changes or wait for review?"}]}},
@@ -239,10 +257,12 @@ def test_block_emission_end_to_end_stop_mode(tmp_path, monkeypatch):
         "session_id": "test-slice-a-e2e",
         "hook_event_name": "Stop",
         "transcript_path": str(tfile.resolve()),
-        "cwd": str(REPO_ROOT),
+        "cwd": str(project_root),
     })
     env = dict(os.environ)
     env.pop("GTKB_BLOCK_ON_PROSE_DECISION_ASK", None)
+    # Per Codex -012 F1: redirect hook's durable-file writes to tmp_path.
+    env["CLAUDE_PROJECT_DIR"] = str(project_root)
     result = subprocess.run(
         [sys.executable, str(HOOK_PATH), "--mode", "stop"],
         input=payload, capture_output=True, text=True, env=env, timeout=10,
@@ -254,3 +274,15 @@ def test_block_emission_end_to_end_stop_mode(tmp_path, monkeypatch):
     assert parsed.get("decision") == "block", f"Expected decision=block; got {parsed!r}"
     assert "reason" in parsed
     assert "should_i_or" in parsed["reason"], f"Expected pattern name in reason; got {parsed['reason'][:200]!r}"
+
+    # Byte-snapshot assertion: live durable file unchanged.
+    post_hash = hashlib.sha256(live_pending_path.read_bytes()).hexdigest() if live_pending_path.exists() else None
+    assert pre_hash == post_hash, (
+        f"Live memory/pending-owner-decisions.md was mutated by test (pre={pre_hash}, post={post_hash}); "
+        "test is not hermetic"
+    )
+
+    # Tmp project's durable file SHOULD have been mutated (hook wrote synthetic decision there).
+    tmp_pending = project_root / "memory" / "pending-owner-decisions.md"
+    tmp_content = tmp_pending.read_text(encoding="utf-8")
+    assert "DECISION-" in tmp_content, "Hook should have written synthetic decision to tmp project root"
