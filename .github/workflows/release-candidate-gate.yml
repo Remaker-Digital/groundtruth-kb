@@ -55,6 +55,14 @@ jobs:
           pip install -r /tmp/test-deps.txt
           pip install bandit[toml] pip-audit ruff
 
+      # Seed groundtruth.db with the MemBase records that governance_adoption +
+      # session_self_initialization tests assert. groundtruth.db is gitignored
+      # per owner decision 2026-04-24 (commit 23a54af3); CI must materialize the
+      # records from tests/fixtures/ci_membase_seed.json before pytest runs.
+      # Per DELIB-S330-SLICE-8-6-PHASE-1-5-CI-DB-SEED-CHOICE (Option A).
+      - name: Seed CI MemBase records
+        run: python scripts/membase_ci_seed.py seed
+
       - name: Run release-candidate gate
         run: python scripts/release_candidate_gate.py --require-python 3.12 --skip-frontend
 

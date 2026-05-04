@@ -1,0 +1,1112 @@
+{
+  "schema_version": 1,
+  "source_db": "E:\\GT-KB\\groundtruth.db",
+  "specifications": [
+    {
+      "id": "ADR-ARTIFACT-FORMALIZATION-GATE-001",
+      "section": "Formal artifact management",
+      "testability": "observable",
+      "description": "Decision: GT-KB formal artifact creation and mutation should flow through a review gate that renders the full native artifact proposal and captures approval evidence. The architecture may support a scoped auto-approval state, but auto-approved proposals must still be rendered to the user and retained in the transcript.\n\nConsequences: This increases friction for artifact changes by default, but improves audit quality, user control, and the ability to test future relaxation of artifact handling rules. It also creates a clear implementation target for hooks, skills, CLI flows, and harness integrations.",
+      "authority": "stated",
+      "type": "architecture_decision",
+      "title": "Use strict formalization gate with scoped auto-approval mode",
+      "scope": "groundtruth-governance",
+      "status": "verified",
+      "tags": [
+        "architecture-decision",
+        "artifact-formalization",
+        "approval-gate",
+        "auto-approval"
+      ],
+      "constraints": {
+        "decision_authority": "owner"
+      },
+      "affected_by": [
+        "DELIB-0835",
+        "GOV-ARTIFACT-APPROVAL-001",
+        "PB-ARTIFACT-APPROVAL-001"
+      ]
+    },
+    {
+      "id": "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001",
+      "section": "artifact_oriented_governance",
+      "testability": "structural",
+      "description": "Decision: GT-KB will model project memory as a durable artifact graph rather than relying on transient conversation history. Specifications, deliberations, plans, work items, procedures, tests, reports, dashboard evidence, and backlog entries are treated as first-class artifacts with lifecycle state. The AI harness should start from the current artifact state before treating chat memory as authoritative. Consequences: this increases capture discipline and can add review friction, but it reduces knowledge loss, improves cross-session continuity, and gives the system clearer decision triggers for when to propose, create, update, retire, or preserve project knowledge.",
+      "priority": "P0",
+      "authority": "stated",
+      "type": "architecture_decision",
+      "title": "Model project memory as a durable artifact graph",
+      "handle": "artifact-oriented-development-model",
+      "scope": "architecture",
+      "status": "verified",
+      "tags": [
+        "artifact-graph",
+        "project-memory",
+        "session-startup",
+        "governance"
+      ],
+      "affected_by": [
+        "DELIB-0874"
+      ],
+      "source_paths": [
+        "independent-progress-assessments/CODEX-STANDING-PRIORITIES.md",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "ADR-CODEX-HOOK-PARITY-FALLBACK-001",
+      "testability": "structural",
+      "description": "Agent Red will maintain .codex/config.toml and .codex/hooks.json as forward-compatible Codex hook intent for the formal artifact approval gate, while Codex hooks remain disabled by the Codex runtime on Windows. Until Windows hook support is restored, Codex sessions must not represent .codex/hooks.json as a live Windows interception boundary. Mechanical enforcement for Codex-on-Windows is provided by scripts/check_codex_hook_parity.py and release-candidate-gate regression tests, alongside active Claude Code hook enforcement where available.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "architecture_decision",
+      "title": "Use Codex hook parity configuration with Windows fallback verifier",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0836"
+      ],
+      "source_paths": [
+        ".codex/config.toml",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "scripts/release_candidate_gate.py"
+      ]
+    },
+    {
+      "id": "ADR-CORE-INTAKE-001",
+      "testability": "structural",
+      "description": "GT-KB core application specification completion is derived from persisted\nMemBase evidence, not from conversation memory or a transient session flag.\n\nThe evaluator should prefer stable slot handles, tags, or linked decision\nrecords over fuzzy title matching. This avoids both repeated prompting after\nthe owner has already answered and premature suppression when an AI merely\ninferred a candidate answer.\n",
+      "authority": "stated",
+      "type": "architecture_decision",
+      "title": "Core Spec Completion Uses Persisted MemBase Evidence",
+      "status": "specified",
+      "tags": [
+        "gtkb-core-001",
+        "core-spec-intake",
+        "baseline-specifications"
+      ],
+      "affected_by": [
+        "DELIB-0875"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "bridge/gtkb-core-spec-intake-001.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-BASELINE-EVALUATION-2026-04-22.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-INTAKE-IMPLEMENTATION-PLAN-2026-04-22.md"
+      ]
+    },
+    {
+      "id": "ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001",
+      "testability": "structural",
+      "description": "Agent Red will treat memory/work_list.md as the current human-readable standing backlog authority, with MemBase governance records defining its contract and tests enforcing required structure. The backlog remains a markdown artifact for direct owner and harness review, while MemBase records provide durable governance semantics and traceability. This keeps the backlog easy to inspect and edit while making its authority explicit, and preserves a path to later migrate it into a structured GT-KB work queue or doctor-managed artifact.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "architecture_decision",
+      "title": "Use the standing backlog as cross-session work authority",
+      "status": "verified",
+      "tags": [
+        "standing-backlog",
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0829",
+        "DELIB-0837",
+        "DELIB-0838"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "groundtruth.db"
+      ]
+    },
+    {
+      "id": "DCL-ARTIFACT-APPROVAL-HOOK-001",
+      "section": "Formal artifact management",
+      "testability": "structural",
+      "description": "Any hook, skill, CLI flow, or harness integration that converts user input into formal GT-KB artifacts must render the complete proposed artifact before canonical persistence. The renderer must not summarize away required metadata or omit content that will be stored.\n\nThe approval event must capture proposed artifact ID and type, source conversation or source artifact, full proposed content hash, approving user or delegated authority, timestamp, approval mode, changed_by, and change_reason.\n\nIf auto-approval is active, the flow must still display the explicit proposed change request and preserve it in the session transcript.",
+      "authority": "stated",
+      "type": "design_constraint",
+      "title": "Artifact approval hook must display full native proposal",
+      "scope": "groundtruth-governance",
+      "status": "verified",
+      "tags": [
+        "design-constraint",
+        "artifact-formalization",
+        "hook",
+        "audit-trail"
+      ],
+      "constraints": {
+        "decision_authority": "owner"
+      },
+      "affected_by": [
+        "DELIB-0835",
+        "ADR-ARTIFACT-FORMALIZATION-GATE-001"
+      ]
+    },
+    {
+      "id": "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001",
+      "section": "artifact_oriented_governance",
+      "testability": "structural",
+      "description": "Any GT-KB hook, skill, CLI flow, startup routine, or harness instruction that interprets owner input should classify concrete input into artifact lifecycle trigger categories before acting. Expected categories include no-op brainstorming, candidate capture, active plan, formal specification, deliberation decision, standing-backlog item, work item, procedure update, test mapping, review report, explicit deferral, supersession, rejection, verification, completion, and retirement. The implementation must preserve explicit lifecycle states such as candidate, active, deferred, blocked, superseded, verified, complete, rejected, and retired so durable memory does not become stale clutter. Formal GOV, SPEC, PB, ADR, DCL, and Deliberation Archive writes must use non-intrusive confirmation flows and preserve applicable approval evidence.",
+      "priority": "P0",
+      "authority": "stated",
+      "type": "design_constraint",
+      "title": "Artifact lifecycle triggers require thresholds, states, and confirmation flows",
+      "handle": "artifact-lifecycle-triggers",
+      "scope": "governance",
+      "status": "verified",
+      "tags": [
+        "artifact-lifecycle",
+        "confirmation-gate",
+        "input-classification"
+      ],
+      "affected_by": [
+        "DELIB-0874"
+      ],
+      "source_paths": [
+        "independent-progress-assessments/CODEX-STANDING-PRIORITIES.md",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "DCL-CORE-INTAKE-001",
+      "testability": "structural",
+      "description": "Core application specification intake may become default-on for new projects\nonly if existing scaffold profile semantics and automation-safe paths remain\ncompatible.\n\nExisting minimal and full spec scaffold behavior must remain backward-compatible\nunless separately approved. Non-interactive and JSON-safe command paths must not\nemit interactive prompts. Automation and unusual projects must have an explicit\nopt-out path such as a command flag or project configuration setting.\n",
+      "authority": "stated",
+      "type": "design_constraint",
+      "title": "Core Intake Preserves Scaffold And Automation Compatibility",
+      "status": "specified",
+      "tags": [
+        "gtkb-core-001",
+        "core-spec-intake",
+        "baseline-specifications"
+      ],
+      "affected_by": [
+        "DELIB-0875"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "bridge/gtkb-core-spec-intake-001.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-BASELINE-EVALUATION-2026-04-22.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-INTAKE-IMPLEMENTATION-PLAN-2026-04-22.md"
+      ]
+    },
+    {
+      "id": "DCL-SESSION-STARTUP-TOKEN-BUDGET-001",
+      "testability": "structural",
+      "description": "Startup self-initialization must report token consumption before first user input where measurable and suggest options for reducing token consumption. Preferred controls include dashboard links, cached startup snapshots, index-first artifact loading, targeted skill loading, progressive disclosure, and explicit relaxation proposals for expensive governance or artifact workflows.",
+      "authority": "stated",
+      "type": "design_constraint",
+      "title": "Startup reports token-cost context and reduction options",
+      "status": "verified",
+      "tags": [
+        "session-startup",
+        "governance",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0840",
+        "DELIB-0842"
+      ],
+      "source_paths": [
+        "scripts/session_self_initialization.py",
+        "docs/gtkb-dashboard/index.html",
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "docs/gtkb-dashboard/session-startup-report.md",
+        "docs/gtkb-dashboard/session-wrapup-report.md",
+        "memory/gtkb-dashboard-history.json",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001",
+      "testability": "structural",
+      "description": "Safe automatic lifecycle hooks may generate startup reports, dashboard snapshots, proactive wrap-up reports, and suggested next actions. Mutating wrap-up operations such as MemBase updates, Deliberation Archive insertion, commits, pushes, deployments, or external updates still require applicable approval, acknowledgement, or owner-authorized automation scope.",
+      "authority": "stated",
+      "type": "design_constraint",
+      "title": "Automatic wrap-up engagement is non-mutating unless separately authorized",
+      "status": "verified",
+      "tags": [
+        "session-lifecycle",
+        "governance",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0841"
+      ],
+      "source_paths": [
+        "scripts/session_self_initialization.py",
+        "docs/gtkb-dashboard/index.html",
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "docs/gtkb-dashboard/session-startup-report.md",
+        "docs/gtkb-dashboard/session-wrapup-report.md",
+        "memory/gtkb-dashboard-history.json",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "DCL-STANDING-BACKLOG-SCHEMA-001",
+      "testability": "structural",
+      "description": "Standing backlog entries must include, at minimum, a stable identifier, disposition or state, priority, source decision, deliberation, bridge thread, or owner directive, required outcome, regression visibility or an explicit reason no regression test applies, and completion evidence when moved to completed status. Tests should fail when required top-priority governance backlog items are missing or when candidate skill/doctor work is not visible near the top of the queue.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "design_constraint",
+      "title": "Standing backlog entries require continuation fields",
+      "status": "verified",
+      "tags": [
+        "standing-backlog",
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0829",
+        "DELIB-0837",
+        "DELIB-0838"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "tests/scripts/test_groundtruth_governance_adoption.py"
+      ]
+    },
+    {
+      "id": "GOV-ACTING-PRIME-BUILDER-001",
+      "testability": "structural",
+      "description": "While the canonical Prime Builder is unavailable and until the owner revokes or supersedes the directive, Codex/Loyal Opposition assumes the acting Prime Builder role for Agent Red recovery work. Bridge unavailability does not waive governance duties; the acting Prime Builder must preserve evidence, regression tests, durable records, and handoff notes for work performed under this exception.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Codex acts as Prime Builder while canonical Prime Builder is unavailable",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0830"
+      ],
+      "source_paths": [
+        ".claude/rules/acting-prime-builder.md",
+        "memory/release-readiness.md"
+      ]
+    },
+    {
+      "id": "GOV-AGENT-RED-GTKB-CONFORMANCE-001",
+      "testability": "structural",
+      "description": "Agent Red is a well-behaved, fully conformant application supported and sustained by GroundTruth-KB. Agent Red must not be treated as an ad hoc exception to GT-KB governance; release-readiness work must preserve and enforce GT-KB specifications, Deliberation Archive discipline, MemBase traceability, role contracts, managed skills, hooks, bridge conventions, release gates, and regression tests to the extent those systems apply. Exceptions must be explicit, documented, and regression-tested where possible.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Agent Red is a fully conformant GroundTruth-KB-supported application",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0834"
+      ],
+      "source_paths": [
+        ".claude/rules/acting-prime-builder.md",
+        "tests/scripts/test_groundtruth_governance_adoption.py"
+      ]
+    },
+    {
+      "id": "GOV-ARTIFACT-APPROVAL-001",
+      "section": "Formal artifact management",
+      "testability": "observable",
+      "description": "GroundTruth-KB must bias toward strictness when managing formal artifacts. When an AI harness proposes to create, update, promote, or retire a GOV, SPEC, PB, ADR, DCL, or Deliberation Archive entry based on user conversation, the system must present the full proposed artifact in its native review format before treating it as canonical project truth.\n\nThe review packet must include the artifact type, proposed identifier, lifecycle status or outcome, title, summary, full content, metadata, links, assertions or constraints where applicable, changed_by, change_reason, and source reference.\n\nThe artifact must not become canonical until the user approves or explicitly acknowledges the proposed entry, unless the user has previously activated a scoped auto-approval state for that exact class of formalization. Auto-approval does not remove the display or transcript-capture requirement.\n\nRationale: The user's interaction with GroundTruth-KB is an artifact generation and management activity, distinct from free-form conversation with an AI assistant. Strict review preserves user control, prevents accidental governance drift, and creates an audit trail that can later be used to evaluate the impact of relaxing artifact-handling rules.",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Formal artifact approval gate",
+      "scope": "groundtruth-governance",
+      "status": "verified",
+      "tags": [
+        "governance",
+        "artifact-formalization",
+        "approval-gate",
+        "audit-trail"
+      ],
+      "constraints": {
+        "decision_authority": "owner"
+      },
+      "affected_by": [
+        "DELIB-0835"
+      ]
+    },
+    {
+      "id": "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+      "section": "artifact_oriented_governance",
+      "testability": "structural",
+      "description": "GT-KB must treat a development project as a network of durable artifacts rather than a sequence of transient conversations. When owner input becomes concrete enough to preserve, the AI harness should interpret it through artifact lifecycle opportunities such as deliberation capture, specification creation or update, plan capture, standing-backlog addition, work-item creation, procedure update, test mapping, review reporting, explicit deferral, supersession, or no-op brainstorming. This governance principle is intended to reduce cross-session memory loss and make project CRUD triggers explicit. It includes capture thresholds: not every thought becomes an artifact; brainstorming remains lightweight until it becomes a decision, plan, requirement, risk, procedure, review finding, or accepted future work. Formal artifact mutations remain subject to the formal approval gate.",
+      "priority": "P0",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Artifact-oriented governance is the default project interpretation stance",
+      "handle": "artifact-oriented-governance",
+      "scope": "governance",
+      "status": "verified",
+      "tags": [
+        "artifact-governance",
+        "session-startup",
+        "standing-backlog",
+        "deliberation-archive"
+      ],
+      "affected_by": [
+        "DELIB-0874"
+      ],
+      "source_paths": [
+        "independent-progress-assessments/CODEX-STANDING-PRIORITIES.md",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "GOV-FILE-BRIDGE-AUTHORITY-001",
+      "section": "file_bridge_governance",
+      "testability": "structural",
+      "description": "The Prime Builder / Loyal Opposition file bridge is a durable coordination\nmechanism, and the live contents of bridge/INDEX.md are the sole authoritative\nsource for bridge queue state.\n\nStartup reports, dashboard fields, cached scan counts, copied excerpts,\nsummaries, and any other artifacts derived from bridge/INDEX.md are context\nonly. They must not be used to determine the current bridge queue, latest\ndocument status, actionable entry count, bridge health, or processing order.\nAny startup, review, repair, automation, dashboard, or report workflow that\nneeds bridge state must re-read the live bridge/INDEX.md file before making an\noperational decision.\n\nLoyal Opposition has permanent owner authority to diagnose and repair correct\nbridge function and correct bridge use. When work is within that bridge scope,\nordinary Loyal Opposition file-safety restrictions and project-level approval\npauses are lifted for the bridge, bridge configuration, startup behavior,\ngenerated bridge-status surfaces, bridge automation, and downstream\nbridge-dependent artifacts. The authority exists to sustain the bridge and\nensure it remains properly and fully utilized.\n\nBridge-scope repairs should stay targeted to bridge function/use, preserve the\nbridge audit trail, and report the resulting changes after the repair.\n",
+      "priority": "P0",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Live bridge index authority and permanent bridge repair authority",
+      "handle": "file-bridge-authority",
+      "scope": "bridge-governance",
+      "status": "verified",
+      "tags": [
+        "governance",
+        "file-bridge",
+        "authoritative-source",
+        "loyal-opposition",
+        "session-startup"
+      ],
+      "affected_by": [
+        "DELIB-0880"
+      ],
+      "source_paths": [
+        "bridge/INDEX.md",
+        "AGENTS.md",
+        ".claude/rules/file-bridge-protocol.md",
+        ".claude/rules/loyal-opposition.md",
+        "independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md",
+        "independent-progress-assessments/CODEX-WAY-OF-WORKING.md",
+        "scripts/session_self_initialization.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        ".groundtruth/formal-artifact-approvals/2026-04-23-bridge-authority.json"
+      ]
+    },
+    {
+      "id": "GOV-GTKB-ADOPTION-ENFORCEMENT-001",
+      "testability": "structural",
+      "description": "Agent Red must adopt and enforce, to the extent possible, all GroundTruth-KB governance specifications, managed skills, hooks, subsystems, and integrations available to the project. Newly identified candidate skills, plug-ins, or doctor checks that are not yet implemented must be added to the top of the outstanding work queue with regression visibility until adopted, explicitly rejected, or superseded.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Agent Red must adopt and enforce available GroundTruth-KB governance capabilities",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0829",
+        "DELIB-0834"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        ".claude/rules/acting-prime-builder.md"
+      ]
+    },
+    {
+      "id": "GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001",
+      "testability": "structural",
+      "description": "When GroundTruth-KB is installed, the system must be fully configured for the role of Prime Builder. If more than one capable AI harness is installed, configuration should be prepared for all capable harnesses so any harness may take the role of Prime Builder or Loyal Opposition. The owner assigns Prime Builder; the bridge participant that is not Prime Builder assumes Loyal Opposition. Harness role configuration comparison and documentation must stay consistent with this principle.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "governance",
+      "title": "GT-KB installs must prepare capable harnesses for Prime Builder and Loyal Opposition roles",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0832",
+        "DELIB-0833"
+      ],
+      "source_paths": [
+        ".claude/rules/acting-prime-builder.md",
+        "tests/scripts/test_groundtruth_governance_adoption.py"
+      ]
+    },
+    {
+      "id": "GOV-HARNESS-ROLE-PORTABILITY-001",
+      "testability": "structural",
+      "description": "Prime Builder and Loyal Opposition are not permanently bound to a vendor, model, or harness name. Any AI model harness that supports required operational capabilities such as hooks, skills, plugins, CLI, desktop/app, filesystem, and related integrations may assume either role when the owner assigns it. Assignment carries the responsibility to enable all applicable role skills, plug-ins, hooks, directives, and responsibilities to the extent possible. When the bridge is available, the bridge counterpart is always Loyal Opposition and must be configured accordingly.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Prime Builder and Loyal Opposition are portable harness-assigned roles",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0831"
+      ],
+      "source_paths": [
+        ".claude/rules/acting-prime-builder.md"
+      ]
+    },
+    {
+      "id": "GOV-RELEASE-READINESS-GOVERNED-TESTING-001",
+      "testability": "structural",
+      "description": "Agent Red must not be treated as production-release GO merely because implementation work is complete. A production candidate must have release-readiness evidence, regression visibility for governance work, and a passing non-deploying release-candidate gate or an explicit documented deferral approved by the owner. This formalizes the owner approval and challenge in DELIB-0828 that the next build must be sufficiently well tested for production release and that DA, MemBase, tests, GT-KB governance specifications, skills, and integrations must be enforced.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Production release readiness requires governed test evidence",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0828",
+        "DELIB-0829"
+      ],
+      "source_paths": [
+        "scripts/release_candidate_gate.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "GOV-SESSION-FORMALIZATION-AUDIT-001",
+      "testability": "structural",
+      "description": "When the owner asks whether session decisions, directives, and principles have been identified and applied, the acting Prime Builder must audit the session against Deliberation Archive entries, MemBase GOV/SPEC/PB/ADR/DCL records, rules/docs, work queue entries, and regression tests. Any gap must be either formalized into the appropriate artifact type or explicitly documented as session-scoped/non-canonical. The audit result must itself be durable and testable.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Session decisions and principles require artifact mapping audit",
+      "status": "verified",
+      "tags": [
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0837"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "tests/scripts/test_groundtruth_governance_adoption.py"
+      ]
+    },
+    {
+      "id": "GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001",
+      "testability": "structural",
+      "description": "Each Agent Red / GT-KB session must actively inform and engage the user, draw attention to priorities across all dimensions of the project, and simplify user input by suggesting concrete actions and priorities.",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Sessions actively inform and engage the user with project priorities and suggested actions",
+      "status": "verified",
+      "tags": [
+        "session-lifecycle",
+        "governance",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0841"
+      ],
+      "source_paths": [
+        "scripts/session_self_initialization.py",
+        "docs/gtkb-dashboard/index.html",
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "docs/gtkb-dashboard/session-startup-report.md",
+        "docs/gtkb-dashboard/session-wrapup-report.md",
+        "memory/gtkb-dashboard-history.json",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "GOV-SESSION-SELF-INITIALIZATION-001",
+      "testability": "structural",
+      "description": "Fresh AI harness sessions for Agent Red must begin by executing startup\nobligations from live project sources, not by treating generated startup\nreports, dashboard fields, cached summaries, copied excerpts, or other derived\nartifacts as authoritative operational state.\n\nThe startup disclosure must still present the role being assumed, active role\nmapping, governance stance, project dashboard link when available, three top\npriority actions for the owner to initiate or confirm, and token-budget options\nfor startup and ongoing work.\n\nThe live bridge/INDEX.md file is the sole authoritative source for Prime Builder\n/ Loyal Opposition bridge queue state. Startup reports and dashboard data may\ndisplay prior scan results or contextual summaries, but they must not be used to\ndetermine the current bridge queue, latest document status, actionable entry\ncount, bridge health, or processing order.\n\nStartup instructions that describe required actions must be executed as actions.\nThey must not be displayed to the owner as a substitute for performing the\nunderlying verification. In Loyal Opposition mode, the harness must verify\nbridge function by reading the live bridge files, scan the live bridge/INDEX.md,\nand only then report the live scan result and ask whether to process actionable\nbridge entries.\n\nThe startup disclosure may include role, governance stance, dashboard link,\nproject state, priority context, token-budget context, and wrap-up commands, but\nany operational claim that can become stale must either be recomputed from the\nauthoritative source during startup or clearly labeled as non-authoritative\ncontext.\n",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Fresh sessions self-initialize with live role, governance, bridge, dashboard, priorities, and token context",
+      "scope": "session-startup",
+      "status": "verified",
+      "tags": [
+        "session-startup",
+        "governance",
+        "file-bridge",
+        "authoritative-source",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0840",
+        "DELIB-0842",
+        "DELIB-0880"
+      ],
+      "source_paths": [
+        "scripts/session_self_initialization.py",
+        "docs/gtkb-dashboard/index.html",
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "docs/gtkb-dashboard/session-startup-report.md",
+        "docs/gtkb-dashboard/session-wrapup-report.md",
+        "memory/gtkb-dashboard-history.json",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "memory/work_list.md",
+        "bridge/INDEX.md",
+        "AGENTS.md",
+        ".claude/rules/file-bridge-protocol.md",
+        ".claude/rules/loyal-opposition.md",
+        "independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md",
+        "independent-progress-assessments/CODEX-WAY-OF-WORKING.md",
+        ".groundtruth/formal-artifact-approvals/2026-04-23-bridge-authority.json"
+      ]
+    },
+    {
+      "id": "GOV-STANDING-BACKLOG-001",
+      "description": "Agent Red and the GT-KB platform must maintain a standing backlog that persists across sessions and records outstanding governance, release-readiness, production-readiness, and GT-KB adoption work. The standing backlog is the durable cross-session queue for work that has been identified but not yet completed, explicitly rejected, superseded, or deferred by owner decision. Future sessions must inspect the standing backlog during startup before selecting new work. Items marked TOP or otherwise owner-prioritized must be considered ahead of discretionary work unless the owner explicitly redirects the session.\n\n## Physical Store (added in v2 per Slice 1 of GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH)\n\nThe standing backlog is physically implemented as the `backlog_items` table in `groundtruth.db` (MemBase) per `ADR-STANDING-BACKLOG-DB-AUTHORITY-001`. Schema invariants are machine-checkable per `DCL-STANDING-BACKLOG-DB-SCHEMA-001`. Both sibling specs are at `status=specified` after Slice 1 (this update); they reach `status=verified` after Slice 2 lands the migration in `groundtruth-kb/src/groundtruth_kb/db.py`.\n\n`memory/work_list.md` is retained as a generated read-only view of `current_backlog_items`, rendered by `gt backlog render-markdown` (Slice 3). Doctor check `_check_backlog_authoritative` (Slice 5) flags drift between the markdown view and DB authority. Hand-edits to `memory/work_list.md` are non-authoritative; the DB is the source of truth.\n\n`DCL-STANDING-BACKLOG-SCHEMA-001` (the markdown-grounded predecessor) is preserved historical and marked superseded after `DCL-STANDING-BACKLOG-DB-SCHEMA-001` reaches `implemented`. Authority semantics from `ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001` are preserved unchanged; that ADR's physical-store choice is superseded by `ADR-STANDING-BACKLOG-DB-AUTHORITY-001`.\n\n## Required Backlog Entry Fields (preserved + extended in v2)\n\nBacklog entries must include enough context for a future harness to continue without relying on conversational memory. The `backlog_items` schema (per `DCL-STANDING-BACKLOG-DB-SCHEMA-001`) provides 24 columns covering:\n\n- **Identity:** id, version, backlog_item_name, subproject_name, supersedes, superseded_by.\n- **Scheduling:** implementation_order, status (proposed | active | blocked | in_progress | verified | superseded | deferred).\n- **Provenance:** created_at, updated_at, created_by, updated_by, change_reason, source_owner_directive, source_deliberation_query.\n- **Linkage:** related_deliberation_ids (snapshot at creation), related_spec_ids_at_creation (historical capture only — see ADR §6 for fresh-discovery semantic), related_bridge_threads, depends_on_backlog_items, blocks_backlog_items.\n- **Closure:** description (long-form intent), acceptance_summary, regression_visibility, completion_evidence.\n\nThese fields supersede the v1 narrative list (identifier, title, priority, source decision/deliberation reference, required outcome, regression visibility, disposition state) by formalizing them as typed columns rather than prose conventions.\n\n## Spec-Snapshot Discipline (key design constraint, v2)\n\n`related_spec_ids_at_creation` and `related_deliberation_ids` capture the spec/deliberation set known at the moment the backlog item was created. They are NOT exhaustive applicability claims. Implementation proposals derived from a backlog item must run fresh `db.list_specs(...)` and `db.search_deliberations(...)` at proposal time. The bridge-compliance-gate hook (Slice 5 extension) enforces this.\n",
+      "authority": "stated",
+      "type": "governance",
+      "title": "Standing backlog is the durable cross-session work authority",
+      "status": "verified",
+      "tags": [
+        "standing-backlog",
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb",
+        "gtkb-gov-backlog-source-of-truth",
+        "slice1",
+        "S327"
+      ]
+    },
+    {
+      "id": "PB-ARTIFACT-APPROVAL-001",
+      "section": "Formal artifact management",
+      "testability": "structural",
+      "description": "No inferred GOV, SPEC, PB, ADR, DCL, or Deliberation Archive formalization may be treated as canonical project truth unless approval or acknowledgement evidence is linked to the artifact, or a scoped owner-activated auto-approval state explicitly permits that class of formalization.\n\nWhen auto-approval is active, the proposed change must still be displayed to the user and captured in the session transcript.",
+      "authority": "stated",
+      "type": "protected_behavior",
+      "title": "Canonical artifact writes require approval evidence",
+      "scope": "groundtruth-governance",
+      "status": "verified",
+      "tags": [
+        "protected-behavior",
+        "artifact-formalization",
+        "approval-evidence",
+        "auto-approval"
+      ],
+      "constraints": {
+        "decision_authority": "owner"
+      },
+      "affected_by": [
+        "DELIB-0835",
+        "GOV-ARTIFACT-APPROVAL-001"
+      ]
+    },
+    {
+      "id": "PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001",
+      "testability": "structural",
+      "description": "A fresh session must not proceed as if governance context is implicit. It must explicitly disclose the role being assumed, governance stance, active role mapping, and known skills, plug-ins, directives, and hooks before continuing with discretionary project work.",
+      "authority": "stated",
+      "type": "protected_behavior",
+      "title": "Sessions must not treat governance startup context as implicit",
+      "status": "verified",
+      "tags": [
+        "session-startup",
+        "governance",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0840",
+        "DELIB-0842"
+      ],
+      "source_paths": [
+        "scripts/session_self_initialization.py",
+        "docs/gtkb-dashboard/index.html",
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "docs/gtkb-dashboard/session-startup-report.md",
+        "docs/gtkb-dashboard/session-wrapup-report.md",
+        "memory/gtkb-dashboard-history.json",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "PB-SESSION-WRAP-UP-PROACTIVE-001",
+      "testability": "structural",
+      "description": "The user should not have to explicitly instruct GT-KB to perform session wrap-up procedures. Sessions must proactively present wrap-up guidance, next actions, and priority signals before ending when the harness provides a lifecycle hook or equivalent mechanism.",
+      "authority": "stated",
+      "type": "protected_behavior",
+      "title": "Sessions proactively initiate wrap-up guidance",
+      "status": "verified",
+      "tags": [
+        "session-lifecycle",
+        "governance",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0841"
+      ],
+      "source_paths": [
+        "scripts/session_self_initialization.py",
+        "docs/gtkb-dashboard/index.html",
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "docs/gtkb-dashboard/session-startup-report.md",
+        "docs/gtkb-dashboard/session-wrapup-report.md",
+        "memory/gtkb-dashboard-history.json",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "memory/work_list.md"
+      ]
+    },
+    {
+      "id": "PB-STANDING-BACKLOG-CONTINUITY-001",
+      "testability": "structural",
+      "description": "A session must not ignore, silently reorder, or drop standing backlog items without an explicit owner decision, superseding artifact, or completion evidence. Completing an item requires durable evidence in the backlog, linked Deliberation Archive or MemBase records where applicable, and regression visibility when the item affects behavior, governance, release-readiness, or production safety.",
+      "priority": "high",
+      "authority": "stated",
+      "type": "protected_behavior",
+      "title": "Standing backlog continuity must not be bypassed",
+      "status": "verified",
+      "tags": [
+        "standing-backlog",
+        "session-governance",
+        "agent-red",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0829",
+        "DELIB-0837",
+        "DELIB-0838"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        ".claude/rules/acting-prime-builder.md"
+      ]
+    },
+    {
+      "id": "SPEC-CORE-INTAKE-001",
+      "testability": "structural",
+      "description": "GT-KB must surface a core application specification intake loop for newly\ninitialized projects. After project initialization, and during later startup or\ndoctor-style health checks, GT-KB must be able to identify the next missing core\napplication specification slot and present exactly one deterministic question\nfor the owner to answer.\n\nThe baseline slots include product identity, application type, tenancy,\nusers/roles, data classification, compliance obligations, security posture,\nreliability posture, external integrations, AI usage, operational/release path,\nand explicit first-release non-goals.\n\nThe prompt is not a long onboarding wizard. It is a persisted missing-spec\ndetector that reduces owner burden to specifications, clarifications, and\ndecisions.\n",
+      "authority": "stated",
+      "type": "requirement",
+      "title": "GT-KB Prompts For Missing Core Application Specifications",
+      "status": "specified",
+      "tags": [
+        "gtkb-core-001",
+        "core-spec-intake",
+        "baseline-specifications"
+      ],
+      "affected_by": [
+        "DELIB-0875"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "bridge/gtkb-core-spec-intake-001.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-BASELINE-EVALUATION-2026-04-22.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-INTAKE-IMPLEMENTATION-PLAN-2026-04-22.md"
+      ]
+    },
+    {
+      "id": "SPEC-CORE-INTAKE-002",
+      "testability": "structural",
+      "description": "Core application specification prompting must continue while any required core\nslot is missing, inferred, or needs clarity. Prompting must stop automatically\nonce every required core slot is either owner-stated or explicitly marked not\napplicable in persisted evidence.\n\nGenerated or inferred candidates must not suppress future prompts until the\nowner confirms them. Explicit not-applicable decisions must be treated as\ncomplete for that slot, not as missing information.\n",
+      "authority": "stated",
+      "type": "requirement",
+      "title": "Core Specification Prompting Stops At Persisted Completion",
+      "status": "specified",
+      "tags": [
+        "gtkb-core-001",
+        "core-spec-intake",
+        "baseline-specifications"
+      ],
+      "affected_by": [
+        "DELIB-0875"
+      ],
+      "source_paths": [
+        "memory/work_list.md",
+        "bridge/gtkb-core-spec-intake-001.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-BASELINE-EVALUATION-2026-04-22.md",
+        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/CORE-SPEC-INTAKE-IMPLEMENTATION-PLAN-2026-04-22.md"
+      ]
+    },
+    {
+      "id": "SPEC-PROJECT-DASHBOARD-KPI-LINK-001",
+      "testability": "structural",
+      "description": "Fresh session startup must display a live project dashboard link. The dashboard must provide time-series KPI for backlog, MemBase, Deliberation Archive, tests, templates, specifications, drift, regression, contention, and tokens consumed at session start before user input.",
+      "authority": "stated",
+      "type": "requirement",
+      "title": "Startup displays a live project dashboard link with GT-KB time-series KPI",
+      "status": "verified",
+      "tags": [
+        "session-startup",
+        "governance",
+        "groundtruth-kb"
+      ],
+      "affected_by": [
+        "DELIB-0840",
+        "DELIB-0842"
+      ],
+      "source_paths": [
+        "scripts/session_self_initialization.py",
+        "docs/gtkb-dashboard/index.html",
+        "docs/gtkb-dashboard/dashboard-data.json",
+        "docs/gtkb-dashboard/session-startup-report.md",
+        "docs/gtkb-dashboard/session-wrapup-report.md",
+        "memory/gtkb-dashboard-history.json",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/check_codex_hook_parity.py",
+        "tests/scripts/test_session_self_initialization.py",
+        "tests/scripts/test_codex_hook_parity.py",
+        "tests/scripts/test_groundtruth_governance_adoption.py",
+        "tests/scripts/test_release_candidate_gate.py",
+        "memory/work_list.md"
+      ]
+    }
+  ],
+  "deliberations": [
+    {
+      "id": "DELIB-0828",
+      "origin_project": "Agent Red Customer Engagement",
+      "content": "Owner conversation decisions during Agent Red release-readiness recovery on 2026-04-19 America/Los_Angeles:\n\n1. Owner granted all required approvals for Codex to continue making necessary production-release-readiness changes.\n2. Owner asked Codex to continue planning and executing the work necessary to ensure the next build will be sufficiently well tested for production release.\n3. Owner explicitly challenged whether Deliberation Archive, MemBase, regression tests, GroundTruth-KB governance specifications, skills, and integrations had been adopted and enforced.\n\nCodex response/actions: acknowledged incomplete adoption, searched prior deliberations, added release-candidate gate script/workflow, added regression tests for production config and release-gate behavior, wrote MemBase markdown, and created an insight report for Deliberation Archive harvesting.\n\nNo raw production credential values are included in this deliberation.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner approval and governance challenge for Agent Red release-readiness recovery",
+      "session_id": "2026-04-19-agent-red-release-readiness",
+      "summary": "Owner approved necessary production-readiness changes and challenged Codex to enforce Deliberation Archive, MemBase, tests, and GroundTruth-KB governance.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-19-agent-red-release-readiness-recovery",
+      "origin_repo": "agent-red",
+      "participants": [
+        "owner",
+        "codex"
+      ]
+    },
+    {
+      "id": "DELIB-0829",
+      "origin_project": "Agent Red Customer Experience",
+      "content": "Owner asked Codex to adopt and enforce, to the extent possible, all GroundTruth-KB governance specifications, skills, subsystems, and integrations available within Agent Red, and to add any newly identified candidate skills/plugins to the top of the outstanding queue.\n\nDecision/action outcome:\n- Continue as Prime Builder for release-readiness recovery despite bridge unavailability.\n- Treat GroundTruth-KB governance adoption as a production-release gate, not a separate advisory checklist.\n- Add top-priority work items for unimplemented candidate managed-skill/doctor work: GTKB-GOV-001, GTKB-GOV-002, GTKB-GOV-003.\n- Add local release-candidate-gate skill and regression tests so drift is observable.\n- Keep remaining production recommendation as NO-GO until credential rotation, exact-candidate CI/Python 3.12 proof, branch provenance, and commercial durability scope are resolved.\n\nEvidence:\n- memory/work_list.md top items GTKB-GOV-001 through GTKB-GOV-003.\n- .claude/skills/release-candidate-gate/SKILL.md.\n- tests/scripts/test_groundtruth_governance_adoption.py.\n- scripts/release_candidate_gate.py includes the governance adoption test.\n- python scripts\\release_candidate_gate.py --skip-frontend passed locally under Python 3.14 with 146 targeted tests.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner directive: adopt and enforce Agent Red GroundTruth-KB governance",
+      "session_id": "2026-04-19-agent-red-release-readiness",
+      "summary": "Owner directed Codex to enforce GroundTruth-KB governance and add unimplemented candidate skill/doctor work to the top of the queue; Codex added local skill, tests, work items, and release-gate wiring.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-19-groundtruth-governance-adoption",
+      "origin_repo": "Agent Red Customer Engagement",
+      "participants": [
+        "Owner",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0830",
+      "origin_project": "Agent Red Customer Experience",
+      "content": "Owner decision: while the canonical Prime Builder is unavailable, Loyal Opposition must assume the Prime Builder role. The owner stated that Prime Builder is not currently available and will inform Codex/Loyal Opposition when that changes.\n\nOperational interpretation:\n- Codex/Loyal Opposition should continue as acting Prime Builder for Agent Red recovery work until the owner revokes or supersedes this instruction.\n- This is an explicit owner override of the normal role split where Opus 4.6 / Claude Code is canonical Prime Builder and Codex is Loyal Opposition.\n- The bridge remains unavailable for this non-standard session, so bridge-GO preconditions cannot be satisfied literally; work should still preserve the intent of the governance system through durable records, evidence, tests, and explicit NO-GO/GO status tracking.\n- When canonical Prime Builder availability is restored, handoff must identify work performed under this acting-Prime exception.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: Loyal Opposition assumes acting Prime Builder while Prime is unavailable",
+      "session_id": "2026-04-20-agent-red-acting-prime",
+      "summary": "Owner directed Loyal Opposition/Codex to assume the Prime Builder role until the canonical Prime Builder becomes available again.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-acting-prime-builder-owner-decision",
+      "origin_repo": "Agent Red Customer Engagement",
+      "participants": [
+        "Owner",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0831",
+      "origin_project": "Agent Red Customer Experience",
+      "content": "Owner clarified the general role-governance principle:\n\nThe roles of Prime Builder and Loyal Opposition may be assumed by any AI model harness that supports the operational capabilities required for the role, including hooks, skills, plugins, CLI access, desktop access, filesystem access, and related integrations. When a harness such as Codex or Claude Code is assigned a role, all skills, plugins, hooks, directives, and responsibilities for that role must be enabled to the extent possible in that harness. When the bridge is available, the bridge counterpart is always Loyal Opposition and must be configured accordingly.\n\nOperational interpretation:\n- Prime Builder and Loyal Opposition are portable roles, not fixed model identities.\n- Role assignment by the owner carries the full role capability and governance burden.\n- Current Agent Red mapping remains: Codex is acting Prime Builder while canonical Prime Builder is unavailable.\n- References in enabled Prime Builder skills to Prime Builder or changed_by='prime-builder/...' apply to the currently assigned acting Prime Builder harness.\n- If/when the bridge becomes available, the counterpart must be Loyal Opposition and must be configured with Loyal Opposition behavior.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: Prime Builder and Loyal Opposition are portable harness-assigned roles",
+      "session_id": "2026-04-20-agent-red-acting-prime",
+      "summary": "Owner clarified that Prime Builder and Loyal Opposition roles may be assumed by any capable AI harness; assigned roles require enabling the full role skills, plugins, hooks, directives, and responsibilities.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-role-portability-principle",
+      "origin_repo": "Agent Red Customer Engagement",
+      "participants": [
+        "Owner",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0832",
+      "origin_project": "Agent Red Customer Experience",
+      "content": "Owner clarified a related GroundTruth-KB installation and role-configuration principle:\n\nWhen GT-KB is installed, the system must be fully configured for the role of Prime Builder. If more than one AI harness is installed, configuration should be prepared for all capable harnesses so any harness may take the role of Prime Builder or Loyal Opposition. The Prime Builder role is assigned by the user. The Loyal Opposition role is assumed by the participant on the bridge that is not Prime Builder.\n\nOperational interpretation:\n- GT-KB installation is not complete if Prime Builder configuration is absent or partial.\n- Multi-harness installations should preconfigure role-capable harnesses rather than binding role capability to one vendor/model by default.\n- The owner/user assigns Prime Builder.\n- In bridge mode, the non-Prime participant is Loyal Opposition and should load/use Loyal Opposition behavior.\n- This principle extends, rather than replaces, DELIB-0830 and DELIB-0831.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: GT-KB installs must configure Prime Builder and all capable harness role paths",
+      "session_id": "2026-04-20-agent-red-acting-prime",
+      "summary": "Owner clarified that GT-KB installation must fully configure Prime Builder, prepare all capable installed harnesses for role assignment, and treat the non-Prime bridge participant as Loyal Opposition.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-gtkb-install-multi-harness-role-config",
+      "origin_repo": "Agent Red Customer Engagement",
+      "participants": [
+        "Owner",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0833",
+      "content": "# GT-KB harness role configuration comparison\n\nDate: 2026-04-20\nParticipants: Mike, Codex acting Prime Builder\nOutcome: informational comparison\n\n## Claim\n\nCurrent upstream GroundTruth-KB installation behavior is asymmetric. It primarily configures Claude Code as Prime Builder and Codex as Loyal Opposition. It does not yet fully implement the newer owner principle that any capable harness, including Cursor, should be prepared for either role.\n\n## Comparison\n\n| Area | Prime Builder configuration | Loyal Opposition configuration | Current tests / enforcement | Gap |\n|---|---|---|---|---|\n| Default harness mapping | `claude-code` provider, `claude` CLI, `CLAUDE.md` plus `.claude/settings.json`, bridge role `prime`. | `codex` provider, `codex` CLI, `AGENTS.md`, bridge role `loyal-opposition`. | Scaffold tests verify default dual-agent outputs. | Registry only contains Claude Code and Codex. Cursor is not first-class. Role portability is not fully encoded. |\n| Primary instructions | `CLAUDE.md` and `.claude/rules/prime-builder.md` define builder responsibilities: specs, implementation, tests, MemBase, work items. | `AGENTS.md` and `.claude/rules/loyal-opposition.md` define review, critique, evidence, GO/NO-GO/VERIFIED output, and file-safety behavior. | Bootstrap/scaffold tests verify `CLAUDE.md`, `AGENTS.md`, and bridge files are created. | LO configuration is Codex-shaped through `AGENTS.md`, not a generic harness-neutral role package. |\n| Hooks and settings | `.claude/settings.json` registers Claude Code hooks: session start governance, spec-before-code, bridge compliance, destructive gate, credential scan, scanner-safe-writer, owner-decision capture, deliberation gates, and related checks. | LO receives project files and rules, but Codex does not automatically consume `.claude/settings.json` hooks. LO enforcement is mostly textual plus bridge/report workflow. | Doctor and scaffold tests check hook registration and managed artifact presence. | No native Codex or Cursor hook-registration parity exists today. |\n| Skills | Dual-agent install copies managed skills under `.claude/skills`: `decision-capture`, `bridge-propose`, and `spec-intake`. These mostly support Prime/spec/bridge workflows. | LO uses AGENTS/bootstrap/report conventions. There is not yet an equivalent native Codex/Cursor LO skill package installed by GT-KB. | Skill scaffold and upgrade tests verify managed skills are copied/repaired. | Skills are Claude Code filesystem skills, not yet cross-harness plugin packages. |\n| Bridge behavior | Prime writes `NEW` / `REVISED` bridge files, watches for `GO`, `NO-GO`, or `VERIFIED`, and owns implementation follow-through. | LO reads actionable `NEW` / `REVISED` entries, writes numbered review files, and marks `GO`, `NO-GO`, or `VERIFIED`. | Bridge inventory and scaffold tests verify file-bridge defaults. | Defaults are still Claude/Codex-oriented. Harness command slots exist conceptually, but complete multi-harness config is not enforced. |\n| Output locations | Prime updates specs, work items, implementation files, MemBase, bridge artifacts, and release/governance records. | LO reports go under `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` and related LO logs/bootstrap docs. | Scaffold copies Codex bootstrap and independent-progress-assessment files. | Directory names and contracts are Codex-specific rather than role-generic. |\n| Doctor / repair behavior | GT-KB doctor/upgrade strongly protects `.claude` hooks, rules, settings, and managed skills. | Some LO bridge rules and Codex bootstrap artifacts are scaffolded and repaired, but not all LO-role enablement is verified as a complete harness package. | Tests cover settings warnings, missing bridge-rule repair, and missing managed-skill repair. | No doctor check yet proves every installed capable harness can act as Prime or LO. |\n| Cursor | No current first-class Prime Builder provider. | No current first-class Loyal Opposition provider. | No provider-registry or scaffold tests for Cursor. | Cursor support remains a candidate implementation item, not current behavior. |\n\n## Evidence anchors\n\n- `E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/src/groundtruth_kb/providers/schema.py` defines only `claude-code` and `codex` providers.\n- `E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/templates/CLAUDE.md` and `templates/rules/prime-builder.md` define Prime Builder behavior.\n- `E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/templates/project/AGENTS.md` and `templates/rules/loyal-opposition.md` define Loyal Opposition behavior.\n- `E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/templates/managed-artifacts.toml` lists Claude Code hooks, rules, settings registrations, and managed skills.\n- `E:/Claude-Playground/CLAUDE-PROJECTS/groundtruth-kb/tests/test_scaffold_skills.py`, `tests/test_upgrade_skills.py`, and doctor/scaffold tests verify parts of this behavior.\n\n## Recommended action\n\nGT-KB should add a harness-role capability model: every capable harness should be configurable for Prime Builder and Loyal Opposition, with harness-native instructions, hooks, skills/plugins, bridge polling, and doctor tests. Until that is implemented, documentation must state that current behavior is Claude-Code-centered for Prime Builder and Codex-centered for Loyal Opposition.",
+      "source_type": "owner_conversation",
+      "outcome": "informational",
+      "title": "Comparison: GT-KB harness role configuration for Prime Builder vs Loyal Opposition",
+      "summary": "Documents the current asymmetric GT-KB install behavior: Claude Code is configured most strongly for Prime Builder, Codex is configured mainly for Loyal Opposition through AGENTS/bootstrap/bridge conventions, and Cursor has no first-class provider yet.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-gtkb-harness-role-comparison",
+      "participants": [
+        "Mike",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0834",
+      "content": "# Owner guiding principle: Agent Red as GT-KB-conformant adopter application\n\nDate: 2026-04-20\nParticipants: Mike, Codex acting Prime Builder\nOutcome: owner decision\n\n## Decision\n\nAgent Red is a well-behaved, fully-conformant application supported and sustained by GroundTruth-KB.\n\n## Interpretation\n\nAgent Red is not to be treated as an ad hoc exception to GroundTruth-KB governance. It is a production application that should conform to GT-KB specifications, governance rules, deliberation/archive discipline, MemBase traceability, release-readiness gates, and bridge/role conventions to the extent those systems apply.\n\nGT-KB is the sustaining governance substrate for Agent Red: it provides the durable specifications, tests, work queue, deliberation archive, role contracts, skills, hooks, and release gates that keep Agent Red releasable and auditable.\n\n## Operational implications\n\n- Agent Red release work should preserve GT-KB adoption artifacts rather than bypassing them.\n- Agent Red exceptions from GT-KB rules must be explicit, documented, and regression-tested where possible.\n- Future Prime Builder or Loyal Opposition sessions should evaluate Agent Red changes through the question: does this maintain Agent Red as a conformant GT-KB-supported application?\n- Production readiness is not only application correctness; it includes governance conformance, durable traceability, and observable regression coverage.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: Agent Red is a fully-conformant application sustained by GT-KB",
+      "summary": "Owner established Agent Red as a well-behaved, fully-conformant application supported and sustained by GroundTruth-KB governance, traceability, skills, hooks, and release-readiness discipline.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-agent-red-gtkb-conformant-application-principle",
+      "participants": [
+        "Mike",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0835",
+      "content": "# Owner decision: strict artifact approval and audit trail with optional auto-approval\n\nDate: 2026-04-20\nParticipants: Mike, Codex acting Prime Builder\nOutcome: owner decision\n\n## Decision\n\nGroundTruth-KB should bias toward strictness when managing formal artifacts and maintain a rich audit trail that can be used to evaluate the impact of relaxing or changing artifact-handling rules.\n\nWhen an AI harness proposes to formalize user input as a Deliberation Archive entry, GOV, SPEC, PB, ADR, or DCL, the system should present the proposed artifact in native review format with full content and metadata before treating it as canonical project truth.\n\nA hook or equivalent enforcement mechanism should require the user to approve or acknowledge the proposed entry before canonical insertion, promotion, or mutation, except when a scoped auto-approval state has been explicitly activated.\n\n## Amendment approved by owner\n\nIt must be possible to activate a state in which user approval is granted automatically. Even in that state, the explicit proposed change request must still be presented to the user and captured in the session transcript.\n\n## Formalization packet approved\n\n### DELIB\n\n```yaml\nartifact_type: deliberation\nsource_type: owner_conversation\nsource_ref: conversation:2026-04-20-strict-artifact-approval-audit-trail\noutcome: owner_decision\ntitle: Owner decision: strict artifact approval and audit trail bias\nparticipants:\n  - Mike\n  - Codex\nsummary: >\n  Owner directed that GroundTruth-KB should bias toward strictness when managing\n  formal artifacts, maintain a rich audit trail, require full native-format\n  presentation before canonicalization, and permit scoped auto-approval only\n  when the proposed change is still presented and transcript-captured.\n```\n\n### GOV\n\n```yaml\nartifact_type: governance_specification\nid: GOV-ARTIFACT-APPROVAL-001\ntype: governance\nstatus: specified\ntitle: Formal artifact approval gate\nrequirement: |\n  GroundTruth-KB must bias toward strictness when managing formal artifacts.\n  When an AI harness proposes to create, update, promote, or retire a GOV, SPEC,\n  PB, ADR, DCL, or Deliberation Archive entry based on user conversation, the\n  system must present the full proposed artifact in its native review format\n  before treating it as canonical project truth.\n\n  The review packet must include the artifact type, proposed identifier,\n  lifecycle status or outcome, title, summary, full content, metadata, links,\n  assertions or constraints where applicable, changed_by, change_reason, and\n  source reference.\n\n  The artifact must not become canonical until the user approves or explicitly\n  acknowledges the proposed entry, unless the user has previously activated a\n  scoped auto-approval state for that exact class of formalization. Auto-approval\n  does not remove the display or transcript-capture requirement.\nrationale: |\n  The user's interaction with GroundTruth-KB is an artifact generation and\n  management activity, distinct from free-form conversation with an AI assistant.\n  Strict review preserves user control, prevents accidental governance drift,\n  and creates an audit trail that can later be used to evaluate the impact of\n  relaxing artifact-handling rules.\n```\n\n### PB\n\n```yaml\nartifact_type: protected_behavior\nid: PB-ARTIFACT-APPROVAL-001\ntype: protected_behavior\nstatus: specified\ntitle: Canonical artifact writes require approval evidence\nprotected_behavior: |\n  No inferred GOV, SPEC, PB, ADR, DCL, or Deliberation Archive formalization may\n  be treated as canonical project truth unless approval or acknowledgement\n  evidence is linked to the artifact, or a scoped owner-activated auto-approval\n  state explicitly permits that class of formalization.\n\n  When auto-approval is active, the proposed change must still be displayed to\n  the user and captured in the session transcript.\n```\n\n### ADR\n\n```yaml\nartifact_type: architecture_decision\nid: ADR-ARTIFACT-FORMALIZATION-GATE-001\ntype: architecture_decision\nstatus: specified\ntitle: Use strict formalization gate with scoped auto-approval mode\ndecision: |\n  GT-KB formal artifact creation and mutation should flow through a review gate\n  that renders the full native artifact proposal and captures approval evidence.\n  The architecture may support a scoped auto-approval state, but auto-approved\n  proposals must still be rendered to the user and retained in the transcript.\nconsequences: |\n  This increases friction for artifact changes by default, but improves audit\n  quality, user control, and the ability to test future relaxation of artifact\n  handling rules.\n```\n\n### DCL\n\n```yaml\nartifact_type: design_constraint\nid: DCL-ARTIFACT-APPROVAL-HOOK-001\ntype: design_constraint\nstatus: specified\ntitle: Artifact approval hook must display full native proposal\nconstraint: |\n  Any hook, skill, CLI flow, or harness integration that converts user input\n  into formal GT-KB artifacts must render the complete proposed artifact before\n  canonical persistence. The renderer must not summarize away required metadata\n  or omit content that will be stored.\n\n  The approval event must capture proposed artifact ID and type, source\n  conversation or source artifact, full proposed content hash, approving user or\n  delegated authority, timestamp, approval mode, changed_by, and change_reason.\n\n  If auto-approval is active, the flow must still display the explicit proposed\n  change request and preserve it in the session transcript.\n```",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: strict artifact approval and audit trail with optional auto-approval",
+      "summary": "Owner approved a strict formal artifact approval/audit-trail rule and amended it to allow scoped auto-approval only when the explicit proposed change is still presented and captured in the session transcript.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-strict-artifact-approval-audit-trail",
+      "participants": [
+        "Mike",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0836",
+      "content": "Decision: The owner understands and agrees that Codex hooks are currently disabled on Windows, so Agent Red should treat .codex/config.toml and .codex/hooks.json as forward-compatible hook intent while using scripts/check_codex_hook_parity.py and release-candidate-gate regression tests as mechanically active Windows enforcement.\n\nContext:\n- Official Codex docs state hooks are experimental and Windows support is temporarily disabled.\n- The owner accepted this limitation after Codex explained it.\n- The implementation added a project-scoped Codex config package, a verifier, regression tests, and release-gate wiring.\n\nImplications:\n- Strict GOV enforcement remains active through Claude Code hooks and release-gate verification today.\n- Codex-native hook enforcement should become active automatically where Codex hook runtime support exists.\n- Until Windows hook support is restored, Codex sessions must not represent .codex/hooks.json as a live Windows interception boundary.\n",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Codex hook Windows limitation accepted",
+      "session_id": "2026-04-20",
+      "summary": "Owner accepted the Codex Windows hook limitation and the fallback verifier/release-gate enforcement posture.",
+      "sensitivity": "normal",
+      "participants": [
+        "owner",
+        "codex"
+      ]
+    },
+    {
+      "id": "DELIB-0837",
+      "content": "# Session formalization audit: 2026-04-20\n\nOwner request: ensure that all decisions, directives, and principles in this session have been identified and applied to their respective artifacts.\n\n## Mapping\n\n- DELIB-0828: release-readiness approvals and testing challenge -> GOV-RELEASE-READINESS-GOVERNED-TESTING-001, release-candidate gate, governance regression tests.\n- DELIB-0829: adopt/enforce GT-KB capabilities and queue candidate skills/plugins first -> GOV-GTKB-ADOPTION-ENFORCEMENT-001, work queue GTKB-GOV-001..003, governance adoption tests.\n- DELIB-0830: Codex/Loyal Opposition acts as Prime Builder while canonical Prime is unavailable -> GOV-ACTING-PRIME-BUILDER-001 and .claude/rules/acting-prime-builder.md.\n- DELIB-0831: Prime Builder and Loyal Opposition are portable harness-assigned roles -> GOV-HARNESS-ROLE-PORTABILITY-001 and acting-prime rule.\n- DELIB-0832: GT-KB installs configure Prime Builder and prepare all capable harness role paths -> GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001 and acting-prime rule.\n- DELIB-0833: harness role comparison -> GT-KB documentation/test updates plus GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001 as the local Agent Red MemBase hook.\n- DELIB-0834: Agent Red is a well-behaved, fully conformant GT-KB-supported application -> GOV-AGENT-RED-GTKB-CONFORMANCE-001 and acting-prime rule.\n- DELIB-0835: strict formal artifact approval/audit with scoped auto-approval -> GOV-ARTIFACT-APPROVAL-001, PB-ARTIFACT-APPROVAL-001, ADR-ARTIFACT-FORMALIZATION-GATE-001, DCL-ARTIFACT-APPROVAL-HOOK-001, Claude hook, release gate, hook tests.\n- DELIB-0836: Codex hooks are disabled on Windows; use forward-compatible hook intent and verifier/release gate fallback -> ADR-CODEX-HOOK-PARITY-FALLBACK-001, .codex package, parity verifier, release gate tests.\n- Current request: all session decisions/directives/principles must be audited for artifact mapping -> GOV-SESSION-FORMALIZATION-AUDIT-001 and this DELIB-0837 audit entry.\n\n## Residual scope notes\n\n- Codex hook enforcement remains forward-compatible intent on Windows until the Codex runtime re-enables hooks on Windows.\n- GTKB-GOV-001 through GTKB-GOV-003 remain active top-queue work items for broader managed-skill/doctor adoption.\n- The non-standard acting-Prime session remains active until the owner says canonical Prime Builder is available again.\n",
+      "source_type": "owner_conversation",
+      "outcome": "informational",
+      "title": "Session formalization audit: decisions, directives, and principles mapped to artifacts",
+      "session_id": "2026-04-20-agent-red-acting-prime",
+      "summary": "Audits session decisions and maps them to Deliberation Archive, MemBase GOV/ADR/PB/DCL records, rules, work queue entries, hooks, and tests.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-session-formalization-audit",
+      "participants": [
+        "Owner",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0838",
+      "content": "# Owner decision: standing backlog formalization\n\nDate: 2026-04-20\nParticipants: Owner, Codex acting Prime Builder\nOutcome: owner decision\n\n## Decision\n\nThe standing backlog should be formalized as a governed cross-session work authority for Agent Red.\n\n## Clarification\n\nThe formalized backlog governance contract is treated like other GroundTruth-KB specifications: it is represented in MemBase, linked to a Deliberation Archive decision, cited in rules, regression-tested, and visible in the release gate.\n\nThe markdown backlog remains the current human-readable authority for standing work. Individual backlog entries remain queue/work items unless a separate decision promotes an entry to GOV, SPEC, PB, ADR, DCL, or another formal artifact type.\n\n## Implications\n\n- Future sessions must inspect the standing backlog before selecting discretionary work.\n- Owner-prioritized or TOP items must not be silently bypassed, reordered, or dropped.\n- Completion requires durable evidence and regression visibility when the item affects behavior, governance, release-readiness, or production safety.\n- The backlog contract can later be migrated to a more structured GT-KB work queue or doctor-managed artifact without losing current authority.\n",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: standing backlog is a governed cross-session work authority",
+      "session_id": "2026-04-20-agent-red-acting-prime",
+      "summary": "Owner approved formalizing the standing backlog with specification-like treatment while retaining memory/work_list.md as the human-readable backlog authority.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-standing-backlog-formalization-approved",
+      "participants": [
+        "Owner",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0839",
+      "content": "Standing backlog harvest snapshot: pre-existing artifacts were inventoried and the standing backlog was populated with explicit reconciliation items for currently discovered actionable sources.\n\nMapped sources:\n- bridge/INDEX.md latest actionable entries: 2 GO and 4 NO-GO.\n- groundtruth.db work_items non-terminal counts: 1994 open, 14 new, 4 in_progress, 8 unresolved, 1 blocked, 17 specified, 1 created, and 1 deferred.\n- memory/release-readiness.md remaining blocker list: credential rotation, git history purge decision, SonarCloud pass, security scan pass, branch provenance reconciliation, exact-candidate Python 3.12 CI, and commercial durability launch-scope decision.\n- independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md records the snapshot.\n\nBacklog updates:\n- GTKB-GOV-004 through GTKB-GOV-010 added to memory/work_list.md.\n- scripts/audit_standing_backlog_sources.py added as repeatable source audit.\n- tests/scripts/test_standing_backlog_harvest.py added and wired into the release-candidate gate.\n\nResidual conclusion: the standing backlog now includes explicit reconciliation items for discovered pre-existing source populations, but MemBase work_items require structured grouping rather than one markdown row per work item.\n",
+      "source_type": "owner_conversation",
+      "outcome": "informational",
+      "title": "Standing backlog harvest snapshot and reconciliation obligations",
+      "session_id": "2026-04-20-agent-red-acting-prime",
+      "summary": "Inventoried pre-existing bridge, MemBase, and release-readiness sources and added explicit standing-backlog reconciliation items GTKB-GOV-004 through GTKB-GOV-010.",
+      "sensitivity": "normal",
+      "source_ref": "conversation:2026-04-20-standing-backlog-harvest",
+      "participants": [
+        "Owner",
+        "Codex"
+      ]
+    },
+    {
+      "id": "DELIB-0840",
+      "origin_project": "Agent Red Customer Engagement",
+      "content": "Owner decision DELIB-0840: Fresh Agent Red / GroundTruth-KB sessions must self-initialize by presenting the role being assumed and the session governance stance, including skills, plug-ins, directives, hooks, and role mapping. Startup must display a live link to the project dashboard with time-series KPI for backlog, MemBase, Deliberation Archive, tests, templates, specifications, drift, regression, contention, and tokens consumed at session start before user input. Startup must propose the three top priority actions for the user to initiate and suggest options for reducing token consumption during startup and ongoing project work.\n\nImplementation note: Formal records, rule text, standing backlog visibility, and regression checks are created immediately. Full live dashboard implementation, startup metric collection, and pre-user-input token measurement remain tracked by GTKB-GOV-011 until complete.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: fresh sessions must self-initialize with role, dashboard, priorities, and token options",
+      "summary": "Fresh sessions must disclose role/governance context, dashboard link, top priority actions, and token-budget options.",
+      "sensitivity": "normal",
+      "source_ref": "owner_conversation:2026-04-20-session-self-initialization-directive",
+      "origin_repo": "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
+      "participants": [
+        "owner",
+        "acting-prime-builder-codex"
+      ]
+    },
+    {
+      "id": "DELIB-0841",
+      "origin_project": "Agent Red Customer Engagement",
+      "content": "Owner decision DELIB-0841: The user should not have to explicitly instruct GT-KB to perform session wrap-up procedures. Each session should actively inform and engage the user to draw attention to priorities across all dimensions of the project and simplify user input by suggesting actions and priorities. The owner clarified that the intended spelling is priorities.\n\nImplementation boundary: safe automatic lifecycle hooks may generate startup reports, dashboard snapshots, proactive wrap-up reports, and suggested next actions. Mutating wrap-up operations remain governed by applicable approval, acknowledgement, or owner-authorized automation scope.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: sessions proactively engage the user and initiate wrap-up guidance",
+      "summary": "Sessions should not wait for explicit wrap-up requests and should surface project priorities with suggested actions.",
+      "sensitivity": "normal",
+      "source_ref": "owner_conversation:2026-04-20-session-lifecycle-engagement-principle",
+      "origin_repo": "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
+      "participants": [
+        "owner",
+        "acting-prime-builder-codex"
+      ]
+    },
+    {
+      "id": "DELIB-0842",
+      "origin_project": "Agent Red Customer Engagement",
+      "content": "GTKB-GOV-011 implementation evidence: scripts/session_self_initialization.py now generates the startup model, live local dashboard, dashboard JSON, startup report, proactive wrap-up report, and bounded time-series KPI history. Claude settings register SessionStart and Stop lifecycle hooks. Codex hooks carry matching hook intent, verified by scripts/check_codex_hook_parity.py while Codex hooks remain disabled on Windows. Regression tests cover startup disclosure, dashboard KPI inventory, top-three actions, token-budget reporting, proactive wrap-up reporting, lifecycle hook intent, and release-gate wiring.",
+      "source_type": "report",
+      "outcome": "informational",
+      "title": "Implementation evidence: GTKB-GOV-011 session lifecycle startup and wrap-up",
+      "summary": "Startup dashboard/report and proactive wrap-up report are implemented and release-gate visible.",
+      "sensitivity": "normal",
+      "source_ref": "implementation:GTKB-GOV-011",
+      "origin_repo": "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
+      "participants": [
+        "acting-prime-builder-codex"
+      ]
+    },
+    {
+      "id": "DELIB-0874",
+      "origin_project": "Agent Red Customer Engagement",
+      "content": "Owner stated that the default behavior of the system should be oriented toward artifacts and plans. The system should be biased toward capturing deliberations, adding planned work to the standing backlog, treating agreed plans as artifacts, and starting sessions by examining the state of artifacts. The owner explained that this imposes a view of development projects that creates clear decision triggers for CRUD operations on artifacts and reduces knowledge and memory loss from session to session. The owner then approved adding the principle to the system to encourage bias toward design options and interpretation of user inputs.",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner decision: artifact-oriented development governance",
+      "session_id": "2026-04-22-artifact-oriented-governance",
+      "summary": "Owner directed GT-KB to orient default behavior toward artifacts and plans, bias interpretation of user inputs toward artifact lifecycle opportunities, and preserve more knowledge across sessions.",
+      "sensitivity": "normal",
+      "source_ref": "owner_conversation:2026-04-22-artifact-oriented-governance",
+      "origin_repo": "Agent Red Customer Engagement",
+      "participants": [
+        "owner",
+        "prime-builder/codex"
+      ]
+    },
+    {
+      "id": "DELIB-0875",
+      "origin_project": "Agent Red Customer Engagement",
+      "content": "Owner decision: approve GTKB-CORE-001 Phase 0.\n\nMike approved proceeding with the core application specification intake\nworkstream after the standing backlog entry and bridge proposal were reviewed.\n\nApproved direction:\n- GT-KB should provide a persisted core application specification intake loop.\n- New initialized projects should be enrolled by default.\n- Automation and unusual cases must have an explicit opt-out path.\n- The loop asks one missing baseline question at a time.\n- Prompting continues across sessions while required core slots remain missing,\n  inferred, or unclear.\n- Prompting stops when every required slot is owner-stated or explicitly not\n  applicable.\n- Completion is derived from persisted MemBase evidence rather than session\n  memory.\n\nImplementation boundary:\n- This approval authorizes Phase 0 formalization and the next implementation\n  proposal.\n- It does not itself implement GT-KB package code.\n- Package changes still require review, tests, and post-implementation\n  verification.\n",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner approval for GT-KB core specification intake Phase 0",
+      "summary": "Owner approved proceeding with GTKB-CORE-001 Phase 0: default-on core spec intake with explicit opt-out and persisted stop conditions.",
+      "sensitivity": "normal",
+      "source_ref": "owner_conversation:2026-04-22-core-spec-intake-approved",
+      "origin_repo": "Agent Red Customer Engagement",
+      "participants": [
+        "owner",
+        "prime-builder/codex"
+      ]
+    },
+    {
+      "id": "DELIB-0880",
+      "origin_project": "Agent Red Customer Engagement",
+      "content": "Owner directive: bridge state must come from the live file bridge index, and\nLoyal Opposition has permanent bridge-function/use authority.\n\nCaptured owner instructions:\n- The content of bridge/INDEX.md is authoritative.\n- Copies, cached versions, summaries, startup reports, dashboard fields, or\n  other artifacts derived from bridge/INDEX.md must not be used as the basis\n  for determining bridge state.\n- All project-level restrictions are lifted when Loyal Opposition is working on\n  the correct function and use of the Prime Builder / Loyal Opposition file\n  bridge.\n- Loyal Opposition has permanent permission to diagnose and repair the bridge\n  and to make changes to all downstream artifacts that depend on the bridge in\n  order to sustain the bridge and ensure it remains properly and fully utilized.\n\nGovernance effect:\n- Live bridge/INDEX.md is the sole authoritative source for current bridge\n  queue state.\n- Derived artifacts may provide context but are non-authoritative after\n  generation.\n- Loyal Opposition may update bridge files, bridge configuration, startup\n  behavior, generated bridge-status surfaces, bridge automation, and downstream\n  bridge-dependent artifacts without separate owner approval when the work is\n  scoped to sustaining correct bridge function and use.\n",
+      "source_type": "owner_conversation",
+      "outcome": "owner_decision",
+      "title": "Owner directive: live bridge index authority and permanent bridge repair authority",
+      "summary": "Owner directed that live bridge/INDEX.md is authoritative for bridge state and that Loyal Opposition has permanent permission to repair bridge function/use and downstream bridge-dependent artifacts.",
+      "sensitivity": "normal",
+      "source_ref": "owner_conversation:2026-04-23-bridge-authority",
+      "origin_repo": "Agent Red Customer Engagement",
+      "participants": [
+        "owner",
+        "loyal-opposition/codex"
+      ]
+    }
+  ]
+}
