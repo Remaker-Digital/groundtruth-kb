@@ -217,3 +217,40 @@ def test_env_override_absent_in_settings():
     """GTKB_BLOCK_ON_PROSE_DECISION_ASK no longer present in .claude/settings.local.json env."""
     config = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     assert "GTKB_BLOCK_ON_PROSE_DECISION_ASK" not in config.get("env", {})
+
+
+def test_block_emission_end_to_end_stop_mode(tmp_path, monkeypatch):
+    """T-block-emission-end-to-end: Stop-mode invocation with valid transcript emits block JSON.
+
+    Per Codex -010 F1: this proves the actual re-enabled blocking behavior end-to-end.
+    Per Codex -010 hint: transcript needs at least one real user event (type=user with
+    non-tool_result content) followed by the assistant text event, because
+    _find_just_completed_turn() looks backward for a real user boundary.
+    """
+    import subprocess
+    monkeypatch.delenv("GTKB_BLOCK_ON_PROSE_DECISION_ASK", raising=False)
+    transcript = [
+        {"type": "user", "message": {"content": [{"type": "text", "text": "continue"}]}},
+        {"type": "assistant", "message": {"content": [{"type": "text", "text": "Should I commit the changes or wait for review?"}]}},
+    ]
+    tfile = tmp_path / "transcript.jsonl"
+    tfile.write_text("\n".join(json.dumps(e) for e in transcript), encoding="utf-8")
+    payload = json.dumps({
+        "session_id": "test-slice-a-e2e",
+        "hook_event_name": "Stop",
+        "transcript_path": str(tfile.resolve()),
+        "cwd": str(REPO_ROOT),
+    })
+    env = dict(os.environ)
+    env.pop("GTKB_BLOCK_ON_PROSE_DECISION_ASK", None)
+    result = subprocess.run(
+        [sys.executable, str(HOOK_PATH), "--mode", "stop"],
+        input=payload, capture_output=True, text=True, env=env, timeout=10,
+    )
+    assert result.returncode == 0, f"Hook exit code {result.returncode}; stderr: {result.stderr[-500:]}"
+    out = result.stdout.strip()
+    assert out, f"Hook produced empty stdout; stderr: {result.stderr[-500:]}"
+    parsed = json.loads(out)
+    assert parsed.get("decision") == "block", f"Expected decision=block; got {parsed!r}"
+    assert "reason" in parsed
+    assert "should_i_or" in parsed["reason"], f"Expected pattern name in reason; got {parsed['reason'][:200]!r}"
