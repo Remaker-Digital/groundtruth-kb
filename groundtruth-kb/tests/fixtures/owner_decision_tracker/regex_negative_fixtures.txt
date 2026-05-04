@@ -1,0 +1,23 @@
+# Negative fixtures for owner-decision-tracker regex tightening per Sub-slice A.
+# Each non-comment line represents text that should NOT match any prose-decision-ask
+# pattern after the lookbehind + split-variant tightening per
+# bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-007.md.
+
+# Status statements without ? or 1st-person construct (S328 directive)
+Awaiting your direction.
+Awaiting owner direction. No stale-entry act required.
+Awaiting your decision.
+Awaiting Codex re-review on -003.
+Awaiting CI green on develop.
+Sub-slice F's promotion gate is awaiting owner approval per the umbrella scope.
+
+# Quoted/backtick-bounded FP class (DECISION-0001 + DECISION-0002, S309)
+ose anti-patterns ("want me to X or Y?") and logs them.
+The detector saw `"want me to X or Y?"` as a literal string.
+prose anti-patterns ("should I X or Y?") and logs them.
+The detector saw `"awaiting your direction?"` as a literal example.
+The detector saw `"want me to X or Y?"` and described it.
+
+# Abstract decision discussion (existing T14 guards)
+The decision was hard, choosing between A or B felt risky.
+In general, decisions about scope are tricky.

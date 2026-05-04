@@ -102,25 +102,69 @@ PENDING_FILE_REL = "memory/pending-owner-decisions.md"
 # are mitigated by T14 (abstract-decision-discussion guard) and by the
 # non-blocking nature of nudges (worst case: one extra reminder).
 PROSE_DECISION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    # "want me to X or Y?" -- offering binary choice in prose.
-    ("offering_or_choice", re.compile(r"\bwant me to\b[^.?!]*\bor\b[^.?!]*\?", re.IGNORECASE)),
-    # "should I X or Y?" -- same shape with different verb.
-    ("should_i_or", re.compile(r"\bshould I\b[^.?!]*\bor\b[^.?!]*\?", re.IGNORECASE)),
-    # "awaiting your direction/input/answer/decision" -- explicit standby.
-    ("awaiting_input", re.compile(r"\bawaiting (?:your|owner)\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b", re.IGNORECASE)),
-    # "standing by for ..." -- same intent, different phrasing.
-    ("standing_by_for", re.compile(r"\bstanding by for\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b", re.IGNORECASE)),
-    # "your decision/choice/input?" -- asking for owner input with question mark.
-    ("your_decision_q", re.compile(r"\b(?:your|owner)\s+(?:decision|choice|input)\b[^.?!]{0,80}\?", re.IGNORECASE)),
+    # All patterns prefixed with negative lookbehind (?<!["`]) to suppress
+    # quoted/backtick-bounded literals (DECISION-0001/0002 FP class, S309).
+    # See bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-007.md.
+    ("offering_or_choice", re.compile(
+        r'(?<!["`])\bwant me to\b[^.?!]*\bor\b[^.?!]*\?',
+        re.IGNORECASE,
+    )),
+    ("should_i_or", re.compile(
+        r'(?<!["`])\bshould I\b[^.?!]*\bor\b[^.?!]*\?',
+        re.IGNORECASE,
+    )),
+    # Split awaiting_input into _q (interrogative) + _first_person (active wait).
+    # Bare "Awaiting your X." status statements no longer match (S328 directive).
+    ("awaiting_input_q", re.compile(
+        r'(?<!["`])\bawaiting (?:your|owner)\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b[^.?!]*\?',
+        re.IGNORECASE,
+    )),
+    ("awaiting_input_first_person", re.compile(
+        r'(?<!["`])\b(?:i am|i\'m|we are|we\'re)\s+awaiting (?:your|owner)\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b',
+        re.IGNORECASE,
+    )),
+    # Split standing_by_for similarly.
+    ("standing_by_for_q", re.compile(
+        r'(?<!["`])\bstanding by for\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b[^.?!]*\?',
+        re.IGNORECASE,
+    )),
+    ("standing_by_for_first_person", re.compile(
+        r'(?<!["`])\b(?:i am|i\'m|we are|we\'re)\s+standing by for\b[^.?!]*\b(?:direction|input|answer|decision|approval)\b',
+        re.IGNORECASE,
+    )),
+    ("your_decision_q", re.compile(
+        r'(?<!["`])\b(?:your|owner)\s+(?:decision|choice|input)\b[^.?!]{0,80}\?',
+        re.IGNORECASE,
+    )),
 )
 
 # False-positive guard for prose detection (T14): patterns that look like
-# decision asks but are actually abstract discussion.
+# decision asks but are actually abstract discussion or detector-describing
+# text. Per Sub-slice A revision -007: applied per-match against bounded
+# local window (GUARD_LOCAL_WINDOW_CHARS), not full event.
 PROSE_FALSE_POSITIVE_GUARDS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bdecisions are (?:hard|complex|difficult|tricky)\b", re.IGNORECASE),
     re.compile(r"\bin general,?\s+decisions?\b", re.IGNORECASE),
     re.compile(r"\babstract(?:ly)?,?\s+(?:about\s+)?decisions?\b", re.IGNORECASE),
+    # Self-reference suppressor (S328 directive): suppresses match when
+    # local window mentions detector internals.
+    re.compile(
+        r"\b(?:PROSE_DECISION_PATTERNS|owner-decision-tracker|decision-tracker|prose pattern|prose-pattern|regex tightening)\b",
+        re.IGNORECASE,
+    ),
+    # Bridge-metadata context suppressor: bridge-state words signal
+    # factual bridge-thread reporting, not a decision-ask.
+    re.compile(
+        r"\bCodex (?:GO|NO-GO|VERIFIED|review|`-\d+|F\d|umbrella)\b",
+        re.IGNORECASE,
+    ),
 )
+
+# Per Sub-slice A revision -007 §F1 (Codex -002 finding): guards are applied
+# against a local window around each match, not the full assistant event.
+# This prevents systematic false negatives when one event mentions bridge
+# state alongside an unrelated genuine prose decision-ask.
+GUARD_LOCAL_WINDOW_CHARS = 200
 
 # Block emission feature flag (Codex -004 GO condition 3).
 # Default '1' (enabled); '=0' suppresses block JSON only — detection,
@@ -636,14 +680,19 @@ def _scan_prose_decisions(turn_events: list[dict[str, Any]]) -> list[tuple[str, 
                 if isinstance(part, dict) and part.get("type") == "text":
                     text_parts.append(str(part.get("text") or ""))
         full_text = "\n".join(text_parts)
-        # False-positive guard first: if the text matches an abstract
-        # discussion pattern, skip prose detection entirely for this
-        # event. This is the T14 guarantee.
-        if any(g.search(full_text) for g in PROSE_FALSE_POSITIVE_GUARDS):
-            continue
+        # Per Sub-slice A -007 §F1: guards applied per-match against bounded
+        # local window (GUARD_LOCAL_WINDOW_CHARS), not full_text. Switch from
+        # pattern.search() (first match only) to pattern.finditer() (all
+        # matches) so multiple genuine asks in one event are detected, and
+        # an unrelated guard-region elsewhere in the event does not suppress
+        # them. T-mixed-event-1 + T-mixed-event-2 verify this behavior.
         for name, pattern in PROSE_DECISION_PATTERNS:
-            m = pattern.search(full_text)
-            if m:
+            for m in pattern.finditer(full_text):
+                window_start = max(0, m.start() - GUARD_LOCAL_WINDOW_CHARS)
+                window_end = min(len(full_text), m.end() + GUARD_LOCAL_WINDOW_CHARS)
+                window = full_text[window_start:window_end]
+                if any(g.search(window) for g in PROSE_FALSE_POSITIVE_GUARDS):
+                    continue
                 snippet = full_text[max(0, m.start() - 20):m.end() + 20].strip()
                 matches.append((name, snippet))
     return matches

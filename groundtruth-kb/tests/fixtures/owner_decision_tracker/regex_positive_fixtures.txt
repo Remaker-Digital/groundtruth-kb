@@ -1,0 +1,32 @@
+# Positive fixtures for owner-decision-tracker regex tightening per Sub-slice A.
+# Each non-comment line represents text that SHOULD match exactly one of the 7
+# prose-decision-ask patterns after tightening per
+# bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-007.md.
+# At least one positive fixture per pattern.
+
+# offering_or_choice
+Want me to clear pending or defer all of them?
+Want me to file Sub-slice B or pause until owner directs?
+
+# should_i_or
+Should I file -005 or wait for the umbrella?
+Should I commit and push now or wait for review?
+
+# awaiting_input_q (interrogative)
+Awaiting your direction?
+Awaiting owner approval on the next step?
+
+# awaiting_input_first_person (active wait)
+I am awaiting your direction on which option to pick.
+I'm awaiting owner approval on the deferred items.
+
+# standing_by_for_q (interrogative)
+Standing by for owner approval?
+
+# standing_by_for_first_person (active wait)
+I'm standing by for your decision on the deferred items.
+We are standing by for owner direction on the next priority.
+
+# your_decision_q
+Your decision on the next sub-slice priority?
+What is your choice between Path A or Path B for the deferred items?
