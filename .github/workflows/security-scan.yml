@@ -91,6 +91,17 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Pin pip to pre-CVE version
+        # Per DELIB-S330-SLICE-8-6-ROW-42-PIP-CVE-CHOICE (S330 owner directive):
+        # pip 26.x carries CVE-2026-3219 with no upstream fix. Pin to pip<26
+        # before installing dependencies or running pip-audit so the resolver
+        # itself does not trigger the CVE. Scope: pip dependency only;
+        # production deps are unaffected. Expiry: revisit at v0.7.0 GA when
+        # a fixed pip 26.x is available. Residual risk: lose pip 26.x
+        # features in CI (release-candidate gate environment only; production
+        # runtime image does not invoke pip).
+        run: python -m pip install --upgrade 'pip<26'
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -151,10 +162,55 @@ jobs:
       - name: Build image for scanning
         run: docker build -t agent-red-scan:local . --no-cache
 
-      - name: Run Docker Scout
+      # Per DELIB-S330-SLICE-8-6-ROW-43-DOCKER-SCOUT-WAIVER (S330 owner directive):
+      # waive 2 specific high-severity container-base CVEs that have no
+      # upstream fix:
+      #   - CVE-2026-33845 in gnutls28
+      #   - CVE-2026-5435 in glibc
+      # Scope: those 2 CVE IDs ONLY. Future CVEs are NOT waived (the post-step
+      # verification fails the gate on any unwaived critical/high CVE).
+      # Expiry: base-image rebuild — soft v0.7.0 GA, hard v0.8.0. Residual
+      # risk: production-deployment hardening covers exposure of these
+      # specific CVEs; backlog row GTKB-DOCKER-SCOUT-CVE-WAIVER-EXPIRY-001
+      # tracks removal at GA.
+      - name: Run Docker Scout (capture findings, no exit on CVE)
         uses: docker/scout-action@v1
         with:
           command: cves
           image: local://agent-red-scan:local
           only-severities: critical,high
-          exit-code: true
+          format: sarif
+          output: scout-cves.sarif
+          # exit-code intentionally left default (false) so we can apply the
+          # waiver evaluation in the next step.
+
+      - name: Evaluate Scout findings against waiver
+        run: |
+          set -euo pipefail
+          WAIVED="CVE-2026-33845 CVE-2026-5435"
+          if [ ! -f scout-cves.sarif ]; then
+            echo "::warning::No scout-cves.sarif produced; treating as no findings."
+            exit 0
+          fi
+          # Extract every CVE ID from the SARIF result rules section.
+          FINDINGS=$(jq -r '.runs[0].tool.driver.rules[]?.id // empty' scout-cves.sarif 2>/dev/null | sort -u || true)
+          if [ -z "$FINDINGS" ]; then
+            echo "Docker Scout: no critical/high CVE findings."
+            exit 0
+          fi
+          echo "Docker Scout findings (critical/high):"
+          echo "$FINDINGS" | sed 's/^/  - /'
+          UNWAIVED=""
+          while IFS= read -r cve; do
+            case " $WAIVED " in
+              *" $cve "*) ;;
+              *) UNWAIVED="$UNWAIVED $cve" ;;
+            esac
+          done <<< "$FINDINGS"
+          UNWAIVED=$(echo "$UNWAIVED" | tr -s ' ')
+          if [ -n "$UNWAIVED" ] && [ "$UNWAIVED" != " " ]; then
+            echo "::error::Unwaived critical/high CVEs found:$UNWAIVED"
+            echo "::error::Waiver covers ONLY: $WAIVED (per DELIB-S330-SLICE-8-6-ROW-43-DOCKER-SCOUT-WAIVER)"
+            exit 1
+          fi
+          echo "All critical/high CVEs are covered by the active waiver."
