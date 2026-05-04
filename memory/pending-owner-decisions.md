@@ -69,6 +69,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: de82a34210c9f03f
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0401
+  asked_at: 2026-05-04T06:44:37.613898Z
+  question: "er direction. Which should I pick up — `isolation-018-agent-red-file-migration` revision, `slice-8-6-ci-failure-triage` revision, a CS-* sub-slice proposal, or IR-0 follow-up?"
+  detected_via: prose:should_i_or
+  status: pending
+  question_hash: 262cd847f5d1d0c4
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0403
+  asked_at: 2026-05-04T07:10:39.867308Z
+  question: "— needs revision)  Awaiting owner direction on which to take ne"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: 40815fb06712b05d
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -4667,6 +4681,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 328f7678c94c7bd2
   resolved_at: 2026-05-04T05:59:25.154784Z
   answer: "User has answered your questions: \"Approve insertion of IPR-REQUIREMENTS-COLLECTION-HOOK-001 (full text shown above)? This is the Implementation Proposal Record (per GOV-20 Phase 1) demonstrating that the hook implementation has been reviewed against DELIB #3 + GOV #4 + DCL #5 BEFORE the bridge proposal is filed. Stored as a document with category=implementation_proposal.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0402
+  asked_at: 2026-05-04T07:09:15.635198Z
+  question: "Auto-dispatch surfaced two stale 2026-04-26 plan-level GOs. Both are plan-level only (each requires per-slice proposals before implementation), and gtkb-incident-response-006 depends on Agent Red being a GT-KB application — a premise superseded by the 2026-05-04 owner correction. How should I handle them?"
+  options:
+    - "Treat as advisory; resume current work (Recommended)"
+    - "File supersession bridge entries for both"
+    - "Revise IR-006 scope under new framing"
+    - "Resume the original CS/IR slice work as-was"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5d9e52257c6f9270
+  resolved_at: 2026-05-04T07:09:15.635198Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0404
+  asked_at: 2026-05-04T07:15:01.538941Z
+  question: "Both auto-dispatched GOs are stale plan-level approvals from S310 (2026-04-26) and don't authorize implementation. `incident-response-006` also conflicts with the 2026-05-04 Agent Red separation. What should I do?"
+  options:
+    - "Skip both; pick top S330 priority (Recommended)"
+    - "File CS-1.5 implementation slice"
+    - "Reframe incident-response for separation"
+    - "Just give a status update"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1f191743e38e6d69
+  resolved_at: 2026-05-04T07:15:01.538941Z
+  answer: "Answer questions?"
   notes: ""
 
 ## History

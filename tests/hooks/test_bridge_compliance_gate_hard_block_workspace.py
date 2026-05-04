@@ -143,8 +143,67 @@ def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
         f"Expected deny; got {hsoutput.get('permissionDecision')!r}. "
         f"Full output: {output}"
     )
-    assert "spec-to-test" in hsoutput.get("permissionDecisionReason", "").lower() or \
-           "Specification Links" in hsoutput.get("permissionDecisionReason", "")
+    reason = hsoutput.get("permissionDecisionReason", "")
+    assert (
+        "spec-to-test" in reason.lower()
+        or "Specification Links" in reason
+        or "Applicability Preflight" in reason
+    )
+
+
+def test_go_lacking_applicability_preflight_blocked_with_deny() -> None:
+    """GO verdicts must carry a clean Applicability Preflight packet so
+    cross-cutting spec applicability is not only memory/judgment based.
+    """
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-fake-go-no-preflight-002.md",
+                "content": "GO\n\n## Findings\n\nNo blocking findings.",
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    hsoutput = output.get("hookSpecificOutput", {})
+    assert hsoutput.get("permissionDecision") == "deny"
+    assert "Applicability Preflight" in hsoutput.get("permissionDecisionReason", "")
+
+
+def test_go_with_clean_applicability_preflight_passes() -> None:
+    """A GO verdict with a generated clean preflight packet is not blocked by
+    the applicability gate.
+    """
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-fake-go-with-preflight-002.md",
+                "content": (
+                    "GO\n\n"
+                    "## Applicability Preflight\n\n"
+                    "- packet_hash: `sha256:"
+                    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`\n"
+                    "- missing_required_specs: []\n\n"
+                    "## Findings\n\nNo blocking findings."
+                ),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    if result.stdout.strip():
+        output = json.loads(result.stdout)
+        decision = output.get("hookSpecificOutput", {}).get("permissionDecision")
+        assert decision != "deny", f"Clean GO verdict incorrectly denied. Output: {output}"
 
 
 def test_compliant_proposal_passes() -> None:

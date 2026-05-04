@@ -53,13 +53,19 @@ If Prime Builder catches itself about to implement without a GO:
 If Loyal Opposition is reviewing an implementation proposal:
 1. Confirm the proposal links all relevant specifications.
 2. Confirm the proposed tests are derived from those linked specifications.
-3. Issue `NO-GO` if either condition is missing or incomplete.
+3. Run `python scripts/bridge_applicability_preflight.py --bridge-id <document-name>`.
+4. Include the generated `Applicability Preflight` section in any `GO` verdict.
+5. Issue `NO-GO` if any required applicable specification is missing or if the
+   test mapping is missing or incomplete.
 
 If Loyal Opposition is verifying an implementation:
 1. Carry forward the proposal's linked specifications.
 2. Confirm tests derived from those specifications were created or identified.
 3. Confirm those tests were executed against the implementation.
-4. Issue `NO-GO` instead of `VERIFIED` for any untested linked specification
+4. Run `python scripts/bridge_applicability_preflight.py --bridge-id <document-name>`.
+5. Include the generated `Applicability Preflight` section in any `VERIFIED`
+   verdict.
+6. Issue `NO-GO` instead of `VERIFIED` for any untested linked specification
    unless an explicit owner waiver is documented.
 
 This applies even when:

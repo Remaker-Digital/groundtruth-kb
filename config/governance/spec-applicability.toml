@@ -1,0 +1,95 @@
+# Mechanical applicability rules for bridge reviews.
+#
+# These rules intentionally define a conservative, explicit subset of
+# cross-cutting specifications. They are not a replacement for reviewer
+# judgment; they are a fail-closed floor for recurring omissions.
+
+[[rules]]
+spec_id = "ADR-ISOLATION-APPLICATION-PLACEMENT-001"
+severity = "blocking"
+rationale = "Application/root placement work must honor the GT-KB root and applications/ boundary."
+applies_when_paths_match = [
+  "applications/**",
+  ".claude/rules/project-root-boundary.md",
+  ".claude/rules/file-bridge-protocol.md",
+  "src/groundtruth_kb/project/**",
+  "groundtruth-kb/src/groundtruth_kb/project/**",
+]
+applies_when_content_matches = [
+  "applications/",
+  "Agent Red",
+  "application isolation",
+  "project root boundary",
+]
+
+[[rules]]
+spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+severity = "blocking"
+rationale = "All bridge-mediated implementation and verification work must honor the file bridge authority model."
+applies_when_doc_matches = ["*"]
+applies_when_paths_match = [
+  "bridge/**",
+  ".claude/rules/file-bridge-protocol.md",
+  ".claude/rules/codex-review-gate.md",
+]
+
+[[rules]]
+spec_id = "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001"
+severity = "blocking"
+rationale = "Implementation proposals must cite every relevant governing specification."
+applies_when_doc_matches = ["*"]
+applies_when_content_matches = [
+  "Specification Links",
+  "implementation proposal",
+  "bridge proposal",
+]
+
+[[rules]]
+spec_id = "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001"
+severity = "blocking"
+rationale = "Verification must be derived from linked specifications and executed against the implementation."
+applies_when_doc_matches = ["*"]
+applies_when_content_matches = [
+  "VERIFIED",
+  "verification",
+  "spec-to-test",
+  "Specification-Derived Verification",
+]
+
+[[rules]]
+spec_id = "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001"
+severity = "advisory"
+rationale = "Concrete requirements, decisions, risks, procedures, and future work should be preserved as durable artifacts."
+applies_when_content_matches = [
+  "owner decision",
+  "requirement",
+  "specification",
+  "ADR",
+  "DCL",
+  "work item",
+  "backlog",
+]
+
+[[rules]]
+spec_id = "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001"
+severity = "advisory"
+rationale = "Development changes should preserve traceability across artifacts, tests, reports, and decisions."
+applies_when_content_matches = [
+  "artifact",
+  "traceability",
+  "deliberation",
+  "MemBase",
+]
+
+[[rules]]
+spec_id = "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001"
+severity = "advisory"
+rationale = "Artifact lifecycle transitions should expose candidate, active, deferred, blocked, superseded, verified, complete, rejected, and retired states."
+applies_when_content_matches = [
+  "candidate",
+  "deferred",
+  "blocked",
+  "superseded",
+  "verified",
+  "retired",
+]

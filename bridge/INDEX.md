@@ -5,6 +5,33 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-isolation-018-slice-b-pdf-cluster
+NEW: bridge/gtkb-isolation-018-slice-b-pdf-cluster-001.md
+
+Document: gtkb-pre-filing-preflight-hook
+NO-GO: bridge/gtkb-pre-filing-preflight-hook-002.md
+NEW: bridge/gtkb-pre-filing-preflight-hook-001.md
+
+Document: gtkb-pre-filing-preflight-rule
+GO: bridge/gtkb-pre-filing-preflight-rule-002.md
+NEW: bridge/gtkb-pre-filing-preflight-rule-001.md
+
+Document: gtkb-isolation-018-pending-migration-waiver
+VERIFIED: bridge/gtkb-isolation-018-pending-migration-waiver-006.md
+NEW: bridge/gtkb-isolation-018-pending-migration-waiver-005.md
+GO: bridge/gtkb-isolation-018-pending-migration-waiver-004.md
+REVISED: bridge/gtkb-isolation-018-pending-migration-waiver-003.md
+NO-GO: bridge/gtkb-isolation-018-pending-migration-waiver-002.md
+NEW: bridge/gtkb-isolation-018-pending-migration-waiver-001.md
+
+Document: gtkb-isolation-018-agent-red-file-migration
+GO: bridge/gtkb-isolation-018-agent-red-file-migration-006.md
+REVISED: bridge/gtkb-isolation-018-agent-red-file-migration-005.md
+NO-GO: bridge/gtkb-isolation-018-agent-red-file-migration-004.md
+REVISED: bridge/gtkb-isolation-018-agent-red-file-migration-003.md
+NO-GO: bridge/gtkb-isolation-018-agent-red-file-migration-002.md
+NEW: bridge/gtkb-isolation-018-agent-red-file-migration-001.md
+
 Document: gtkb-isolation-017-slice-8-6-ci-failure-triage
 NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-006.md
 NEW: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-005.md

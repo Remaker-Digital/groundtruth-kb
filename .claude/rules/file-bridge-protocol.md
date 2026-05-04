@@ -52,6 +52,27 @@ If a linked specification has no executed test coverage, Loyal Opposition must
 issue `NO-GO` unless the owner explicitly approves a documented waiver for that
 specific specification and risk.
 
+## Mandatory Applicability Preflight Gate
+
+Before Loyal Opposition issues `GO` or `VERIFIED`, it must run the mechanical
+bridge applicability preflight:
+
+```text
+python scripts/bridge_applicability_preflight.py --bridge-id <document-name>
+```
+
+The generated `Applicability Preflight` section must be included in the
+verdict file. `GO` and `VERIFIED` are valid only when the preflight reports
+`missing_required_specs: []`. If the preflight reports missing required
+cross-cutting specifications, Loyal Opposition must issue `NO-GO` unless the
+proposal or implementation report is revised to cite and satisfy those
+specifications.
+
+The applicability preflight is a mechanical floor, not a ceiling. Loyal
+Opposition remains responsible for identifying relevant specifications that
+are not yet represented in `config/governance/spec-applicability.toml` and
+should raise omissions as findings or propose registry updates.
+
 ## File Naming
 
 `{descriptive-name}-{NNN}.md`

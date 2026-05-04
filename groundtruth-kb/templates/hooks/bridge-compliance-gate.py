@@ -41,6 +41,18 @@ COMMAND_EVIDENCE_RE = re.compile(
     r"\b(?:python -m pytest|pytest|ruff|npm test|pnpm test|uv run|make test)\b",
     re.IGNORECASE,
 )
+APPLICABILITY_PREFLIGHT_HEADING_RE = re.compile(
+    r"^#{1,6}\s*applicability\s+preflight\s*$",
+    re.IGNORECASE,
+)
+PREFLIGHT_PACKET_HASH_RE = re.compile(
+    r"\bpacket_hash\s*:\s*`?sha256:[0-9a-f]{64}`?",
+    re.IGNORECASE,
+)
+PREFLIGHT_MISSING_REQUIRED_RE = re.compile(
+    r"\bmissing_required_specs\s*:\s*(?:\[\s*\]|`?\[\s*\]`?|none|None|NONE)",
+    re.IGNORECASE,
+)
 
 
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
@@ -116,6 +128,29 @@ def _has_spec_derived_verification(content: str) -> bool:
         _has_concrete_spec_links(content)
         and SPEC_TEST_HEADING_RE.search(content)
         and COMMAND_EVIDENCE_RE.search(content)
+    )
+
+
+def _has_clean_applicability_preflight(content: str) -> bool:
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if APPLICABILITY_PREFLIGHT_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return False
+
+    section: list[str] = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            break
+        section.append(line)
+    section_text = "\n".join(section)
+    return bool(
+        PREFLIGHT_PACKET_HASH_RE.search(section_text)
+        and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text)
     )
 
 
@@ -232,6 +267,16 @@ def main() -> None:
     content = str(tool_input.get("content", ""))
     if _is_bridge_markdown_file(file_path) and content:
         first_line = _first_nonblank_line(content)
+        if first_line in {"GO", "VERIFIED"} and not _has_clean_applicability_preflight(content):
+            emit_deny(
+                "PreToolUse",
+                "[Governance] GO and VERIFIED bridge verdicts must include a clean "
+                "Applicability Preflight section with packet_hash and "
+                "missing_required_specs: []. Generate it with "
+                "python scripts/bridge_applicability_preflight.py --bridge-id <document-name>. "
+                "(Hard-block per mechanical cross-cutting specification applicability gate.)",
+            )
+            sys.exit(0)
         if first_line == "VERIFIED" and not _has_spec_derived_verification(content):
             emit_deny(
                 "PreToolUse",
