@@ -5,6 +5,9 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate
+NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-001.md
+
 Document: gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule
 VERIFIED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md
 NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-005.md
