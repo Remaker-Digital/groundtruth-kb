@@ -240,3 +240,27 @@ Operational requirements while this override is active:
 3. Keep MemBase / KnowledgeDB release-readiness records current.
 4. Do not treat bridge unavailability as a reason to skip evidence, regression tests, or release gates.
 5. When canonical Prime Builder availability is restored, hand off with a list of work performed under this acting-Prime exception.
+
+## AskUserQuestion as the Only Valid Owner-Decision Channel
+
+(Active per S331 owner directive; mechanically enforced by `.claude/hooks/owner-decision-tracker.py` per `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md` VERIFIED.)
+
+Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are invalid:
+
+- The Stop-mode hook detects prose decision-ask patterns (`PROSE_DECISION_PATTERNS`) and emits `{"decision": "block", ...}` to refuse turn-end when no `AskUserQuestion` tool_use occurred in the same turn (per `bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-006.md` VERIFIED + Sub-slice A tightening).
+- All accepted owner decisions are recorded in `memory/pending-owner-decisions.md` with `detected_via: ask_user_question`.
+
+In-scope decision classes (use `AskUserQuestion`, never prose):
+
+- approvals
+- waivers
+- priority choices
+- formal artifact approvals
+- requirement clarifications
+- destructive actions
+- deployments
+- blocking owner decisions
+
+Bridge proposals/reports that depend on owner approval should cite this rule and include an `Owner Decisions / Input` section enumerating the AskUserQuestion answers that authorize the work. Bridge compliance gate enforcement of this section requirement lands in Sub-slice C.
+
+When in doubt, ask via `AskUserQuestion`. Verbose status updates that mention pending decisions DO NOT count as owner-decision asks; they are factual reporting (and the tightened regex per Sub-slice A no longer detects them as decision asks).
