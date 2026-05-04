@@ -44,10 +44,15 @@ pact-python>=2.2.0
 pytest-json-report>=1.5.0
 
 # GroundTruth KB — specification-driven governance toolkit (S251 closeout)
-# Installed from in-repo source so CI tests target the same surface as local dev.
-# The previous v0.6.1 GitHub-tag pin caused 9 CI test failures in S330 because
-# v0.6.1 predates `_check_smart_bridge_poller` (added at commit 931157f2).
-# Per DELIB-S330-ISOLATION-017-SLICE-8-6-GROUNDTRUTH-KB-PIN-FIX. The local
-# `./groundtruth-kb/` source matches the rest of the repo and is the canonical
-# truth for adopter-facing API.
--e ./groundtruth-kb[search]
+# Installed from GitHub tag for reproducible CI. Local dev can override
+# via requirements-local.txt with an editable sibling checkout.
+#
+# NOTE (S330 Slice 8.6): the `check_environment_isolation.py` governance
+# gate `REQUIREMENTS_EDITABLE_GTKB_SIBLING` blocks editable installs in
+# ALL requirement files. CI workflows that need the in-repo source
+# (e.g., for newer API surface like `_check_smart_bridge_poller` added
+# post-v0.6.1) install it via a separate `pip install ./groundtruth-kb`
+# step in the workflow YAML AFTER this requirements file is processed.
+# See `.github/workflows/release-candidate-gate.yml` "Install local
+# groundtruth-kb source" step.
+groundtruth-kb[search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.6.1

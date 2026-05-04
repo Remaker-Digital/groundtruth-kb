@@ -55,6 +55,17 @@ jobs:
           pip install -r /tmp/test-deps.txt
           pip install bandit[toml] pip-audit ruff
 
+      # Override the v0.6.1 pin from requirements-test.txt with the in-repo
+      # groundtruth-kb source so CI tests target the same API surface as the
+      # rest of the repo. Per S330 Slice 8.6 catalog rows 26-34: 9
+      # `_check_smart_bridge_poller` tests fail in CI when CI installs
+      # v0.6.1 (predates the function). Non-editable install satisfies the
+      # `REQUIREMENTS_EDITABLE_GTKB_SIBLING` governance gate (which only
+      # rejects `-e` form in requirement files; workflow-driven non-editable
+      # installs are allowed).
+      - name: Install local groundtruth-kb source
+        run: pip install --upgrade ./groundtruth-kb[search]
+
       # Seed groundtruth.db with the MemBase records that governance_adoption +
       # session_self_initialization tests assert. groundtruth.db is gitignored
       # per owner decision 2026-04-24 (commit 23a54af3); CI must materialize the
