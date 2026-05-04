@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable
+VERIFIED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md
 REVISED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-013.md
 NO-GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-012.md
 REVISED: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-011.md
