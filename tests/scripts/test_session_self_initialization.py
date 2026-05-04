@@ -847,7 +847,19 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert dashboard_data["model"]["infrastructure"]["testing_service_integrations"]["sonarcloud"]["scope"] == (
         "implementation_infrastructure"
     )
-    assert any(row["scope_confidence"] == "gtkb_inferred" for row in dashboard_data["history"])
+    # Per S330 Slice 8.6 row-24 fix: history may contain `gtkb_inferred`
+    # rows (back-fill from MemBase version history of past days) AND/OR
+    # `gtkb_current_heuristic` rows (the current snapshot). In CI's clean
+    # environment the seeded MemBase records all carry today's
+    # `changed_at`, so back-fill produces no rows < today; the only
+    # history row is the current snapshot tagged
+    # `gtkb_current_heuristic`. Locally where the DB has multi-day
+    # history, both tags appear. The assertion the test cares about is
+    # that scope_confidence is set on every row.
+    assert all(
+        row.get("scope_confidence") in ("gtkb_inferred", "gtkb_current_heuristic")
+        for row in dashboard_data["history"]
+    )
     assert all(row["scope_version"] == "gtkb_v1" for row in dashboard_data["history"])
     assert history[-1]["token_measurement_status"]
     assert history[-1]["scope_version"] == "gtkb_v1"

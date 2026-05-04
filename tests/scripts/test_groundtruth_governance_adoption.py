@@ -131,19 +131,18 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md",
     ]
 
-    # Per bridge/gtkb-telemetry-churn-policy-2026-04-28-002.md (GO): these 2
-    # auto-regen telemetry files are intentionally gitignored (high diff churn,
-    # reproducible by SessionStart hook). They must still exist on disk at
-    # session-start time but are NOT required to be git-tracked.
-    runtime_present_only_paths = [
-        "docs/gtkb-dashboard/dashboard-data.json",
-        "memory/gtkb-dashboard-history.json",
-    ]
-
+    # Per S330 Slice 8.6 row-9 waiver
+    # (DELIB-S330-SLICE-8-6-ROW-9-DASHBOARD-FILES-WAIVER, scope = these 2
+    # files only; expiry = v0.7.0 GA / GTKB-DASHBOARD-002 work_list row 30
+    # completion; residual risk = adopters can't see the dashboard until
+    # then): the 2 auto-regen telemetry files are produced by the
+    # SessionStart hook, which does not run in CI's clean-checkout
+    # environment. They are gitignored per bridge/gtkb-telemetry-churn-
+    # policy-2026-04-28-002.md (GO). The test no longer fails on their
+    # absence; presence is verified by the runtime hook itself when it
+    # executes (a different test surface). Other required_paths still
+    # fail-closed.
     missing = [path for path in required_paths if not (REPO_ROOT / path).is_file()]
-    missing.extend(
-        path for path in runtime_present_only_paths if not (REPO_ROOT / path).is_file()
-    )
     assert not missing, f"Missing GroundTruth governance artifacts: {missing}"
     _assert_not_git_ignored(required_paths)
 
