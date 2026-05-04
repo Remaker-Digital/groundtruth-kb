@@ -12,10 +12,10 @@ live here as numbered markdown files.
 
 Every bridge proposal, review, implementation report, and verification must
 comply with `.claude/rules/project-root-boundary.md`: all active GT-KB files and
-artifacts must remain within `E:\GT-KB`; all GT-KB application files must remain
-within `E:\GT-KB\applications\`; Agent Red files must remain within
-`E:\GT-KB\applications\Agent_Red\`. There are no exceptions. A bridge item that
-depends on a live path outside those roots is `NO-GO`.
+artifacts must remain within `E:\GT-KB`; all GT-KB demo/application files must
+remain within `E:\GT-KB\applications\`. Agent Red files are not GT-KB files and
+must not be used as live GT-KB artifacts. There are no exceptions. A bridge item
+that depends on a live path outside those roots is `NO-GO`.
 
 ## Mandatory Specification Linkage Gate
 

@@ -107,6 +107,30 @@ the toolkit, not any one tenant).
 **Implementation pointer:** `src/groundtruth_kb/` (package),
 `pyproject.toml` (`name = "groundtruth-kb"`).
 
+### project-resource alias resolution
+
+**Canonical aliases:** the GitHub; project GitHub; repo; the repo; GitHub
+repo; GT-KB repo; GroundTruth-KB repo.
+
+**Definition:** Conversational references to source-control resources resolve
+through the configured GroundTruth-KB project resource URL unless the owner
+explicitly scopes the reference otherwise.
+
+**Configured GitHub repository URL:** `https://github.com/Remaker-Digital/groundtruth-kb`.
+
+**Not to be confused with:** separate project repositories such as Agent Red;
+local `origin` remote values; historical or erroneous remotes. If a local
+remote points elsewhere, treat it as configuration drift and verify before
+using it as evidence.
+
+**Source:** owner correction, 2026-05-03;
+`memory/feedback_groundtruth_kb_canonical_project_urls.md`.
+
+**Implementation pointer:** use explicit `--repo Remaker-Digital/groundtruth-kb`
+for GitHub CLI checks when the local remote is inconsistent with this record.
+The configured alias registry is `.claude/rules/project-resource-aliases.toml`;
+the human-readable companion is `memory/project_external_resource_registry.md`.
+
 ### GT-KB
 
 **Canonical form:** GroundTruth KB
@@ -234,11 +258,17 @@ of an application (vs. the lifecycle record managed by GT-KB).
 
 **Canonical full name:** Agent Red Customer Experience.
 
-**Definition:** A specific application (instance) under GT-KB lifecycle
-governance. Used in this GT-KB checkout as the running example of an adopter
-application. Adopter scaffolds use their own project_name in this slot.
+**Definition:** A separate project, not part of GT-KB. Agent Red previously
+validated GT-KB during isolation work, but unqualified GT-KB references must not
+resolve to Agent Red files, CI, GitHub Actions, or repository state.
 
-**Source:** `CLAUDE.md` § "Application Identity".
+**Configured GitHub repository URL:** `https://github.com/mike-remakerdigital/agent-red`.
+
+**Not to be confused with:** the four small demo applications included with
+GT-KB, or with the GroundTruth-KB platform repository
+`https://github.com/Remaker-Digital/groundtruth-kb`.
+
+**Source:** owner correction, 2026-05-04.
 
 ### adopter
 

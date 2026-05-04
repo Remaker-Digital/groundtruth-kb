@@ -8,8 +8,10 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 - All active files for the GT-KB project MUST be within `E:\GT-KB`.
 - No GT-KB artifact may be created, read as a live dependency, updated, verified,
   or required from outside `E:\GT-KB`.
-- GT-KB application files MUST be within `E:\GT-KB\applications\`.
-- Agent Red application files MUST be within `E:\GT-KB\applications\Agent_Red\`.
+- GT-KB demo/application files MUST be within `E:\GT-KB\applications\`.
+- Agent Red project files are not GT-KB files and must not be treated as live
+  GT-KB artifacts. Agent Red's separate repository is
+  `https://github.com/mike-remakerdigital/agent-red`.
 - `E:\Claude-Playground` is an archive only. It is not a live GT-KB,
   Agent Red, harness-state, bridge, dashboard, memory, source, verification, or
   dependency location.
@@ -24,8 +26,9 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 - Historical references to obsolete external paths may remain only as historical
   evidence. They must not be used as current instructions, defaults, examples,
   verification paths, or live dependencies.
-- Any live GT-KB or Agent Red artifact discovered under `E:\Claude-Playground`
-  must be relocated to its correct in-root home before that archive is deleted.
+- Any live GT-KB artifact discovered under `E:\Claude-Playground` must be
+  relocated to its correct in-root home before that archive is deleted. Agent
+  Red artifacts belong to the separate Agent Red project, not the GT-KB root.
 - When a live path is unknown, fail closed and request or derive an in-root path.
 - Any proposal, review, implementation, or test that depends on a path outside
   the allowed roots is a NO-GO until revised to be root-contained.

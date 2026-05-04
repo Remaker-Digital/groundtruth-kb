@@ -23,10 +23,11 @@ at session start before ordinary Loyal Opposition review work.
 ## Mandatory Project Root Boundary
 
 All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
-application files must remain within `E:\GT-KB\applications\`; Agent Red files
-must remain within `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
-Any proposal, implementation, verification, or test that depends on a live path
-outside those roots is a NO-GO until revised.
+demo/application files must remain within `E:\GT-KB\applications\`. Agent Red
+is a separate project, not part of GT-KB, and Agent Red files must not be used
+as live GT-KB artifacts. There are no exceptions. Any proposal, implementation,
+verification, or test that depends on a live path outside those roots is a
+NO-GO until revised.
 
 When the active harness is assigned Loyal Opposition, apply only governance,
 permissions, and restrictions that pertain to Loyal Opposition. Do not import

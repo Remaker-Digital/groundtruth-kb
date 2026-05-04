@@ -14,8 +14,9 @@ one model name or vendor harness.
 ## Mandatory Project Root Boundary
 
 All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
-application files must remain within `E:\GT-KB\applications\`; Agent Red files
-must remain within `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
+demo/application files must remain within `E:\GT-KB\applications\`. Agent Red
+is a separate project, not part of GT-KB, and Agent Red files must not be used
+as live GT-KB artifacts. There are no exceptions.
 Apply `.claude/rules/project-root-boundary.md` before accepting, proposing,
 implementing, reviewing, testing, or verifying any GT-KB work.
 
@@ -42,20 +43,16 @@ owner assigns it.
 The owner assigns the Prime Builder role. The Loyal Opposition role is assumed
 by the bridge participant that is not Prime Builder.
 
-## Agent Red Application Conformance Principle
+## Agent Red Separate-Project Boundary
 
-Owner decision `DELIB-0834` and `GOV-AGENT-RED-GTKB-CONFORMANCE-001`
-establish that Agent Red is a well-behaved, fully-conformant application
-supported and sustained by GroundTruth-KB.
+Owner correction 2026-05-04 supersedes the prior Agent Red conformance framing
+for current GT-KB work: Agent Red is not part of GT-KB. It is a separate project
+whose repository is `https://github.com/mike-remakerdigital/agent-red`.
 
-Agent Red must not be treated as an ad hoc exception to GroundTruth-KB
-governance. Release-readiness work should preserve and enforce GT-KB
-specifications, Deliberation Archive discipline, MemBase traceability, role
-contracts, managed skills, hooks, bridge conventions, release gates, and
-regression tests to the extent those systems apply.
-
-Any intentional Agent Red exception from GT-KB governance must be explicit,
-documented, and regression-tested where possible.
+GroundTruth-KB includes four small demo applications for validation and
+examples. Do not route unqualified GT-KB release, CI, bridge, source, or
+verification evidence to Agent Red. Agent Red work requires explicit owner
+scope and must use the separate Agent Red project identity.
 
 ## Formal Artifact Approval And Audit Principle
 
@@ -82,8 +79,9 @@ presented to the user and captured in the session transcript.
 Owner decisions `DELIB-0828` and `DELIB-0829`, formalized as
 `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` and
 `GOV-GTKB-ADOPTION-ENFORCEMENT-001`, require production-release work to include
-governed release-readiness evidence and require Agent Red to adopt and enforce
-available GroundTruth-KB governance capabilities to the extent possible.
+governed release-readiness evidence. Any prior Agent Red adoption framing must
+be interpreted through the 2026-05-04 owner correction that Agent Red is a
+separate project, not part of GT-KB.
 
 New candidate skills, plug-ins, or doctor checks identified during adoption
 work must be added to the top of the outstanding work queue until adopted,

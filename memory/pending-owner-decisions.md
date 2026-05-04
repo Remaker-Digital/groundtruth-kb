@@ -48,6 +48,27 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   status: pending
   question_hash: 93bdbcacc4173f18
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0386
+  asked_at: 2026-05-04T05:11:10.684885Z
+  question: "pe**: dozens exist; should I delete them (they look like test fixtures left behind), move them somewhere, or leave them alone for this migration? 3. **Should I file"
+  detected_via: prose:should_i_or
+  status: pending
+  question_hash: 608076de985d2352
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0391
+  asked_at: 2026-05-04T05:35:41.972737Z
+  question: "ll pending (queued, awaiting your direction on which to proceed first)  **Downstream artifacts each DELIB plans to spawn** (each requires its own approval packet):  | DELIB |"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: b0b7be1915659ed7
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0392
+  asked_at: 2026-05-04T05:37:30.297682Z
+  question: "rose patterns like \"awaiting your direction\" / \"should I\" (per"
+  detected_via: prose:awaiting_input
+  status: pending
+  question_hash: de82a34210c9f03f
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -4420,6 +4441,232 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 76989d3d8b3c61b7
   resolved_at: 2026-05-03T21:36:41.596153Z
   answer: "User has answered your questions: \"Phase 1 owner-input is complete (40 of 43 rows classified; 3 remain as `awaiting-investigation` requiring code probes, no owner decisions). Phase 2 implementation (~3-5 sessions of fixing 37 `fix-required` + 1 `environmental` + 2 waiver mechanics) is the next major step. How should I proceed from here?\"=\"Wrap session here; next session resumes Phase 1 investigation + Phase 2 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0381
+  asked_at: 2026-05-04T01:31:11.135153Z
+  question: "Slice 8.6 Phase 3-G — How should the 2 pre-existing Python Tests failures be dispositioned (`tests/performance/test_concurrent_tenants.py::test_perf_03_*` and `::test_perf_04_*`, both `ModuleNotFoundError: No module named 'evaluation'`)?"
+  options:
+    - "(A) Skip both tests with waiver DELIB (recommended)"
+    - "(B) Expand Slice 8.6 to restore evaluation module"
+    - "(C) Extend the existing python-tests waiver to this commit chain"
+    - "(D) Delete the 2 broken tests outright"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d73ee5c72676e20c
+  resolved_at: 2026-05-04T01:31:11.135153Z
+  answer: "User has answered your questions: \"Slice 8.6 Phase 3-G — How should the 2 pre-existing Python Tests failures be dispositioned (`tests/performance/test_concurrent_tenants.py::test_perf_03_*` and `::test_perf_04_*`, both `ModuleNotFoundError: No module named 'evaluation'`)?\"=\"(A) Skip both tests with waiver DELIB (recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0382
+  asked_at: 2026-05-04T02:06:29.335467Z
+  question: "Slice 8.6 Phase 4 — Codex NO-GO at -006 cites that CI evidence is on Agent Red repo, not the canonical GT-KB framework repo (`Remaker-Digital/groundtruth-kb`). My Agent Red CI workflows (Lint/RC Gate/SonarCloud/Security Scan/Python Tests) don't exist on the GT-KB framework repo — they're Agent Red-only. How should I resolve?"
+  options:
+    - "(A) File -007 REVISED-1 reframing CI evidence + cite operating-model platform/adopter split"
+    - "(B) Mirror commits to GT-KB framework repo (where applicable) + capture BOTH CI evidences"
+    - "(C) Surface as owner deliberation needing formal capture"
+    - "(D) Pause Slice 8.6 + repair origin drift first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 048cbcae0c2bcbe4
+  resolved_at: 2026-05-04T02:06:29.335467Z
+  answer: "User has answered your questions: \"Slice 8.6 Phase 4 — Codex NO-GO at -006 cites that CI evidence is on Agent Red repo, not the canonical GT-KB framework repo (`Remaker-Digital/groundtruth-kb`). My Agent Red CI workflows (Lint/RC Gate/SonarCloud/Security Scan/Python Tests) don't exist on the GT-KB framework repo — they're Agent Red-only. How should I resolve?\"=\"Agent Red is *not* a part of GT-KB. We have included 4 small demo apps. Agent Red should be pushed to https://github.com/mike-remakerdigital/agent-red and GroundTruth-KB should be pushed to https://github.com/Remaker-Digital/groundtruth-kb. These are now separate projects. That was the point of the GT-KB isolation project.\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0383
+  asked_at: 2026-05-04T02:06:29.335467Z
+  question: "Local `origin` points at the stale `Remaker-Digital/agent-red-customer-engagement` (where my 12-commit Slice 8.6 chain landed). Canonical Agent Red home per your direction is `mike-remakerdigital/agent-red`. How should I proceed for Slice 8.6 acceptance?"
+  options:
+    - "(A) Add `mike-remakerdigital/agent-red` as new remote, push commit chain there, capture fresh CI evidence"
+    - "(B) Repoint origin away from stale repo to mike-remakerdigital/agent-red (more invasive)"
+    - "(C) Surface to owner before any remote change — needs broader discussion"
+    - "(D) Push only the GT-KB framework subset (1 file) to `Remaker-Digital/groundtruth-kb`; leave Agent Red work where it is"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a8e610bf5ede31fd
+  resolved_at: 2026-05-04T02:06:29.335467Z
+  answer: "User has answered your questions: \"Local `origin` points at the stale `Remaker-Digital/agent-red-customer-engagement` (where my 12-commit Slice 8.6 chain landed). Canonical Agent Red home per your direction is `mike-remakerdigital/agent-red`. How should I proceed for Slice 8.6 acceptance?\"=\"(A) Add `mike-remakerdigital/agent-red` as new remote, push commit chain there, capture fresh CI evidence\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0384
+  asked_at: 2026-05-04T02:06:29.335467Z
+  question: "Local develop is 700 ahead / 102 behind `mike-remakerdigital/agent-red/develop`. Histories diverged at f8c35ad3 (old). Neither fast-forward nor clean merge is possible. Which path resolves Slice 8.6 acceptance without making the broader Agent Red repo migration worse?"
+  options:
+    - "(A) Cherry-pick the 12 Slice 8.6 commits onto a new branch off `agent-red/develop`, push as PR"
+    - "(B) Force-push local develop to `agent-red/develop` (DESTRUCTIVE — loses 102 commits)"
+    - "(C) Pause Slice 8.6 + surface the bigger repo-divergence problem first"
+    - "(D) Merge `agent-red/develop` (102 commits) into local develop, then push to `agent-red/develop`"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4e7f4df8e80bc3a8
+  resolved_at: 2026-05-04T02:06:29.335467Z
+  answer: "User has answered your questions: \"Local develop is 700 ahead / 102 behind `mike-remakerdigital/agent-red/develop`. Histories diverged at f8c35ad3 (old). Neither fast-forward nor clean merge is possible. Which path resolves Slice 8.6 acceptance without making the broader Agent Red repo migration worse?\"=\"(A) Cherry-pick the 12 Slice 8.6 commits onto a new branch off `agent-red/develop`, push as PR\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0385
+  asked_at: 2026-05-04T02:06:29.335467Z
+  question: "Cherry-pick can't proceed: `mike-remakerdigital/agent-red/develop` is missing most files my Slice 8.6 fixes edit (release-candidate-gate.yml, wrap_scan_hygiene.py, test_groundtruth_governance_adoption.py, etc. — the entire 700-commit recent Agent Red codebase doesn't exist there). The current Agent Red code lives on `Remaker-Digital/agent-red-customer-engagement` where I've been pushing. Which repo is actually canonical?"
+  options:
+    - "(A) `Remaker-Digital/agent-red-customer-engagement` IS the de facto Agent Red — my pushes are correct, refile -007 with corrected terminology"
+    - "(B) `mike-remakerdigital/agent-red` IS canonical — the current Agent Red code needs migration there"
+    - "(C) Force-push our 12-commit chain onto `mike-remakerdigital/agent-red/develop` despite divergence"
+    - "(D) Pause Slice 8.6 + escalate the dual-repo problem as its own bridge thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 20090701dbc08fc2
+  resolved_at: 2026-05-04T02:06:29.335467Z
+  answer: "User has answered your questions: \"Cherry-pick can't proceed: `mike-remakerdigital/agent-red/develop` is missing most files my Slice 8.6 fixes edit (release-candidate-gate.yml, wrap_scan_hygiene.py, test_groundtruth_governance_adoption.py, etc. — the entire 700-commit recent Agent Red codebase doesn't exist there). The current Agent Red code lives on `Remaker-Digital/agent-red-customer-engagement` where I've been pushing. Which repo is actually canonical?\"=\"(B) `mike-remakerdigital/agent-red` IS canonical — the current Agent Red code needs migration there\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0387
+  asked_at: 2026-05-04T05:35:41.972737Z
+  question: "Approve insertion of DELIB-S330-SPEC-CAPTURE-TRANSPARENCY (full text shown above)? This DELIB becomes canonical project truth on approval and will spawn a GOV spec for permanent enforcement."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 69479f91b7afef47
+  resolved_at: 2026-05-04T05:35:41.972737Z
+  answer: "User has answered your questions: \"Approve insertion of DELIB-S330-SPEC-CAPTURE-TRANSPARENCY (full text shown above)? This DELIB becomes canonical project truth on approval and will spawn a GOV spec for permanent enforcement.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0388
+  asked_at: 2026-05-04T05:35:41.972737Z
+  question: "Approve insertion of DELIB-S330-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT (full text shown above)? This DELIB becomes canonical project truth on approval and will spawn a GOV + DCL pair (governance rule + machine-checkable design constraint)."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 29e07b560d8711d7
+  resolved_at: 2026-05-04T05:35:41.972737Z
+  answer: "User has answered your questions: \"Approve insertion of DELIB-S330-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT (full text shown above)? This DELIB becomes canonical project truth on approval and will spawn a GOV + DCL pair (governance rule + machine-checkable design constraint).\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0389
+  asked_at: 2026-05-04T05:35:41.972737Z
+  question: "Approve insertion of DELIB-S330-REQUIREMENTS-COLLECTION-HOOK-WITH-3-OPTION-CLARIFICATION (full text shown above)? This DELIB becomes canonical project truth on approval and will spawn a GOV + DCL + IPR triple (governance rule + design constraint + implementation proposal)."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 86298802c34ec5ab
+  resolved_at: 2026-05-04T05:35:41.972737Z
+  answer: "User has answered your questions: \"Approve insertion of DELIB-S330-REQUIREMENTS-COLLECTION-HOOK-WITH-3-OPTION-CLARIFICATION (full text shown above)? This DELIB becomes canonical project truth on approval and will spawn a GOV + DCL + IPR triple (governance rule + design constraint + implementation proposal).\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0390
+  asked_at: 2026-05-04T05:35:41.972737Z
+  question: "Approve insertion of DELIB-S330-AGENT-RED-NESTED-IN-APPLICATIONS-RULE (full text shown above)? This DELIB retroactively captures the owner's verbatim topology choice that was missed during ISOLATION-017 planning. It supersedes DELIB-0879's conflicting recommendations and becomes the source DELIB for the existing CLAUDE.md / project-root-boundary.md rules. Will spawn GOV-AGENT-RED-NESTED-IN-APPLICATIONS-001 + a new bridge thread for the actual file migration."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dd7712c46aad8a27
+  resolved_at: 2026-05-04T05:35:41.972737Z
+  answer: "User has answered your questions: \"Approve insertion of DELIB-S330-AGENT-RED-NESTED-IN-APPLICATIONS-RULE (full text shown above)? This DELIB retroactively captures the owner's verbatim topology choice that was missed during ISOLATION-017 planning. It supersedes DELIB-0879's conflicting recommendations and becomes the source DELIB for the existing CLAUDE.md / project-root-boundary.md rules. Will spawn GOV-AGENT-RED-NESTED-IN-APPLICATIONS-001 + a new bridge thread for the actual file migration.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0393
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of GOV-SPEC-CAPTURE-TRANSPARENCY-001 (full text shown above)? This GOV becomes the canonical governance rule operationalizing DELIB #1; status begins as 'specified' and promotes to 'verified' once enforcement hooks are in place."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ca9fe13fa57bf19c
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of GOV-SPEC-CAPTURE-TRANSPARENCY-001 (full text shown above)? This GOV becomes the canonical governance rule operationalizing DELIB #1; status begins as 'specified' and promotes to 'verified' once enforcement hooks are in place.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0394
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001 (full text shown above)? This is the foundational governance rule that operationalizes DELIB #2's defense-in-depth enforcement model. Will be paired with the companion DCL specifying the registry schema/contract."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2cc093346a98180b
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001 (full text shown above)? This is the foundational governance rule that operationalizes DELIB #2's defense-in-depth enforcement model. Will be paired with the companion DCL specifying the registry schema/contract.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0395
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of DCL-CROSS-CUTTING-REQUIREMENTS-REGISTRY-001 (full text shown above)? This DCL specifies the machine-checkable contract for the cross-cutting requirements registry that GOV #2 enforces. Will be paired with the registry implementation work in a separate bridge thread."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d2f84e007647fa31
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of DCL-CROSS-CUTTING-REQUIREMENTS-REGISTRY-001 (full text shown above)? This DCL specifies the machine-checkable contract for the cross-cutting requirements registry that GOV #2 enforces. Will be paired with the registry implementation work in a separate bridge thread.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0396
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of GOV-REQUIREMENTS-COLLECTION-HOOK-001 (full text shown above)? This is the governance rule for the requirements collection hook (Learning 2). Will be paired with the companion DCL specifying the hook contract and IPR for the implementation work."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 647ac445068ef6b6
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of GOV-REQUIREMENTS-COLLECTION-HOOK-001 (full text shown above)? This is the governance rule for the requirements collection hook (Learning 2). Will be paired with the companion DCL specifying the hook contract and IPR for the implementation work.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0397
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 (full text shown above)? This DCL specifies the hook's implementation contract (location, I/O schema, classifier bounds, retrieval interface, test coverage, doctor invariants)."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 86b7aedb91bb8ac5
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 (full text shown above)? This DCL specifies the hook's implementation contract (location, I/O schema, classifier bounds, retrieval interface, test coverage, doctor invariants).\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0398
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of GOV-AGENT-RED-NESTED-IN-APPLICATIONS-001 (full text shown above)? This GOV ties the existing CLAUDE.md / project-root-boundary.md rules to the retroactive source DELIB (DELIB-S330-AGENT-RED-NESTED-IN-APPLICATIONS-RULE) and supersedes DELIB-0879's conflicting recommendations."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 52338b96126f51ce
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of GOV-AGENT-RED-NESTED-IN-APPLICATIONS-001 (full text shown above)? This GOV ties the existing CLAUDE.md / project-root-boundary.md rules to the retroactive source DELIB (DELIB-S330-AGENT-RED-NESTED-IN-APPLICATIONS-RULE) and supersedes DELIB-0879's conflicting recommendations.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0399
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of DCL-AGENT-RED-NESTED-IN-APPLICATIONS-CHECK-001 (full text shown above)? This DCL specifies the machine-checkable check definitions (fast_check + deep_check + doctor invariants + regression test contract) for the GOV #6 topology rule. Includes a documented exception covering the current pre-migration state."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0983a20a4d36294e
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of DCL-AGENT-RED-NESTED-IN-APPLICATIONS-CHECK-001 (full text shown above)? This DCL specifies the machine-checkable check definitions (fast_check + deep_check + doctor invariants + regression test contract) for the GOV #6 topology rule. Includes a documented exception covering the current pre-migration state.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0400
+  asked_at: 2026-05-04T05:59:25.154784Z
+  question: "Approve insertion of IPR-REQUIREMENTS-COLLECTION-HOOK-001 (full text shown above)? This is the Implementation Proposal Record (per GOV-20 Phase 1) demonstrating that the hook implementation has been reviewed against DELIB #3 + GOV #4 + DCL #5 BEFORE the bridge proposal is filed. Stored as a document with category=implementation_proposal."
+  options:
+    - "Approve as drafted"
+    - "Approve with edits (state edits in 'Other')"
+    - "Reject — do not capture"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 328f7678c94c7bd2
+  resolved_at: 2026-05-04T05:59:25.154784Z
+  answer: "User has answered your questions: \"Approve insertion of IPR-REQUIREMENTS-COLLECTION-HOOK-001 (full text shown above)? This is the Implementation Proposal Record (per GOV-20 Phase 1) demonstrating that the hook implementation has been reviewed against DELIB #3 + GOV #4 + DCL #5 BEFORE the bridge proposal is filed. Stored as a document with category=implementation_proposal.\"=\"Approve as drafted\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

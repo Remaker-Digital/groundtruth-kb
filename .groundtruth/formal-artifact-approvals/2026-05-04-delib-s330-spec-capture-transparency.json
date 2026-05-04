@@ -1,0 +1,16 @@
+{
+  "artifact_type": "deliberation",
+  "artifact_id": "DELIB-S330-SPEC-CAPTURE-TRANSPARENCY",
+  "action": "insert",
+  "source_ref": "owner_conversation:S330-2026-05-04-via-AskUserQuestion",
+  "full_content": "Verbatim owner statement:\n\"I want to know when every specification is captured (or not captured) and I want to see the text of it when I approve or reject it.\"\n\nDecision:\nTwo-part operational rule for Prime Builder + the formal-artifact-approval gate:\n\n1. CAPTURE-EVENT VISIBILITY (positive AND negative):\n   - When the AI classifies any owner statement as a candidate requirement, specification, GOV, PB, ADR, DCL, or DELIB (i.e., a capture decision is being made), surface the classification to the owner in chat.\n   - This applies WHETHER the AI decides to capture (positive path) OR decides not to capture (negative path - e.g., \"owner mentioned X but I judged it conversational, not a requirement\").\n   - Surface in chat so the owner sees capture decisions in real time, not batched at session-end.\n\n2. APPROVE/REJECT WITH FULL TEXT:\n   - When a formal artifact (GOV, SPEC, PB, ADR, DCL, DELIB) is being proposed for insertion (formal-artifact-approval gate firing), present the FULL proposed artifact text in the approval prompt - not a summary, not a paraphrase, not a link.\n   - Owner sees exact text being inserted before approving or rejecting.\n   - Approval/rejection itself is captured as a sub-DELIB with the owner's exact response.\n\nRationale:\nCurrent state: formal-artifact-approval gate exists (per DCL-ARTIFACT-APPROVAL-HOOK-001) but operates with selective visibility: approval flows are visible, but the AI's decisions to NOT capture (or to defer capture) are silent. Owner has no way to know what was considered for capture and rejected by AI judgment vs what was truly never recognized as a requirement. This silent failure mode is the root cause of the project-root-boundary capture gap that caused the Slice 8.6 incident: rules existed in CLAUDE.md but the AI's choice to NOT enforce them was invisible to the owner.\n\nImplementation references:\n- Cross-cutting with Learning (1): this rule itself becomes a cross-cutting technical requirement subject to mechanical enforcement.\n- Cross-cutting with Learning (2): the requirements-collection hook surfaces capture-classifications by design.\n- Replaces or extends the existing formal-artifact-approval-gate hook behavior; needs spec for the negative-path (non-capture) surfacing.\n\nOwner approval: Approve as drafted (S330 chat, 2026-05-04, via AskUserQuestion).",
+  "full_content_sha256": "23e7a9d428f45176cdefa19510ae2c924f0bbd4331c3095388772b64f9fe2c89",
+  "approval_mode": "approve",
+  "presented_to_user": true,
+  "transcript_captured": true,
+  "explicit_change_request": "Owner approved insertion via AskUserQuestion: \"Approve as drafted\". Verbatim source statement: \"I want to know when every specification is captured (or not captured) and I want to see the text of it when I approve or reject it....\"",
+  "changed_by": "prime-builder/claude-code",
+  "change_reason": "S330 capture queue item approved by owner via AskUserQuestion in chat. Capture per just-approved DELIB-S330-SPEC-CAPTURE-TRANSPARENCY transparency rule.",
+  "approved_by": "owner",
+  "acknowledged_by": "owner"
+}

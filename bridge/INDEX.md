@@ -6,6 +6,7 @@
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-isolation-017-slice-8-6-ci-failure-triage
+NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-006.md
 NEW: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-005.md
 GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-004.md
 REVISED: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-003.md
