@@ -919,6 +919,22 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
         "gtkb-isolation-018-pending-migration-waiver-005.md",
     }
 
+    bridge_filename_date_re = _re.compile(r"(20\d{2}-\d{2}-\d{2})")
+
+    def bridge_file_effective_datetime(path: Path) -> datetime | None:
+        # Fresh CI checkouts rewrite filesystem mtimes, so prefer the stable
+        # date embedded in most bridge filenames before falling back to mtime.
+        filename_match = bridge_filename_date_re.search(path.name)
+        if filename_match:
+            try:
+                return datetime.fromisoformat(filename_match.group(1)).replace(tzinfo=timezone.utc)
+            except ValueError:
+                pass
+        try:
+            return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            return None
+
     offenders: list[str] = []
     for doc_name, files in threads:
         # Latest status is the first listed file in the thread (insertion is at top).
@@ -932,11 +948,10 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
                 continue
             if vf.name in known_historical_offenders:
                 continue
-            try:
-                mtime = datetime.fromtimestamp(vf.stat().st_mtime, tz=timezone.utc)
-            except OSError:
+            effective_datetime = bridge_file_effective_datetime(vf)
+            if effective_datetime is None:
                 continue
-            if mtime < cutoff:
+            if effective_datetime < cutoff:
                 continue
             try:
                 content = vf.read_text(encoding="utf-8")

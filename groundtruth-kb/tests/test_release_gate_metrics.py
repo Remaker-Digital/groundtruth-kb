@@ -144,6 +144,37 @@ def _add_realistic_verified_thread(target: Path) -> None:
     os.utime(bridge_dir / report_fname, (ts, ts))
 
 
+def _add_historical_filename_offender_with_fresh_mtime(target: Path) -> None:
+    """Adds a pre-cutoff bridge file whose mtime looks fresh, as in CI checkout."""
+    bridge_dir = target / "bridge"
+    verdict_fname = "historical-offender-2026-05-03-002.md"
+    report_fname = "historical-offender-2026-05-03-001.md"
+    (bridge_dir / verdict_fname).write_text(
+        "VERIFIED\n\n# Loyal Opposition Verification\n\nLooks fine.\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / report_fname).write_text(
+        "NEW\n\n"
+        "# Prime Implementation Report\n\n"
+        "## Specification Links\n\n- SPEC-X\n\n"
+        "This report asserts owner approval was obtained but predates the cutoff.\n",
+        encoding="utf-8",
+    )
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(
+        "# Bridge Index\n\n"
+        "Document: historical-offender\n"
+        f"VERIFIED: bridge/{verdict_fname}\n"
+        f"NEW: bridge/{report_fname}\n",
+        encoding="utf-8",
+    )
+    import os
+    from datetime import datetime
+    fresh_checkout_ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
+    os.utime(bridge_dir / verdict_fname, (fresh_checkout_ts, fresh_checkout_ts))
+    os.utime(bridge_dir / report_fname, (fresh_checkout_ts, fresh_checkout_ts))
+
+
 def _run_doctor_check(target: Path, check_name: str):
     """Import doctor and run a single check function."""
     sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
@@ -255,6 +286,17 @@ def test_check_uncited_owner_input_bridges_fail_on_realistic_verified_thread(tmp
     )
     assert "realistic-offender-001.md" in r.message, (
         f"Offender Prime report (realistic-offender-001.md) must be flagged; got {r.message}"
+    )
+
+
+def test_check_uncited_owner_input_bridges_uses_filename_date_before_mtime(tmp_path, monkeypatch):
+    """CI checkout gives old bridge files fresh mtimes; filename date remains stable."""
+    target = _make_clean_fixture(tmp_path)
+    _add_historical_filename_offender_with_fresh_mtime(target)
+    monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "2026-05-04")
+    r = _run_doctor_check(target, "_check_uncited_owner_input_bridges")
+    assert r.status == "pass", (
+        f"Pre-cutoff filename date should override fresh checkout mtime; got {r.status}: {r.message}"
     )
 
 
