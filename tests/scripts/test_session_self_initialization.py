@@ -797,7 +797,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Top Priority Actions" in report_text
     assert "GTKB-GOV-006" not in report_text
     assert "GTKB-GOV-007" not in report_text
-    assert "GTKB-GOV-010" in report_text
+    top_action_ids = [item["id"] for item in dashboard_data["model"]["top_priority_actions"]]
+    assert top_action_ids
+    for action_id in top_action_ids:
+        assert action_id in report_text
     assert "Current signal:" in report_text
     assert "Prompt details:" in report_text
     assert "Resolve Release Blockers" in report_text
@@ -1418,17 +1421,16 @@ def test_top_priority_actions_come_from_standing_backlog() -> None:
 
     model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
     action_ids = [item["id"] for item in model["top_priority_actions"]]
+    _, expected_top_actions = module._backlog_metrics(REPO_ROOT)
+    expected_action_ids = [item["id"] for item in expected_top_actions]
 
     # Per S330 Slice 8.6 row-36 fix: assert top-priority discipline rather than
     # exact list equality. Production code returns visible_items[:3] from the
-    # standing backlog (scripts/session_self_initialization.py:934). The
-    # original `action_ids == ["GTKB-GOV-010"]` strict equality assumed
-    # GTKB-GOV-010 was the sole active item; today the backlog contains
-    # additional active items above it. The invariants the test actually cares
-    # about: (a) GTKB-GOV-010 is among the top priorities, (b) the actions
-    # come from the active standing-backlog ordering, (c) historically-closed
-    # items don't reappear, and (d) the cap is at most 3.
-    assert "GTKB-GOV-010" in action_ids, f"GTKB-GOV-010 must remain a top priority; got {action_ids}"
+    # standing backlog (scripts/session_self_initialization.py:934). The test
+    # should not pin whichever item is currently first in that governed list;
+    # it should pin the invariants: actions come from active standing-backlog
+    # ordering, historically-closed items don't reappear, and the cap is 3.
+    assert action_ids == expected_action_ids
     assert len(action_ids) <= 3, f"top_priority_actions must cap at 3 (visible_items[:3]); got {action_ids}"
     assert "GTKB-ISOLATION-007" not in action_ids
     assert "GTKB-GOV-012" not in action_ids

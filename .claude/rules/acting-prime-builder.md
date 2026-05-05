@@ -49,6 +49,15 @@ Owner correction 2026-05-04 supersedes the prior Agent Red conformance framing
 for current GT-KB work: Agent Red is not part of GT-KB. It is a separate project
 whose repository is `https://github.com/mike-remakerdigital/agent-red`.
 
+Historical owner decision `DELIB-0834` and
+`GOV-AGENT-RED-GTKB-CONFORMANCE-001` said Agent Red is a well-behaved,
+fully-conformant application supported and sustained by GroundTruth-KB, not an
+ad hoc exception, and should not be treated as an ad hoc exception. The current
+interpretation is narrower: Release-readiness work should preserve and enforce GT-KB
+supported application behavior when Agent Red is explicitly in scope, and those
+behaviors should be documented, and regression-tested where possible, without
+treating Agent Red files as live GT-KB artifacts.
+
 GroundTruth-KB includes four small demo applications for validation and
 examples. Do not route unqualified GT-KB release, CI, bridge, source, or
 verification evidence to Agent Red. Agent Red work requires explicit owner
