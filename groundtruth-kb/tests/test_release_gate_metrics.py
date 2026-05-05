@@ -10,12 +10,9 @@ Verifies:
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
-
-import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -175,6 +172,38 @@ def _add_historical_filename_offender_with_fresh_mtime(target: Path) -> None:
     os.utime(bridge_dir / report_fname, (fresh_checkout_ts, fresh_checkout_ts))
 
 
+def _add_historical_content_date_offender_with_fresh_mtime(target: Path) -> None:
+    """Adds a pre-cutoff bridge file with no date in filename but dated metadata."""
+    bridge_dir = target / "bridge"
+    verdict_fname = "historical-content-date-offender-002.md"
+    report_fname = "historical-content-date-offender-001.md"
+    (bridge_dir / verdict_fname).write_text(
+        "VERIFIED\n\n# Loyal Opposition Verification\n\nLooks fine.\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / report_fname).write_text(
+        "NEW\n\n"
+        "# Prime Implementation Report\n\n"
+        "**Date:** 2026-05-02 (S326)\n\n"
+        "## Specification Links\n\n- SPEC-X\n\n"
+        "This report asserts owner approval was obtained but predates the cutoff.\n",
+        encoding="utf-8",
+    )
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(
+        "# Bridge Index\n\n"
+        "Document: historical-content-date-offender\n"
+        f"VERIFIED: bridge/{verdict_fname}\n"
+        f"NEW: bridge/{report_fname}\n",
+        encoding="utf-8",
+    )
+    import os
+    from datetime import datetime
+    fresh_checkout_ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
+    os.utime(bridge_dir / verdict_fname, (fresh_checkout_ts, fresh_checkout_ts))
+    os.utime(bridge_dir / report_fname, (fresh_checkout_ts, fresh_checkout_ts))
+
+
 def _run_doctor_check(target: Path, check_name: str):
     """Import doctor and run a single check function."""
     sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
@@ -297,6 +326,17 @@ def test_check_uncited_owner_input_bridges_uses_filename_date_before_mtime(tmp_p
     r = _run_doctor_check(target, "_check_uncited_owner_input_bridges")
     assert r.status == "pass", (
         f"Pre-cutoff filename date should override fresh checkout mtime; got {r.status}: {r.message}"
+    )
+
+
+def test_check_uncited_owner_input_bridges_uses_content_date_before_mtime(tmp_path, monkeypatch):
+    """Older bridge files without dated filenames still carry stable Date metadata."""
+    target = _make_clean_fixture(tmp_path)
+    _add_historical_content_date_offender_with_fresh_mtime(target)
+    monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "2026-05-04")
+    r = _run_doctor_check(target, "_check_uncited_owner_input_bridges")
+    assert r.status == "pass", (
+        f"Pre-cutoff content date should override fresh checkout mtime; got {r.status}: {r.message}"
     )
 
 

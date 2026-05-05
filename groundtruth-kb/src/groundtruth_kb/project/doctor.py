@@ -920,16 +920,25 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
     }
 
     bridge_filename_date_re = _re.compile(r"(20\d{2}-\d{2}-\d{2})")
+    bridge_content_date_re = _re.compile(r"^\*\*Date:\*\*\s*(20\d{2}-\d{2}-\d{2})(?:\b|[^\d])", _re.MULTILINE)
 
-    def bridge_file_effective_datetime(path: Path) -> datetime | None:
+    def bridge_file_effective_datetime(path: Path, content: str | None) -> datetime | None:
         # Fresh CI checkouts rewrite filesystem mtimes, so prefer the stable
-        # date embedded in most bridge filenames before falling back to mtime.
+        # date embedded in most bridge filenames or bridge metadata before
+        # falling back to mtime.
         filename_match = bridge_filename_date_re.search(path.name)
         if filename_match:
             try:
                 return datetime.fromisoformat(filename_match.group(1)).replace(tzinfo=timezone.utc)
             except ValueError:
                 pass
+        if content is not None:
+            content_match = bridge_content_date_re.search(content)
+            if content_match:
+                try:
+                    return datetime.fromisoformat(content_match.group(1)).replace(tzinfo=timezone.utc)
+                except ValueError:
+                    pass
         try:
             return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
         except OSError:
@@ -948,14 +957,14 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
                 continue
             if vf.name in known_historical_offenders:
                 continue
-            effective_datetime = bridge_file_effective_datetime(vf)
-            if effective_datetime is None:
-                continue
-            if effective_datetime < cutoff:
-                continue
             try:
                 content = vf.read_text(encoding="utf-8")
             except OSError:
+                continue
+            effective_datetime = bridge_file_effective_datetime(vf, content)
+            if effective_datetime is None:
+                continue
+            if effective_datetime < cutoff:
                 continue
             first_line = next((ln for ln in content.splitlines() if ln.strip()), "")
             if first_line.strip().startswith(("GO", "NO-GO", "VERIFIED")):
