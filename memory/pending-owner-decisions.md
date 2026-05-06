@@ -4824,6 +4824,32 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-04T20:26:08.961864Z
   answer: "User has answered your questions: \"Remote develop was force-pushed by another agent/session and now shares NO history with my local 37 commits. My local has this session's work (Sub-slices A/D VERIFIED, Sub-slice E proposal cycle GO'd) + prior-session work (Slices A/B/C of AUQ enforcement stack, ISOLATION-018 setup). Remote has docs overhaul, CHANGELOG, mkdocs-material, Makefile, pre-commit, scaffold templates. How should I reconcile?\"=\"Force-push my local (overwrites remote work)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0417
+  asked_at: 2026-05-06T22:28:22.517317Z
+  question: "How broadly should I audit the work done since 2026-05-03? (Volume: ~70+ commits, 146 bridge files touched, plus the just-pushed batch in 721f7c69. Scope choice drives review depth and timeline.)"
+  options:
+    - "Bridges + their changes (Recommended)"
+    - "Bridge files only"
+    - "Targeted umbrella audit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cb57d864cfb6cb63
+  resolved_at: 2026-05-06T22:28:22.517317Z
+  answer: "User has answered your questions: \"How broadly should I audit the work done since 2026-05-03? (Volume: ~70+ commits, 146 bridge files touched, plus the just-pushed batch in 721f7c69. Scope choice drives review depth and timeline.)\"=\"Bridges + their changes (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0418
+  asked_at: 2026-05-06T22:28:22.517317Z
+  question: "When I find errors or omissions during the review, what's the deliverable shape you want?"
+  options:
+    - "Chat summary first, then triage (Recommended)"
+    - "Single retrospective bridge thread"
+    - "Per-finding bridge proposals as I go"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6d59bee5575b6858
+  resolved_at: 2026-05-06T22:28:22.517317Z
+  answer: "User has answered your questions: \"When I find errors or omissions during the review, what's the deliverable shape you want?\"=\"Chat summary first, then triage (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 
