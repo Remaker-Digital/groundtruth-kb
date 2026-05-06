@@ -5,6 +5,128 @@
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
+Document: gtkb-claude-session-start-parity
+GO: bridge/gtkb-claude-session-start-parity-002.md
+NEW: bridge/gtkb-claude-session-start-parity-001.md
+
+Document: gtkb-harness-parity-baseline
+NO-GO: bridge/gtkb-harness-parity-baseline-002.md
+NEW: bridge/gtkb-harness-parity-baseline-001.md
+
+Document: gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan
+VERIFIED: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-006.md
+REVISED: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-005.md
+NO-GO: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-004.md
+NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-003.md
+GO: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-002.md
+NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-001.md
+
+Document: gtkb-env-inventory-drift-control-001
+NO-GO: bridge/gtkb-env-inventory-drift-control-001-006.md
+REVISED: bridge/gtkb-env-inventory-drift-control-001-005.md
+NO-GO: bridge/gtkb-env-inventory-drift-control-001-004.md
+NEW: bridge/gtkb-env-inventory-drift-control-001-003.md
+GO: bridge/gtkb-env-inventory-drift-control-001-002.md
+NEW: bridge/gtkb-env-inventory-drift-control-001-001.md
+
+Document: gtkb-secrets-purge-and-commit-enforcement-slice2-ci-prepush
+VERIFIED: bridge/gtkb-secrets-purge-and-commit-enforcement-slice2-ci-prepush-004.md
+NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-slice2-ci-prepush-003.md
+GO: bridge/gtkb-secrets-purge-and-commit-enforcement-slice2-ci-prepush-002.md
+NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-slice2-ci-prepush-001.md
+
+Document: gtkb-secrets-purge-and-commit-enforcement-001
+VERIFIED: bridge/gtkb-secrets-purge-and-commit-enforcement-001-004.md
+NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-001-003.md
+GO: bridge/gtkb-secrets-purge-and-commit-enforcement-001-002.md
+NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-001-001.md
+
+Document: agent-red-repo-migration-001
+VERIFIED: bridge/agent-red-repo-migration-001-006.md
+NEW: bridge/agent-red-repo-migration-001-005.md
+GO: bridge/agent-red-repo-migration-001-004.md
+REVISED: bridge/agent-red-repo-migration-001-003.md
+NO-GO: bridge/agent-red-repo-migration-001-002.md
+NEW: bridge/agent-red-repo-migration-001-001.md
+
+Document: gtkb-pip-install-adopter-ux-001
+VERIFIED: bridge/gtkb-pip-install-adopter-ux-001-006.md
+NEW: bridge/gtkb-pip-install-adopter-ux-001-005.md
+GO: bridge/gtkb-pip-install-adopter-ux-001-004.md
+REVISED: bridge/gtkb-pip-install-adopter-ux-001-003.md
+NO-GO: bridge/gtkb-pip-install-adopter-ux-001-002.md
+NEW: bridge/gtkb-pip-install-adopter-ux-001-001.md
+
+Document: gtkb-evaluation-module-restoration-001
+VERIFIED: bridge/gtkb-evaluation-module-restoration-001-006.md
+NEW: bridge/gtkb-evaluation-module-restoration-001-005.md
+GO: bridge/gtkb-evaluation-module-restoration-001-004.md
+REVISED: bridge/gtkb-evaluation-module-restoration-001-003.md
+NO-GO: bridge/gtkb-evaluation-module-restoration-001-002.md
+NEW: bridge/gtkb-evaluation-module-restoration-001-001.md
+
+Document: gtkb-ci-coverage-for-platform-001
+VERIFIED: bridge/gtkb-ci-coverage-for-platform-001-008.md
+NEW: bridge/gtkb-ci-coverage-for-platform-001-007.md
+NO-GO: bridge/gtkb-ci-coverage-for-platform-001-006.md
+NEW: bridge/gtkb-ci-coverage-for-platform-001-005.md
+GO: bridge/gtkb-ci-coverage-for-platform-001-004.md
+REVISED: bridge/gtkb-ci-coverage-for-platform-001-003.md
+NO-GO: bridge/gtkb-ci-coverage-for-platform-001-002.md
+NEW: bridge/gtkb-ci-coverage-for-platform-001-001.md
+
+Document: agent-red-ruff-cleanup-001
+GO: bridge/agent-red-ruff-cleanup-001-004.md
+REVISED: bridge/agent-red-ruff-cleanup-001-003.md
+NO-GO: bridge/agent-red-ruff-cleanup-001-002.md
+NEW: bridge/agent-red-ruff-cleanup-001-001.md
+
+Document: gtkb-isolation-017-slice-5-5-overlay-tests
+VERIFIED: bridge/gtkb-isolation-017-slice-5-5-overlay-tests-006.md
+NEW: bridge/gtkb-isolation-017-slice-5-5-overlay-tests-005.md
+GO: bridge/gtkb-isolation-017-slice-5-5-overlay-tests-004.md
+REVISED: bridge/gtkb-isolation-017-slice-5-5-overlay-tests-003.md
+NO-GO: bridge/gtkb-isolation-017-slice-5-5-overlay-tests-002.md
+NEW: bridge/gtkb-isolation-017-slice-5-5-overlay-tests-001.md
+
+Document: gtkb-ops-current-state-monitoring-001
+VERIFIED: bridge/gtkb-ops-current-state-monitoring-001-006.md
+NEW: bridge/gtkb-ops-current-state-monitoring-001-005.md
+GO: bridge/gtkb-ops-current-state-monitoring-001-004.md
+REVISED: bridge/gtkb-ops-current-state-monitoring-001-003.md
+NO-GO: bridge/gtkb-ops-current-state-monitoring-001-002.md
+NEW: bridge/gtkb-ops-current-state-monitoring-001-001.md
+
+Document: gtkb-auq-policy-gates-001
+VERIFIED: bridge/gtkb-auq-policy-gates-001-010.md
+REVISED: bridge/gtkb-auq-policy-gates-001-009.md
+NO-GO: bridge/gtkb-auq-policy-gates-001-008.md
+NEW: bridge/gtkb-auq-policy-gates-001-007.md
+NO-GO: bridge/gtkb-auq-policy-gates-001-006.md
+NEW: bridge/gtkb-auq-policy-gates-001-005.md
+GO: bridge/gtkb-auq-policy-gates-001-004.md
+REVISED: bridge/gtkb-auq-policy-gates-001-003.md
+NO-GO: bridge/gtkb-auq-policy-gates-001-002.md
+NEW: bridge/gtkb-auq-policy-gates-001-001.md
+
+Document: gtkb-resource-reference-disambiguation-001
+VERIFIED: bridge/gtkb-resource-reference-disambiguation-001-004.md
+NEW: bridge/gtkb-resource-reference-disambiguation-001-003.md
+GO: bridge/gtkb-resource-reference-disambiguation-001-002.md
+NEW: bridge/gtkb-resource-reference-disambiguation-001-001.md
+
+Document: gtkb-systems-terminology-map-001
+VERIFIED: bridge/gtkb-systems-terminology-map-001-004.md
+NEW: bridge/gtkb-systems-terminology-map-001-003.md
+GO: bridge/gtkb-systems-terminology-map-001-002.md
+NEW: bridge/gtkb-systems-terminology-map-001-001.md
+
+Document: gtkb-env-inventory-001
+VERIFIED: bridge/gtkb-env-inventory-001-004.md
+NEW: bridge/gtkb-env-inventory-001-003.md
+GO: bridge/gtkb-env-inventory-001-002.md
+NEW: bridge/gtkb-env-inventory-001-001.md
+
 Document: gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04
 VERIFIED: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-006.md
 REVISED: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-005.md
@@ -14,9 +136,17 @@ GO: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-002
 NEW: bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04-001.md
 
 Document: gtkb-auq-policy-gate-backlog-advisory-2026-05-04
+VERIFIED: bridge/gtkb-auq-policy-gate-backlog-advisory-2026-05-04-005.md
+NEW: bridge/gtkb-auq-policy-gate-backlog-advisory-2026-05-04-004.md
+GO: bridge/gtkb-auq-policy-gate-backlog-advisory-2026-05-04-003.md
+REVISED: bridge/gtkb-auq-policy-gate-backlog-advisory-2026-05-04-002.md
 NO-GO: bridge/gtkb-auq-policy-gate-backlog-advisory-2026-05-04-001.md
 
 Document: gtkb-ops-current-state-monitoring-advisory-2026-05-04
+VERIFIED: bridge/gtkb-ops-current-state-monitoring-advisory-2026-05-04-005.md
+NEW: bridge/gtkb-ops-current-state-monitoring-advisory-2026-05-04-004.md
+GO: bridge/gtkb-ops-current-state-monitoring-advisory-2026-05-04-003.md
+REVISED: bridge/gtkb-ops-current-state-monitoring-advisory-2026-05-04-002.md
 NO-GO: bridge/gtkb-ops-current-state-monitoring-advisory-2026-05-04-001.md
 
 Document: gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04
@@ -84,6 +214,8 @@ NO-GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-0
 NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-001.md
 
 Document: gtkb-gov-askuserquestion-enforcement-stack-2026-05-04
+VERIFIED: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-006.md
+NEW: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-005.md
 GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-004.md
 REVISED: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-003.md
 NO-GO: bridge/gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-002.md
@@ -104,10 +236,16 @@ NO-GO: bridge/gtkb-isolation-018-slice-b-pdf-cluster-002.md
 NEW: bridge/gtkb-isolation-018-slice-b-pdf-cluster-001.md
 
 Document: gtkb-pre-filing-preflight-hook
+NO-GO: bridge/gtkb-pre-filing-preflight-hook-006.md
+NEW: bridge/gtkb-pre-filing-preflight-hook-005.md
+GO: bridge/gtkb-pre-filing-preflight-hook-004.md
+REVISED: bridge/gtkb-pre-filing-preflight-hook-003.md
 NO-GO: bridge/gtkb-pre-filing-preflight-hook-002.md
 NEW: bridge/gtkb-pre-filing-preflight-hook-001.md
 
 Document: gtkb-pre-filing-preflight-rule
+NO-GO: bridge/gtkb-pre-filing-preflight-rule-004.md
+NEW: bridge/gtkb-pre-filing-preflight-rule-003.md
 GO: bridge/gtkb-pre-filing-preflight-rule-002.md
 NEW: bridge/gtkb-pre-filing-preflight-rule-001.md
 
@@ -128,6 +266,8 @@ NO-GO: bridge/gtkb-isolation-018-agent-red-file-migration-002.md
 NEW: bridge/gtkb-isolation-018-agent-red-file-migration-001.md
 
 Document: gtkb-isolation-017-slice-8-6-ci-failure-triage
+VERIFIED: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-010.md
+REVISED: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-009.md
 NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-008.md
 REVISED: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-007.md
 NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-006.md
@@ -138,6 +278,10 @@ NO-GO: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-002.md
 NEW: bridge/gtkb-isolation-017-slice-8-6-ci-failure-triage-001.md
 
 Document: gtkb-isolation-017-slice-8-5-ci-green
+VERIFIED: bridge/gtkb-isolation-017-slice-8-5-ci-green-006.md
+NEW: bridge/gtkb-isolation-017-slice-8-5-ci-green-005.md
+GO: bridge/gtkb-isolation-017-slice-8-5-ci-green-004.md
+REVISED: bridge/gtkb-isolation-017-slice-8-5-ci-green-003.md
 NO-GO: bridge/gtkb-isolation-017-slice-8-5-ci-green-002.md
 NEW: bridge/gtkb-isolation-017-slice-8-5-ci-green-001.md
 
@@ -345,12 +489,16 @@ NO-GO: bridge/gtkb-phantom-index-cleanup-2026-04-30-002.md
 NEW: bridge/gtkb-phantom-index-cleanup-2026-04-30-001.md
 
 Document: gtkb-bridge-propose-helper-index-parity-2026-04-30
+GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-006.md
+REVISED: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-005.md
 NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-004.md
 REVISED: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-003.md
 NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-002.md
 NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-001.md
 
 Document: gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30
+NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-010.md
+REVISED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-009.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-008.md
 NEW: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-007.md
 GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-006.md
@@ -419,6 +567,8 @@ NEW: bridge/gtkb-directive-enforcement-registry-001.md
 
 
 Document: generator-hardening-002
+GO: bridge/generator-hardening-002-010.md
+REVISED: bridge/generator-hardening-002-009.md
 NO-GO: bridge/generator-hardening-002-008.md
 REVISED: bridge/generator-hardening-002-007.md
 NO-GO: bridge/generator-hardening-002-006.md
@@ -463,6 +613,8 @@ NEW: bridge/gtkb-bridge-poller-001-smart-poller-001.md
 
 
 Document: gtkb-db-backup-001-snapshot-daemon
+GO: bridge/gtkb-db-backup-001-snapshot-daemon-006.md
+NEW: bridge/gtkb-db-backup-001-snapshot-daemon-005.md
 GO: bridge/gtkb-db-backup-001-snapshot-daemon-004.md
 REVISED: bridge/gtkb-db-backup-001-snapshot-daemon-003.md
 NO-GO: bridge/gtkb-db-backup-001-snapshot-daemon-002.md

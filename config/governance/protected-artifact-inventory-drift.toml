@@ -1,0 +1,99 @@
+schema_version = 1
+
+volatile_inventory_paths = [
+  "generated_at",
+  "redaction.sensitive_environment_entry_count",
+  "redaction.sensitive_environment_categories",
+]
+
+[[protected_artifacts]]
+id = "harness-identity-and-role-state"
+patterns = [
+  "harness-state/harness-identities.json",
+  "harness-state/role-assignments.json",
+]
+severity = "governance_review"
+route = "governance_review"
+accept_with_inventory_baseline_update = false
+required_evidence = [
+  "bridge report",
+  "role assignment verification",
+]
+
+[[protected_artifacts]]
+id = "role-and-governance-rules"
+patterns = [
+  ".claude/rules/**",
+  "AGENTS.md",
+  "CLAUDE.md",
+]
+severity = "governance_review"
+route = "governance_review"
+accept_with_inventory_baseline_update = false
+required_evidence = [
+  "bridge report",
+  "governance review",
+]
+
+[[protected_artifacts]]
+id = "hook-and-action-gates"
+patterns = [
+  ".claude/hooks/**",
+  ".codex/gtkb-hooks/**",
+  ".codex/hooks.json",
+  ".githooks/**",
+]
+severity = "compatibility_tests"
+route = "compatibility_tests"
+accept_with_inventory_baseline_update = false
+required_evidence = [
+  "hook parity test",
+  "compatibility tests",
+]
+
+[[protected_artifacts]]
+id = "release-and-ci-gates"
+patterns = [
+  "scripts/release_candidate_gate.py",
+  ".github/workflows/**",
+]
+severity = "release_blocker"
+route = "release_blocker"
+accept_with_inventory_baseline_update = false
+required_evidence = [
+  "release gate test",
+  "workflow coverage test",
+]
+
+[[protected_artifacts]]
+id = "inventory-collector-and-baseline"
+patterns = [
+  "scripts/collect_dev_environment_inventory.py",
+  "scripts/check_dev_environment_inventory_drift.py",
+  "docs/release/dev-environment-inventory.json",
+  "docs/release/dev-environment-inventory.md",
+  "config/governance/protected-artifact-inventory-drift.toml",
+]
+severity = "accepted_baseline_update"
+route = "accepted_baseline_update"
+accept_with_inventory_baseline_update = true
+required_evidence = [
+  "inventory regenerated",
+  "normalized drift check",
+]
+
+[[protected_artifacts]]
+id = "package-and-project-config"
+patterns = [
+  "groundtruth.toml",
+  "groundtruth-kb/pyproject.toml",
+  "pyproject.toml",
+]
+severity = "docs_review"
+route = "docs_review"
+accept_with_inventory_baseline_update = false
+required_evidence = [
+  "documentation review",
+  "compatibility tests",
+]
+

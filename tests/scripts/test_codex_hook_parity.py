@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_codex_hook_parity.py"
+CODEX_SESSION_START_DISPATCHER = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
 
 
 def _load_module():
@@ -17,6 +18,15 @@ def _load_module():
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["check_codex_hook_parity"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_session_start_dispatcher():
+    spec = importlib.util.spec_from_file_location("codex_session_start_dispatch", CODEX_SESSION_START_DISPATCHER)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["codex_session_start_dispatch"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -43,6 +53,12 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         "gtkb-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
         for group in codex_hooks["hooks"]["SessionStart"]
         for hook in group["hooks"]
+    )
+    assert all(
+        hook.get("timeout", 0) >= 60
+        for group in codex_hooks["hooks"]["SessionStart"]
+        for hook in group["hooks"]
+        if "session_start_dispatch.py" in hook.get("command", "")
     )
     assert any(
         "gtkb-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
@@ -71,9 +87,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in event_groups
         for hook in group["hooks"]
     ]
-    assert not any(
-        "owner-decision-tracker-ups.cmd" in cmd for cmd in all_codex_commands
-    ), (
+    assert not any("owner-decision-tracker-ups.cmd" in cmd for cmd in all_codex_commands), (
         "Codex owner-decision-tracker-ups.cmd entry must remain absent until "
         "the wrapper file is created on disk. Active fallback is in the "
         "release-candidate gate via check_pending_owner_decisions_parity.py."
@@ -83,6 +97,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         and "--emit-report" in hook["command"]
         and "--fast-hook" in hook["command"]
         and "--harness-name claude" in hook["command"]
+        and "--harness-id B" not in hook["command"]
         and "--role-profile" not in hook["command"]
         for group in claude_settings["hooks"]["SessionStart"]
         for hook in group["hooks"]
@@ -92,10 +107,33 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         and "--emit-wrapup" in hook["command"]
         and "--fast-hook" in hook["command"]
         and "--harness-name claude" in hook["command"]
+        and "--harness-id B" not in hook["command"]
         and "--role-profile" not in hook["command"]
         for group in claude_settings["hooks"]["Stop"]
         for hook in group["hooks"]
     )
+
+
+def test_codex_session_start_dispatcher_preserves_hook_specific_schema() -> None:
+    module = _load_session_start_dispatcher()
+
+    payload = module._session_start_payload("startup context")
+
+    assert payload == {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": "startup context",
+        }
+    }
+
+
+def test_codex_session_start_dispatcher_json_is_utf8_safe_on_windows() -> None:
+    module = _load_session_start_dispatcher()
+
+    text = module._dump_payload(module._session_start_payload("Smart-poller notification \u2014 ready"))
+
+    assert text.isascii()
+    assert json.loads(text)["hookSpecificOutput"]["additionalContext"] == "Smart-poller notification \u2014 ready"
 
 
 def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None:
@@ -111,9 +149,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
         for command in commands
     )
     assert any(
-        "gtkb-hooks" in command
-        and "session_wrapup_trigger_dispatch.py" in command
-        and command.startswith("python ")
+        "gtkb-hooks" in command and "session_wrapup_trigger_dispatch.py" in command and command.startswith("python ")
         for command in commands
     )
     assert any(
@@ -129,7 +165,11 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     start_text = start_dispatcher.read_text(encoding="utf-8")
     assert "--emit-startup-service-payload" in start_text
     assert "--harness-name" in start_text
-    assert "HARNESS_NAME = \"codex\"" in start_text
+    assert "--harness-id" in start_text
+    assert 'HARNESS_NAME = "codex"' in start_text
+    assert 'HARNESS_ID = "A"' not in start_text
+    assert "harness_identity" in start_text
+    assert "resolved_harness_id" in start_text
     assert "--role-profile" not in start_text
     assert "STARTUP_SERVICE" in start_text
     assert "STARTUP_FRESHNESS_CONTRACT_VERSION" in start_text
@@ -138,6 +178,8 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "_purge_previous_diagnostics" in start_text
     assert "GTKB_STARTUP_REQUESTED_AT" in start_text
     assert "subprocess.run" in start_text
+    assert "STARTUP_SERVICE_TIMEOUT_SECONDS = 50.0" in start_text
+    assert "timeout=STARTUP_SERVICE_TIMEOUT_SECONDS" in start_text
     assert "Startup First-Response Directive" not in start_text
     assert "_live_bridge_index_context" not in start_text
     assert "Mandatory Direct Live Bridge Index Read" not in start_text
@@ -157,12 +199,31 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "last-session-start.json" in start_text
     assert "last-session-start.err" in start_text
 
+    session_start_cmd = (REPO_ROOT / ".codex" / "gtkb-hooks" / "session-start.cmd").read_text(encoding="utf-8")
+    assert "harness_identity.py" in session_start_cmd
+    assert "GTKB_HARNESS_ID" in session_start_cmd
+    assert "--harness-name codex" in session_start_cmd
+    assert "--harness-id %GTKB_HARNESS_ID%" in session_start_cmd
+
+    stop_dispatcher = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_stop_dispatch.py"
+    stop_text = stop_dispatcher.read_text(encoding="utf-8")
+    assert "--emit-wrapup" in stop_text
+    assert "--harness-name" in stop_text
+    assert "--harness-id" in stop_text
+    assert 'HARNESS_NAME = "codex"' in stop_text
+    assert 'HARNESS_ID = "A"' not in stop_text
+    assert "resolved_harness_id" in stop_text
+    assert "--role-profile" not in stop_text
+
     wrapup_dispatcher = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_wrapup_trigger_dispatch.py"
     wrapup_text = wrapup_dispatcher.read_text(encoding="utf-8")
     assert "--emit-wrapup" in wrapup_text
     assert "--force-wrapup" in wrapup_text
     assert "--harness-name" in wrapup_text
-    assert "HARNESS_NAME = \"codex\"" in wrapup_text
+    assert "--harness-id" in wrapup_text
+    assert 'HARNESS_NAME = "codex"' in wrapup_text
+    assert 'HARNESS_ID = "A"' not in wrapup_text
+    assert "resolved_harness_id" in wrapup_text
     assert "--role-profile" not in wrapup_text
     assert "UserPromptSubmit" in wrapup_text
     assert "ACCEPTED_TRIGGER_PHRASES" in wrapup_text
@@ -187,6 +248,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     workstream_text = workstream_wrapper.read_text(encoding="utf-8")
     assert "workstream-focus.py" in workstream_text
     assert "GTKB_HARNESS_NAME=codex" in workstream_text
+    assert "GTKB_HARNESS_ID=A" not in workstream_text
 
 
 def test_codex_hook_parity_reports_missing_codex_hooks(tmp_path) -> None:
@@ -231,8 +293,14 @@ def test_codex_hook_parity_requires_bash_matcher(tmp_path) -> None:
     (tmp_path / ".claude" / "rules").mkdir()
     (tmp_path / "scripts").mkdir()
     (tmp_path / ".codex" / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
-    (tmp_path / ".claude" / "rules" / "operating-role.md").write_text(
-        "active_role: loyal-opposition\n",
+    (tmp_path / "harness-state").mkdir()
+    (tmp_path / "harness-state" / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}) + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "harness-state" / "role-assignments.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"A": {"harness_type": "codex", "role": "loyal-opposition"}}})
+        + "\n",
         encoding="utf-8",
     )
     (tmp_path / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text(

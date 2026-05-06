@@ -1,0 +1,509 @@
+schema_version = 1
+map_id = "gtkb-system-interface-map"
+human_companion = "docs/gtkb-systems-and-tools.md"
+
+[metadata]
+canonical_project = "GroundTruth-KB"
+purpose = "Resolve owner-facing GT-KB system and artifact terms to their authoritative sources, read paths, and mutation routes."
+first_reconciliation_case = "backlog"
+last_updated = "2026-05-06"
+
+[[systems]]
+id = "backlog"
+canonical_name = "backlog"
+accepted_aliases = ["backlog", "standing backlog", "active backlog", "current backlog", "work list", "known work"]
+discouraged_aliases = ["the list"]
+forbidden_aliases = []
+concept_vs_artifact = "membase_record_view"
+authoritative_source = "MemBase table: current_work_items"
+generated_or_authoritative = "authoritative_record_view"
+read_method = "Use `gt backlog list` or query MemBase/current_work_items. memory/work_list.md is a compatibility view; bridge/INDEX.md is only bridge queue state."
+mutation_method = "Use governed GT-KB work item APIs/CLI commands. Legacy memory/work_list.md rows are migrated by `gt backlog migrate-work-list`."
+role_permissions = "Prime Builder may update backlog artifacts within approved scope; Loyal Opposition is additive/read-mostly except bridge repair scope."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "All work items are backlog items; memory/work_list.md is non-authoritative compatibility output; bridge/INDEX.md is queue state; dashboard/startup rows are summaries."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["GOV-STANDING-BACKLOG-001", "ADR-STANDING-BACKLOG-DB-AUTHORITY-001", "DCL-STANDING-BACKLOG-DB-SCHEMA-001"]
+related_deliberations = ["DELIB-S327-FORMAL-BACKLOG-DB-SCHEMA-OWNER-DIRECTIVE", "DELIB-0838", "DELIB-0839"]
+
+[[systems]]
+id = "work-item"
+canonical_name = "work item"
+accepted_aliases = ["work item", "backlog item", "WI", "task record"]
+discouraged_aliases = []
+forbidden_aliases = []
+concept_vs_artifact = "membase_record"
+authoritative_source = "MemBase table: current_work_items"
+generated_or_authoritative = "authoritative_record_view"
+read_method = "Query MemBase/current_work_items through GT-KB APIs, `gt backlog list`, or reports."
+mutation_method = "Use governed GT-KB database APIs and change reasons."
+role_permissions = "Prime Builder may mutate within approved implementation scope; Loyal Opposition reviews and reports."
+startup_visibility = "count_only"
+dashboard_visibility = "summary_only"
+harness_caveats = "A work item is an individual backlog item; projects and sub-projects organize work items."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "membase"
+canonical_name = "MemBase"
+accepted_aliases = ["MemBase", "GroundTruth DB", "groundtruth.db", "knowledge database"]
+discouraged_aliases = ["KB database"]
+forbidden_aliases = []
+concept_vs_artifact = "database"
+authoritative_source = "groundtruth.db"
+generated_or_authoritative = "authoritative"
+read_method = "Use GT-KB APIs or sqlite read-only probes when direct verification is required."
+mutation_method = "Use governed GT-KB APIs; avoid ad hoc SQLite writes."
+role_permissions = "Prime Builder may mutate with approved scope; Loyal Opposition defaults to read-only investigation."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "SQLite probes must remain inside E:\\GT-KB for live GT-KB work."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "deliberation-archive"
+canonical_name = "Deliberation Archive"
+accepted_aliases = ["Deliberation Archive", "DA", "deliberations", "deliberation records"]
+discouraged_aliases = ["chat history"]
+forbidden_aliases = []
+concept_vs_artifact = "membase_record_set"
+authoritative_source = "MemBase table: current_deliberations"
+generated_or_authoritative = "authoritative_record_view"
+read_method = "Use gt deliberations search or MemBase read APIs."
+mutation_method = "Use governed deliberation capture/import flows."
+role_permissions = "Prime Builder may mutate through governed capture; Loyal Opposition cites and reports."
+startup_visibility = "count_only"
+dashboard_visibility = "summary_only"
+harness_caveats = "ChromaDB is an optional search overlay, not the Deliberation Archive authority."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "memory-md"
+canonical_name = "MEMORY.md"
+accepted_aliases = ["MEMORY.md", "memory note", "operational notepad"]
+discouraged_aliases = ["project memory"]
+forbidden_aliases = []
+concept_vs_artifact = "file"
+authoritative_source = "memory/MEMORY.md"
+generated_or_authoritative = "authoritative_operational_notepad"
+read_method = "Read memory/MEMORY.md when operational notepad context is needed."
+mutation_method = "Update through session memory/wrap-up process."
+role_permissions = "Prime Builder may update; Loyal Opposition additive reports should stay in independent-progress-assessments unless asked."
+startup_visibility = "summary_only"
+dashboard_visibility = "none"
+harness_caveats = "Harness-memory profile skips root MEMORY.md; use memory/MEMORY.md in this checkout."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["ADR-0001"]
+related_deliberations = []
+
+[[systems]]
+id = "canonical-glossary"
+canonical_name = "canonical glossary"
+accepted_aliases = ["glossary", "canonical terminology", "term primer", "terminology primer"]
+discouraged_aliases = ["dictionary"]
+forbidden_aliases = []
+concept_vs_artifact = "rule_file"
+authoritative_source = ".claude/rules/canonical-terminology.md"
+generated_or_authoritative = "authoritative_rule"
+read_method = "Read .claude/rules/canonical-terminology.md and .toml."
+mutation_method = "Use governed terminology proposal/review flow."
+role_permissions = "Prime Builder may implement approved updates; Loyal Opposition critiques and requests disambiguation."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Glossary terms do not by themselves identify concrete artifact locations; use this system map for that."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = ["DELIB-0722"]
+
+[[systems]]
+id = "operating-model"
+canonical_name = "operating model"
+accepted_aliases = ["operating model", "GT-KB operating model", "IDP operating model"]
+discouraged_aliases = ["process doc"]
+forbidden_aliases = []
+concept_vs_artifact = "rule_file"
+authoritative_source = ".claude/rules/operating-model.md"
+generated_or_authoritative = "rule_cited_soft_authority"
+read_method = "Read .claude/rules/operating-model.md for canonical operating-model definitions."
+mutation_method = "Use formal artifact or rule-update governance as applicable."
+role_permissions = "Prime Builder may update within approved scope; Loyal Opposition may critique requirements."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "AGENTS.md glossary may reference the operating model but does not replace it."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = ["DELIB-S324-OM-DELTA-0001-CHOICE"]
+
+[[systems]]
+id = "file-bridge"
+canonical_name = "file bridge"
+accepted_aliases = ["file bridge", "Prime/Loyal bridge", "bridge protocol"]
+discouraged_aliases = ["poller"]
+forbidden_aliases = []
+concept_vs_artifact = "protocol_and_files"
+authoritative_source = ".claude/rules/file-bridge-protocol.md"
+generated_or_authoritative = "authoritative_rule"
+read_method = "Read .claude/rules/file-bridge-protocol.md and live bridge/INDEX.md for queue state."
+mutation_method = "Write numbered bridge files and update bridge/INDEX.md per protocol."
+role_permissions = "Prime Builder acts on latest GO/NO-GO; Loyal Opposition acts on latest NEW/REVISED."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "The poller is not the bridge."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001"]
+related_deliberations = []
+
+[[systems]]
+id = "bridge-queue"
+canonical_name = "bridge queue"
+accepted_aliases = ["bridge queue", "review queue", "bridge index", "bridge/INDEX.md"]
+discouraged_aliases = ["backlog"]
+forbidden_aliases = []
+concept_vs_artifact = "file"
+authoritative_source = "bridge/INDEX.md"
+generated_or_authoritative = "authoritative_queue_state"
+read_method = "Read bridge/INDEX.md live; do not rely on cached startup or dashboard counts."
+mutation_method = "Insert latest status rows with numbered bridge documents."
+role_permissions = "Prime Builder ignores latest NEW/REVISED/VERIFIED as actionable; Loyal Opposition ignores latest GO/NO-GO as review queue."
+startup_visibility = "counts_only"
+dashboard_visibility = "counts_only"
+harness_caveats = "Queue state is not the standing backlog."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001"]
+related_deliberations = []
+
+[[systems]]
+id = "smart-poller"
+canonical_name = "verified smart poller"
+accepted_aliases = ["smart poller", "verified smart poller", "bridge smart poller"]
+discouraged_aliases = ["OS poller"]
+forbidden_aliases = []
+concept_vs_artifact = "automation_runtime"
+authoritative_source = "independent-progress-assessments/bridge-automation/"
+generated_or_authoritative = "supporting_runtime"
+read_method = "Inspect bridge automation scripts and live status files when poller health matters."
+mutation_method = "Repair only within bridge-function authority or approved automation scope."
+role_permissions = "Both roles may use it when available; bridge function repairs are specially authorized."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Use manual bridge scans when the verified smart poller is unavailable."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "retired-os-poller"
+canonical_name = "retired OS poller"
+accepted_aliases = ["retired OS poller", "old poller", "OS poller"]
+discouraged_aliases = ["bridge"]
+forbidden_aliases = []
+concept_vs_artifact = "retired_runtime"
+authoritative_source = ".claude/rules/file-bridge-protocol.md"
+generated_or_authoritative = "retired"
+read_method = "Read protocol text only when diagnosing confusion."
+mutation_method = "Do not restore."
+role_permissions = "No role should reactivate it."
+startup_visibility = "warning_if_referenced"
+dashboard_visibility = "none"
+harness_caveats = "The retired OS poller remains disabled and must not be treated as the bridge."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "retired"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "dashboard"
+canonical_name = "dashboard"
+accepted_aliases = ["dashboard", "GT-KB dashboard", "session dashboard", "Grafana dashboard"]
+discouraged_aliases = ["source of truth"]
+forbidden_aliases = []
+concept_vs_artifact = "generated_summary"
+authoritative_source = "docs/gtkb-dashboard/session-startup-report.md"
+generated_or_authoritative = "generated_non_authoritative"
+read_method = "Use dashboard/startup for summaries; follow links to authoritative sources for decisions."
+mutation_method = "Regenerate through dashboard/startup scripts or gt dashboard commands."
+role_permissions = "Prime Builder may regenerate; Loyal Opposition may cite only as summary context."
+startup_visibility = "compact_status"
+dashboard_visibility = "primary_surface"
+harness_caveats = "Dashboard rows do not supersede source artifacts."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "generated"
+related_specs = ["SPEC-PROJECT-DASHBOARD-KPI-LINK-001"]
+related_deliberations = []
+
+[[systems]]
+id = "release-readiness"
+canonical_name = "release readiness"
+accepted_aliases = ["release readiness", "release-readiness", "readiness matrix", "release checklist"]
+discouraged_aliases = ["release gate"]
+forbidden_aliases = []
+concept_vs_artifact = "file"
+authoritative_source = "memory/release-readiness.md"
+generated_or_authoritative = "authoritative_release_working_record"
+read_method = "Read memory/release-readiness.md for release readiness evidence."
+mutation_method = "Update through release-path bridge work."
+role_permissions = "Prime Builder may update within approved release scope; Loyal Opposition verifies evidence."
+startup_visibility = "summary_only"
+dashboard_visibility = "summary_only"
+harness_caveats = "Release readiness evidence is not the same as automated release-gate execution."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "release-gate"
+canonical_name = "release gate"
+accepted_aliases = ["release gate", "release candidate gate", "RC gate", "release-candidate gate"]
+discouraged_aliases = ["release checklist"]
+forbidden_aliases = []
+concept_vs_artifact = "script_and_workflow"
+authoritative_source = "scripts/release_candidate_gate.py"
+generated_or_authoritative = "executable_gate"
+read_method = "Inspect scripts/release_candidate_gate.py and CI workflow bindings."
+mutation_method = "Update through governed release-hardening work."
+role_permissions = "Prime Builder may update gates in approved scope; Loyal Opposition verifies fail-closed behavior."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Passing local gate does not by itself authorize external release or publish."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "doctor-check"
+canonical_name = "doctor check"
+accepted_aliases = ["doctor", "doctor check", "gt project doctor", "workstation doctor"]
+discouraged_aliases = ["release gate"]
+forbidden_aliases = []
+concept_vs_artifact = "cli_check"
+authoritative_source = "groundtruth-kb/src/groundtruth_kb/project/doctor.py"
+generated_or_authoritative = "executable_check"
+read_method = "Run gt project doctor or inspect the doctor module."
+mutation_method = "Update through project doctor implementation work."
+role_permissions = "Prime Builder may update checks in approved scope; Loyal Opposition verifies diagnostics."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Doctor checks evaluate local workstation/project health, not bridge authority."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "startup-disclosure"
+canonical_name = "startup disclosure"
+accepted_aliases = ["startup disclosure", "session startup", "startup report", "startup text"]
+discouraged_aliases = ["dashboard authority"]
+forbidden_aliases = []
+concept_vs_artifact = "generated_summary"
+authoritative_source = "scripts/session_self_initialization.py"
+generated_or_authoritative = "generated_non_authoritative"
+read_method = "Read generated startup text for orientation; follow cited artifacts for authority."
+mutation_method = "Update through startup-refactor work or startup script changes."
+role_permissions = "Prime Builder may update approved startup code; Loyal Opposition critiques startup correctness."
+startup_visibility = "primary_surface"
+dashboard_visibility = "summary_only"
+harness_caveats = "Fresh-session first owner message is a stimulus, not task content."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["GOV-SESSION-SELF-INITIALIZATION-001", "PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001"]
+related_deliberations = []
+
+[[systems]]
+id = "session-focus"
+canonical_name = "session focus"
+accepted_aliases = ["session focus", "focus option", "startup option"]
+discouraged_aliases = ["owner decision"]
+forbidden_aliases = []
+concept_vs_artifact = "startup_selection"
+authoritative_source = "scripts/session_self_initialization.py"
+generated_or_authoritative = "generated_prompt_surface"
+read_method = "Read the latest Prime Builder startup disclosure and owner reply mapping."
+mutation_method = "Update only through startup governance changes."
+role_permissions = "Prime Builder maps owner tasks to focus; Loyal Opposition does not present Prime focus choices."
+startup_visibility = "primary_surface"
+dashboard_visibility = "none"
+harness_caveats = "Loyal Opposition sessions default to bridge reviews, not Prime focus choices."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001"]
+related_deliberations = []
+
+[[systems]]
+id = "work-subject"
+canonical_name = "work subject"
+accepted_aliases = ["work subject", "active subject", "project subject"]
+discouraged_aliases = ["project"]
+forbidden_aliases = []
+concept_vs_artifact = "scope_binding"
+authoritative_source = ".claude/rules/operating-model.md"
+generated_or_authoritative = "rule_cited_soft_authority"
+read_method = "Resolve through operating model, current root, and owner task scope."
+mutation_method = "Change only through explicit owner-directed work-subject switch or governed startup process."
+role_permissions = "Both roles must respect the current work subject and root boundary."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Agent Red is a separate project unless Mike explicitly scopes the session to Agent Red."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+related_deliberations = []
+
+[[systems]]
+id = "role-assignment-record"
+canonical_name = "role assignment record"
+accepted_aliases = ["role assignment", "role assignments", "operating-role record"]
+discouraged_aliases = ["mode file"]
+forbidden_aliases = []
+concept_vs_artifact = "file"
+authoritative_source = "harness-state/role-assignments.json"
+generated_or_authoritative = "authoritative"
+read_method = "Read harness-state/role-assignments.json after resolving harness identity."
+mutation_method = "Update only through owner-directed role switch semantics or harness role scripts."
+role_permissions = "Current harness role determines Prime Builder or Loyal Opposition behavior."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Legacy per-harness operating-role.md files are pointers only."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "harness-identity-record"
+canonical_name = "harness identity record"
+accepted_aliases = ["harness identity", "harness identities", "installation ID"]
+discouraged_aliases = ["model identity"]
+forbidden_aliases = []
+concept_vs_artifact = "file"
+authoritative_source = "harness-state/harness-identities.json"
+generated_or_authoritative = "authoritative"
+read_method = "Read harness-state/harness-identities.json before role assignment."
+mutation_method = "Use scripts/harness_identity.py set only when owner requested."
+role_permissions = "Do not silently replace persisted identity."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Roles attach to durable harness IDs, not vendor/model names."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "skill"
+canonical_name = "skill"
+accepted_aliases = ["skill", "Codex skill", "skills"]
+discouraged_aliases = ["plugin"]
+forbidden_aliases = []
+concept_vs_artifact = "harness_capability"
+authoritative_source = "AGENTS.md and installed skill manifests"
+generated_or_authoritative = "runtime_capability"
+read_method = "Use session skill list and read relevant SKILL.md only when triggered."
+mutation_method = "Install/update only through explicit skill workflows."
+role_permissions = "Use triggered skills; do not carry skill state across unrelated turns."
+startup_visibility = "count_only"
+dashboard_visibility = "summary_only"
+harness_caveats = "Skills are local instructions, not external apps."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "hook"
+canonical_name = "hook"
+accepted_aliases = ["hook", "hooks", "Claude hook", "Codex hook"]
+discouraged_aliases = ["skill"]
+forbidden_aliases = []
+concept_vs_artifact = "harness_or_git_hook"
+authoritative_source = ".claude/settings.json and .githooks/"
+generated_or_authoritative = "configured_control_surface"
+read_method = "Inspect .claude/settings.json, .codex/hooks.json, and .githooks as relevant."
+mutation_method = "Update through governed hook/harness configuration work."
+role_permissions = "Prime Builder may repair configured hooks in approved scope; Loyal Opposition critiques and verifies."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "Git hooks, Claude hooks, and Codex hooks are separate surfaces."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "plugin-app-capability"
+canonical_name = "plugin/app capability"
+accepted_aliases = ["plugin", "app", "connector", "plugin capability", "app capability"]
+discouraged_aliases = ["skill"]
+forbidden_aliases = []
+concept_vs_artifact = "runtime_capability"
+authoritative_source = "session plugin/app tool list"
+generated_or_authoritative = "runtime_capability"
+read_method = "Use the current session plugin/app availability and tool discovery."
+mutation_method = "Install only through explicit owner-requested plugin/connector flows."
+role_permissions = "Use available capabilities when relevant; do not invent unavailable tool access."
+startup_visibility = "count_only"
+dashboard_visibility = "summary_only"
+harness_caveats = "Plugins are not invoked directly; use underlying skills, MCP tools, or app tools."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "mcp-server"
+canonical_name = "MCP server"
+accepted_aliases = ["MCP", "MCP server", "MCP tools", "connector tools"]
+discouraged_aliases = ["plugin"]
+forbidden_aliases = []
+concept_vs_artifact = "runtime_tool_server"
+authoritative_source = "current session tool list and MCP resource listings"
+generated_or_authoritative = "runtime_capability"
+read_method = "Use available MCP tools or tool discovery when needed."
+mutation_method = "Do not configure external MCP servers without explicit scope."
+role_permissions = "Prefer MCP resources over web search when the relevant server is available."
+startup_visibility = "count_only"
+dashboard_visibility = "summary_only"
+harness_caveats = "Apps may expose MCP tools lazily through tool_search."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "resource-alias-registry"
+canonical_name = "resource alias registry"
+accepted_aliases = ["resource registry", "resource alias registry", "project resource aliases", "external resource registry"]
+discouraged_aliases = ["systems map"]
+forbidden_aliases = []
+concept_vs_artifact = "registry"
+authoritative_source = "config/agent-control/project-resource-aliases.toml"
+generated_or_authoritative = "authoritative"
+read_method = "Use scripts/resolve_project_resource.py or read the governed TOML registry."
+mutation_method = "Update through resource-reference disambiguation bridge work."
+role_permissions = "Prime Builder may update within approved scope; Loyal Opposition verifies exact resource binding."
+startup_visibility = "compact_status"
+dashboard_visibility = "summary_only"
+harness_caveats = "This registry owns external identities; the system interface map owns internal artifact/interface names."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []

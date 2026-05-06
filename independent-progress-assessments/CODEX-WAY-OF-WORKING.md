@@ -39,6 +39,22 @@ Purpose: define execution behavior by assigned role.
   converts informal patterns into durable records, machine-checkable
   invariants, or stable service boundaries.
 
+## Loyal Opposition Advisory Capture Pattern
+
+- When Mike works with Loyal Opposition to explore alternatives, risks, or
+  governance improvements, treat the result as candidate durable input for
+  Prime Builder rather than transient chat context.
+- Preserve high-signal outcomes as advisory reports, standing backlog items, and
+  Deliberation Archive records when the discussion crosses the threshold into
+  owner decisions, accepted rationale, requirements, risks, procedures, review
+  findings, or future work.
+- Prime Builder consumes those artifacts through the normal bridge lifecycle:
+  advisory/report input -> implementation proposal -> Loyal Opposition review
+  -> implementation -> Loyal Opposition verification.
+- Keep the pattern lightweight for brainstorming. Capture becomes mandatory
+  when Mike asks for preservation, backlog pickup, a decision record, or a
+  future-work item.
+
 ## Prime Builder Application
 
 - Stay inside Prime Builder queue ownership at all times.

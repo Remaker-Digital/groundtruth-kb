@@ -41,6 +41,7 @@ def _make_minimal_legacy_root(tmp_path: Path) -> Path:
     (legacy / "bridge").mkdir(parents=True)
     (legacy / "memory").mkdir(parents=True)
     (legacy / ".claude" / "rules").mkdir(parents=True)
+    (legacy / "harness-state").mkdir(parents=True)
     (legacy / ".github" / "workflows").mkdir(parents=True)
 
     # Generator + helper code.
@@ -57,7 +58,32 @@ def _make_minimal_legacy_root(tmp_path: Path) -> Path:
     # Required sandbox inputs.
     (legacy / "groundtruth.db").write_bytes(b"SQLite stub for tests")
     (legacy / "bridge" / "INDEX.md").write_text("# bridge index\n", encoding="utf-8")
-    (legacy / ".claude" / "rules" / "operating-role.md").write_text("active_role: prime-builder\n", encoding="utf-8")
+    (legacy / "harness-state" / "harness-identities.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "codex": {"id": "A"},
+                    "claude": {"id": "B"},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (legacy / "harness-state" / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "A": {"harness_type": "codex", "role": "loyal-opposition"},
+                    "B": {"harness_type": "claude", "role": "prime-builder"},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (legacy / "memory" / "work_list.md").write_text("# work list\n", encoding="utf-8")
     (legacy / "memory" / "release-readiness.md").write_text("# release readiness\n", encoding="utf-8")
     (legacy / "pyproject.toml").write_text("[project]\nname='stub'\n", encoding="utf-8")
@@ -423,17 +449,13 @@ def test_run_subprocess_command_passes_user_preferences_path_to_generator(tmp_pa
     pref_value = captured_cmds[0][pref_idx + 1]
     # The value must be sandbox-relative; the sandbox root is named "sandbox"
     # by convention inside the lane output dir.
-    assert "sandbox" in pref_value, (
-        f"--user-preferences-path value should be sandbox-relative, got {pref_value!r}"
+    assert "sandbox" in pref_value, f"--user-preferences-path value should be sandbox-relative, got {pref_value!r}"
+    assert pref_value.endswith(str(Path("harness-state") / "codex" / "session-startup-preferences.json")), (
+        f"path tail mismatch: {pref_value!r}"
     )
-    assert pref_value.endswith(
-        str(Path("harness-state") / "codex" / "session-startup-preferences.json")
-    ), f"path tail mismatch: {pref_value!r}"
     # Confirm it is NOT the canonical legacy_root path (per GO condition 5).
     canonical_pref = legacy / "harness-state" / "codex" / "session-startup-preferences.json"
-    assert pref_value != str(canonical_pref), (
-        "lane must not pass the canonical legacy preferences path"
-    )
+    assert pref_value != str(canonical_pref), "lane must not pass the canonical legacy preferences path"
 
 
 def test_run_subprocess_command_routes_through_runner_not_legacy_script_directly(tmp_path: Path) -> None:

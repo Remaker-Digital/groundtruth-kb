@@ -16,14 +16,10 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import shutil
 import sys
-import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "audit_pending_owner_decisions.py"

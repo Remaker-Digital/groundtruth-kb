@@ -1,0 +1,622 @@
+{
+  "collector": {
+    "name": "GT-KB development environment inventory collector",
+    "script": "scripts/collect_dev_environment_inventory.py",
+    "script_hash": "sha256:09a700118a7350e2d5928fe493011fc5aa237928850b21bfbc1798bdaeacc3fb",
+    "version": "gtkb-dev-environment-inventory-v1"
+  },
+  "generated_at": "2026-05-06T22:24:17Z",
+  "harnesses": {
+    "claude": {
+      "session_start_configured": true,
+      "settings": {
+        "classification": "public_safe",
+        "evidence": ".claude/settings.json",
+        "path": ".claude/settings.json",
+        "present": true
+      }
+    },
+    "codex": {
+      "config": {
+        "classification": "public_safe",
+        "evidence": ".codex/config.toml",
+        "path": ".codex/config.toml",
+        "present": true
+      },
+      "hooks": {
+        "classification": "public_safe",
+        "evidence": ".codex/hooks.json",
+        "path": ".codex/hooks.json",
+        "present": true
+      },
+      "hooks_enabled": true,
+      "session_start_configured": true
+    },
+    "identities": {
+      "claude": {
+        "id": "B",
+        "status": "verified"
+      },
+      "codex": {
+        "id": "A",
+        "status": "verified"
+      }
+    },
+    "identity_source": {
+      "classification": "public_safe",
+      "evidence": "harness-state/harness-identities.json",
+      "path": "harness-state/harness-identities.json",
+      "present": true
+    },
+    "role_assignment_source": {
+      "classification": "public_safe",
+      "evidence": "harness-state/role-assignments.json",
+      "path": "harness-state/role-assignments.json",
+      "present": true
+    },
+    "role_assignments": {
+      "A": {
+        "harness_type": "codex",
+        "role": "loyal-opposition",
+        "status": "verified"
+      },
+      "B": {
+        "harness_type": "claude",
+        "role": "prime-builder",
+        "status": "verified"
+      }
+    }
+  },
+  "host": {
+    "architecture": "AMD64",
+    "classification": "public_safe",
+    "hostname": "redacted",
+    "os_family": "Windows",
+    "os_release": "11",
+    "os_version": "10.0.26200",
+    "python_platform": "Windows-11"
+  },
+  "project": {
+    "classification": "public_safe",
+    "configured_project_name": "Agent Red Customer Experience",
+    "groundtruth_kb_package_version": "0.7.0rc1",
+    "name": "GroundTruth-KB host workspace",
+    "profile": "dual-agent",
+    "root_boundary": ".",
+    "scaffold_version": "0.6.1"
+  },
+  "redaction": {
+    "public_exclusions": [
+      "raw credential values",
+      "credential-like environment variable names",
+      "absolute local paths",
+      "machine-specific MCP config contents",
+      "local command output with path detail"
+    ],
+    "public_output_policy": "public inventory contains only counts/classes for sensitive local values",
+    "sensitive_environment_categories": [
+      "key_name"
+    ],
+    "sensitive_environment_entry_count": 1,
+    "status": "pass"
+  },
+  "repo_configured_surfaces": {
+    "claude_hooks": {
+      "classification": "public_safe",
+      "count": 10,
+      "items": [
+        ".claude/hooks/assertion-check.py",
+        ".claude/hooks/bridge-compliance-gate.py",
+        ".claude/hooks/credential-scan.py",
+        ".claude/hooks/destructive-gate.py",
+        ".claude/hooks/formal-artifact-approval-gate.py",
+        ".claude/hooks/owner-decision-tracker.py",
+        ".claude/hooks/scheduler.py",
+        ".claude/hooks/spec-classifier.py",
+        ".claude/hooks/spec-event-surfacer.py",
+        ".claude/hooks/workstream-focus.py"
+      ]
+    },
+    "codex_hooks": {
+      "classification": "public_safe",
+      "count": 8,
+      "items": [
+        ".codex/gtkb-hooks/session_start_dispatch.py",
+        ".codex/gtkb-hooks/session_stop_dispatch.py",
+        ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
+        ".codex/gtkb-hooks/formal-artifact-approval.cmd",
+        ".codex/gtkb-hooks/session-start (1).cmd",
+        ".codex/gtkb-hooks/session-start.cmd",
+        ".codex/gtkb-hooks/session-stop.cmd",
+        ".codex/gtkb-hooks/workstream-focus.cmd"
+      ]
+    },
+    "commands": {
+      "classification": "public_safe",
+      "count": 0,
+      "items": [],
+      "registry": ".claude/commands/registry.json"
+    },
+    "git_hooks": {
+      "classification": "public_safe",
+      "pre_commit": {
+        "classification": "public_safe",
+        "evidence": ".githooks/pre-commit",
+        "path": ".githooks/pre-commit",
+        "present": true
+      }
+    },
+    "github_workflows": {
+      "classification": "public_safe",
+      "count": 16,
+      "items": [
+        ".github/workflows/accessibility.yml",
+        ".github/workflows/build-agent-containers.yml",
+        ".github/workflows/build-api-gateway.yml",
+        ".github/workflows/build-slim-gateway.yml",
+        ".github/workflows/build-test-host.yml",
+        ".github/workflows/chromatic.yml",
+        ".github/workflows/deploy-docs.yml",
+        ".github/workflows/docs-quality.yml",
+        ".github/workflows/groundtruth-kb-tests.yml",
+        ".github/workflows/gtkb-secrets-scan.yml",
+        ".github/workflows/lint.yml",
+        ".github/workflows/python-tests.yml",
+        ".github/workflows/release-candidate-gate.yml",
+        ".github/workflows/security-scan.yml",
+        ".github/workflows/sonarcloud.yml",
+        ".github/workflows/visual-regression.yml"
+      ]
+    },
+    "mcp_config": {
+      "classification": "local_only",
+      "evidence": ".mcp.json",
+      "path": ".mcp.json",
+      "present": true
+    },
+    "rules": {
+      "classification": "public_safe",
+      "count": 12,
+      "items": [
+        ".claude/rules/acting-prime-builder.md",
+        ".claude/rules/bridge-essential.md",
+        ".claude/rules/canonical-terminology.md",
+        ".claude/rules/codex-review-gate.md",
+        ".claude/rules/deliberation-protocol.md",
+        ".claude/rules/file-bridge-protocol.md",
+        ".claude/rules/loyal-opposition.md",
+        ".claude/rules/operating-model.md",
+        ".claude/rules/operating-role.md",
+        ".claude/rules/prime-builder-role.md",
+        ".claude/rules/project-root-boundary.md",
+        ".claude/rules/report-depth-prime-builder-context.md"
+      ]
+    },
+    "skills": {
+      "classification": "public_safe",
+      "count": 25,
+      "items": [
+        "alternatives-investigation",
+        "arch-audit",
+        "bridge-propose",
+        "check-deliberations",
+        "code-review-audit",
+        "codex-report",
+        "decision-capture",
+        "deploy",
+        "harness-parity-review",
+        "kb-adr",
+        "kb-assert",
+        "kb-batch",
+        "kb-promote",
+        "kb-query",
+        "kb-session-wrap",
+        "kb-session-wrap-scan",
+        "kb-spec",
+        "kb-work-item",
+        "proposal-review",
+        "release-candidate-gate",
+        "run-tests",
+        "seed-tenant",
+        "send-review",
+        "spec-intake",
+        "structural-hygiene-review"
+      ]
+    }
+  },
+  "role_by_harness_compatibility": [
+    {
+      "assignment": {
+        "current_role": "prime-builder",
+        "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
+        "harness_id": "B",
+        "matrix_role": "prime-builder",
+        "status": "verified"
+      },
+      "capabilities": {
+        "browser_automation": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "unknown"
+        },
+        "canonical_terminology_load": {
+          "evidence": ".claude/rules/canonical-terminology.md",
+          "status": "configured"
+        },
+        "command_support": {
+          "evidence": ".claude/commands/registry.json",
+          "status": "configured"
+        },
+        "credential_safety_gates": {
+          "evidence": ".claude/hooks/credential-scan.py and .githooks/pre-commit",
+          "status": "configured"
+        },
+        "file_bridge_read_write": {
+          "evidence": "bridge/INDEX.md",
+          "status": "verified"
+        },
+        "formal_artifact_mutation_gates": {
+          "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
+          "status": "configured"
+        },
+        "github_pr_ci_access": {
+          "evidence": ".github/workflows/",
+          "status": "configured"
+        },
+        "hook_support": {
+          "evidence": ".claude/settings.json",
+          "status": "configured"
+        },
+        "mcp_support": {
+          "evidence": ".mcp.json presence only; contents are local_only",
+          "status": "configured"
+        },
+        "permission_approval_model": {
+          "evidence": "AGENTS.md and harness role assignment",
+          "status": "configured"
+        },
+        "release_package_command_support": {
+          "evidence": "scripts/release_candidate_gate.py",
+          "status": "configured"
+        },
+        "role_record_resolution": {
+          "evidence": "harness-state/role-assignments.json",
+          "status": "verified"
+        },
+        "shell_runtime_behavior": {
+          "evidence": "collector executed in current shell",
+          "status": "verified"
+        },
+        "skill_support": {
+          "evidence": ".claude/skills/*/SKILL.md",
+          "status": "configured"
+        },
+        "startup_support": {
+          "evidence": ".claude/settings.json SessionStart",
+          "status": "configured"
+        },
+        "subagent_team_support": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "unknown"
+        }
+      },
+      "harness": "claude",
+      "role": "prime-builder"
+    },
+    {
+      "assignment": {
+        "current_role": "loyal-opposition",
+        "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
+        "harness_id": "A",
+        "matrix_role": "prime-builder",
+        "status": "configured"
+      },
+      "capabilities": {
+        "browser_automation": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "runtime_provided"
+        },
+        "canonical_terminology_load": {
+          "evidence": ".claude/rules/canonical-terminology.md",
+          "status": "configured"
+        },
+        "command_support": {
+          "evidence": ".claude/commands/registry.json",
+          "status": "configured"
+        },
+        "credential_safety_gates": {
+          "evidence": ".claude/hooks/credential-scan.py and .githooks/pre-commit",
+          "status": "configured"
+        },
+        "file_bridge_read_write": {
+          "evidence": "bridge/INDEX.md",
+          "status": "verified"
+        },
+        "formal_artifact_mutation_gates": {
+          "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
+          "status": "configured"
+        },
+        "github_pr_ci_access": {
+          "evidence": ".github/workflows/",
+          "status": "configured"
+        },
+        "hook_support": {
+          "evidence": ".codex/hooks.json",
+          "status": "configured"
+        },
+        "mcp_support": {
+          "evidence": ".mcp.json presence only; contents are local_only",
+          "status": "configured"
+        },
+        "permission_approval_model": {
+          "evidence": "AGENTS.md and harness role assignment",
+          "status": "configured"
+        },
+        "release_package_command_support": {
+          "evidence": "scripts/release_candidate_gate.py",
+          "status": "configured"
+        },
+        "role_record_resolution": {
+          "evidence": "harness-state/role-assignments.json",
+          "status": "verified"
+        },
+        "shell_runtime_behavior": {
+          "evidence": "collector executed in current shell",
+          "status": "verified"
+        },
+        "skill_support": {
+          "evidence": ".claude/skills/*/SKILL.md",
+          "status": "configured"
+        },
+        "startup_support": {
+          "evidence": ".codex/hooks.json SessionStart",
+          "status": "configured"
+        },
+        "subagent_team_support": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "runtime_provided"
+        }
+      },
+      "harness": "codex",
+      "role": "prime-builder"
+    },
+    {
+      "assignment": {
+        "current_role": "prime-builder",
+        "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
+        "harness_id": "B",
+        "matrix_role": "loyal-opposition",
+        "status": "configured"
+      },
+      "capabilities": {
+        "browser_automation": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "unknown"
+        },
+        "canonical_terminology_load": {
+          "evidence": ".claude/rules/canonical-terminology.md",
+          "status": "configured"
+        },
+        "command_support": {
+          "evidence": ".claude/commands/registry.json",
+          "status": "configured"
+        },
+        "credential_safety_gates": {
+          "evidence": ".claude/hooks/credential-scan.py and .githooks/pre-commit",
+          "status": "configured"
+        },
+        "file_bridge_read_write": {
+          "evidence": "bridge/INDEX.md",
+          "status": "verified"
+        },
+        "formal_artifact_mutation_gates": {
+          "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
+          "status": "configured"
+        },
+        "github_pr_ci_access": {
+          "evidence": ".github/workflows/",
+          "status": "configured"
+        },
+        "hook_support": {
+          "evidence": ".claude/settings.json",
+          "status": "configured"
+        },
+        "mcp_support": {
+          "evidence": ".mcp.json presence only; contents are local_only",
+          "status": "configured"
+        },
+        "permission_approval_model": {
+          "evidence": "AGENTS.md and harness role assignment",
+          "status": "configured"
+        },
+        "release_package_command_support": {
+          "evidence": "scripts/release_candidate_gate.py",
+          "status": "configured"
+        },
+        "role_record_resolution": {
+          "evidence": "harness-state/role-assignments.json",
+          "status": "verified"
+        },
+        "shell_runtime_behavior": {
+          "evidence": "collector executed in current shell",
+          "status": "verified"
+        },
+        "skill_support": {
+          "evidence": ".claude/skills/*/SKILL.md",
+          "status": "configured"
+        },
+        "startup_support": {
+          "evidence": ".claude/settings.json SessionStart",
+          "status": "configured"
+        },
+        "subagent_team_support": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "unknown"
+        }
+      },
+      "harness": "claude",
+      "role": "loyal-opposition"
+    },
+    {
+      "assignment": {
+        "current_role": "loyal-opposition",
+        "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
+        "harness_id": "A",
+        "matrix_role": "loyal-opposition",
+        "status": "verified"
+      },
+      "capabilities": {
+        "browser_automation": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "runtime_provided"
+        },
+        "canonical_terminology_load": {
+          "evidence": ".claude/rules/canonical-terminology.md",
+          "status": "configured"
+        },
+        "command_support": {
+          "evidence": ".claude/commands/registry.json",
+          "status": "configured"
+        },
+        "credential_safety_gates": {
+          "evidence": ".claude/hooks/credential-scan.py and .githooks/pre-commit",
+          "status": "configured"
+        },
+        "file_bridge_read_write": {
+          "evidence": "bridge/INDEX.md",
+          "status": "verified"
+        },
+        "formal_artifact_mutation_gates": {
+          "evidence": ".claude/hooks/formal-artifact-approval-gate.py",
+          "status": "configured"
+        },
+        "github_pr_ci_access": {
+          "evidence": ".github/workflows/",
+          "status": "configured"
+        },
+        "hook_support": {
+          "evidence": ".codex/hooks.json",
+          "status": "configured"
+        },
+        "mcp_support": {
+          "evidence": ".mcp.json presence only; contents are local_only",
+          "status": "configured"
+        },
+        "permission_approval_model": {
+          "evidence": "AGENTS.md and harness role assignment",
+          "status": "configured"
+        },
+        "release_package_command_support": {
+          "evidence": "scripts/release_candidate_gate.py",
+          "status": "configured"
+        },
+        "role_record_resolution": {
+          "evidence": "harness-state/role-assignments.json",
+          "status": "verified"
+        },
+        "shell_runtime_behavior": {
+          "evidence": "collector executed in current shell",
+          "status": "verified"
+        },
+        "skill_support": {
+          "evidence": ".claude/skills/*/SKILL.md",
+          "status": "configured"
+        },
+        "startup_support": {
+          "evidence": ".codex/hooks.json SessionStart",
+          "status": "configured"
+        },
+        "subagent_team_support": {
+          "evidence": "harness runtime; not repo-configured",
+          "status": "runtime_provided"
+        }
+      },
+      "harness": "codex",
+      "role": "loyal-opposition"
+    }
+  ],
+  "runtime_provided_capabilities": {
+    "repo_local_collector_limit": {
+      "classification": "unsupported",
+      "evidence": "active Codex/Claude plugin and MCP runtime lists are not exposed to this repo-local script",
+      "recommended_source": "startup payload or harness-provided tool metadata when available",
+      "status": "unsupported"
+    }
+  },
+  "schema_version": 1,
+  "shell": {
+    "classification": "public_safe",
+    "current_shell_family": "PowerShell-compatible",
+    "path_detail": "local_only",
+    "terminal": "redacted"
+  },
+  "toolchain": {
+    "gh": {
+      "classification": "verified",
+      "command": "gh --version",
+      "evidence": "gh --version",
+      "status": "verified",
+      "version": "2.83.2"
+    },
+    "git": {
+      "classification": "verified",
+      "command": "git --version",
+      "evidence": "git --version",
+      "status": "verified",
+      "version": "2.51.2.windows.1"
+    },
+    "node": {
+      "classification": "verified",
+      "command": "node --version",
+      "evidence": "node --version",
+      "status": "verified",
+      "version": "24.11.1"
+    },
+    "npm": {
+      "classification": "verified",
+      "command": "npm --version",
+      "evidence": "npm --version",
+      "status": "verified",
+      "version": "11.6.2"
+    },
+    "pip": {
+      "classification": "verified",
+      "command": "python -m pip --version",
+      "evidence": "python -m pip --version",
+      "status": "verified",
+      "version": "25.3"
+    },
+    "playwright": {
+      "classification": "unsupported",
+      "command": "playwright --version",
+      "evidence": "playwright --version not found on PATH",
+      "status": "unsupported",
+      "version": "unknown"
+    },
+    "pytest": {
+      "classification": "verified",
+      "command": "python -m pytest --version",
+      "evidence": "python -m pytest --version",
+      "status": "verified",
+      "version": "9.0.2"
+    },
+    "python": {
+      "classification": "verified",
+      "command": "python --version",
+      "evidence": "running interpreter",
+      "status": "verified",
+      "version": "3.14.0"
+    },
+    "ruff": {
+      "classification": "verified",
+      "command": "python -m ruff --version",
+      "evidence": "python -m ruff --version",
+      "status": "verified",
+      "version": "0.15.5"
+    }
+  },
+  "verification": {
+    "latest_command": "python scripts/collect_dev_environment_inventory.py --public-json docs/release/dev-environment-inventory.json --public-markdown docs/release/dev-environment-inventory.md --local-json .gtkb-state/dev-environment-inventory/local.json",
+    "release_gate_check": "python scripts/release_candidate_gate.py --skip-python --skip-frontend",
+    "status": "generated"
+  }
+}

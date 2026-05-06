@@ -56,6 +56,24 @@ def _isolate_state(monkeypatch, tmp_path: Path) -> tuple[Path, Path]:
     return canonical, legacy
 
 
+def _write_role_map(path: Path, roles: dict[str, tuple[str, str]]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    harness_id: {"harness_type": harness_type, "role": role}
+                    for harness_id, (harness_type, role) in roles.items()
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_default_work_subject_is_gtkb_and_startup_lines_explain_commands(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
@@ -173,51 +191,66 @@ def test_prompt_hook_switches_focus_with_standalone_commands(tmp_path) -> None:
 
 def test_prompt_hook_toggles_next_session_role_with_simple_phrase(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    role_path = tmp_path / "operating-role.md"
-    role_path.write_text("active_role: loyal-opposition\n", encoding="utf-8")
-    monkeypatch.setenv("GTKB_OPERATING_ROLE_PATH", str(role_path))
+    role_path = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
+    )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_path))
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
 
     response = module.handle_user_prompt("switch mode next session", REPO_ROOT)
 
     assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
-    assert role_path.read_text(encoding="utf-8") == "active_role: prime-builder\n"
+    assert "Harness parity after role change:" in response["systemMessage"]
+    data = json.loads(role_path.read_text(encoding="utf-8"))
+    assert data["harnesses"]["A"]["role"] == "prime-builder"
+    assert data["harnesses"]["B"]["role"] == "loyal-opposition"
 
     response = module.handle_user_prompt("please change mode next session.", REPO_ROOT)
 
     assert "Next fresh-session operating mode set to Loyal Opposition" in response["systemMessage"]
-    assert role_path.read_text(encoding="utf-8") == "active_role: loyal-opposition\n"
+    data = json.loads(role_path.read_text(encoding="utf-8"))
+    assert data["harnesses"]["A"]["role"] == "loyal-opposition"
 
 
 def test_prompt_hook_sets_explicit_next_session_role(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    role_path = tmp_path / "operating-role.md"
-    role_path.write_text("active_role: loyal-opposition\n", encoding="utf-8")
-    monkeypatch.setenv("GTKB_OPERATING_ROLE_PATH", str(role_path))
+    role_path = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
+    )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_path))
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
 
     response = module.handle_user_prompt("prime builder mode next session", REPO_ROOT)
 
     assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
-    assert role_path.read_text(encoding="utf-8") == "active_role: prime-builder\n"
+    data = json.loads(role_path.read_text(encoding="utf-8"))
+    assert data["harnesses"]["A"]["role"] == "prime-builder"
+    assert data["harnesses"]["B"]["role"] == "loyal-opposition"
 
 
-def test_prompt_hook_uses_harness_local_role_record_when_named(tmp_path, monkeypatch) -> None:
+def test_prompt_hook_uses_harness_id_role_map_when_named(tmp_path, monkeypatch) -> None:
     module = _load_module()
-    codex_dir = tmp_path / ".codex" / "gtkb-hooks"
-    codex_dir.mkdir(parents=True)
-    role_path = codex_dir / "operating-role.md"
-    role_path.write_text("active_role: loyal-opposition\n", encoding="utf-8")
-    monkeypatch.setitem(module.HARNESS_ROLE_RECORDS, "codex", role_path)
+    role_path = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
+    )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_path))
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
-    monkeypatch.delenv("GTKB_OPERATING_ROLE_PATH", raising=False)
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
 
     response = module.handle_user_prompt("switch mode next session", REPO_ROOT)
 
     assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
     assert str(role_path) in response["systemMessage"]
-    assert role_path.read_text(encoding="utf-8").startswith("active_role: prime-builder")
+    assert "harness `A`" in response["systemMessage"]
+    assert json.loads(role_path.read_text(encoding="utf-8"))["harnesses"]["A"]["role"] == "prime-builder"
 
 
 def test_prompt_hook_toggles_dashboard_auto_launch(tmp_path, monkeypatch) -> None:
@@ -257,7 +290,9 @@ def test_prompt_hook_discards_first_fresh_session_message_when_startup_gate_is_a
 
     assert "first owner message of a fresh session is never actionable" in response["systemMessage"]
     assert response["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-    assert "startup disclosure already generated for this session" in response["hookSpecificOutput"]["additionalContext"]
+    assert (
+        "startup disclosure already generated for this session" in response["hookSpecificOutput"]["additionalContext"]
+    )
 
     guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
     assert guard_state["discard_next_user_prompt"] is False
@@ -304,7 +339,9 @@ def test_classify_root_4_categories(tmp_path, monkeypatch) -> None:
     assert module.classify_root(str(gtkb_target), REPO_ROOT) == module.ROOT_GTKB_PRODUCT
     assert module.classify_root("src/example.py", REPO_ROOT) == module.ROOT_APPLICATION_PRODUCT
     assert module.classify_root(".claude/rules/new-rule.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
-    assert module.classify_root("bridge/some-proposal-001.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
+    assert (
+        module.classify_root("bridge/some-proposal-001.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
+    )
     assert module.classify_root("AGENTS.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
     assert module.classify_root("README.md", REPO_ROOT) == module.ROOT_NEUTRAL
 
@@ -538,14 +575,12 @@ def test_overlay_startup_note_never_canonical_phrasing() -> None:
 def test_detect_counterpart_state_no_counterpart_files_no_warning(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {
-            "codex": tmp_path / ".codex" / "operating-role.md",
-            "claude": tmp_path / ".claude" / "operating-role.md",
-        },
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"B": ("claude", "prime-builder")},
     )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     result = module.detect_counterpart_state()
     assert result["warnings"] == []
     assert result["counterpart_present"] is False
@@ -554,16 +589,12 @@ def test_detect_counterpart_state_no_counterpart_files_no_warning(tmp_path, monk
 def test_detect_counterpart_state_same_role_warns(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    codex_record = tmp_path / ".codex" / "operating-role.md"
-    claude_record = tmp_path / ".claude" / "operating-role.md"
-    for record in (codex_record, claude_record):
-        record.parent.mkdir(parents=True, exist_ok=True)
-        record.write_text("active_role: prime-builder\n", encoding="utf-8")
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {"codex": codex_record, "claude": claude_record},
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "prime-builder"), "B": ("claude", "prime-builder")},
     )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     result = module.detect_counterpart_state()
     assert result["same_role_slot"] is True
     assert result["counterpart_present"] is True
@@ -573,17 +604,12 @@ def test_detect_counterpart_state_same_role_warns(tmp_path, monkeypatch) -> None
 def test_detect_counterpart_state_different_role_warns(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    codex_record = tmp_path / ".codex" / "operating-role.md"
-    claude_record = tmp_path / ".claude" / "operating-role.md"
-    codex_record.parent.mkdir(parents=True)
-    claude_record.parent.mkdir(parents=True)
-    codex_record.write_text("active_role: loyal-opposition\n", encoding="utf-8")
-    claude_record.write_text("active_role: prime-builder\n", encoding="utf-8")
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {"codex": codex_record, "claude": claude_record},
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
     )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     result = module.detect_counterpart_state()
     assert result["same_role_slot"] is False
     assert result["counterpart_present"] is True
@@ -594,17 +620,16 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
     module = _load_module()
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-
-    codex_record = tmp_path / ".codex" / "operating-role.md"
-    claude_record = tmp_path / ".claude" / "operating-role.md"
-    for record, role in (
-        (codex_record, "loyal-opposition"),
-        (claude_record, "prime-builder"),
-    ):
-        record.parent.mkdir(parents=True, exist_ok=True)
-        record.write_text(f"active_role: {role}\n", encoding="utf-8")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
+    )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
     claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_guard.parent.mkdir(parents=True, exist_ok=True)
+    claude_guard.parent.mkdir(parents=True, exist_ok=True)
     codex_guard.write_text(
         json.dumps({"current_subject": module.FOCUS_GTKB_INFRASTRUCTURE}) + "\n",
         encoding="utf-8",
@@ -612,11 +637,6 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
     claude_guard.write_text(
         json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
         encoding="utf-8",
-    )
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {"codex": codex_record, "claude": claude_record},
     )
     monkeypatch.setattr(
         module,
@@ -628,14 +648,11 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
     result = module.detect_counterpart_state()
     assert result["subject_mismatch"] is True
     assert any(
-        module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg
-        for msg in result["warnings"]
+        module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg for msg in result["warnings"]
     )
 
 
-def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
-    tmp_path, monkeypatch
-) -> None:
+def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(tmp_path, monkeypatch) -> None:
     """Symmetric §E regression (bridge -014 P1).
 
     Reproduces the live asymmetry Codex demonstrated: Codex on
@@ -651,17 +668,16 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
     module = _load_module()
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
-
-    codex_record = tmp_path / ".codex" / "operating-role.md"
-    claude_record = tmp_path / ".claude" / "operating-role.md"
-    for record, role in (
-        (codex_record, "prime-builder"),
-        (claude_record, "loyal-opposition"),
-    ):
-        record.parent.mkdir(parents=True, exist_ok=True)
-        record.write_text(f"active_role: {role}\n", encoding="utf-8")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "prime-builder"), "B": ("claude", "loyal-opposition")},
+    )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
     claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_guard.parent.mkdir(parents=True, exist_ok=True)
+    claude_guard.parent.mkdir(parents=True, exist_ok=True)
     # Codex harness's own guard says gtkb_infrastructure.
     codex_guard.write_text(
         json.dumps({"current_subject": module.FOCUS_GTKB_INFRASTRUCTURE}) + "\n",
@@ -671,11 +687,6 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
     claude_guard.write_text(
         json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
         encoding="utf-8",
-    )
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {"codex": codex_record, "claude": claude_record},
     )
     monkeypatch.setattr(
         module,
@@ -694,8 +705,7 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(
         "the shared canonical instead of codex's own guard."
     )
     assert any(
-        module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg
-        for msg in result["warnings"]
+        module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg for msg in result["warnings"]
     )
 
 
@@ -703,27 +713,21 @@ def test_detect_counterpart_state_subject_match_no_warning(tmp_path, monkeypatch
     module = _load_module()
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-
-    codex_record = tmp_path / ".codex" / "operating-role.md"
-    claude_record = tmp_path / ".claude" / "operating-role.md"
-    for record, role in (
-        (codex_record, "loyal-opposition"),
-        (claude_record, "prime-builder"),
-    ):
-        record.parent.mkdir(parents=True, exist_ok=True)
-        record.write_text(f"active_role: {role}\n", encoding="utf-8")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
+    )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
     claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_guard.parent.mkdir(parents=True, exist_ok=True)
+    claude_guard.parent.mkdir(parents=True, exist_ok=True)
     for guard in (codex_guard, claude_guard):
         guard.write_text(
             json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
             encoding="utf-8",
         )
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {"codex": codex_record, "claude": claude_record},
-    )
     monkeypatch.setattr(
         module,
         "HARNESS_LIFECYCLE_GUARDS",
@@ -739,36 +743,26 @@ def test_detect_counterpart_state_subject_match_no_warning(tmp_path, monkeypatch
 def test_detect_counterpart_state_missing_counterpart_no_crash(tmp_path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    claude_record = tmp_path / ".claude" / "operating-role.md"
-    claude_record.parent.mkdir(parents=True)
-    claude_record.write_text("active_role: prime-builder\n", encoding="utf-8")
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {
-            "codex": tmp_path / "missing" / ".codex" / "operating-role.md",
-            "claude": claude_record,
-        },
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"B": ("claude", "prime-builder")},
     )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     result = module.detect_counterpart_state()
     assert result["counterpart_present"] is False
     assert result["warnings"] == []
 
 
-def test_render_active_work_subject_combines_focus_overlay_and_counterpart(
-    tmp_path, monkeypatch
-) -> None:
+def test_render_active_work_subject_combines_focus_overlay_and_counterpart(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    monkeypatch.setattr(
-        module,
-        "HARNESS_ROLE_RECORDS",
-        {
-            "codex": tmp_path / "missing.md",
-            "claude": tmp_path / "missing-claude.md",
-        },
+    role_map = _write_role_map(
+        tmp_path / "role-assignments.json",
+        {"B": ("claude", "prime-builder")},
     )
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
 
     rendered = module.render_active_work_subject(
         REPO_ROOT,
@@ -782,38 +776,23 @@ def test_render_active_work_subject_combines_focus_overlay_and_counterpart(
 def test_assert_readiness_subject_scope_hard_rejects_unlabeled_combined_green() -> None:
     module = _load_module()
     with pytest.raises(module.SubjectScopeError, match="combined application \\+ GT-KB"):
-        module.assert_readiness_subject_scope(
-            application_green=True, gtkb_green=True, dual_scope_declared=False
-        )
+        module.assert_readiness_subject_scope(application_green=True, gtkb_green=True, dual_scope_declared=False)
 
 
 def test_assert_readiness_subject_scope_permits_dual_scope_declaration() -> None:
     module = _load_module()
-    module.assert_readiness_subject_scope(
-        application_green=True, gtkb_green=True, dual_scope_declared=True
-    )
+    module.assert_readiness_subject_scope(application_green=True, gtkb_green=True, dual_scope_declared=True)
 
 
 def test_harness_state_records_for_project_returns_sandbox_relative_paths(tmp_path) -> None:
-    """Per bridge/harness-state-preferences-path-cli-2026-04-28-005.md class-level fix.
-
-    The helper builds harness role-record and lifecycle-guard dicts rooted at
-    the passed project_root, mirroring the module-level canonical-bound
-    constants but parameterized for sandbox-aware execution.
-    """
     module = _load_module()
     sandbox = tmp_path / "sandbox"
-    role_records, lifecycle_guards = module._harness_state_records_for_project(sandbox)
+    role_assignment_path, lifecycle_guards = module._harness_state_records_for_project(sandbox)
 
-    assert role_records["codex"] == sandbox / "harness-state" / "codex" / "operating-role.md"
-    assert role_records["claude"] == sandbox / "harness-state" / "claude" / "operating-role.md"
+    assert role_assignment_path == sandbox / "harness-state" / "role-assignments.json"
     assert lifecycle_guards["codex"] == sandbox / "harness-state" / "codex" / "session-lifecycle-guard.json"
     assert lifecycle_guards["claude"] == sandbox / "harness-state" / "claude" / "session-lifecycle-guard.json"
-
-    # Helper paths must NOT match the canonical module-level constants when a
-    # different project_root is supplied (the whole point of the class-level
-    # fix).
-    assert role_records["codex"] != module.HARNESS_ROLE_RECORDS["codex"]
+    assert role_assignment_path != module.PROJECT_ROOT / "harness-state" / "role-assignments.json"
     assert lifecycle_guards["codex"] != module.HARNESS_LIFECYCLE_GUARDS["codex"]
 
 
@@ -821,68 +800,53 @@ def test_detect_counterpart_state_uses_project_root_paths_when_provided(tmp_path
     """Per bridge/harness-state-preferences-path-cli-2026-04-28-005.md class-level fix.
 
     When detect_counterpart_state is called with a sandbox project_root, it
-    must NOT iterate the canonical module-level HARNESS_ROLE_RECORDS or
-    HARNESS_LIFECYCLE_GUARDS dictionaries. Monkeypatch
-    _read_active_role_from_file to record every path it is asked to read;
-    all recorded paths must be sandbox-relative.
+    must read the sandbox role-assignment map, not the canonical map.
     """
     module = _load_module()
     sandbox = tmp_path / "sandbox"
     sandbox.mkdir()
     recorded_paths: list[Path] = []
 
-    def _fake_read(path: Path) -> str | None:
-        recorded_paths.append(path)
-        return None
+    def _fake_load(project_root: Path, assignment_path: Path | None = None) -> dict:
+        recorded_paths.append(assignment_path or project_root / "harness-state" / "role-assignments.json")
+        return {"harnesses": {}}
 
-    monkeypatch.setattr(module, "_read_active_role_from_file", _fake_read)
+    monkeypatch.setattr(module, "load_role_assignments", _fake_load)
     monkeypatch.setattr(module, "_read_counterpart_subject", lambda _path: None)
 
     module.detect_counterpart_state(sandbox)
 
-    assert recorded_paths, "expected detect_counterpart_state to call _read_active_role_from_file"
+    assert recorded_paths, "expected detect_counterpart_state to load role assignments"
     canonical_root = module.PROJECT_ROOT
     for path in recorded_paths:
         assert sandbox in path.parents, (
-            f"role record path {path!r} should be under sandbox {sandbox!r} "
-            "but is not — class-level fix regressed"
+            f"role assignment path {path!r} should be under sandbox {sandbox!r} but is not — class-level fix regressed"
         )
         assert canonical_root not in path.parents, (
-            f"role record path {path!r} should NOT be under canonical "
+            f"role assignment path {path!r} should NOT be under canonical "
             f"PROJECT_ROOT {canonical_root!r} — class-level fix regressed"
         )
 
 
 def test_detect_counterpart_state_falls_back_to_canonical_when_project_root_omitted(tmp_path, monkeypatch) -> None:
-    """Back-compat guarantee: detect_counterpart_state() without project_root must
-    still iterate the canonical module-level HARNESS_ROLE_RECORDS dict, preserving
-    production behavior where this module is imported from the canonical project root.
-    """
     module = _load_module()
     recorded_paths: list[Path] = []
 
-    def _fake_read(path: Path) -> str | None:
-        recorded_paths.append(path)
-        return None
+    def _fake_load(project_root: Path, assignment_path: Path | None = None) -> dict:
+        recorded_paths.append(assignment_path or project_root / "harness-state" / "role-assignments.json")
+        return {"harnesses": {}}
 
-    monkeypatch.setattr(module, "_read_active_role_from_file", _fake_read)
+    monkeypatch.setattr(module, "load_role_assignments", _fake_load)
     monkeypatch.setattr(module, "_read_counterpart_subject", lambda _path: None)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(module.PROJECT_ROOT))
 
     module.detect_counterpart_state()  # no project_root arg
 
-    assert recorded_paths, "expected detect_counterpart_state to call _read_active_role_from_file"
-    canonical_paths_seen = {module.HARNESS_ROLE_RECORDS["codex"], module.HARNESS_ROLE_RECORDS["claude"]}
-    assert set(recorded_paths) == canonical_paths_seen, (
-        f"back-compat path: when project_root omitted, must iterate canonical "
-        f"HARNESS_ROLE_RECORDS; got {recorded_paths!r}"
-    )
+    assert recorded_paths, "expected detect_counterpart_state to load role assignments"
+    assert recorded_paths == [module.PROJECT_ROOT / "harness-state" / "role-assignments.json"]
 
 
 def test_assert_readiness_subject_scope_permits_single_green() -> None:
     module = _load_module()
-    module.assert_readiness_subject_scope(
-        application_green=True, gtkb_green=False, dual_scope_declared=False
-    )
-    module.assert_readiness_subject_scope(
-        application_green=False, gtkb_green=True, dual_scope_declared=False
-    )
+    module.assert_readiness_subject_scope(application_green=True, gtkb_green=False, dual_scope_declared=False)
+    module.assert_readiness_subject_scope(application_green=False, gtkb_green=True, dual_scope_declared=False)

@@ -62,6 +62,33 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution path
     )
 
 try:
+    from scripts.harness_roles import (
+        DEFAULT_HARNESS_IDS,
+        ROLE_ASSIGNMENTS_RELATIVE_PATH,
+        role_assignments_path,
+        role_for_harness,
+    )
+    from scripts.harness_roles import (
+        normalize_harness_name as _normalize_harness_name_from_roles,
+    )
+    from scripts.harness_roles import (
+        resolved_harness_id as _resolved_harness_id_from_roles,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from harness_roles import (  # type: ignore[no-redef]
+        DEFAULT_HARNESS_IDS,
+        ROLE_ASSIGNMENTS_RELATIVE_PATH,
+        role_assignments_path,
+        role_for_harness,
+    )
+    from harness_roles import (  # type: ignore[no-redef]
+        normalize_harness_name as _normalize_harness_name_from_roles,
+    )
+    from harness_roles import (  # type: ignore[no-redef]
+        resolved_harness_id as _resolved_harness_id_from_roles,
+    )
+
+try:
     from scripts import gtkb_overlay as _gtkb_overlay
 except ImportError:  # pragma: no cover - direct script execution path
     # Broader than ModuleNotFoundError: direct `python scripts/session_self_initialization.py`
@@ -106,11 +133,7 @@ DASHBOARD_SCOPE_NOTE = "GroundTruth-KB project dashboard."
 DEFAULT_RELEASE_BRANCH = "main"
 STARTUP_SERVICE_CONTRACT_VERSION = "gtkb-startup-service-v2"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
-OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
-HARNESS_ROLE_RECORDS = {
-    "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
-    "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
-}
+OPERATING_ROLE_RELATIVE_PATH = ROLE_ASSIGNMENTS_RELATIVE_PATH
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
@@ -122,10 +145,10 @@ POLLER_ROLE_TEXT = (
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
-        "role_assignment": "active AI harness assigned by owner through durable operating-role record",
+        "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "poller": POLLER_ROLE_TEXT,
-        "role_mapping_source": ".claude/rules/operating-role.md",
+        "role_mapping_source": "harness-state/role-assignments.json",
     },
     "acting-prime-builder": {
         "assumed_role": "Acting Prime Builder",
@@ -136,13 +159,29 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
     },
     "loyal-opposition": {
         "assumed_role": "Loyal Opposition",
-        "role_assignment": "active AI harness assigned by owner for counterpart review",
+        "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "poller": POLLER_ROLE_TEXT,
-        "role_mapping_source": ".claude/rules/operating-role.md",
+        "role_mapping_source": "harness-state/role-assignments.json",
     },
 }
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
+DEV_ENV_INVENTORY_PUBLIC_JSON_RELATIVE_PATH = Path("docs") / "release" / "dev-environment-inventory.json"
+DEV_ENV_INVENTORY_PUBLIC_MARKDOWN_RELATIVE_PATH = Path("docs") / "release" / "dev-environment-inventory.md"
+DEV_ENV_INVENTORY_MAX_AGE_HOURS = 336
+DEV_ENV_INVENTORY_REQUIRED_SECTIONS = (
+    "project",
+    "collector",
+    "host",
+    "shell",
+    "toolchain",
+    "harnesses",
+    "repo_configured_surfaces",
+    "runtime_provided_capabilities",
+    "role_by_harness_compatibility",
+    "redaction",
+    "verification",
+)
 
 
 def _normalized_path(path: Path) -> Path:
@@ -150,8 +189,8 @@ def _normalized_path(path: Path) -> Path:
 
 
 def _normalize_harness_name(value: str | None) -> str | None:
-    normalized = str(value or "").strip().lower().replace("_", "-")
-    if normalized in HARNESS_ROLE_RECORDS:
+    normalized = _normalize_harness_name_from_roles(value)
+    if normalized in DEFAULT_HARNESS_IDS:
         return normalized
     return None
 
@@ -160,39 +199,44 @@ def _resolved_harness_name(explicit: str | None = None) -> str | None:
     return _normalize_harness_name(explicit) or _normalize_harness_name(os.environ.get("GTKB_HARNESS_NAME"))
 
 
+def _resolved_harness_id(
+    explicit: str | None = None,
+    *,
+    harness_name: str | None = None,
+    project_root: Path | None = None,
+) -> str | None:
+    return _resolved_harness_id_from_roles(project_root, harness_id=explicit, harness_name=harness_name)
+
+
 def _repo_operating_role_path(project_root: Path) -> Path:
-    return project_root / OPERATING_ROLE_RELATIVE_PATH
+    return role_assignments_path(project_root)
 
 
 def operating_role_path(
     project_root: Path,
     *,
     harness_name: str | None = None,
+    harness_id: str | None = None,
     role_record_path: Path | None = None,
     prefer_local: bool = True,
 ) -> Path:
     if role_record_path is not None:
         return _normalized_path(role_record_path)
-    override = os.environ.get("GTKB_OPERATING_ROLE_PATH")
-    if override:
-        return _normalized_path(Path(override))
-    resolved_harness_name = _resolved_harness_name(harness_name)
-    if resolved_harness_name:
-        local_path = _normalized_path(HARNESS_ROLE_RECORDS[resolved_harness_name])
-        if prefer_local or local_path.is_file():
-            return local_path
-    return _repo_operating_role_path(project_root)
+    _ = harness_name, harness_id, prefer_local
+    return role_assignments_path(project_root)
 
 
 def _display_role_mapping_source(
     project_root: Path,
     *,
     harness_name: str | None = None,
+    harness_id: str | None = None,
     role_record_path: Path | None = None,
 ) -> str:
     path = operating_role_path(
         project_root,
         harness_name=harness_name,
+        harness_id=harness_id,
         role_record_path=role_record_path,
         prefer_local=False,
     )
@@ -207,22 +251,23 @@ def _role_metadata(
     project_root: Path,
     *,
     harness_name: str | None = None,
+    harness_id: str | None = None,
     role_record_path: Path | None = None,
 ) -> dict[str, str]:
     metadata = dict(ROLE_PROFILES[role_profile])
     mapping_source = _display_role_mapping_source(
         project_root,
         harness_name=harness_name,
+        harness_id=harness_id,
         role_record_path=role_record_path,
     )
     metadata["role_mapping_source"] = mapping_source
-    if (
-        role_profile in {"prime-builder", "loyal-opposition"}
-        and mapping_source != OPERATING_ROLE_RELATIVE_PATH.as_posix()
-    ):
-        metadata["role_assignment"] = metadata["role_assignment"].replace(
-            "durable operating-role record",
-            "durable harness-local operating-role record",
+    resolved_id = _resolved_harness_id(harness_id, harness_name=harness_name, project_root=project_root)
+    if resolved_id:
+        metadata["harness_id"] = resolved_id
+        metadata["harness_identity_source"] = "harness-state/harness-identities.json"
+        metadata["role_assignment"] = (
+            f"active AI harness assigned by owner through single role map entry for harness `{resolved_id}`"
         )
     return metadata
 
@@ -325,6 +370,7 @@ NON_TERMINAL_WORK_ITEM_STATUSES = {
 }
 ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
 REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED"}
+PRIME_RESPONSE_BRIDGE_STATUSES = {"GO", "NO-GO"}
 AGENT_RED_SCOPE_INCLUDED = {
     "agent_red_product",
     "agent_red_release",
@@ -970,6 +1016,7 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
     counts = Counter(entry["status"] for entry in visible_entries)
     actionable = [entry for entry in visible_entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES]
     raw_review_queue = [entry for entry in entries if entry["status"] in REVIEW_QUEUE_BRIDGE_STATUSES]
+    raw_prime_response_queue = [entry for entry in entries if entry["status"] in PRIME_RESPONSE_BRIDGE_STATUSES]
     return {
         "latest_status_counts": dict(sorted(counts.items())),
         "actionable_count": len(actionable),
@@ -979,6 +1026,10 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         "raw_actionable_count": sum(1 for entry in entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES),
         "raw_review_queue_count": len(raw_review_queue),
         "raw_review_queue_by_status": dict(sorted(Counter(entry["status"] for entry in raw_review_queue).items())),
+        "raw_prime_response_queue_count": len(raw_prime_response_queue),
+        "raw_prime_response_queue_by_status": dict(
+            sorted(Counter(entry["status"] for entry in raw_prime_response_queue).items())
+        ),
         "scope_counts": dict(sorted(Counter(entry["scope"] for entry in classified).items())),
         "scope_confidence": "gtkb_current_heuristic",
         "source": "bridge/INDEX.md",
@@ -987,6 +1038,137 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         "derived_artifacts_authoritative": False,
         "live_index_available": index_path.is_file(),
     }
+
+
+def _dev_environment_inventory_status(project_root: Path) -> dict[str, Any]:
+    public_json = project_root / DEV_ENV_INVENTORY_PUBLIC_JSON_RELATIVE_PATH
+    public_markdown = project_root / DEV_ENV_INVENTORY_PUBLIC_MARKDOWN_RELATIVE_PATH
+    base = {
+        "public_json": DEV_ENV_INVENTORY_PUBLIC_JSON_RELATIVE_PATH.as_posix(),
+        "public_markdown": DEV_ENV_INVENTORY_PUBLIC_MARKDOWN_RELATIVE_PATH.as_posix(),
+        "present": public_json.is_file(),
+        "markdown_present": public_markdown.is_file(),
+        "authoritative": False,
+        "full_inventory_loaded": False,
+        "max_age_hours": DEV_ENV_INVENTORY_MAX_AGE_HOURS,
+    }
+    if not public_json.is_file():
+        return {
+            **base,
+            "state": "missing",
+            "health": "red",
+            "generated_at": None,
+            "age_hours": None,
+            "redaction_status": "unknown",
+            "collector_version": "unknown",
+            "collector_hash": None,
+            "missing_sections": list(DEV_ENV_INVENTORY_REQUIRED_SECTIONS),
+            "latest_verification_command": (
+                "python scripts/collect_dev_environment_inventory.py "
+                "--public-json docs/release/dev-environment-inventory.json "
+                "--public-markdown docs/release/dev-environment-inventory.md "
+                "--local-json .gtkb-state/dev-environment-inventory/local.json"
+            ),
+        }
+    try:
+        payload = json.loads(public_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            **base,
+            "state": "malformed",
+            "health": "red",
+            "generated_at": None,
+            "age_hours": None,
+            "redaction_status": "unknown",
+            "collector_version": "unknown",
+            "collector_hash": None,
+            "missing_sections": list(DEV_ENV_INVENTORY_REQUIRED_SECTIONS),
+            "error": str(exc),
+            "latest_verification_command": "python scripts/collect_dev_environment_inventory.py --check-only",
+        }
+    if not isinstance(payload, dict):
+        payload = {}
+    generated_at = str(payload.get("generated_at") or "")
+    generated_dt = _parse_iso8601(generated_at)
+    age_hours = (
+        round((datetime.now(UTC) - generated_dt).total_seconds() / 3600, 1) if generated_dt is not None else None
+    )
+    missing_sections = [section for section in DEV_ENV_INVENTORY_REQUIRED_SECTIONS if section not in payload]
+    redaction_status = str((payload.get("redaction") or {}).get("status") or "unknown")
+    collector = payload.get("collector") or {}
+    verification = payload.get("verification") or {}
+    stale = age_hours is None or age_hours > DEV_ENV_INVENTORY_MAX_AGE_HOURS
+    if missing_sections or redaction_status != "pass":
+        health = "red"
+        state = "invalid"
+    elif stale:
+        health = "yellow"
+        state = "stale"
+    else:
+        health = "green"
+        state = "present"
+    return {
+        **base,
+        "state": state,
+        "health": health,
+        "generated_at": generated_at or None,
+        "age_hours": age_hours,
+        "redaction_status": redaction_status,
+        "collector_version": str(collector.get("version") or "unknown"),
+        "collector_hash": collector.get("script_hash"),
+        "missing_sections": missing_sections,
+        "latest_verification_command": str(
+            verification.get("latest_command") or "python scripts/collect_dev_environment_inventory.py --check-only"
+        ),
+    }
+
+
+def _harness_parity_status(project_root: Path, *, harness_name: str | None, role_profile: str) -> dict[str, Any]:
+    harness_scope = _normalize_harness_name(harness_name) or "all"
+    if harness_scope not in {"claude", "codex"}:
+        harness_scope = "all"
+    try:
+        from scripts.check_harness_parity import check_harness_parity  # noqa: PLC0415
+
+        report = check_harness_parity(
+            project_root,
+            harness=harness_scope,
+            role=role_profile,
+            include_all=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - startup must continue with visible diagnostic
+        return {
+            "status": "unavailable",
+            "harness_scope": harness_scope,
+            "role_scope": role_profile,
+            "counts": {},
+            "verification_command": "python scripts/check_harness_parity.py --all --markdown",
+            "error": str(exc),
+        }
+    return {
+        "status": report.overall_status.lower(),
+        "harness_scope": harness_scope,
+        "role_scope": role_profile,
+        "counts": report.counts,
+        "verification_command": (
+            f"python scripts/check_harness_parity.py --harness {harness_scope} --role {role_profile} --markdown"
+            if harness_scope != "all"
+            else "python scripts/check_harness_parity.py --all --markdown"
+        ),
+    }
+
+
+def _harness_parity_compact_text(status: dict[str, Any]) -> str:
+    counts = status.get("counts") if isinstance(status.get("counts"), dict) else {}
+    count_text = ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "no counts"
+    text = (
+        f"{status.get('status', 'unknown')} "
+        f"(harness={status.get('harness_scope', 'unknown')}, "
+        f"role={status.get('role_scope', 'unknown')}, {count_text})"
+    )
+    if status.get("error"):
+        text += f"; error={status['error']}"
+    return text
 
 
 def _release_blockers(project_root: Path) -> list[str]:
@@ -1304,7 +1486,7 @@ def _gtkb_upgrade_plan(project_root: Path) -> dict[str, Any]:
     }
 
 
-def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
+def _gtkb_upgrade_posture(project_root: Path, *, fast_hook: bool = False) -> dict[str, Any]:
     config = _read_toml(project_root / "groundtruth.toml")
     scaffold_version = config.get("project", {}).get("scaffold_version")
     package = _gtkb_package_info()
@@ -1322,8 +1504,22 @@ def _gtkb_upgrade_posture(project_root: Path) -> dict[str, Any]:
         if configured_gtkb_repo
         else checkout.get("remote_url") or "https://github.com/Remaker-Digital/groundtruth-kb.git"
     )
-    latest_release = _latest_remote_semver_tag(project_root, str(remote_url))
-    latest_main = _remote_branch_sha(project_root, str(remote_url), "main")
+    if fast_hook:
+        latest_release = {
+            "available": False,
+            "tag": None,
+            "sha": None,
+            "error": "skipped_fast_hook",
+        }
+        latest_main = {
+            "available": False,
+            "branch": "main",
+            "sha": None,
+            "error": "skipped_fast_hook",
+        }
+    else:
+        latest_release = _latest_remote_semver_tag(project_root, str(remote_url))
+        latest_main = _remote_branch_sha(project_root, str(remote_url), "main")
     upgrade_plan = _gtkb_upgrade_plan(project_root)
 
     package_version = package.get("version")
@@ -1862,13 +2058,17 @@ def _integration(
     }
 
 
-def _testing_service_integrations(project_root: Path, plugins: list[str]) -> dict[str, Any]:
+def _testing_service_integrations(project_root: Path, plugins: list[str], *, fast_hook: bool = False) -> dict[str, Any]:
     workflows = _workflow_inventory(project_root)
     workflow_names = sorted(workflows)
     workflow_set = set(workflow_names)
     remote = _git_remote_origin(project_root)
-    gh_auth_status = _gh_auth_status(project_root)
-    gh_runs = _latest_github_workflow_runs(project_root, gh_auth_status)
+    if fast_hook:
+        gh_auth_status = "skipped_fast_hook"
+        gh_runs = {"available": False, "reason": "skipped_fast_hook", "runs_by_workflow": {}}
+    else:
+        gh_auth_status = _gh_auth_status(project_root)
+        gh_runs = _latest_github_workflow_runs(project_root, gh_auth_status)
     github_plugin_detected = any(plugin.lower() == "github" for plugin in plugins)
     pyproject_text = _read_text(project_root / "pyproject.toml")
     sonar_text = _read_text(project_root / "sonar-project.properties")
@@ -2313,6 +2513,7 @@ def _dashboard_intelligence(
     bridge_actions = metrics["contention"].get("actionable_count") or 0
     drift_count = metrics["drift"].get("changed_path_count") or 0
     upgrade_posture = infrastructure["gtkb_upgrade_posture"]
+    dev_environment_inventory = infrastructure.get("dev_environment_inventory", {})
     scaffold_actions = upgrade_posture.get("upgrade_plan", {}).get("mutating_action_count") or 0
     repo_state = _repo_state(project_root)
     database_path = project_root / "groundtruth.db"
@@ -2373,6 +2574,12 @@ def _dashboard_intelligence(
             "Installed GT-KB package/scaffold and upstream posture.",
         ),
         _health_pill(
+            "Dev Env Inventory",
+            str(dev_environment_inventory.get("health") or "red"),
+            str(dev_environment_inventory.get("state") or "missing"),
+            "Release-safe harness and development environment inventory status.",
+        ),
+        _health_pill(
             "Data Freshness",
             data_status,
             "live probes",
@@ -2419,6 +2626,22 @@ def _dashboard_intelligence(
                 "remediation": "Run the dry-run command, review the diff, and apply only with owner approval.",
                 "shortcut": _shortcut("Copy dry-run command", str(upgrade_posture.get("plan_command")), "command"),
                 "source": "GT-KB Upgrade Posture",
+            }
+        )
+    if dev_environment_inventory.get("health") != "green":
+        action_center.append(
+            {
+                "severity": str(dev_environment_inventory.get("health") or "red"),
+                "owner_lane": "Prime Builder",
+                "action": "Refresh GT-KB dev environment inventory",
+                "why": _dev_inventory_compact_text(dev_environment_inventory),
+                "remediation": "Run the collector and then rerun the release-gate inventory check.",
+                "shortcut": _shortcut(
+                    "Copy collector command",
+                    str(dev_environment_inventory.get("latest_verification_command")),
+                    "command",
+                ),
+                "source": "Dev Environment Inventory",
             }
         )
     for item in top_actions[:3]:
@@ -2479,6 +2702,17 @@ def _dashboard_intelligence(
                 "owner": "Prime Builder",
             }
         )
+    if dev_environment_inventory.get("health") != "green":
+        risks.append(
+            {
+                "severity": str(dev_environment_inventory.get("health") or "red"),
+                "risk": "Development environment inventory is not release-ready",
+                "evidence": _dev_inventory_compact_text(dev_environment_inventory),
+                "impact": "Release/package evidence cannot prove the current harness and tool baseline.",
+                "remediation": "Regenerate and validate the public inventory before packaging.",
+                "owner": "Prime Builder",
+            }
+        )
 
     return {
         "health": health,
@@ -2516,6 +2750,7 @@ def _dashboard_intelligence(
                 "memory/release-readiness.md",
                 "bridge/INDEX.md",
                 ".github/workflows",
+                "docs/release/dev-environment-inventory.json",
                 "GitHub Actions via gh when authenticated",
                 "GT-KB package and upstream repository probes",
             ],
@@ -2525,6 +2760,7 @@ def _dashboard_intelligence(
             _shortcut("Open release readiness", "memory/release-readiness.md"),
             _shortcut("Open standing backlog", "memory/work_list.md"),
             _shortcut("Open bridge index", "bridge/INDEX.md"),
+            _shortcut("Open dev environment inventory", "docs/release/dev-environment-inventory.md"),
             _shortcut(
                 "Open GitHub Actions", "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions", "web"
             ),
@@ -2537,33 +2773,18 @@ def discover_role_profile(
     project_root: Path,
     *,
     harness_name: str | None = None,
+    harness_id: str | None = None,
     role_record_path: Path | None = None,
 ) -> str:
-    """Read the durable role assignment for fresh-session startup."""
+    """Read the durable role assignment from the single harness role map."""
 
-    path = operating_role_path(
+    role_profile, _document, _path = role_for_harness(
         project_root,
+        harness_id=harness_id,
         harness_name=harness_name,
-        role_record_path=role_record_path,
-        prefer_local=False,
+        assignment_path=role_record_path,
+        ensure_prime_on_startup=True,
     )
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        repo_path = _repo_operating_role_path(project_root)
-        if path != repo_path:
-            try:
-                text = repo_path.read_text(encoding="utf-8")
-            except OSError:
-                return "prime-builder"
-        else:
-            return "prime-builder"
-
-    match = re.search(r"(?im)^\s*active_role\s*:\s*`?([a-z][a-z0-9-]*)`?\s*$", text)
-    if not match:
-        return "prime-builder"
-
-    role_profile = match.group(1).strip().lower()
     return role_profile if role_profile in ROLE_PROFILES else "prime-builder"
 
 
@@ -2572,6 +2793,7 @@ def _role_profile_or_discovered(
     role_profile: str | None = None,
     *,
     harness_name: str | None = None,
+    harness_id: str | None = None,
     role_record_path: Path | None = None,
 ) -> str:
     if role_profile:
@@ -2579,6 +2801,7 @@ def _role_profile_or_discovered(
     return discover_role_profile(
         project_root,
         harness_name=harness_name,
+        harness_id=harness_id,
         role_record_path=role_record_path,
     )
 
@@ -2588,7 +2811,9 @@ def build_startup_model(
     role_profile: str | None = None,
     *,
     harness_name: str | None = None,
+    harness_id: str | None = None,
     role_record_path: Path | None = None,
+    fast_hook: bool = False,
 ) -> dict[str, Any]:
     """Collect the complete startup disclosure model without writing files."""
 
@@ -2596,6 +2821,7 @@ def build_startup_model(
         project_root,
         role_profile,
         harness_name=harness_name,
+        harness_id=harness_id,
         role_record_path=role_record_path,
     )
     generated_at = _now_iso()
@@ -2607,6 +2833,12 @@ def build_startup_model(
     hook_files = sorted((project_root / ".claude" / "hooks").glob("*.py"))
     test_files = sorted((project_root / "tests").rglob("test_*.py"))
     plugins = _plugin_inventory()
+    dev_environment_inventory = _dev_environment_inventory_status(project_root)
+    harness_parity = _harness_parity_status(
+        project_root,
+        harness_name=harness_name,
+        role_profile=resolved_role_profile,
+    )
     agent_red_test_files = [
         path for path in test_files if _path_matches(path.relative_to(project_root).as_posix(), AGENT_RED_PATH_PREFIXES)
     ]
@@ -2638,6 +2870,8 @@ def build_startup_model(
         "contention": _bridge_metrics(project_root),
         "tokens": _token_metric(),
         "work_subject": _collect_work_subject(project_root),
+        "dev_environment_inventory": dev_environment_inventory,
+        "harness_parity": harness_parity,
     }
     infrastructure = {
         "instrumentation": "GT-KB",
@@ -2647,8 +2881,10 @@ def build_startup_model(
         "hook_template_count": len(hook_files),
         "hook_registrations": _hook_inventory(project_root),
         "dashboard_history_path": "memory/gtkb-dashboard-history.json",
-        "gtkb_upgrade_posture": _gtkb_upgrade_posture(project_root),
-        "testing_service_integrations": _testing_service_integrations(project_root, plugins),
+        "dev_environment_inventory": dev_environment_inventory,
+        "harness_parity": harness_parity,
+        "gtkb_upgrade_posture": _gtkb_upgrade_posture(project_root, fast_hook=fast_hook),
+        "testing_service_integrations": _testing_service_integrations(project_root, plugins, fast_hook=fast_hook),
     }
     infrastructure["delivery_timeline"] = _delivery_timeline(project_root, infrastructure)
     dashboard_intelligence = _dashboard_intelligence(
@@ -2666,6 +2902,7 @@ def build_startup_model(
             resolved_role_profile,
             project_root,
             harness_name=harness_name,
+            harness_id=harness_id,
             role_record_path=role_record_path,
         ),
         "role_profile": resolved_role_profile,
@@ -2718,6 +2955,7 @@ def build_startup_model(
                 "drift",
                 "regression",
                 "contention",
+                "dev environment inventory",
                 "tokens consumed before user input",
             ],
         },
@@ -2935,6 +3173,15 @@ def _protocol_review_queue_count(contention: dict[str, Any]) -> int:
     return sum(int(raw_status_counts.get(status, 0) or 0) for status in REVIEW_QUEUE_BRIDGE_STATUSES)
 
 
+def _protocol_prime_response_queue_count(contention: dict[str, Any]) -> int:
+    """Count latest GO/NO-GO bridge entries without dashboard scope filtering."""
+
+    if "raw_prime_response_queue_count" in contention:
+        return int(contention.get("raw_prime_response_queue_count") or 0)
+    raw_status_counts = contention.get("raw_latest_status_counts", {})
+    return sum(int(raw_status_counts.get(status, 0) or 0) for status in PRIME_RESPONSE_BRIDGE_STATUSES)
+
+
 def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
     metrics = model["metrics"]
     intelligence = model.get("dashboard_intelligence", {})
@@ -2957,7 +3204,7 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
     continuation_go_count = int(raw_status_counts.get("GO", 0) or 0)
     continuation_no_go_count = int(raw_status_counts.get("NO-GO", 0) or 0)
     continuation_response_count = continuation_go_count + continuation_no_go_count
-    actionable_review_count = _protocol_review_queue_count(metrics["contention"])
+    prime_response_count = _protocol_prime_response_queue_count(metrics["contention"])
     first_blocker = _sentence_fragment(
         _first_text(blockers, "run the release gate and confirm no blocker evidence is stale"),
         "run the release gate and confirm no blocker evidence is stale",
@@ -2993,8 +3240,8 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
         or "No active standing-backlog items found"
     )
     file_bridge_summary = (
-        f"file bridge scan shows {actionable_review_count} latest NEW/REVISED entr"
-        f"{'y' if actionable_review_count == 1 else 'ies'}"
+        f"file bridge scan shows {prime_response_count} latest GO/NO-GO bridge response"
+        f"{'s' if prime_response_count != 1 else ''}"
     )
 
     return [
@@ -3160,6 +3407,21 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
     )
 
 
+def _render_fresh_session_input_semantics(model: dict[str, Any]) -> str:
+    lines = [
+        "- The first owner message in a fresh session is a session-start stimulus only; do not interpret it as a focus choice, task prompt, approval, answer, or other informational input.",
+    ]
+    if _is_loyal_opposition_model(model):
+        lines.append(
+            "- After presenting this startup disclosure, execute the harness-only Loyal Opposition startup action before ordinary task work."
+        )
+    else:
+        lines.append(
+            "- After presenting this startup disclosure and the session-focus choices, wait for Mike's next message before choosing or mapping session work."
+        )
+    return "\n".join(lines)
+
+
 def _render_startup_pruning(model: dict[str, Any]) -> str:
     pruning = model.get("startup_pruning")
     if not pruning:
@@ -3193,12 +3455,23 @@ def _active_subject_label(model: dict[str, Any]) -> str:
     return "Application"
 
 
+def _dev_inventory_compact_text(status: dict[str, Any]) -> str:
+    state = str(status.get("state") or "unknown")
+    generated_at = status.get("generated_at") or "unknown"
+    redaction = status.get("redaction_status") or "unknown"
+    if not status.get("present"):
+        return f"{state}; generate with `{status.get('latest_verification_command')}`"
+    return f"{state}; generated {generated_at}; redaction {redaction}"
+
+
 def _render_current_project_state(model: dict[str, Any]) -> str:
     metrics = model["metrics"]
     intelligence = model.get("dashboard_intelligence", {})
     release = intelligence.get("release_readiness", {})
     quality = intelligence.get("quality_rollup", {})
     upgrade_posture = model.get("infrastructure", {}).get("gtkb_upgrade_posture", {})
+    dev_inventory = model.get("infrastructure", {}).get("dev_environment_inventory", {})
+    harness_parity = model.get("infrastructure", {}).get("harness_parity", {})
     subject_label = _active_subject_label(model)
 
     # Â§A hard-rejection: a combined application + GT-KB green claim may not be
@@ -3240,6 +3513,8 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
                 f"package {upgrade_posture.get('package_version', 'unknown')}; "
                 f"dry-run upgrade plan available: {upgrade_posture.get('upgrade_plan', {}).get('available', False)}"
             ),
+            f"- GT-KB dev environment inventory: {_dev_inventory_compact_text(dev_inventory)}",
+            f"- Harness parity: {_harness_parity_compact_text(harness_parity)}",
         ]
     )
 
@@ -3606,11 +3881,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
         pending_decisions_section = []
 
     if _is_loyal_opposition_model(model):
-        startup_task_section = [
-            "## Loyal Opposition Startup Task",
-            "",
-            _render_loyal_opposition_startup_task(model),
-        ]
+        startup_task_section = []
     else:
         session_focus_options = _session_focus_options(model)
         startup_task_section = [
@@ -3639,6 +3910,8 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Bridge: {role['bridge']}",
             f"- Poller: {role['poller']}",
             f"- Role mapping source: {role['role_mapping_source']}",
+            f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
+            f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
             "",
             _markdown_list(model["governance_stance"]),
             "",
@@ -3662,19 +3935,12 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
                 snapshot=model.get("workstream_focus"),
                 overlay_status=model.get("session_overlay") or {},
                 include_counterpart=True,
+                include_overlay_note=False,
+                include_operational_instructions=False,
             ),
             "",
             *_render_smart_poller_section(project_root, role),
             *pending_decisions_section,
-            "### Session Overlay Status (Non-Authoritative)",
-            "",
-            _render_session_overlay_status(model.get("session_overlay") or {}),
-            "",
-            "### Fresh-Session Input Semantics",
-            "",
-            "- The first owner message in a fresh session is a session-start stimulus only; do not interpret it as a focus choice, task prompt, approval, answer, or other informational input.",
-            "- After presenting this startup disclosure and the session-focus choices, wait for Mike's next message before choosing or mapping session work.",
-            "",
             "### Wrap-Up Trigger Commands",
             "",
             _render_wrapup_trigger_commands(),
@@ -4753,6 +5019,7 @@ def render_dashboard(model: dict[str, Any], history: list[dict[str, Any]]) -> st
       <tr><th>Skill Templates</th><td>{html.escape(str(model["infrastructure"].get("skill_template_count")))}</td></tr>
       <tr><th>Rule Templates</th><td>{html.escape(str(model["infrastructure"].get("rule_template_count")))}</td></tr>
       <tr><th>Hook Templates</th><td>{html.escape(str(model["infrastructure"].get("hook_template_count")))}</td></tr>
+      <tr><th>Dev Environment Inventory</th><td>{html.escape(_dev_inventory_compact_text(model["infrastructure"].get("dev_environment_inventory", {})))}</td></tr>
       <tr><th>Dashboard History</th><td>{html.escape(str(model["infrastructure"].get("dashboard_history_path")))}</td></tr>
     </tbody>
   </table>
@@ -5034,13 +5301,17 @@ def write_dashboard_and_report(
     startup_pruning: dict[str, Any] | None = None,
     role_profile: str | None = None,
     harness_name: str | None = None,
+    harness_id: str | None = None,
     role_record_path: Path | None = None,
+    fast_hook: bool = False,
 ) -> dict[str, Any]:
     model = build_startup_model(
         project_root,
         role_profile=role_profile,
         harness_name=harness_name,
+        harness_id=harness_id,
         role_record_path=role_record_path,
+        fast_hook=fast_hook,
     )
     if startup_bridge_maintenance is not None:
         model["startup_bridge_maintenance"] = startup_bridge_maintenance
@@ -5249,6 +5520,42 @@ def _startup_service_context(result: dict[str, Any]) -> str:
     report_text = str(result["report_text"])
     model = result["model"]
     focus_option_count = len(_session_focus_options(model))
+    startup_instruction_context = [
+        "",
+        "## Session Startup Instructions",
+        "",
+        "- Do not relay this section to Mike as user-visible startup content.",
+        "- These instructions describe startup handling and operational context; they are not disclosure text.",
+        "",
+        "### Session Overlay Status (Non-Authoritative)",
+        "",
+        _render_session_overlay_status(model.get("session_overlay") or {}),
+        "",
+        "### Fresh-Session Input Semantics",
+        "",
+        _render_fresh_session_input_semantics(model),
+    ]
+    loyal_opposition_context: list[str] = []
+    if _is_loyal_opposition_model(model):
+        startup_relay_instruction = (
+            "- The AI harness must relay the generated startup message verbatim as the first durable assistant answer, "
+            "then execute the harness-only Loyal Opposition startup action before ordinary task work; Loyal Opposition "
+            "mode does not wait for a Prime Builder focus selection."
+        )
+        loyal_opposition_context = [
+            "",
+            "## Harness-Only Loyal Opposition Startup Action",
+            "",
+            "- Do not relay this section to Mike as user-visible startup content.",
+            "- Execute these instructions before ordinary task work; they are operational startup requirements, not disclosure text.",
+            "",
+            _render_loyal_opposition_startup_task(model),
+        ]
+    else:
+        startup_relay_instruction = (
+            "- The AI harness must relay the generated startup message verbatim as the first durable assistant answer "
+            "and then wait for Mike's focus selection."
+        )
     return "\n".join(
         [
             "# GroundTruth-KB Programmatic Startup Payload",
@@ -5257,7 +5564,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             "- Source: `scripts/session_self_initialization.py`",
             f"- Generated: {model['generated_at']}",
             "- User-visible startup content below was generated programmatically by the startup service.",
-            "- The AI harness must relay the generated startup message verbatim as the first durable assistant answer and then wait for Mike's focus selection.",
+            startup_relay_instruction,
             "- Do not summarize, paraphrase, shorten, reorder, or omit any startup section or any session-focus option detail.",
             "- Preserve every generated heading, bullet, numbered item, `Current signal`, and `Prompt details` line exactly as written.",
             (
@@ -5270,6 +5577,8 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             "- Codex Desktop durability rule: relay the startup message in the first durable assistant answer, not in transient progress/intermediary output.",
             "- Do not replace the startup message with a shorter final answer after rendering it.",
             "- The AI harness is not responsible for composing role, mode, bridge, process, or focus content during startup.",
+            *startup_instruction_context,
+            *loyal_opposition_context,
             "",
             "## User-Visible Startup Message",
             "",
@@ -5477,7 +5786,13 @@ def main(argv: list[str] | None = None) -> int:
         "--role-record-path",
         type=Path,
         default=None,
-        help="Override the durable operating-role record path for this harness.",
+        help="Deprecated alias: override the single durable role-assignment map path.",
+    )
+    parser.add_argument(
+        "--role-assignment-path",
+        type=Path,
+        default=None,
+        help="Override the single durable role-assignment map path.",
     )
     parser.add_argument(
         "--user-preferences-path",
@@ -5498,9 +5813,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--harness-name",
-        choices=sorted(HARNESS_ROLE_RECORDS),
+        choices=sorted(DEFAULT_HARNESS_IDS),
         default=None,
-        help="Select harness-local durable role and lifecycle state paths.",
+        help="Select harness-local lifecycle state paths and default harness ID.",
+    )
+    parser.add_argument(
+        "--harness-id",
+        default=None,
+        help="Assert the durable installation ID for this harness; persistent identity is loaded from harness-state/harness-identities.json.",
     )
     parser.add_argument("--json", action="store_true", help="Print machine-readable output paths and current model.")
     parser.add_argument(
@@ -5554,11 +5874,16 @@ def main(argv: list[str] | None = None) -> int:
     startup_requested_at = os.environ.get("GTKB_STARTUP_REQUESTED_AT") if args.emit_startup_service_payload else None
     if _parse_iso8601(startup_requested_at) is None:
         startup_requested_at = _utc_now_iso()
-    role_record_path = args.role_record_path.resolve() if args.role_record_path is not None else None
+    role_record_path = (
+        args.role_assignment_path.resolve()
+        if args.role_assignment_path is not None
+        else (args.role_record_path.resolve() if args.role_record_path is not None else None)
+    )
     role_profile = (
         discover_role_profile(
             project_root,
             harness_name=args.harness_name,
+            harness_id=args.harness_id,
             role_record_path=role_record_path,
         )
         if startup_emit_requested
@@ -5566,6 +5891,7 @@ def main(argv: list[str] | None = None) -> int:
             project_root,
             args.role_profile,
             harness_name=args.harness_name,
+            harness_id=args.harness_id,
             role_record_path=role_record_path,
         )
     )
@@ -5619,7 +5945,9 @@ def main(argv: list[str] | None = None) -> int:
         startup_pruning=startup_pruning,
         role_profile=role_profile,
         harness_name=args.harness_name,
+        harness_id=args.harness_id,
         role_record_path=role_record_path,
+        fast_hook=args.fast_hook,
     )
     if startup_emit_requested:
         _maybe_open_dashboard_on_session_start(result["dashboard_url"])

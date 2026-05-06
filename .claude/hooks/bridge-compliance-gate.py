@@ -18,11 +18,14 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
+PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
 SPEC_LINK_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,
@@ -33,6 +36,12 @@ SPEC_LINK_TOKEN_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 SPEC_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|none|n/a|not applicable|no relevant)\b", re.IGNORECASE)
+OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
+    r"^[\s>*`_\-:]*"
+    r"(?:tbd|todo|none|n/a|not applicable|no relevant(?: owner decisions?)?)"
+    r"[\s.`_\-:]*$",
+    re.IGNORECASE,
+)
 SPEC_TEST_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
     re.IGNORECASE,
@@ -121,6 +130,12 @@ def _is_bridge_markdown_file(file_path: str) -> bool:
     return "/bridge/" in f"/{normalized}" and not normalized.endswith("/bridge/INDEX.md")
 
 
+def _extract_bridge_id_from_path(file_path: str) -> str | None:
+    filename = Path(file_path.replace("\\", "/")).name
+    match = re.match(r"(?P<bridge_id>.+)-\d{3}\.md$", filename)
+    return match.group("bridge_id") if match else None
+
+
 def _has_concrete_spec_links(content: str) -> bool:
     lines = content.splitlines()
     start: int | None = None
@@ -139,9 +154,7 @@ def _has_concrete_spec_links(content: str) -> bool:
         section.append(line)
     section_text = "\n".join(section).strip()
     return bool(
-        section_text
-        and not SPEC_PLACEHOLDER_RE.search(section_text)
-        and SPEC_LINK_TOKEN_RE.search(section_text)
+        section_text and not SPEC_PLACEHOLDER_RE.search(section_text) and SPEC_LINK_TOKEN_RE.search(section_text)
     )
 
 
@@ -183,7 +196,8 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
     text = "\n".join(section).strip()
     if not text:
         return False
-    return not SPEC_PLACEHOLDER_RE.search(text)
+    nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
+    return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
 
 
 def _has_clean_applicability_preflight(content: str) -> bool:
@@ -203,10 +217,76 @@ def _has_clean_applicability_preflight(content: str) -> bool:
             break
         section.append(line)
     section_text = "\n".join(section)
-    return bool(
-        PREFLIGHT_PACKET_HASH_RE.search(section_text)
-        and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text)
-    )
+    return bool(PREFLIGHT_PACKET_HASH_RE.search(section_text) and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text))
+
+
+def _root_contained_scratch_path(cwd: Path, bridge_id: str) -> Path:
+    root = cwd.resolve()
+    scratch_dir = root / ".tmp" / "bridge-preflight-hook"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    scratch = scratch_dir / f"{bridge_id}-{uuid4().hex}.md"
+    scratch.resolve().relative_to(root)
+    return scratch
+
+
+def _run_pending_applicability_preflight(
+    *,
+    cwd: Path,
+    file_path: str,
+    bridge_id: str,
+    content: str,
+) -> tuple[bool, str]:
+    scratch_path: Path | None = None
+    try:
+        scratch_path = _root_contained_scratch_path(cwd, bridge_id)
+        scratch_path.write_text(content, encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/bridge_applicability_preflight.py",
+                "--bridge-id",
+                bridge_id,
+                "--content-file",
+                str(scratch_path),
+                "--json",
+            ],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        print(f"[Governance] Bridge applicability preflight warning for {file_path}: {exc}", file=sys.stderr)
+        return True, ""
+    finally:
+        if scratch_path is not None:
+            try:
+                scratch_path.unlink(missing_ok=True)
+            except OSError as exc:
+                print(f"[Governance] Could not remove bridge preflight scratch file: {exc}", file=sys.stderr)
+
+    combined_output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+    if result.returncode not in (0, 5):
+        print(
+            f"[Governance] Bridge applicability preflight warning for {file_path}: {combined_output}",
+            file=sys.stderr,
+        )
+        return True, ""
+    try:
+        packet = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        print(
+            f"[Governance] Bridge applicability preflight warning for {file_path}: invalid JSON output",
+            file=sys.stderr,
+        )
+        return True, ""
+    missing_required = packet.get("missing_required_specs") or []
+    if missing_required:
+        return False, json.dumps(missing_required)
+    return True, ""
 
 
 def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
@@ -309,6 +389,7 @@ def main() -> None:
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {})
     cwd = payload.get("cwd", ".")
+    cwd_path = Path(cwd).resolve()
 
     if tool_name not in WRITE_TOOLS:
         emit_pass()
@@ -367,8 +448,28 @@ def main() -> None:
                 "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)",
             )
             sys.exit(0)
+        if tool_name == "Write" and first_line in PENDING_PREFLIGHT_STATUSES:
+            bridge_id = _extract_bridge_id_from_path(file_path)
+            if bridge_id:
+                preflight_ok, error_msg = _run_pending_applicability_preflight(
+                    cwd=cwd_path,
+                    file_path=file_path,
+                    bridge_id=bridge_id,
+                    content=content,
+                )
+                if not preflight_ok:
+                    emit_deny(
+                        "PreToolUse",
+                        "[Governance] Pre-filing applicability preflight failed: "
+                        f"missing_required_specs={error_msg}. Run "
+                        f"python scripts/bridge_applicability_preflight.py --bridge-id {bridge_id} "
+                        "for full output. (Hard-block per "
+                        "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
+                        "mechanical enforcement.)",
+                    )
+                    sys.exit(0)
 
-    index_path = Path(cwd) / BRIDGE_INDEX_FILENAME
+    index_path = cwd_path / BRIDGE_INDEX_FILENAME
     if not index_path.exists():
         emit_pass()
         sys.exit(0)

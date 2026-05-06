@@ -1,0 +1,74 @@
+---
+name: harness-parity-review
+description: Use when reviewing or correcting parity between Claude Code and Codex harnesses, including skills, hooks, roles, commands, plugins, MCP tools, startup context, permissions, role-specific capabilities, or harness capability drift.
+---
+
+# Harness Parity Review
+
+## Goal
+
+Ensure each active harness has the capabilities required for its assigned role.
+Parity means semantic capability equivalence, not byte-for-byte identical files.
+
+## Required Inputs
+
+Read:
+
+- `harness-state/harness-identities.json`
+- `harness-state/role-assignments.json`
+- `config/agent-control/harness-capability-registry.toml`
+- `.claude/skills/*/SKILL.md`
+- `.claude/settings.json`
+- `.codex/hooks.json`
+- `.codex/config.toml`
+
+## Workflow
+
+1. Resolve durable harness IDs and role assignments.
+2. Read the harness capability registry.
+3. Inventory actual Claude and Codex surfaces.
+4. Compare role-required capabilities by harness.
+5. Classify each capability:
+   - `PASS`: equivalent capability is available natively
+   - `DEGRADED`: documented fallback exists but is not native
+   - `MISSING`: required capability is absent
+   - `STALE`: adapter or mirror differs from canonical source
+   - `EXTRA`: harness has undeclared capability
+   - `UNSUPPORTED`: known non-equivalence is explicitly documented
+   - `OWNER_ACTION_REQUIRED`: install, auth, or external setup blocks parity
+6. Correct safe drift by updating registry entries, pointers, adapters, or
+   generated reports.
+7. Escalate owner action only for required installs/auth/setup.
+8. Verify with `scripts/check_harness_parity.py`.
+
+## Commands
+
+Run:
+
+```powershell
+python scripts/check_harness_parity.py --all --markdown
+python scripts/check_harness_parity.py --harness codex --role loyal-opposition --json
+```
+
+## Rules
+
+- Do not assume `.claude/skills` are native Codex skills.
+- Do not assume Codex plugin skills are available to Claude Code.
+- Missing role-critical capability blocks normal role work unless the registry
+  marks an accepted fallback or unsupported state.
+- Historical or harness-specific capabilities must be explicitly labeled.
+- Undeclared extras are drift until classified.
+
+## Report Format
+
+Include:
+
+- overall status
+- role/harness checked
+- missing role-critical capabilities
+- degraded fallbacks
+- stale adapters
+- undeclared extras
+- recommended corrections
+- verification command output
+

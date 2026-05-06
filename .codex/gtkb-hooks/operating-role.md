@@ -1,10 +1,14 @@
-﻿# Durable Operating Role Assignment
+# Legacy Role Record Pointer
 
-Harness: Codex
-Owner directive date: 2026-04-23
+This file is retained only to avoid broken historical references.
 
-active_role: loyal-opposition
+It is not an operating-role source of truth and must not contain an
+`active_role:` assignment.
 
-This file is the Codex harness-local durable next-session role record for
-GroundTruth-KB. It overrides the tracked repository default when
-Codex startup hooks resolve the operating role.
+Current role authority:
+
+`harness-state/role-assignments.json`
+
+Persistent harness identity authority:
+
+`harness-state/harness-identities.json`

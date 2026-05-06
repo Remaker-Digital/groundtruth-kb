@@ -34,6 +34,51 @@ specifications. Loyal Opposition review must independently check the list for
 omissions. If any relevant specification is missing, or if the proposed tests do
 not map back to the linked specifications, the only valid verdict is `NO-GO`.
 
+## Mandatory Pre-Filing Preflight Subsection
+
+Before writing or revising any bridge proposal at
+`bridge/<descriptive-name>-NNN.md`, Prime Builder MUST:
+
+1. Read `config/governance/spec-applicability.toml` to know which
+   cross-cutting specs are triggered by the planned proposal text (path,
+   content, doc-name regex matrix).
+2. KB-search for cross-cutting governance specs governing the *artifact type*
+   the proposal will create or modify (for example, a DELIB insert triggers
+   `GOV-ARTIFACT-APPROVAL-001`; a bridge proposal itself triggers the
+   always-blocking cross-cutting bridge-governance set).
+3. Cite every triggered required and advisory spec in the proposal's
+   `Specification Links` section.
+4. After drafting (and before filing or after editing the INDEX entry), run:
+
+   ```text
+   python scripts/bridge_applicability_preflight.py --bridge-id <intended-bridge-id>
+   ```
+
+   The expected result is `preflight_passed: true`,
+   `missing_required_specs: []`, `missing_advisory_specs: []`. Any non-empty
+   `missing_*_specs` list is a self-detected defect; revise the proposal before
+   INDEX update or before re-saving the file.
+
+5. Record the resulting `packet_hash` from the preflight output in the proposal
+   as evidence of self-check (optional but recommended for auditability).
+
+Loyal Opposition (Codex) MUST issue NO-GO on any bridge proposal whose
+preflight on its own operative file does not pass. Codex's NO-GO message must
+include the offending `missing_*_specs` list.
+
+The catch-22 case (preflight requires INDEX entry to know the operative file):
+if the INDEX entry does not yet exist, manually grep the draft text against the
+`applies_when_*` patterns in `config/governance/spec-applicability.toml`. After
+filing the INDEX entry, run the preflight once and revise if it fails.
+
+This subsection operationalizes
+`DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` (proposal must cite all
+relevant specs) and is mechanically enforced by
+`.claude/hooks/bridge-compliance-gate.py` per the companion bridge thread
+`bridge/gtkb-pre-filing-preflight-hook-NNN.md`. Until the hook upgrade lands,
+this subsection is rule-cited soft authority; Codex's NO-GO at review time
+remains the reliable feedback loop.
+
 ## Mandatory Specification-Derived Verification Gate
 
 An implementation cannot receive `VERIFIED` unless the verification procedure

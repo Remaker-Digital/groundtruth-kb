@@ -14,7 +14,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "release_governance_metrics.py"
 
@@ -37,6 +36,7 @@ def _make_clean_fixture(tmp_path: Path) -> Path:
     (project / ".claude" / "hooks").mkdir(parents=True)
     # Symlink/copy the canonical hooks so doctor's importlib calls resolve.
     import shutil
+
     for hook_name in ("owner-decision-tracker.py", "bridge-compliance-gate.py"):
         src = REPO_ROOT / ".claude" / "hooks" / hook_name
         if src.exists():
@@ -50,11 +50,11 @@ def _add_prose_pending_entry(target: Path, decision_id: str = "DECISION-9001") -
     entry = (
         f"- id: {decision_id}\n"
         f"  asked_at: 2026-05-10T08:00:00Z\n"
-        f"  question: \"\"\n"
+        f'  question: ""\n'
         f"  detected_via: prose:offering_or_choice\n"
         f"  status: pending\n"
         f"  question_hash: deadbeefcafebabe\n"
-        f"  notes: \"\"\n"
+        f'  notes: ""\n'
     )
     new_text = text.replace("## Pending\n\n(none)\n", f"## Pending\n\n{entry}\n")
     pending_path.write_text(new_text, encoding="utf-8")
@@ -66,12 +66,12 @@ def _add_non_auq_resolved_entry(target: Path, decision_id: str = "DECISION-9002"
     entry = (
         f"- id: {decision_id}\n"
         f"  asked_at: 2026-05-10T08:00:00Z\n"
-        f"  question: \"\"\n"
+        f'  question: ""\n'
         f"  detected_via: prose:awaiting_input_q\n"
         f"  status: resolved\n"
         f"  question_hash: aaaa1111bbbb2222\n"
         f"  resolved_at: 2026-05-10T08:30:00Z\n"
-        f"  notes: \"\"\n"
+        f'  notes: ""\n'
     )
     new_text = text.replace("## Resolved\n\n(none)\n", f"## Resolved\n\n{entry}\n")
     pending_path.write_text(new_text, encoding="utf-8")
@@ -98,6 +98,7 @@ def _add_offending_verified_bridge(target: Path) -> None:
     # Touch mtime to be in-window
     import os
     from datetime import datetime
+
     ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
     os.utime(bridge_dir / fname, (ts, ts))
 
@@ -111,8 +112,7 @@ def _add_realistic_verified_thread(target: Path) -> None:
     report_fname = "realistic-offender-001.md"
     # LO verdict file (starts with VERIFIED first line — must be SKIPPED by check)
     (bridge_dir / verdict_fname).write_text(
-        "VERIFIED\n\n"
-        "# Loyal Opposition Verification\n\nLooks fine.\n",
+        "VERIFIED\n\n# Loyal Opposition Verification\n\nLooks fine.\n",
         encoding="utf-8",
     )
     # Prime report (the actual offender — no verdict prefix; claims owner approval; missing section)
@@ -136,6 +136,44 @@ def _add_realistic_verified_thread(target: Path) -> None:
     )
     import os
     from datetime import datetime
+
+    ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
+    os.utime(bridge_dir / verdict_fname, (ts, ts))
+    os.utime(bridge_dir / report_fname, (ts, ts))
+
+
+def _add_compliant_verified_thread_with_none_status(target: Path) -> None:
+    """Adds a VERIFIED thread whose substantive Owner Decisions section
+    also states that current owner input needed is none."""
+    bridge_dir = target / "bridge"
+    verdict_fname = "realistic-compliant-002.md"
+    report_fname = "realistic-compliant-001.md"
+    (bridge_dir / verdict_fname).write_text(
+        "VERIFIED\n\n# Loyal Opposition Verification\n\nLooks fine.\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / report_fname).write_text(
+        "NEW\n\n"
+        "# Prime Implementation Report\n\n"
+        "## Specification Links\n\n- SPEC-X\n\n"
+        "This report cites Sub-slice B's AUQ-only rule per "
+        "bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md.\n\n"
+        "## Owner Decisions / Input\n\n"
+        '- Owner approval cited from S331 AskUserQuestion answer "Autonomous progression".\n'
+        "- Current owner input needed: none.\n",
+        encoding="utf-8",
+    )
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(
+        "# Bridge Index\n\n"
+        "Document: realistic-compliant\n"
+        f"VERIFIED: bridge/{verdict_fname}\n"
+        f"NEW: bridge/{report_fname}\n",
+        encoding="utf-8",
+    )
+    import os
+    from datetime import datetime
+
     ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
     os.utime(bridge_dir / verdict_fname, (ts, ts))
     os.utime(bridge_dir / report_fname, (ts, ts))
@@ -167,6 +205,7 @@ def _add_historical_filename_offender_with_fresh_mtime(target: Path) -> None:
     )
     import os
     from datetime import datetime
+
     fresh_checkout_ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
     os.utime(bridge_dir / verdict_fname, (fresh_checkout_ts, fresh_checkout_ts))
     os.utime(bridge_dir / report_fname, (fresh_checkout_ts, fresh_checkout_ts))
@@ -199,6 +238,7 @@ def _add_historical_content_date_offender_with_fresh_mtime(target: Path) -> None
     )
     import os
     from datetime import datetime
+
     fresh_checkout_ts = datetime(2026, 5, 10, 12, 0, 0).timestamp()
     os.utime(bridge_dir / verdict_fname, (fresh_checkout_ts, fresh_checkout_ts))
     os.utime(bridge_dir / report_fname, (fresh_checkout_ts, fresh_checkout_ts))
@@ -208,7 +248,9 @@ def _run_doctor_check(target: Path, check_name: str):
     """Import doctor and run a single check function."""
     sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
     import importlib
+
     import groundtruth_kb.project.doctor as doctor_module
+
     importlib.reload(doctor_module)
     fn = getattr(doctor_module, check_name)
     return fn(target)
@@ -260,6 +302,14 @@ def test_check_uncited_owner_input_bridges_pass_when_compliant(tmp_path):
     assert r.status == "pass", f"Expected pass; got {r.status}: {r.message}"
 
 
+def test_check_uncited_owner_input_bridges_allows_substantive_section_with_none_status(tmp_path, monkeypatch):
+    target = _make_clean_fixture(tmp_path)
+    _add_compliant_verified_thread_with_none_status(target)
+    monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "2026-01-01")
+    r = _run_doctor_check(target, "_check_uncited_owner_input_bridges")
+    assert r.status == "pass", f"Expected pass; got {r.status}: {r.message}"
+
+
 def test_check_uncited_owner_input_bridges_fail_when_section_missing(tmp_path, monkeypatch):
     target = _make_clean_fixture(tmp_path)
     _add_offending_verified_bridge(target)
@@ -277,7 +327,9 @@ def test_release_gate_script_exits_0_on_clean_baseline(tmp_path, monkeypatch):
     monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "2099-01-01")
     result = subprocess.run(
         [sys.executable, str(SCRIPT_PATH), "--target", str(target)],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     assert result.returncode == 0, (
         f"Expected exit 0; got {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
@@ -291,7 +343,9 @@ def test_release_gate_script_exits_1_on_polluted_baseline(tmp_path, monkeypatch)
     monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "2099-01-01")
     result = subprocess.run(
         [sys.executable, str(SCRIPT_PATH), "--target", str(target)],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     assert result.returncode == 1, (
         f"Expected exit 1; got {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
@@ -310,9 +364,7 @@ def test_check_uncited_owner_input_bridges_fail_on_realistic_verified_thread(tmp
     _add_realistic_verified_thread(target)
     monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "2026-01-01")
     r = _run_doctor_check(target, "_check_uncited_owner_input_bridges")
-    assert r.status == "fail", (
-        f"Realistic verified-thread topology must produce fail; got {r.status}: {r.message}"
-    )
+    assert r.status == "fail", f"Realistic verified-thread topology must produce fail; got {r.status}: {r.message}"
     assert "realistic-offender-001.md" in r.message, (
         f"Offender Prime report (realistic-offender-001.md) must be flagged; got {r.message}"
     )
@@ -348,7 +400,9 @@ def test_release_gate_script_blocks_on_warning_status(tmp_path, monkeypatch):
     monkeypatch.setenv("GTKB_AUQ_METRICS_CUTOFF_DATE", "not-a-date")
     result = subprocess.run(
         [sys.executable, str(SCRIPT_PATH), "--target", str(target)],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     assert result.returncode == 1, (
         f"Expected exit 1 on warning status; got {result.returncode}\n"

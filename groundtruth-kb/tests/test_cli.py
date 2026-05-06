@@ -86,6 +86,84 @@ class TestSummary:
 
 
 # ---------------------------------------------------------------------------
+# gt backlog
+# ---------------------------------------------------------------------------
+
+
+class TestBacklog:
+    def test_backlog_migrate_work_list_json_dry_run(self, runner: CliRunner, project_dir: Path) -> None:
+        work_list = project_dir / "memory" / "work_list.md"
+        work_list.parent.mkdir()
+        work_list.write_text(
+            "\n".join(
+                [
+                    "| # | ID | Status | Blocks / blocked by | Next step |",
+                    "|---|---|---|---|---|",
+                    "| 0 | `GTKB-DASHBOARD-002` Slice 2.3 | open | None. | Review. |",
+                    "| 1 | `GTKB-DASHBOARD-002` Slice 2.2 | open | None. | Review. |",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(project_dir / "groundtruth.toml"),
+                "backlog",
+                "migrate-work-list",
+                "--work-list",
+                str(work_list),
+                "--dry-run",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["parsed"] == 2
+        assert payload["inserted"] == ["GTKB-DASHBOARD-002-SLICE-2-3", "GTKB-DASHBOARD-002-SLICE-2-2"]
+
+    def test_backlog_migrate_work_list_inserts_rows(self, runner: CliRunner, project_dir: Path) -> None:
+        work_list = project_dir / "memory" / "work_list.md"
+        work_list.parent.mkdir()
+        work_list.write_text(
+            "\n".join(
+                [
+                    "| # | ID | Status | Blocks / blocked by | Next step |",
+                    "|---|---|---|---|---|",
+                    "| 0 | `GTKB-COMMIT-TRIAGE-001` | open | None. | Review. |",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(project_dir / "groundtruth.toml"),
+                "backlog",
+                "migrate-work-list",
+                "--work-list",
+                str(work_list),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "inserted 1" in result.output
+        db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+        try:
+            item = db.get_work_item("GTKB-COMMIT-TRIAGE-001")
+        finally:
+            db.close()
+        assert item is not None
+        assert item["component"] == "backlog"
+        assert item["implementation_order"] == 0
+
+
+# ---------------------------------------------------------------------------
 # gt history
 # ---------------------------------------------------------------------------
 

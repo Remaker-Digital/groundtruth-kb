@@ -106,7 +106,7 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
 
     assert model["role"]["assumed_role"] == "Prime Builder"
     assert (
-        model["role"]["role_assignment"] == "active AI harness assigned by owner through durable operating-role record"
+        model["role"]["role_assignment"] == "active AI harness assigned by owner through the single role assignment map"
     )
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
     assert "verified smart poller" in model["role"]["poller"]
@@ -114,7 +114,7 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert "Strict GOV enforcement" in model["governance_stance"][0]
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
     assert model["skills"]["count"] > 0
-    assert "operating-role.md" in model["role"]["role_mapping_source"]
+    assert "role-assignments.json" in model["role"]["role_mapping_source"]
     assert "formal-artifact-approval-gate.py" in model["directives"]["hook_files"]
     assert model["workstream_focus"]["default_label"] == "GT-KB Infrastructure Focus"
     assert model["workstream_focus"]["current_label"] == "GT-KB Infrastructure Focus"
@@ -134,6 +134,13 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert posture["plan_command"]
     assert posture["apply_enabled"] is False
     assert posture["upgrade_plan"]["available"] is True
+    dev_inventory = model["infrastructure"]["dev_environment_inventory"]
+    assert dev_inventory["public_json"] == "docs/release/dev-environment-inventory.json"
+    assert dev_inventory["full_inventory_loaded"] is False
+    assert dev_inventory["latest_verification_command"]
+    harness_parity = model["infrastructure"]["harness_parity"]
+    assert harness_parity["status"] in {"pass", "warn", "fail", "unavailable"}
+    assert harness_parity["verification_command"]
     integrations = model["infrastructure"]["testing_service_integrations"]
     github = integrations["github"]
     assert github["scope"] == "implementation_infrastructure"
@@ -218,8 +225,30 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
         "drift",
         "regression",
         "contention",
+        "dev environment inventory",
         "tokens consumed before user input",
     } <= subsystems
+
+
+def test_prime_focus_top_priority_uses_go_no_go_bridge_signal() -> None:
+    module = _load_module()
+    model = {
+        "metrics": {
+            "regression": {"release_blocker_count": 0, "blockers": []},
+            "drift": {"changed_path_count": 0},
+            "contention": {"raw_latest_status_counts": {"NEW": 4, "GO": 1, "NO-GO": 1}},
+        },
+        "dashboard_intelligence": {"risk_register": [], "action_center": []},
+        "startup_pruning": {},
+        "token_reduction_options": [],
+        "infrastructure": {"testing_service_integrations": {}},
+        "top_priority_actions": [{"id": "GTKB-ENV-INVENTORY-001", "title": "Harness inventory"}],
+    }
+
+    top_priority = module._session_focus_options(model)[1]
+
+    assert "2 latest GO/NO-GO bridge responses" in top_priority["reason"]
+    assert "NEW/REVISED" not in top_priority["reason"]
 
 
 def test_startup_model_discovers_durable_operating_role() -> None:
@@ -233,9 +262,9 @@ def test_startup_model_discovers_durable_operating_role() -> None:
 
     assert model["role_profile"] == discovered_role
     assert model["role"]["assumed_role"] == module.ROLE_PROFILES[discovered_role]["assumed_role"]
-    assert "operating-role.md" in model["role"]["role_mapping_source"]
+    assert "role-assignments.json" in model["role"]["role_mapping_source"]
     if discovered_role == "loyal-opposition":
-        assert "## Loyal Opposition Startup Task" in report
+        assert "## Loyal Opposition Startup Task" not in report
         assert "## Choose This Session's Focus" not in report
     else:
         assert "## Loyal Opposition Startup Task" not in report
@@ -243,20 +272,49 @@ def test_startup_model_discovers_durable_operating_role() -> None:
         assert "13. **Continue Last Session**" in report
 
 
-def test_harness_local_role_record_overrides_repo_default_for_startup(tmp_path, capsys, monkeypatch) -> None:
+def test_fast_hook_startup_model_skips_optional_live_network_probes(monkeypatch) -> None:
     module = _load_module()
-    # Post-migration tmp path mirrors the canonical
-    # harness-state/codex/ location used in production.
-    # Tests still monkeypatch HARNESS_ROLE_RECORDS so the actual location
-    # is the temp path; rename is a clarity improvement, not a behavior change.
-    codex_dir = tmp_path / "harness-state" / "codex"
+
+    def _fail_if_called(*_args, **_kwargs):
+        raise AssertionError("fast-hook startup must not call optional live network probes")
+
+    monkeypatch.setattr(module, "_latest_remote_semver_tag", _fail_if_called)
+    monkeypatch.setattr(module, "_remote_branch_sha", _fail_if_called)
+    monkeypatch.setattr(module, "_gh_auth_status", _fail_if_called)
+    monkeypatch.setattr(module, "_latest_github_workflow_runs", _fail_if_called)
+
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder", fast_hook=True)
+    posture = model["infrastructure"]["gtkb_upgrade_posture"]
+    github = model["infrastructure"]["testing_service_integrations"]["github"]
+
+    assert posture["latest_release_probe_error"] == "skipped_fast_hook"
+    assert posture["latest_main_probe_error"] == "skipped_fast_hook"
+    assert github["gh_auth_status"] == "skipped_fast_hook"
+    assert github["latest_run_source"] == "skipped_fast_hook"
+
+
+def test_harness_role_assignment_map_is_startup_source_of_truth(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    state_root = tmp_path / "harness-state"
+    codex_dir = state_root / "codex"
     codex_dir.mkdir(parents=True)
-    role_path = codex_dir / "operating-role.md"
+    role_path = state_root / "role-assignments.json"
     guard_path = codex_dir / "session-lifecycle-guard.json"
-    role_path.write_text("active_role: loyal-opposition\n", encoding="utf-8")
-    monkeypatch.setitem(module.HARNESS_ROLE_RECORDS, "codex", role_path)
+    role_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "A": {"harness_type": "codex", "role": "loyal-opposition"},
+                    "B": {"harness_type": "claude", "role": "prime-builder"},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     monkeypatch.setitem(module.HARNESS_LIFECYCLE_GUARDS, "codex", guard_path)
-    monkeypatch.delenv("GTKB_OPERATING_ROLE_PATH", raising=False)
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_path))
     monkeypatch.delenv("GTKB_LIFECYCLE_GUARD_PATH", raising=False)
     monkeypatch.setattr(
         module,
@@ -281,6 +339,8 @@ def test_harness_local_role_record_overrides_repo_default_for_startup(tmp_path, 
             "--skip-bridge-maintenance",
             "--harness-name",
             "codex",
+            "--harness-id",
+            "A",
         ]
     )
 
@@ -289,6 +349,8 @@ def test_harness_local_role_record_overrides_repo_default_for_startup(tmp_path, 
     context = payload["additionalContext"]
     assert "Role being assumed: Loyal Opposition" in context
     assert f"Role mapping source: {role_path}" in context
+    assert "Harness self-identification: A" in context
+    assert "Harness identity source: harness-state/harness-identities.json" in context
     assert guard_path.exists()
 
 
@@ -307,20 +369,19 @@ def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() ->
     # Constant-level invariant: the authority root resolves under PROJECT_ROOT.
     assert module.GTKB_HARNESS_STATE_ROOT == expected_root
     for harness_name in ("codex", "claude"):
-        assert module.HARNESS_ROLE_RECORDS[harness_name].is_relative_to(expected_root)
         assert module.HARNESS_LIFECYCLE_GUARDS[harness_name].is_relative_to(expected_root)
     assert module.DEFAULT_USER_STARTUP_PREFERENCES_PATH.is_relative_to(expected_root)
 
     # Behavior-level invariant: operating_role_path() with --harness-name resolves
-    # to the in-root authority record (not the .claude/rules/operating-role.md
+    # to the in-root role assignment map (not the legacy guidance file
     # repo fallback). prefer_local=False forces the function to gate on
     # local_path.is_file(), which requires the authority files to be tracked
     # (Commit 1 in this thread). If this assertion fails with the repo-fallback
     # path, the migration is incomplete (likely Commit 1 missing).
     for harness_name in ("codex", "claude"):
         role_path = module.operating_role_path(REPO_ROOT, harness_name=harness_name, prefer_local=False)
-        assert role_path == expected_root / harness_name / "operating-role.md", (
-            f"--harness-name {harness_name} must resolve to in-root authority, got {role_path}"
+        assert role_path == expected_root / "role-assignments.json", (
+            f"--harness-name {harness_name} must resolve to the single role map, got {role_path}"
         )
 
 
@@ -466,13 +527,23 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
         REPO_ROOT,
     )
 
-    assert "### Fresh-Session Input Semantics" in prime_report
-    assert "The first owner message in a fresh session is a session-start stimulus only" in prime_report
-    assert "do not interpret it as a focus choice, task prompt, approval, answer" in prime_report
-    assert "wait for Mike's next message before choosing or mapping session work" in prime_report
-    assert prime_report.index("### Fresh-Session Input Semantics") < prime_report.index(
-        "## Choose This Session's Focus"
+    assert "### Fresh-Session Input Semantics" not in prime_report
+    assert "The first owner message in a fresh session is a session-start stimulus only" not in prime_report
+    assert "do not interpret it as a focus choice, task prompt, approval, answer" not in prime_report
+    assert "wait for Mike's next message before choosing or mapping session work" not in prime_report
+
+    prime_context = module._startup_service_context({"report_text": prime_report, "model": prime_model})
+    assert "## Session Startup Instructions" in prime_context
+    assert "### Fresh-Session Input Semantics" in prime_context
+    assert "The first owner message in a fresh session is a session-start stimulus only" in prime_context
+    assert "do not interpret it as a focus choice, task prompt, approval, answer" in prime_context
+    assert "wait for Mike's next message before choosing or mapping session work" in prime_context
+    assert prime_context.index("## Session Startup Instructions") < prime_context.index(
+        "## User-Visible Startup Message"
     )
+    prime_user_visible = prime_context.split("## User-Visible Startup Message", 1)[1]
+    assert "### Fresh-Session Input Semantics" not in prime_user_visible
+    assert "The first owner message in a fresh session is a session-start stimulus only" not in prime_user_visible
 
     loyal_model = module.build_startup_model(REPO_ROOT, role_profile="loyal-opposition")
     loyal_report = module.render_report(
@@ -481,9 +552,22 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
         REPO_ROOT,
     )
 
-    assert "### Fresh-Session Input Semantics" in loyal_report
-    assert "The first owner message in a fresh session is a session-start stimulus only" in loyal_report
-    assert "wait for Mike's next message before choosing or mapping session work" in loyal_report
+    assert "### Fresh-Session Input Semantics" not in loyal_report
+    assert "The first owner message in a fresh session is a session-start stimulus only" not in loyal_report
+    assert "execute the harness-only Loyal Opposition startup action before ordinary task work" not in loyal_report
+    assert "wait for Mike's next message before choosing or mapping session work" not in loyal_report
+
+    loyal_context = module._startup_service_context({"report_text": loyal_report, "model": loyal_model})
+    assert "## Session Startup Instructions" in loyal_context
+    assert "### Fresh-Session Input Semantics" in loyal_context
+    assert "The first owner message in a fresh session is a session-start stimulus only" in loyal_context
+    assert "execute the harness-only Loyal Opposition startup action before ordinary task work" in loyal_context
+    loyal_user_visible = loyal_context.split("## User-Visible Startup Message", 1)[1]
+    assert "### Fresh-Session Input Semantics" not in loyal_user_visible
+    assert "The first owner message in a fresh session is a session-start stimulus only" not in loyal_user_visible
+    assert (
+        "execute the harness-only Loyal Opposition startup action before ordinary task work" not in loyal_user_visible
+    )
 
 
 def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(tmp_path, monkeypatch) -> None:
@@ -503,13 +587,22 @@ def test_startup_report_surfaces_session_overlay_status_as_non_authoritative(tmp
     assert any("non-authoritative" in note or "no current session overlay" in note for note in overlay["notes"])
 
     report = module.render_report(model, "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
-    assert "### Session Overlay Status (Non-Authoritative)" in report
-    assert "non-authoritative by construction" in report
-    # The overlay section must appear before the input-semantics section so
-    # startup readers see the overlay disclaimer before any focus-choice wording.
-    assert report.index("### Session Overlay Status (Non-Authoritative)") < report.index(
+    assert "### Session Overlay Status (Non-Authoritative)" not in report
+    assert "non-authoritative by construction" not in report
+    assert "no current session overlay" not in report
+
+    context = module._startup_service_context({"report_text": report, "model": model})
+    assert "## Session Startup Instructions" in context
+    assert "### Session Overlay Status (Non-Authoritative)" in context
+    assert "non-authoritative by construction" in context
+    assert context.index("### Session Overlay Status (Non-Authoritative)") < context.index(
         "### Fresh-Session Input Semantics"
     )
+    assert context.index("## Session Startup Instructions") < context.index("## User-Visible Startup Message")
+    user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
+    assert "### Session Overlay Status (Non-Authoritative)" not in user_visible_context
+    assert "non-authoritative by construction" not in user_visible_context
+    assert "no current session overlay" not in user_visible_context
 
 
 def test_workflow_run_can_prefer_release_branch_over_newer_pr_run() -> None:
@@ -547,34 +640,58 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     report = module.render_report(model, "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
 
     assert model["role"]["assumed_role"] == "Loyal Opposition"
-    assert model["role"]["role_assignment"] == "active AI harness assigned by owner for counterpart review"
+    assert (
+        model["role"]["role_assignment"]
+        == "active AI harness assigned by owner through single role map entry for harness `B`"
+    )
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
     assert "verified smart poller" in model["role"]["poller"]
     assert "retired OS poller remains disabled" in model["role"]["poller"]
-    assert model["role"]["role_mapping_source"] == "harness-state/claude/operating-role.md"
-    assert "## Loyal Opposition Startup Task" in report
+    assert model["role"]["role_mapping_source"] == "harness-state/role-assignments.json"
+    assert model["role"]["harness_id"] == "B"
+    assert "## Loyal Opposition Startup Task" not in report
     assert "## Choose This Session's Focus" not in report
     assert "Commit and push to GitHub" not in report
-    assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." in report
-    assert "Session-focus menu: not presented in Loyal Opposition mode" in report
-    assert "Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism" in report
-    assert "Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup." in report
-    assert "current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`" in report
+    assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." not in report
+    assert "Session-focus menu: not presented in Loyal Opposition mode" not in report
+    assert "Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism" not in report
+    assert (
+        "Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup." not in report
+    )
+    assert "current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`" not in report
     assert (
         "Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly"
-        in report
+        not in report
     )
     assert (
         "startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries"
-        in report
+        not in report
     )
-    assert "do not display this checklist as a substitute for performing the verification" in report
-    assert "Poller startup rule: use the verified smart poller when it is available and functioning" in report
-    assert "do not restore the retired OS poller" in report
-    assert "First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning." in report
-    assert "permanent owner permission to diagnose and repair bridge function/use" in report
-    assert "report the live scan result and ask Mike whether to begin processing reviews and verifications" in report
-    assert "yes` to begin processing the bridge queue" in report
+    assert "do not display this checklist as a substitute for performing the verification" not in report
+    assert "Poller startup rule: use the verified smart poller when it is available and functioning" not in report
+    assert "First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning." not in report
+    assert "permanent owner permission to diagnose and repair bridge function/use" not in report
+    assert (
+        "report the live scan result and ask Mike whether to begin processing reviews and verifications" not in report
+    )
+
+    context = module._startup_service_context({"report_text": report, "model": model})
+    assert "## Harness-Only Loyal Opposition Startup Action" in context
+    assert "Do not relay this section to Mike as user-visible startup content." in context
+    assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." in context
+    assert (
+        "Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly"
+        in context
+    )
+    assert context.index("## Harness-Only Loyal Opposition Startup Action") < context.index(
+        "## User-Visible Startup Message"
+    )
+    user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
+    assert "## Loyal Opposition Startup Task" not in user_visible_context
+    assert (
+        "Default session purpose: process Prime Builder reviews and verifications on the file bridge."
+        not in user_visible_context
+    )
 
 
 def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> None:
@@ -604,6 +721,7 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
     assert contention["actionable_count"] == 0
     assert contention["raw_latest_status_counts"] == {"NEW": 1}
     assert contention["raw_review_queue_count"] == 1
+    assert contention["raw_prime_response_queue_count"] == 0
     assert contention["source"] == "bridge/INDEX.md"
     assert contention["source_read_mode"] == "direct_file_read"
     assert contention["derived_artifacts_authoritative"] is False
@@ -647,6 +765,7 @@ def test_bridge_metrics_ignore_cached_startup_report_counts(tmp_path) -> None:
 
     assert contention["raw_latest_status_counts"] == {"GO": 1}
     assert contention["raw_review_queue_count"] == 0
+    assert contention["raw_prime_response_queue_count"] == 1
     assert contention["source_read_mode"] == "direct_file_read"
 
 
@@ -771,6 +890,8 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Bridge role slot:" in report_text
     assert "Harness topology:" in report_text
     assert "Testing/tool rollup:" in report_text
+    assert "GT-KB dev environment inventory:" in report_text
+    assert "Harness parity:" in report_text
     assert "Active Work Subject" in report_text
     assert "Default work subject: GT-KB Infrastructure Focus" in report_text
     assert "Application work subject commands:" in report_text
@@ -832,7 +953,9 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert intelligence["release_readiness"]["release_gate_script"] == "scripts/release_candidate_gate.py"
     assert intelligence["quality_rollup"]["total"] >= 1
     assert intelligence["data_freshness"]["scope_version"] == "gtkb_v1"
+    assert "docs/release/dev-environment-inventory.json" in intelligence["data_freshness"]["sources"]
     assert any(shortcut["label"] == "Open GitHub Actions" for shortcut in intelligence["shortcuts"])
+    assert any(shortcut["label"] == "Open dev environment inventory" for shortcut in intelligence["shortcuts"])
     delivery_timeline = dashboard_data["model"]["infrastructure"]["delivery_timeline"]
     assert delivery_timeline["timeline"]
     assert any(item["stage"] == "commit" for item in delivery_timeline["timeline"])
@@ -860,8 +983,7 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     # history, both tags appear. The assertion the test cares about is
     # that scope_confidence is set on every row.
     assert all(
-        row.get("scope_confidence") in ("gtkb_inferred", "gtkb_current_heuristic")
-        for row in dashboard_data["history"]
+        row.get("scope_confidence") in ("gtkb_inferred", "gtkb_current_heuristic") for row in dashboard_data["history"]
     )
     assert all(row["scope_version"] == "gtkb_v1" for row in dashboard_data["history"])
     assert history[-1]["token_measurement_status"]
@@ -1186,7 +1308,9 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     stop_commands = [hook["command"] for group in claude_settings["hooks"]["Stop"] for hook in group["hooks"]]
     assert any("session_self_initialization.py" in command for command in session_commands)
     assert any("--harness-name claude" in command for command in session_commands)
+    assert all("--harness-id B" not in command for command in session_commands)
     assert any("--harness-name claude" in command for command in stop_commands)
+    assert all("--harness-id B" not in command for command in stop_commands)
     assert all("--role-profile" not in command for command in session_commands + stop_commands)
 
     guard_path = tmp_path / "guard.json"
@@ -1215,9 +1339,13 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in context
     assert "Poller: use verified smart poller when available and functioning" in context
     assert "retired OS poller remains disabled" in context
-    assert "Role mapping source: harness-state/claude/operating-role.md" in context
+    assert "Role mapping source: harness-state/role-assignments.json" in context
+    assert "Harness self-identification: B" in context
+    assert "Harness identity source: harness-state/harness-identities.json" in context
     if discovered_role == "loyal-opposition":
-        assert "## Loyal Opposition Startup Task" in context
+        assert "## Harness-Only Loyal Opposition Startup Action" in context
+        user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
+        assert "## Loyal Opposition Startup Task" not in user_visible_context
         assert "## Choose This Session's Focus" not in context
         assert "Commit and push to GitHub" not in context
         assert guard_path.exists()
@@ -1592,11 +1720,20 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_pa
 
     codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
     claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
-    codex_role = tmp_path / ".codex" / "operating-role.md"
-    claude_role = tmp_path / ".claude" / "operating-role.md"
-    for path, role in ((codex_role, "loyal-opposition"), (claude_role, "prime-builder")):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"active_role: {role}\n", encoding="utf-8")
+    role_map = tmp_path / "role-assignments.json"
+    role_map.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "A": {"harness_type": "codex", "role": "loyal-opposition"},
+                    "B": {"harness_type": "claude", "role": "prime-builder"},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     # Counterpart harness (codex) runs startup with GT-KB subject.
     session_module._arm_startup_interaction_guard(
@@ -1622,11 +1759,8 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_pa
 
     # Now route detect_counterpart_state through the files the writer produced.
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    monkeypatch.setattr(
-        focus_module,
-        "HARNESS_ROLE_RECORDS",
-        {"codex": codex_role, "claude": claude_role},
-    )
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
     monkeypatch.setattr(
         focus_module,
         "HARNESS_LIFECYCLE_GUARDS",
@@ -1879,7 +2013,9 @@ def test_smart_poller_section_renders_diagnostic_on_doctor_warning(tmp_path, mon
     section is rendered carrying the doctor's remediation hint.
     """
     module = _load_module()
-    warning_msg = "smart-poller task 'GTKB-SmartBridgePoller' not registered — run scripts/install_smart_poller_task.ps1"
+    warning_msg = (
+        "smart-poller task 'GTKB-SmartBridgePoller' not registered — run scripts/install_smart_poller_task.ps1"
+    )
     monkeypatch.setattr(
         "groundtruth_kb.project.doctor._check_smart_bridge_poller",
         _make_synthetic_doctor_check("warning", message=warning_msg),
@@ -1975,9 +2111,7 @@ def test_smart_poller_section_fail_open_on_doctor_exception(tmp_path, monkeypatc
     assert module._render_smart_poller_section(tmp_path, role) == []
 
 
-def test_smart_poller_section_silent_on_doctor_exception_with_notification_present(
-    tmp_path, monkeypatch
-) -> None:
+def test_smart_poller_section_silent_on_doctor_exception_with_notification_present(tmp_path, monkeypatch) -> None:
     """Doctor raises + notification present → silent (notification NOT rendered).
 
     Per ``-001 §3.1`` matrix row 6 ("doctor exception | any notification |
@@ -2048,7 +2182,17 @@ def test_main_with_only_project_root_writes_under_that_root(tmp_path, monkeypatc
     (fake_root / "memory").mkdir()
     (fake_root / "docs").mkdir()
     (fake_root / ".claude" / "rules").mkdir(parents=True)
-    (fake_root / ".claude" / "rules" / "operating-role.md").write_text("active_role: prime-builder\n", encoding="utf-8")
+    (fake_root / "harness-state").mkdir()
+    (fake_root / "harness-state" / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {"A": {"harness_type": "codex", "role": "prime-builder"}},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     # Capture canonical-path sentinels (must remain untouched).
     canonical_dashboard_dir = REPO_ROOT / "docs" / "gtkb-dashboard"

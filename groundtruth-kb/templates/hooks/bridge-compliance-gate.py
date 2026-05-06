@@ -18,11 +18,14 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 BRIDGE_INDEX_FILENAME = "bridge/INDEX.md"
 WRITE_TOOLS = {"Write", "Edit"}
+PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
 SPEC_LINK_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,
@@ -33,6 +36,12 @@ SPEC_LINK_TOKEN_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 SPEC_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|none|n/a|not applicable|no relevant)\b", re.IGNORECASE)
+OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
+    r"^[\s>*`_\-:]*"
+    r"(?:tbd|todo|none|n/a|not applicable|no relevant(?: owner decisions?)?)"
+    r"[\s.`_\-:]*$",
+    re.IGNORECASE,
+)
 SPEC_TEST_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
     re.IGNORECASE,
@@ -52,6 +61,28 @@ PREFLIGHT_PACKET_HASH_RE = re.compile(
 PREFLIGHT_MISSING_REQUIRED_RE = re.compile(
     r"\bmissing_required_specs\s*:\s*(?:\[\s*\]|`?\[\s*\]`?|none|None|NONE)",
     re.IGNORECASE,
+)
+
+# Owner Decisions / Input section gate (Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK).
+# Per bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md
+# (Codex GO at -004): conditional check that fires only when proposal/report content
+# indicates owner-approval scope. Verdict files (GO/NO-GO/VERIFIED first line) are
+# excluded — they are evidence narratives, not approval claims.
+OWNER_DECISIONS_HEADING_RE = re.compile(
+    r"^#{1,6}\s*Owner Decisions(?:\s*/\s*Input)?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+OWNER_APPROVAL_MARKER_RES = (
+    # Marker 1: cites Sub-slice B's VERIFIED rule (the AUQ-only rule)
+    re.compile(
+        r"gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006\.md",
+        re.IGNORECASE,
+    ),
+    # Marker 2: AUQ + decision-context phrase within ~200 chars
+    re.compile(
+        r"\b(?:AUQ|AskUserQuestion)\b[^.]{0,200}\b(?:answer|approval|decision|directive|authorize|authorization)\b",
+        re.IGNORECASE,
+    ),
 )
 
 
@@ -99,6 +130,12 @@ def _is_bridge_markdown_file(file_path: str) -> bool:
     return "/bridge/" in f"/{normalized}" and not normalized.endswith("/bridge/INDEX.md")
 
 
+def _extract_bridge_id_from_path(file_path: str) -> str | None:
+    filename = Path(file_path.replace("\\", "/")).name
+    match = re.match(r"(?P<bridge_id>.+)-\d{3}\.md$", filename)
+    return match.group("bridge_id") if match else None
+
+
 def _has_concrete_spec_links(content: str) -> bool:
     lines = content.splitlines()
     start: int | None = None
@@ -117,9 +154,7 @@ def _has_concrete_spec_links(content: str) -> bool:
         section.append(line)
     section_text = "\n".join(section).strip()
     return bool(
-        section_text
-        and not SPEC_PLACEHOLDER_RE.search(section_text)
-        and SPEC_LINK_TOKEN_RE.search(section_text)
+        section_text and not SPEC_PLACEHOLDER_RE.search(section_text) and SPEC_LINK_TOKEN_RE.search(section_text)
     )
 
 
@@ -129,6 +164,40 @@ def _has_spec_derived_verification(content: str) -> bool:
         and SPEC_TEST_HEADING_RE.search(content)
         and COMMAND_EVIDENCE_RE.search(content)
     )
+
+
+def _proposal_claims_owner_approval(content: str) -> bool:
+    """Return True when proposal content signals dependence on owner approval.
+
+    Self-citing (Owner Decisions / Input heading present) also counts as a
+    claim because the author invoked the contract. The hook then verifies
+    the section is substantive, not placeholder-only.
+    """
+    if OWNER_DECISIONS_HEADING_RE.search(content):
+        return True
+    return any(p.search(content) for p in OWNER_APPROVAL_MARKER_RES)
+
+
+def _has_concrete_owner_decisions_section(content: str) -> bool:
+    """Section heading present AND section text non-empty AND not placeholder-only."""
+    lines = content.splitlines()
+    start: int | None = None
+    for i, line in enumerate(lines):
+        if OWNER_DECISIONS_HEADING_RE.match(line.strip()):
+            start = i + 1
+            break
+    if start is None:
+        return False
+    section: list[str] = []
+    for line in lines[start:]:
+        if line.strip().startswith("#"):
+            break
+        section.append(line)
+    text = "\n".join(section).strip()
+    if not text:
+        return False
+    nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
+    return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
 
 
 def _has_clean_applicability_preflight(content: str) -> bool:
@@ -148,10 +217,76 @@ def _has_clean_applicability_preflight(content: str) -> bool:
             break
         section.append(line)
     section_text = "\n".join(section)
-    return bool(
-        PREFLIGHT_PACKET_HASH_RE.search(section_text)
-        and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text)
-    )
+    return bool(PREFLIGHT_PACKET_HASH_RE.search(section_text) and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text))
+
+
+def _root_contained_scratch_path(cwd: Path, bridge_id: str) -> Path:
+    root = cwd.resolve()
+    scratch_dir = root / ".tmp" / "bridge-preflight-hook"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    scratch = scratch_dir / f"{bridge_id}-{uuid4().hex}.md"
+    scratch.resolve().relative_to(root)
+    return scratch
+
+
+def _run_pending_applicability_preflight(
+    *,
+    cwd: Path,
+    file_path: str,
+    bridge_id: str,
+    content: str,
+) -> tuple[bool, str]:
+    scratch_path: Path | None = None
+    try:
+        scratch_path = _root_contained_scratch_path(cwd, bridge_id)
+        scratch_path.write_text(content, encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/bridge_applicability_preflight.py",
+                "--bridge-id",
+                bridge_id,
+                "--content-file",
+                str(scratch_path),
+                "--json",
+            ],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        print(f"[Governance] Bridge applicability preflight warning for {file_path}: {exc}", file=sys.stderr)
+        return True, ""
+    finally:
+        if scratch_path is not None:
+            try:
+                scratch_path.unlink(missing_ok=True)
+            except OSError as exc:
+                print(f"[Governance] Could not remove bridge preflight scratch file: {exc}", file=sys.stderr)
+
+    combined_output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+    if result.returncode not in (0, 5):
+        print(
+            f"[Governance] Bridge applicability preflight warning for {file_path}: {combined_output}",
+            file=sys.stderr,
+        )
+        return True, ""
+    try:
+        packet = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        print(
+            f"[Governance] Bridge applicability preflight warning for {file_path}: invalid JSON output",
+            file=sys.stderr,
+        )
+        return True, ""
+    missing_required = packet.get("missing_required_specs") or []
+    if missing_required:
+        return False, json.dumps(missing_required)
+    return True, ""
 
 
 def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
@@ -254,6 +389,7 @@ def main() -> None:
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {})
     cwd = payload.get("cwd", ".")
+    cwd_path = Path(cwd).resolve()
 
     if tool_name not in WRITE_TOOLS:
         emit_pass()
@@ -294,8 +430,46 @@ def main() -> None:
                 "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)",
             )
             sys.exit(0)
+        # Owner Decisions / Input gate (Sub-slice C). Conditional: fires only when
+        # proposal/report content indicates owner-approval scope, AND only on
+        # non-verdict files (verdict files are evidence narratives per Codex
+        # -004 GO condition).
+        if (
+            not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+            and _proposal_claims_owner_approval(content)
+            and not _has_concrete_owner_decisions_section(content)
+        ):
+            emit_deny(
+                "PreToolUse",
+                "[Governance] Bridge proposals/reports that claim owner-approval scope must "
+                "include a non-empty Owner Decisions / Input section enumerating the "
+                "AskUserQuestion answers that authorize the work. "
+                "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
+                "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)",
+            )
+            sys.exit(0)
+        if tool_name == "Write" and first_line in PENDING_PREFLIGHT_STATUSES:
+            bridge_id = _extract_bridge_id_from_path(file_path)
+            if bridge_id:
+                preflight_ok, error_msg = _run_pending_applicability_preflight(
+                    cwd=cwd_path,
+                    file_path=file_path,
+                    bridge_id=bridge_id,
+                    content=content,
+                )
+                if not preflight_ok:
+                    emit_deny(
+                        "PreToolUse",
+                        "[Governance] Pre-filing applicability preflight failed: "
+                        f"missing_required_specs={error_msg}. Run "
+                        f"python scripts/bridge_applicability_preflight.py --bridge-id {bridge_id} "
+                        "for full output. (Hard-block per "
+                        "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
+                        "mechanical enforcement.)",
+                    )
+                    sys.exit(0)
 
-    index_path = Path(cwd) / BRIDGE_INDEX_FILENAME
+    index_path = cwd_path / BRIDGE_INDEX_FILENAME
     if not index_path.exists():
         emit_pass()
         sys.exit(0)

@@ -54,6 +54,25 @@ def test_tp_val_3_resolve_gt_kb_host_root_refuses_mismatched_explicit(tmp_path: 
         _resolve_gt_kb_host_root(tmp_path)
 
 
+def test_tp_val_3b_installed_context_accepts_explicit_adopter_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from groundtruth_kb.project import scaffold as scaffold_mod
+
+    monkeypatch.setattr(scaffold_mod, "_is_installed_wheel_context", lambda: True)
+
+    assert _resolve_gt_kb_host_root(tmp_path) == tmp_path.resolve()
+
+
+def test_tp_val_3c_installed_context_defaults_to_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from groundtruth_kb.project import scaffold as scaffold_mod
+
+    monkeypatch.setattr(scaffold_mod, "_is_installed_wheel_context", lambda: True)
+    monkeypatch.chdir(tmp_path)
+
+    assert _resolve_gt_kb_host_root(None) == tmp_path.resolve()
+
+
 def test_tp_val_4_validate_application_target_accepts_under_applications() -> None:
     target = _GT_KB_HOST_ROOT / "applications" / "x"
     # Purely path-based check; target need not exist.
@@ -124,9 +143,7 @@ def cli_runner():
     return CliRunner()
 
 
-def test_tp_cli_refuse_1_explicit_root_mismatch_exits_nonzero(
-    tmp_path: Path, cli_runner
-) -> None:
+def test_tp_cli_refuse_1_explicit_root_mismatch_exits_nonzero(tmp_path: Path, cli_runner) -> None:
     from groundtruth_kb.cli import main as cli
 
     result = cli_runner.invoke(
@@ -147,9 +164,7 @@ def test_tp_cli_refuse_1_explicit_root_mismatch_exits_nonzero(
     assert "must resolve to the active GT-KB host root" in (result.output + str(result.exception))
 
 
-def test_tp_cli_refuse_2_dir_outside_applications_exits_nonzero(
-    tmp_path: Path, cli_runner
-) -> None:
+def test_tp_cli_refuse_2_dir_outside_applications_exits_nonzero(tmp_path: Path, cli_runner) -> None:
     from groundtruth_kb.cli import main as cli
 
     out_of_apps = tmp_path / "elsewhere" / "myapp"
@@ -216,6 +231,66 @@ def test_tp_cli_refuse_3_existing_adopter_recommends_upgrade(cli_runner) -> None
             shutil.rmtree(sandbox_path, ignore_errors=True)
 
 
+def test_tp_cli_installed_context_allows_explicit_adopter_root(
+    tmp_path: Path, cli_runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from groundtruth_kb.cli import main as cli
+    from groundtruth_kb.project import scaffold as scaffold_mod
+
+    monkeypatch.setattr(scaffold_mod, "_is_installed_wheel_context", lambda: True)
+    host_root = tmp_path / "host"
+    target = host_root / "applications" / "WheelApp"
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "project",
+            "init",
+            "WheelApp",
+            "--owner",
+            "Tester",
+            "--gt-kb-root",
+            str(host_root),
+            "--profile",
+            "local-only",
+            "--no-include-ci",
+            "--no-seed-example",
+        ],
+    )
+
+    assert result.exit_code == 0, f"init failed: {result.output} | exc={result.exception!r}"
+    assert (target / "groundtruth.toml").exists()
+
+
+def test_tp_cli_installed_context_defaults_host_root_to_cwd(
+    tmp_path: Path, cli_runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from groundtruth_kb.cli import main as cli
+    from groundtruth_kb.project import scaffold as scaffold_mod
+
+    monkeypatch.setattr(scaffold_mod, "_is_installed_wheel_context", lambda: True)
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "applications" / "WheelDefault"
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "project",
+            "init",
+            "WheelDefault",
+            "--owner",
+            "Tester",
+            "--profile",
+            "local-only",
+            "--no-include-ci",
+            "--no-seed-example",
+        ],
+    )
+
+    assert result.exit_code == 0, f"init failed: {result.output} | exc={result.exception!r}"
+    assert (target / "groundtruth.toml").exists()
+
+
 # ============================================================================
 # TP-INTEG-1 — In-root sandbox integration test (Phase 9 §1 enumeration)
 # ============================================================================
@@ -268,14 +343,10 @@ def test_tp_integ_1_scaffold_emits_phase9_section1_enumeration(in_root_sandbox: 
     assert "Active Work List" in work_list_text
 
     # TP6: memory/release-readiness.md banner
-    banner_text = (in_root_sandbox / "memory" / "release-readiness.md").read_text(
-        encoding="utf-8"
-    )
+    banner_text = (in_root_sandbox / "memory" / "release-readiness.md").read_text(encoding="utf-8")
     # Strip blockquote `> ` markers + collapse whitespace so the line-wrapped
     # banner still matches the substantive banner phrases.
-    banner_normalized = " ".join(
-        line.lstrip("> ").strip() for line in banner_text.splitlines() if line.strip()
-    )
+    banner_normalized = " ".join(line.lstrip("> ").strip() for line in banner_text.splitlines() if line.strip())
     banner_normalized = " ".join(banner_normalized.split())
     assert "Application-subject release readiness only" in banner_normalized
     assert "GT-KB product readiness is not tracked here" in banner_normalized
@@ -370,9 +441,7 @@ def test_tp16_enumerate_outputs_lists_new_scaffold_files() -> None:
 # Regenerate fixtures (when scaffold templates legitimately change):
 #   python scripts/_capture_scaffold_golden.py
 
-_GOLDEN_FIXTURE_ROOT = (
-    Path(__file__).resolve().parent / "fixtures" / "scaffold_golden"
-)
+_GOLDEN_FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "scaffold_golden"
 # `created_at = "..."` is unique to TOML key-value context here. No anchor —
 # scaffold writes this with native line endings (CRLF on Windows, LF on Linux),
 # and a `$` anchor in MULTILINE mode would not match before `\r`.
@@ -389,11 +458,7 @@ def _normalize_for_diff(content: bytes, rel_path: Path) -> bytes:
 
 def _list_fixture_files(profile: str) -> set[Path]:
     fixture_root = _GOLDEN_FIXTURE_ROOT / profile
-    return {
-        f.relative_to(fixture_root)
-        for f in fixture_root.rglob("*")
-        if f.is_file()
-    }
+    return {f.relative_to(fixture_root) for f in fixture_root.rglob("*") if f.is_file()}
 
 
 def _run_golden_scaffold(profile: str) -> Path:
@@ -419,39 +484,26 @@ def _run_golden_scaffold(profile: str) -> Path:
 def _assert_byte_equal_to_fixture(profile: str, sandbox: Path) -> None:
     fixture_root = _GOLDEN_FIXTURE_ROOT / profile
     expected_files = _list_fixture_files(profile)
-    actual_files = {
-        f.relative_to(sandbox)
-        for f in sandbox.rglob("*")
-        if f.is_file()
-    }
+    actual_files = {f.relative_to(sandbox) for f in sandbox.rglob("*") if f.is_file()}
     db_path = Path("groundtruth.db")
     assert db_path in actual_files, "groundtruth.db must be created by scaffold"
 
     extras = actual_files - expected_files - {db_path}
     missing = expected_files - actual_files
     assert not extras, (
-        f"Scaffold produced files not in fixture (regen fixtures or update "
-        f"scaffold): {sorted(map(str, extras))}"
+        f"Scaffold produced files not in fixture (regen fixtures or update scaffold): {sorted(map(str, extras))}"
     )
-    assert not missing, (
-        f"Fixture lists files not produced by scaffold (regen fixtures): "
-        f"{sorted(map(str, missing))}"
-    )
+    assert not missing, f"Fixture lists files not produced by scaffold (regen fixtures): {sorted(map(str, missing))}"
 
     mismatches: list[str] = []
     for rel in sorted(expected_files):
-        expected_bytes = _normalize_for_diff(
-            (fixture_root / rel).read_bytes(), rel
-        )
-        actual_bytes = _normalize_for_diff(
-            (sandbox / rel).read_bytes(), rel
-        )
+        expected_bytes = _normalize_for_diff((fixture_root / rel).read_bytes(), rel)
+        actual_bytes = _normalize_for_diff((sandbox / rel).read_bytes(), rel)
         if expected_bytes != actual_bytes:
             mismatches.append(str(rel))
     assert not mismatches, (
         f"Byte-level mismatch in {len(mismatches)} file(s) for profile "
-        f"{profile!r}: {mismatches[:10]}"
-        + (" ..." if len(mismatches) > 10 else "")
+        f"{profile!r}: {mismatches[:10]}" + (" ..." if len(mismatches) > 10 else "")
     )
 
 

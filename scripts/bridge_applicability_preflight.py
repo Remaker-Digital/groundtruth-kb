@@ -28,16 +28,12 @@ DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spe
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 
 INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/\S+\.md)\s*$"
-)
+INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/\S+\.md)\s*$")
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,
 )
-SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(
-    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b"
-)
+SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
 RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
 WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b")
 PATH_TOKEN_RE: Final[re.Pattern[str]] = re.compile(
@@ -247,14 +243,28 @@ def build_packet(
     index_path: Path = DEFAULT_INDEX_PATH,
     config_path: Path = DEFAULT_CONFIG_PATH,
     db_path: Path = DEFAULT_DB_PATH,
+    content_file: Path | None = None,
 ) -> dict[str, Any]:
     versions = parse_index_for_document(index_path, bridge_id)
     operative = choose_operative_version(versions)
-    if operative is None:
+    if operative is None and content_file is None:
         raise SystemExit(f"ERR_NO_INDEX_ENTRY: no entry for bridge_id={bridge_id!r} in {index_path}")
-    if not operative.abs_path.is_file():
+    if operative is not None and not operative.abs_path.is_file():
         raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {operative.rel_path}")
-    content = operative.abs_path.read_text(encoding="utf-8")
+    if content_file is not None:
+        content = content_file.read_text(encoding="utf-8")
+        content_source = {
+            "mode": "pending_content",
+            "path": _display_path(content_file),
+        }
+    elif operative is not None:
+        content = operative.abs_path.read_text(encoding="utf-8")
+        content_source = {
+            "mode": "indexed_operative",
+            "path": operative.rel_path,
+        }
+    else:
+        raise SystemExit(f"ERR_NO_INDEX_ENTRY: no entry for bridge_id={bridge_id!r} in {index_path}")
     cited_specs = extract_spec_links(content)
     target_paths = extract_target_paths(content)
     work_items = sorted(set(WORK_ITEM_RE.findall(content)))
@@ -272,17 +282,20 @@ def build_packet(
     )
     packet: dict[str, Any] = {
         "bridge_document_name": bridge_id,
-        "operative_version": {
-            "status": operative.status,
-            "path": operative.rel_path,
-            "version_number": operative.version_number,
-        },
+        "content_source": content_source,
+        "operative_version": (
+            {
+                "status": operative.status,
+                "path": operative.rel_path,
+                "version_number": operative.version_number,
+            }
+            if operative is not None
+            else None
+        ),
         "cited_specs": sorted(cited_specs),
         "target_paths": sorted(target_paths),
         "work_items": work_items,
-        "applicable_specs": {
-            sid: asdict(item) for sid, item in sorted(applicable.items())
-        },
+        "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
         "missing_required_specs": missing_required,
         "missing_advisory_specs": advisory_missing,
         "preflight_passed": not missing_required,
@@ -292,13 +305,26 @@ def build_packet(
     return packet
 
 
+def _display_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def format_markdown(packet: dict[str, Any]) -> str:
+    operative = packet.get("operative_version")
+    operative_path = operative["path"] if isinstance(operative, dict) else "(none)"
+    content_source = packet.get("content_source") or {}
     lines = [
         "## Applicability Preflight",
         "",
         f"- packet_hash: `{packet['packet_hash']}`",
         f"- bridge_document_name: `{packet['bridge_document_name']}`",
-        f"- operative_file: `{packet['operative_version']['path']}`",
+        f"- content_source: `{content_source.get('mode', 'indexed_operative')}`",
+        f"- content_file: `{content_source.get('path', operative_path)}`",
+        f"- operative_file: `{operative_path}`",
         f"- preflight_passed: `{str(packet['preflight_passed']).lower()}`",
         f"- missing_required_specs: {json.dumps(packet['missing_required_specs'])}",
         f"- missing_advisory_specs: {json.dumps(packet['missing_advisory_specs'])}",
@@ -309,15 +335,16 @@ def format_markdown(packet: dict[str, Any]) -> str:
     cited = set(packet["cited_specs"])
     for spec_id, item in packet["applicable_specs"].items():
         matched = ", ".join(item["matched_by"])
-        lines.append(
-            f"| `{spec_id}` | `{item['severity']}` | `{'yes' if spec_id in cited else 'no'}` | {matched} |"
-        )
+        lines.append(f"| `{spec_id}` | `{item['severity']}` | `{'yes' if spec_id in cited else 'no'}` | {matched} |")
     return "\n".join(lines) + "\n"
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bridge-id", required=True, help="Document name from bridge/INDEX.md.")
+    parser.add_argument(
+        "--content-file", type=Path, default=None, help="Evaluate pending Markdown content from a file."
+    )
     parser.add_argument("--index", type=Path, default=DEFAULT_INDEX_PATH)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
@@ -332,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
         index_path=args.index,
         config_path=args.config,
         db_path=args.db,
+        content_file=args.content_file,
     )
     if args.json:
         sys.stdout.write(json.dumps(packet, indent=2, sort_keys=True) + "\n")

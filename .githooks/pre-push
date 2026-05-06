@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Pre-push hook: redacted secret range scan for refs about to be pushed.
+#
+# Activation (one-time, per developer):
+#   git config core.hooksPath .githooks
+#
+# This hook is read-only. It does not fetch, push, rewrite, tag, or mutate
+# remotes; it only scans local blobs named by Git's pre-push stdin.
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+set -euo pipefail
+
+PYTHON_BIN="${PYTHON:-python}"
+ZERO_SHA="0000000000000000000000000000000000000000"
+
+is_zero_sha() {
+    [ "$1" = "$ZERO_SHA" ]
+}
+
+merge_base_for_new_ref() {
+    local local_sha="$1"
+    local local_ref="$2"
+    local candidate=""
+
+    if candidate=$(git rev-parse --verify --quiet "${local_ref}@{upstream}" 2>/dev/null); then
+        git merge-base "$candidate" "$local_sha" 2>/dev/null || true
+        return 0
+    fi
+
+    for candidate in refs/remotes/origin/HEAD refs/remotes/origin/main refs/remotes/origin/develop main develop; do
+        if git rev-parse --verify --quiet "$candidate" >/dev/null 2>&1; then
+            git merge-base "$candidate" "$local_sha" 2>/dev/null || true
+            return 0
+        fi
+    done
+}
+
+run_scan() {
+    local range_spec="$1"
+    "$PYTHON_BIN" -m groundtruth_kb secrets scan \
+        --range "$range_spec" \
+        --redacted \
+        --fail-on verified-provider
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if is_zero_sha "$local_sha"; then
+        echo "pre-push secret scan: skipping deleted ref $remote_ref"
+        continue
+    fi
+
+    if is_zero_sha "$remote_sha"; then
+        base_sha=$(merge_base_for_new_ref "$local_sha" "$local_ref" || true)
+        if [ -z "${base_sha:-}" ]; then
+            echo "pre-push secret scan: cannot determine a safe base for new ref $local_ref -> $remote_ref" >&2
+            echo "Run a reviewed redacted scan before pushing, for example:" >&2
+            echo "  python -m groundtruth_kb secrets scan --tracked --redacted --fail-on verified-provider" >&2
+            exit 1
+        fi
+        run_scan "$base_sha..$local_sha"
+    else
+        run_scan "$remote_sha..$local_sha"
+    fi
+done

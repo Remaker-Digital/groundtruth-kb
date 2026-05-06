@@ -69,7 +69,8 @@ _KNOWN_DEPLOYMENT_INPUTS: tuple[str, ...] = (
 _REQUIRED_SANDBOX_INPUTS: tuple[str, ...] = (
     "groundtruth.db",
     "bridge/INDEX.md",
-    ".claude/rules/operating-role.md",
+    "harness-state/harness-identities.json",
+    "harness-state/role-assignments.json",
     "memory/work_list.md",
     "memory/release-readiness.md",
     "pyproject.toml",
@@ -347,18 +348,13 @@ def _build_generator_argv(sandbox_root: Path) -> list[str]:
         str(sandbox_root / "docs" / "gtkb-dashboard"),
         "--history-path",
         str(sandbox_root / "memory" / "gtkb-dashboard-history.json"),
-        "--role-record-path",
-        str(sandbox_root / ".claude" / "rules" / "operating-role.md"),
+        "--role-assignment-path",
+        str(sandbox_root / "harness-state" / "role-assignments.json"),
         "--lifecycle-guard-path",
         str(sandbox_root / ".claude" / "session" / "lifecycle-guard.json"),
         "--user-preferences-path",
         str(
-            sandbox_root
-            / "applications"
-            / "Agent_Red"
-            / "harness-state"
-            / "codex"
-            / "session-startup-preferences.json"
+            sandbox_root / "applications" / "Agent_Red" / "harness-state" / "codex" / "session-startup-preferences.json"
         ),
         "--harness-name",
         "claude",

@@ -151,6 +151,17 @@ CREATE TABLE IF NOT EXISTS current_metrics (
     sort_order INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS operating_state_components (
+    name TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    detail TEXT NOT NULL,
+    source TEXT NOT NULL,
+    duration_ms REAL NOT NULL,
+    evidence_json TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    sort_order INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS data_freshness (
     id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
@@ -421,10 +432,13 @@ def initialize_dashboard(paths: DashboardPaths, config: GTConfig) -> None:
 
 def refresh_dashboard_db(paths: DashboardPaths, config: GTConfig) -> None:
     """Refresh the generated reporting SQLite DB used by Grafana."""
+    from groundtruth_kb.operating_state import collect_operating_state
+
     paths.db_path.parent.mkdir(parents=True, exist_ok=True)
     captured_at = _now()
     source_counts = _source_counts(config.db_path)
     git_state = _git_state(paths.project_root)
+    operating_state = collect_operating_state(paths.project_root, config=config)
 
     with sqlite3.connect(paths.db_path) as conn:
         conn.executescript(SCHEMA_SQL)
@@ -439,6 +453,7 @@ def refresh_dashboard_db(paths: DashboardPaths, config: GTConfig) -> None:
             "integration_status",
             "kpi_snapshots",
             "current_metrics",
+            "operating_state_components",
             "data_freshness",
             "setup_steps",
             "required_tools",
@@ -455,6 +470,8 @@ def refresh_dashboard_db(paths: DashboardPaths, config: GTConfig) -> None:
             "git_branch": git_state.get("branch", "unknown"),
             "git_commit": git_state.get("commit", "unknown"),
             "captured_at": captured_at,
+            "operating_state_schema_version": str(operating_state.schema_version),
+            "operating_state_overall": operating_state.overall_status,
         }
         conn.executemany(
             "INSERT INTO dashboard_metadata(key, value, updated_at) VALUES (?, ?, ?)",
@@ -469,6 +486,7 @@ def refresh_dashboard_db(paths: DashboardPaths, config: GTConfig) -> None:
         _insert_risks(conn)
         _insert_integrations(conn)
         _insert_current_metrics(conn, source_counts)
+        _insert_operating_state(conn, operating_state, captured_at)
         _insert_kpis(conn, source_counts, captured_at)
         _insert_freshness(conn, config, paths, captured_at)
         _insert_setup(conn)
@@ -687,6 +705,13 @@ def _dashboard_json(config: GTConfig) -> dict[str, Any]:
             12,
             18,
             "SELECT severity, risk, mitigation, owner, status FROM risk_register ORDER BY sort_order",
+        ),
+        _table_panel(
+            7,
+            "Operating State",
+            0,
+            27,
+            "SELECT name, status, detail, source, duration_ms FROM operating_state_components ORDER BY sort_order",
         ),
     ]
     for panel in panels:
@@ -1025,6 +1050,29 @@ def _insert_current_metrics(conn: sqlite3.Connection, counts: dict[str, int]) ->
         ),
     ]
     conn.executemany("INSERT INTO current_metrics VALUES (?, ?, ?, ?, ?, ?)", rows)
+
+
+def _insert_operating_state(conn: sqlite3.Connection, state: Any, captured_at: str) -> None:
+    rows = []
+    for sort_order, component in enumerate(state.components, start=1):
+        rows.append(
+            (
+                component.name,
+                component.status,
+                component.detail,
+                component.source,
+                component.duration_ms,
+                json.dumps(component.evidence, sort_keys=True),
+                captured_at,
+                sort_order,
+            )
+        )
+    conn.executemany(
+        "INSERT INTO operating_state_components("
+        "name, status, detail, source, duration_ms, evidence_json, captured_at, sort_order"
+        ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
 
 
 def _insert_kpis(conn: sqlite3.Connection, counts: dict[str, int], captured_at: str) -> None:

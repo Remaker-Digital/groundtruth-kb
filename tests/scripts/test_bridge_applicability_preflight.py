@@ -113,6 +113,97 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["missing_advisory_specs"] == []
 
 
+def test_preflight_content_file_uses_pending_content(tmp_path: Path) -> None:
+    bridge_id = "application-move"
+    _write_bridge(
+        tmp_path,
+        bridge_id,
+        """
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Specification Links
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+""",
+    )
+    pending = tmp_path / "pending.md"
+    pending.write_text(
+        """
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Specification Links
+
+- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001
+""",
+        encoding="utf-8",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        index_path=tmp_path / "bridge" / "INDEX.md",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=pending,
+    )
+
+    assert packet["content_source"]["mode"] == "pending_content"
+    assert packet["operative_version"]["path"] == f"bridge/{bridge_id}-001.md"
+    assert packet["preflight_passed"] is False
+    assert packet["missing_required_specs"] == ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+
+
+def test_preflight_content_file_passes_for_pending_compliant_content(tmp_path: Path) -> None:
+    bridge_id = "application-move"
+    _write_bridge(
+        tmp_path,
+        bridge_id,
+        """
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Specification Links
+
+- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001
+""",
+    )
+    pending = tmp_path / "pending.md"
+    pending.write_text(
+        """
+# Proposal
+
+target_paths: ["applications/Agent_Red/src/app.py"]
+
+## Specification Links
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001
+""",
+        encoding="utf-8",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        index_path=tmp_path / "bridge" / "INDEX.md",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=pending,
+    )
+
+    assert packet["content_source"]["mode"] == "pending_content"
+    assert packet["preflight_passed"] is True
+    assert packet["missing_required_specs"] == []
+    assert packet["missing_advisory_specs"] == []
+
+
 def test_markdown_output_contains_hook_readable_clean_fields(tmp_path: Path) -> None:
     bridge_id = "application-move"
     _write_bridge(

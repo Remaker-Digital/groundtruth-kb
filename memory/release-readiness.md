@@ -51,17 +51,32 @@ Slice 8 disposition resolved per `DELIB-S330-ISOLATION-017-SLICE8-DISPOSITION-CH
 | B3 — Pytest feasibility | DONE (GREEN) | `python -m pytest groundtruth-kb/tests/ -q` runs to completion in ~620s; all tests PASS. 13 stale-baseline + behavioral failures fixed in this slice per `DELIB-S330-ISOLATION-017-SLICE8-PYTEST-FIX-SCOPE-CHOICE`. Per-lane runtime breakdown documented in `release-notes-0.7.0-rc1.md`. |
 | B4 — Release notes file | DONE | `groundtruth-kb/release-notes-0.7.0-rc1.md` (~170 LOC) authored mirroring `release-notes-0.6.1.md` structure. Cross-references Slice 8.5 follow-on. |
 | B5 — Wheel/sdist install smoke | DONE | `scripts/_verify_slice8_closeout.py` `check_b5_wheel_smoke` runs full smoke: (a) `python -m build --wheel --sdist` from `groundtruth-kb/` produces `groundtruth_kb-0.7.0rc1-*.whl` + `groundtruth_kb-0.7.0rc1.tar.gz`; (b) `pip install` the wheel into a fresh tmp venv; (c) `gt --version` reports `0.7.0rc1`; (d) `gt project init SmokeApp --gt-kb-root <discovered_host_root> --dir <discovered_host_root>/applications/SmokeApp --profile local-only --no-include-ci --no-seed-example` succeeds; (e) scaffolded `groundtruth.toml` confirmed under target. The `--gt-kb-root` is discovered at runtime via `from groundtruth_kb.project.scaffold import _GT_KB_HOST_ROOT` per `DELIB-S330-ISOLATION-017-SLICE8-INSTALL-UX-LIMITATION-ACK` — the original `-005` plan's `gt project init <tmp>/test-app --profile local-only` command shape did NOT work for installed wheels under Slice 4 isolation. Pip-install adopter UX simplification tracked at row 36 (`GTKB-PIP-INSTALL-ADOPTER-UX-001`); not blocking for this rc. |
-| B6 — CI-green evidence | **DEFERRED to Slice 8.5** | Per `DELIB-S330-ISOLATION-017-SLICE8-DISPOSITION-CHOICE`. New bridge thread `bridge/gtkb-isolation-017-slice-8-5-ci-green-001.md` filed AFTER Slice 8 commit lands. Slice 8.5 captures GitHub Actions run URL + asserts final green status; gates `v0.7.0-rc1` tag authorization. |
+| B6 — CI-green evidence | **GREEN (transient de facto evidence)** | Slice 8.5 captured the five required GitHub Actions workflows for `Remaker-Digital/agent-red-customer-engagement` `develop@98b7eab19812ed995d1e606d1d9854a7da803dab`; all completed with conclusion `success`. This uses the transient exception in `DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE` and does not authorize the rc tag until canonical migration and canonical CI binding are complete. Verifier: `python scripts/verify_slice8_5_ci_green.py`. |
 | B7 — Bridge terminal state | DONE | All 8 ISOLATION-017 slice bridges VERIFIED: Slice 1 (doctor checks), Slice 2 (registry isolation), Slice 2.5 (rationale schema), Slice 3 (init defaults), Slice 4 (upgrade), Slice 5 (clean-adopter tests), Slice 6 (docs), Slice 7 (examples). This Slice 8 closes via the post-impl REPORT. Standing-Backlog DB / Term Primer / Term Disambiguation Slice 1s landed in S327; Slices 2-7 deferred per `Feature Freeze` block above (lifts at v0.7.0-rc1 tag). |
+
+### Slice 8.5 CI-green evidence (transient exception)
+
+Authority: `DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE` permits Slice 8.6 and Slice 8.5 artifacts to cite de facto Agent Red CI evidence from `Remaker-Digital/agent-red-customer-engagement` while canonical migration is pending. The exception is evidence-scoped only; it does not authorize `v0.7.0-rc1`.
+
+Verified on 2026-05-06 with `gh run view <run-id> --repo Remaker-Digital/agent-red-customer-engagement --json databaseId,workflowName,headBranch,event,headSha,conclusion,status,url,createdAt,updatedAt`.
+
+| Workflow | Repository | Branch | Event | Head SHA | Run ID | URL | Conclusion | Authority |
+|---|---|---|---|---|---|---|---|---|
+| Lint | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296718957 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296718957 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
+| Release Candidate Gate | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296719002 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296719002 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
+| SonarCloud | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296718961 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296718961 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
+| Security Scan | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296718958 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296718958 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
+| Python Tests | Remaker-Digital/agent-red-customer-engagement | develop | push | 98b7eab19812ed995d1e606d1d9854a7da803dab | 25296718963 | https://github.com/Remaker-Digital/agent-red-customer-engagement/actions/runs/25296718963 | success | DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE |
 
 ### Tag authorization gate
 
-`git tag -a v0.7.0-rc1` does NOT authorize until BOTH:
+`git tag -a v0.7.0-rc1` does NOT authorize until ALL:
 
 1. Slice 8 (this thread) is VERIFIED + committed.
 2. Slice 8.5 (`bridge/gtkb-isolation-017-slice-8-5-ci-green-001.md`) is VERIFIED.
+3. Canonical Agent Red migration is VERIFIED and equivalent canonical CI is captured from the canonical repository.
 
-Until both close, the rc has not been published; release-notes and announcement are author-ready but not authoritative.
+`v0.7.0-rc1 remains unauthorized` pending canonical migration and canonical CI. Until all gates close, the rc has not been published; release-notes and announcement are author-ready but not authoritative.
 
 ### Owner sub-decisions archived (S330)
 
@@ -71,6 +86,7 @@ Until both close, the rc has not been published; release-notes and announcement 
 - `DELIB-S330-ISOLATION-017-SLICE8-INSTALL-UX-LIMITATION-ACK` — Slice 8 -008 NO-GO disposition; Path A (narrow fix + rc1 install-UX limitation acknowledgement; row 36 added).
 - `DELIB-S330-ISOLATION-017-SLICE8-5-PYTHON-TESTS-WAIVER` — Slice 8.5 -002 F2 disposition; python-tests.yml waived for GT-KB-only commits; row 37 added.
 - `DELIB-S330-RC1-CI-RED-PAUSE-AND-SLICE-8-6-DISPOSITION` — RC1 CI-red discovery; pause Slice 8.5; Slice 8.6 fix-thread filed.
+- `DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE` — transient exception permitting de facto CI evidence for Slice 8.6 and Slice 8.5 while canonical migration remains pending; does not authorize `v0.7.0-rc1`.
 
 ## ISOLATION-017-CLOSEOUT-CI-TRIAGE (Slice 8.6 Phase 1)
 

@@ -71,11 +71,9 @@ def test_settings_json_registers_hook_for_write_and_edit() -> None:
     settings = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))
     pre_tool_use = settings.get("hooks", {}).get("PreToolUse", [])
     matching_entries = [
-        entry for entry in pre_tool_use
-        if any(
-            "bridge-compliance-gate.py" in hook.get("command", "")
-            for hook in entry.get("hooks", [])
-        )
+        entry
+        for entry in pre_tool_use
+        if any("bridge-compliance-gate.py" in hook.get("command", "") for hook in entry.get("hooks", []))
     ]
     assert matching_entries, "bridge-compliance-gate.py not registered in PreToolUse"
     assert len(matching_entries) == 1, "bridge-compliance-gate.py registered multiple times"
@@ -108,8 +106,7 @@ def test_proposal_lacking_spec_links_blocked_with_deny() -> None:
     hsoutput = output.get("hookSpecificOutput", {})
     assert hsoutput.get("hookEventName") == "PreToolUse"
     assert hsoutput.get("permissionDecision") == "deny", (
-        f"Expected deny; got {hsoutput.get('permissionDecision')!r}. "
-        f"Full output: {output}"
+        f"Expected deny; got {hsoutput.get('permissionDecision')!r}. Full output: {output}"
     )
     assert "Specification Links" in hsoutput.get("permissionDecisionReason", "")
 
@@ -126,10 +123,7 @@ def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
             "tool_name": "Write",
             "tool_input": {
                 "file_path": "bridge/test-fake-verified-no-tests-002.md",
-                "content": (
-                    "VERIFIED\n\n## Specification Links\n"
-                    "- DCL-EXAMPLE-001\n\nNo command evidence here."
-                ),
+                "content": ("VERIFIED\n\n## Specification Links\n- DCL-EXAMPLE-001\n\nNo command evidence here."),
             },
             "session_id": "test",
             "cwd": str(REPO_ROOT),
@@ -140,15 +134,10 @@ def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
     output = json.loads(result.stdout)
     hsoutput = output.get("hookSpecificOutput", {})
     assert hsoutput.get("permissionDecision") == "deny", (
-        f"Expected deny; got {hsoutput.get('permissionDecision')!r}. "
-        f"Full output: {output}"
+        f"Expected deny; got {hsoutput.get('permissionDecision')!r}. Full output: {output}"
     )
     reason = hsoutput.get("permissionDecisionReason", "")
-    assert (
-        "spec-to-test" in reason.lower()
-        or "Specification Links" in reason
-        or "Applicability Preflight" in reason
-    )
+    assert "spec-to-test" in reason.lower() or "Specification Links" in reason or "Applicability Preflight" in reason
 
 
 def test_go_lacking_applicability_preflight_blocked_with_deny() -> None:
@@ -206,6 +195,155 @@ def test_go_with_clean_applicability_preflight_passes() -> None:
         assert decision != "deny", f"Clean GO verdict incorrectly denied. Output: {output}"
 
 
+def _pending_preflight_content(*, include_application_spec: bool) -> str:
+    spec_lines = [
+        "- GOV-FILE-BRIDGE-AUTHORITY-001",
+        "- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001",
+        "- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001",
+    ]
+    if include_application_spec:
+        spec_lines.append("- ADR-ISOLATION-APPLICATION-PLACEMENT-001")
+    return (
+        "NEW\n\n"
+        "# Implementation Proposal\n\n"
+        'target_paths: ["applications/Agent_Red/src/app.py"]\n\n'
+        "This proposal touches Agent Red application isolation.\n\n"
+        "## Specification Links\n\n" + "\n".join(spec_lines) + "\n\n"
+        "## Specification-Derived Verification\n\n"
+        "Run `python -m pytest tests/example.py`.\n"
+    )
+
+
+def test_bridge_hook_blocks_write_when_pending_content_fails_preflight() -> None:
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-fake-pending-preflight-001.md",
+                "content": _pending_preflight_content(include_application_spec=False),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    hsoutput = output.get("hookSpecificOutput", {})
+    assert hsoutput.get("permissionDecision") == "deny"
+    reason = hsoutput.get("permissionDecisionReason", "")
+    assert "Pre-filing applicability preflight failed" in reason
+    assert "ADR-ISOLATION-APPLICATION-PLACEMENT-001" in reason
+
+
+def test_bridge_hook_allows_write_when_pending_content_passes_preflight() -> None:
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-fake-pending-preflight-001.md",
+                "content": _pending_preflight_content(include_application_spec=True),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, result.stderr
+    if result.stdout.strip():
+        output = json.loads(result.stdout)
+        decision = output.get("hookSpecificOutput", {}).get("permissionDecision")
+        assert decision != "deny", f"Compliant pending proposal incorrectly denied. Output: {output}"
+
+
+def test_bridge_hook_does_not_claim_edit_applicability_preflight() -> None:
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": "bridge/test-fake-pending-preflight-001.md",
+                "content": _pending_preflight_content(include_application_spec=False),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, result.stderr
+    if result.stdout.strip():
+        output = json.loads(result.stdout)
+        reason = output.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+        assert "Pre-filing applicability preflight failed" not in reason
+
+
+def test_bridge_hook_preflight_has_no_cache_between_writes() -> None:
+    failing_payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-fake-pending-preflight-001.md",
+                "content": _pending_preflight_content(include_application_spec=False),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+    passing_payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-fake-pending-preflight-001.md",
+                "content": _pending_preflight_content(include_application_spec=True),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    failing = _run_hook(failing_payload)
+    passing = _run_hook(passing_payload)
+
+    assert json.loads(failing.stdout).get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
+    if passing.stdout.strip():
+        output = json.loads(passing.stdout)
+        assert output.get("hookSpecificOutput", {}).get("permissionDecision") != "deny"
+
+
+def test_bridge_hook_scratch_path_is_root_contained_and_removed() -> None:
+    bridge_id = "test-fake-pending-preflight"
+    scratch_dir = REPO_ROOT / ".tmp" / "bridge-preflight-hook"
+    before = set(scratch_dir.glob(f"{bridge_id}-*.md")) if scratch_dir.exists() else set()
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": f"bridge/{bridge_id}-001.md",
+                "content": _pending_preflight_content(include_application_spec=True),
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, result.stderr
+    after = set(scratch_dir.glob(f"{bridge_id}-*.md")) if scratch_dir.exists() else set()
+    assert after == before
+
+
 def test_compliant_proposal_passes() -> None:
     """Verifies the inverse: a compliant proposal with proper Specification
     Links section is NOT blocked. Per bridge/gov-process-spec-precondition-
@@ -235,6 +373,4 @@ def test_compliant_proposal_passes() -> None:
     if result.stdout.strip():
         output = json.loads(result.stdout)
         decision = output.get("hookSpecificOutput", {}).get("permissionDecision")
-        assert decision != "deny", (
-            f"Compliant proposal incorrectly denied. Output: {output}"
-        )
+        assert decision != "deny", f"Compliant proposal incorrectly denied. Output: {output}"

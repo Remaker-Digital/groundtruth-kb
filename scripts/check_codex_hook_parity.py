@@ -15,7 +15,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FORMAL_APPROVAL_HOOK = ".claude/hooks/formal-artifact-approval-gate.py"
 WORKSTREAM_FOCUS_HOOK = ".claude/hooks/workstream-focus.py"
 SESSION_SELF_INITIALIZATION_SCRIPT = "scripts/session_self_initialization.py"
-OPERATING_ROLE_RECORD = ".claude/rules/operating-role.md"
+HARNESS_IDENTITY_RECORD = "harness-state/harness-identities.json"
+ROLE_ASSIGNMENT_RECORD = "harness-state/role-assignments.json"
 CODEX_CONFIG = ".codex/config.toml"
 CODEX_HOOKS = ".codex/hooks.json"
 CLAUDE_SETTINGS = ".claude/settings.json"
@@ -98,6 +99,9 @@ def _wrapup_trigger_errors(wrapper_path: Path) -> list[str]:
             "--force-wrapup",
             "--fast-hook",
             "--harness-name",
+            "--harness-id",
+            "harness_identity",
+            "resolved_harness_id",
             "UserPromptSubmit",
             "ACCEPTED_TRIGGER_PHRASES",
             "_is_wrapup_trigger",
@@ -136,6 +140,9 @@ def _start_wrapper_errors(wrapper_path: Path) -> list[str]:
             "--emit-startup-service-payload",
             "--fast-hook",
             "--harness-name",
+            "--harness-id",
+            "harness_identity",
+            "resolved_harness_id",
             "STARTUP_SERVICE",
             "STARTUP_FRESHNESS_CONTRACT_VERSION",
             "Programmatic Startup Payload",
@@ -215,7 +222,8 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     formal_hook_path = project_root / FORMAL_APPROVAL_HOOK
     workstream_hook_path = project_root / WORKSTREAM_FOCUS_HOOK
     session_startup_path = project_root / SESSION_SELF_INITIALIZATION_SCRIPT
-    operating_role_path = project_root / OPERATING_ROLE_RECORD
+    harness_identity_path = project_root / HARNESS_IDENTITY_RECORD
+    role_assignment_path = project_root / ROLE_ASSIGNMENT_RECORD
 
     for path in (
         codex_config_path,
@@ -224,7 +232,8 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         formal_hook_path,
         workstream_hook_path,
         session_startup_path,
-        operating_role_path,
+        harness_identity_path,
+        role_assignment_path,
     ):
         if not path.is_file():
             errors.append(f"missing required file: {path.relative_to(project_root).as_posix()}")
@@ -251,7 +260,9 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     if not any("--fast-hook" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must use the fast lifecycle hook path")
     if not any("--harness-name claude" in command for command in claude_session_commands):
-        errors.append("Claude SessionStart hook must resolve the Claude harness-local role state")
+        errors.append("Claude SessionStart hook must identify the Claude harness type")
+    if any("--harness-id B" in command for command in claude_session_commands):
+        errors.append("Claude SessionStart hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must discover the role profile instead of forcing one")
 
@@ -263,7 +274,9 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     if not any("--fast-hook" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must use the fast lifecycle hook path")
     if not any("--harness-name claude" in command for command in claude_stop_commands):
-        errors.append("Claude Stop hook must resolve the Claude harness-local lifecycle state")
+        errors.append("Claude Stop hook must identify the Claude harness type")
+    if any("--harness-id B" in command for command in claude_stop_commands):
+        errors.append("Claude Stop hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must discover the role profile instead of forcing one")
 
@@ -338,6 +351,30 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
 
     errors.extend(_wrapper_errors(CODEX_WORKSTREAM_FOCUS_WRAPPER, [WORKSTREAM_FOCUS_HOOK.replace("/", "\\")]))
     errors.extend(_wrapper_errors(CODEX_WORKSTREAM_FOCUS_WRAPPER, ["GTKB_HARNESS_NAME=codex"]))
+    if CODEX_WORKSTREAM_FOCUS_WRAPPER.is_file() and "GTKB_HARNESS_ID=A" in CODEX_WORKSTREAM_FOCUS_WRAPPER.read_text(
+        encoding="utf-8"
+    ):
+        errors.append("Codex workstream wrapper must resolve durable ID from harness-state/harness-identities.json")
+    errors.extend(
+        _wrapper_errors(
+            CODEX_SESSION_START_WRAPPER,
+            ["harness_identity.py", "GTKB_HARNESS_ID", "--harness-name codex", "--harness-id %GTKB_HARNESS_ID%"],
+        )
+    )
+    errors.extend(
+        _wrapper_errors(
+            CODEX_SESSION_STOP_DISPATCHER,
+            ["--emit-wrapup", "--harness-name", "--harness-id", 'HARNESS_NAME = "codex"', "resolved_harness_id"],
+        )
+    )
+    if CODEX_SESSION_STOP_DISPATCHER.is_file() and 'HARNESS_ID = "A"' in CODEX_SESSION_STOP_DISPATCHER.read_text(
+        encoding="utf-8"
+    ):
+        errors.append("Codex legacy session_stop_dispatch.py must not hardcode harness ID A")
+    if CODEX_SESSION_STOP_DISPATCHER.is_file() and "--role-profile" in CODEX_SESSION_STOP_DISPATCHER.read_text(
+        encoding="utf-8"
+    ):
+        errors.append("Codex legacy session_stop_dispatch.py must discover the role profile instead of forcing one")
     stop_commands = _commands_for_event(codex_hooks, "Stop")
     if any(
         _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
@@ -384,8 +421,10 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
                 ):
                     continue
                 timeout = hook.get("timeout")
-                if not isinstance(timeout, int) or timeout < 12:
-                    errors.append("Codex SessionStart hook timeout must allow purge-first fresh startup generation")
+                if not isinstance(timeout, int) or timeout < 60:
+                    errors.append(
+                        "Codex SessionStart hook timeout must be at least 60 seconds"
+                    )
         if event_name == "UserPromptSubmit":
             errors.extend(_wrapup_trigger_errors(wrapper_path))
         else:

@@ -270,6 +270,351 @@ def summary(ctx: click.Context) -> None:
 
 
 # ---------------------------------------------------------------------------
+# gt status
+# ---------------------------------------------------------------------------
+
+
+@main.command("status")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option("--startup", is_flag=True, default=False, help="Emit compact startup-safe status.")
+@click.option(
+    "--component",
+    "components",
+    multiple=True,
+    type=click.Choice(
+        [
+            "project",
+            "db",
+            "chroma",
+            "bridge",
+            "smart-poller",
+            "dashboard",
+            "hooks",
+            "resource-registry",
+            "system-interface-map",
+            "startup",
+        ],
+        case_sensitive=False,
+    ),
+    help="Limit output to one component; repeat for multiple components.",
+)
+@click.pass_context
+def status_cmd(ctx: click.Context, json_output: bool, startup: bool, components: tuple[str, ...]) -> None:
+    """Report deterministic local operating state."""
+    from groundtruth_kb.operating_state import (
+        collect_operating_state,
+        format_operating_state_text,
+        format_startup_operating_state,
+    )
+
+    config = _resolve_config(ctx)
+    selected = tuple(component.lower() for component in components) or None
+    try:
+        state = collect_operating_state(config.project_root, config=config, startup=startup, components=selected)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(state.to_json_dict(), indent=2, sort_keys=True))
+    elif startup:
+        click.echo(format_startup_operating_state(state))
+    else:
+        click.echo(format_operating_state_text(state))
+
+    if state.overall_status == "FAIL":
+        raise SystemExit(1)
+
+
+# ---------------------------------------------------------------------------
+# gt backlog
+# ---------------------------------------------------------------------------
+
+
+@main.group()
+def backlog() -> None:
+    """Unified backlog commands backed by MemBase work_items."""
+
+
+@backlog.command("migrate-work-list")
+@click.option(
+    "--work-list",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Legacy memory/work_list.md path. Defaults to <project_root>/memory/work_list.md.",
+)
+@click.option("--dry-run", is_flag=True, help="Parse and report rows without inserting MemBase records.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--changed-by", default="gt-backlog-migration", show_default=True, help="History author for inserts.")
+@click.option(
+    "--change-reason",
+    default="Migrate legacy markdown work_list rows into unified MemBase work_items backlog.",
+    show_default=True,
+    help="History reason for inserts.",
+)
+@click.pass_context
+def backlog_migrate_work_list(
+    ctx: click.Context,
+    work_list: Path | None,
+    dry_run: bool,
+    json_output: bool,
+    changed_by: str,
+    change_reason: str,
+) -> None:
+    """Migrate legacy markdown work-list rows into the unified backlog."""
+    from groundtruth_kb.backlog import migrate_work_list_items, parse_work_list_file
+
+    config = _resolve_config(ctx)
+    work_list_path = work_list or config.project_root / "memory" / "work_list.md"
+    if not work_list_path.exists():
+        raise click.ClickException(f"Work-list file not found: {work_list_path}")
+
+    db = _open_db(config)
+    try:
+        items = parse_work_list_file(work_list_path)
+        result = migrate_work_list_items(
+            db,
+            items,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            dry_run=dry_run,
+        )
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
+        return
+    action = "would insert" if dry_run else "inserted"
+    update_action = "would enrich" if dry_run else "enriched"
+    click.echo(
+        "Backlog work-list migration: "
+        f"parsed {result.parsed}, {action} {len(result.inserted)}, "
+        f"{update_action} {len(result.updated_existing)}, "
+        f"skipped existing {len(result.skipped_existing)}."
+    )
+    if result.inserted:
+        click.echo("Inserted:")
+        for item_id in result.inserted:
+            click.echo(f"  - {item_id}")
+    if result.updated_existing:
+        click.echo("Enriched existing:")
+        for item_id in result.updated_existing:
+            click.echo(f"  - {item_id}")
+    if result.skipped_existing:
+        click.echo("Skipped existing:")
+        for item_id in result.skipped_existing:
+            click.echo(f"  - {item_id}")
+
+
+@backlog.command("list")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--all", "include_verified", is_flag=True, help="Include verified/closed work items.")
+@click.pass_context
+def backlog_list(ctx: click.Context, json_output: bool, include_verified: bool) -> None:
+    """List unified backlog items from MemBase work_items."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        items = db.list_work_items() if include_verified else db.get_open_work_items()
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(items, indent=2, sort_keys=True))
+        return
+    if not items:
+        click.echo("No backlog items found.")
+        return
+    for item in items:
+        order = item.get("implementation_order")
+        order_prefix = "-" if order is None else str(order)
+        status = item.get("status_detail") or item.get("resolution_status")
+        title = item.get("title") or item["id"]
+        click.echo(f"{order_prefix}\t{item['id']}\t{status}\t{title}")
+
+
+# ---------------------------------------------------------------------------
+# gt secrets
+# ---------------------------------------------------------------------------
+
+
+_SECRET_SCAN_FINDINGS_EXIT = 5
+
+
+@main.group()
+def secrets() -> None:
+    """Secret scanning and redacted credential-inventory commands."""
+
+
+def _parse_secret_fail_on(raw: str) -> tuple[Any, ...]:
+    from groundtruth_kb.secrets import Severity
+
+    if not raw.strip():
+        return ()
+    parsed = []
+    valid = {item.value: item for item in Severity}
+    for item in raw.split(","):
+        key = item.strip()
+        if not key:
+            continue
+        if key not in valid:
+            allowed = ", ".join(sorted(valid))
+            raise click.UsageError(f"Unknown severity {key!r}; expected one of: {allowed}")
+        parsed.append(valid[key])
+    return tuple(parsed)
+
+
+def _format_secret_scan_markdown(result: Any) -> str:
+    lines = [f"Secret scan ({result.mode}): {len(result.findings)} finding(s), {result.paths_scanned} path(s) scanned."]
+    for finding in result.findings:
+        lines.append(
+            f"- {finding.path}:{finding.line} `{finding.provider_class}` "
+            f"{finding.severity.value} {finding.fingerprint_prefix} - {finding.description}"
+        )
+    return "\n".join(lines)
+
+
+def _default_secret_allowlist(repo_root: Path) -> Any:
+    from groundtruth_kb.secrets import Allowlist
+
+    return Allowlist.load(repo_root / "tests" / "secrets" / "fixtures" / "allowlist.toml")
+
+
+@secrets.command("scan")
+@click.option("--staged", is_flag=True, help="Scan staged git blobs for the pre-commit gate.")
+@click.option("--range", "range_spec", default=None, help="Scan changed blobs in <base>..<head> form.")
+@click.option("--paths", "paths_mode", is_flag=True, help="Scan the path arguments that follow this flag.")
+@click.option("--tracked", is_flag=True, help="Scan current tracked working-tree files for Slice 1 inventory.")
+@click.option(
+    "--all-refs",
+    is_flag=True,
+    help="Scan blobs reachable from locally known refs; does not fetch or rewrite.",
+)
+@click.option("--redacted", is_flag=True, help="Emit redacted findings; raw secret output is not supported.")
+@click.option("--json", "json_output", is_flag=True, help="Write redacted structured output to stdout.")
+@click.option("--report-json", "report_json", type=click.Path(), default=None, help="Write redacted JSON report.")
+@click.option(
+    "--fail-on",
+    default="verified-provider",
+    show_default=True,
+    help="Comma-separated severities that produce exit code 5; pass an empty value for report-only scans.",
+)
+@click.argument("path_args", nargs=-1, type=click.Path())
+def secrets_scan(
+    staged: bool,
+    range_spec: str | None,
+    paths_mode: bool,
+    tracked: bool,
+    all_refs: bool,
+    redacted: bool,
+    json_output: bool,
+    report_json: str | None,
+    fail_on: str,
+    path_args: tuple[str, ...],
+) -> None:
+    """Run the shared scanner without exposing raw matched values."""
+    from groundtruth_kb.secrets import (
+        GitScanError,
+        scan_all_refs,
+        scan_paths,
+        scan_range,
+        scan_staged,
+        scan_tracked,
+        write_json_report,
+    )
+
+    del redacted  # Raw output is intentionally unsupported; all output is redacted.
+    selected = sum(1 for value in (staged, range_spec is not None, paths_mode, tracked, all_refs) if value)
+    if selected != 1:
+        raise click.UsageError("Choose exactly one scan mode: --staged, --range, --paths, --tracked, or --all-refs.")
+    if not paths_mode and path_args:
+        raise click.UsageError("Path arguments are only valid after --paths.")
+    if paths_mode and not path_args:
+        raise click.UsageError("--paths requires at least one path argument.")
+    repo_root = Path.cwd().resolve()
+    try:
+        allowlist = _default_secret_allowlist(repo_root)
+        if staged:
+            result = scan_staged(repo_root=repo_root, allowlist=allowlist)
+        elif range_spec is not None:
+            result = scan_range(range_spec, repo_root=repo_root, allowlist=allowlist)
+        elif tracked:
+            result = scan_tracked(repo_root=repo_root, allowlist=allowlist)
+        elif all_refs:
+            result = scan_all_refs(repo_root=repo_root, allowlist=allowlist)
+        else:
+            result = scan_paths((Path(path) for path in path_args), repo_root=repo_root, allowlist=allowlist)
+    except GitScanError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if report_json:
+        write_json_report(result, Path(report_json))
+    if json_output:
+        click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(_format_secret_scan_markdown(result))
+
+    if result.has_findings_at_or_above(_parse_secret_fail_on(fail_on)):
+        raise SystemExit(_SECRET_SCAN_FINDINGS_EXIT)
+
+
+# ---------------------------------------------------------------------------
+# gt policy
+# ---------------------------------------------------------------------------
+
+
+@main.group()
+def policy() -> None:
+    """Deterministic policy-gate checks."""
+
+
+@policy.command("check")
+@click.option("--action", required=True, help="Policy action class to evaluate.")
+@click.option("--scope", required=True, help="Active scope, such as platform or application.")
+@click.option("--path", "--paths", "paths", multiple=True, help="Path touched by the action; repeat as needed.")
+@click.option("--registry", type=click.Path(exists=True), default=None, help="Policy registry TOML path.")
+@click.option("--receipt", type=click.Path(exists=True), default=None, help="Scoped approval receipt JSON path.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def policy_check(
+    action: str,
+    scope: str,
+    paths: tuple[str, ...],
+    registry: str | None,
+    receipt: str | None,
+    json_output: bool,
+) -> None:
+    """Evaluate a policy decision without installing an adapter."""
+    from groundtruth_kb.policy.engine import check_policy, load_policy_registry, load_receipt
+
+    try:
+        loaded_registry = load_policy_registry(Path(registry) if registry else None)
+        decision = check_policy(
+            action=action,
+            scope=scope,
+            paths=tuple(Path(path) for path in paths),
+            registry=loaded_registry,
+            receipt=load_receipt(Path(receipt) if receipt else None),
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(decision.to_json_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(f"{decision.outcome}: {decision.message}")
+        if decision.ask_options:
+            for index, option in enumerate(decision.ask_options, start=1):
+                click.echo(f"  {index}. {option}")
+        for reason in decision.reasons:
+            click.echo(f"  reason: {reason}")
+
+    if decision.outcome == "ASK":
+        raise SystemExit(2)
+    if decision.outcome == "DENY":
+        raise SystemExit(3)
+
+
+# ---------------------------------------------------------------------------
 # gt history
 # ---------------------------------------------------------------------------
 
@@ -788,10 +1133,11 @@ def project() -> None:
     "gt_kb_root_arg",
     default=None,
     help=(
-        "GT-KB host root path (must resolve to the active workspace root). "
-        "When omitted, the active workspace root is auto-derived. Per "
-        "ADR-ISOLATION-APPLICATION-PLACEMENT-001, applications are created "
-        "at <gt-kb-root>/applications/<project_name>/."
+        "GT-KB host root path. Source checkouts require this to resolve to the "
+        "active workspace root; installed wheels accept this as the adopter host "
+        "root and default to the current directory. Per "
+        "ADR-ISOLATION-APPLICATION-PLACEMENT-001, applications are created at "
+        "<gt-kb-root>/applications/<project_name>/."
     ),
 )
 def project_init(
@@ -873,6 +1219,43 @@ def project_init(
     except ValueError as exc:
         raise click.UsageError(str(exc)) from exc
     click.echo(scaffold_summary(result, profile))
+
+
+@project.group("chroma")
+def project_chroma() -> None:
+    """Manage disposable project ChromaDB caches."""
+
+
+@project_chroma.command("regenerate")
+@click.option("--dir", "target_dir", default=".", help="Adopter project directory (default: cwd).")
+@click.option("--dry-run", is_flag=True, default=False, help="Report what would be regenerated without writing.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+def project_chroma_regenerate(target_dir: str, dry_run: bool, json_output: bool) -> None:
+    """Regenerate the disposable ChromaDB cache from groundtruth.db."""
+    from groundtruth_kb.project.chroma import regenerate
+
+    try:
+        result = regenerate(Path(target_dir), dry_run=dry_run)
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(f"ChromaDB cache {result.status}: {result.chroma_path}")
+        click.echo(f"  source: {result.db_path}")
+        if result.removed_paths:
+            click.echo(f"  stale files replaced: {len(result.removed_paths)}")
+        if result.indexed or result.chunks:
+            click.echo(f"  indexed deliberations: {result.indexed}")
+            click.echo(f"  chunks: {result.chunks}")
+        for error in result.errors:
+            click.echo(f"  error: {error}", err=True)
+
+    if result.status == "skipped":
+        raise SystemExit(2)
+    if result.status == "error":
+        raise SystemExit(1)
 
 
 @project.command("doctor")
@@ -1036,9 +1419,7 @@ def project_upgrade(
         # However, if isolation pre-flight is clean too (already covered by
         # informational [ISOLATION] all-checks-pass row), there's nothing to do.
         # Detection of failing isolation rows in `actions` indicates work needed.
-        has_isolation_warning = any(
-            a.action == "warning" and a.file.startswith("<isolation:") for a in actions
-        )
+        has_isolation_warning = any(a.action == "warning" and a.file.startswith("<isolation:") for a in actions)
         if not has_isolation_warning:
             return
         # Fall through to execute_upgrade with empty mutating_actions so the

@@ -20,7 +20,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "spec-classifier.py"
 TRACKED_SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"

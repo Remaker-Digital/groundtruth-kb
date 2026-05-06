@@ -58,8 +58,19 @@ def test_full_tree_mypy_strict_is_clean() -> None:
             pytest.skip("mypy not installed; install via pip install '.[dev]'")
 
     repo_root = Path(__file__).resolve().parents[1]
+    cache_dir = repo_root.parent / ".tmp" / "mypy-cache" / "full-tree"
+    shutil.rmtree(cache_dir, ignore_errors=True)
     result = subprocess.run(
-        [sys.executable, "-m", "mypy", "--strict", "--no-incremental", FULL_TREE_TARGET],
+        [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--strict",
+            "--no-incremental",
+            "--cache-dir",
+            str(cache_dir),
+            FULL_TREE_TARGET,
+        ],
         cwd=repo_root,
         capture_output=True,
         text=True,

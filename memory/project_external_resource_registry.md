@@ -1,7 +1,11 @@
 # Project External Resource Registry
 
 This is the human-readable companion to
-`.claude/rules/project-resource-aliases.toml`.
+`config/agent-control/project-resource-aliases.toml`.
+
+The startup-readable `.claude/rules/project-resource-aliases.toml` file is only
+a pointer to the governed registry so there are not two competing resource
+registries.
 
 Purpose: AI agents must resolve casual user references such as "the GitHub",
 "the repo", "repo", "CI", "PyPI", "SonarCloud", "Azure", "docs site", and

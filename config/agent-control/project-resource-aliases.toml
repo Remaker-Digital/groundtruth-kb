@@ -1,0 +1,195 @@
+schema_version = 1
+registry_id = "gtkb-project-resource-aliases"
+
+[project]
+canonical_name = "GroundTruth-KB"
+canonical_aliases = ["GroundTruth KB", "GT-KB", "GroundTruth-KB", "groundtruth-kb"]
+root = "E:\\GT-KB"
+package_name = "groundtruth-kb"
+
+[[resources]]
+id = "gtkb.github.repo"
+kind = "github_repository"
+name = "GroundTruth-KB GitHub repository"
+url = "https://github.com/Remaker-Digital/groundtruth-kb"
+identity = "Remaker-Digital/groundtruth-kb"
+aliases = ["the GitHub", "project GitHub", "GitHub", "repo", "the repo", "GitHub repo", "GT-KB repo", "GroundTruth-KB repo", "repository"]
+status = "canonical"
+authority = "owner-corrected project resource registry"
+verification_method = "git remote origin plus public GitHub URL"
+last_verified = "2026-05-06"
+release_blocking = true
+owner_confirmation_required = false
+notes = "Owner correction 2026-05-03: this is the project GitHub. A local origin pointing elsewhere is configuration drift."
+related_specs = ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+related_deliberations = ["DELIB-S330-ISOLATION-017-SLICE8-5-PYTHON-TESTS-WAIVER"]
+
+[[resources]]
+id = "gtkb.github.actions"
+kind = "github_actions"
+name = "GroundTruth-KB GitHub Actions"
+url = "https://github.com/Remaker-Digital/groundtruth-kb/actions"
+identity = "Remaker-Digital/groundtruth-kb/actions"
+aliases = ["CI", "GitHub Actions", "Actions", "workflow runs", "checks", "the CI"]
+status = "canonical"
+authority = "project GitHub repository identity"
+verification_method = "GitHub Actions URL and exact workflow evidence"
+last_verified = "2026-05-06"
+release_blocking = true
+owner_confirmation_required = false
+notes = "CI evidence must include repo, branch, event, full head SHA, workflow, job, and run URL."
+related_specs = ["DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001"]
+related_deliberations = ["DELIB-S330-ISOLATION-017-SLICE8-5-PYTHON-TESTS-WAIVER"]
+
+[[resources]]
+id = "gtkb.github.issues"
+kind = "github_issues"
+name = "GroundTruth-KB GitHub issues"
+url = "https://github.com/Remaker-Digital/groundtruth-kb/issues"
+identity = "Remaker-Digital/groundtruth-kb/issues"
+aliases = ["issues", "issue tracker", "GitHub issues", "project issues"]
+status = "canonical"
+authority = "project GitHub repository identity"
+verification_method = "public URL"
+last_verified = "2026-05-06"
+release_blocking = false
+owner_confirmation_required = false
+notes = "Default issue tracker for GT-KB platform work."
+related_specs = []
+related_deliberations = []
+
+[[resources]]
+id = "gtkb.github.wiki"
+kind = "github_wiki"
+name = "GroundTruth-KB GitHub wiki"
+url = "https://github.com/Remaker-Digital/groundtruth-kb/wiki"
+identity = "Remaker-Digital/groundtruth-kb/wiki"
+aliases = ["wiki", "project wiki", "GitHub wiki"]
+status = "canonical"
+authority = "project GitHub repository identity"
+verification_method = "public URL"
+last_verified = "2026-05-06"
+release_blocking = false
+owner_confirmation_required = false
+notes = "Default wiki for GT-KB platform work."
+related_specs = []
+related_deliberations = []
+
+[[resources]]
+id = "gtkb.pypi.package"
+kind = "pypi_project"
+name = "groundtruth-kb PyPI package"
+url = "https://pypi.org/project/groundtruth-kb/"
+identity = "groundtruth-kb"
+aliases = ["PyPI", "the PyPI package", "package", "published package", "pip package"]
+status = "canonical"
+authority = "groundtruth-kb package metadata"
+verification_method = "package metadata and release-readiness evidence"
+last_verified = "2026-05-06"
+release_blocking = true
+owner_confirmation_required = false
+notes = "Release reports must distinguish local source, wheel/sdist, GitHub refs, and PyPI project state."
+related_specs = []
+related_deliberations = ["DELIB-0332"]
+
+[[resources]]
+id = "gtkb.sonarcloud.project"
+kind = "sonarcloud_project"
+name = "GroundTruth-KB SonarCloud project"
+url = "https://sonarcloud.io/project/overview?id=Remaker-Digital_groundtruth-kb"
+identity = "Remaker-Digital_groundtruth-kb"
+aliases = ["SonarCloud", "sonar", "quality gate", "quality gate badge"]
+status = "canonical_unverified_url"
+authority = "inferred from GitHub org/repo naming convention"
+verification_method = "manual/public SonarCloud URL verification before release evidence use"
+last_verified = "2026-05-06"
+release_blocking = true
+owner_confirmation_required = false
+notes = "Verify exact SonarCloud project key before using this as release evidence."
+related_specs = []
+related_deliberations = ["DELIB-0602", "DELIB-1057"]
+
+[[resources]]
+id = "remaker.organization"
+kind = "organization"
+name = "Remaker Digital"
+url = "https://remakerdigital.com"
+identity = "Remaker Digital"
+aliases = ["Remaker", "Remaker Digital", "the org", "organization"]
+status = "canonical"
+authority = "owner identity"
+verification_method = "public organization URL"
+last_verified = "2026-05-06"
+release_blocking = false
+owner_confirmation_required = false
+notes = "Owning organization."
+related_specs = []
+related_deliberations = []
+
+[[resources]]
+id = "agentred.github.repo"
+kind = "github_repository"
+name = "Agent Red repository"
+url = "https://github.com/mike-remakerdigital/agent-red"
+identity = "mike-remakerdigital/agent-red"
+aliases = ["Agent Red repo", "Agent Red GitHub", "agent-red", "Agent Red repository"]
+status = "separate_project_not_gtkb"
+authority = "owner correction: Agent Red is separate from GT-KB"
+verification_method = "explicit owner scope plus separate git remote"
+last_verified = "2026-05-06"
+release_blocking = false
+owner_confirmation_required = true
+notes = "Do not resolve unqualified 'repo' or 'the GitHub' here during GT-KB work."
+related_specs = ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+related_deliberations = ["DELIB-1074"]
+
+[[resources]]
+id = "agentred.docs.site"
+kind = "docs_site"
+name = "Agent Red public docs site"
+url = "https://agentredcx.com"
+identity = "agentredcx.com"
+aliases = ["docs site", "public docs", "Agent Red docs"]
+status = "separate_project_not_gtkb"
+authority = "Agent Red project context"
+verification_method = "explicit owner scope"
+last_verified = "2026-05-06"
+release_blocking = false
+owner_confirmation_required = true
+notes = "Separate-project docs; not a default GT-KB docs site."
+related_specs = []
+related_deliberations = []
+
+[[resources]]
+id = "agentred.shopify.storefront"
+kind = "shopify_storefront"
+name = "Agent Red Shopify storefront"
+url = "https://blanco-9939.myshopify.com/"
+identity = "blanco-9939.myshopify.com"
+aliases = ["Shopify", "storefront", "Shopify storefront", "test store"]
+status = "separate_project_not_gtkb"
+authority = "Agent Red project context"
+verification_method = "explicit owner scope"
+last_verified = "2026-05-06"
+release_blocking = false
+owner_confirmation_required = true
+notes = "Separate-project Shopify resource."
+related_specs = []
+related_deliberations = []
+
+[[resources]]
+id = "agentred.azure.subscription"
+kind = "azure_subscription"
+name = "Agent Red Azure subscription"
+url = "https://portal.azure.com/"
+identity = "4dce2122-690a-4654-b531-cc647db62331"
+aliases = ["Azure", "subscription", "Azure subscription"]
+status = "separate_project_not_gtkb"
+authority = "Agent Red project context"
+verification_method = "explicit owner scope"
+last_verified = "2026-05-06"
+release_blocking = false
+owner_confirmation_required = true
+notes = "Known Agent Red infrastructure; unqualified Azure references require context."
+related_specs = ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+related_deliberations = []

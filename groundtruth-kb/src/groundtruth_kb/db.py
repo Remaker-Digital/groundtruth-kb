@@ -52,6 +52,35 @@ CHUNK_OVERLAP_TOKENS = 30  # Overlap between consecutive chunks
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _CHROMA_COLLECTION_NAME = "deliberations"
 
+WORK_ITEM_BACKLOG_COLUMNS = {
+    "project_name": "TEXT",
+    "subproject_name": "TEXT",
+    "implementation_order": "INTEGER",
+    "status_detail": "TEXT",
+    "source_owner_directive": "TEXT",
+    "source_deliberation_query": "TEXT",
+    "related_deliberation_ids": "TEXT",
+    "related_spec_ids_at_creation": "TEXT",
+    "related_bridge_threads": "TEXT",
+    "depends_on_work_items": "TEXT",
+    "blocks_work_items": "TEXT",
+    "acceptance_summary": "TEXT",
+    "regression_visibility": "TEXT",
+    "completion_evidence": "TEXT",
+    "supersedes": "TEXT",
+    "superseded_by": "TEXT",
+}
+
+WORK_ITEM_BACKLOG_FIELDS = tuple(WORK_ITEM_BACKLOG_COLUMNS)
+
+WORK_ITEM_TERMINAL_RESOLUTION_STATUSES = (
+    "verified",
+    "resolved",
+    "retired",
+    "wont_fix",
+    "not_a_defect",
+)
+
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS specifications (
@@ -235,6 +264,22 @@ CREATE TABLE IF NOT EXISTS work_items (
     resolution_status TEXT NOT NULL,
     priority TEXT,
     stage TEXT NOT NULL DEFAULT 'created',
+    project_name TEXT,
+    subproject_name TEXT,
+    implementation_order INTEGER,
+    status_detail TEXT,
+    source_owner_directive TEXT,
+    source_deliberation_query TEXT,
+    related_deliberation_ids TEXT,
+    related_spec_ids_at_creation TEXT,
+    related_bridge_threads TEXT,
+    depends_on_work_items TEXT,
+    blocks_work_items TEXT,
+    acceptance_summary TEXT,
+    regression_visibility TEXT,
+    completion_evidence TEXT,
+    supersedes TEXT,
+    superseded_by TEXT,
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -668,6 +713,19 @@ class KnowledgeDB:
             conn.execute("ALTER TABLE specifications ADD COLUMN source_paths TEXT DEFAULT NULL")
             conn.commit()
             _log.info("Applied migration: add source_paths column")
+
+        # Migration 5: unify backlog metadata onto work_items.
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(work_items)").fetchall()}
+        added_work_item_cols = []
+        for col_name, col_type in WORK_ITEM_BACKLOG_COLUMNS.items():
+            if col_name not in cols:
+                conn.execute(f"ALTER TABLE work_items ADD COLUMN {col_name} {col_type}")
+                added_work_item_cols.append(col_name)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_work_items_project ON work_items(project_name)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_work_items_order ON work_items(implementation_order)")
+        conn.commit()
+        if added_work_item_cols:
+            _log.info("Applied migration: unified backlog work item columns %s", added_work_item_cols)
 
     @staticmethod
     def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
@@ -2868,6 +2926,22 @@ class KnowledgeDB:
         failure_description: str | None = None,
         priority: str | None = None,
         stage: str = "created",
+        project_name: str | None = None,
+        subproject_name: str | None = None,
+        implementation_order: int | None = None,
+        status_detail: str | None = None,
+        source_owner_directive: str | None = None,
+        source_deliberation_query: str | None = None,
+        related_deliberation_ids: str | None = None,
+        related_spec_ids_at_creation: str | None = None,
+        related_bridge_threads: str | None = None,
+        depends_on_work_items: str | None = None,
+        blocks_work_items: str | None = None,
+        acceptance_summary: str | None = None,
+        regression_visibility: str | None = None,
+        completion_evidence: str | None = None,
+        supersedes: str | None = None,
+        superseded_by: str | None = None,
     ) -> dict[str, Any] | None:
         """Insert a new version of a work item.
 
@@ -2882,31 +2956,64 @@ class KnowledgeDB:
             failure_description: What failed and why (required for regression/defect).
         """
         version = self._next_work_item_version(id)
+        backlog_values = {
+            "project_name": project_name,
+            "subproject_name": subproject_name,
+            "implementation_order": implementation_order,
+            "status_detail": status_detail,
+            "source_owner_directive": source_owner_directive,
+            "source_deliberation_query": source_deliberation_query,
+            "related_deliberation_ids": related_deliberation_ids,
+            "related_spec_ids_at_creation": related_spec_ids_at_creation,
+            "related_bridge_threads": related_bridge_threads,
+            "depends_on_work_items": depends_on_work_items,
+            "blocks_work_items": blocks_work_items,
+            "acceptance_summary": acceptance_summary,
+            "regression_visibility": regression_visibility,
+            "completion_evidence": completion_evidence,
+            "supersedes": supersedes,
+            "superseded_by": superseded_by,
+        }
+        columns = [
+            "id",
+            "version",
+            "title",
+            "description",
+            "origin",
+            "component",
+            "source_spec_id",
+            "source_test_id",
+            "failure_description",
+            "resolution_status",
+            "priority",
+            "stage",
+            *WORK_ITEM_BACKLOG_FIELDS,
+            "changed_by",
+            "changed_at",
+            "change_reason",
+        ]
+        values = [
+            id,
+            version,
+            title,
+            description,
+            origin,
+            component,
+            source_spec_id,
+            source_test_id,
+            failure_description,
+            resolution_status,
+            priority,
+            stage,
+            *(backlog_values[field] for field in WORK_ITEM_BACKLOG_FIELDS),
+            changed_by,
+            _now(),
+            change_reason,
+        ]
         conn = self._get_conn()
         conn.execute(
-            """INSERT INTO work_items
-               (id, version, title, description, origin, component,
-                source_spec_id, source_test_id, failure_description,
-                resolution_status, priority, stage,
-                changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                id,
-                version,
-                title,
-                description,
-                origin,
-                component,
-                source_spec_id,
-                source_test_id,
-                failure_description,
-                resolution_status,
-                priority,
-                stage,
-                changed_by,
-                _now(),
-                change_reason,
-            ),
+            f"INSERT INTO work_items ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})",
+            values,
         )
         try:
             self._record_event(
@@ -2921,10 +3028,14 @@ class KnowledgeDB:
                     "component": component,
                     "priority": priority,
                     "resolution_status": resolution_status,
-                    "stage": stage,
-                    "source_spec_id": source_spec_id,
-                    "source_test_id": source_test_id,
-                },
+                        "stage": stage,
+                        "project_name": project_name,
+                        "subproject_name": subproject_name,
+                        "implementation_order": implementation_order,
+                        "status_detail": status_detail,
+                        "source_spec_id": source_spec_id,
+                        "source_test_id": source_test_id,
+                    },
             )
             conn.commit()
         except Exception:
@@ -2967,6 +3078,9 @@ class KnowledgeDB:
         priority = fields.get("priority", current["priority"])
         current_stage = current.get("stage", "created")
         new_stage = fields.get("stage", current_stage)
+        backlog_values = {
+            field: fields.get(field, current.get(field)) for field in WORK_ITEM_BACKLOG_FIELDS
+        }
         # Enforce stage transitions (includes GOV-15 owner approval gate)
         self._validate_stage_transition(
             id,
@@ -2975,30 +3089,45 @@ class KnowledgeDB:
             owner_approved=owner_approved,
         )
         conn = self._get_conn()
+        columns = [
+            "id",
+            "version",
+            "title",
+            "description",
+            "origin",
+            "component",
+            "source_spec_id",
+            "source_test_id",
+            "failure_description",
+            "resolution_status",
+            "priority",
+            "stage",
+            *WORK_ITEM_BACKLOG_FIELDS,
+            "changed_by",
+            "changed_at",
+            "change_reason",
+        ]
+        values = [
+            id,
+            version,
+            title,
+            description,
+            origin,
+            component,
+            source_spec_id,
+            source_test_id,
+            failure_description,
+            resolution_status,
+            priority,
+            new_stage,
+            *(backlog_values[field] for field in WORK_ITEM_BACKLOG_FIELDS),
+            changed_by,
+            _now(),
+            change_reason,
+        ]
         conn.execute(
-            """INSERT INTO work_items
-               (id, version, title, description, origin, component,
-                source_spec_id, source_test_id, failure_description,
-                resolution_status, priority, stage,
-                changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                id,
-                version,
-                title,
-                description,
-                origin,
-                component,
-                source_spec_id,
-                source_test_id,
-                failure_description,
-                resolution_status,
-                priority,
-                new_stage,
-                changed_by,
-                _now(),
-                change_reason,
-            ),
+            f"INSERT INTO work_items ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})",
+            values,
         )
         try:
             actually_resolving = resolution_status == "resolved" and current["resolution_status"] != "resolved"
@@ -3016,6 +3145,10 @@ class KnowledgeDB:
                         "priority": priority,
                         "resolution_status": resolution_status,
                         "stage": new_stage,
+                        "project_name": backlog_values.get("project_name"),
+                        "subproject_name": backlog_values.get("subproject_name"),
+                        "implementation_order": backlog_values.get("implementation_order"),
+                        "status_detail": backlog_values.get("status_detail"),
                         "previous_resolution_status": current["resolution_status"],
                         "previous_stage": current.get("stage"),
                         "source_spec_id": source_spec_id,
@@ -3066,6 +3199,8 @@ class KnowledgeDB:
         resolution_status: str | None = None,
         priority: str | None = None,
         source_spec_id: str | None = None,
+        project_name: str | None = None,
+        subproject_name: str | None = None,
     ) -> list[dict[str, Any]]:
         """List current work items with optional filters."""
         query = "SELECT * FROM current_work_items WHERE 1=1"
@@ -3085,18 +3220,26 @@ class KnowledgeDB:
         if source_spec_id:
             query += " AND source_spec_id = ?"
             params.append(source_spec_id)
-        query += " ORDER BY id"
+        if project_name:
+            query += " AND project_name = ?"
+            params.append(project_name)
+        if subproject_name:
+            query += " AND subproject_name = ?"
+            params.append(subproject_name)
+        query += " ORDER BY implementation_order IS NULL, implementation_order, id"
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
     def get_open_work_items(self) -> list[dict[str, Any]]:
-        """Get all work items that are not yet verified (the active backlog)."""
+        """Get all work items that are not terminal (the active backlog)."""
+        placeholders = ", ".join("?" for _ in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES)
         rows = (
             self._get_conn()
             .execute(
-                """SELECT * FROM current_work_items
-               WHERE resolution_status != 'verified'
-               ORDER BY priority, id"""
+                f"""SELECT * FROM current_work_items
+               WHERE resolution_status NOT IN ({placeholders})
+               ORDER BY implementation_order IS NULL, implementation_order, priority, id""",
+                WORK_ITEM_TERMINAL_RESOLUTION_STATUSES,
             )
             .fetchall()
         )
@@ -4808,6 +4951,13 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "constraints",
         "affected_by",
         "source_paths",
+        "related_deliberation_ids",
+        "related_spec_ids_at_creation",
+        "related_bridge_threads",
+        "depends_on_work_items",
+        "blocks_work_items",
+        "supersedes",
+        "superseded_by",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:

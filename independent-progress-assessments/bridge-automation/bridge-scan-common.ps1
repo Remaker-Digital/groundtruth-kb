@@ -32,6 +32,149 @@
 
 Set-StrictMode -Version Latest
 
+function Get-BridgeScanHarnessId {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Workspace,
+        [Parameter(Mandatory)] [string] $HarnessName
+    )
+
+    $identityPath = Join-Path $Workspace "harness-state\harness-identities.json"
+    $harnessNameNormalized = $HarnessName.Trim().ToLowerInvariant()
+    if (-not (Test-Path -LiteralPath $identityPath)) {
+        throw "HARNESS-IDENTITY-BLOCKED: persistent harness identity map is missing: $identityPath"
+    }
+
+    try {
+        $document = Get-Content -LiteralPath $identityPath -Raw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        throw "HARNESS-IDENTITY-BLOCKED: could not parse persistent harness identity map $identityPath`: $($_.Exception.Message)"
+    }
+
+    $harnesses = $document.PSObject.Properties["harnesses"]
+    if ($null -eq $harnesses -or $null -eq $harnesses.Value) {
+        throw "HARNESS-IDENTITY-BLOCKED: persistent harness identity map has no harnesses object: $identityPath"
+    }
+
+    $seen = @{}
+    foreach ($property in $harnesses.Value.PSObject.Properties) {
+        $record = $property.Value
+        $idProperty = $record.PSObject.Properties["id"]
+        if ($null -eq $idProperty -or $null -eq $idProperty.Value) {
+            continue
+        }
+        $id = ([string]$idProperty.Value).Trim().ToUpperInvariant()
+        if (-not $id) {
+            continue
+        }
+        if ($seen.ContainsKey($id) -and $seen[$id] -ne $property.Name) {
+            throw "HARNESS-IDENTITY-BLOCKED: harness ID $id is assigned to both $($seen[$id]) and $($property.Name)"
+        }
+        $seen[$id] = $property.Name
+    }
+
+    $entryProperty = $harnesses.Value.PSObject.Properties[$harnessNameNormalized]
+    if ($null -eq $entryProperty) {
+        throw "HARNESS-IDENTITY-BLOCKED: no persistent harness identity is recorded for $harnessNameNormalized in $identityPath"
+    }
+    $entryIdProperty = $entryProperty.Value.PSObject.Properties["id"]
+    if ($null -eq $entryIdProperty -or $null -eq $entryIdProperty.Value) {
+        throw "HARNESS-IDENTITY-BLOCKED: harness $harnessNameNormalized has no persistent ID in $identityPath"
+    }
+    return ([string]$entryIdProperty.Value).Trim().ToUpperInvariant()
+}
+
+function Test-BridgeScanRoleAuthority {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Workspace,
+        [Parameter(Mandatory)] [string] $HarnessId,
+        [Parameter(Mandatory)] [string] $ExpectedRole,
+        [Parameter(Mandatory)] [string] $ScannerName
+    )
+
+    $rolePath = Join-Path $Workspace "harness-state\role-assignments.json"
+    $harnessIdNormalized = $HarnessId.Trim().ToUpperInvariant()
+    $expectedRoleNormalized = $ExpectedRole.Trim().ToLowerInvariant()
+
+    if (-not (Test-Path -LiteralPath $rolePath)) {
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but role assignment map is missing: $rolePath"
+        return [pscustomobject]@{
+            Allowed      = $false
+            RolePath     = $rolePath
+            HarnessId    = $harnessIdNormalized
+            ExpectedRole = $expectedRoleNormalized
+            ActiveRole   = $null
+            Message      = $message
+        }
+    }
+
+    try {
+        $document = Get-Content -LiteralPath $rolePath -Raw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName could not parse role assignment map $rolePath`: $($_.Exception.Message)"
+        return [pscustomobject]@{
+            Allowed      = $false
+            RolePath     = $rolePath
+            HarnessId    = $harnessIdNormalized
+            ExpectedRole = $expectedRoleNormalized
+            ActiveRole   = $null
+            Message      = $message
+        }
+    }
+
+    $harnesses = $document.PSObject.Properties["harnesses"]
+    $entry = $null
+    if ($null -ne $harnesses -and $null -ne $harnesses.Value) {
+        $entryProperty = $harnesses.Value.PSObject.Properties[$harnessIdNormalized]
+        if ($null -ne $entryProperty) {
+            $entry = $entryProperty.Value
+        }
+    }
+
+    if ($null -eq $entry) {
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but no role map entry exists in $rolePath"
+        return [pscustomobject]@{
+            Allowed      = $false
+            RolePath     = $rolePath
+            HarnessId    = $harnessIdNormalized
+            ExpectedRole = $expectedRoleNormalized
+            ActiveRole   = $null
+            Message      = $message
+        }
+    }
+
+    $roleProperty = $entry.PSObject.Properties["role"]
+    $activeRole = if ($null -ne $roleProperty -and $null -ne $roleProperty.Value) {
+        [string]$roleProperty.Value
+    } else {
+        ""
+    }
+    $activeRoleNormalized = $activeRole.Trim().ToLowerInvariant()
+
+    if ($activeRoleNormalized -ne $expectedRoleNormalized) {
+        $message = "ROLE-AUTHORITY-BLOCKED: $ScannerName requires harness $harnessIdNormalized role $expectedRoleNormalized, but $rolePath currently maps it to $activeRoleNormalized"
+        return [pscustomobject]@{
+            Allowed      = $false
+            RolePath     = $rolePath
+            HarnessId    = $harnessIdNormalized
+            ExpectedRole = $expectedRoleNormalized
+            ActiveRole   = $activeRoleNormalized
+            Message      = $message
+        }
+    }
+
+    $message = "ROLE-AUTHORITY-OK: $ScannerName authorized by $rolePath harness $harnessIdNormalized role $activeRoleNormalized"
+    return [pscustomobject]@{
+        Allowed      = $true
+        RolePath     = $rolePath
+        HarnessId    = $harnessIdNormalized
+        ExpectedRole = $expectedRoleNormalized
+        ActiveRole   = $activeRoleNormalized
+        Message      = $message
+    }
+}
+
 function Get-IndexEntryTopVersion {
     [CmdletBinding()]
     param(

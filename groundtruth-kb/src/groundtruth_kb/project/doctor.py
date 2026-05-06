@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -645,7 +646,7 @@ def _check_spec_classifier_test_exists(target: Path) -> ToolCheck:
 _AUQ_METRICS_CUTOFF_DATE_DEFAULT = "2026-05-04"
 
 
-def _parse_pending_decisions_file(path: Path) -> dict[str, list[dict]]:
+def _parse_pending_decisions_file(path: Path) -> dict[str, list[dict[str, Any]]]:
     """Parse the pending-owner-decisions.md durable file via the canonical hook parser.
 
     Copies to a tempfile first so the hook's corruption-rename behavior on
@@ -692,15 +693,11 @@ def _parse_pending_decisions_file(path: Path) -> dict[str, list[dict]]:
             for section, entries in sections.items()
         }
     finally:
-        try:
+        with suppress(OSError):
             tmp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
         for sibling in tmp_path.parent.glob(tmp_path.name + ".corrupted-*"):
-            try:
+            with suppress(OSError):
                 sibling.unlink()
-            except OSError:
-                pass
 
 
 def _check_untriaged_prose_decisions(target: Path) -> ToolCheck:
@@ -747,11 +744,11 @@ def _check_auq_coverage(target: Path) -> ToolCheck:
     pre-tightening detector, not current AUQ-only contract.
     """
     import os
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     cutoff_str = os.environ.get("GTKB_AUQ_METRICS_CUTOFF_DATE", _AUQ_METRICS_CUTOFF_DATE_DEFAULT)
     try:
-        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=timezone.utc)
+        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=UTC)
     except ValueError:
         return ToolCheck(
             name="AUQ coverage",
@@ -779,7 +776,7 @@ def _check_auq_coverage(target: Path) -> ToolCheck:
             asked_str = asked.replace("Z", "+00:00") if asked.endswith("Z") else asked
             dt = datetime.fromisoformat(asked_str)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
         except (ValueError, TypeError):
             continue
         if dt >= cutoff:
@@ -832,13 +829,13 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
     """
     import importlib.util
     import os
-    import sys
     import re as _re
-    from datetime import datetime, timezone
+    import sys
+    from datetime import datetime
 
     cutoff_str = os.environ.get("GTKB_AUQ_METRICS_CUTOFF_DATE", _AUQ_METRICS_CUTOFF_DATE_DEFAULT)
     try:
-        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=timezone.utc)
+        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=UTC)
     except ValueError:
         return ToolCheck(
             name="Uncited owner-input bridges",
@@ -929,30 +926,30 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
         filename_match = bridge_filename_date_re.search(path.name)
         if filename_match:
             try:
-                return datetime.fromisoformat(filename_match.group(1)).replace(tzinfo=timezone.utc)
+                return datetime.fromisoformat(filename_match.group(1)).replace(tzinfo=UTC)
             except ValueError:
                 pass
         if content is not None:
             content_match = bridge_content_date_re.search(content)
             if content_match:
                 try:
-                    return datetime.fromisoformat(content_match.group(1)).replace(tzinfo=timezone.utc)
+                    return datetime.fromisoformat(content_match.group(1)).replace(tzinfo=UTC)
                 except ValueError:
                     pass
         try:
-            return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+            return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
         except OSError:
             return None
 
     offenders: list[str] = []
-    for doc_name, files in threads:
+    for _doc_name, files in threads:
         # Latest status is the first listed file in the thread (insertion is at top).
         if not files or files[0][0] != "VERIFIED":
             continue
         # For VERIFIED threads, inspect every non-verdict file in the thread.
         # Verdict files start with GO/NO-GO/VERIFIED on first non-blank line;
         # mirrors bridge-compliance-gate.py:357 exclusion.
-        for status, vf in files:
+        for _status, vf in files:
             if not vf.exists():
                 continue
             if vf.name in known_historical_offenders:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -20,6 +21,84 @@ def _load_gate_module():
     sys.modules["release_candidate_gate"] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _valid_dev_inventory_payload(gate, generated_at: str = "2026-05-06T00:00:00Z") -> dict:
+    _default_max_age, _relative_path, _validate = gate._dev_inventory_helpers()
+    from scripts import collect_dev_environment_inventory as collector
+
+    return {
+        "schema_version": collector.SCHEMA_VERSION,
+        "generated_at": generated_at,
+        "project": {},
+        "collector": {},
+        "host": {},
+        "shell": {},
+        "toolchain": {},
+        "harnesses": {},
+        "repo_configured_surfaces": {},
+        "runtime_provided_capabilities": {},
+        "role_by_harness_compatibility": [
+            {
+                "harness": harness,
+                "role": role,
+                "assignment": {"status": "configured", "evidence": "test"},
+                "capabilities": {
+                    dimension: {"status": "unknown", "evidence": "test"}
+                    for dimension in collector.CAPABILITY_DIMENSIONS
+                },
+            }
+            for harness, role in collector.MATRIX_ROWS
+        ],
+        "redaction": {"status": "pass"},
+        "verification": {},
+    }
+
+
+def _write_dev_inventory(gate, root: Path, payload: dict) -> Path:
+    _default_max_age, relative_path, _validate = gate._dev_inventory_helpers()
+    path = root / relative_path
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    return path
+
+
+def _write_valid_secret_gate_files(root: Path) -> None:
+    hooks_dir = root / ".githooks"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / "pre-commit").write_text(
+        "python -m groundtruth_kb secrets scan --staged --redacted --fail-on verified-provider\n",
+        encoding="utf-8",
+    )
+    (hooks_dir / "pre-push").write_text(
+        'python -m groundtruth_kb secrets scan --range "$remote_sha..$local_sha" --redacted --fail-on verified-provider\n',
+        encoding="utf-8",
+    )
+    (hooks_dir / "setup-hooks.sh").write_text(
+        "git config core.hooksPath .githooks\nchmod +x .githooks/pre-commit\nchmod +x .githooks/pre-push\n",
+        encoding="utf-8",
+    )
+
+
+def _write_valid_secret_workflow(root: Path) -> None:
+    workflow = root / ".github" / "workflows" / "gtkb-secrets-scan.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "\n".join(
+            [
+                "on:",
+                "  pull_request:",
+                "  push:",
+                "  workflow_dispatch:",
+                "jobs:",
+                "  secrets-scan:",
+                "    steps:",
+                "      - run: python -m groundtruth_kb secrets scan --tracked --redacted --report-json .quality/gtkb-secrets.json --fail-on verified-provider",
+                "      - uses: actions/upload-artifact@v4",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_secret_manifest_check_fails_when_generated_manifest_exists(tmp_path, monkeypatch):
@@ -66,6 +145,226 @@ def test_secret_manifest_check_fails_when_still_tracked_without_deletion(tmp_pat
 
     with pytest.raises(gate.GateFailure, match="still tracked"):
         gate._check_secret_manifest_removed()
+
+
+def test_secret_gate_presence_requires_tracked_staged_scan_hook(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    _write_valid_secret_gate_files(tmp_path)
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    commands = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        if command[:3] == ["git", "config", "--get"]:
+            return subprocess.CompletedProcess(command, 0, stdout=".githooks\n")
+        if command[:5] == [sys.executable, "-m", "groundtruth_kb", "secrets", "scan"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="Usage: gt secrets scan --staged --range --paths --tracked --all-refs\n",
+            )
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    gate._check_secret_gate_present()
+
+    assert ["git", "config", "--get", "core.hooksPath"] in commands
+    assert [sys.executable, "-m", "groundtruth_kb", "secrets", "scan", "--help"] in commands
+
+
+def test_secret_gate_presence_fails_when_pre_commit_hook_is_missing(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(gate.GateFailure, match="pre-commit hook is missing"):
+        gate._check_secret_gate_present()
+
+
+def test_secret_gate_presence_fails_when_pre_push_hook_is_missing(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    _write_valid_secret_gate_files(tmp_path)
+    (tmp_path / ".githooks" / "pre-push").unlink()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(gate.GateFailure, match="pre-push hook is missing"):
+        gate._check_secret_gate_present()
+
+
+def test_secret_gate_presence_fails_when_cli_help_omits_all_refs(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    _write_valid_secret_gate_files(tmp_path)
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    def fake_run(command, **_kwargs):
+        if command[:3] == ["git", "config", "--get"]:
+            return subprocess.CompletedProcess(command, 0, stdout=".githooks\n")
+        if command[:5] == [sys.executable, "-m", "groundtruth_kb", "secrets", "scan"]:
+            return subprocess.CompletedProcess(command, 0, stdout="Usage: gt secrets scan --staged --range\n")
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    with pytest.raises(gate.GateFailure, match="--all-refs"):
+        gate._check_secret_gate_present()
+
+
+def test_secret_gate_presence_fails_when_hooks_path_is_not_portable(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    _write_valid_secret_gate_files(tmp_path)
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    def fake_run(command, **_kwargs):
+        if command[:3] == ["git", "config", "--get"]:
+            return subprocess.CompletedProcess(command, 0, stdout=".git/hooks\n")
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    with pytest.raises(gate.GateFailure, match="core.hooksPath"):
+        gate._check_secret_gate_present()
+
+
+def test_secret_ci_workflow_presence_requires_broad_redacted_scan(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    _write_valid_secret_workflow(tmp_path)
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    gate._check_secret_ci_workflow_present()
+
+
+def test_secret_ci_workflow_presence_fails_when_missing(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(gate.GateFailure, match="secret-scan workflow is missing"):
+        gate._check_secret_ci_workflow_present()
+
+
+def test_secret_ci_workflow_presence_fails_when_path_filtered(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    _write_valid_secret_workflow(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "gtkb-secrets-scan.yml"
+    workflow.write_text(workflow.read_text(encoding="utf-8") + "\npaths:\n  - scripts/**\n", encoding="utf-8")
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(gate.GateFailure, match="path filters"):
+        gate._check_secret_ci_workflow_present()
+
+
+def test_dev_environment_inventory_gate_passes_valid_public_inventory(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    _write_dev_inventory(gate, tmp_path, _valid_dev_inventory_payload(gate))
+
+    gate._check_dev_environment_inventory(max_age_hours=24)
+
+
+def test_dev_environment_inventory_gate_fails_when_missing(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(gate.GateFailure, match="inventory is missing"):
+        gate._check_dev_environment_inventory(max_age_hours=24)
+
+
+def test_dev_environment_inventory_gate_fails_when_malformed(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    _default_max_age, relative_path, _validate = gate._dev_inventory_helpers()
+    path = tmp_path / relative_path
+    path.parent.mkdir(parents=True)
+    path.write_text("{not json\n", encoding="utf-8")
+
+    with pytest.raises(gate.GateFailure, match="malformed JSON"):
+        gate._check_dev_environment_inventory(max_age_hours=24)
+
+
+def test_dev_environment_inventory_gate_fails_when_stale(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    _write_dev_inventory(gate, tmp_path, _valid_dev_inventory_payload(gate, generated_at="2000-01-01T00:00:00Z"))
+
+    with pytest.raises(gate.GateFailure, match="stale"):
+        gate._check_dev_environment_inventory(max_age_hours=24)
+
+
+def test_dev_environment_inventory_drift_gate_fails_on_blocking_result(monkeypatch):
+    gate = _load_gate_module()
+
+    def fake_helpers():
+        return lambda _root: {
+            "status": "fail",
+            "blocking": [{"path": ".githooks/pre-commit", "route": "compatibility_tests"}],
+        }
+
+    monkeypatch.setattr(gate, "_dev_inventory_drift_helpers", fake_helpers)
+
+    with pytest.raises(gate.GateFailure, match="pre-commit requires compatibility_tests"):
+        gate._check_dev_environment_inventory_drift()
+
+
+def test_dev_environment_inventory_drift_gate_passes_clean_result(monkeypatch):
+    gate = _load_gate_module()
+
+    def fake_helpers():
+        return lambda _root: {"status": "pass", "outcome": "clean", "blocking": []}
+
+    monkeypatch.setattr(gate, "_dev_inventory_drift_helpers", fake_helpers)
+
+    gate._check_dev_environment_inventory_drift()
+
+
+def test_project_resource_registry_gate_passes_valid_registry(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    registry = tmp_path / "config" / "agent-control" / "project-resource-aliases.toml"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("schema_version = 1\n", encoding="utf-8")
+
+    def fake_helpers():
+        return (
+            lambda _path: {"schema_version": 1},
+            lambda _registry: [],
+            lambda _registry, *, repo_root: {
+                "status": "pass",
+                "message": "origin remote matches governed GT-KB repo",
+                "origin": "https://github.com/Remaker-Digital/groundtruth-kb.git",
+            },
+        )
+
+    monkeypatch.setattr(gate, "_project_resource_helpers", fake_helpers)
+
+    gate._check_project_resource_registry()
+
+
+def test_project_resource_registry_gate_fails_when_missing(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(gate.GateFailure, match="resource registry is missing"):
+        gate._check_project_resource_registry()
+
+
+def test_project_resource_registry_gate_fails_on_remote_drift(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    registry = tmp_path / "config" / "agent-control" / "project-resource-aliases.toml"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("schema_version = 1\n", encoding="utf-8")
+
+    def fake_helpers():
+        return (
+            lambda _path: {"schema_version": 1},
+            lambda _registry: [],
+            lambda _registry, *, repo_root: {"status": "fail", "message": "origin remote drift detected"},
+        )
+
+    monkeypatch.setattr(gate, "_project_resource_helpers", fake_helpers)
+
+    with pytest.raises(gate.GateFailure, match="remote identity drift"):
+        gate._check_project_resource_registry()
 
 
 def test_python_version_gate_requires_exact_minor():
@@ -131,13 +430,19 @@ def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
     gate._python_gates()
 
     parity_index = commands.index([sys.executable, "scripts/check_codex_hook_parity.py"])
+    adapter_index = commands.index(
+        [sys.executable, "scripts/generate_codex_skill_adapters.py", "--update-registry", "--check"]
+    )
+    harness_parity_index = commands.index([sys.executable, "scripts/check_harness_parity.py", "--all", "--markdown"])
     pytest_index = next(
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
-    assert parity_index < pytest_index
+    assert parity_index < adapter_index < harness_parity_index < pytest_index
     assert "tests/scripts/test_codex_hook_parity.py" in commands[pytest_index]
     assert "tests/scripts/test_standing_backlog_harvest.py" in commands[pytest_index]
     assert "tests/scripts/test_session_self_initialization.py" in commands[pytest_index]
+    assert "tests/scripts/test_collect_dev_environment_inventory.py" in commands[pytest_index]
+    assert "tests/scripts/test_check_dev_environment_inventory_drift.py" in commands[pytest_index]
     assert "tests/scripts/test_gtkb_dashboard_control_plane.py" in commands[pytest_index]
     assert "tests/hooks/test_workstream_focus.py" in commands[pytest_index]
     assert "tests/integrations/test_usage_consumption.py" in commands[pytest_index]
@@ -156,10 +461,11 @@ def test_python_gate_runs_environment_isolation_before_pytest(monkeypatch):
 
     env_index = commands.index([sys.executable, "scripts/check_environment_isolation.py"])
     parity_index = commands.index([sys.executable, "scripts/check_codex_hook_parity.py"])
+    harness_parity_index = commands.index([sys.executable, "scripts/check_harness_parity.py", "--all", "--markdown"])
     pytest_index = next(
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
-    assert parity_index < env_index < pytest_index
+    assert parity_index < harness_parity_index < env_index < pytest_index
     assert "tests/scripts/test_check_environment_isolation.py" in commands[pytest_index]
 
 

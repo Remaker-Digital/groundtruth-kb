@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -12,7 +12,11 @@ OUT_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
 HARNESS_NAME = "codex"
+STARTUP_SERVICE_TIMEOUT_SECONDS = 50.0
 # Parity marker for tests: Role: Prime Builder
+
+sys.path.insert(0, str(PROJECT_ROOT))
+from scripts.harness_identity import resolved_harness_id  # noqa: E402
 
 
 def _now_iso() -> str:
@@ -49,6 +53,13 @@ def _purge_previous_diagnostics(*paths: Path) -> None:
             pass
 
 
+def _persistent_harness_id() -> str:
+    harness_id = resolved_harness_id(PROJECT_ROOT, harness_name=HARNESS_NAME)
+    if not harness_id:
+        raise RuntimeError(f"Could not resolve persistent harness identity for {HARNESS_NAME}")
+    return harness_id
+
+
 def _fallback_context(reason: str) -> str:
     dashboard = "file:///E:/GT-KB/docs/gtkb-dashboard/index.html"
     return "\n".join(
@@ -74,6 +85,10 @@ def _session_start_payload(context: str) -> dict[str, dict[str, str]]:
             "additionalContext": context,
         }
     }
+
+
+def _dump_payload(payload: dict[str, object]) -> str:
+    return json.dumps(payload, ensure_ascii=True)
 
 
 def _valid_session_start_payload(text: str, request_started_at: str) -> bool:
@@ -120,6 +135,8 @@ def main() -> int:
         "--fast-hook",
         "--harness-name",
         HARNESS_NAME,
+        "--harness-id",
+        _persistent_harness_id(),
     ]
     try:
         env = dict(os.environ)
@@ -130,27 +147,28 @@ def main() -> int:
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=14.0,
+            timeout=STARTUP_SERVICE_TIMEOUT_SECONDS,
             check=False,
             env=env,
         )
         stdout_path.write_text(process.stdout, encoding="utf-8")
         stderr_path.write_text(process.stderr, encoding="utf-8")
         if process.returncode == 0 and _valid_session_start_payload(process.stdout, request_started_at):
-            print(process.stdout.strip())
+            payload = json.loads(process.stdout)
+            print(_dump_payload(_session_start_payload(payload["hookSpecificOutput"]["additionalContext"])))
             return 0
         reason = f"startup service returned exit {process.returncode}"
         if process.stderr.strip():
             reason = f"{reason}: {process.stderr.strip()[:400]}"
         elif process.returncode == 0:
             reason = "startup service freshness contract validation failed"
-        print(json.dumps(_session_start_payload(_fallback_context(reason)), ensure_ascii=False))
+        print(_dump_payload(_session_start_payload(_fallback_context(reason))))
     except Exception as exc:  # noqa: BLE001 - lifecycle hook must fail soft.
         try:
             stderr_path.write_text(str(exc), encoding="utf-8")
         except OSError:
             pass
-        print(json.dumps(_session_start_payload(_fallback_context(str(exc))), ensure_ascii=False))
+        print(_dump_payload(_session_start_payload(_fallback_context(str(exc)))))
     return 0
 
 

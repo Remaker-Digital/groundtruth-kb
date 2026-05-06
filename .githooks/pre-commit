@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-commit hook: PowerShell syntax validation for staged .ps1 files.
+# Pre-commit hook: redacted secret scan plus PowerShell syntax validation.
 # Delegates to .githooks/pre-commit-ps1-parse.ps1 when PS1 files are staged.
 #
 # Activation (one-time, per developer):
@@ -8,6 +8,18 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 set -e
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+PYTHON_BIN="${PYTHON:-python}"
+
+"$PYTHON_BIN" -m groundtruth_kb secrets scan \
+    --staged \
+    --redacted \
+    --fail-on verified-provider || exit $?
+
+"$PYTHON_BIN" scripts/check_dev_environment_inventory_drift.py \
+    --staged \
+    --allow-review-evidence || exit $?
 
 # Only proceed if PowerShell is available
 PWSH=""
@@ -26,6 +38,5 @@ if [ "$STAGED_PS1" -eq 0 ]; then
     exit 0
 fi
 
-REPO_ROOT=$(git rev-parse --show-toplevel)
 "$PWSH" -NoProfile -ExecutionPolicy Bypass \
     -File "$REPO_ROOT/.githooks/pre-commit-ps1-parse.ps1" || exit 1

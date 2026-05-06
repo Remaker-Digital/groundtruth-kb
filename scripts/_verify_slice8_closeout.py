@@ -2,12 +2,10 @@
 
 Per `bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-005.md` (REVISED-2;
 Codex GO at `-006`) acceptance criteria 5: this script runs the composite
-acceptance gate covering B1/B2/B3/B4/B5/B7 outcomes. B6 is explicitly skipped
-and reports "deferred to Slice 8.5" per
-`DELIB-S330-ISOLATION-017-SLICE8-DISPOSITION-CHOICE`.
+acceptance gate covering B1/B2/B3/B4/B5/B6/B7 outcomes. B6 is verified by the
+Slice 8.5 fail-closed evidence verifier once CI-green evidence is captured.
 
-Exit code: 0 if all in-scope checks PASS (B6 deferred is intentional, not a
-failure). Non-zero if any in-scope check FAILS.
+Exit code: 0 if all in-scope checks PASS. Non-zero if any check FAILS.
 
 Per `DELIB-S330-ISOLATION-017-SLICE8-B2-RUFF-SCOPE-CHOICE`, B2 is narrowed to
 `groundtruth-kb/` (not full repo).
@@ -15,7 +13,6 @@ Per `DELIB-S330-ISOLATION-017-SLICE8-B2-RUFF-SCOPE-CHOICE`, B2 is narrowed to
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -43,7 +40,11 @@ def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
 def check_b1_version_bump() -> tuple[str, str]:
     """B1 — `__version__` reports 0.7.0rc1 in groundtruth_kb package."""
     code, out, err = _run(
-        [sys.executable, "-c", "import sys; sys.path.insert(0, 'src'); import groundtruth_kb; print(groundtruth_kb.__version__)"],
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.path.insert(0, 'src'); import groundtruth_kb; print(groundtruth_kb.__version__)",
+        ],
         cwd=GT_KB_PKG,
     )
     if code != 0:
@@ -97,33 +98,33 @@ def check_b4_release_notes_exists() -> tuple[str, str]:
 def check_b5_wheel_smoke() -> tuple[str, str]:
     """B5 — wheel + sdist build, plus install + version + init smoke.
 
-    Per the accepted REVISED-2 plan and the S330 -008 NO-GO disposition
-    (DELIB-S330-ISOLATION-017-SLICE8-INSTALL-UX-LIMITATION-ACK), this check
-    runs:
+     Per the accepted REVISED-2 plan and the S330 -008 NO-GO disposition
+     (DELIB-S330-ISOLATION-017-SLICE8-INSTALL-UX-LIMITATION-ACK), this check
+     runs:
 
-    1. `python -m build --wheel --sdist` (build step).
-    2. Confirms wheel + sdist artifacts for EXPECTED_VERSION exist.
-    3. Creates an **in-root** scratch venv at
-       `E:/GT-KB/.tmp/slice8-install-smoke/<run-id>/venv` (per
-       Codex `-010` F1 + `.claude/rules/project-root-boundary.md`: all
-       active GT-KB verification paths must be within `E:\\GT-KB`).
-    4. `pip install` the built wheel into the venv.
-    5. Runs `gt --version` from the venv; asserts `0.7.0rc1`.
-    6. Discovers `_GT_KB_HOST_ROOT` from the installed package (= `<venv>`
-       for installed wheels: `scaffold.py` is at
-       `<venv>/Lib/site-packages/groundtruth_kb/project/scaffold.py` and
-       `parents[4]` resolves to `<venv>`). Since the venv is now in-root,
-       `_GT_KB_HOST_ROOT` is also in-root.
-    7. Creates `<host_root>/applications/SmokeApp` target dir.
-    8. Runs `gt project init SmokeApp --gt-kb-root <host_root> --dir
-       <host_root>/applications/SmokeApp --profile local-only
-       --no-include-ci` using the working command shape under the Slice 4
-       isolation contract (per DELIB-S330-...-INSTALL-UX-LIMITATION-ACK;
-       the bare command `gt project init <tmp>/test-app --profile
-       local-only` from the original `-005` plan does NOT work for
-       installed wheels and is superseded by this command shape).
-    9. Confirms scaffolded `groundtruth.toml` exists under the target.
-   10. Cleans up scratch dir.
+     1. `python -m build --wheel --sdist` (build step).
+     2. Confirms wheel + sdist artifacts for EXPECTED_VERSION exist.
+     3. Creates an **in-root** scratch venv at
+        `E:/GT-KB/.tmp/slice8-install-smoke/<run-id>/venv` (per
+        Codex `-010` F1 + `.claude/rules/project-root-boundary.md`: all
+        active GT-KB verification paths must be within `E:\\GT-KB`).
+     4. `pip install` the built wheel into the venv.
+     5. Runs `gt --version` from the venv; asserts `0.7.0rc1`.
+     6. Discovers `_GT_KB_HOST_ROOT` from the installed package (= `<venv>`
+        for installed wheels: `scaffold.py` is at
+        `<venv>/Lib/site-packages/groundtruth_kb/project/scaffold.py` and
+        `parents[4]` resolves to `<venv>`). Since the venv is now in-root,
+        `_GT_KB_HOST_ROOT` is also in-root.
+     7. Creates `<host_root>/applications/SmokeApp` target dir.
+     8. Runs `gt project init SmokeApp --gt-kb-root <host_root> --dir
+        <host_root>/applications/SmokeApp --profile local-only
+        --no-include-ci` using the working command shape under the Slice 4
+        isolation contract (per DELIB-S330-...-INSTALL-UX-LIMITATION-ACK;
+        the bare command `gt project init <tmp>/test-app --profile
+        local-only` from the original `-005` plan does NOT work for
+        installed wheels and is superseded by this command shape).
+     9. Confirms scaffolded `groundtruth.toml` exists under the target.
+    10. Cleans up scratch dir.
     """
     import shutil
     import uuid
@@ -187,9 +188,14 @@ def check_b5_wheel_smoke() -> tuple[str, str]:
         # wheel is <venv> itself. Discover it via subprocess so the smoke uses the
         # exact value the installed wheel computes.
         discovered = subprocess.run(  # noqa: S603 - trusted local invocation
-            [str(venv_python), "-c",
-             "from groundtruth_kb.project.scaffold import _GT_KB_HOST_ROOT; print(_GT_KB_HOST_ROOT)"],
-            capture_output=True, text=True, timeout=30,
+            [
+                str(venv_python),
+                "-c",
+                "from groundtruth_kb.project.scaffold import _GT_KB_HOST_ROOT; print(_GT_KB_HOST_ROOT)",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if discovered.returncode != 0:
             return "FAIL", f"discover host_root exit {discovered.returncode}"
@@ -198,10 +204,16 @@ def check_b5_wheel_smoke() -> tuple[str, str]:
         target.parent.mkdir(parents=True, exist_ok=True)
 
         init_cmd = [
-            str(venv_gt), "project", "init", "SmokeApp",
-            "--profile", "local-only",
-            "--gt-kb-root", str(host_root),
-            "--dir", str(target),
+            str(venv_gt),
+            "project",
+            "init",
+            "SmokeApp",
+            "--profile",
+            "local-only",
+            "--gt-kb-root",
+            str(host_root),
+            "--dir",
+            str(target),
             "--no-seed-example",
             "--no-include-ci",
         ]
@@ -242,6 +254,26 @@ def check_b6_deferred_to_slice_8_5() -> tuple[str, str]:
     if SLICE_8_5_BRIDGE_REF not in readiness:
         return "FAIL", f"release-readiness.md does not cite {SLICE_8_5_BRIDGE_REF}"
     return "DEFERRED", f"intentional: B6 captured by Slice 8.5 ({SLICE_8_5_BRIDGE_REF})"
+
+
+def check_b6_slice_8_5_ci_green() -> tuple[str, str]:
+    """B6 - CI-green evidence captured by the Slice 8.5 verifier."""
+    readiness_path = REPO_ROOT / "memory" / "release-readiness.md"
+    if not readiness_path.exists():
+        return "FAIL", "memory/release-readiness.md missing"
+    readiness = readiness_path.read_text(encoding="utf-8")
+    scripts_dir = REPO_ROOT / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from verify_slice8_5_ci_green import REQUIRED_RUNS, verify_text
+
+    errors = verify_text(readiness)
+    if errors:
+        preview = "; ".join(errors[:3])
+        if len(errors) > 3:
+            preview = f"{preview}; plus {len(errors) - 3} more"
+        return "FAIL", preview
+    return "PASS", f"Slice 8.5 CI-green evidence captured for {len(REQUIRED_RUNS)} workflows"
 
 
 def check_b7_bridge_terminal_state() -> tuple[str, str]:
@@ -297,7 +329,7 @@ CHECKS = [
     ("B3", "Pytest completes + green", check_b3_pytest_completes_clean),
     ("B4", "release-notes-0.7.0-rc1.md", check_b4_release_notes_exists),
     ("B5", "Wheel/sdist build smoke", check_b5_wheel_smoke),
-    ("B6", "CI-green evidence (deferred to Slice 8.5)", check_b6_deferred_to_slice_8_5),
+    ("B6", "CI-green evidence (Slice 8.5)", check_b6_slice_8_5_ci_green),
     ("B7", "Bridge terminal state in release-readiness", check_b7_bridge_terminal_state),
     ("CHANGELOG", "[0.7.0-rc1] entry", check_changelog_entry),
     ("ANNOUNCE", "v0.7.0-rc1 announcement", check_announcement_exists),
@@ -325,7 +357,7 @@ def main() -> int:
     if fails:
         print(f"FAIL: composite gate has {len(fails)} failing check(s); rc1 not ready.")
         return 1
-    print("PASS: composite gate green for Slice 8 in-scope checks. Slice 8.5 captures B6.")
+    print("PASS: composite gate green for Slice 8 closeout checks, including Slice 8.5 B6 evidence.")
     return 0
 
 

@@ -1,0 +1,18 @@
+{
+  "description": "Maps host-local harness installation names to durable unique IDs. IDs must not change after assignment except by explicit owner-requested identity change.",
+  "harnesses": {
+    "claude": {
+      "assigned_at": "2026-05-05T00:00:00Z",
+      "assigned_by": "owner-directed-initial-identity",
+      "id": "B"
+    },
+    "codex": {
+      "assigned_at": "2026-05-05T00:00:00Z",
+      "assigned_by": "owner-directed-initial-identity",
+      "id": "A"
+    }
+  },
+  "schema_version": 1,
+  "source_of_truth": "GT-KB harness installation identities",
+  "updated_at": "2026-05-05T00:00:00Z"
+}

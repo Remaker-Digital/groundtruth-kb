@@ -62,6 +62,8 @@ def test_internal_helpers_mypy_strict_is_clean() -> None:
             pytest.skip("mypy not installed; install via pip install '.[dev]'")
 
     repo_root = Path(__file__).resolve().parents[1]
+    cache_dir = repo_root.parent / ".tmp" / "mypy-cache" / "internal-helpers"
+    shutil.rmtree(cache_dir, ignore_errors=True)
     result = subprocess.run(
         [
             sys.executable,
@@ -70,6 +72,8 @@ def test_internal_helpers_mypy_strict_is_clean() -> None:
             "--strict",
             "--follow-imports=silent",
             "--no-incremental",
+            "--cache-dir",
+            str(cache_dir),
         ]
         + INTERNAL_HELPER_FILES,
         cwd=repo_root,

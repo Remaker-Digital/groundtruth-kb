@@ -29,6 +29,16 @@ logs/
 *.crt
 scripts/production-keys-*.json
 
+# GT-KB's scanner implementation and tests intentionally live in directories
+# named "secrets". Keep runtime secret directories ignored, but allow these
+# source/test packages to be tracked.
+!groundtruth-kb/src/groundtruth_kb/secrets/
+!groundtruth-kb/src/groundtruth_kb/secrets/*.py
+!tests/secrets/
+!tests/secrets/*.py
+!tests/secrets/fixtures/
+!tests/secrets/fixtures/*.toml
+
 # =============================================================================
 # Python
 # =============================================================================

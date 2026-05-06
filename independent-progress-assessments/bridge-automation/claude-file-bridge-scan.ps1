@@ -11,6 +11,8 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "bridge-scan-common.ps1")
 
 $Workspace = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
+$HarnessName = "claude"
+$HarnessId = Get-BridgeScanHarnessId -Workspace $Workspace -HarnessName $HarnessName
 $IndexPath = Join-Path $Workspace "bridge\INDEX.md"
 $ProtocolPath = Join-Path $Workspace ".claude\rules\file-bridge-protocol.md"
 $LogDir = Join-Path $Workspace "independent-progress-assessments\bridge-automation\logs"
@@ -241,6 +243,19 @@ try {
 }
 
 try {
+    $RoleAuthority = Test-BridgeScanRoleAuthority `
+        -Workspace $Workspace `
+        -HarnessId $HarnessId `
+        -ExpectedRole "prime-builder" `
+        -ScannerName "Claude automated Prime Builder bridge continuation scan"
+    Write-ScanLog $RoleAuthority.Message
+    if (-not $RoleAuthority.Allowed) {
+        $pausedMessage = "paused (role authority blocked): $($RoleAuthority.Message)"
+        Write-ScanStatus -State "paused" -Message $pausedMessage
+        Show-PollerToast -Title "Bridge scan" -Message "paused (role authority blocked)"
+        exit 0
+    }
+
     $attention = @(Get-AttentionEntries)
     if ($attention.Count -eq 0) {
         Write-ScanLog "Bridge scan: clear."
@@ -328,6 +343,14 @@ You are Prime Builder running an automated file bridge scan for Agent Red Custom
 Workspace:
 $Workspace
 
+Effective role: Prime Builder
+
+Role authority:
+- Harness self-identification: $HarnessId
+- Role map source: harness-state/role-assignments.json
+- Required durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ExpectedRole)
+- Observed durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ActiveRole)
+
 THIS SPAWN IS CAPPED to $($selected.Count) entry/entries (cap=$MAX_ITEMS_PER_SPAWN, oldest-first selection from a queue of $($attention.Count)).
 Process ONLY the entries listed below. Do NOT read bridge/INDEX.md to discover
 additional actionable entries and do NOT action any entry not listed here.
@@ -341,6 +364,12 @@ For each listed entry:
   - NO-GO:    Read the NO-GO file. Address all findings. Write a revised proposal as the next
               version number. Update bridge/INDEX.md with a REVISED entry for only this document.
   - VERIFIED: Report verified. If implementation is uncommitted, commit it.
+
+Before writing any implementation result, re-read `harness-state/role-assignments.json`.
+If harness `$HarnessId` no longer declares role `prime-builder`, report `ROLE-AUTHORITY-BLOCKED`.
+Do not implement, revise, or file bridge updates. Every implementation or
+revision file you create must include a `## Role Authority` section with the
+role map path, harness ID, required role, and observed role.
 
 Key files: CLAUDE.md, memory/MEMORY.md, memory/work_list.md
 "@

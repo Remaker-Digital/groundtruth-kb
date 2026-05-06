@@ -676,10 +676,16 @@ class TestWorkItems:
             resolution_status="open",
             changed_by="test",
             change_reason="found bug",
+            project_name="Project Alpha",
+            implementation_order=7,
+            status_detail="ready",
         )
         assert result["id"] == "WI-001"
         assert result["origin"] == "defect"
         assert result["stage"] == "created"
+        assert result["project_name"] == "Project Alpha"
+        assert result["implementation_order"] == 7
+        assert result["status_detail"] == "ready"
 
     def test_list_open_work_items(self, db):
         db.insert_work_item(
@@ -704,6 +710,7 @@ class TestWorkItems:
         open_wis = db.get_open_work_items()
         open_ids = [wi["id"] for wi in open_wis]
         assert "WI-001" in open_ids
+        assert "WI-002" not in open_ids
 
 
 class TestTests:

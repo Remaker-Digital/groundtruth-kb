@@ -13,9 +13,10 @@
 # so every developer must run this once on their machine.
 #
 # Hooks activated:
-#   pre-commit — PowerShell AST syntax check for staged .ps1 files
+#   pre-commit - redacted staged secret scan and PowerShell AST syntax check
+#   pre-push - redacted secret range scan for refs about to be pushed
 #
-# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 set -e
 
@@ -28,7 +29,9 @@ cd "$REPO_ROOT"
 
 git config core.hooksPath .githooks
 chmod +x .githooks/pre-commit 2>/dev/null || true
+chmod +x .githooks/pre-push 2>/dev/null || true
 
 echo "Git hooks activated: core.hooksPath = .githooks"
 echo "Active hooks:"
-echo "  pre-commit — PowerShell syntax validation for staged .ps1 files"
+echo "  pre-commit - redacted staged secret scan and PowerShell syntax validation for staged .ps1 files"
+echo "  pre-push - redacted secret range scan for refs about to be pushed"

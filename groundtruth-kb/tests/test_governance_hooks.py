@@ -806,7 +806,15 @@ def test_bridge_compliance_blocks_verified_without_spec_to_test_evidence(tmp_pat
             "tool_name": "Write",
             "tool_input": {
                 "file_path": "bridge/verify-without-tests-002.md",
-                "content": "VERIFIED\n\n## Specification Links\n- SPEC-TEST-001\n\nNo command evidence.",
+                "content": (
+                    "VERIFIED\n\n"
+                    "## Applicability Preflight\n\n"
+                    "- packet_hash: `sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`\n"
+                    "- missing_required_specs: []\n\n"
+                    "## Specification Links\n"
+                    "- SPEC-TEST-001\n\n"
+                    "No command evidence."
+                ),
             },
             "session_id": "test",
             "cwd": str(tmp_path),

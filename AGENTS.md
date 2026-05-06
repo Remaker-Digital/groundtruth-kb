@@ -28,38 +28,56 @@ all harness configuration, and all applications developed or managed by GT-KB.
 
 # Durable Operating Role Assignment
 
-As of 2026-04-22, Mike designates `.claude/rules/operating-role.md` as the
-tracked default operating-role record for GroundTruth-KB.
+As of 2026-05-05, Mike designates:
 
-Session startup must discover the assigned operating role from the active
-harness's durable role record before applying role-specific startup text,
-permissions, restrictions, or hook behavior. When no harness-local durable role
-record is configured or present, startup falls back to
-`.claude/rules/operating-role.md`. The active record may be toggled at any
-point to set the role for the next fresh session.
+- `harness-state/harness-identities.json` as the persistent source of truth for
+  host-local harness installation IDs.
+- `harness-state/role-assignments.json` as the single source-of-truth
+  operating-role record for those harness IDs.
 
-When multiple harnesses share this workspace, each harness should keep its own
-durable next-session role record so one harness's mode toggle does not
-overwrite the other's. Current local defaults:
+Session startup must identify the active harness by its durable installation ID
+before applying role-specific startup text, permissions, restrictions, or hook
+behavior. Current host-local identities:
 
-- Codex: `harness-state/codex/operating-role.md`
-- Claude Code: `harness-state/claude/operating-role.md`
+- Codex: `A`
+- Claude Code: `B`
+
+Startup resolves the harness ID from `harness-state/harness-identities.json`,
+then resolves the role by reading that harness ID entry in
+`harness-state/role-assignments.json`. A persisted harness ID must be unique on
+the workstation and must not change after initial assignment except through an
+explicit owner-requested identity change operation. A startup-supplied
+`--harness-id` is only a consistency assertion; it must not silently replace the
+persisted identity.
+
+The explicit identity change operation is
+`python scripts/harness_identity.py set --harness-name <name> --harness-id <id> --owner-requested`.
+Do not run that operation unless Mike has directly requested an identity
+change.
+
+`.claude/rules/operating-role.md` is human-readable guidance only and must not
+contain a competing `active_role:` assignment. The per-harness
+`harness-state/*/operating-role.md` files are legacy pointers only and must not
+be used as role authority.
 
 Standalone owner prompts `switch mode next session` and `change mode next
 session` are sufficient to toggle the current harness's durable next-session
-role between Prime Builder and Loyal Opposition. Explicit prompts `prime
-builder mode next session` and `loyal opposition mode next session` set the
-current harness's next-session role directly.
+role between Prime Builder and Loyal Opposition by updating
+`harness-state/role-assignments.json`. Explicit prompts `prime builder mode next
+session` and `loyal opposition mode next session` set the current harness's
+next-session role directly.
 
 While Claude Code is unavailable, Codex may be assigned either Prime Builder or
 Loyal Opposition so the normal Prime Builder / Loyal Opposition development
 process can continue instead of being suspended.
 
-Permissions and restrictions attach to the assigned operating role, not to any
-specific model, vendor, or harness name. When the assigned role is Prime
-Builder, apply only governance, permissions, and restrictions that pertain to
-Prime Builder. When the assigned role is Loyal Opposition, apply only
-governance, permissions, and restrictions that pertain to Loyal Opposition.
+Permissions and restrictions attach to the assigned operating role for the
+harness ID, not to any specific model, vendor, or transient session. When the
+assigned role is Prime Builder, apply only governance, permissions, and
+restrictions that pertain to Prime Builder. When the assigned role is Loyal
+Opposition, apply only governance, permissions, and restrictions that pertain to
+Loyal Opposition. If startup finds no recorded Prime Builder in the role map,
+the starting harness self-assigns Prime Builder and records that correction.
 
 ## Prime Builder File Authority
 
@@ -190,10 +208,11 @@ When the active role is Loyal Opposition, do not present the Prime Builder numbe
 5. Report scan count: "File bridge scan: N entries processed."
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
-5. Resolve the active harness's durable operating-role record, then read the
-   currently assigned role file before applying any role-specific permissions
-   or restrictions. Use `.claude/rules/operating-role.md` only as the fallback
-   tracked default when no harness-local role record is present.
+5. Resolve the active harness's durable installation ID from
+   `harness-state/harness-identities.json`, then read
+   `harness-state/role-assignments.json` before applying any role-specific
+   permissions or restrictions. If the role map records no Prime Builder, the
+   starting harness assumes Prime Builder and updates the role map.
 6. Read `.claude/rules/canonical-terminology.md` before ordinary Prime Builder
    or Loyal Opposition work so the live glossary is loaded for both roles.
 7. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.

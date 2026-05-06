@@ -1,55 +1,52 @@
 # Durable Operating Role Assignment
 
-Owner directive date: 2026-04-23
+Owner directive date: 2026-05-05
 
-active_role: prime-builder
+The persistent harness identity artifact is:
 
-This file is the tracked default fresh-session role record for GroundTruth-KB.
-Session startup must resolve the active harness's durable
-role record before applying role-specific permissions, restrictions, startup
-text, or hook behavior. When no harness-local durable role record is
-configured or present, startup falls back to this file.
+`harness-state/harness-identities.json`
 
-Allowed role profile values:
+The single source-of-truth role artifact is:
 
-- `prime-builder`
-- `loyal-opposition`
-- `acting-prime-builder`
+`harness-state/role-assignments.json`
 
-The role assignment attaches to the operating role, not to a specific model,
-vendor, or harness name. When multiple harnesses share this workspace, each
-harness should keep its own durable next-session role record so one harness's
-mode toggle does not overwrite the other's. Current local defaults:
+This rule file is not a role record and must not contain an `active_role:`
+assignment. It exists only as human-readable startup guidance for the role
+assignment system.
 
-- Codex: `harness-state/codex/operating-role.md`
-- Claude Code: `harness-state/claude/operating-role.md`
+## Harness Identity
 
-While Claude Code is unavailable, Codex may be assigned either Prime Builder or
-Loyal Opposition so the normal Prime Builder / Loyal Opposition process can
-continue instead of being suspended.
+Harness identity is installation-stable and resolved from the persistent
+identity artifact:
 
-To change the next fresh session's operating mode, update only the
-resolved durable role record's `active_role:` value unless a broader governance
-change is intended.
-Standalone owner prompts `switch mode next session` and `change mode next
-session` toggle the current harness's next fresh-session role between Prime
-Builder and Loyal Opposition by updating only that harness-local
-`active_role:` value. Explicit prompts
-`prime builder mode next session` and `loyal opposition mode next session`
-set the current harness's next fresh-session role directly.
+- Codex: harness ID `A`
+- Claude Code: harness ID `B`
+- Future host-local harnesses: assign the next unused ID (`C`, `D`, ...)
 
-When `active_role: prime-builder` is set, startup uses the Prime Builder
-profile, checks the file bridge, presents Prime Builder session-focus choices,
-and applies Prime Builder file authority subject to formal artifact governance,
-credential safety, and release/deployment approval gates.
+Harness identity and operating role are separate concepts. Startup first reads
+`harness-state/harness-identities.json`, then uses the resolved harness ID to
+look up the role in `harness-state/role-assignments.json`.
 
-When `active_role: loyal-opposition` is set, startup uses the Loyal Opposition
-profile, suppresses Prime Builder session-focus choices, verifies the file
-bridge first, and applies Loyal Opposition review and file-safety constraints.
+A persisted harness ID must be unique on the workstation and must not change
+after initial assignment except through an explicit owner-requested identity
+change operation. A startup-supplied `--harness-id` is a consistency assertion
+only; it must not silently replace the persisted identity.
 
-The file bridge is always available through `bridge/INDEX.md` as the role
-handoff and review mechanism. A poller is a separate monitoring/activation
-service. The retired OS poller remains disabled. The verified smart poller
-should be used when it is available and functioning; otherwise use manual scans
-or monitoring only when Prime Builder and Loyal Opposition are running in
-separate harnesses or asynchronous monitoring is otherwise needed.
+The explicit identity change operation is
+`python scripts/harness_identity.py set --harness-name <name> --harness-id <id> --owner-requested`.
+Do not run that operation unless Mike has directly requested an identity
+change.
+
+## Role Assignment Rules
+
+- The role map records one role per harness ID.
+- A role-switch command updates the role map through code as one operation.
+- When a harness is assigned Prime Builder, all other recorded harnesses are
+  demoted to Loyal Opposition in the same role-map update.
+- When a harness is assigned Loyal Opposition, only that harness's role changes;
+  if this leaves no Prime Builder, the next harness startup self-corrects.
+- If startup finds no recorded Prime Builder, the starting harness assumes Prime
+  Builder and updates `harness-state/role-assignments.json`.
+
+The role assignment attaches to the harness ID, not to a model, vendor name, or
+transient session.

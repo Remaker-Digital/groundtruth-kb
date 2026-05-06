@@ -1,0 +1,455 @@
+schema_version = 1
+registry_id = "gtkb-harness-capability-registry"
+purpose = "Canonical registry for semantic capability parity across Claude Code and Codex harnesses."
+last_updated = "2026-05-06"
+
+[[capabilities]]
+id = "skill.alternatives-investigation"
+kind = "skill"
+canonical_name = "alternatives-investigation"
+canonical_purpose = "Investigate alternatives and solution options."
+canonical_source = ".claude/skills/alternatives-investigation/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/alternatives-investigation/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/alternatives-investigation/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/alternatives-investigation/SKILL.md"
+source_sha256 = "a58d3a9ef5fd13aa734c76b8f787404546610201782b3af06a5b8f1bec239572"
+[[capabilities]]
+id = "skill.arch-audit"
+kind = "skill"
+canonical_name = "arch-audit"
+canonical_purpose = "Review architecture and structural concerns."
+canonical_source = ".claude/skills/arch-audit/SKILL.md"
+required_for_roles = ["loyal-opposition", "prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/arch-audit/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/arch-audit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/arch-audit/SKILL.md"
+source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
+[[capabilities]]
+id = "skill.bridge-propose"
+kind = "skill"
+canonical_name = "gtkb-bridge-propose"
+canonical_purpose = "Create bridge proposal files and bridge INDEX entries through the governed helper path."
+canonical_source = ".claude/skills/bridge-propose/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/bridge-propose/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/bridge-propose/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/bridge-propose/SKILL.md"
+source_sha256 = "5c0cfcd2a55f25e7f824933a23cd77941016d02e3df0de61e195d971a9f24ac7"
+[[capabilities]]
+id = "skill.check-deliberations"
+kind = "skill"
+canonical_name = "check-deliberations"
+canonical_purpose = "Search and cite Deliberation Archive context."
+canonical_source = ".claude/skills/check-deliberations/SKILL.md"
+required_for_roles = ["loyal-opposition", "prime-builder"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/check-deliberations/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/check-deliberations/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/check-deliberations/SKILL.md"
+source_sha256 = "ea6f9f23c5d36c673e82d120bdab5868203f78ee073530bb72c3e16ac2efb59d"
+[[capabilities]]
+id = "skill.code-review-audit"
+kind = "skill"
+canonical_name = "code-review-audit"
+canonical_purpose = "Perform evidence-based implementation/code review."
+canonical_source = ".claude/skills/code-review-audit/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/code-review-audit/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/code-review-audit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/code-review-audit/SKILL.md"
+source_sha256 = "318aec13485938431ccb85fea58a4ec3bacab8dab2dfe8ea97c54f8d118bc2d3"
+[[capabilities]]
+id = "skill.codex-report"
+kind = "skill"
+canonical_name = "loyal-opposition-report"
+canonical_purpose = "Create Codex/Loyal Opposition reports in the expected format."
+canonical_source = ".claude/skills/codex-report/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/codex-report/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/codex-report/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/codex-report/SKILL.md"
+source_sha256 = "c930da76aec08dc9a1a092f9e90a0d0fcd43cfb5bc089feb4df4661175961d22"
+[[capabilities]]
+id = "skill.decision-capture"
+kind = "skill"
+canonical_name = "gtkb-decision-capture"
+canonical_purpose = "Capture owner decisions and durable decision evidence."
+canonical_source = ".claude/skills/decision-capture/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/decision-capture/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/decision-capture/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/decision-capture/SKILL.md"
+source_sha256 = "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
+[[capabilities]]
+id = "skill.deploy"
+kind = "skill"
+canonical_name = "deploy"
+canonical_purpose = "Execute governed deployment workflows."
+canonical_source = ".claude/skills/deploy/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "owner-gated"
+
+[capabilities.claude]
+surface = ".claude/skills/deploy/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/deploy/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/deploy/SKILL.md"
+source_sha256 = "7a9a68d5808b31b92a13d7fcc927bc94ee5f12012f8e81ae0937851867f7672f"
+[[capabilities]]
+id = "skill.harness-parity-review"
+kind = "skill"
+canonical_name = "harness-parity-review"
+canonical_purpose = "Review and correct parity between Claude Code and Codex harness capabilities."
+canonical_source = ".claude/skills/harness-parity-review/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/harness-parity-review/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/harness-parity-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
+source_sha256 = "9868556c7f76998cb5ccfb6613b9170b18ba172a9c3f512e023c4bd36c787c5d"
+[[capabilities]]
+id = "skill.kb-adr"
+kind = "skill"
+canonical_name = "kb-adr"
+canonical_purpose = "Create or update ADR-related KB artifacts."
+canonical_source = ".claude/skills/kb-adr/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-adr/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-adr/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-adr/SKILL.md"
+source_sha256 = "5313dca3d3c8c42ca3f69ccfd8b61eba716e3267a6ee19ce7454d79c76fc00d4"
+[[capabilities]]
+id = "skill.kb-assert"
+kind = "skill"
+canonical_name = "kb-assert"
+canonical_purpose = "Run or reason about KB assertion workflows."
+canonical_source = ".claude/skills/kb-assert/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-assert/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-assert/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-assert/SKILL.md"
+source_sha256 = "41e992629bbc599f80464971f0135cea20870803082f4dab720dce8a642db4e2"
+[[capabilities]]
+id = "skill.kb-batch"
+kind = "skill"
+canonical_name = "kb-batch"
+canonical_purpose = "Perform batch KB operations."
+canonical_source = ".claude/skills/kb-batch/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-batch/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-batch/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-batch/SKILL.md"
+source_sha256 = "235090b9cedeb9b194b94f747b4fc4cbff5156b128493f2ab8aab0bebbd1542c"
+[[capabilities]]
+id = "skill.kb-promote"
+kind = "skill"
+canonical_name = "kb-promote"
+canonical_purpose = "Promote KB artifacts through governed lifecycle steps."
+canonical_source = ".claude/skills/kb-promote/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-promote/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-promote/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-promote/SKILL.md"
+source_sha256 = "d2e768c49b47519160b4042506c34d3c3faf3f90fd06aeb8ff2c59152db11dbd"
+[[capabilities]]
+id = "skill.kb-query"
+kind = "skill"
+canonical_name = "kb-query"
+canonical_purpose = "Query KB/MemBase state."
+canonical_source = ".claude/skills/kb-query/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-query/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-query/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-query/SKILL.md"
+source_sha256 = "693cfda872edd966ca5f382b0435df0c8b9c62639b32be22ef56f65c92e84086"
+[[capabilities]]
+id = "skill.kb-session-wrap"
+kind = "skill"
+canonical_name = "kb-session-wrap"
+canonical_purpose = "Perform governed session wrap-up."
+canonical_source = ".claude/skills/kb-session-wrap/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-session-wrap/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-session-wrap/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-session-wrap/SKILL.md"
+source_sha256 = "7030afc18af9f3a471bafcf4bbf982004f0e0e7fc2bafe1a15927119ad0e57c6"
+[[capabilities]]
+id = "skill.kb-session-wrap-scan"
+kind = "skill"
+canonical_name = "kb-session-wrap-scan"
+canonical_purpose = "Scan for session wrap-up hygiene and carryover."
+canonical_source = ".claude/skills/kb-session-wrap-scan/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-session-wrap-scan/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-session-wrap-scan/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-session-wrap-scan/SKILL.md"
+source_sha256 = "203d0492747c6e5011df3ee357287cb6e3d32de9bde7ecdc00878cc8526deb56"
+[[capabilities]]
+id = "skill.kb-spec"
+kind = "skill"
+canonical_name = "kb-spec"
+canonical_purpose = "Create or update specification artifacts."
+canonical_source = ".claude/skills/kb-spec/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-spec/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-spec/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-spec/SKILL.md"
+source_sha256 = "77d84c4ee4960b9cfc119347c36080e92edb62613c4e6514148019a717ca5dda"
+[[capabilities]]
+id = "skill.kb-work-item"
+kind = "skill"
+canonical_name = "kb-work-item"
+canonical_purpose = "Create and update MemBase work items."
+canonical_source = ".claude/skills/kb-work-item/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/kb-work-item/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/kb-work-item/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/kb-work-item/SKILL.md"
+source_sha256 = "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
+[[capabilities]]
+id = "skill.proposal-review"
+kind = "skill"
+canonical_name = "proposal-review"
+canonical_purpose = "Review implementation proposals."
+canonical_source = ".claude/skills/proposal-review/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/proposal-review/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/proposal-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/proposal-review/SKILL.md"
+source_sha256 = "28b517c4790bb61f96aaabda59cdef1f5aa4872c93e69f078fdeb42698b42dcf"
+[[capabilities]]
+id = "skill.release-candidate-gate"
+kind = "skill"
+canonical_name = "release-candidate-gate"
+canonical_purpose = "Run and interpret release-candidate gate evidence."
+canonical_source = ".claude/skills/release-candidate-gate/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/release-candidate-gate/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/release-candidate-gate/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/release-candidate-gate/SKILL.md"
+source_sha256 = "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
+[[capabilities]]
+id = "skill.run-tests"
+kind = "skill"
+canonical_name = "run-tests"
+canonical_purpose = "Run governed test workflows."
+canonical_source = ".claude/skills/run-tests/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/run-tests/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/run-tests/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/run-tests/SKILL.md"
+source_sha256 = "eb6c2f2b5c19028f5716fd7cbf4d3e150c73170548d2073041e5056da7b15bb9"
+[[capabilities]]
+id = "skill.seed-tenant"
+kind = "skill"
+canonical_name = "seed-tenant"
+canonical_purpose = "Seed tenant data under governed workflows."
+canonical_source = ".claude/skills/seed-tenant/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/seed-tenant/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/seed-tenant/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/seed-tenant/SKILL.md"
+source_sha256 = "935fd60755692ec66473b86a1ff1130b79948a5e0c14cc6555f81b5bcd9ff41d"
+[[capabilities]]
+id = "skill.send-review"
+kind = "skill"
+canonical_name = "send-review"
+canonical_purpose = "Send or format review outputs for counterpart handoff."
+canonical_source = ".claude/skills/send-review/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/send-review/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/send-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/send-review/SKILL.md"
+source_sha256 = "d1e8a85a64f3b8191c0e7495873bfb00154ffc05e35a92e448535f8cc22f5213"
+[[capabilities]]
+id = "skill.spec-intake"
+kind = "skill"
+canonical_name = "gtkb-spec-intake"
+canonical_purpose = "Capture owner requirement/specification intake."
+canonical_source = ".claude/skills/spec-intake/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/spec-intake/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/spec-intake/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/spec-intake/SKILL.md"
+source_sha256 = "0cee9f8e82f1e4f2944832d763636e0932ae12983006784aa20c2fd0bff9d84f"
+[[capabilities]]
+id = "skill.structural-hygiene-review"
+kind = "skill"
+canonical_name = "structural-hygiene-review"
+canonical_purpose = "Review and correct structural/naming/source-of-truth cues that can mislead agents."
+canonical_source = ".claude/skills/structural-hygiene-review/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/structural-hygiene-review/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/structural-hygiene-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/structural-hygiene-review/SKILL.md"
+source_sha256 = "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"

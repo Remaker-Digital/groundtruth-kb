@@ -3,6 +3,8 @@ param(
     [ValidateSet("Codex", "Claude")]
     [string]$Scanner,
 
+    [switch]$NoExec,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ForwardArgs = @()
 )
@@ -142,8 +144,15 @@ if ($writeGenerated) {
     Set-Content -LiteralPath $generatedPath -Value $patched -Encoding UTF8
 }
 
+$forwardNoExec = $NoExec -or (@($ForwardArgs) -contains "-NoExec")
+$ForwardArgs = @($ForwardArgs | Where-Object { $_ -ne "-NoExec" })
+
 $global:LASTEXITCODE = $null
-& $generatedPath @ForwardArgs
+if ($forwardNoExec) {
+    & $generatedPath -NoExec @ForwardArgs
+} else {
+    & $generatedPath @ForwardArgs
+}
 $scriptOk = $?
 if ($null -ne $global:LASTEXITCODE) {
     exit $global:LASTEXITCODE

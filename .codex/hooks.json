@@ -7,7 +7,7 @@
             "type": "command",
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\session_start_dispatch.py",
             "statusMessage": "Preparing GT-KB startup orientation",
-            "timeout": 15
+            "timeout": 60
           }
         ]
       }

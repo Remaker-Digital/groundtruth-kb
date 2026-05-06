@@ -41,8 +41,16 @@ from groundtruth_kb.spec_scaffold import SpecScaffoldConfig, scaffold_specs
 _GT_KB_HOST_ROOT: Path = Path(__file__).resolve().parents[4]
 
 
+def _is_installed_wheel_context() -> bool:
+    """Return True when GT-KB is imported from an installed distribution."""
+    parts = {part.lower() for part in Path(__file__).resolve().parts}
+    return "site-packages" in parts or "dist-packages" in parts
+
+
 def _resolve_gt_kb_host_root(explicit: Path | None) -> Path:
     """Return the bound GT-KB host root or raise if explicit value mismatches."""
+    if _is_installed_wheel_context():
+        return explicit.resolve() if explicit is not None else Path.cwd().resolve()
     if explicit is None:
         return _GT_KB_HOST_ROOT
     resolved = explicit.resolve()
@@ -71,8 +79,7 @@ def _validate_application_target(target: Path, host_root: Path) -> None:
         )
     if (target / "groundtruth.toml").exists():
         raise ValueError(
-            f"Existing adopter detected at {target} (groundtruth.toml present); "
-            f"run `gt project upgrade` instead."
+            f"Existing adopter detected at {target} (groundtruth.toml present); run `gt project upgrade` instead."
         )
 
 
@@ -406,11 +413,7 @@ def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: st
     templates = get_templates_dir()
 
     def _render(text: str) -> str:
-        return (
-            text
-            .replace("{{PROJECT_NAME}}", project_name)
-            .replace("{{COPYRIGHT_NOTICE}}", copyright_notice)
-        )
+        return text.replace("{{PROJECT_NAME}}", project_name).replace("{{COPYRIGHT_NOTICE}}", copyright_notice)
 
     readme_src = templates / "project" / "README-quickstart.md"
     if readme_src.exists():
@@ -796,8 +799,7 @@ def _render_all_templates(
         "{{SCHEDULE}}": "Smart-poller registration interval or manual fallback",
         "{{EXECUTOR}}": "claude -p / codex exec via project-owned scanner scripts",
         "{{SOURCE}}": (
-            "bridge-os-poller-setup-prompt.md (legacy filename; smart-poller content) "
-            "and BRIDGE-INVENTORY.md"
+            "bridge-os-poller-setup-prompt.md (legacy filename; smart-poller content) and BRIDGE-INVENTORY.md"
         ),
         "{{FAILURE_SIGNAL}}": "No recent scan logs or stale actionable bridge entries",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (

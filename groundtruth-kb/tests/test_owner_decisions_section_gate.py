@@ -25,17 +25,23 @@ HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 
 def _run_hook(file_path: str, content: str, cwd: str | None = None) -> dict:
     """Invoke bridge-compliance-gate.py as subprocess; return parsed stdout JSON."""
-    payload = json.dumps({
-        "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
-        "tool_input": {"file_path": file_path, "content": content},
-        "session_id": "test-slice-c",
-        "cwd": cwd or str(REPO_ROOT),
-    })
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {"file_path": file_path, "content": content},
+            "session_id": "test-slice-c",
+            "cwd": cwd or str(REPO_ROOT),
+        }
+    )
     env = dict(os.environ)
     result = subprocess.run(
         [sys.executable, str(HOOK_PATH)],
-        input=payload, capture_output=True, text=True, env=env, timeout=10,
+        input=payload,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=10,
     )
     return json.loads(result.stdout) if result.stdout.strip() else {}
 
@@ -60,12 +66,25 @@ PROPOSAL_CLAIMS_NO_SECTION = """NEW
 VERIFIED contingent on test execution.
 """
 
-PROPOSAL_CLAIMS_WITH_SECTION = PROPOSAL_CLAIMS_NO_SECTION + """
+PROPOSAL_CLAIMS_WITH_SECTION = (
+    PROPOSAL_CLAIMS_NO_SECTION
+    + """
 ## Owner Decisions / Input
 
 Owner approval cited from S331 AskUserQuestion answer "Autonomous progression"
 authorizing this sub-slice under standard lifecycle.
 """
+)
+
+PROPOSAL_CLAIMS_WITH_SECTION_AND_NONE_STATUS = (
+    PROPOSAL_CLAIMS_NO_SECTION
+    + """
+## Owner Decisions / Input
+
+- Owner approval cited from S331 AskUserQuestion answer "Autonomous progression".
+- Current owner input needed: none.
+"""
+)
 
 # Routine proposal that does NOT claim owner-approval scope (no AUQ markers,
 # no Sub-slice B citation).
@@ -123,6 +142,17 @@ def test_hook_allows_proposal_claiming_approval_with_section():
     if decision == "deny":
         assert "Owner Decisions" not in reason, (
             f"Owner Decisions check should NOT fire when section is present; got reason: {reason[:300]!r}"
+        )
+
+
+def test_hook_allows_substantive_owner_decisions_section_with_none_status():
+    """A substantive section remains valid when it also says no current input is needed."""
+    out = _run_hook("bridge/test-fixture-002b.md", PROPOSAL_CLAIMS_WITH_SECTION_AND_NONE_STATUS)
+    decision = out.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
+    reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+    if decision == "deny":
+        assert "Owner Decisions" not in reason, (
+            f"Owner Decisions check should NOT treat a substantive section as placeholder-only; got: {reason[:300]!r}"
         )
 
 

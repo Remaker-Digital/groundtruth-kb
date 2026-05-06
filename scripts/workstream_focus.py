@@ -19,6 +19,45 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.harness_roles import (
+        DEFAULT_HARNESS_IDS,
+        ROLE_ACTING_PRIME_BUILDER,
+        ROLE_ASSIGNMENTS_RELATIVE_PATH,
+        ROLE_LOYAL_OPPOSITION,
+        ROLE_PRIME_BUILDER,
+        current_prime_ids,
+        load_role_assignments,
+        role_assignments_path,
+        role_for_harness,
+        set_harness_role,
+    )
+    from scripts.harness_roles import (
+        normalize_harness_name as _normalize_harness_name_from_roles,
+    )
+    from scripts.harness_roles import (
+        resolved_harness_id as _resolved_harness_id_from_roles,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from harness_roles import (  # type: ignore[no-redef]
+        DEFAULT_HARNESS_IDS,
+        ROLE_ACTING_PRIME_BUILDER,
+        ROLE_ASSIGNMENTS_RELATIVE_PATH,
+        ROLE_LOYAL_OPPOSITION,
+        ROLE_PRIME_BUILDER,
+        current_prime_ids,
+        load_role_assignments,
+        role_assignments_path,
+        role_for_harness,
+        set_harness_role,
+    )
+    from harness_roles import (  # type: ignore[no-redef]
+        normalize_harness_name as _normalize_harness_name_from_roles,
+    )
+    from harness_roles import (  # type: ignore[no-redef]
+        resolved_harness_id as _resolved_harness_id_from_roles,
+    )
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GTKB_HARNESS_STATE_ROOT = PROJECT_ROOT / "harness-state"
 
@@ -48,25 +87,16 @@ LEGACY_STATE_RELATIVE_PATH = Path(".claude") / "hooks" / ".workstream-focus-stat
 CANONICAL_STATE_RELATIVE_PATH = Path(".claude") / "session" / "work-subject.json"
 STATE_RELATIVE_PATH = CANONICAL_STATE_RELATIVE_PATH  # Back-compat alias (now canonical)
 
-OPERATING_ROLE_RELATIVE_PATH = Path(".claude") / "rules" / "operating-role.md"
+OPERATING_ROLE_RELATIVE_PATH = ROLE_ASSIGNMENTS_RELATIVE_PATH
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
 STARTUP_REPORT_RELATIVE_PATH = Path("docs") / "gtkb-dashboard" / "session-startup-report.md"
-DEFAULT_DASHBOARD_PREFERENCES_PATH = (
-    GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
-)
-HARNESS_ROLE_RECORDS = {
-    "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "operating-role.md",
-    "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "operating-role.md",
-}
+DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
 }
 
 # ---- Role profiles (unchanged from prior module) -----------------------
-ROLE_PRIME_BUILDER = "prime-builder"
-ROLE_LOYAL_OPPOSITION = "loyal-opposition"
-ROLE_ACTING_PRIME_BUILDER = "acting-prime-builder"
 TOGGLEABLE_ROLE_PROFILES = {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION, ROLE_ACTING_PRIME_BUILDER}
 
 # Labels preserved (asserted by test_session_self_initialization.py:93-95).
@@ -221,14 +251,21 @@ def _project_root_from_env() -> Path:
 
 
 def _normalize_harness_name(value: str | None) -> str | None:
-    normalized = str(value or "").strip().lower().replace("_", "-")
-    if normalized in HARNESS_ROLE_RECORDS:
+    normalized = _normalize_harness_name_from_roles(value)
+    if normalized in DEFAULT_HARNESS_IDS:
         return normalized
     return None
 
 
 def _resolved_harness_name() -> str | None:
     return _normalize_harness_name(os.environ.get("GTKB_HARNESS_NAME"))
+
+
+def _resolved_harness_id(project_root: Path | None = None) -> str | None:
+    return _resolved_harness_id_from_roles(
+        (project_root or _project_root_from_env()).resolve(),
+        harness_name=_resolved_harness_name(),
+    )
 
 
 def state_path(project_root: Path | None = None) -> Path:
@@ -252,14 +289,8 @@ def legacy_state_path(project_root: Path | None = None) -> Path:
 
 
 def operating_role_path(project_root: Path | None = None) -> Path:
-    override = os.environ.get("GTKB_OPERATING_ROLE_PATH")
-    if override:
-        return Path(override).expanduser().resolve()
-    harness_name = _resolved_harness_name()
-    if harness_name:
-        return HARNESS_ROLE_RECORDS[harness_name].expanduser().resolve()
     root = (project_root or _project_root_from_env()).resolve()
-    return root / OPERATING_ROLE_RELATIVE_PATH
+    return role_assignments_path(root)
 
 
 def dashboard_preferences_path() -> Path:
@@ -527,22 +558,12 @@ def _role_label(role: str) -> str:
 
 
 def _read_active_role(project_root: Path | None = None) -> str:
-    path = operating_role_path(project_root)
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        fallback_path = ((project_root or _project_root_from_env()).resolve()) / OPERATING_ROLE_RELATIVE_PATH
-        if path != fallback_path:
-            try:
-                text = fallback_path.read_text(encoding="utf-8")
-            except OSError:
-                return ROLE_PRIME_BUILDER
-        else:
-            return ROLE_PRIME_BUILDER
-    match = re.search(r"(?im)^\s*active_role\s*:\s*`?([a-z][a-z0-9-]*)`?\s*$", text)
-    if not match:
-        return ROLE_PRIME_BUILDER
-    role = match.group(1).lower()
+    role, _document, _path = role_for_harness(
+        (project_root or _project_root_from_env()).resolve(),
+        harness_id=_resolved_harness_id(project_root),
+        harness_name=_resolved_harness_name(),
+        ensure_prime_on_startup=False,
+    )
     return role if role in TOGGLEABLE_ROLE_PROFILES else ROLE_PRIME_BUILDER
 
 
@@ -550,27 +571,31 @@ def _next_toggled_role(current_role: str) -> str:
     return ROLE_PRIME_BUILDER if current_role == ROLE_LOYAL_OPPOSITION else ROLE_LOYAL_OPPOSITION
 
 
+def _role_change_parity_message(role: str, project_root: Path | None = None) -> str:
+    root = (project_root or _project_root_from_env()).resolve()
+    harness_name = _resolved_harness_name()
+    harness_scope = _normalize_harness_name_from_roles(harness_name) or "all"
+    if harness_scope not in {"claude", "codex"}:
+        harness_scope = "all"
+    try:
+        from scripts.check_harness_parity import check_harness_parity  # noqa: PLC0415
+
+        report = check_harness_parity(root, harness=harness_scope, role=role)
+    except Exception as exc:  # noqa: BLE001 - role command must still complete with visible diagnostic
+        return f" Harness parity check unavailable: {exc}."
+    counts = ", ".join(f"{key}={value}" for key, value in sorted(report.counts.items())) or "no counts"
+    return f" Harness parity after role change: {report.overall_status} ({counts})."
+
+
 def set_next_session_role(role: str, project_root: Path | None = None) -> str:
     if role not in {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION}:
         raise ValueError(f"Unsupported next-session role: {role}")
-
-    path = operating_role_path(project_root)
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        fallback_path = ((project_root or _project_root_from_env()).resolve()) / OPERATING_ROLE_RELATIVE_PATH
-        try:
-            text = fallback_path.read_text(encoding="utf-8")
-        except OSError:
-            text = "# Durable Operating Role Assignment\n\nactive_role: prime-builder\n"
-
-    if re.search(r"(?im)^\s*active_role\s*:", text):
-        text = re.sub(r"(?im)^(\s*active_role\s*:\s*)`?[a-z][a-z0-9-]*`?(\s*)$", rf"\1{role}\2", text)
-    else:
-        text = text.rstrip() + f"\n\nactive_role: {role}\n"
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    set_harness_role(
+        (project_root or _project_root_from_env()).resolve(),
+        role,
+        harness_id=_resolved_harness_id(project_root),
+        harness_name=_resolved_harness_name(),
+    )
     return role
 
 
@@ -589,7 +614,9 @@ def handle_role_command(prompt: str, project_root: Path | None = None) -> dict[s
     return {
         "systemMessage": (
             f"Next fresh-session operating mode set to {_role_label(next_role)}. "
-            f"This updates `{role_path_display}`; the current session role is unchanged."
+            f"This updates `{role_path_display}` for harness `{_resolved_harness_id(project_root) or 'unidentified'}`; "
+            "the current session role is unchanged."
+            f"{_role_change_parity_message(next_role, project_root)}"
         )
     }
 
@@ -637,29 +664,37 @@ def startup_focus_snapshot(project_root: Path | None = None) -> dict[str, str | 
     }
 
 
-def render_startup_focus_lines(snapshot: dict[str, str | None] | None = None) -> str:
+def render_startup_focus_lines(
+    snapshot: dict[str, str | None] | None = None,
+    *,
+    include_operational_instructions: bool = True,
+) -> str:
     """Render the Active Work Subject block with Phase-7 ``work subject`` language."""
 
     snapshot = snapshot or startup_focus_snapshot()
     app_label = snapshot["application_label"] or DEFAULT_APPLICATION_LABEL
     role_slot = snapshot.get("role_slot") or ROLE_SLOT_DEFAULT
     topology_mode = snapshot.get("topology_mode") or TOPOLOGY_MODE_DEFAULT
-    return "\n".join(
-        [
-            f"- Default work subject: {snapshot['default_label']}",
-            f"- Current work subject: {snapshot['current_label']}",
-            f"- Application label: {app_label}",
-            f"- Bridge role slot: `{role_slot}` (shared, prime-builder, or loyal-opposition).",
-            f"- Harness topology: `{topology_mode}` (single_harness or multi_harness).",
-            "- GT-KB is the default work subject; owner direction is interpreted as GroundTruth-KB work unless Mike explicitly names an adopter application.",
-            "- Application work subject means owner direction is interpreted as work on a named adopter/demo application such as Agent Red.",
-            "- Application work subject commands: `work subject application`, `application mode`, `app mode`, `agent red mode`.",
-            "- GT-KB work subject commands: `work subject GT-KB`, `GT-KB mode`, `GT-KB infrastructure mode`, `GroundTruth-KB mode`.",
-            "- Canonical state file: `.claude/session/work-subject.json` (legacy `.claude/hooks/.workstream-focus-state.json` migrated on next owner command).",
-            "- First owner message in a fresh session is a session-start stimulus only; do not map it to a task, focus, approval, or answer.",
-            "- Live bridge authority: `bridge/INDEX.md` is the canonical handoff/review record; poller status, scan-freshness files, and startup snapshots are non-canonical.",
-        ]
-    )
+    lines = [
+        f"- Default work subject: {snapshot['default_label']}",
+        f"- Current work subject: {snapshot['current_label']}",
+        f"- Application label: {app_label}",
+        f"- Bridge role slot: `{role_slot}` (shared, prime-builder, or loyal-opposition).",
+        f"- Harness topology: `{topology_mode}` (single_harness or multi_harness).",
+        "- GT-KB is the default work subject; owner direction is interpreted as GroundTruth-KB work unless Mike explicitly names an adopter application.",
+        "- Application work subject means owner direction is interpreted as work on a named adopter/demo application such as Agent Red.",
+        "- Application work subject commands: `work subject application`, `application mode`, `app mode`, `agent red mode`.",
+        "- GT-KB work subject commands: `work subject GT-KB`, `GT-KB mode`, `GT-KB infrastructure mode`, `GroundTruth-KB mode`.",
+        "- Canonical state file: `.claude/session/work-subject.json` (legacy `.claude/hooks/.workstream-focus-state.json` migrated on next owner command).",
+    ]
+    if include_operational_instructions:
+        lines.extend(
+            [
+                "- First owner message in a fresh session is a session-start stimulus only; do not map it to a task, focus, approval, or answer.",
+                "- Live bridge authority: `bridge/INDEX.md` is the canonical handoff/review record; poller status, scan-freshness files, and startup snapshots are non-canonical.",
+            ]
+        )
+    return "\n".join(lines)
 
 
 def render_active_work_subject(
@@ -668,6 +703,8 @@ def render_active_work_subject(
     snapshot: dict[str, str | None] | None = None,
     overlay_status: dict[str, Any] | None = None,
     include_counterpart: bool = True,
+    include_overlay_note: bool = True,
+    include_operational_instructions: bool = True,
 ) -> str:
     """Render the enriched Active Work Subject block (Slice 1 §A).
 
@@ -677,9 +714,15 @@ def render_active_work_subject(
     the startup report never treats them as canonical.
     """
 
-    lines = [render_startup_focus_lines(snapshot or startup_focus_snapshot(project_root))]
-    overlay_note = overlay_startup_note(overlay_status or {})
-    lines.extend(f"- {line}" for line in overlay_note["lines"])
+    lines = [
+        render_startup_focus_lines(
+            snapshot or startup_focus_snapshot(project_root),
+            include_operational_instructions=include_operational_instructions,
+        )
+    ]
+    if include_overlay_note:
+        overlay_note = overlay_startup_note(overlay_status or {})
+        lines.extend(f"- {line}" for line in overlay_note["lines"])
     if include_counterpart:
         counterpart = detect_counterpart_state(project_root)
         for warning in counterpart["warnings"]:
@@ -719,8 +762,7 @@ def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
         )
     if status.get("subject_mismatch"):
         warnings.append(
-            "WARNING: session overlay work subject differs from the active subject; "
-            "overlay is informational only."
+            "WARNING: session overlay work subject differs from the active subject; overlay is informational only."
         )
     if status.get("projection_diff"):
         warnings.append(
@@ -729,8 +771,7 @@ def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
         )
     if warnings:
         warnings.append(
-            "Session overlays are never canonical for Deliberation Archive, MemBase, "
-            "bridge, or readiness decisions."
+            "Session overlays are never canonical for Deliberation Archive, MemBase, bridge, or readiness decisions."
         )
         return {"level": "warning", "lines": warnings}
 
@@ -744,18 +785,6 @@ def overlay_startup_note(status: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---- §E Counterpart state detection -------------------------------------
-
-
-def _read_active_role_from_file(path: Path) -> str | None:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (FileNotFoundError, OSError):
-        return None
-    match = re.search(r"^active_role:\s*([a-z0-9_\-]+)\s*$", text, re.MULTILINE | re.IGNORECASE)
-    if not match:
-        return None
-    value = match.group(1).strip().lower()
-    return value or None
 
 
 def _read_counterpart_subject(path: Path) -> str | None:
@@ -777,11 +806,10 @@ def _read_counterpart_subject(path: Path) -> str | None:
 
 def _harness_state_records_for_project(
     project_root: Path,
-) -> tuple[dict[str, Path], dict[str, Path]]:
-    """Build harness role-record and lifecycle-guard path dicts rooted at project_root.
+) -> tuple[Path, dict[str, Path]]:
+    """Build harness role-map and lifecycle-guard paths rooted at project_root.
 
-    Mirrors the module-level ``HARNESS_ROLE_RECORDS`` and
-    ``HARNESS_LIFECYCLE_GUARDS`` constants but builds them from a passed
+    Mirrors the module-level ``HARNESS_LIFECYCLE_GUARDS`` constants but builds them from a passed
     ``project_root`` rather than from this module's ``PROJECT_ROOT`` (which
     is computed from ``__file__`` at import time and resolves to the legacy
     root when this module is imported from there — e.g., during the Slice 11
@@ -793,15 +821,11 @@ def _harness_state_records_for_project(
     module-level dictionaries when called with a sandbox project_root.
     """
     state_root = project_root / "harness-state"
-    role_records: dict[str, Path] = {
-        "codex": state_root / "codex" / "operating-role.md",
-        "claude": state_root / "claude" / "operating-role.md",
-    }
     lifecycle_guards: dict[str, Path] = {
         "codex": state_root / "codex" / "session-lifecycle-guard.json",
         "claude": state_root / "claude" / "session-lifecycle-guard.json",
     }
-    return role_records, lifecycle_guards
+    return state_root / "role-assignments.json", lifecycle_guards
 
 
 def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]:
@@ -811,28 +835,37 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
     "warnings"}``. Warnings are only emitted when counterpart state files are
     present; missing files yield no warnings and no crash.
 
-    When ``project_root`` is provided, harness-state record/guard paths are
+    When ``project_root`` is provided, harness-state role-map/guard paths are
     resolved relative to that root (sandbox-aware execution). When omitted,
     falls back to the canonical module-level constants (production default
     where this module is imported from the canonical project root).
     """
 
     if project_root is not None:
-        role_records, lifecycle_guards = _harness_state_records_for_project(project_root)
+        assignment_path, lifecycle_guards = _harness_state_records_for_project(project_root)
+        root = project_root.resolve()
     else:
-        role_records = HARNESS_ROLE_RECORDS
+        root = _project_root_from_env()
+        assignment_path = role_assignments_path(root)
         lifecycle_guards = HARNESS_LIFECYCLE_GUARDS
 
     current_harness = _resolved_harness_name()
+    current_harness_id = _resolved_harness_id(root)
+    role_document = load_role_assignments(root, assignment_path)
     per_harness_roles: dict[str, str] = {}
-    for harness, record_path in role_records.items():
-        role = _read_active_role_from_file(record_path)
-        if role:
-            per_harness_roles[harness] = role
+    harnesses = role_document.get("harnesses", {})
+    if isinstance(harnesses, dict):
+        for harness_id, record in harnesses.items():
+            if not isinstance(record, dict):
+                continue
+            role = str(record.get("role") or "").strip().lower()
+            if role not in TOGGLEABLE_ROLE_PROFILES:
+                continue
+            harness_type = str(record.get("harness_type") or harness_id).strip().lower()
+            per_harness_roles[harness_type] = role
 
     counterpart_present = any(
-        harness != current_harness and harness in per_harness_roles
-        for harness in role_records
+        harness != current_harness and harness in per_harness_roles for harness in DEFAULT_HARNESS_IDS
     )
 
     warnings: list[str] = []
@@ -845,13 +878,13 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
             if role == our_role and role in TOGGLEABLE_ROLE_PROFILES:
                 same_role_slot = True
                 warnings.append(
-                    f"both `{current_harness}` and `{harness}` have active_role=`{role}` "
-                    "— counterpart bridge roles may collide; verify operating-role.md per harness."
+                    f"both `{current_harness}` and `{harness}` have role=`{role}` "
+                    "— counterpart bridge roles may collide; verify harness-state/role-assignments.json."
                 )
             elif role != our_role and role in TOGGLEABLE_ROLE_PROFILES and our_role in TOGGLEABLE_ROLE_PROFILES:
                 warnings.append(
                     f"`{current_harness}` is `{our_role}`; counterpart `{harness}` is `{role}`. "
-                    "Treat bridge message authority per operating-role.md."
+                    "Treat bridge message authority per harness-state/role-assignments.json."
                 )
 
     # Read OUR subject from our own per-harness lifecycle-guard so divergence
@@ -876,11 +909,7 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
         if harness == current_harness:
             continue
         counterpart_subject = _read_counterpart_subject(guard_path)
-        if (
-            counterpart_subject is not None
-            and our_subject is not None
-            and counterpart_subject != our_subject
-        ):
+        if counterpart_subject is not None and our_subject is not None and counterpart_subject != our_subject:
             subject_mismatch = True
             warnings.append(
                 f"counterpart `{harness}` records work subject=`{counterpart_subject}` "
@@ -892,6 +921,8 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
         "counterpart_present": counterpart_present,
         "same_role_slot": same_role_slot,
         "subject_mismatch": subject_mismatch,
+        "current_harness_id": current_harness_id,
+        "prime_harness_ids": current_prime_ids(role_document),
         "warnings": warnings,
     }
 

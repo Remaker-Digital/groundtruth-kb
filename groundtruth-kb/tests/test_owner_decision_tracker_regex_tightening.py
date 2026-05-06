@@ -20,7 +20,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "owner_decision_tracker"
@@ -242,14 +241,27 @@ def test_block_emission_end_to_end_stop_mode(tmp_path, monkeypatch):
     # Build hermetic project root in tmp_path.
     project_root = tmp_path / "project"
     (project_root / "memory").mkdir(parents=True)
+    empty_pending_file = (
+        "# Pending Owner Decisions\n\n"
+        "This file is owned by .claude/hooks/owner-decision-tracker.py.\n\n"
+        "---\n\n"
+        "## Pending\n\n"
+        "## Resolved\n\n"
+        "## History\n"
+    )
     (project_root / "memory" / "pending-owner-decisions.md").write_text(
-        "# Pending Owner Decisions\n\nThis file is owned by .claude/hooks/owner-decision-tracker.py.\n\n---\n\n## Pending\n\n## Resolved\n\n## History\n",
+        empty_pending_file,
         encoding="utf-8",
     )
 
     transcript = [
         {"type": "user", "message": {"content": [{"type": "text", "text": "continue"}]}},
-        {"type": "assistant", "message": {"content": [{"type": "text", "text": "Should I commit the changes or wait for review?"}]}},
+        {
+            "type": "assistant",
+            "message": {
+                "content": [{"type": "text", "text": "Should I commit the changes or wait for review?"}]
+            },
+        },
     ]
     tfile = tmp_path / "transcript.jsonl"
     tfile.write_text("\n".join(json.dumps(e) for e in transcript), encoding="utf-8")

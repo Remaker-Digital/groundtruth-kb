@@ -287,45 +287,70 @@ adopter's hosted application (those are the adopter's customers).
 
 ### project
 
-**Definition:** Scoped implementation work inside the active application
-or GT-KB platform. Examples: `GTKB-DASHBOARD-002`,
+**Definition:** A named grouping of related known work in the backlog. A
+project may group related sub-projects, individual work items, or both.
+Examples: `GTKB-DASHBOARD-002`,
 `GTKB-OPERATING-MODEL-ALIGNMENT-REMEDIATION`. A project is a
-workstream/program; not the hosted application.
+workstream/program grouping; not the hosted application.
 
 **Not to be confused with:** application (the lifecycle object;
-applications contain projects); platform (GT-KB itself).
+applications contain projects); platform (GT-KB itself); work item (the
+atomic known-work unit).
 
-**Source:** `.claude/rules/operating-model.md` §2 "project".
+**Source:** `.claude/rules/operating-model.md` §2 "project"; owner
+clarification, 2026-05-06.
+
+### sub-project
+
+**Canonical aliases:** sub-project; subproject.
+
+**Definition:** A named grouping of related work items inside a project.
+A sub-project exists to organize work under a larger project; it is not a
+separate application and is not a separate backlog source.
+
+**Not to be confused with:** project (the parent or top-level grouping);
+work item (the atomic known-work unit); application (the lifecycle object).
+
+**Source:** owner clarification, 2026-05-06.
 
 ### work item
 
-**Definition:** The unit of selectable work in the backlog. Identified
-by `WI-NNNN` IDs in MemBase. Carries origin (regression / defect / new),
-component, stage, and lifecycle state. Distinct from `backlog_items`
-(which is the scheduling+provenance authority); see operating-model.md
-§2 for the relationship.
+**Definition:** The atomic unit of known work in the backlog. All work
+items are backlog items; there is no separate conceptual class of
+"backlog item" distinct from work items. Work items are identified by
+`WI-NNNN` IDs in MemBase and may carry origin (regression / defect / new),
+component, stage, lifecycle state, priority/order, project/sub-project
+grouping, and continuation context.
 
-**Not to be confused with:** backlog (the ordered set; see below);
-issue or ticket (external-system terms).
+**Not to be confused with:** project or sub-project (groupings of work
+items); external issue or ticket records.
 
 **Source:** `.claude/rules/operating-model.md` §2 "work item";
-`work_items` table in MemBase.
+`work_items` table in MemBase; owner clarification, 2026-05-06.
 
 ### backlog
 
-**Definition:** The ordered set of active and candidate work for an
-application or platform, organized by priority. Implemented as
-`memory/work_list.md` historically; per
-`ADR-STANDING-BACKLOG-DB-AUTHORITY-001` (S327), the canonical
-implementation is the `backlog_items` table in MemBase, with
-`memory/work_list.md` as a generated read-only view.
+**Definition:** The unified view of all known work for an application or
+platform. The backlog includes all work items and the project/sub-project
+groupings that organize those work items. In this taxonomy, every work
+item is in the backlog, and "backlog item" is a general reference to a
+work item, not a separate artifact type.
+
+**Taxonomy:** backlog -> projects -> sub-projects -> work items. Projects
+may contain sub-projects, work items, or both. Sub-projects contain work
+items. Work items are the atomic known-work units.
+
+**Source-of-truth intent:** Known work should converge into one MemBase
+source of truth, with generated views such as `memory/work_list.md` used
+only for human-readable compatibility once convergence is implemented.
 
 **Not to be confused with:** ignore list or deprecated work (forbidden
-uses per operating-model §2); backlog snapshot (point-in-time export).
+uses per operating-model §2); backlog snapshot (point-in-time export);
+a separate `backlog_items` conceptual class distinct from work items.
 
 **Source:** `.claude/rules/operating-model.md` §2 "backlog";
-`GOV-STANDING-BACKLOG-001` (governance contract);
-`ADR-STANDING-BACKLOG-DB-AUTHORITY-001` (DB authority).
+`GOV-STANDING-BACKLOG-001` (governance contract); owner clarification,
+2026-05-06.
 
 ### specification
 

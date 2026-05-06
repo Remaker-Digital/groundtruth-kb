@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import re
@@ -12,6 +12,9 @@ OUT_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 LIFECYCLE_GUARD_PATH = OUT_DIR / "session-lifecycle-guard.json"
 HARNESS_NAME = "codex"
 # Parity marker: prime-builder role is discovered by session_self_initialization.py.
+
+sys.path.insert(0, str(PROJECT_ROOT))
+from scripts.harness_identity import resolved_harness_id  # noqa: E402
 
 ACCEPTED_TRIGGER_PHRASES = {
     "wrap up",
@@ -99,6 +102,10 @@ def _hook_payload(context: str) -> dict[str, dict[str, str]]:
     }
 
 
+def _dump_payload(payload: dict[str, object]) -> str:
+    return json.dumps(payload, ensure_ascii=True)
+
+
 def _emit_no_context() -> None:
     print("{}")
 
@@ -111,6 +118,13 @@ def _startup_input_gate_active() -> bool:
     if not isinstance(state, dict):
         return False
     return state.get("discard_next_user_prompt") is True or state.get("startup_response_pending") is True
+
+
+def _persistent_harness_id() -> str:
+    harness_id = resolved_harness_id(PROJECT_ROOT, harness_name=HARNESS_NAME)
+    if not harness_id:
+        raise RuntimeError(f"Could not resolve persistent harness identity for {HARNESS_NAME}")
+    return harness_id
 
 
 def main() -> int:
@@ -138,10 +152,11 @@ def main() -> int:
             "--fast-hook",
             "--harness-name",
             HARNESS_NAME,
+            "--harness-id",
+            _persistent_harness_id(),
         ],
         cwd=str(PROJECT_ROOT),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         text=True,
         check=False,
     )
@@ -167,7 +182,7 @@ def main() -> int:
         "Mike used an explicit phrase indicating intent to begin a new session. "
         "Before normal task work, present the wrap-up report below and ask whether to proceed into fresh-session startup."
     )
-    print(json.dumps(_hook_payload(f"{directive}\n\n{context}"), ensure_ascii=False))
+    print(_dump_payload(_hook_payload(f"{directive}\n\n{context}")))
     return 0
 
 

@@ -11,6 +11,8 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "bridge-scan-common.ps1")
 
 $Workspace = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
+$HarnessName = "codex"
+$HarnessId = Get-BridgeScanHarnessId -Workspace $Workspace -HarnessName $HarnessName
 $IndexPath = Join-Path $Workspace "bridge\INDEX.md"
 $ProtocolPath = Join-Path $Workspace ".claude\rules\file-bridge-protocol.md"
 $LogDir = Join-Path $Workspace "independent-progress-assessments\bridge-automation\logs"
@@ -197,6 +199,14 @@ You are Codex running an automated file bridge scan for Agent Red Customer Engag
 Workspace:
 $Workspace
 
+Effective role: Loyal Opposition
+
+Role authority:
+- Harness self-identification: $HarnessId
+- Role map source: harness-state/role-assignments.json
+- Required durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ExpectedRole)
+- Observed durable role at spawn time: harness $($RoleAuthority.HarnessId) role $($RoleAuthority.ActiveRole)
+
 THIS SPAWN IS CAPPED to $($SelectedEntries.Count) entry/entries (cap=$MAX_ITEMS_PER_SPAWN, oldest-first selection from a queue of $AttentionCount).
 Process ONLY the entries listed below. Do NOT read bridge/INDEX.md to discover
 additional actionable entries and do NOT action any entry not listed here.
@@ -216,6 +226,8 @@ Important constraints:
 - Use only the file bridge protocol and `bridge/INDEX.md` for coordination.
 - Respect the project file-safety contract. Only create new bridge review files and make the required targeted bridge/INDEX.md coordination update for processed entries.
 - $GroundtruthKbHint
+- Before writing any review result, re-read `harness-state/role-assignments.json`. If harness `$HarnessId` no longer declares role `loyal-opposition`, report `ROLE-AUTHORITY-BLOCKED`. Do not issue GO, NO-GO, or VERIFIED.
+- Every review file you create must include a `## Role Authority` section with the role map path, harness ID, required role, and observed role.
 - Favor verification over assumption and cite concrete paths and command results.
 "@
 
@@ -259,7 +271,7 @@ Important constraints:
     Write-ScanStatus `
         -State "running" `
         -Message $runMessage `
-        -AttentionNames $AttentionNames `
+        -AttentionNames $SelectedNames `
         -RunStamp $runStamp `
         -StdoutPath $stdoutPath `
         -StderrPath $stderrPath `
@@ -342,6 +354,19 @@ try {
         $pausedMessage = "paused: interactive Codex desktop process is not running; scheduled scan will not spawn codex exec"
         Write-ScanLog $pausedMessage
         Write-ScanStatus -State "paused" -Message $pausedMessage
+        exit 0
+    }
+
+    $RoleAuthority = Test-BridgeScanRoleAuthority `
+        -Workspace $Workspace `
+        -HarnessId $HarnessId `
+        -ExpectedRole "loyal-opposition" `
+        -ScannerName "Codex automated Loyal Opposition bridge review scan"
+    Write-ScanLog $RoleAuthority.Message
+    if (-not $RoleAuthority.Allowed) {
+        $pausedMessage = "paused (role authority blocked): $($RoleAuthority.Message)"
+        Write-ScanStatus -State "paused" -Message $pausedMessage
+        Show-PollerToast -Title "Codex bridge scan" -Message "paused (role authority blocked)"
         exit 0
     }
 

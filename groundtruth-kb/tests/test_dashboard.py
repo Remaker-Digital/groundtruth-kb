@@ -29,6 +29,7 @@ def test_dashboard_init_generates_sqlite_and_grafana_assets(runner: CliRunner, p
     dashboard = json.loads(dashboard_json.read_text(encoding="utf-8"))
     assert dashboard["uid"] == "groundtruth-kb"
     assert dashboard["title"].startswith("Test Project")
+    assert any(panel["title"] == "Operating State" for panel in dashboard["panels"])
 
     with sqlite3.connect(dashboard_db) as conn:
         setup_steps = conn.execute("SELECT COUNT(*) FROM setup_steps").fetchone()[0]
@@ -36,10 +37,16 @@ def test_dashboard_init_generates_sqlite_and_grafana_assets(runner: CliRunner, p
         openai = conn.execute(
             "SELECT service_name FROM third_party_services WHERE id = 'openai'",
         ).fetchone()[0]
+        operating_components = conn.execute("SELECT COUNT(*) FROM operating_state_components").fetchone()[0]
+        operating_schema = conn.execute(
+            "SELECT value FROM dashboard_metadata WHERE key = 'operating_state_schema_version'",
+        ).fetchone()[0]
 
     assert setup_steps >= 6
     assert services >= 7
     assert openai == "OpenAI Codex"
+    assert operating_components >= 8
+    assert operating_schema == "1"
 
 
 def test_dashboard_refresh_reports_seeded_spec_counts(runner: CliRunner, project_dir: Path) -> None:
