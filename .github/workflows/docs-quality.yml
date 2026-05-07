@@ -30,7 +30,7 @@ on:
 
 defaults:
   run:
-    working-directory: docs-site
+    working-directory: applications/Agent_Red/docs-site
 
 jobs:
   # ---------- Build ----------
@@ -78,7 +78,7 @@ jobs:
           node-version: '20'
 
       - run: npm run lint:md
-        working-directory: docs-site
+        working-directory: applications/Agent_Red/docs-site
 
   # ---------- Link Check ----------
   link-check:
@@ -92,7 +92,7 @@ jobs:
           node-version: '20'
 
       - run: npm run lint:links
-        working-directory: docs-site
+        working-directory: applications/Agent_Red/docs-site
 
   # ---------- Coverage Report ----------
   coverage:
@@ -106,4 +106,4 @@ jobs:
           node-version: '20'
 
       - run: node scripts/docs-coverage-audit.mjs
-        working-directory: docs-site
+        working-directory: applications/Agent_Red/docs-site

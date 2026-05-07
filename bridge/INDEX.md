@@ -11,16 +11,31 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-lift-feature-freeze
+REVISED: bridge/gtkb-lift-feature-freeze-005.md
+NO-GO: bridge/gtkb-lift-feature-freeze-004.md
+REVISED: bridge/gtkb-lift-feature-freeze-003.md
+NO-GO: bridge/gtkb-lift-feature-freeze-002.md
+NEW: bridge/gtkb-lift-feature-freeze-001.md
+
 Document: gtkb-adr-dcl-clause-test-enforcement
+VERIFIED: bridge/gtkb-adr-dcl-clause-test-enforcement-004.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-003.md
 GO: bridge/gtkb-adr-dcl-clause-test-enforcement-002.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-001.md
 
 Document: gtkb-isolation-018-slice-d-non-functional-content
+VERIFIED: bridge/gtkb-isolation-018-slice-d-non-functional-content-006.md
+NEW: bridge/gtkb-isolation-018-slice-d-non-functional-content-005.md
+GO: bridge/gtkb-isolation-018-slice-d-non-functional-content-004.md
+REVISED: bridge/gtkb-isolation-018-slice-d-non-functional-content-003.md
 NO-GO: bridge/gtkb-isolation-018-slice-d-non-functional-content-002.md
 NEW: bridge/gtkb-isolation-018-slice-d-non-functional-content-001.md
 
 Document: gtkb-isolation-018-slice-c-docs-cluster
+NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-008.md
+NO-GO: bridge/gtkb-isolation-018-slice-c-docs-cluster-007.md
+NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-006.md
 GO: bridge/gtkb-isolation-018-slice-c-docs-cluster-005.md
 REVISED: bridge/gtkb-isolation-018-slice-c-docs-cluster-004.md
 NO-GO: bridge/gtkb-isolation-018-slice-c-docs-cluster-003.md
@@ -58,6 +73,7 @@ NO-GO: bridge/gtkb-kb-attribution-harness-aware-002.md
 NEW: bridge/gtkb-kb-attribution-harness-aware-001.md
 
 Document: gtkb-codex-bridge-compliance-gate-parity
+GO: bridge/gtkb-codex-bridge-compliance-gate-parity-008.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-007.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-006.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-005.md

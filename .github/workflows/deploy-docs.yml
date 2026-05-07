@@ -39,11 +39,11 @@ jobs:
           cache-dependency-path: applications/Agent_Red/docs-site/package-lock.json
 
       - name: Install dependencies
-        working-directory: docs-site
+        working-directory: applications/Agent_Red/docs-site
         run: npm ci
 
       - name: Build site
-        working-directory: docs-site
+        working-directory: applications/Agent_Red/docs-site
         run: npm run build
 
       - name: Upload artifact
