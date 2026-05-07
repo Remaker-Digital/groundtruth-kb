@@ -6,10 +6,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-0433
+  asked_at: 2026-05-07T02:03:31.445813Z
+  question: "roposal yet filed.  Want me to do anything else right now, or wrap and pick this up next session?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 410a09d26b853188
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0435
+  asked_at: 2026-05-07T02:06:23.479326Z
+  question: "roposal yet filed.  Want me to do anything else right now, or wrap and pick this up next session? (asked 2026-05-07T0"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 1aefa5c1b120b430
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
+- id: DECISION-0432
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 950891a19d2aebeb
+  resolved_at: 2026-05-07T03:00:00.000000Z
+  resolved_in_session: S333
+  answer: "Same prose-detected false-positive class as DECISION-0419/0420 from this session. Substantive question was converted to AskUserQuestion (header 'Next-pass plan'); owner answered 'Items 1 + 2 this session, 3 + 4 next (Recommended)' and that choice was implemented (item 1 = gtkb-isolation-017-citation-backfill post-impl REPORT filed at -005; item 2 = gtkb-kb-attribution-harness-aware post-impl REPORT filed at -005). Closing as resolved."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-0420
   asked_at: 2026-05-06T23:56:15.229032Z
   question: ""
@@ -30,7 +53,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: S333
   answer: "Substantive question was converted to AskUserQuestion (header 'Proceed how'); owner answered 'Full autonomy under prior pre-approval (Recommended)' and that choice was implemented via post-impl REVISED-1, governance-hygiene-bundle implementation, and 4 NO-GO REVISED-1 filings during the same S333 turn-set."
   notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-
 - id: DECISION-0334
   asked_at: 2026-05-03T07:55:56.048857Z
   question: ""
@@ -4936,6 +4958,112 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 583b4005159e9725
   resolved_at: 2026-05-07T00:09:46.449207Z
   answer: "User has answered your questions: \"Agent Red isolation — what's the next move?\"=\"I fully approve of making whatever changes are required to complete this isolation work. We will not be able to release anything until it is done. The only reason to defer any part of this project is a blocking technical dependency.\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0426
+  asked_at: 2026-05-07T00:42:09.644577Z
+  question: "Sub-slice 18.D — how to handle the inventory drift found during live probe?"
+  options:
+    - "Tight scope (recommended)"
+    - "Strict umbrella -005 scope"
+    - "Re-scope umbrella first"
+    - "Skip 18.D; jump to 18.E"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ad3041c6c3434fa9
+  resolved_at: 2026-05-07T00:42:09.644577Z
+  answer: "User has answered your questions: \"Sub-slice 18.D — how to handle the inventory drift found during live probe?\"=\"Re-scope umbrella first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0427
+  asked_at: 2026-05-07T01:06:10.518069Z
+  question: "Push is blocked by a deeper problem than a normal upstream-moved scenario. Local develop and origin/develop have 1389/1386 different commits respectively — the entire history was force-pushed/rebased. Plus my failed rebase attempt left .git/rebase-merge stuck, and the destructive-gate (correctly) blocks me from removing that directory without your approval. How should I proceed?"
+  options:
+    - "Approve cleanup + cherry-pick to feature branch (Recommended)"
+    - "Approve cleanup + reset develop to match origin"
+    - "Investigate the divergence first; pause push"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 847f0d52265c19c5
+  resolved_at: 2026-05-07T01:06:10.518069Z
+  answer: "User has answered your questions: \"Push is blocked by a deeper problem than a normal upstream-moved scenario. Local develop and origin/develop have 1389/1386 different commits respectively — the entire history was force-pushed/rebased. Plus my failed rebase attempt left .git/rebase-merge stuck, and the destructive-gate (correctly) blocks me from removing that directory without your approval. How should I proceed?\"=\"Approve cleanup + cherry-pick to feature branch (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0428
+  asked_at: 2026-05-07T01:06:10.518069Z
+  question: "Pre-push hook fails for new branches because its merge-base auto-detection doesn't resolve when the upstream-tracking ref pattern (`refs/heads/X@{upstream}`) hits the new-branch case. The hook itself asks me to run a manual scan; I ran the exact equivalent (`secrets scan --range origin/develop..HEAD --redacted --fail-on verified-provider`) and it reports 0 findings across 35 paths. May I push with `--no-verify` for this one push?"
+  options:
+    - "Approve --no-verify for this push (Recommended)"
+    - "File bridge proposal to fix the pre-push hook first"
+    - "Push to a different branch name structure that the hook accepts"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3b550820d3c42350
+  resolved_at: 2026-05-07T01:06:10.518069Z
+  answer: "User has answered your questions: \"Pre-push hook fails for new branches because its merge-base auto-detection doesn't resolve when the upstream-tracking ref pattern (`refs/heads/X@{upstream}`) hits the new-branch case. The hook itself asks me to run a manual scan; I ran the exact equivalent (`secrets scan --range origin/develop..HEAD --redacted --fail-on verified-provider`) and it reports 0 findings across 35 paths. May I push with `--no-verify` for this one push?\"=\"Approve --no-verify for this push (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0429
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: "Which implementation order for the 3 GO'd items + 1 NO-GO revision?"
+  options:
+    - "Items 1 + 2 this session, 3 + 4 next (Recommended)"
+    - "All 4 items this session, accept rougher quality"
+    - "Just item 1 (smallest) this session, plan rest"
+    - "Pause; you choose individual items"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 829a4edf649bbb50
+  resolved_at: 2026-05-07T02:00:28.518632Z
+  answer: "User has answered your questions: \"Which implementation order for the 3 GO'd items + 1 NO-GO revision?\"=\"Items 1 + 2 this session, 3 + 4 next (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0430
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: "Approve the DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the audit-capture DELIB authorized by the gtkb-isolation-017-citation-backfill-004 GO.)"
+  options:
+    - "Approve (Recommended)"
+    - "Modify content first, then approve"
+    - "Reject; do not insert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 40cd7ea6bbe1efe3
+  resolved_at: 2026-05-07T02:00:28.518632Z
+  answer: "User has answered your questions: \"Approve the DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the audit-capture DELIB authorized by the gtkb-isolation-017-citation-backfill-004 GO.)\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0431
+  asked_at: 2026-05-07T02:00:28.518632Z
+  question: "Approve the DELIB-S333-CODEX-PRIME-PERIOD-KB-ATTRIBUTION-DEFECT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the historical-capture DELIB authorized by the gtkb-kb-attribution-harness-aware-004 GO.)"
+  options:
+    - "Approve (Recommended)"
+    - "Modify content first"
+    - "Reject; do not insert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ca8c0a5b7e7f39fb
+  resolved_at: 2026-05-07T02:00:28.518632Z
+  answer: "User has answered your questions: \"Approve the DELIB-S333-CODEX-PRIME-PERIOD-KB-ATTRIBUTION-DEFECT formal-artifact insert per GOV-ARTIFACT-APPROVAL-001? (Native format displayed above; this is the historical-capture DELIB authorized by the gtkb-kb-attribution-harness-aware-004 GO.)\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0434
+  asked_at: 2026-05-07T02:03:58.865561Z
+  question: "Approve insertion of DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT as displayed above?"
+  options:
+    - "Approve as displayed (Recommended)"
+    - "Revise body before approval"
+    - "Reject — do not insert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 15114f1ee8e2a648
+  resolved_at: 2026-05-07T02:03:58.865561Z
+  answer: "User has answered your questions: \"Approve insertion of DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT as displayed above?\"=\"Approve as displayed (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0436
+  asked_at: 2026-05-07T02:07:04.372305Z
+  question: "DECISION-0433 in the pending-decisions tracker is a malformed fragment (\"roposal yet filed...\") captured from a prior session and surfaced again at this session's startup. How should I dispose of it?"
+  options:
+    - "clear pending (Recommended)"
+    - "defer all"
+    - "Leave it; pick session focus first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e0ffbd017cc84d5b
+  resolved_at: 2026-05-07T02:07:04.372305Z
+  answer: "Answer questions?"
   notes: ""
 
 ## History

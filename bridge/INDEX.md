@@ -11,30 +11,47 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-isolation-018-slice-d-non-functional-content
+NO-GO: bridge/gtkb-isolation-018-slice-d-non-functional-content-002.md
+NEW: bridge/gtkb-isolation-018-slice-d-non-functional-content-001.md
+
 Document: gtkb-isolation-018-slice-c-docs-cluster
+GO: bridge/gtkb-isolation-018-slice-c-docs-cluster-005.md
+REVISED: bridge/gtkb-isolation-018-slice-c-docs-cluster-004.md
+NO-GO: bridge/gtkb-isolation-018-slice-c-docs-cluster-003.md
+NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-002.md
 NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-001.md
 
 Document: gtkb-codex-backlog-cleanup-retroactive-review
+GO: bridge/gtkb-codex-backlog-cleanup-retroactive-review-004.md
 REVISED: bridge/gtkb-codex-backlog-cleanup-retroactive-review-003.md
 NO-GO: bridge/gtkb-codex-backlog-cleanup-retroactive-review-002.md
 NEW: bridge/gtkb-codex-backlog-cleanup-retroactive-review-001.md
 
 Document: gtkb-isolation-017-citation-backfill
+VERIFIED: bridge/gtkb-isolation-017-citation-backfill-006.md
+NEW: bridge/gtkb-isolation-017-citation-backfill-005.md
+GO: bridge/gtkb-isolation-017-citation-backfill-004.md
 REVISED: bridge/gtkb-isolation-017-citation-backfill-003.md
 NO-GO: bridge/gtkb-isolation-017-citation-backfill-002.md
 NEW: bridge/gtkb-isolation-017-citation-backfill-001.md
 
 Document: gtkb-governance-hygiene-bundle
+VERIFIED: bridge/gtkb-governance-hygiene-bundle-004.md
 NEW: bridge/gtkb-governance-hygiene-bundle-003.md
 GO: bridge/gtkb-governance-hygiene-bundle-002.md
 NEW: bridge/gtkb-governance-hygiene-bundle-001.md
 
 Document: gtkb-kb-attribution-harness-aware
+VERIFIED: bridge/gtkb-kb-attribution-harness-aware-006.md
+NEW: bridge/gtkb-kb-attribution-harness-aware-005.md
+GO: bridge/gtkb-kb-attribution-harness-aware-004.md
 REVISED: bridge/gtkb-kb-attribution-harness-aware-003.md
 NO-GO: bridge/gtkb-kb-attribution-harness-aware-002.md
 NEW: bridge/gtkb-kb-attribution-harness-aware-001.md
 
 Document: gtkb-codex-bridge-compliance-gate-parity
+NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-004.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-003.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-002.md
 NEW: bridge/gtkb-codex-bridge-compliance-gate-parity-001.md
@@ -296,6 +313,8 @@ NO-GO: bridge/gtkb-isolation-018-pending-migration-waiver-002.md
 NEW: bridge/gtkb-isolation-018-pending-migration-waiver-001.md
 
 Document: gtkb-isolation-018-agent-red-file-migration
+GO: bridge/gtkb-isolation-018-agent-red-file-migration-009.md
+REVISED: bridge/gtkb-isolation-018-agent-red-file-migration-008.md
 NEW: bridge/gtkb-isolation-018-agent-red-file-migration-007.md
 GO: bridge/gtkb-isolation-018-agent-red-file-migration-006.md
 REVISED: bridge/gtkb-isolation-018-agent-red-file-migration-005.md
