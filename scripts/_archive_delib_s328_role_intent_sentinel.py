@@ -22,6 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from scripts._kb_attribution import resolve_changed_by  # noqa: E402
 
 DELIB_ID = "DELIB-S328-ROLE-INTENT-SENTINEL-OWNER-DIRECTIVE"
 
@@ -124,7 +125,7 @@ def main() -> int:
         title="S328 owner directive: bridge/INDEX.md role-intent sentinel for startup role-confusion drift detection",
         summary=SUMMARY,
         content=CONTENT,
-        changed_by="prime-builder/claude-code",
+        changed_by=resolve_changed_by(),
         change_reason=(
             "Archive S328 owner directive proposing role-intent sentinel pattern "
             "for bridge/INDEX.md. Capture mode chosen by owner via AskUserQuestion: "
