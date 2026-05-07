@@ -4,8 +4,46 @@
 <!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
 <!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
+<!-- Umbrella naming note (per gtkb-governance-hygiene-bundle Change G):
+     The AUQ-enforcement-stack umbrella uses two prefixes for the same family:
+       - gtkb-gov-askuserquestion-enforcement-stack-slice-{a,b,c,d}-* (Sub-slices A-D)
+       - gtkb-gov-auq-enforcement-stack-slice-{e,f,a-followup}-* (Sub-slices E, F, follow-ups)
+     They are the same governance umbrella; search both prefixes when investigating. -->
+
+
+Document: gtkb-isolation-018-slice-c-docs-cluster
+NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-001.md
+
+Document: gtkb-codex-backlog-cleanup-retroactive-review
+REVISED: bridge/gtkb-codex-backlog-cleanup-retroactive-review-003.md
+NO-GO: bridge/gtkb-codex-backlog-cleanup-retroactive-review-002.md
+NEW: bridge/gtkb-codex-backlog-cleanup-retroactive-review-001.md
+
+Document: gtkb-isolation-017-citation-backfill
+REVISED: bridge/gtkb-isolation-017-citation-backfill-003.md
+NO-GO: bridge/gtkb-isolation-017-citation-backfill-002.md
+NEW: bridge/gtkb-isolation-017-citation-backfill-001.md
+
+Document: gtkb-governance-hygiene-bundle
+NEW: bridge/gtkb-governance-hygiene-bundle-003.md
+GO: bridge/gtkb-governance-hygiene-bundle-002.md
+NEW: bridge/gtkb-governance-hygiene-bundle-001.md
+
+Document: gtkb-kb-attribution-harness-aware
+REVISED: bridge/gtkb-kb-attribution-harness-aware-003.md
+NO-GO: bridge/gtkb-kb-attribution-harness-aware-002.md
+NEW: bridge/gtkb-kb-attribution-harness-aware-001.md
+
+Document: gtkb-codex-bridge-compliance-gate-parity
+REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-003.md
+NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-002.md
+NEW: bridge/gtkb-codex-bridge-compliance-gate-parity-001.md
 
 Document: gtkb-claude-session-start-parity
+VERIFIED: bridge/gtkb-claude-session-start-parity-006.md
+REVISED: bridge/gtkb-claude-session-start-parity-005.md
+NO-GO: bridge/gtkb-claude-session-start-parity-004.md
+NEW: bridge/gtkb-claude-session-start-parity-003.md
 GO: bridge/gtkb-claude-session-start-parity-002.md
 NEW: bridge/gtkb-claude-session-start-parity-001.md
 
@@ -258,6 +296,7 @@ NO-GO: bridge/gtkb-isolation-018-pending-migration-waiver-002.md
 NEW: bridge/gtkb-isolation-018-pending-migration-waiver-001.md
 
 Document: gtkb-isolation-018-agent-red-file-migration
+NEW: bridge/gtkb-isolation-018-agent-red-file-migration-007.md
 GO: bridge/gtkb-isolation-018-agent-red-file-migration-006.md
 REVISED: bridge/gtkb-isolation-018-agent-red-file-migration-005.md
 NO-GO: bridge/gtkb-isolation-018-agent-red-file-migration-004.md

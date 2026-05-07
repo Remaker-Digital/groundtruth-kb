@@ -10,6 +10,27 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0420
+  asked_at: 2026-05-06T23:56:15.229032Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 09be2e17614c26a2
+  resolved_at: 2026-05-07T00:30:00.000000Z
+  resolved_in_session: S333
+  answer: "Duplicate of DECISION-0419 — same prose pattern detected twice across two turns. Substantive question was converted to AskUserQuestion (header 'Proceed how'); owner answered 'Full autonomy under prior pre-approval (Recommended)' and that choice was implemented via post-impl REVISED-1, governance-hygiene-bundle implementation, and 4 NO-GO REVISED-1 filings during the same S333 turn-set."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0419
+  asked_at: 2026-05-06T23:27:02.948675Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: e505441708526865
+  resolved_at: 2026-05-07T00:30:00.000000Z
+  resolved_in_session: S333
+  answer: "Substantive question was converted to AskUserQuestion (header 'Proceed how'); owner answered 'Full autonomy under prior pre-approval (Recommended)' and that choice was implemented via post-impl REVISED-1, governance-hygiene-bundle implementation, and 4 NO-GO REVISED-1 filings during the same S333 turn-set."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+
 - id: DECISION-0334
   asked_at: 2026-05-03T07:55:56.048857Z
   question: ""
@@ -4849,6 +4870,72 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 6d59bee5575b6858
   resolved_at: 2026-05-06T22:28:22.517317Z
   answer: "User has answered your questions: \"When I find errors or omissions during the review, what's the deliverable shape you want?\"=\"Chat summary first, then triage (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0421
+  asked_at: 2026-05-06T23:57:13.373244Z
+  question: "How would you like to start this session?"
+  options:
+    - "Resolve DECISION-0419"
+    - "Pick focus 1-13"
+    - "Defer pending, fresh focus"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 73af575d11379a52
+  resolved_at: 2026-05-06T23:57:13.373244Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0422
+  asked_at: 2026-05-06T23:59:07.606377Z
+  question: "How should I proceed given the Codex review results (1 GO, 5 NO-GO)?"
+  options:
+    - "Full autonomy under prior pre-approval (Recommended)"
+    - "Implement GO only; pause NO-GO revisions"
+    - "Revise NO-GOs first, then implement bundle"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c4eda1e524030442
+  resolved_at: 2026-05-06T23:59:07.606377Z
+  answer: "User has answered your questions: \"How should I proceed given the Codex review results (1 GO, 5 NO-GO)?\"=\"Full autonomy under prior pre-approval (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0423
+  asked_at: 2026-05-06T23:59:07.606377Z
+  question: "Approve `git rm` of the two stale duplicate files (Change A of the GO'd governance-hygiene-bundle)?"
+  options:
+    - "Approve (Recommended)"
+    - "Skip Change A only"
+    - "Pause whole bundle implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 16e9eb83702ca2df
+  resolved_at: 2026-05-06T23:59:07.606377Z
+  answer: "User has answered your questions: \"Approve `git rm` of the two stale duplicate files (Change A of the GO'd governance-hygiene-bundle)?\"=\"Approve (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0424
+  asked_at: 2026-05-07T00:01:44.315482Z
+  question: "How should I handle the two stale pending owner decisions surfaced at startup?"
+  options:
+    - "Clear pending"
+    - "Defer all"
+    - "Wait for focus pick"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1c9a7fea3babc22c
+  resolved_at: 2026-05-07T00:01:44.315482Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0425
+  asked_at: 2026-05-07T00:09:46.449207Z
+  question: "Agent Red isolation — what's the next move?"
+  options:
+    - "Action the GO'd threads"
+    - "Revise the NO-GO'd citation-backfill"
+    - "File a re-scoping proposal"
+    - "Accept as v0.7.0-rc release scope"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 583b4005159e9725
+  resolved_at: 2026-05-07T00:09:46.449207Z
+  answer: "User has answered your questions: \"Agent Red isolation — what's the next move?\"=\"I fully approve of making whatever changes are required to complete this isolation work. We will not be able to release anything until it is done. The only reason to defer any part of this project is a blocking technical dependency.\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
