@@ -584,7 +584,7 @@ async def handle_subscription_deleted(event: dict) -> dict:
 
     Starts a grace period before data deletion. The tenant's access
     is restricted but data is preserved for the grace period defined
-    in the SLA (30 days per legal/sla/SERVICE-LEVEL-AGREEMENT.md).
+    in the SLA (30 days per applications/Agent_Red/legal/sla/SERVICE-LEVEL-AGREEMENT.md).
     """
     subscription = event["data"]["object"]
     metadata = subscription.get("metadata", {})
