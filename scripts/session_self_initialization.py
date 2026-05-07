@@ -34,6 +34,16 @@ if hasattr(sys.stderr, "reconfigure"):
     except (AttributeError, ValueError):
         pass
 
+# Ensure E:\GT-KB project root is on sys.path so `from scripts.<sibling>` imports
+# resolve when this script is invoked as `python scripts/session_self_initialization.py`
+# (where sys.path[0] is the scripts/ directory, not the project root).
+# Per gtkb-claude-session-start-parity-001 GO Change 3 — repairs the
+# `No module named 'scripts.check_harness_parity'` error that surfaced in the
+# `Harness parity` field of every startup payload.
+_PROJECT_ROOT_FOR_IMPORTS = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT_FOR_IMPORTS) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT_FOR_IMPORTS))
+
 try:
     from scripts.workstream_focus import (
         CANONICAL_STATE_RELATIVE_PATH as _WORK_SUBJECT_CANONICAL_PATH,

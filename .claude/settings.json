@@ -28,8 +28,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-report --fast-hook --harness-name claude",
-            "timeout": 15
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\"",
+            "timeout": 60
           }
         ]
       }

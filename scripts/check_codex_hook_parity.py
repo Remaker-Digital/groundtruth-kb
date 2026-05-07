@@ -20,6 +20,7 @@ ROLE_ASSIGNMENT_RECORD = "harness-state/role-assignments.json"
 CODEX_CONFIG = ".codex/config.toml"
 CODEX_HOOKS = ".codex/hooks.json"
 CLAUDE_SETTINGS = ".claude/settings.json"
+CLAUDE_SESSION_START_DISPATCHER = ".claude/hooks/session_start_dispatch.py"
 CODEX_WRAPPER_DIR = PROJECT_ROOT / ".codex" / "gtkb-hooks"
 CODEX_FORMAL_APPROVAL_WRAPPER = CODEX_WRAPPER_DIR / "formal-artifact-approval.cmd"
 CODEX_WORKSTREAM_FOCUS_WRAPPER = CODEX_WRAPPER_DIR / "workstream-focus.cmd"
@@ -253,14 +254,60 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append(".claude/settings.json does not register the formal artifact approval PreToolUse hook")
 
     claude_session_commands = _commands_for_event(claude_settings, "SessionStart")
-    if not any(_contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT) for command in claude_session_commands):
-        errors.append(".claude/settings.json does not register the session self-initialization SessionStart hook")
-    if not any("--emit-report" in command for command in claude_session_commands):
-        errors.append("Claude SessionStart hook must emit the startup report")
-    if not any("--fast-hook" in command for command in claude_session_commands):
-        errors.append("Claude SessionStart hook must use the fast lifecycle hook path")
-    if not any("--harness-name claude" in command for command in claude_session_commands):
-        errors.append("Claude SessionStart hook must identify the Claude harness type")
+    # Per gtkb-claude-session-start-parity GO at -002, the Claude SessionStart
+    # hook may register the canonical script directly (legacy contract) OR a
+    # dispatcher under .claude/hooks/ whose source delegates to the canonical
+    # script with the startup-service payload contract. Both shapes preserve
+    # the same governance contract: a SessionStart hookSpecificOutput envelope
+    # is produced from the canonical service.
+    direct_session = any(
+        _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
+        for command in claude_session_commands
+    )
+    dispatcher_session = any(
+        _contains_hook_path(command, CLAUDE_SESSION_START_DISPATCHER)
+        for command in claude_session_commands
+    )
+    if not (direct_session or dispatcher_session):
+        errors.append(
+            ".claude/settings.json must register either the session-self-initialization "
+            "SessionStart hook directly or a dispatcher under .claude/hooks/ that "
+            "delegates to it"
+        )
+
+    if dispatcher_session:
+        # Dispatcher pattern: verify dispatcher source delegates correctly.
+        dispatcher_path = PROJECT_ROOT / CLAUDE_SESSION_START_DISPATCHER
+        if not dispatcher_path.is_file():
+            errors.append(
+                f"{CLAUDE_SESSION_START_DISPATCHER} referenced by SessionStart hook does not exist"
+            )
+        else:
+            dispatcher_source = dispatcher_path.read_text(encoding="utf-8")
+            if "session_self_initialization.py" not in dispatcher_source:
+                errors.append(
+                    "Claude SessionStart dispatcher must delegate to session_self_initialization.py"
+                )
+            if "--emit-startup-service-payload" not in dispatcher_source:
+                errors.append(
+                    "Claude SessionStart dispatcher must use the --emit-startup-service-payload contract"
+                )
+            if "--fast-hook" not in dispatcher_source:
+                errors.append(
+                    "Claude SessionStart dispatcher must use the fast lifecycle hook path"
+                )
+            if "--harness-name" not in dispatcher_source or "claude" not in dispatcher_source:
+                errors.append(
+                    "Claude SessionStart dispatcher must identify the Claude harness type"
+                )
+    elif direct_session:
+        # Legacy direct-invocation pattern: preserve the original assertions.
+        if not any("--emit-report" in command for command in claude_session_commands):
+            errors.append("Claude SessionStart hook must emit the startup report")
+        if not any("--fast-hook" in command for command in claude_session_commands):
+            errors.append("Claude SessionStart hook must use the fast lifecycle hook path")
+        if not any("--harness-name claude" in command for command in claude_session_commands):
+            errors.append("Claude SessionStart hook must identify the Claude harness type")
     if any("--harness-id B" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_session_commands):

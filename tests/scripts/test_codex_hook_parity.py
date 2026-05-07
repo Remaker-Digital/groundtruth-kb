@@ -92,16 +92,40 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         "the wrapper file is created on disk. Active fallback is in the "
         "release-candidate gate via check_pending_owner_decisions_parity.py."
     )
-    assert any(
-        "session_self_initialization.py" in hook["command"]
-        and "--emit-report" in hook["command"]
-        and "--fast-hook" in hook["command"]
-        and "--harness-name claude" in hook["command"]
-        and "--harness-id B" not in hook["command"]
-        and "--role-profile" not in hook["command"]
+    # Per gtkb-claude-session-start-parity GO at -002, the SessionStart
+    # registration may be either the canonical script directly (legacy)
+    # or a dispatcher under .claude/hooks/ that delegates to it via the
+    # --emit-startup-service-payload contract.
+    session_start_hooks = [
+        hook["command"]
         for group in claude_settings["hooks"]["SessionStart"]
         for hook in group["hooks"]
+    ]
+    direct_match = any(
+        "session_self_initialization.py" in cmd
+        and "--emit-report" in cmd
+        and "--fast-hook" in cmd
+        and "--harness-name claude" in cmd
+        and "--harness-id B" not in cmd
+        and "--role-profile" not in cmd
+        for cmd in session_start_hooks
     )
+    dispatcher_match = any(
+        "session_start_dispatch.py" in cmd
+        for cmd in session_start_hooks
+    )
+    assert direct_match or dispatcher_match, (
+        "Claude SessionStart must register either the canonical service directly "
+        "or a dispatcher under .claude/hooks/ that delegates to it"
+    )
+    if dispatcher_match:
+        from pathlib import Path as _P
+        dispatcher_source = _P(".claude/hooks/session_start_dispatch.py").read_text(encoding="utf-8")
+        assert "session_self_initialization.py" in dispatcher_source
+        assert "--emit-startup-service-payload" in dispatcher_source
+        assert "--fast-hook" in dispatcher_source
+        assert "--harness-name" in dispatcher_source
+        assert "claude" in dispatcher_source
     assert any(
         "session_self_initialization.py" in hook["command"]
         and "--emit-wrapup" in hook["command"]

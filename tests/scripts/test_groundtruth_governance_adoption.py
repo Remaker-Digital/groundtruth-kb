@@ -157,13 +157,45 @@ def test_project_settings_registers_bridge_visibility_hook() -> None:
     ]
 
     assert any("formal-artifact-approval-gate.py" in command for command in pre_tool_commands)
-    assert any(
-        "session_self_initialization.py" in hook["command"]
-        and "--emit-report" in hook["command"]
-        and "--fast-hook" in hook["command"]
+
+    # Per gtkb-claude-session-start-parity GO at -002, the Claude SessionStart
+    # hook may register the canonical script directly (legacy --emit-report path)
+    # OR a dispatcher under .claude/hooks/ that delegates to the canonical
+    # service via the --emit-startup-service-payload contract. Both shapes
+    # preserve governance: the SessionStart hook surface is canonical-service-backed.
+    session_start_hooks = [
+        hook["command"]
         for group in settings["hooks"]["SessionStart"]
         for hook in group["hooks"]
+    ]
+    direct_match = any(
+        "session_self_initialization.py" in command
+        and "--emit-report" in command
+        and "--fast-hook" in command
+        for command in session_start_hooks
     )
+    dispatcher_match = any(
+        "session_start_dispatch.py" in command
+        for command in session_start_hooks
+    )
+    assert direct_match or dispatcher_match, (
+        "SessionStart must register either the canonical service directly "
+        "(--emit-report --fast-hook) or a dispatcher under .claude/hooks/ "
+        "that delegates to it"
+    )
+    if dispatcher_match:
+        # Verify the dispatcher source delegates to the canonical service
+        # using the SessionStart-correct startup-service payload contract.
+        dispatcher_path = Path(".claude/hooks/session_start_dispatch.py")
+        assert dispatcher_path.is_file(), (
+            f"SessionStart dispatcher path missing: {dispatcher_path}"
+        )
+        dispatcher_source = dispatcher_path.read_text(encoding="utf-8")
+        assert "session_self_initialization.py" in dispatcher_source
+        assert "--emit-startup-service-payload" in dispatcher_source
+        assert "--fast-hook" in dispatcher_source
+        assert "--harness-name" in dispatcher_source
+        assert "claude" in dispatcher_source
     assert any(
         "session_self_initialization.py" in hook["command"]
         and "--emit-wrapup" in hook["command"]

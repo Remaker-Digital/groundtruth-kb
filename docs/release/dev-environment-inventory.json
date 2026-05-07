@@ -5,7 +5,7 @@
     "script_hash": "sha256:09a700118a7350e2d5928fe493011fc5aa237928850b21bfbc1798bdaeacc3fb",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-06T22:24:17Z",
+  "generated_at": "2026-05-07T00:31:02Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -97,13 +97,13 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 10,
+      "count": 11,
       "items": [
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-compliance-gate.py",
@@ -112,6 +112,7 @@
         ".claude/hooks/formal-artifact-approval-gate.py",
         ".claude/hooks/owner-decision-tracker.py",
         ".claude/hooks/scheduler.py",
+        ".claude/hooks/session_start_dispatch.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/hooks/spec-event-surfacer.py",
         ".claude/hooks/workstream-focus.py"
@@ -119,13 +120,12 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 8,
+      "count": 7,
       "items": [
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
         ".codex/gtkb-hooks/formal-artifact-approval.cmd",
-        ".codex/gtkb-hooks/session-start (1).cmd",
         ".codex/gtkb-hooks/session-start.cmd",
         ".codex/gtkb-hooks/session-stop.cmd",
         ".codex/gtkb-hooks/workstream-focus.cmd"
