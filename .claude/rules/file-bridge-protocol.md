@@ -224,3 +224,33 @@ Implementation proposals and reports that depend on owner approval — citing Su
 The bridge-compliance-gate hook (`.claude/hooks/bridge-compliance-gate.py`) mechanically enforces this requirement at Write time. Loyal Opposition issues NO-GO when an applicable proposal/report lacks the section. Codex review checks the section's substance; placeholder content (`tbd`, `todo`, `n/a`, `none`, `not applicable`, `no relevant`) is rejected.
 
 The check fires conditionally — proposals that do NOT depend on owner approval (routine refactors, scaffold updates, etc.) are not affected. Loyal Opposition verdict files (lines starting with `GO`, `NO-GO`, or `VERIFIED`) are explicitly excluded because they are evidence narratives, not approval claims.
+
+## Conventional Commits Type Discipline (Implementation Reports)
+
+Per `bridge/gtkb-governance-hygiene-bundle-001.md` (Change B; rationale: S333 audit FINDING-P0-001 — commit `721f7c69` was labeled `chore` despite adding ~13 K LOC of net infrastructure):
+
+Implementation reports filed for `VERIFIED` review MUST include a recommended Conventional Commits type for the eventual commit. Accepted values: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`, `build:`, `ci:`, `perf:`, `style:`. The recommendation appears in a section titled `## Recommended Commit Type` (or as part of an existing `## Files Changed` / `## Summary` section explicitly tagged `Recommended commit type:`).
+
+Loyal Opposition validates that the recommended type matches the diff stat:
+
+- `feat:` for net-new modules, scripts, hooks, skills, or capabilities.
+- `fix:` for repairs to broken behavior with no new capability surface.
+- `refactor:` for restructuring without behavior change.
+- `chore:` for true maintenance-only changes (dependency bumps without code, README touches, etc.).
+- `docs:` for governance/rule/runbook-only edits.
+- `test:` for test-only additions.
+
+The discipline does not mandate any specific type; it requires the choice to be declared and justified, so commit-history-driven tooling (release notes, changelogs, semantic-version inference) doesn't mis-categorize sweeping changes.
+
+## Parked-Draft Pattern
+
+Per `bridge/gtkb-governance-hygiene-bundle-001.md` (Change D; rationale: S333 audit FINDING-P4-001 — `bridge/gtkb-isolation-018-slice-c-docs-cluster-001.md` was committed at `cd8f27ce` without an INDEX entry, which the bridge applicability preflight tool legitimately surfaces as `ERR_NO_INDEX_ENTRY`):
+
+A bridge file MAY be committed without an INDEX entry when the commit message tags it as a parked draft (e.g., `... 18.C draft parked`). The applicability preflight tool returns `ERR_NO_INDEX_ENTRY` for such files; that is expected behavior and not a defect.
+
+Parked drafts are deliberate work-in-progress artifacts that must NOT trigger Loyal Opposition review until they are promoted by:
+
+1. Adding an INDEX entry with status `NEW` or `REVISED`.
+2. The promotion commit message explicitly states `<bridge-id>: parked draft promoted to <status>`.
+
+Audits SHOULD identify parked drafts in their inventory phase but MUST NOT flag them as orphans without checking the originating commit message for the `parked` tag.

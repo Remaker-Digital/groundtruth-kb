@@ -79,4 +79,19 @@ The bridge-compliance-gate hook fails the Write before submission, but Loyal Opp
 
 Verdict files (lines starting with GO/NO-GO/VERIFIED) are explicitly excluded; they are evidence narratives, not approval claims.
 
+## Loyal Opposition KB-Write Approval-Packet Pathway
+
+Per `bridge/gtkb-governance-hygiene-bundle-001.md` (Change C; rationale: S333 audit FINDING-P1-007 — Codex-as-LO inserted `GOV-ENV-LOCAL-AUTHORITY-001` on 2026-05-05 via the `codex-loyal-opposition` `changed_by` attribution):
+
+The §"Loyal Opposition File Safety Rule" above restricts non-self-created file modifications without explicit owner approval. This clarification documents the approval-packet pathway by which Loyal Opposition MAY perform a MemBase write (spec/work-item/deliberation insert or new-version):
+
+1. An explicit owner-approval packet exists at `.groundtruth/formal-artifact-approvals/<date>-<artifact-id>.json`.
+2. The packet contents (`artifact_id`, `artifact_type`, `body_hash` or equivalent fingerprint) match the inserted MemBase row.
+3. The MemBase row's `change_reason` cites the approval-packet path explicitly.
+4. The `changed_by` attribution accurately reflects the active LO harness identity (e.g., `codex-loyal-opposition`).
+
+Without all four, the LO file-safety rule applies and the operation requires explicit owner approval through the chat interface before the write occurs.
+
+This pathway exists for owner-directed governance work that the owner has chosen to route through Loyal Opposition. It does NOT authorize discretionary LO-initiated KB writes.
+
 

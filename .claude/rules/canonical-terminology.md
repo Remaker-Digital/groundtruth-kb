@@ -262,13 +262,18 @@ of an application (vs. the lifecycle record managed by GT-KB).
 validated GT-KB during isolation work, but unqualified GT-KB references must not
 resolve to Agent Red files, CI, GitHub Actions, or repository state.
 
-**Configured GitHub repository URL:** `https://github.com/mike-remakerdigital/agent-red`.
+**Configured GitHub repository URLs (canonical-migration window in effect):**
+
+- **Current canonical:** `https://github.com/mike-remakerdigital/agent-red`. This is the repository whose contents are the canonical Agent Red truth at the time of writing.
+- **Migration target (de facto under transient exception):** `https://github.com/Remaker-Digital/agent-red-customer-engagement`. Agent Red CI evidence is currently captured against this repository under the transient exception in `DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE` while the canonical migration completes. The exception is evidence-scoped and does NOT authorize the GT-KB `v0.7.0-rc1` tag until canonical migration and canonical CI binding are complete.
+
+When the canonical migration completes, the migration-target URL becomes the sole canonical and this entry is updated to remove the dual listing.
 
 **Not to be confused with:** the four small demo applications included with
 GT-KB, or with the GroundTruth-KB platform repository
 `https://github.com/Remaker-Digital/groundtruth-kb`.
 
-**Source:** owner correction, 2026-05-04.
+**Source:** owner correction, 2026-05-04; dual-repo clarification per S333 audit FINDING-P1-002 (downgraded to P3) and `bridge/gtkb-governance-hygiene-bundle-001.md` Change E.
 
 ### adopter
 
