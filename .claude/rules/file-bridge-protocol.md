@@ -118,6 +118,26 @@ Opposition remains responsible for identifying relevant specifications that
 are not yet represented in `config/governance/spec-applicability.toml` and
 should raise omissions as findings or propose registry updates.
 
+## Clause-Test Preflight (Advisory; Slice 1)
+
+A companion preflight surface, `scripts/adr_dcl_clause_preflight.py`, asks
+a finer-grained question than the applicability preflight above: for each
+ADR/DCL clause registered in `config/governance/adr-dcl-clauses.toml`, does
+the bridge proposal/report show evidence that satisfies the clause? It
+emits a "Clause Applicability" section listing each clause with its
+applicability verdict (`must_apply` / `may_apply` / `not_applicable`) and,
+for `must_apply` clauses, whether satisfying evidence was found.
+
+**Slice 1 is advisory only.** The clause-test preflight is NOT a blocking
+gate. It always exits 0 — even when blocking-severity clauses lack
+satisfying evidence. Reviewers MAY consult its output during review, but
+`GO` and `VERIFIED` decisions are not yet conditioned on its result. Slice 2
+of `gtkb-adr-dcl-clause-test-enforcement` is the future bridge thread that
+will promote selected blocking clauses to a hard gate, after Slice-1
+feedback has tightened the applicability triggers and evidence patterns.
+
+Source: `bridge/gtkb-adr-dcl-clause-test-enforcement-001.md` (GO at -002).
+
 ## File Naming
 
 `{descriptive-name}-{NNN}.md`

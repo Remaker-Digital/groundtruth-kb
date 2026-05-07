@@ -12,6 +12,7 @@
 
 
 Document: gtkb-adr-dcl-clause-test-enforcement
+NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-003.md
 GO: bridge/gtkb-adr-dcl-clause-test-enforcement-002.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-001.md
 
@@ -57,6 +58,7 @@ NO-GO: bridge/gtkb-kb-attribution-harness-aware-002.md
 NEW: bridge/gtkb-kb-attribution-harness-aware-001.md
 
 Document: gtkb-codex-bridge-compliance-gate-parity
+REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-007.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-006.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-005.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-004.md

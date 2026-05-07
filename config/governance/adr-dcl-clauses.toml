@@ -1,0 +1,109 @@
+# ADR/DCL Clause Registry — Slice 1 (per gtkb-adr-dcl-clause-test-enforcement GO at -002)
+#
+# This file encodes the five highest-risk ADR/DCL/governance fixtures as
+# atomic clauses with applicability triggers and evidence-detection patterns.
+# Slice 1 runs in advisory mode only — the companion CLI
+# (scripts/adr_dcl_clause_preflight.py) reports gaps but does NOT block.
+#
+# Schema per bridge/gtkb-adr-dcl-clause-test-enforcement-001.md Change 1:
+#   clause_id              = "<spec-id>/<short-clause-name>"
+#   spec_id                = governing spec ID in MemBase
+#   description            = human-readable clause statement
+#   applies_when_path      = list of glob patterns matching changed paths
+#   applies_when_doc_name  = list of regex patterns matching the bridge doc name
+#   applies_when_content   = list of regex patterns matching bridge content
+#   evidence_required      = describes what implementation evidence satisfies the clause
+#   evidence_pattern       = regex matching satisfying-evidence text in the bridge
+#   failure_condition      = human-readable description of what failure looks like
+#   failure_pattern        = optional regex; if matched, evidence is treated as inverted/refuted
+#   severity               = "blocking" | "advisory"
+#   waiver_policy          = "explicit_owner_waiver_required_in_bridge" | "advisory_only"
+#   enforcement_mode       = "advisory_only_in_slice_1" (Slice 2 promotes selected clauses)
+#
+# Future-slice path: Slice 2 promotes selected blocking clauses to a hard
+# GO/VERIFIED gate; Slice 3 wires the matrix into LO verdict templates;
+# Slice 4 ratchets adoption; Slice 5 may add semantic discovery.
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+[[clauses]]
+clause_id = "ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT"
+spec_id = "ADR-ISOLATION-APPLICATION-PLACEMENT-001"
+description = "All active GT-KB files must remain within E:\\GT-KB; all GT-KB demo/application files must remain within E:\\GT-KB\\applications\\."
+applies_when_path = ["**/*"]
+applies_when_doc_name = []
+applies_when_content = [
+    "(?i)\\b(?:in[- ]root|out[- ]of[- ]root|project root|root boundary|E:\\\\GT-KB|E:/GT-KB)\\b",
+]
+evidence_required = "Implementation must declare in-root output paths for all generated artifacts; bridge file must reside under E:\\GT-KB\\bridge\\."
+evidence_pattern = "(?i)(?:E:\\\\GT-KB|under .{0,40}root|in[- ]root|`E:/GT-KB`)"
+failure_condition = "Implementation report references an output path outside E:\\GT-KB."
+failure_pattern = "(?i)(?:C:\\\\Users\\\\|/tmp/(?!agent-red-rehearsal)|C:\\\\temp\\\\(?!agent-red-rehearsal))"
+severity = "blocking"
+waiver_policy = "explicit_owner_waiver_required_in_bridge"
+enforcement_mode = "advisory_only_in_slice_1"
+
+[[clauses]]
+clause_id = "GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-INDEX-IS-CANONICAL"
+spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+description = "bridge/INDEX.md is the canonical workflow state; both agents must trust INDEX over any other signal; bridge files are append-only audit trail."
+applies_when_path = ["bridge/**"]
+applies_when_doc_name = []
+applies_when_content = [
+    "(?i)\\b(?:bridge/INDEX\\.md|INDEX entry|INDEX update|append[- ]only)\\b",
+]
+evidence_required = "Bridge artifact filed under bridge/ with INDEX.md entry of correct status; no deletion or rewrite of prior versions."
+evidence_pattern = "(?i)(?:bridge/INDEX\\.md|INDEX update|insert.+top of.+(?:INDEX|entry))"
+failure_condition = "Implementation deletes a prior bridge file, mutates an existing INDEX entry's prior versions, or claims VERIFIED without an INDEX entry."
+severity = "blocking"
+waiver_policy = "explicit_owner_waiver_required_in_bridge"
+enforcement_mode = "advisory_only_in_slice_1"
+
+[[clauses]]
+clause_id = "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS"
+spec_id = "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001"
+description = "Every implementation proposal must include a concrete Specification Links section citing all governing specs/rules/ADR/DCL artifacts before GO."
+applies_when_path = ["bridge/**"]
+applies_when_doc_name = []
+applies_when_content = [
+    "(?i)^#{1,6}\\s*(?:relevant|linked|governing)?\\s*specification(?:\\s+links?|\\s+references?|\\s*)$",
+]
+evidence_required = "Bridge proposal includes a `## Specification Links` section with at least one concrete spec/rule/ADR/DCL citation; no placeholder content (TBD/TODO/N/A)."
+evidence_pattern = "(?i)\\b(?:GOV|SPEC|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\\b"
+failure_condition = "Bridge proposal lacks a Specification Links section, or the section contains only placeholder text."
+failure_pattern = "(?i)(?:specification\\s+links?[\\s:]*(?:tbd|todo|n/a|none|not applicable))"
+severity = "blocking"
+waiver_policy = "explicit_owner_waiver_required_in_bridge"
+enforcement_mode = "advisory_only_in_slice_1"
+
+[[clauses]]
+clause_id = "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING"
+spec_id = "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001"
+description = "VERIFIED reports must include a spec-to-test mapping with executed test command evidence; passing tests alone are insufficient if not mapped to linked specs."
+applies_when_path = ["bridge/**"]
+applies_when_doc_name = []
+applies_when_content = [
+    "(?i)\\b(?:VERIFIED|implementation report|post[- ]impl(?:ementation)?)\\b",
+]
+evidence_required = "Implementation report includes a `Specification-Derived Verification` (or equivalent spec-to-test) section AND command evidence (pytest/python -m pytest/etc.) AND observed results."
+evidence_pattern = "(?i)(?:specification[- ]derived\\s+verification|spec[- ]to[- ]test|python -m pytest|pytest|ruff|test_.+\\.py)"
+failure_condition = "VERIFIED report lacks the spec-to-test mapping or omits executed-command evidence."
+severity = "blocking"
+waiver_policy = "explicit_owner_waiver_required_in_bridge"
+enforcement_mode = "advisory_only_in_slice_1"
+
+[[clauses]]
+clause_id = "GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS"
+spec_id = "GOV-STANDING-BACKLOG-001"
+description = "Bulk operations against the standing backlog (e.g., bulk work_item state transitions) must be visible in audit and review packets; the operation must not silently bypass the deliberation/approval surface."
+applies_when_path = ["scripts/**", "tools/**", "bridge/**"]
+applies_when_doc_name = []
+applies_when_content = [
+    "(?i)\\b(?:standing\\s+backlog|work[- ]item|backlog\\s+cleanup|bulk\\s+(?:transition|update|operation))\\b",
+]
+evidence_required = "Bulk-operation work item produces an inventory artifact AND review packet AND a Phase/Path-deferred decision marker, OR carries explicit owner-approval packet for the bulk action."
+evidence_pattern = "(?i)(?:inventory|review[- ]packet|DECISION DEFERRED|formal-artifact-approval)"
+failure_condition = "Bulk-operation bridge claims completion without inventory + review packet + deferred-decision marker AND without an explicit owner-approval packet."
+severity = "blocking"
+waiver_policy = "explicit_owner_waiver_required_in_bridge"
+enforcement_mode = "advisory_only_in_slice_1"
