@@ -70,8 +70,8 @@ id = "inventory-collector-and-baseline"
 patterns = [
   "scripts/collect_dev_environment_inventory.py",
   "scripts/check_dev_environment_inventory_drift.py",
-  "docs/release/dev-environment-inventory.json",
-  "docs/release/dev-environment-inventory.md",
+  ".groundtruth/inventory/dev-environment-inventory.json",
+  ".groundtruth/inventory/dev-environment-inventory.md",
   "config/governance/protected-artifact-inventory-drift.toml",
 ]
 severity = "accepted_baseline_update"

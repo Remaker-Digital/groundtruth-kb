@@ -12,6 +12,7 @@
 
 
 Document: gtkb-adr-dcl-clause-test-enforcement
+GO: bridge/gtkb-adr-dcl-clause-test-enforcement-002.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-001.md
 
 Document: gtkb-isolation-018-slice-d-non-functional-content
@@ -26,6 +27,7 @@ NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-002.md
 NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-001.md
 
 Document: gtkb-codex-backlog-cleanup-retroactive-review
+VERIFIED: bridge/gtkb-codex-backlog-cleanup-retroactive-review-006.md
 NEW: bridge/gtkb-codex-backlog-cleanup-retroactive-review-005.md
 GO: bridge/gtkb-codex-backlog-cleanup-retroactive-review-004.md
 REVISED: bridge/gtkb-codex-backlog-cleanup-retroactive-review-003.md
@@ -55,6 +57,7 @@ NO-GO: bridge/gtkb-kb-attribution-harness-aware-002.md
 NEW: bridge/gtkb-kb-attribution-harness-aware-001.md
 
 Document: gtkb-codex-bridge-compliance-gate-parity
+NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-006.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-005.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-004.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-003.md

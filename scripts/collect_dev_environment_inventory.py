@@ -26,8 +26,8 @@ from typing import Any
 SCHEMA_VERSION = 1
 COLLECTOR_VERSION = "gtkb-dev-environment-inventory-v1"
 DEFAULT_MAX_AGE_HOURS = 336
-PUBLIC_JSON_RELATIVE_PATH = Path("docs/release/dev-environment-inventory.json")
-PUBLIC_MARKDOWN_RELATIVE_PATH = Path("docs/release/dev-environment-inventory.md")
+PUBLIC_JSON_RELATIVE_PATH = Path(".groundtruth/inventory/dev-environment-inventory.json")
+PUBLIC_MARKDOWN_RELATIVE_PATH = Path(".groundtruth/inventory/dev-environment-inventory.md")
 LOCAL_JSON_RELATIVE_PATH = Path(".gtkb-state/dev-environment-inventory/local.json")
 PUBLIC_REQUIRED_SECTIONS = (
     "project",

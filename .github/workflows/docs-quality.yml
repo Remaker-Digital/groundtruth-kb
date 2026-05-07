@@ -17,12 +17,12 @@ name: Docs Quality
 on:
   pull_request:
     paths:
-      - 'docs-site/**'
+      - 'applications/Agent_Red/docs-site/**'
       - '.github/workflows/docs-quality.yml'
   push:
     branches: [main]
     paths:
-      - 'docs-site/**'
+      - 'applications/Agent_Red/docs-site/**'
   schedule:
     # Weekly link rot check — Sundays at 06:00 UTC
     - cron: '0 6 * * 0'
@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: docs-site/package-lock.json
+          cache-dependency-path: applications/Agent_Red/docs-site/package-lock.json
 
       - run: npm ci
       - run: npm run build
@@ -63,8 +63,8 @@ jobs:
         run: |
           curl -fsSL -o vale.tar.gz "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
           tar -xzf vale.tar.gz vale
-          ./vale --config=docs-site/.vale.ini sync
-          ./vale --config=docs-site/.vale.ini docs-site/docs
+          ./vale --config=applications/Agent_Red/docs-site/.vale.ini sync
+          ./vale --config=applications/Agent_Red/docs-site/.vale.ini applications/Agent_Red/docs-site/docs
 
   # ---------- markdownlint ----------
   markdownlint:

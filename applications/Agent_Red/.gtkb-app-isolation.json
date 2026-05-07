@@ -64,6 +64,18 @@
       "type": "DIR",
       "bucket": "A",
       "purpose": "Agent Red SaaS legal documents (DPA, Privacy, SLA, Terms); migrated from GT-KB root in S334 sub-slice 18.D Pattern G (re-run per S334 owner AUQ after rollback); covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "docs",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red documentation (admin guides, architecture, plans, proposals, marketing, etc.; migrated from GT-KB root in S334 sub-slice 18.C re-run per S334 owner AUQ; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause). Platform docs (gtkb-dashboard, specification-scaffold, assets/gtkb-dashboard) explicitly excluded per S331 owner directive and remain at GT-KB root."
+    },
+    {
+      "name": "docs-site",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red Docusaurus site (agentredcx.com source); migrated from GT-KB root in S334 sub-slice 18.C re-run as per-file moves into existing destination subtree; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
     }
   ],
   "validator_contract": {
