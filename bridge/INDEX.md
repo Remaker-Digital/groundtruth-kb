@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-adr-dcl-clause-test-enforcement
+NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-001.md
+
 Document: gtkb-isolation-018-slice-d-non-functional-content
 NO-GO: bridge/gtkb-isolation-018-slice-d-non-functional-content-002.md
 NEW: bridge/gtkb-isolation-018-slice-d-non-functional-content-001.md
@@ -23,6 +26,7 @@ NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-002.md
 NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-001.md
 
 Document: gtkb-codex-backlog-cleanup-retroactive-review
+NEW: bridge/gtkb-codex-backlog-cleanup-retroactive-review-005.md
 GO: bridge/gtkb-codex-backlog-cleanup-retroactive-review-004.md
 REVISED: bridge/gtkb-codex-backlog-cleanup-retroactive-review-003.md
 NO-GO: bridge/gtkb-codex-backlog-cleanup-retroactive-review-002.md
@@ -51,6 +55,7 @@ NO-GO: bridge/gtkb-kb-attribution-harness-aware-002.md
 NEW: bridge/gtkb-kb-attribution-harness-aware-001.md
 
 Document: gtkb-codex-bridge-compliance-gate-parity
+REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-005.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-004.md
 REVISED: bridge/gtkb-codex-bridge-compliance-gate-parity-003.md
 NO-GO: bridge/gtkb-codex-bridge-compliance-gate-parity-002.md

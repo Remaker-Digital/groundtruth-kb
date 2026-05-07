@@ -6,23 +6,29 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0433
-  asked_at: 2026-05-07T02:03:31.445813Z
-  question: "roposal yet filed.  Want me to do anything else right now, or wrap and pick this up next session?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 410a09d26b853188
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0435
-  asked_at: 2026-05-07T02:06:23.479326Z
-  question: "roposal yet filed.  Want me to do anything else right now, or wrap and pick this up next session? (asked 2026-05-07T0"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 1aefa5c1b120b430
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
+- id: DECISION-0435
+  asked_at: 2026-05-07T02:06:23.479326Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 1aefa5c1b120b430
+  resolved_at: 2026-05-07T03:10:00.000000Z
+  resolved_in_session: S334
+  answer: "Recursive false-positive class — the original prose ask was a benign session-wrap status update from a prior turn. The startup payload's verbatim re-render of this entry triggered the Stop hook again at S334 startup. Owner selected 'Clear pending (Recommended)' via AskUserQuestion at S334 startup; closing as resolved."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0433
+  asked_at: 2026-05-07T02:03:31.445813Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 410a09d26b853188
+  resolved_at: 2026-05-07T03:10:00.000000Z
+  resolved_in_session: S334
+  answer: "Recursive false-positive class — the original prose ask was a benign session-wrap status update from a prior turn. The startup payload's verbatim re-render of this entry triggered the Stop hook again at S334 startup. Owner selected 'Clear pending (Recommended)' via AskUserQuestion at S334 startup; closing as resolved."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-0432
   asked_at: 2026-05-07T02:00:28.518632Z
   question: ""
