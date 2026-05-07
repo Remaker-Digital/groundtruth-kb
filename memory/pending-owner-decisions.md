@@ -6,7 +6,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-0443
+  asked_at: 2026-05-07T12:39:51.888410Z
+  question: "─────────────────`  Standing by for direction — file -003 now, or pause?"
+  detected_via: prose:standing_by_for_q
+  status: pending
+  question_hash: f788face7ff1627f
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -5084,6 +5090,87 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: d0f901db4a829e6f
   resolved_at: 2026-05-07T03:45:56.215082Z
   answer: "User has answered your questions: \"Local develop is at commit fef42fe1 with origin/develop as a strict ancestor. Pushing will be a clean fast-forward of 7 commits. Push now?\"=\"Push develop to origin (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0438
+  asked_at: 2026-05-07T04:49:02.832001Z
+  question: "Wrap-scan flagged 12 pre-existing ERRORs (10 recursive snapshot-rule violations + 2 INDEX entries pointing at missing isolation-018-slice-d files from prior sessions). None are S334-introduced. The skill contract requires explicit owner override to proceed with mutating /kb-session-wrap. Override and wrap?"
+  options:
+    - "Override and run /kb-session-wrap S334 (Recommended)"
+    - "Triage the 2 INDEX-points-at-missing-file errors first"
+    - "Wrap manually; you handle it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7dd829540f279bef
+  resolved_at: 2026-05-07T04:49:02.832001Z
+  answer: "User has answered your questions: \"Wrap-scan flagged 12 pre-existing ERRORs (10 recursive snapshot-rule violations + 2 INDEX entries pointing at missing isolation-018-slice-d files from prior sessions). None are S334-introduced. The skill contract requires explicit owner override to proceed with mutating /kb-session-wrap. Override and wrap?\"=\"Override and run /kb-session-wrap S334 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0439
+  asked_at: 2026-05-07T05:28:01.870807Z
+  question: "Which categories of FREEZE/HOLD/DEFER state should I lift?"
+  options:
+    - "A + B + C only (Recommended)"
+    - "A + B + C + H"
+    - "Everything except G"
+    - "Truly all (including G)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 782d803e732fef5c
+  resolved_at: 2026-05-07T05:28:01.870807Z
+  answer: "User has answered your questions: \"Which categories of FREEZE/HOLD/DEFER state should I lift?\"=\"A + B + C + H\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0440
+  asked_at: 2026-05-07T05:28:01.870807Z
+  question: "Approve DELIB-S332 as drafted and authorize me to file the bridge proposal?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve, but also lift S327 release-path goal entirely"
+    - "Revise drafts before filing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ec6405be6c86a9c6
+  resolved_at: 2026-05-07T05:28:01.870807Z
+  answer: "User has answered your questions: \"Approve DELIB-S332 as drafted and authorize me to file the bridge proposal?\"=\"Approve, but also lift S327 release-path goal entirely\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0441
+  asked_at: 2026-05-07T05:55:18.523885Z
+  question: "18.C NO-GO at -007. The 6 working-directory directives you previously rolled back are now Codex's NO-GO blocker. How to resolve?"
+  options:
+    - "Add the 6 working-directory edits + fix the count (Recommended)"
+    - "File 18.C as accepted-with-known-gap (request override)"
+    - "Defer 18.C entirely; file follow-up bridge thread later"
+    - "Pause; pick up next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b069041166f95e43
+  resolved_at: 2026-05-07T05:55:18.523885Z
+  answer: "User has answered your questions: \"18.C NO-GO at -007. The 6 working-directory directives you previously rolled back are now Codex's NO-GO blocker. How to resolve?\"=\"Add the 6 working-directory edits + fix the count (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0442
+  asked_at: 2026-05-07T08:24:52.504182Z
+  question: "18.E structure — single atomic slice or sub-split into reviewable sub-sub-slices?"
+  options:
+    - "Sub-split: 18.E.1 + 18.E.2 + 18.E.3 (Recommended)"
+    - "Single atomic 18.E commit per umbrella -005 plan"
+    - "Probe more before deciding"
+    - "Pause; pick up next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 78efb5329715f4bc
+  resolved_at: 2026-05-07T08:24:52.504182Z
+  answer: "User has answered your questions: \"18.E structure — single atomic slice or sub-split into reviewable sub-sub-slices?\"=\"Sub-split: 18.E.1 + 18.E.2 + 18.E.3 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0444
+  asked_at: 2026-05-07T12:43:19.864631Z
+  question: "18.E scoping NO-GO at -002 — file the corrected -003 now or pause?"
+  options:
+    - "File -003 corrections now"
+    - "File -003 with Option B as new default"
+    - "Pause; pick up next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: aac3011d0547ef04
+  resolved_at: 2026-05-07T12:43:19.864631Z
+  answer: "User has answered your questions: \"18.E scoping NO-GO at -002 — file the corrected -003 now or pause?\"=\"File -003 corrections now\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

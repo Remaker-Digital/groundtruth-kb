@@ -11,7 +11,19 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-isolation-018-slice-e-code-cluster
+REVISED: bridge/gtkb-isolation-018-slice-e-code-cluster-003.md
+NO-GO: bridge/gtkb-isolation-018-slice-e-code-cluster-002.md
+NEW: bridge/gtkb-isolation-018-slice-e-code-cluster-001.md
+
 Document: gtkb-lift-feature-freeze
+VERIFIED: bridge/gtkb-lift-feature-freeze-012.md
+REVISED: bridge/gtkb-lift-feature-freeze-011.md
+NO-GO: bridge/gtkb-lift-feature-freeze-010.md
+NEW: bridge/gtkb-lift-feature-freeze-009.md
+GO: bridge/gtkb-lift-feature-freeze-008.md
+REVISED: bridge/gtkb-lift-feature-freeze-007.md
+NO-GO: bridge/gtkb-lift-feature-freeze-006.md
 REVISED: bridge/gtkb-lift-feature-freeze-005.md
 NO-GO: bridge/gtkb-lift-feature-freeze-004.md
 REVISED: bridge/gtkb-lift-feature-freeze-003.md
@@ -33,6 +45,9 @@ NO-GO: bridge/gtkb-isolation-018-slice-d-non-functional-content-002.md
 NEW: bridge/gtkb-isolation-018-slice-d-non-functional-content-001.md
 
 Document: gtkb-isolation-018-slice-c-docs-cluster
+VERIFIED: bridge/gtkb-isolation-018-slice-c-docs-cluster-011.md
+NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-010.md
+NO-GO: bridge/gtkb-isolation-018-slice-c-docs-cluster-009.md
 NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-008.md
 NO-GO: bridge/gtkb-isolation-018-slice-c-docs-cluster-007.md
 NEW: bridge/gtkb-isolation-018-slice-c-docs-cluster-006.md

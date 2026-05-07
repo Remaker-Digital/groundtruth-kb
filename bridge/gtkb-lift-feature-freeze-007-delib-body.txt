@@ -1,0 +1,40 @@
+DELIB-S332-LIFT-FEATURE-FREEZE-AND-RELEASE-PATH-FRAMING
+
+source_type: owner_conversation
+outcome: owner_decision
+session_id: S332
+detected_via: ask_user_question
+recorded_at: 2026-05-07
+supersedes: DELIB-S327-RELEASE-PATH-CLEAN-ADOPTER-PRODUCTIZATION (full)
+preserves: DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE; DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE; GTKB-SECRETS-PURGE-AND-COMMIT-ENFORCEMENT (P0)
+
+Decision:
+  1. Lift the S327 release-path "Feature freeze in effect" governance
+     state. Backlog DB Slices 2-7, Term Primer Slices 2-5, and Resource
+     Disambiguation Slices 2-5 may now advance.
+     GTKB-ARTIFACT-RECORDER-CLI is no longer freeze-blocked.
+  2. Drop the S327 "release path = clean-adopter productization"
+     framing. rc1 sequencing is open.
+  3. Lift the GTKB-GOV-007 PAUSED tag (2026-04-18). Entry stale.
+  4. Clear stale freeze/defer text from the status_detail field of
+     7 backlogged WIs. New status_detail contains current state only;
+     historical context lives in change_reason. 5 H-category items
+     stay (genuine dependency / contingency / different decision class).
+
+Excluded from this decision (per owner AUQ #1):
+  D. Technical-dependency defers - kept (real build-order)
+  E. wont_fix items - different decision class
+  F. Contingent items (GTKB-DASHBOARD-RETENTION) - kept
+  G. VERIFIED bridge thread scope language - append-only audit trail
+
+Preserved release blockers (NOT lifted):
+  - P0 security override (GTKB-SECRETS-PURGE-AND-COMMIT-ENFORCEMENT)
+  - DELIB-S330 canonical Agent Red repo migration prerequisite for rc1
+  - Slice 8.5 / 8.6 in-flight bridge work
+
+Rationale: owner directive 2026-05-07 - these states are stale.
+
+Authority: Two AskUserQuestion answers in S332.
+  Q1 ("Which categories of FREEZE/HOLD/DEFER state should I lift?"): owner answered "A + B + C + H".
+  Q2 ("Approve DELIB-S332 as drafted and authorize me to file the bridge proposal?"): owner answered "Approve, but also lift S327 release-path goal entirely."
+Captured in session transcript and approval-packet evidence at .groundtruth/formal-artifact-approvals/2026-05-07-DELIB-S332-LIFT-FEATURE-FREEZE.json.
