@@ -11,13 +11,21 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-narrative-artifact-approval-extension-001
+NEW: bridge/gtkb-narrative-artifact-approval-extension-001-001.md
+
 Document: gtkb-backlog-work-list-retirement-directive-001
+NO-GO: bridge/gtkb-backlog-work-list-retirement-directive-001-002.md
 NEW: bridge/gtkb-backlog-work-list-retirement-directive-001-001.md
 
 Document: gtkb-canonical-terms-production-seed-and-doctor-elevation
+NO-GO: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-004.md
+NEW: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-003.md
+GO: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-002.md
 NEW: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-001.md
 
 Document: gtkb-startup-priority-recommender-defect-001
+GO: bridge/gtkb-startup-priority-recommender-defect-001-002.md
 NEW: bridge/gtkb-startup-priority-recommender-defect-001-001.md
 
 Document: gtkb-canonical-terminology-system-context-model-001
