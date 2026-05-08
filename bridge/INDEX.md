@@ -11,6 +11,10 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-docs-quality-remediation
+GO: bridge/gtkb-docs-quality-remediation-002.md
+NEW: bridge/gtkb-docs-quality-remediation-001.md
+
 Document: gtkb-isolation-018-slice-e-code-cluster
 REVISED: bridge/gtkb-isolation-018-slice-e-code-cluster-003.md
 NO-GO: bridge/gtkb-isolation-018-slice-e-code-cluster-002.md
