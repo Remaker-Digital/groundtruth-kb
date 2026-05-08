@@ -218,6 +218,33 @@ def _check_dev_environment_inventory_drift() -> None:
     print(f"PASS development environment inventory drift ({result.get('outcome')})")
 
 
+def _check_narrative_artifact_evidence() -> None:
+    """Surface narrative-artifact evidence rollup in the release gate.
+
+    Per GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 Slice C C4:
+    if any narrative-artifact paths are staged, each must have a matching
+    approval packet (option a). When the staged set has no protected paths,
+    the rollup PASSes informationally.
+    """
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from scripts.check_narrative_artifact_evidence import GateError, evaluate  # noqa: PLC0415
+
+    try:
+        result = evaluate(PROJECT_ROOT)
+    except GateError as exc:
+        raise GateFailure(f"Narrative-artifact evidence gate error: {exc}") from exc
+
+    if result.get("status") != "pass":
+        reasons = [f"{finding.get('path')}: {finding.get('reason')}" for finding in result.get("findings", [])]
+        raise GateFailure("Narrative-artifact evidence: " + "; ".join(reasons))
+    cleared_count = len(result.get("cleared") or [])
+    if cleared_count:
+        print(f"PASS narrative-artifact evidence ({cleared_count} cleared)")
+    else:
+        print("PASS narrative-artifact evidence (no protected paths in staged set)")
+
+
 def _project_resource_helpers():
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
@@ -402,6 +429,7 @@ def main() -> int:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
         if not args.skip_dev_inventory_drift:
             _check_dev_environment_inventory_drift()
+        _check_narrative_artifact_evidence()
         if not args.skip_python:
             _python_gates()
         if args.include_frontend and not args.skip_frontend:

@@ -295,3 +295,37 @@ def test_c_config_missing_returns_runtime_error(tmp_path, monkeypatch):
     fake_root.mkdir()
     with pytest.raises(module.GateError):
         module._load_config(fake_root)
+
+
+# ---------------------------------------------------------------------------
+# T-C-release-gate-integration (per GO -004 condition C4 + NO-GO -007 F1)
+# ---------------------------------------------------------------------------
+
+
+def test_c_release_gate_imports_narrative_artifact_evidence():
+    """Per Slice C C4 + NO-GO -007 F1: scripts/release_candidate_gate.py must
+    integrate with check_narrative_artifact_evidence so the release-readiness
+    report surfaces the narrative-artifact rollup.
+    """
+    release_gate = REPO_ROOT / "scripts" / "release_candidate_gate.py"
+    text = release_gate.read_text(encoding="utf-8")
+    # The release gate calls check_narrative_artifact_evidence.evaluate(...)
+    assert "check_narrative_artifact_evidence" in text, (
+        "scripts/release_candidate_gate.py must import check_narrative_artifact_evidence "
+        "to surface the narrative-artifact rollup per Slice C C4."
+    )
+    assert "_check_narrative_artifact_evidence" in text or "evaluate(PROJECT_ROOT" in text, (
+        "release_candidate_gate.py must invoke evaluate() against PROJECT_ROOT per Slice C C4 GO scope."
+    )
+
+
+def test_c_release_gate_pass_message_present():
+    """The release-gate integration emits a PASS line with 'narrative-artifact evidence'
+    so dashboard / CI consumers can pattern-match the rollup status.
+    """
+    release_gate = REPO_ROOT / "scripts" / "release_candidate_gate.py"
+    text = release_gate.read_text(encoding="utf-8")
+    assert "PASS narrative-artifact evidence" in text, (
+        "release_candidate_gate.py must emit a 'PASS narrative-artifact evidence' "
+        "message so the rollup is consumable by downstream tooling."
+    )

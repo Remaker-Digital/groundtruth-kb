@@ -16,6 +16,7 @@ NO-GO: bridge/gtkb-startup-dashboard-reachability-probe-002.md
 NEW: bridge/gtkb-startup-dashboard-reachability-probe-001.md
 
 Document: gtkb-narrative-artifact-approval-extension-001
+REVISED: bridge/gtkb-narrative-artifact-approval-extension-001-008.md
 NO-GO: bridge/gtkb-narrative-artifact-approval-extension-001-007.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-006.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-005.md
@@ -25,6 +26,7 @@ NO-GO: bridge/gtkb-narrative-artifact-approval-extension-001-002.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-001.md
 
 Document: gtkb-backlog-work-list-retirement-directive-001
+NO-GO: bridge/gtkb-backlog-work-list-retirement-directive-001-008.md
 REVISED: bridge/gtkb-backlog-work-list-retirement-directive-001-007.md
 NO-GO: bridge/gtkb-backlog-work-list-retirement-directive-001-006.md
 REVISED: bridge/gtkb-backlog-work-list-retirement-directive-001-005.md
