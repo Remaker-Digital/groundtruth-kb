@@ -70,6 +70,9 @@ REVISED: bridge/gtkb-lift-feature-freeze-003.md
 NO-GO: bridge/gtkb-lift-feature-freeze-002.md
 NEW: bridge/gtkb-lift-feature-freeze-001.md
 
+Document: gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion
+NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-001.md
+
 Document: gtkb-adr-dcl-clause-test-enforcement
 VERIFIED: bridge/gtkb-adr-dcl-clause-test-enforcement-004.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-003.md
@@ -648,6 +651,8 @@ NO-GO: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-002.md
 NEW: bridge/gtkb-bridge-propose-helper-index-parity-2026-04-30-001.md
 
 Document: gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30
+VERIFIED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-012.md
+REVISED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-011.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-010.md
 REVISED: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-009.md
 NO-GO: bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-008.md
