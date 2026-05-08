@@ -21,6 +21,9 @@ REVISED: bridge/gtkb-canonical-terminology-system-context-model-001-003.md
 NO-GO: bridge/gtkb-canonical-terminology-system-context-model-001-002.md
 NEW: bridge/gtkb-canonical-terminology-system-context-model-001-001.md
 
+Document: gtkb-canonical-terminology-system-context-model-advisory-2026-05-07
+NO-GO: bridge/gtkb-canonical-terminology-system-context-model-advisory-2026-05-07-001.md
+
 Document: gtkb-isolation-018-slice-e3-platform-test-disposition
 VERIFIED: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-010.md
 NEW: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-009.md
