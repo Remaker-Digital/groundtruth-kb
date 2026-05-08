@@ -345,9 +345,19 @@ work item, not a separate artifact type.
 may contain sub-projects, work items, or both. Sub-projects contain work
 items. Work items are the atomic known-work units.
 
-**Source-of-truth intent:** Known work should converge into one MemBase
-source of truth, with generated views such as `memory/work_list.md` used
-only for human-readable compatibility once convergence is implemented.
+**Source-of-truth intent:** Known work converges into one MemBase source
+of truth (the canonical `work_items` table). During the migration window,
+`memory/work_list.md` is a transitional generated view; the file is
+regenerated empty as canonical content moves to MemBase.
+
+**Lifecycle endpoint:** Per S337 owner directive
+(`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), at the
+conclusion of the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration,
+`memory/work_list.md` is deleted. The post-migration steady state is
+"MemBase only" — no markdown view persists. Migration-completion is gated
+by parent thread Slice 7-prime
+(`bridge/gtkb-gov-backlog-source-of-truth-2026-05-02`) which physically
+removes the file after Slices 2-6 land.
 
 **Not to be confused with:** ignore list or deprecated work (forbidden
 uses per operating-model §2); backlog snapshot (point-in-time export);

@@ -943,12 +943,22 @@ define exact DDL, but the row model must include at least:
   `blocks_backlog_items`, `acceptance_summary`, `regression_visibility`,
   `completion_evidence`, `supersedes`, and `superseded_by`
 
-**Required behavior:** `memory/work_list.md` becomes a generated view or
-temporary compatibility surface. Startup, dashboard, bridge citation checks,
+**Required behavior (during migration window):** `memory/work_list.md` becomes a
+transitional generated view. Startup, dashboard, bridge citation checks,
 standing-backlog harvest, and doctor/readiness checks must read the canonical
-table. Manual markdown backlog edits should either be rejected, ignored as
-non-authoritative, or surfaced as drift until migrated through the structured
-backlog writer.
+`backlog_items` table. Manual markdown backlog edits should either be rejected,
+ignored as non-authoritative, or surfaced as drift until migrated through the
+structured backlog writer.
+
+**Migration-completion gate (Slice 7-prime):** Per S337 owner directive
+(`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), at the conclusion
+of the migration this file is deleted. The post-completion steady state is
+"MemBase only" — no markdown view persists. Slice 7-prime physically removes
+`memory/work_list.md` after parent-thread Slices 2-6 land. The deletion gate
+verifies: (a) no row content remains in the file (the generator emits zero
+work-item entries because all rows are in `backlog_items`); (b) all consumers
+(startup, dashboard, doctor, harness scripts) read from MemBase; (c) the file's
+deletion does not break any currently-active hook or rule.
 
 **Migration scope:** migrate active and candidate rows from
 `memory/work_list.md` into `backlog_items`, preserving sequential order,
