@@ -11,6 +11,18 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-isolation-018-slice-e3-platform-test-disposition
+VERIFIED: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-010.md
+NEW: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-009.md
+GO: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-008.md
+REVISED: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-007.md
+NO-GO: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-006.md
+REVISED: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-005.md
+NO-GO: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-004.md
+REVISED: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-003.md
+NO-GO: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-002.md
+NEW: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-001.md
+
 Document: gtkb-docs-quality-remediation-slice-1-root-readme-rewrite
 VERIFIED: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-006.md
 NEW: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-005.md
