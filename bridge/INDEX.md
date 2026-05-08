@@ -12,10 +12,12 @@
 
 
 Document: gtkb-narrative-artifact-approval-extension-001
+REVISED: bridge/gtkb-narrative-artifact-approval-extension-001-003.md
 NO-GO: bridge/gtkb-narrative-artifact-approval-extension-001-002.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-001.md
 
 Document: gtkb-backlog-work-list-retirement-directive-001
+NO-GO: bridge/gtkb-backlog-work-list-retirement-directive-001-006.md
 REVISED: bridge/gtkb-backlog-work-list-retirement-directive-001-005.md
 NO-GO: bridge/gtkb-backlog-work-list-retirement-directive-001-004.md
 REVISED: bridge/gtkb-backlog-work-list-retirement-directive-001-003.md
@@ -31,6 +33,7 @@ GO: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-002.md
 NEW: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-001.md
 
 Document: gtkb-startup-priority-recommender-defect-001
+VERIFIED: bridge/gtkb-startup-priority-recommender-defect-001-004.md
 NEW: bridge/gtkb-startup-priority-recommender-defect-001-003.md
 GO: bridge/gtkb-startup-priority-recommender-defect-001-002.md
 NEW: bridge/gtkb-startup-priority-recommender-defect-001-001.md
