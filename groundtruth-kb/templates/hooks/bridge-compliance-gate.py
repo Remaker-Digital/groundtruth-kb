@@ -461,6 +461,7 @@ def main() -> None:
                     emit_deny(
                         "PreToolUse",
                         "[Governance] Pre-filing applicability preflight failed: "
+                        f"file_path={file_path}; "
                         f"missing_required_specs={error_msg}. Run "
                         f"python scripts/bridge_applicability_preflight.py --bridge-id {bridge_id} "
                         "for full output. (Hard-block per "

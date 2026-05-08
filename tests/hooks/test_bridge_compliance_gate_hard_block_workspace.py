@@ -237,6 +237,10 @@ def test_bridge_hook_blocks_write_when_pending_content_fails_preflight() -> None
     reason = hsoutput.get("permissionDecisionReason", "")
     assert "Pre-filing applicability preflight failed" in reason
     assert "ADR-ISOLATION-APPLICATION-PLACEMENT-001" in reason
+    # NO-GO -006 F1: hook denial output must include the blocked file path
+    # so operators can identify which Write was rejected.
+    assert "bridge/test-fake-pending-preflight-001.md" in reason
+    assert "file_path=" in reason
 
 
 def test_bridge_hook_allows_write_when_pending_content_passes_preflight() -> None:

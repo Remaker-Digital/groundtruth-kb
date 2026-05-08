@@ -362,6 +362,8 @@ NO-GO: bridge/gtkb-isolation-018-slice-b-pdf-cluster-002.md
 NEW: bridge/gtkb-isolation-018-slice-b-pdf-cluster-001.md
 
 Document: gtkb-pre-filing-preflight-hook
+VERIFIED: bridge/gtkb-pre-filing-preflight-hook-008.md
+REVISED: bridge/gtkb-pre-filing-preflight-hook-007.md
 NO-GO: bridge/gtkb-pre-filing-preflight-hook-006.md
 NEW: bridge/gtkb-pre-filing-preflight-hook-005.md
 GO: bridge/gtkb-pre-filing-preflight-hook-004.md
