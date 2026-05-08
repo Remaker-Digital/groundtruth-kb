@@ -1,0 +1,182 @@
+# Narrative-artifact approval gate configuration
+#
+# Authority: GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 Slice A
+# Bridge:    bridge/gtkb-narrative-artifact-approval-extension-001-004.md (GO)
+# Specs:     GOV-ARTIFACT-APPROVAL-001 (extended), DCL-ARTIFACT-APPROVAL-HOOK-001 (extended)
+#
+# This registry drives two enforcement layers:
+#   1. Slice A: .claude/hooks/narrative-artifact-approval-gate.py (Claude PreToolUse Write|Edit)
+#      - Best-effort harness-specific real-time UX for the Claude harness.
+#      - Codex template parity at groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py
+#        is forward-compatible-only per ADR-CODEX-HOOK-PARITY-FALLBACK-001; it is NOT a
+#        live Windows interception boundary.
+#   2. Slice C: scripts/check_narrative_artifact_evidence.py (.githooks/pre-commit)
+#      - Universal harness-agnostic enforcement floor; hard-blocks both Claude and Codex
+#        paths because git commit runs regardless of which harness produced the staged change.
+#
+# Both layers share this registry as the single source of truth for protected-path matching.
+
+schema_version = 1
+
+# ----------------------------------------------------------------------------
+# Protected narrative-artifact path patterns (Slice A initial set)
+# ----------------------------------------------------------------------------
+#
+# Aligned with config/governance/protected-artifact-inventory-drift.toml's
+# `role-and-governance-rules` family (lines 23-29):
+#   patterns = [".claude/rules/**", "AGENTS.md", "CLAUDE.md"]
+# This Slice A uses .md-suffix scoping for narrative-artifact text; the broader
+# .claude/rules/** scope from inventory-drift covers control-config files
+# (.toml, .json, .local.md) that are tracked under that family but managed
+# through their own programmatic-update channels (see "Excluded by design"
+# below).
+
+[[protected_artifacts]]
+id = "role-and-governance-rules"
+description = "Active narrative authority surfaces for role and governance rules."
+patterns = [
+  ".claude/rules/*.md",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "CLAUDE-REFERENCE.md",
+  "CLAUDE-ARCHITECTURE.md",
+  "memory/work_list.md",
+]
+required_evidence = [
+  "approval_packet",
+  "presented_to_user=true",
+  "transcript_captured=true",
+  "explicit_change_request",
+]
+
+# ----------------------------------------------------------------------------
+# Exempted paths (hook-managed files; agents do not directly author these)
+# ----------------------------------------------------------------------------
+#
+# These files match a protected pattern but are written by hooks/scripts as
+# part of their machine-managed surface. Gating them would prevent the hooks
+# from updating their own state.
+
+[[exemptions]]
+id = "hook-managed-files"
+description = "Files written by hooks or scripts as part of their machine-managed state, not as narrative authority."
+patterns = [
+  "memory/pending-owner-decisions.md",  # owned by .claude/hooks/owner-decision-tracker.py
+]
+
+[[exemptions]]
+id = "local-override-files"
+description = "Local-only override files explicitly outside the canonical-authority surface."
+patterns = [
+  ".claude/rules/*.local.md",  # *.local.md files are local overrides per .claude/rules/ conventions
+]
+
+# ----------------------------------------------------------------------------
+# Excluded by design (NOT in the Slice A initial set; documented per Codex GO -004 §3)
+# ----------------------------------------------------------------------------
+#
+# The decisions below are scope-bounded for Slice A. Future slices may revisit
+# any item here with explicit owner direction.
+
+[excluded_by_design]
+description = """
+Files NOT included in Slice A's narrative-artifact protected set, with rationale.
+Each exclusion is a deliberate Slice A scoping decision; future slices may revisit.
+"""
+
+[[excluded_by_design.items]]
+pattern = ".claude/rules/*.toml"
+rationale = """
+Machine-readable governance config data (e.g., canonical-terminology.toml,
+spec-applicability.toml, project-resource-aliases.toml). These files are edited
+as part of programmatic registry-update work (typically via gt CLI or scripted
+maintenance), not as narrative authority text. Including them in Slice A would
+conflate two different mutation classes. The protected-artifact-inventory-drift
+registry (config/governance/protected-artifact-inventory-drift.toml) already
+covers .claude/rules/** with broader scoping for inventory-drift purposes;
+that surface is independently enforced.
+
+Future slice may revisit if drift evidence accumulates that .toml registry
+edits drift from owner intent without owner-visible review.
+"""
+
+[[excluded_by_design.items]]
+pattern = "MEMORY.md"
+rationale = """
+Per Codex GO -002 answer 2 (.claude/rules/canonical-terminology.md ADR-0001
+three-tier memory architecture), MEMORY.md is the operational notepad tier.
+It is high-churn session-state, not canonical authority. Gating every MEMORY.md
+write would create high friction without proportional governance value. A
+future slice may revisit if drift evidence accumulates.
+"""
+
+[[excluded_by_design.items]]
+pattern = "memory/*.md"
+rationale = """
+Topic files in memory/ are operational subsystems (per .claude/rules/
+canonical-terminology.md ADR-0001 three-tier memory architecture). High-churn
+notepad tier. Same rationale as MEMORY.md.
+
+Notable exception within this exclusion: memory/work_list.md IS protected
+because it is the standing-backlog narrative authority per DELIB-0838 +
+GOV-STANDING-BACKLOG-001, not operational notepad.
+"""
+
+[[excluded_by_design.items]]
+pattern = ".claude/hooks/*.py"
+rationale = """
+Hook implementation files are governance-meta-code. Including them in the
+protected set would create a recursive-approval-packet ceremony (you'd need
+an approval packet to edit the hook that enforces approval packets). Hook
+changes are governed through the bridge protocol's normal GO/VERIFIED cycle.
+"""
+
+[[excluded_by_design.items]]
+pattern = "config/governance/narrative-artifact-approval.toml"
+rationale = """
+Self-bootstrapping exclusion: the path-pattern config that DRIVES this gate
+cannot also be gated by it without circular dependency. Edits to this file
+are governed through the bridge protocol's normal GO/VERIFIED cycle.
+"""
+
+# ----------------------------------------------------------------------------
+# Approval packet schema (shared with .groundtruth/formal-artifact-approvals/)
+# ----------------------------------------------------------------------------
+#
+# Narrative-artifact approval packets follow the same JSON schema as
+# formal-artifact (ADR/DCL/GOV) approval packets, with one new artifact_type
+# value: "narrative_artifact".
+
+[approval_packet]
+required_fields = [
+  "artifact_type",          # must be "narrative_artifact"
+  "artifact_id",            # stable id, e.g., "claude-rules-canonical-terminology-md"
+  "action",                 # "create" | "update" | "delete"
+  "target_path",            # the file path being written, relative to project root
+  "source_ref",             # bridge-id or DELIB reference authorizing this change
+  "full_content",           # full proposed file content
+  "full_content_sha256",    # sha256 hash of full_content
+  "approval_mode",          # "approve" | "acknowledge" | "edit-and-approve" | "auto"
+  "presented_to_user",      # must be true
+  "transcript_captured",    # must be true
+  "explicit_change_request",# verbatim owner approval text
+  "changed_by",             # harness identifier
+  "change_reason",          # short rationale (typically cites bridge thread)
+]
+
+artifact_type_value = "narrative_artifact"
+packet_directory = ".groundtruth/formal-artifact-approvals"
+packet_filename_pattern = "{date}-{artifact_id}.json"
+
+# ----------------------------------------------------------------------------
+# Hook detection: how the hook locates the approval packet
+# ----------------------------------------------------------------------------
+
+[hook_detection]
+env_var_names = [
+  "GTKB_NARRATIVE_ARTIFACT_APPROVAL_PACKET",
+  "GTKB_FORMAL_APPROVAL_PACKET",  # shared with formal-artifact-approval-gate.py for caller convenience
+]
+flag_pattern = "--narrative-artifact-approval-packet"
+
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

@@ -11,7 +11,12 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-startup-dashboard-reachability-probe
+NEW: bridge/gtkb-startup-dashboard-reachability-probe-001.md
+
 Document: gtkb-narrative-artifact-approval-extension-001
+NEW: bridge/gtkb-narrative-artifact-approval-extension-001-005.md
+GO: bridge/gtkb-narrative-artifact-approval-extension-001-004.md
 REVISED: bridge/gtkb-narrative-artifact-approval-extension-001-003.md
 NO-GO: bridge/gtkb-narrative-artifact-approval-extension-001-002.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-001.md
