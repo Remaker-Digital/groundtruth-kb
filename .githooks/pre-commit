@@ -21,6 +21,12 @@ PYTHON_BIN="${PYTHON:-python}"
     --staged \
     --allow-review-evidence || exit $?
 
+# GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 Slice C: universal-floor
+# evidence gate for narrative-artifact mutations (rule files, AGENTS.md,
+# CLAUDE*.md, memory/work_list.md). Harness-agnostic: runs regardless of
+# which AI harness produced the staged change.
+"$PYTHON_BIN" scripts/check_narrative_artifact_evidence.py --staged || exit $?
+
 # Only proceed if PowerShell is available
 PWSH=""
 if command -v pwsh &>/dev/null; then

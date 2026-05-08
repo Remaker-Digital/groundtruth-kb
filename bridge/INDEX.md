@@ -15,6 +15,7 @@ Document: gtkb-startup-dashboard-reachability-probe
 NEW: bridge/gtkb-startup-dashboard-reachability-probe-001.md
 
 Document: gtkb-narrative-artifact-approval-extension-001
+NEW: bridge/gtkb-narrative-artifact-approval-extension-001-006.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-005.md
 GO: bridge/gtkb-narrative-artifact-approval-extension-001-004.md
 REVISED: bridge/gtkb-narrative-artifact-approval-extension-001-003.md
