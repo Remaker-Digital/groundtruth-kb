@@ -12,6 +12,8 @@
 
 
 Document: gtkb-docs-quality-remediation
+VERIFIED: bridge/gtkb-docs-quality-remediation-004.md
+NEW: bridge/gtkb-docs-quality-remediation-003.md
 GO: bridge/gtkb-docs-quality-remediation-002.md
 NEW: bridge/gtkb-docs-quality-remediation-001.md
 
