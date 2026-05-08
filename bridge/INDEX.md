@@ -11,6 +11,12 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-backlog-work-list-retirement-directive-001
+NEW: bridge/gtkb-backlog-work-list-retirement-directive-001-001.md
+
+Document: gtkb-canonical-terms-production-seed-and-doctor-elevation
+NEW: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-001.md
+
 Document: gtkb-startup-priority-recommender-defect-001
 NEW: bridge/gtkb-startup-priority-recommender-defect-001-001.md
 
@@ -74,6 +80,8 @@ NO-GO: bridge/gtkb-lift-feature-freeze-002.md
 NEW: bridge/gtkb-lift-feature-freeze-001.md
 
 Document: gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion
+NO-GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-006.md
+NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-005.md
 GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-004.md
 REVISED: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-003.md
 NO-GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-002.md
