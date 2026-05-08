@@ -51,6 +51,7 @@ GO: bridge/gtkb-docs-quality-remediation-002.md
 NEW: bridge/gtkb-docs-quality-remediation-001.md
 
 Document: gtkb-isolation-018-slice-e-code-cluster
+GO: bridge/gtkb-isolation-018-slice-e-code-cluster-004.md
 REVISED: bridge/gtkb-isolation-018-slice-e-code-cluster-003.md
 NO-GO: bridge/gtkb-isolation-018-slice-e-code-cluster-002.md
 NEW: bridge/gtkb-isolation-018-slice-e-code-cluster-001.md
