@@ -145,6 +145,10 @@ GO: bridge/gtkb-claude-session-start-parity-002.md
 NEW: bridge/gtkb-claude-session-start-parity-001.md
 
 Document: gtkb-harness-parity-baseline
+VERIFIED: bridge/gtkb-harness-parity-baseline-006.md
+NEW: bridge/gtkb-harness-parity-baseline-005.md
+GO: bridge/gtkb-harness-parity-baseline-004.md
+REVISED: bridge/gtkb-harness-parity-baseline-003.md
 NO-GO: bridge/gtkb-harness-parity-baseline-002.md
 NEW: bridge/gtkb-harness-parity-baseline-001.md
 
