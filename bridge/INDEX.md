@@ -71,6 +71,7 @@ NO-GO: bridge/gtkb-lift-feature-freeze-002.md
 NEW: bridge/gtkb-lift-feature-freeze-001.md
 
 Document: gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion
+NO-GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-002.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-001.md
 
 Document: gtkb-adr-dcl-clause-test-enforcement
