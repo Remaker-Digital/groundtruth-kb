@@ -2399,3 +2399,138 @@ def test_write_session_start_json_handles_filesystem_errors_gracefully(tmp_path,
     # File doesn't exist (write failed gracefully)
     target = fake_root / ".claude" / "session" / "session-start.json"
     assert not target.exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests for GTKB-STARTUP-PRIORITY-RECOMMENDER-DEFECT-001 Slice 1
+# Bridge GO at bridge/gtkb-startup-priority-recommender-defect-001-002.md
+# ---------------------------------------------------------------------------
+
+
+def _make_recommender_fixture(tmp_path, work_list_text: str, index_text: str) -> Path:
+    """Build a synthetic project root with memory/work_list.md and bridge/INDEX.md."""
+    (tmp_path / "memory").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "memory" / "work_list.md").write_text(work_list_text, encoding="utf-8")
+    (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "bridge" / "INDEX.md").write_text(index_text, encoding="utf-8")
+    return tmp_path
+
+
+def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path) -> None:
+    """T-recommender-1: items whose mapped bridge thread is VERIFIED are filtered."""
+    module = _load_module()
+    work_list = (
+        "## Active Items\n\n"
+        "### GTKB-SHIPPED-ITEM-001 - Already shipped\n\n"
+        "Body of done item.\n\n"
+        "### GTKB-ACTIVE-ITEM-002 - Still in flight\n\n"
+        "Body of active item.\n\n"
+        "### GTKB-ACTIVE-ITEM-003 - Also in flight\n\n"
+        "Body of third item.\n\n"
+    )
+    index = (
+        "Document: gtkb-shipped-item-001\n"
+        "VERIFIED: bridge/gtkb-shipped-item-001-004.md\n\n"
+        "Document: gtkb-active-item-002\n"
+        "GO: bridge/gtkb-active-item-002-002.md\n"
+    )
+    root = _make_recommender_fixture(tmp_path, work_list, index)
+    module.classify_dashboard_scope = lambda row: "gtkb"
+    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+
+    metrics, top = module._backlog_metrics(root)
+    top_ids = [item["id"] for item in top]
+    assert "GTKB-SHIPPED-ITEM-001" not in top_ids
+    assert "GTKB-ACTIVE-ITEM-002" in top_ids
+    assert "GTKB-ACTIVE-ITEM-003" in top_ids
+    assert metrics["filtered_verified_ids"] == ["GTKB-SHIPPED-ITEM-001"]
+
+
+def test_recommender_2_work_item_id_maps_to_bridge_document_name() -> None:
+    """T-recommender-2: deterministic lowercase mapping."""
+    module = _load_module()
+    assert module._work_item_id_to_bridge_document("GTKB-ENV-INVENTORY-001") == "gtkb-env-inventory-001"
+    assert (
+        module._work_item_id_to_bridge_document("GTKB-SYSTEMS-TERMINOLOGY-MAP-001")
+        == "gtkb-systems-terminology-map-001"
+    )
+    assert module._work_item_id_to_bridge_document("AGENT-RED-RUFF-CLEANUP-001") == "agent-red-ruff-cleanup-001"
+
+
+def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path) -> None:
+    """T-recommender-3: items with no matching bridge Document remain eligible."""
+    module = _load_module()
+    work_list = "## Active Items\n\n### GTKB-NO-BRIDGE-001 - Item without a bridge thread\n\nBody.\n\n"
+    index = "Document: gtkb-other-thread\nGO: bridge/gtkb-other-thread-002.md\n"
+    root = _make_recommender_fixture(tmp_path, work_list, index)
+    module.classify_dashboard_scope = lambda row: "gtkb"
+    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+
+    metrics, top = module._backlog_metrics(root)
+    assert "GTKB-NO-BRIDGE-001" in [item["id"] for item in top]
+    assert metrics["filtered_verified_ids"] == []
+
+
+def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path) -> None:
+    """T-recommender-4: **Status:** VERIFIED (residual: ...) marker keeps item recommended."""
+    module = _load_module()
+    work_list = (
+        "## Active Items\n\n"
+        "### GTKB-VERIFIED-WITH-RESIDUAL-001 - Verified but residual work\n\n"
+        "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\n"
+        "Body explaining the residual work.\n\n"
+    )
+    index = "Document: gtkb-verified-with-residual-001\nVERIFIED: bridge/gtkb-verified-with-residual-001-004.md\n"
+    root = _make_recommender_fixture(tmp_path, work_list, index)
+    module.classify_dashboard_scope = lambda row: "gtkb"
+    module.AGENT_RED_PRIMARY_SCOPE_INCLUDED = {"gtkb"}
+    module.AGENT_RED_SCOPE_INCLUDED = {"gtkb"}
+
+    metrics, top = module._backlog_metrics(root)
+    assert "GTKB-VERIFIED-WITH-RESIDUAL-001" in [item["id"] for item in top]
+    assert metrics["filtered_verified_ids"] == []
+
+
+def test_recommender_5_index_parser_captures_only_latest_status_per_document(tmp_path) -> None:
+    """T-recommender-5: per-document parser returns first (latest) status line only."""
+    module = _load_module()
+    index = (
+        "Document: gtkb-multi-version\n"
+        "VERIFIED: bridge/gtkb-multi-version-008.md\n"
+        "NEW: bridge/gtkb-multi-version-007.md\n"
+        "GO: bridge/gtkb-multi-version-006.md\n"
+        "REVISED: bridge/gtkb-multi-version-005.md\n\n"
+        "Document: gtkb-no-go-thread\n"
+        "NO-GO: bridge/gtkb-no-go-thread-002.md\n"
+        "NEW: bridge/gtkb-no-go-thread-001.md\n"
+    )
+    (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "bridge" / "INDEX.md").write_text(index, encoding="utf-8")
+
+    status_map = module._bridge_index_latest_status(tmp_path)
+    assert status_map == {
+        "gtkb-multi-version": "VERIFIED",
+        "gtkb-no-go-thread": "NO-GO",
+    }
+
+
+def test_recommender_6_live_regression_excludes_known_stale_priorities() -> None:
+    """T-recommender-6: against the live tree, the two known-stale VERIFIED items
+    must not appear in top_priority_actions. Per Codex GO -002 condition 1 and 5.
+    """
+    module = _load_module()
+    repo_root = REPO_ROOT
+    metrics, top = module._backlog_metrics(repo_root)
+    top_ids = [item["id"] for item in top]
+    # The session that motivated this work observed both these items in the
+    # top_priority_actions surface despite being VERIFIED at -004 on 2026-05-06.
+    # The fix must drop them.
+    assert "GTKB-SYSTEMS-TERMINOLOGY-MAP-001" not in top_ids, (
+        f"systems-terminology-map (VERIFIED 2026-05-06) leaked into top_priority_actions={top_ids}; "
+        f"filtered_verified_ids={metrics.get('filtered_verified_ids')}"
+    )
+    assert "GTKB-RESOURCE-REFERENCE-DISAMBIGUATION-001" not in top_ids, (
+        f"resource-reference-disambiguation (VERIFIED 2026-05-06) leaked into top_priority_actions={top_ids}"
+    )

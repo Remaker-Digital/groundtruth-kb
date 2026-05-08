@@ -976,22 +976,67 @@ def _parse_active_work_items(work_list_text: str) -> list[dict[str, str]]:
     return items
 
 
+_RESIDUAL_OVERRIDE_RE = re.compile(r"\*\*Status:\*\*\s+VERIFIED\s*\(residual:", re.IGNORECASE)
+
+
+def _work_item_id_to_bridge_document(wi_id: str) -> str:
+    return wi_id.lower()
+
+
+def _bridge_index_latest_status(project_root: Path) -> dict[str, str]:
+    index_path = project_root / "bridge" / "INDEX.md"
+    if not index_path.exists():
+        return {}
+    text = _read_text(index_path)
+    result: dict[str, str] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        if line.startswith("Document: "):
+            current = line.split(": ", 1)[1].strip()
+            continue
+        if not current:
+            continue
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+bridge/", line)
+        if match:
+            result[current] = match.group(1)
+            current = None
+    return result
+
+
+def _residual_override_present(body: str) -> bool:
+    return bool(_RESIDUAL_OVERRIDE_RE.search(body or ""))
+
+
 def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
     items = _parse_active_work_items(_read_text(project_root / "memory" / "work_list.md"))
+    bridge_status = _bridge_index_latest_status(project_root)
     classified = []
     for item in items:
         row = {"id": item["id"], "title": item["title"], "description": item.get("body", "")}
         classified.append({**item, "scope": classify_dashboard_scope(row)})
     primary_items = [item for item in classified if item["scope"] in AGENT_RED_PRIMARY_SCOPE_INCLUDED]
     visible_items = primary_items or [item for item in classified if item["scope"] in AGENT_RED_SCOPE_INCLUDED]
+
+    filtered_verified_ids: list[str] = []
+    eligible: list[dict[str, Any]] = []
+    for item in visible_items:
+        wi_id = item.get("id", "")
+        mapped = _work_item_id_to_bridge_document(wi_id)
+        latest_status = bridge_status.get(mapped)
+        if latest_status == "VERIFIED" and not _residual_override_present(item.get("body", "")):
+            filtered_verified_ids.append(wi_id)
+            continue
+        eligible.append(item)
+
     return {
-        "active_item_count": len(visible_items),
+        "active_item_count": len(eligible),
         "raw_active_item_count": len(items),
-        "top_priority_actions": visible_items[:3],
+        "top_priority_actions": eligible[:3],
         "source": "memory/work_list.md",
         "scope_counts": dict(sorted(Counter(item["scope"] for item in classified).items())),
         "scope_confidence": "gtkb_current_heuristic",
-    }, visible_items[:3]
+        "filtered_verified_ids": filtered_verified_ids,
+    }, eligible[:3]
 
 
 def _bridge_metrics(project_root: Path) -> dict[str, Any]:

@@ -31,6 +31,7 @@ GO: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-002.md
 NEW: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-001.md
 
 Document: gtkb-startup-priority-recommender-defect-001
+NEW: bridge/gtkb-startup-priority-recommender-defect-001-003.md
 GO: bridge/gtkb-startup-priority-recommender-defect-001-002.md
 NEW: bridge/gtkb-startup-priority-recommender-defect-001-001.md
 
