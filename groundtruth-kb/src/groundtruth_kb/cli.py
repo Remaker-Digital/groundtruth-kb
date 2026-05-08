@@ -438,6 +438,168 @@ def backlog_list(ctx: click.Context, json_output: bool, include_verified: bool) 
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# gt canonical-terms (Phase 1 backing-registry CLI)
+# ---------------------------------------------------------------------------
+
+
+@main.group(name="canonical-terms")
+def canonical_terms_cmd() -> None:
+    """Canonical Terminology System backing-registry commands.
+
+    Phase 1: ``.claude/rules/canonical-terminology.md`` and the matching
+    ``.toml`` profile remain the startup-readable authority. These commands
+    populate and inspect the structured backing registry in MemBase used
+    by tools (collision detection, parity checks, future retrieval surfaces).
+    """
+
+
+@canonical_terms_cmd.command("seed")
+@click.option("--dry-run", "dry_run", is_flag=True, help="Plan without applying. Default behavior.")
+@click.option("--apply", "apply_flag", is_flag=True, help="Apply the planned operations.")
+@click.option(
+    "--markdown",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Glossary markdown path. Defaults to <project_root>/.claude/rules/canonical-terminology.md.",
+)
+@click.option(
+    "--changed-by",
+    default=None,
+    help="History author for inserts/updates. Defaults to canonical-terms-seed.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def canonical_terms_seed(
+    ctx: click.Context,
+    dry_run: bool,
+    apply_flag: bool,
+    markdown: Path | None,
+    changed_by: str | None,
+    json_output: bool,
+) -> None:
+    """Seed (or plan to seed) canonical_terms from the markdown glossary.
+
+    Idempotent: running ``--apply`` against an unchanged markdown produces
+    all-unchanged operations. Append-only: revisions append a new version;
+    removals append a ``lifecycle_status='retired'`` row. Never DELETE.
+    """
+    from groundtruth_kb import canonical_terms as _ct
+
+    if dry_run and apply_flag:
+        raise click.ClickException("Specify either --dry-run or --apply, not both.")
+    actually_apply = bool(apply_flag) and not dry_run
+
+    config = _resolve_config(ctx)
+    md_path = markdown or config.project_root / ".claude" / "rules" / "canonical-terminology.md"
+    if not md_path.exists():
+        raise click.ClickException(f"Glossary markdown not found: {md_path}")
+
+    db = _open_db(config)
+    try:
+        plan = _ct.seed_from_markdown(
+            db,
+            md_path,
+            dry_run=not actually_apply,
+            changed_by=changed_by or "canonical-terms-seed",
+        )
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(plan.to_dict(), indent=2, sort_keys=True))
+        return
+
+    mode = "APPLIED" if actually_apply else "DRY-RUN"
+    click.echo(f"canonical-terms seed [{mode}]")
+    click.echo(f"  source: {plan.source_path}")
+    click.echo(f"  hash:   {plan.source_hash}")
+    summary = plan.summary()
+    parts = ", ".join(f"{op}={n}" for op, n in sorted(summary.items()))
+    click.echo(f"  summary: {parts or '(no operations)'}")
+    for op in plan.operations:
+        click.echo(f"    {op.op:<10} {op.id:<40} {op.canonical_term}")
+
+
+@canonical_terms_cmd.command("list")
+@click.option(
+    "--authority-level",
+    type=click.Choice(["platform_core", "adopter_extension", "project_local"]),
+    default=None,
+)
+@click.option("--scope", default=None, help="Filter by scope (e.g., platform, adopter:agent_red).")
+@click.option("--include-retired", is_flag=True, help="Include retired terms in the output.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def canonical_terms_list(
+    ctx: click.Context,
+    authority_level: str | None,
+    scope: str | None,
+    include_retired: bool,
+    json_output: bool,
+) -> None:
+    """List canonical_terms current state (latest version per id)."""
+    from groundtruth_kb import canonical_terms as _ct
+
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        rows = _ct.list_terms(
+            db,
+            authority_level=authority_level,
+            scope=scope,
+            include_retired=include_retired,
+        )
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(rows, indent=2, sort_keys=True, default=str))
+        return
+
+    click.echo(f"canonical-terms list ({len(rows)} terms)")
+    for r in rows:
+        click.echo(
+            f"  [{r.get('authority_level')}/{r.get('scope')}] "
+            f"{r.get('id')} ({r.get('lifecycle_status')}): {r.get('canonical_term')}"
+        )
+
+
+@canonical_terms_cmd.command("history")
+@click.argument("term_id")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def canonical_terms_history(ctx: click.Context, term_id: str, json_output: bool) -> None:
+    """Show all versions of a canonical term, oldest first."""
+    from groundtruth_kb import canonical_terms as _ct
+
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        versions = _ct.list_versions(db, term_id)
+    finally:
+        db.close()
+
+    if not versions:
+        raise click.ClickException(f"No versions found for term id: {term_id}")
+
+    if json_output:
+        click.echo(json.dumps(versions, indent=2, sort_keys=True, default=str))
+        return
+
+    click.echo(f"canonical-terms history: {term_id}")
+    for v in versions:
+        click.echo(
+            f"  v{v.get('version')} [{v.get('lifecycle_status')}] "
+            f"{v.get('changed_at')} by {v.get('changed_by')}: {v.get('change_reason')}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# gt secrets
+# ---------------------------------------------------------------------------
+
+
 _SECRET_SCAN_FINDINGS_EXIT = 5
 
 

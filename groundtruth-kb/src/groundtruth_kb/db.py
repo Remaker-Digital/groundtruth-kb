@@ -413,6 +413,32 @@ CREATE TABLE IF NOT EXISTS deliberation_work_items (
     UNIQUE(deliberation_id, work_item_id)
 );
 
+-- Canonical Terminology System backing registry
+-- (per gtkb-canonical-terminology-system-context-model-001-005, GO at -006).
+-- Phase 1: structured backing registry; markdown/TOML remain startup-readable
+-- canonical authority. Append-only/versioned per artifact discipline.
+CREATE TABLE IF NOT EXISTS canonical_terms (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    canonical_term TEXT NOT NULL,
+    definition TEXT NOT NULL,
+    authority_level TEXT NOT NULL CHECK (authority_level IN ('platform_core', 'adopter_extension', 'project_local')),
+    scope TEXT NOT NULL,
+    accepted_synonyms TEXT,
+    discouraged_synonyms TEXT,
+    linked_artifacts TEXT,
+    linked_services TEXT,
+    usage_examples TEXT,
+    forbidden_uses TEXT,
+    lifecycle_status TEXT NOT NULL CHECK (lifecycle_status IN ('candidate', 'active', 'deprecated', 'retired')),
+    source_authority TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -453,6 +479,9 @@ CREATE INDEX IF NOT EXISTS idx_dspecs_delib ON deliberation_specs(deliberation_i
 CREATE INDEX IF NOT EXISTS idx_dspecs_spec ON deliberation_specs(spec_id);
 CREATE INDEX IF NOT EXISTS idx_dwis_delib ON deliberation_work_items(deliberation_id);
 CREATE INDEX IF NOT EXISTS idx_dwis_wi ON deliberation_work_items(work_item_id);
+CREATE INDEX IF NOT EXISTS idx_canonical_terms_id_version ON canonical_terms(id, version);
+CREATE INDEX IF NOT EXISTS idx_canonical_terms_authority ON canonical_terms(authority_level);
+CREATE INDEX IF NOT EXISTS idx_canonical_terms_scope ON canonical_terms(scope);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -514,6 +543,11 @@ CREATE VIEW IF NOT EXISTS current_deliberations AS
 SELECT d.* FROM deliberations d
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM deliberations GROUP BY id) m
 ON d.id = m.id AND d.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_canonical_terms AS
+SELECT c.* FROM canonical_terms c
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM canonical_terms GROUP BY id) m
+ON c.id = m.id AND c.version = m.max_v;
 """
 
 

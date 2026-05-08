@@ -496,6 +496,7 @@ def _check_settings_classifiers(target: Path) -> ToolCheck:
 # Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2; DCL DOCTOR INVARIANTS section.
 # See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
 
+
 def _check_spec_classifier_canonical_path(target: Path) -> ToolCheck:
     """Verify spec-classifier.py exists at the DCL-mandated canonical path."""
     hook_path = target / ".claude" / "hooks" / "spec-classifier.py"
@@ -671,9 +672,7 @@ def _parse_pending_decisions_file(path: Path) -> dict[str, list[dict[str, Any]]]
     sys.modules["owner_decision_tracker_doctor"] = module
     spec.loader.exec_module(module)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, encoding="utf-8"
-    ) as tf:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
         tmp_path = Path(tf.name)
     try:
         shutil.copy2(path, tmp_path)
@@ -893,7 +892,7 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
         if s.startswith("Document:"):
             if current_doc and current_files:
                 threads.append((current_doc, current_files))
-            current_doc = s[len("Document:"):].strip()
+            current_doc = s[len("Document:") :].strip()
             current_files = []
             continue
         m = line_re.match(s)
@@ -1550,9 +1549,7 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
         [t for t in raw_primer_terms if isinstance(t, str)] if isinstance(raw_primer_terms, list) else []
     )
     primer_missing_severity_raw = profile_cfg.get("primer_missing_severity", missing_severity_raw)
-    primer_missing_severity = (
-        str(primer_missing_severity_raw).upper() if primer_missing_severity_raw else "ERROR"
-    )
+    primer_missing_severity = str(primer_missing_severity_raw).upper() if primer_missing_severity_raw else "ERROR"
     if required_primer_terms:
         defaults_section: dict[str, Any] = {}
         try:
@@ -1625,6 +1622,138 @@ def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
             f"present in {len(required_files)} required files (profile: {profile_name})"
         ),
     )
+
+
+def _check_canonical_terms_registry(target: Path) -> ToolCheck:
+    """Phase 1 backing-registry check for the Canonical Terminology System.
+
+    Per ``bridge/gtkb-canonical-terminology-system-context-model-001-005.md``
+    (Codex GO at ``-006``): when the ``canonical_terms`` table exists in
+    the project's MemBase, run parity check (markdown ↔ table) plus
+    collision detection over current platform_core rows.
+
+    Behavior:
+
+    - Pass when the table is empty (Phase 1 backing registry hasn't been
+      seeded yet — that's fine; the markdown remains the canonical source).
+    - Pass when seeded and parity is clean and no collision findings exist.
+    - Warning when parity has WARN findings (e.g., markdown term not seeded
+      yet, content drift).
+    - Fail when parity has ERROR findings (e.g., platform_core row in table
+      but no markdown counterpart) or collision detection reports any
+      ``platform_core_redefinition``.
+
+    The table-not-present case is also a pass: this check never blocks if
+    the schema upgrade hasn't been applied yet. Run ``gt project upgrade
+    --apply`` to install the table.
+    """
+    glossary = target / ".claude" / "rules" / "canonical-terminology.md"
+    if not glossary.exists():
+        return ToolCheck(
+            name="canonical terms registry",
+            required=False,
+            found=False,
+            status="pass",
+            message="canonical-terminology.md not present; backing registry check skipped",
+        )
+
+    db_path = target / "groundtruth.db"
+    if not db_path.exists():
+        return ToolCheck(
+            name="canonical terms registry",
+            required=False,
+            found=False,
+            status="pass",
+            message="groundtruth.db not present; backing registry check skipped",
+        )
+
+    try:
+        import sqlite3 as _sqlite3
+
+        from groundtruth_kb import canonical_terms as _ct
+    except ImportError as exc:
+        return ToolCheck(
+            name="canonical terms registry",
+            required=False,
+            found=False,
+            status="warning",
+            message=f"canonical_terms module unavailable: {exc}",
+        )
+
+    conn = _sqlite3.connect(str(db_path))
+    try:
+        # Ensure the schema migration is applied; if not, treat as pass-skip.
+        cur = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'canonical_terms'")
+        if cur.fetchone() is None:
+            return ToolCheck(
+                name="canonical terms registry",
+                required=False,
+                found=False,
+                status="pass",
+                message=("canonical_terms table not yet provisioned — run gt project upgrade --apply"),
+            )
+
+        terms = _ct.list_terms(conn, include_retired=False)
+        if not terms:
+            return ToolCheck(
+                name="canonical terms registry",
+                required=False,
+                found=True,
+                status="pass",
+                message=("canonical_terms table present but empty — run gt canonical-terms seed --apply"),
+            )
+
+        parity = _ct.parity_check(conn, glossary)
+        errors_collisions, warnings_collisions = _ct.find_collisions(terms)
+
+        parity_errors = [p for p in parity if p.severity == "error"]
+        parity_warnings = [p for p in parity if p.severity == "warning"]
+
+        if parity_errors or errors_collisions:
+            details = []
+            for p in parity_errors:
+                details.append(f"parity:{p.kind}:{p.id}")
+            for c in errors_collisions:
+                details.append(f"collision:{c.classification}:{c.key[1]}")
+            return ToolCheck(
+                name="canonical terms registry",
+                required=True,
+                found=True,
+                status="fail",
+                message=(
+                    f"canonical_terms registry blocking findings: {len(parity_errors)} parity error(s), "
+                    f"{len(errors_collisions)} platform_core redefinition(s) — "
+                    f"{'; '.join(details[:10])}"
+                ),
+            )
+
+        if parity_warnings or warnings_collisions:
+            details = []
+            for p in parity_warnings:
+                details.append(f"parity:{p.kind}:{p.id}")
+            for c in warnings_collisions:
+                details.append(f"collision:{c.classification}:{c.key[1]}")
+            return ToolCheck(
+                name="canonical terms registry",
+                required=False,
+                found=True,
+                status="warning",
+                message=(
+                    f"canonical_terms registry advisory findings: {len(parity_warnings)} parity warn(s), "
+                    f"{len(warnings_collisions)} cross-field/cross-scope collision(s) — "
+                    f"{'; '.join(details[:10])}"
+                ),
+            )
+
+        return ToolCheck(
+            name="canonical terms registry",
+            required=True,
+            found=True,
+            status="pass",
+            message=(f"canonical_terms registry OK — {len(terms)} active terms, parity clean, no collisions"),
+        )
+    finally:
+        conn.close()
 
 
 def _check_file_bridge_setup(target: Path) -> ToolCheck:
@@ -1770,9 +1899,7 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
             required=False,
             found=True,
             status="fail",
-            message=(
-                f"{agent} bridge dispatch-state missing 'recipients' map — ALARM. See {_BRIDGE_AUTH_DOC}"
-            ),
+            message=(f"{agent} bridge dispatch-state missing 'recipients' map — ALARM. See {_BRIDGE_AUTH_DOC}"),
         )
 
     recipient_state = recipients.get(role)
@@ -2406,6 +2533,7 @@ def run_doctor(
     checks.append(_check_hooks(target, profile))
     checks.append(_check_rules(target, profile))
     checks.append(_check_canonical_terminology(target, profile))
+    checks.append(_check_canonical_terms_registry(target))
 
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))

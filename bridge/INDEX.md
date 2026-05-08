@@ -11,6 +11,16 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-canonical-terminology-system-context-model-001
+VERIFIED: bridge/gtkb-canonical-terminology-system-context-model-001-008.md
+NEW: bridge/gtkb-canonical-terminology-system-context-model-001-007.md
+GO: bridge/gtkb-canonical-terminology-system-context-model-001-006.md
+REVISED: bridge/gtkb-canonical-terminology-system-context-model-001-005.md
+NO-GO: bridge/gtkb-canonical-terminology-system-context-model-001-004.md
+REVISED: bridge/gtkb-canonical-terminology-system-context-model-001-003.md
+NO-GO: bridge/gtkb-canonical-terminology-system-context-model-001-002.md
+NEW: bridge/gtkb-canonical-terminology-system-context-model-001-001.md
+
 Document: gtkb-isolation-018-slice-e3-platform-test-disposition
 VERIFIED: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-010.md
 NEW: bridge/gtkb-isolation-018-slice-e3-platform-test-disposition-009.md
