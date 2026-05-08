@@ -11,6 +11,14 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-bridge-poller-event-driven-replacement-001
+NEW: bridge/gtkb-bridge-poller-event-driven-replacement-001.md
+
+Document: gtkb-da-read-surface-correction-phase-0-formalization
+REVISED: bridge/gtkb-da-read-surface-correction-phase-0-formalization-003.md
+NO-GO: bridge/gtkb-da-read-surface-correction-phase-0-formalization-002.md
+NEW: bridge/gtkb-da-read-surface-correction-phase-0-formalization-001.md
+
 Document: gtkb-startup-dashboard-reachability-probe
 NO-GO: bridge/gtkb-startup-dashboard-reachability-probe-002.md
 NEW: bridge/gtkb-startup-dashboard-reachability-probe-001.md
@@ -29,6 +37,7 @@ NO-GO: bridge/gtkb-narrative-artifact-approval-extension-001-002.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-001.md
 
 Document: gtkb-backlog-work-list-retirement-directive-001
+VERIFIED: bridge/gtkb-backlog-work-list-retirement-directive-001-012.md
 NEW: bridge/gtkb-backlog-work-list-retirement-directive-001-011.md
 GO: bridge/gtkb-backlog-work-list-retirement-directive-001-010.md
 REVISED: bridge/gtkb-backlog-work-list-retirement-directive-001-009.md
