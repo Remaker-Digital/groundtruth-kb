@@ -1699,8 +1699,11 @@ def _check_canonical_terms_registry(target: Path) -> ToolCheck:
                 name="canonical terms registry",
                 required=False,
                 found=True,
-                status="pass",
-                message=("canonical_terms table present but empty — run gt canonical-terms seed --apply"),
+                status="warning",
+                message=(
+                    "canonical_terms table present but empty while .claude/rules/canonical-terminology.md "
+                    "defines platform_core terms — schema/seed drift; run `gt canonical-terms seed --apply`"
+                ),
             )
 
         parity = _ct.parity_check(conn, glossary)

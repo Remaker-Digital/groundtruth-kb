@@ -47,17 +47,24 @@ def _open_db(tmp_path: Path) -> KnowledgeDB:
     return KnowledgeDB(str(tmp_path / "groundtruth.db"))
 
 
-def test_pass_when_table_empty(tmp_path: Path) -> None:
-    """Table provisioned but no rows yet: backing registry hasn't been seeded;
-    pass with informational message.
+def test_warning_when_table_empty_with_glossary(tmp_path: Path) -> None:
+    """Table provisioned but no rows while the markdown glossary defines
+    platform_core terms: schema/seed drift, surfaced as ``warning`` (not
+    ``pass``) so the same regression class that left the production seed
+    unrun cannot remain invisible in aggregate doctor output.
+
+    Pinned per `bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-001.md`
+    (Codex GO at -002), Change 2 / GO Condition 4.
     """
     target = _setup_project(tmp_path)
     db = _open_db(target)
     db.close()
 
     check = _check_canonical_terms_registry(target)
-    assert check.status == "pass"
-    assert "empty" in check.message.lower() or "seed" in check.message.lower()
+    assert check.status == "warning"
+    assert "empty" in check.message.lower()
+    assert "seed" in check.message.lower()
+    assert "drift" in check.message.lower()
 
 
 def test_pass_when_seeded_clean(tmp_path: Path) -> None:
