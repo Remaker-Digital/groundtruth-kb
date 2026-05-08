@@ -553,12 +553,7 @@ def collect_inventory(project_root: Path, *, generated_at: str | None = None) ->
         "role_by_harness_compatibility": _compatibility_matrix(project_root, harnesses, surfaces),
         "redaction": redaction_public,
         "verification": {
-            "latest_command": (
-                "python scripts/collect_dev_environment_inventory.py "
-                "--public-json docs/release/dev-environment-inventory.json "
-                "--public-markdown docs/release/dev-environment-inventory.md "
-                "--local-json .gtkb-state/dev-environment-inventory/local.json"
-            ),
+            "latest_command": ("python scripts/collect_dev_environment_inventory.py"),
             "release_gate_check": "python scripts/release_candidate_gate.py --skip-python --skip-frontend",
             "status": "generated",
         },

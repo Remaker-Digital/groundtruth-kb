@@ -1,7 +1,7 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-05-07T04:20:11Z
-Collector: gtkb-dev-environment-inventory-v1 (sha256:7741a1bc3e166a958e3c689cf28eb27c56a46b4c4471ecc77f1140a6a763c449)
+Generated: 2026-05-08T01:20:04Z
+Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8)
 
 ## Project
 
@@ -51,5 +51,5 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:7741a1bc3e166a958e3c689cf28
 
 ## Verification
 
-- Latest command: `python scripts/collect_dev_environment_inventory.py --public-json docs/release/dev-environment-inventory.json --public-markdown docs/release/dev-environment-inventory.md --local-json .gtkb-state/dev-environment-inventory/local.json`
+- Latest command: `python scripts/collect_dev_environment_inventory.py`
 - Release gate check: `python scripts/release_candidate_gate.py --skip-python --skip-frontend`

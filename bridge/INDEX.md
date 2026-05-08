@@ -144,6 +144,10 @@ GO: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-0
 NEW: bridge/gtkb-secrets-purge-and-commit-enforcement-slice3-history-purge-plan-001.md
 
 Document: gtkb-env-inventory-drift-control-001
+VERIFIED: bridge/gtkb-env-inventory-drift-control-001-010.md
+REVISED: bridge/gtkb-env-inventory-drift-control-001-009.md
+NO-GO: bridge/gtkb-env-inventory-drift-control-001-008.md
+REVISED: bridge/gtkb-env-inventory-drift-control-001-007.md
 NO-GO: bridge/gtkb-env-inventory-drift-control-001-006.md
 REVISED: bridge/gtkb-env-inventory-drift-control-001-005.md
 NO-GO: bridge/gtkb-env-inventory-drift-control-001-004.md

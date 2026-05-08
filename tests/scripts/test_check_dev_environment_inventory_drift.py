@@ -32,7 +32,7 @@ def _write_registry(root: Path) -> Path:
                 "",
                 "[[protected_artifacts]]",
                 'id = "inventory"',
-                'patterns = ["docs/release/dev-environment-inventory.json", "scripts/check_dev_environment_inventory_drift.py"]',
+                'patterns = [".groundtruth/inventory/dev-environment-inventory.json", "scripts/check_dev_environment_inventory_drift.py"]',
                 'severity = "accepted_baseline_update"',
                 'route = "accepted_baseline_update"',
                 "accept_with_inventory_baseline_update = true",
@@ -54,7 +54,7 @@ def _write_registry(root: Path) -> Path:
 
 
 def _write_inventory(root: Path, payload: dict) -> Path:
-    path = root / "docs" / "release" / "dev-environment-inventory.json"
+    path = root / ".groundtruth" / "inventory" / "dev-environment-inventory.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
     return path
@@ -131,7 +131,7 @@ def test_inventory_baseline_update_passes_when_current_matches_new_baseline(tmp_
 
     result = module.evaluate_drift(
         tmp_path,
-        changed_paths=["docs/release/dev-environment-inventory.json"],
+        changed_paths=[".groundtruth/inventory/dev-environment-inventory.json"],
         current_inventory=current,
     )
 

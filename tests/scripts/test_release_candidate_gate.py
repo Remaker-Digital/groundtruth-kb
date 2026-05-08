@@ -23,9 +23,16 @@ def _load_gate_module():
     return module
 
 
-def _valid_dev_inventory_payload(gate, generated_at: str = "2026-05-06T00:00:00Z") -> dict:
+def _valid_dev_inventory_payload(gate, generated_at: str | None = None) -> dict:
     _default_max_age, _relative_path, _validate = gate._dev_inventory_helpers()
     from scripts import collect_dev_environment_inventory as collector
+
+    if generated_at is None:
+        # Use a fresh timestamp so this fixture does not become stale as time
+        # passes (per gtkb-env-inventory-drift-control-001-008 NO-GO F1).
+        from datetime import UTC, datetime
+
+        generated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     return {
         "schema_version": collector.SCHEMA_VERSION,
