@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-startup-priority-recommender-defect-001
+NEW: bridge/gtkb-startup-priority-recommender-defect-001-001.md
+
 Document: gtkb-canonical-terminology-system-context-model-001
 VERIFIED: bridge/gtkb-canonical-terminology-system-context-model-001-008.md
 NEW: bridge/gtkb-canonical-terminology-system-context-model-001-007.md
@@ -71,6 +74,8 @@ NO-GO: bridge/gtkb-lift-feature-freeze-002.md
 NEW: bridge/gtkb-lift-feature-freeze-001.md
 
 Document: gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion
+GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-004.md
+REVISED: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-003.md
 NO-GO: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-002.md
 NEW: bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-001.md
 
