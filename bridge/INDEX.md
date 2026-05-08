@@ -11,6 +11,14 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-docs-quality-remediation-slice-1-root-readme-rewrite
+VERIFIED: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-006.md
+NEW: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-005.md
+GO: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-004.md
+REVISED: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-003.md
+NO-GO: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-002.md
+NEW: bridge/gtkb-docs-quality-remediation-slice-1-root-readme-rewrite-001.md
+
 Document: gtkb-docs-quality-remediation
 VERIFIED: bridge/gtkb-docs-quality-remediation-004.md
 NEW: bridge/gtkb-docs-quality-remediation-003.md
