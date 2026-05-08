@@ -16,11 +16,14 @@ NO-GO: bridge/gtkb-narrative-artifact-approval-extension-001-002.md
 NEW: bridge/gtkb-narrative-artifact-approval-extension-001-001.md
 
 Document: gtkb-backlog-work-list-retirement-directive-001
+REVISED: bridge/gtkb-backlog-work-list-retirement-directive-001-005.md
+NO-GO: bridge/gtkb-backlog-work-list-retirement-directive-001-004.md
 REVISED: bridge/gtkb-backlog-work-list-retirement-directive-001-003.md
 NO-GO: bridge/gtkb-backlog-work-list-retirement-directive-001-002.md
 NEW: bridge/gtkb-backlog-work-list-retirement-directive-001-001.md
 
 Document: gtkb-canonical-terms-production-seed-and-doctor-elevation
+VERIFIED: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-006.md
 REVISED: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-005.md
 NO-GO: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-004.md
 NEW: bridge/gtkb-canonical-terms-production-seed-and-doctor-elevation-003.md
