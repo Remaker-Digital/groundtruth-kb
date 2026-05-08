@@ -6,13 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0443
-  asked_at: 2026-05-07T12:39:51.888410Z
-  question: "─────────────────`  Standing by for direction — file -003 now, or pause?"
-  detected_via: prose:standing_by_for_q
-  status: pending
-  question_hash: f788face7ff1627f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -5172,6 +5166,148 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-07T12:43:19.864631Z
   answer: "User has answered your questions: \"18.E scoping NO-GO at -002 — file the corrected -003 now or pause?\"=\"File -003 corrections now\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0446
+  asked_at: 2026-05-07T12:54:45.515846Z
+  question: "How should this session begin?"
+  options:
+    - "Top Priority Actions"
+    - "Pick From Standing Backlog"
+    - "Continue Last Session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c22fd3d1c3bced8
+  resolved_at: 2026-05-07T12:54:45.515846Z
+  answer: "Answer questions?"
+  notes: ""
+- id: DECISION-0447
+  asked_at: 2026-05-07T22:42:51.296296Z
+  question: "How do you want to scope the response to the documentation-quality NO-GO?"
+  options:
+    - "Small first slice: F1+F4 only"
+    - "All P1 findings as one project"
+    - "Full 8-finding remediation"
+    - "Standing-backlog only, defer this session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e35489c3efcd0e26
+  resolved_at: 2026-05-07T22:42:51.296296Z
+  answer: "User has answered your questions: \"How do you want to scope the response to the documentation-quality NO-GO?\"=\"Full 8-finding remediation\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0448
+  asked_at: 2026-05-07T22:53:47.138598Z
+  question: "18.E.3 second NO-GO. How to handle the recursive inventory-undercount pattern?"
+  options:
+    - "Full systematic probe + -005 revision"
+    - "Tooling-assisted approach: write a classifier script"
+    - "Pause E.3; wrap session"
+    - "Defer E.3 entirely; let E.1 surface platform-test set"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 00fbf78ca7df9a54
+  resolved_at: 2026-05-07T22:53:47.138598Z
+  answer: "User has answered your questions: \"18.E.3 second NO-GO. How to handle the recursive inventory-undercount pattern?\"=\"Full systematic probe + -005 revision\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0443
+  asked_at: 2026-05-07T12:39:51.888410Z
+  question: "─────────────────`  Standing by for direction — file -003 now, or pause?"
+  detected_via: prose:standing_by_for_q
+  status: resolved
+  question_hash: f788face7ff1627f
+  resolved_at: 2026-05-08T00:09:25.414543Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0445
+  asked_at: 2026-05-07T12:53:31.033932Z
+  question: "─────────────────`  Standing by for direction — file -003 now, or pause? (asked 2026-05-07T1"
+  detected_via: prose:standing_by_for_q
+  status: resolved
+  question_hash: 973218366d19200f
+  resolved_at: 2026-05-08T00:09:25.414563Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0449
+  asked_at: 2026-05-08T00:20:33.452142Z
+  question: "What focus should this session take?"
+  options:
+    - "Continue docs-quality remediation (Recommended)"
+    - "Top Priority Actions (standing-backlog)"
+    - "Sweep stale bridge GO/NO-GO entries"
+    - "Optimize startup token consumption"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1377c3a8a1b3cc64
+  resolved_at: 2026-05-08T00:20:33.452142Z
+  answer: "User has answered your questions: \"What focus should this session take?\"=\"Continue docs-quality remediation (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0450
+  asked_at: 2026-05-08T03:25:50.154766Z
+  question: "How do you want to proceed given the much-smaller-than-expected actionable GO set?"
+  options:
+    - "Wait for slice-1 round-trip; tackle one fresh GO in parallel"
+    - "Full INDEX re-survey, then decide"
+    - "Pick from head section's 4 actionable threads now"
+    - "Defer parallel work; close out session-start state"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 718a62f64f89c259
+  resolved_at: 2026-05-08T03:25:50.154766Z
+  answer: "User has answered your questions: \"How do you want to proceed given the much-smaller-than-expected actionable GO set?\"=\"Full INDEX re-survey, then decide\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0451
+  asked_at: 2026-05-08T03:49:18.862685Z
+  question: "bridge/INDEX.md was modified to remove several thread entries that have active verdicts on disk (e.g., canonical-terminology-system-context-model-001 NO-GO -004; harness-parity-baseline GO -004; env-inventory-drift-control-001 VERIFIED -010; isolation-018-slice-e3 VERIFIED -010). The system-reminder says the change was intentional and not to revert it. How should I proceed?"
+  options:
+    - "File -005 + restore INDEX entries"
+    - "File -005 only; leave INDEX as-is"
+    - "Pause; treat INDEX state as authoritative"
+    - "Investigate INDEX prune cause first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8bc449136a0289e3
+  resolved_at: 2026-05-08T03:49:18.862685Z
+  answer: "User has answered your questions: \"bridge/INDEX.md was modified to remove several thread entries that have active verdicts on disk (e.g., canonical-terminology-system-context-model-001 NO-GO -004; harness-parity-baseline GO -004; env-inventory-drift-control-001 VERIFIED -010; isolation-018-slice-e3 VERIFIED -010). The system-reminder says the change was intentional and not to revert it. How should I proceed?\"=\"Investigate INDEX prune cause first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0455
+  asked_at: 2026-05-08T05:04:28.709208Z
+  question: "Now that the 7 NO-GO bridge items are fully closed, where would you like me to direct attention next?"
+  options:
+    - "Band 1: P0 secrets-purge / Slice 8.5/8.6"
+    - "Band 2: Acceleration / deterministic-services"
+    - "Band 3: Governance tightening"
+    - "End session here / wrap up"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 499007f8d3b07bd4
+  resolved_at: 2026-05-08T05:04:28.709208Z
+  answer: "User has answered your questions: \"Now that the 7 NO-GO bridge items are fully closed, where would you like me to direct attention next?\"=\"Band 3: Governance tightening\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0452
+  asked_at: 2026-05-08T03:49:18.862685Z
+  question: "rized remediation.  Should I proceed with filing `-005`, or would you prefer to handle this thread differently?"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 9be9bb8c79673b41
+  resolved_at: 2026-05-08T05:09:31.370329Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0453
+  asked_at: 2026-05-08T04:35:56.005042Z
+  question: "rized remediation.  Should I proceed with filing `-005`, or would you prefer to handle this thread differently? (asked 2026-05-08T0"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: dc1b333e7ce0ef3d
+  resolved_at: 2026-05-08T05:09:31.370347Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0454
+  asked_at: 2026-05-08T04:56:42.663457Z
+  question: "poller catches up.  Want me to focus on a specific band, pick the top item from Band 1 / Band 2, or do something else?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 3be2346455c8646e
+  resolved_at: 2026-05-08T05:09:31.370350Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 
