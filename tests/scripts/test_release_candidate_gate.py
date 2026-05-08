@@ -525,3 +525,119 @@ def test_python_gate_runs_scoped_service_boundary_before_pytest(monkeypatch):
     )
     assert scoped_index < pytest_index
     assert "tests/scripts/test_gtkb_scoped_client.py" in commands[pytest_index]
+
+
+# ---------------------------------------------------------------------------
+# Slice C C4 reachability tests (per GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 NO-GO -009 F2)
+# ---------------------------------------------------------------------------
+
+
+def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypatch, capsys):
+    """Behavioral test per NO-GO -009 F2: when the inventory-drift lane FAILs
+    in the current baseline state, the narrative-artifact-evidence lane must
+    still emit its PASS line so dashboard / CI consumers can pattern-match
+    the rollup status. The fix moves the narrative-artifact lane BEFORE the
+    inventory-drift lane.
+
+    This test is the reachability protection that string-presence tests miss:
+    a regression that re-orders the lanes (putting drift before narrative)
+    would silently pass `test_c_release_gate_imports_narrative_artifact_evidence`
+    + `test_c_release_gate_pass_message_present` (since the source still
+    contains the import + string), but THIS test would fail because the
+    PASS line would not appear before the simulated FAIL.
+    """
+    gate = _load_gate_module()
+
+    narrative_lane_was_called = []
+    inventory_drift_was_called = []
+
+    def fake_narrative_lane():
+        narrative_lane_was_called.append(True)
+        print("PASS narrative-artifact evidence (no protected paths in staged set)")
+
+    def fake_inventory_drift():
+        inventory_drift_was_called.append(True)
+        raise gate.GateFailure(
+            "Development environment inventory drift: simulated baseline failure for reachability test"
+        )
+
+    # Stub out lanes that come earlier in the pipeline so they pass quickly.
+    monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
+    monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
+    monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_dev_environment_inventory_drift", fake_inventory_drift)
+    monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
+
+    monkeypatch.setattr(sys, "argv", ["release_candidate_gate.py", "--skip-python", "--skip-frontend"])
+
+    exit_code = gate.main()
+
+    assert exit_code == 1, "Release gate must FAIL when inventory-drift lane raises GateFailure"
+    assert narrative_lane_was_called, (
+        "Narrative-artifact evidence lane MUST be called even when inventory-drift fails. "
+        "Per NO-GO -009 F1, lane must run before inventory-drift to surface rollup in baseline state."
+    )
+    assert inventory_drift_was_called, "Inventory-drift lane was monkeypatched but never called"
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+
+    pass_pos = output.find("PASS narrative-artifact evidence")
+    fail_pos = output.find("RELEASE GATE: FAIL")
+
+    assert pass_pos != -1, (
+        "PASS narrative-artifact evidence line MUST appear in release-gate output "
+        f"(per Slice C C4 acceptance). Got:\n{output}"
+    )
+    assert fail_pos != -1, "Expected RELEASE GATE: FAIL after simulated drift failure"
+    assert pass_pos < fail_pos, (
+        "PASS narrative-artifact evidence MUST appear BEFORE RELEASE GATE: FAIL "
+        "so dashboard / CI consumers can pattern-match the rollup status in baseline state. "
+        f"Got pass_pos={pass_pos}, fail_pos={fail_pos}."
+    )
+
+
+def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsys):
+    """Per NO-GO -009 F1 control check: when --skip-dev-inventory-drift is
+    passed, the narrative-artifact lane STILL runs (it has no dependency on
+    inventory-drift state). This is the simpler path that Codex used as a
+    control to prove the helper itself works.
+    """
+    gate = _load_gate_module()
+
+    narrative_lane_was_called = []
+
+    def fake_narrative_lane():
+        narrative_lane_was_called.append(True)
+        print("PASS narrative-artifact evidence (no protected paths in staged set)")
+
+    monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
+    monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
+    monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "release_candidate_gate.py",
+            "--skip-python",
+            "--skip-frontend",
+            "--skip-dev-inventory-drift",
+        ],
+    )
+
+    exit_code = gate.main()
+
+    assert exit_code == 0, "Release gate must PASS when only narrative-artifact lane runs and is clean"
+    assert narrative_lane_was_called, "Narrative-artifact lane must run when invoked without skips"
+
+    captured = capsys.readouterr()
+    assert "PASS narrative-artifact evidence" in captured.out
+    assert "RELEASE GATE: PASS" in captured.out

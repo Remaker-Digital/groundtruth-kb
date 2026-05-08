@@ -427,9 +427,17 @@ def main() -> int:
         _check_project_resource_registry()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
+        # Narrative-artifact evidence rollup runs BEFORE the inventory-drift check
+        # so the rollup line surfaces in the release-readiness report even when
+        # the inventory-drift lane fails on pre-existing baseline state. Per
+        # GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 NO-GO -009 F1: the lane
+        # has no dependency on inventory-drift state, and dashboard / CI
+        # consumers must be able to pattern-match the rollup status in every
+        # release-gate output, not only when the drift baseline happens to be
+        # clean.
+        _check_narrative_artifact_evidence()
         if not args.skip_dev_inventory_drift:
             _check_dev_environment_inventory_drift()
-        _check_narrative_artifact_evidence()
         if not args.skip_python:
             _python_gates()
         if args.include_frontend and not args.skip_frontend:
