@@ -370,6 +370,8 @@ NO-GO: bridge/gtkb-pre-filing-preflight-hook-002.md
 NEW: bridge/gtkb-pre-filing-preflight-hook-001.md
 
 Document: gtkb-pre-filing-preflight-rule
+VERIFIED: bridge/gtkb-pre-filing-preflight-rule-006.md
+REVISED: bridge/gtkb-pre-filing-preflight-rule-005.md
 NO-GO: bridge/gtkb-pre-filing-preflight-rule-004.md
 NEW: bridge/gtkb-pre-filing-preflight-rule-003.md
 GO: bridge/gtkb-pre-filing-preflight-rule-002.md

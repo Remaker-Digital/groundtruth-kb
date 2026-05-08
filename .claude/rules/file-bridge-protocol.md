@@ -43,14 +43,14 @@ Before writing or revising any bridge proposal at
    cross-cutting specs are triggered by the planned proposal text (path,
    content, doc-name regex matrix).
 2. KB-search for cross-cutting governance specs governing the *artifact type*
-   the proposal will create or modify (for example, a DELIB insert triggers
+   the proposal will create or modify (e.g., a DELIB insert triggers
    `GOV-ARTIFACT-APPROVAL-001`; a bridge proposal itself triggers the
    always-blocking cross-cutting bridge-governance set).
-3. Cite every triggered required and advisory spec in the proposal's
+3. Cite every triggered required + advisory spec in the proposal's
    `Specification Links` section.
 4. After drafting (and before filing or after editing the INDEX entry), run:
 
-   ```text
+   ```
    python scripts/bridge_applicability_preflight.py --bridge-id <intended-bridge-id>
    ```
 
@@ -67,7 +67,7 @@ preflight on its own operative file does not pass. Codex's NO-GO message must
 include the offending `missing_*_specs` list.
 
 The catch-22 case (preflight requires INDEX entry to know the operative file):
-if the INDEX entry does not yet exist, manually grep the draft text against the
+if the INDEX entry doesn't yet exist, manually grep the draft text against the
 `applies_when_*` patterns in `config/governance/spec-applicability.toml`. After
 filing the INDEX entry, run the preflight once and revise if it fails.
 
