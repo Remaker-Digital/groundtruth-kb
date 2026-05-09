@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-startup-trigger-awareness-and-skill-reference-001
+NEW: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001.md
+
 Document: gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001
 GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-006.md
 REVISED: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-005.md
@@ -20,6 +23,7 @@ NO-GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-
 NEW: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001.md
 
 Document: gtkb-loyal-opposition-startup-symmetry-001
+GO: bridge/gtkb-loyal-opposition-startup-symmetry-001-008.md
 REVISED: bridge/gtkb-loyal-opposition-startup-symmetry-001-007.md
 NO-GO: bridge/gtkb-loyal-opposition-startup-symmetry-001-006.md
 REVISED: bridge/gtkb-loyal-opposition-startup-symmetry-001-005.md
