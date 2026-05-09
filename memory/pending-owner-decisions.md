@@ -5925,6 +5925,47 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T18:51:46.328111Z
   answer: "User has answered your questions: \"How should we close the gap between 'cross-harness trigger exists' and 'agents create their own monitoring automations'?\"=\"File a separate bridge thread to expand startup payload (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0502
+  asked_at: 2026-05-09T19:08:54.992386Z
+  question: "Your model reframes the thread automation as a first-class architectural surface (interactive-pickup peer of the dispatch trigger), not just a gap-filler. The in-flight `gtkb-startup-trigger-awareness-and-skill-reference-001-001` is NEW awaiting Codex review and uses the older 'supplemental monitoring' framing. Revise it now or wait?"
+  options:
+    - "File Prime-side REVISED-1 -002 now incorporating the new model (Recommended)"
+    - "Wait for Codex review of -001 first"
+    - "File the reframe as a separate follow-on bridge thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 79e4bd9e5a73f2eb
+  resolved_at: 2026-05-09T19:08:54.992386Z
+  answer: "User has answered your questions: \"Your model reframes the thread automation as a first-class architectural surface (interactive-pickup peer of the dispatch trigger), not just a gap-filler. The in-flight `gtkb-startup-trigger-awareness-and-skill-reference-001-001` is NEW awaiting Codex review and uses the older 'supplemental monitoring' framing. Revise it now or wait?\"=\"File Prime-side REVISED-1 -002 now incorporating the new model (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0503
+  asked_at: 2026-05-09T19:08:54.992386Z
+  question: "Codex NO-GO -002 surfaced that BRIDGE_OPERATION_INSTRUCTIONS_TEXT already exists and the proposal would duplicate/contradict it. Combined with your two-axis reframe, how should I scope -003 REVISED-1?"
+  options:
+    - "Minimal: rewrite BRIDGE_OPERATION_INSTRUCTIONS_TEXT + bridge-essential.md two-axis section only (Recommended)"
+    - "Minimal + owner-disposition AUQ for existing automations"
+    - "Withdraw the proposal entirely; revisit later"
+    - "Keep full -001 scope; address F1+F2+F3 inline in -003"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e43879a603b2610a
+  resolved_at: 2026-05-09T19:08:54.992386Z
+  answer: "User has answered your questions: \"Codex NO-GO -002 surfaced that BRIDGE_OPERATION_INSTRUCTIONS_TEXT already exists and the proposal would duplicate/contradict it. Combined with your two-axis reframe, how should I scope -003 REVISED-1?\"=\"Minimal: rewrite BRIDGE_OPERATION_INSTRUCTIONS_TEXT + bridge-essential.md two-axis section only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0504
+  asked_at: 2026-05-09T19:08:54.992386Z
+  question: "Codex unilaterally edited scripts/session_self_initialization.py + test file (added BRIDGE_OPERATION_INSTRUCTIONS_TEXT constant + 5 test assertions) while reviewing the trigger-awareness thread. This appears to violate the Loyal Opposition File Safety Rule. Plus: umbrella -007 GO'd at -008. How to handle?"
+  options:
+    - "Commit current state + file -003 rewriting Codex's added constant (Recommended)"
+    - "Revert Codex's source/test edits + commit verdict files only + file -003 from clean state"
+    - "Commit current state + file LO File Safety Rule violation as a separate bridge thread"
+    - "Withdraw -003 entirely; let Codex's edit stand; close trigger-awareness thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3c23168a0f544224
+  resolved_at: 2026-05-09T19:08:54.992386Z
+  answer: "User has answered your questions: \"Codex unilaterally edited scripts/session_self_initialization.py + test file (added BRIDGE_OPERATION_INSTRUCTIONS_TEXT constant + 5 test assertions) while reviewing the trigger-awareness thread. This appears to violate the Loyal Opposition File Safety Rule. Plus: umbrella -007 GO'd at -008. How to handle?\"=\"Commit current state + file LO File Safety Rule violation as a separate bridge thread\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

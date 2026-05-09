@@ -11,10 +11,15 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-claude-code-bridge-status-thread-automation-001
+NEW: bridge/gtkb-claude-code-bridge-status-thread-automation-001.md
+
 Document: gtkb-lo-file-safety-rule-clarification-001
+GO: bridge/gtkb-lo-file-safety-rule-clarification-001-002.md
 NEW: bridge/gtkb-lo-file-safety-rule-clarification-001.md
 
 Document: gtkb-startup-trigger-awareness-and-skill-reference-001
+GO: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-004.md
 REVISED: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-003.md
 NO-GO: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-002.md
 NEW: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001.md
