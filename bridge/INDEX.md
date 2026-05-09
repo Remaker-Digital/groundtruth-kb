@@ -12,6 +12,8 @@
 
 
 Document: gtkb-da-read-surface-correction-phase-1-glossary-backfill
+NO-GO: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-006.md
+REVISED: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-005.md
 NO-GO: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-004.md
 REVISED: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-003.md
 NO-GO: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-002.md
@@ -24,6 +26,11 @@ GO: bridge/gtkb-bridge-skill-unified-001-002.md
 NEW: bridge/gtkb-bridge-skill-unified-001-001.md
 
 Document: gtkb-bridge-poller-event-driven-replacement-001
+VERIFIED: bridge/gtkb-bridge-poller-event-driven-replacement-010.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-009.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-008.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-007.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-006.md
 NEW: bridge/gtkb-bridge-poller-event-driven-replacement-005.md
 GO: bridge/gtkb-bridge-poller-event-driven-replacement-004.md
 REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-003.md
