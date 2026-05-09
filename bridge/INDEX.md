@@ -11,10 +11,15 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-bridge-skill-unified-001
+NEW: bridge/gtkb-bridge-skill-unified-001-001.md
+
 Document: gtkb-bridge-poller-event-driven-replacement-001
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-002.md
 NEW: bridge/gtkb-bridge-poller-event-driven-replacement-001.md
 
 Document: gtkb-da-read-surface-correction-phase-0-formalization
+GO: bridge/gtkb-da-read-surface-correction-phase-0-formalization-004.md
 REVISED: bridge/gtkb-da-read-surface-correction-phase-0-formalization-003.md
 NO-GO: bridge/gtkb-da-read-surface-correction-phase-0-formalization-002.md
 NEW: bridge/gtkb-da-read-surface-correction-phase-0-formalization-001.md
