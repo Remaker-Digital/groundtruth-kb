@@ -12,9 +12,11 @@
 
 
 Document: gtkb-bridge-skill-unified-001
+GO: bridge/gtkb-bridge-skill-unified-001-002.md
 NEW: bridge/gtkb-bridge-skill-unified-001-001.md
 
 Document: gtkb-bridge-poller-event-driven-replacement-001
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-003.md
 NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-002.md
 NEW: bridge/gtkb-bridge-poller-event-driven-replacement-001.md
 
