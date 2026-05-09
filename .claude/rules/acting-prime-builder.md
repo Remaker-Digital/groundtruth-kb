@@ -98,15 +98,30 @@ explicitly rejected, or superseded.
 
 ## Harness Hook Parity Fallback Principle
 
-Owner acknowledgement `DELIB-0836` and
-`ADR-CODEX-HOOK-PARITY-FALLBACK-001` establish that `.codex/config.toml` and
-`.codex/hooks.json` are forward-compatible hook intent for harnesses that use
-the `.codex` adapter while those hooks remain disabled on Windows.
+Owner acknowledgement `DELIB-0836` (predecessor — preserved as historical
+record), `ADR-CODEX-HOOK-PARITY-FALLBACK-001` v2 (current authority;
+supersedes v1), and `DELIB-S337-CODEX-HOOK-PARITY-STANCE-REFRESH-2026-05-08`
+(refresh deliberation) establish the current state: `.codex/config.toml` and
+`.codex/hooks.json` ARE a live Codex interception boundary on Windows for
+Codex CLI versions >= 0.128.0-alpha.1, where the `codex_hooks` feature flag
+is `stable, true` by default. The empirical foundation is
+`DELIB-S337-CODEX-HOOKS-WINDOWS-RETEST-2026-05-08` (rowid 1550): SessionStart,
+UserPromptSubmit, and Stop hooks all fired during a `codex exec` invocation
+on Windows.
 
-Until those hooks are live on Windows, sessions must not represent
-`.codex/hooks.json` as a live Windows interception boundary. Mechanical
-adapter-on-Windows enforcement is provided by `scripts/check_codex_hook_parity.py`
-and the release-candidate gate.
+The fallback obligation persists for two cases: (1) older Codex CLI versions
+where the `codex_hooks` feature is not stable; (2) any future regression that
+re-disables the feature. In either case, sessions must verify the live state
+via `codex features list` (looking for `codex_hooks  stable  true`) before
+relying on `.codex/hooks.json` as a live interception boundary, and must use
+mechanical fallback (`scripts/check_codex_hook_parity.py` and Claude-side
+hooks where available) when verification fails.
+
+A regression test in `tests/scripts/test_codex_hook_parity.py` (or successor;
+landed via `gtkb-bridge-poller-event-driven-replacement-001` Slice 2) invokes
+`codex exec --skip-git-repo-check "<sentinel prompt>"` against a fixture Stop
+hook and asserts hook firing; failure indicates the v1 fallback stance is
+again operative.
 
 ## Session Formalization Audit Principle
 
