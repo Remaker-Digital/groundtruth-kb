@@ -5,6 +5,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode session-start --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Active-session heartbeat (start)",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\session_start_dispatch.py",
             "statusMessage": "Preparing GT-KB startup orientation",
             "timeout": 60
@@ -31,6 +37,12 @@
             "type": "command",
             "command": "python E:\\GT-KB\\.claude\\hooks\\spec-classifier.py",
             "statusMessage": "Checking specification language",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\glossary-expansion.py",
+            "statusMessage": "Glossary expansion (Phase 3 of GTKB-DA-READ-SURFACE-CORRECTION)",
             "timeout": 5
           }
         ]
@@ -76,6 +88,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode tool-use --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Active-session heartbeat (refresh)",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
             "statusMessage": "Cross-harness bridge trigger",
             "timeout": 5
@@ -85,6 +103,12 @@
       {
         "matcher": "apply_patch",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode tool-use --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Active-session heartbeat (refresh)",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
@@ -99,8 +123,20 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode tool-use --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Active-session heartbeat (refresh before Stop)",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
             "statusMessage": "Cross-harness bridge Stop reconciliation",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode session-stop --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Active-session heartbeat (stop)",
             "timeout": 5
           }
         ]

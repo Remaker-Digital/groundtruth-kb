@@ -11,7 +11,57 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-cross-harness-trigger-active-session-suppression-001
+VERIFIED: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md
+NEW: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-007.md
+GO: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-006.md
+REVISED: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-005.md
+NO-GO: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-004.md
+REVISED: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-003.md
+NO-GO: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-002.md
+NEW: bridge/gtkb-cross-harness-trigger-active-session-suppression-001.md
+
+Document: gtkb-session-start-formalization-001
+NO-GO: bridge/gtkb-session-start-formalization-001-002.md
+NEW: bridge/gtkb-session-start-formalization-001.md
+
+Document: gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook
+VERIFIED: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-010.md
+REVISED: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-009.md
+NO-GO: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-008.md
+NEW: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-007.md
+GO: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-006.md
+REVISED: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-005.md
+NO-GO: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-004.md
+REVISED: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-003.md
+NO-GO: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-002.md
+NEW: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-001.md
+
+Document: gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001
+GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-016.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-015.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-014.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-013.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-012.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-011.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-010.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-009.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-008.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-007.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-006.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-005.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-004.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-003.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-002.md
+NEW: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001.md
+
 Document: gtkb-da-read-surface-correction-phase-2-template-pre-population
+VERIFIED: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-008.md
+REVISED: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-007.md
+NO-GO: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-006.md
+NEW: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-005.md
+GO: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-004.md
+REVISED: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-003.md
 NO-GO: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-002.md
 NEW: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-001.md
 

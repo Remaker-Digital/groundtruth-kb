@@ -33,6 +33,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode session-start --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\"",
             "timeout": 60
           }
@@ -54,6 +59,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode tool-use --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
           }
@@ -62,6 +72,11 @@
       {
         "matcher": "Write|Edit",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode tool-use --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
@@ -85,7 +100,17 @@
           },
           {
             "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode tool-use --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\" --stop-hook",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode session-stop --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
           }
         ]
@@ -102,6 +127,11 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-classifier.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/glossary-expansion.py\"",
             "timeout": 5
           }
         ]

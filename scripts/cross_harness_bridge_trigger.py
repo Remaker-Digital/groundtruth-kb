@@ -53,6 +53,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -274,6 +275,89 @@ def _harness_command(recipient: str, prompt: str, project_root: Path) -> list[st
     return None
 
 
+# ---------------------------------------------------------------------------
+# Active-session suppression (cross-harness-trigger-active-session-suppression
+# at -005 GO at -006).
+#
+# When a counterpart harness holds an active foreground session (its
+# heartbeat lock file is present and fresh), suppress dispatch to that
+# role to prevent duplicate auto-dispatched parallel-revision work. The
+# suppression state-machine uses two signature fields:
+#
+# - last_dispatched_signature: the signature actually spawned. Slice 2
+#   dedup field — current signature == last_dispatched_signature → skip.
+# - last_suppressed_signature: marker that suppression fired. Allows
+#   retry after counterpart exits because last_dispatched_signature was
+#   never updated.
+#
+# Legacy ``signature`` field is preserved for backward-compat readers and
+# is updated only on real dispatch (not on suppression).
+#
+# Lock files live in the same ``--state-dir`` the trigger uses (typically
+# ``.gtkb-state/bridge-poller``). The hook commands MUST pass identical
+# ``--state-dir`` values to both ``active_session_heartbeat.py`` and this
+# script. Heartbeat script enforces ``--state-dir`` as REQUIRED so the
+# coupling is explicit at config time.
+# ---------------------------------------------------------------------------
+
+
+HEARTBEAT_LOCK_TEMPLATE = "active-{role}-session.lock"
+
+
+def _counterpart_role(recipient: str) -> str:
+    """Map a recipient name to the harness role that holds its active-session lock.
+
+    The trigger dispatches to ``recipient``; the counterpart that is
+    *currently active* and would race with that dispatch is the harness
+    *the recipient is*. Specifically, ``recipient="prime"`` would dispatch
+    to a Claude harness, so the counterpart-active lock to check is
+    ``active-claude-session.lock``. ``recipient="codex"`` checks
+    ``active-codex-session.lock``.
+    """
+    if recipient == "prime":
+        return "claude"
+    if recipient == "codex":
+        return "codex"
+    # Unknown recipient: treat as no-counterpart (do not suppress).
+    return ""
+
+
+def check_counterpart_active(recipient: str, state_dir: Path) -> bool:
+    """Return True if the recipient's harness has a fresh active-session lock.
+
+    Reads ``<state-dir>/active-{counterpart_role}-session.lock`` and treats
+    the recipient as active when:
+
+    - The lock file exists, AND
+    - Its mtime is within ``GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS``
+      (default 120, matching the owner-stated value in
+      ``DELIB-S337-OWNER-ACTIVE-SESSION-SUPPRESSION-DIRECTIVE-2026-05-09``).
+
+    Locks older than the sanity TTL are treated as orphaned (the harness
+    crashed without firing its Stop hook) and the function returns False.
+    Locks that are unreadable due to OSError also return False (fail open
+    rather than falsely suppress).
+    """
+    role = _counterpart_role(recipient)
+    if not role:
+        return False
+    lock_path = state_dir / HEARTBEAT_LOCK_TEMPLATE.format(role=role)
+    if not lock_path.exists():
+        return False
+    try:
+        mtime = lock_path.stat().st_mtime
+    except OSError:
+        return False
+    age_seconds = time.time() - mtime
+    try:
+        sanity_ttl = int(os.environ.get("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "120"))
+    except (TypeError, ValueError):
+        sanity_ttl = 120
+    if age_seconds > sanity_ttl:
+        return False
+    return True
+
+
 def _spawn_harness(
     *,
     recipient: str,
@@ -422,27 +506,74 @@ def run_trigger(
         selected = _selected_oldest_first(filtered, max_items)
         signature = _signature(selected)
 
-        prior = recipients_state.get(recipient)
-        prior_signature = prior.get("signature") if isinstance(prior, dict) else None
+        prior = recipients_state.get(recipient) if isinstance(recipients_state.get(recipient), dict) else {}
+        # Active-session suppression state model:
+        # - last_dispatched_signature: dedup field. Slice 2 invariant —
+        #   current_signature == last_dispatched_signature → "unchanged".
+        # - last_suppressed_signature: retry-pending marker. Set when
+        #   suppression fires; cleared when dispatch finally succeeds.
+        # - signature (legacy): preserved for back-compat readers; updated
+        #   ONLY on real dispatch.
+        prior_legacy_signature = prior.get("signature") if isinstance(prior, dict) else None
+        # Backward compatibility: pre-suppression dispatch-state.json files
+        # have only the legacy `signature` field. Fall back to it as the
+        # dedup signal when `last_dispatched_signature` is absent, so
+        # rolling deployment does not produce duplicate dispatches for
+        # already-handled entries. After the first run that takes the
+        # dispatch branch, last_dispatched_signature is populated and the
+        # fallback is no longer used for that recipient.
+        prior_dispatched = (
+            prior.get("last_dispatched_signature")
+            if isinstance(prior, dict) and prior.get("last_dispatched_signature") is not None
+            else prior_legacy_signature
+        )
+        prior_suppressed = prior.get("last_suppressed_signature") if isinstance(prior, dict) else None
 
+        # Carry forward prior values; update conditionally per branch below.
         recipient_state: dict[str, Any] = {
-            "signature": signature,
             "signature_scope": "selected_dispatch_batch",
             "pending_count": len(filtered),
             "selected_count": len(selected),
             "raw_pending_count": len(items),
             "updated_at": _now_iso(),
+            "last_dispatched_signature": prior_dispatched,
+            "last_suppressed_signature": prior_suppressed,
+            # Legacy field updated only on real dispatch; carry forward here.
+            "signature": prior_legacy_signature,
         }
 
         if not selected:
             recipient_state["last_result"] = (
                 "no_pending_after_filter" if items else "no_pending"
             )
+            # Empty pending: keep legacy `signature` aligned to the empty
+            # state for back-compat with Slice 2 readers (which expected
+            # the field to track current signature, including empty).
+            recipient_state["signature"] = signature
             results[recipient] = {"launched": False, "reason": recipient_state["last_result"]}
-        elif prior_signature == signature:
+        elif check_counterpart_active(recipient, state_dir):
+            # Active-session suppression: counterpart harness is in an
+            # active foreground session. Record the signature in the
+            # suppressed field (NOT the dispatched field) so it remains
+            # retryable when the counterpart exits. Do NOT update legacy
+            # `signature`.
+            recipient_state["last_suppressed_signature"] = signature
+            recipient_state["last_result"] = "counterpart_active_session_present"
+            results[recipient] = {
+                "launched": False,
+                "reason": "counterpart_active_session_present",
+            }
+        elif prior_dispatched == signature:
+            # Slice 2 dedup: this exact signature was already dispatched.
+            # Skip without spawning. Legacy `signature` stays in sync.
+            recipient_state["signature"] = signature
             recipient_state["last_result"] = "unchanged"
             results[recipient] = {"launched": False, "reason": "unchanged"}
         else:
+            # Dispatch path. Covers:
+            #   - first dispatch ever
+            #   - signature changed since last dispatch
+            #   - prior_suppressed == signature (retry after counterpart exit)
             launch = _spawn_harness(
                 recipient=recipient,
                 items=filtered,
@@ -455,6 +586,11 @@ def run_trigger(
                 "launched" if launch.get("launched") else "launch_failed"
             )
             recipient_state["last_launch"] = launch
+            recipient_state["last_dispatched_signature"] = signature
+            # Dispatch supersedes any prior suppression.
+            recipient_state["last_suppressed_signature"] = None
+            # Legacy `signature` field updated ONLY on real dispatch.
+            recipient_state["signature"] = signature
             results[recipient] = launch
 
         recipients_state[recipient] = recipient_state
