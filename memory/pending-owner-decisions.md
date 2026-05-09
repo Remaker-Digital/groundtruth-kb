@@ -6,9 +6,17 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
-
 ## Resolved
+
+- id: DECISION-0494
+  asked_at: 2026-05-09T17:16:53.121114Z
+  question: "(prose decision-ask captured by tracker; pattern over-match included decorative prefix/suffix; question was formalized as AUQ later in the same turn S339 2026-05-09 and answered 'Wait — status sharing only'. Manually resolved here per AUQ 'Combine — clear -0494 now AND file the bridge proposal' 2026-05-09.)"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 2d8fe8965869cb88
+  resolved_at: 2026-05-09T17:30:00.000000Z
+  answer: "Wait — status sharing only (per same-turn AUQ formalization)"
+  notes: "Tracker pattern over-match + missing same-turn AUQ auto-resolution; both defects to be addressed via bridge proposal gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001."
 
 - id: DECISION-0481
   asked_at: 2026-05-09T02:29:10.336550Z
@@ -5804,6 +5812,47 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 3f90279df148debe
   resolved_at: 2026-05-09T16:56:21.824779Z
   answer: "User has answered your questions: \"How should we handle Codex's `monitor-gt-kb-bridge` thread automation given the just-landed Slice 4 retirement framing?\"=\"Inventory only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0493
+  asked_at: 2026-05-09T17:13:56.584054Z
+  question: "How should we scope the LO startup correction? Concerns: (1) init-keyword parity for LO (in-flight in `gtkb-session-start-formalization-001` at NO-GO -002); (2) LO auto-launch into bridge-processing mode (new design change; not in any in-flight thread)."
+  options:
+    - "One umbrella bridge proposal covering both concerns (Recommended)"
+    - "Two parallel bridge proposals"
+    - "Quick surgical fix for concern 2 only; keep -001 paused"
+    - "Research-only: file a Codex Loyal Opposition advisory documenting the design space"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1835e5a0440974de
+  resolved_at: 2026-05-09T17:13:56.584054Z
+  answer: "User has answered your questions: \"How should we scope the LO startup correction? Concerns: (1) init-keyword parity for LO (in-flight in `gtkb-session-start-formalization-001` at NO-GO -002); (2) LO auto-launch into bridge-processing mode (new design change; not in any in-flight thread).\"=\"One umbrella bridge proposal covering both concerns (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0495
+  asked_at: 2026-05-09T17:17:18.928703Z
+  question: "The screenshot showed Codex detecting the umbrella proposal as actionable but stopping at report-only (the same gate the proposal targets). Take an action to unblock review, or wait?"
+  options:
+    - "Wait — status sharing only (Recommended)"
+    - "Manually invoke Codex on the proposal"
+    - "File REVISED-1 (-002) of the umbrella adding the heartbeat-variance observation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d3c20a23a9e99698
+  resolved_at: 2026-05-09T17:17:18.928703Z
+  answer: "User has answered your questions: \"The screenshot showed Codex detecting the umbrella proposal as actionable but stopping at report-only (the same gate the proposal targets). Take an action to unblock review, or wait?\"=\"Wait — status sharing only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0496
+  asked_at: 2026-05-09T17:24:33.275498Z
+  question: "Want me to evaluate a specific aspect of the LO startup disclosure, or is this status sharing?"
+  options:
+    - "Status sharing only — no action (Recommended)"
+    - "Compare current LO startup vs umbrella's intended LO startup"
+    - "Scroll-and-evaluate the full LO startup payload"
+    - "Identify gaps relative to Prime Builder's startup"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: caa5eb4951fd2f60
+  resolved_at: 2026-05-09T17:24:33.275498Z
+  answer: "User has answered your questions: \"Want me to evaluate a specific aspect of the LO startup disclosure, or is this status sharing?\"=\"Status sharing only — no action (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

@@ -11,7 +11,11 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001
+NEW: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001.md
+
 Document: gtkb-loyal-opposition-startup-symmetry-001
+NO-GO: bridge/gtkb-loyal-opposition-startup-symmetry-001-002.md
 NEW: bridge/gtkb-loyal-opposition-startup-symmetry-001.md
 
 Document: gtkb-cross-harness-trigger-active-session-suppression-001
