@@ -1,0 +1,166 @@
+---
+name: gtkb-bridge
+description: Operate the full bridge protocol — file proposals, scan INDEX for actionable items, write GO/NO-GO/VERIFIED verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.
+---
+
+# /gtkb-bridge
+
+This skill is the canonical entry point for bridge protocol operations. The bridge is GroundTruth-KB's coordination mechanism between Prime Builder and Loyal Opposition: implementation proposals, reviews, and verifications flow through versioned markdown files under `bridge/` governed by `bridge/INDEX.md` per `.claude/rules/file-bridge-protocol.md`.
+
+This skill body presents **identical content** to both Claude Code and Codex agents via the cross-harness skill-adapter pipeline (per `config/agent-control/harness-capability-registry.toml` + `scripts/generate_codex_skill_adapters.py`). Operations described here behave the same way regardless of which harness invokes the skill.
+
+## Bridge protocol summary
+
+Five operations, six lifecycle states. Operations:
+
+| Operation | Who runs it | What it produces |
+|---|---|---|
+| **Propose** | Prime Builder | New or revised proposal file `bridge/<topic>-NNN.md` + INDEX entry |
+| **Scan** | Both harnesses | List of actionable items needing review or implementation |
+| **Respond** | Loyal Opposition | Review file with verdict GO/NO-GO/VERIFIED + INDEX update |
+| **Verify** | Prime Builder | Post-implementation report + INDEX entry (status NEW; the post-impl report itself awaits VERIFIED) |
+| **Status** | Both harnesses | Read-only inspection of thread state without mutation |
+
+Lifecycle states (per `.claude/rules/file-bridge-protocol.md`):
+
+| State | Set by | Means |
+|---|---|---|
+| `NEW` | Prime | Fresh proposal awaiting review |
+| `REVISED` | Prime | Updated proposal after a NO-GO |
+| `GO` | Loyal Opposition | Proposal approved for implementation |
+| `NO-GO` | Loyal Opposition | Proposal requires changes before approval |
+| `VERIFIED` | Loyal Opposition | Post-implementation verification passed |
+| (terminal) | — | A thread is "terminal" when its latest entry is VERIFIED with no further work pending |
+
+A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implementation) → `NEW` (post-impl report) → `VERIFIED`.
+
+## Operations
+
+### Propose
+
+**Purpose**: file a NEW or REVISED proposal for review.
+
+**Action**:
+
+1. Draft proposal body containing required sections per `.claude/rules/file-bridge-protocol.md`: `Specification Links`, `Owner Decisions / Input` (when owner-approval-dependent), spec-derived test plan, acceptance criteria, risk/rollback. Per `.claude/rules/codex-review-gate.md`, every proposal must cite all relevant governing specifications; proposals without specification links MUST be NO-GO'd.
+2. Choose a kebab-case `topic-slug` describing the work (e.g., `gtkb-foo-bar-001`).
+3. Choose a version number: `001` for the first NEW; subsequent REVISEDs increment (`002`, `003`, ...). Versions are monotonic per thread.
+4. Run pre-filing preflights:
+   - `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>` — must report `preflight_passed: true`, no missing required/advisory specs.
+   - `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` — must exit 0, no blocking gaps.
+5. Delegate the file write + INDEX update to the helper-mediated path (`gtkb-bridge-propose` skill — see `.claude/skills/bridge-propose/SKILL.md`). The helper performs credential scanning per `CREDENTIAL_PATTERNS + BASH_EXTRAS`, writes `bridge/<topic-slug>-<version>.md`, and inserts `Document: <topic-slug>` + `<status>: bridge/<topic-slug>-<version>.md` at the top of `bridge/INDEX.md`.
+
+**Credential safety**: never bypass the helper for governance-content writes. Use `mode="abort"` on credential hits unless redaction is genuinely safe; `mode="redact"` replaces spans with `[REDACTED:<label>]` markers.
+
+### Scan
+
+**Purpose**: identify actionable bridge items for the current harness's role.
+
+**Action**:
+
+1. Read `bridge/INDEX.md`. Each `Document:` block lists versions with the **latest at top**. The latest line per document defines the queue state.
+2. Filter for actionable status given the current role:
+   - **Loyal Opposition** acts on `NEW` and `REVISED` (proposals/reports awaiting verdict).
+   - **Prime Builder** acts on `NO-GO` (revise) and `GO` (implement) for proposals; on `VERIFIED` (close) for post-impl reports.
+3. For each actionable thread, read **the full version chain** (all prior entries) before responding. The protocol requires reading the whole thread, not just the latest version.
+4. Optional: cross-check with `.gtkb-state/bridge-poller/dispatch-state.json` (or successor under `.gtkb-state/cross-harness-trigger/`) to deduplicate against already-dispatched signatures.
+
+### Respond
+
+**Purpose**: file a GO/NO-GO/VERIFIED verdict on a NEW or REVISED entry.
+
+**Action**:
+
+1. Read the full thread version chain.
+2. Run the mandatory applicability preflight: `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>`. The output's `Applicability Preflight` section must be included verbatim in the verdict file.
+3. Run the mandatory clause preflight: `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` (no `--report-only`). Treat exit 5 as a NO-GO blocker unless explicit owner-waiver lines are present per `.claude/rules/file-bridge-protocol.md` "Clause-Test Preflight (Mandatory; Slice 2)".
+4. Run a deliberation search: `db.search_deliberations(...)` per `.claude/rules/deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
+5. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
+6. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
+7. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
+8. Update `bridge/INDEX.md`: insert the verdict line at the top of the document version list.
+
+**Owner Decisions / Input section enforcement**: bridge proposals/reports that depend on owner approval (cite the AUQ-only rule, reference AskUserQuestion answers, or otherwise indicate owner-decision scope) MUST include a non-empty `## Owner Decisions / Input` section. Loyal Opposition issues NO-GO when this section is missing or contains placeholder content (`tbd`, `n/a`, `none`, etc.).
+
+### Verify
+
+**Purpose**: file a post-implementation report after a GO is implemented.
+
+**Action**:
+
+1. Implement the work per the GO d proposal scope. Run the spec-derived tests; capture the exact commands and observed results.
+2. Draft the post-implementation report carrying forward: `Specification Links` (verbatim from the proposal), spec-to-test mapping, tests executed, observed results, files changed, baseline accounting (per `.claude/rules/file-bridge-protocol.md` "Mandatory Specification-Derived Verification Gate" + the F2 baseline-discipline pattern from prior threads).
+3. File the report as a NEW entry on the same thread (`bridge/<topic-slug>-<next-version>.md`); update `bridge/INDEX.md` with `NEW:` line on top.
+4. Wait for Loyal Opposition VERIFIED or NO-GO response.
+
+### Status
+
+**Purpose**: read-only inspection without mutation.
+
+**Action**:
+
+1. `grep -n "Document: <topic-slug>" bridge/INDEX.md` to find the entry.
+2. Read the entry full version list (latest on top).
+3. The latest line status defines the current queue position:
+   - `VERIFIED` (terminal — no further action)
+   - `GO` (Prime: implement)
+   - `NO-GO` (Prime: revise)
+   - `NEW` / `REVISED` (Loyal Opposition: review)
+
+Use this when you need to know "what is the state of thread X?" without touching anything.
+
+## Required reading
+
+Before any operation:
+
+- `.claude/rules/file-bridge-protocol.md` — protocol root contract (status table, file naming, INDEX format, mandatory gates).
+- `.claude/rules/codex-review-gate.md` — review-gate constraints (mandatory specification-linkage gate; mandatory pre-filing preflight subsection).
+- `.claude/rules/deliberation-protocol.md` — deliberation search obligations before proposing AND before reviewing.
+- `.claude/rules/operating-model.md` — canonical vocabulary (specification, implementation proposal, implementation report, verification, etc.).
+- For Loyal Opposition: `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
+- For Prime Builder: `.claude/rules/acting-prime-builder.md` and `.claude/rules/prime-builder-role.md`.
+
+## Mandatory gates
+
+The bridge protocol carries several mandatory gates. Skipping any is a NO-GO trigger:
+
+- **Mandatory project root boundary** (`.claude/rules/project-root-boundary.md`): all live GT-KB files within `E:\GT-KB`. Bridge items depending on paths outside this root are NO-GO.
+- **Mandatory specification linkage gate** (`.claude/rules/file-bridge-protocol.md`): every proposal must include `Specification Links` citing every relevant governing specification. Absence = NO-GO.
+- **Mandatory pre-filing preflight subsection** (`.claude/rules/file-bridge-protocol.md`): preflights must run before filing; results must be cited; mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`.
+- **Mandatory specification-derived verification gate** (`.claude/rules/file-bridge-protocol.md`): VERIFIED requires implementation reports to include spec-to-test mapping + executed evidence.
+- **Mandatory applicability preflight gate** (`.claude/rules/file-bridge-protocol.md`): GO and VERIFIED verdicts must include the `Applicability Preflight` section with `missing_required_specs: []`.
+- **Mandatory clause-test preflight gate** (Slice 2; `.claude/rules/file-bridge-protocol.md`): exit 5 from `scripts/adr_dcl_clause_preflight.py` is a NO-GO blocker unless explicit owner waiver per blocking gap.
+- **Mandatory Owner Decisions / Input section gate** (`.claude/rules/file-bridge-protocol.md`): proposals/reports depending on owner approval must include a non-empty `## Owner Decisions / Input` section enumerating relevant AskUserQuestion evidence. Hook-enforced via `.claude/hooks/bridge-compliance-gate.py`.
+
+## Non-bypassable behaviors
+
+- **Bridge files are append-only.** Never delete or rewrite a prior version. The version chain forms the audit trail.
+- **`bridge/INDEX.md` is canonical for queue state.** Both harnesses must trust INDEX over any other signal (commit history, file mtime, smart-poller cache).
+- **Versioning is monotonic per thread.** Latest at top within each `Document:` block.
+- **Scoped commits only.** Bridge work commits should not bundle unrelated source changes.
+
+## Companion per-action skills
+
+For specific subactions, prefer the more focused skill:
+
+| Action | Specific skill | Path |
+|---|---|---|
+| File a proposal | `gtkb-bridge-propose` | `.claude/skills/bridge-propose/SKILL.md` |
+| Review a proposal | `gtkb-proposal-review` | `.claude/skills/proposal-review/SKILL.md` |
+| Submit for review | `gtkb-send-review` | `.claude/skills/send-review/SKILL.md` |
+
+This skill (`gtkb-bridge`) is the cross-cutting reference. Use it when:
+
+- The action fit with a per-action skill is not obvious.
+- You need to navigate the protocol across multiple operations in one session.
+- You want to understand the full lifecycle and required gates in one place.
+
+## Cross-harness implementation notes
+
+- The skill body is identical across Claude Code and Codex via the `scripts/generate_codex_skill_adapters.py` adapter pipeline. The Codex adapter version at `.codex/skills/bridge/SKILL.md` carries a `<!-- GTKB-CODEX-SKILL-ADAPTER -->` marker; do NOT edit the adapter directly. Edit the canonical at `.claude/skills/bridge/SKILL.md` and regenerate.
+- Hook-layer behavior (PreToolUse / PostToolUse / Stop) differs between harnesses by necessity (different schemas: `.claude/settings.json` JSON vs `.codex/hooks.json` JSON). Hook handler scripts are shared regardless.
+- Underlying scripts and CLIs are harness-agnostic. A future `gt bridge` CLI subcommand (per `gtkb-bridge-skill-unified-001` Slice 3, deferred at Codex GO `-002`) will provide a uniform invocation surface; until that lands, this skill delegates to per-action helpers (`gtkb-bridge-propose`, etc.) and direct script invocations.
+
+## Copyright
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

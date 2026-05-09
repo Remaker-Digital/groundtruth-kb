@@ -40,6 +40,24 @@ status = "adapter"
 adapter_source = ".claude/skills/arch-audit/SKILL.md"
 source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
 [[capabilities]]
+id = "skill.bridge"
+kind = "skill"
+canonical_name = "gtkb-bridge"
+canonical_purpose = "Operate the full bridge protocol — propose, scan, respond, verify, lifecycle, status — as a single canonical entry point spanning the per-action helper skills."
+canonical_source = ".claude/skills/bridge/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/bridge/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/bridge/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/bridge/SKILL.md"
+source_sha256 = "ae8b62209bb2e20cfd10a92a43fd3c84fb0fda349bf81e94c5b4036cce7a3df0"
+[[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
 canonical_name = "gtkb-bridge-propose"

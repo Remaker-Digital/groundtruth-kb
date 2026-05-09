@@ -15,6 +15,13 @@
       "source_sha256": "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
     },
     {
+      "adapter_relative_path": ".codex/skills/bridge/SKILL.md",
+      "canonical_name": "gtkb-bridge",
+      "capability_id": "skill.bridge",
+      "source_relative_path": ".claude/skills/bridge/SKILL.md",
+      "source_sha256": "ae8b62209bb2e20cfd10a92a43fd3c84fb0fda349bf81e94c5b4036cce7a3df0"
+    },
+    {
       "adapter_relative_path": ".codex/skills/bridge-propose/SKILL.md",
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
