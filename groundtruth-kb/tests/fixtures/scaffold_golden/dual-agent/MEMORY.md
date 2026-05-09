@@ -17,7 +17,7 @@ This file is the MEMORY.md operational notepad per ADR-0001: Three-Tier Memory A
 ## Operational Control Surfaces
 
 - **Bridge / runtime inventory:** BRIDGE-INVENTORY.md
-- **Automations / schedules:** File bridge inventory and smart-poller setup prompt included
+- **Automations / schedules:** File bridge inventory and cross-harness event-driven trigger (.claude/settings.json + .codex/hooks.json PostToolUse + Stop hooks) included; smart poller and OS poller retired in Slice 4 and archived
 - **Current operational health notes:** Bootstrap complete. Update after the first working session.
 
 ## Recent Sessions

@@ -185,7 +185,7 @@ TEMPLATES=$(python -c "from groundtruth_kb import get_templates_dir; print(get_t
 cp "$TEMPLATES/CLAUDE.md" ./CLAUDE.md
 cp "$TEMPLATES/MEMORY.md" ./MEMORY.md
 cp "$TEMPLATES/BRIDGE-INVENTORY.md" ./BRIDGE-INVENTORY.md
-cp "$TEMPLATES/bridge-os-poller-setup-prompt.md" ./bridge-os-poller-setup-prompt.md
+cp "$TEMPLATES/bridge-os-poller-setup-prompt.md" ./bridge-os-poller-setup-prompt.md  # DEPRECATED stub; smart poller retired in Slice 4
 
 # Hooks for Claude Code
 mkdir -p .claude/hooks .claude/rules
@@ -199,8 +199,15 @@ cp "$TEMPLATES/rules/"*.toml .claude/rules/
 > copies above — it drives scaffold from `templates/managed-artifacts.toml`
 > and always copies every managed rule, regardless of extension.
 
-Edit `CLAUDE.md`, `MEMORY.md`, `BRIDGE-INVENTORY.md`, and the bridge setup
-prompt to replace placeholders with your project's details.
+> **Deprecated stub:** `bridge-os-poller-setup-prompt.md` is retained as a
+> compatibility stub for two release cycles after the Slice 4 smart-poller
+> retirement (2026-05-09). Bridge dispatch is now automated by the
+> cross-harness event-driven trigger registered in `.claude/settings.json`
+> and `.codex/hooks.json`; do not follow the legacy prompt content. See
+> `groundtruth-kb/docs/tutorials/dual-agent-setup.md`.
+
+Edit `CLAUDE.md`, `MEMORY.md`, and `BRIDGE-INVENTORY.md` to replace
+placeholders with your project's details.
 
 If your project uses a bridge, multiple agents, scheduled pollers, or recurring
 automations, keep `BRIDGE-INVENTORY.md` and the related rule/state files

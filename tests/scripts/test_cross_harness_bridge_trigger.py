@@ -554,6 +554,18 @@ def test_dispatched_child_env_does_not_inherit_disable_var(
     )
     # GTKB_PROJECT_ROOT IS propagated (legitimate).
     assert child_env.get("GTKB_PROJECT_ROOT") == str(root)
+    # Per Slice 4 D9b (Codex F1 on -006): the trigger MUST set
+    # GTKB_BRIDGE_POLLER_RUN_ID on the child env so the SessionStart hooks at
+    # .claude/hooks/session_start_dispatch.py and .codex/gtkb-hooks/session_start_dispatch.py
+    # enter bridge auto-dispatch mode rather than treating the initial prompt as
+    # a discarded owner session-start stimulus. The retired smart-poller used to
+    # set this; the cross-harness trigger now sets it itself with the dispatch_id.
+    assert "GTKB_BRIDGE_POLLER_RUN_ID" in child_env, (
+        "trigger must set GTKB_BRIDGE_POLLER_RUN_ID for SessionStart auto-dispatch context"
+    )
+    assert child_env["GTKB_BRIDGE_POLLER_RUN_ID"] == meta["dispatch_id"], (
+        "GTKB_BRIDGE_POLLER_RUN_ID must equal the dispatch_id"
+    )
 
 
 def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:

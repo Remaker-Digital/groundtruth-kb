@@ -5764,6 +5764,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T06:40:06.309603Z
   answer: "User has answered your questions: \"How should we sequence the active-session suppression work relative to the in-flight threads?\"=\"File suppression NEW now; pause Slice 4 + formalization NO-GO revisions until suppression GO+VERIFIED\", \"What's the freshness window for the heartbeat (how long since last tool-use marks a session as 'active')?\"=\"120 seconds (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0490
+  asked_at: 2026-05-09T13:43:51.504412Z
+  question: "Working tree has 141 paths in `git status` — mix of S338 work (my Cross-Harness implementation + DA Phase 3 fixes + bridge files), parallel-Prime artifacts (cross-harness -005, DA Phase 3 hook files, archived smart-poller files), and pre-existing modifications from prior sessions that were never committed. The parallel Prime's commit `7855efeb` isn't on local develop (likely on a worktree branch). How should I scope the wrap-up commit?"
+  options:
+    - "Scoped to S338 work + MEMORY.md (Recommended)"
+    - "Comprehensive commit — everything in working tree"
+    - "MEMORY.md-only commit"
+    - "Defer commit — wrap up MEMORY.md only, no commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e7c0c90662349c2d
+  resolved_at: 2026-05-09T13:43:51.504412Z
+  answer: "User has answered your questions: \"Working tree has 141 paths in `git status` — mix of S338 work (my Cross-Harness implementation + DA Phase 3 fixes + bridge files), parallel-Prime artifacts (cross-harness -005, DA Phase 3 hook files, archived smart-poller files), and pre-existing modifications from prior sessions that were never committed. The parallel Prime's commit `7855efeb` isn't on local develop (likely on a worktree branch). How should I scope the wrap-up commit?\"=\"Scoped to S338 work + MEMORY.md (Recommended)\", \"After commit (or instead of commit if deferred), should I push develop to origin?\"=\"Push if scoped commit lands clean\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0491
+  asked_at: 2026-05-09T13:43:51.504412Z
+  question: "After commit (or instead of commit if deferred), should I push develop to origin?"
+  options:
+    - "No push this session (Recommended)"
+    - "Push if scoped commit lands clean"
+    - "Skip commit entirely — just close out MEMORY.md update"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1bf7a75b5ccf4d32
+  resolved_at: 2026-05-09T13:43:51.504412Z
+  answer: "User has answered your questions: \"Working tree has 141 paths in `git status` — mix of S338 work (my Cross-Harness implementation + DA Phase 3 fixes + bridge files), parallel-Prime artifacts (cross-harness -005, DA Phase 3 hook files, archived smart-poller files), and pre-existing modifications from prior sessions that were never committed. The parallel Prime's commit `7855efeb` isn't on local develop (likely on a worktree branch). How should I scope the wrap-up commit?\"=\"Scoped to S338 work + MEMORY.md (Recommended)\", \"After commit (or instead of commit if deferred), should I push develop to origin?\"=\"Push if scoped commit lands clean\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

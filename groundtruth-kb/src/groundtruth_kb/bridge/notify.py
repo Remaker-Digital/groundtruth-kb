@@ -1,8 +1,18 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Smart-poller notification artifacts (current-state).
+"""Bridge dispatch notification artifacts (RETIRED smart-poller substrate).
+
+RETIRED (2026-05-09): This module belongs to the retired smart-poller
+runtime. The smart-poller scheduled task and runner script have been
+archived to ``archive/smart-poller-2026-05-09/``; bridge dispatch is now
+governed by the cross-harness event-driven trigger
+(``scripts/cross_harness_bridge_trigger.py``) registered as PostToolUse +
+Stop hooks in ``.claude/settings.json`` and ``.codex/hooks.json``. The
+notification-artifact API below is retained for compatibility and historical
+reference; the trigger writes its own dispatch state at
+``.gtkb-state/bridge-poller/dispatch-state.json``.
 
 Per ``bridge/gtkb-bridge-poller-p3-notify-2026-04-29-008.md`` GO at REVISED-3,
-this module owns the current-state notification artifact lifecycle.
+this module owns the (now-retired) notification artifact lifecycle.
 
 Per ``bridge/smart-poller-kind-aware-routing-2026-04-30-009.md`` REVISED-4
 (GO at -010), the routing is now kind-aware: each ``ActionablePending`` carries

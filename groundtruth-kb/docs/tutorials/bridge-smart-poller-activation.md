@@ -1,167 +1,57 @@
-# Bridge Smart Poller — Activation Procedure (Windows)
+# DEPRECATED — Smart Poller Retired (Slice 4, 2026-05-09)
 
-This tutorial walks through activating the notification-based smart-poller as
-a Windows Scheduled Task. The procedure was authorized by
-`bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md` (GO at REVISED-1
-`-003`).
+> ⚠️ **DEPRECATED** — The smart-poller activation procedure this
+> tutorial documented was retired on 2026-05-09 in favor of the
+> cross-harness event-driven trigger. Do **NOT** run
+> `install_smart_poller_task.ps1` or attempt to register the
+> `GTKB-SmartBridgePoller` scheduled task; those scripts have been
+> archived and will fail.
+>
+> The smart-poller runtime
+> (`scripts/run_smart_bridge_poller.vbs`,
+> `scripts/run_smart_bridge_poller.ps1`,
+> `scripts/install_smart_poller_task.ps1`,
+> `scripts/uninstall_smart_poller_task.ps1`,
+> `groundtruth-kb/scripts/bridge_poller_runner.py`) has been archived to
+> `archive/smart-poller-2026-05-09/`.
 
-## Prerequisites
+## Replacement Mechanism
 
-Before activation, all of the following must be VERIFIED:
+The active bridge dispatch automation is the **cross-harness
+event-driven trigger** at
+`scripts/cross_harness_bridge_trigger.py`. There is no installation
+procedure analogous to `install_smart_poller_task.ps1`; the trigger is
+activated by hook registrations in `.claude/settings.json`
+(`PostToolUse` + `Stop`) and `.codex/hooks.json`. Hook registrations
+are scaffolded automatically by `gt project init` for the
+`dual-agent` profile and are present in this repository at
+`HEAD`.
 
-- P1 detector module (`groundtruth_kb.bridge.detector`)
-- P2 registry module (`groundtruth_kb.bridge.registry`)
-- P2.5 spike machinery + report
-- P3-notify writer (`groundtruth_kb.bridge.notify.update_notification`,
-  `read_notification`, `NotificationArtifact`, `NOTIFY_SCHEMA_VERSION`)
-- Activation reader (`scripts/bridge_notify_reader.py`)
-- Session-start wiring in `scripts/session_self_initialization.py`
-- Wrapper script at `scripts/run_smart_bridge_poller.ps1`
-
-Run the project doctor to confirm:
+To verify the trigger is active:
 
 ```text
 python -c "from groundtruth_kb.cli import main; main(['project','doctor','--dir','.'], standalone_mode=False)"
 ```
 
-The smart-poller-specific checks should pass (or report only the "Task not
-registered" failure that this procedure resolves).
+The doctor reports the cross-harness-trigger status via
+`_check_cross_harness_trigger` (PASS/WARN/FAIL covering trigger script
+presence, both hook registrations, and dispatch-state freshness) and
+the per-recipient dispatch-state liveness via
+`_check_bridge_dispatch_liveness`.
 
-## Activation
+## See Instead
 
-```powershell
-# From the project root (e.g., E:\GT-KB)
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File scripts/install_smart_poller_task.ps1
-```
+- Tutorial: `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (cross-harness
+  event-driven trigger setup is documented here per Slice 4 D5d).
+- Slice 3 closure (hook registrations):
+  `bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`.
+- Slice 4 retirement:
+  `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`.
 
-Output (success):
+This file remains as a deprecated stub for two release cycles to give
+adopter projects time to migrate references. It will be removed in a
+future cleanup; see Slice 4 Open Follow-On §7.
 
-```text
-Smart-poller task 'GTKB-SmartBridgePoller' registered (wrapper=E:\GT-KB\scripts\run_smart_bridge_poller.ps1, interval=15 s).
-Smart-poller task 'GTKB-SmartBridgePoller' started.
-```
+---
 
-To override the polling interval:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File scripts/install_smart_poller_task.ps1 `
-  -IntervalSeconds 30
-```
-
-The script is idempotent — re-running updates the existing task in place.
-
-## Smoke Test
-
-After installation, verify the activation chain end-to-end:
-
-1. **Confirm task is running:**
-   ```powershell
-   Get-ScheduledTask -TaskName "GTKB-SmartBridgePoller" |
-     Format-Table TaskName, State, LastTaskResult
-   ```
-   `State` should be `Running` and `LastTaskResult` should be `0` (or
-   recent `267009` indicating a started task).
-
-2. **Wait 30 seconds** (1 bootstrap iteration + 1 post-bootstrap iteration
-   at the default 15-second interval).
-
-3. **Confirm notification artifacts:**
-   ```powershell
-   Test-Path .gtkb-state/bridge-poller/notifications/pending-bridge-action-prime.json
-   Test-Path .gtkb-state/bridge-poller/notifications/pending-bridge-action-codex.json
-   ```
-   At least one will exist if the live `bridge/INDEX.md` has actionable
-   GO/NO-GO entries (for prime) or NEW/REVISED entries (for codex).
-
-4. **Confirm reader integration:**
-   Open a fresh Claude Code session. The session-start orient block should
-   include a "Smart-poller notification" section listing the pending
-   actions for Prime (or no section at all if INDEX has no actionable
-   GO/NO-GO entries for the current role).
-
-## Phase 2 Path Rebase (Future)
-
-After Phase 2 of the GT-KB isolation plan moves `groundtruth-kb/` content to
-the platform root, the **only change required** to keep the smart poller
-operational is a single-line edit to the wrapper:
-
-```powershell
-# scripts/run_smart_bridge_poller.ps1, around line 28:
-$runnerPath = Join-Path $projectRoot "groundtruth-kb\scripts\bridge_poller_runner.py"
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# After Phase 2:
-$runnerPath = Join-Path $projectRoot "scripts\bridge_poller_runner.py"
-```
-
-**No OS task re-registration is required.** The wrapper architecture deliberately
-isolates the OS task layer from the file-layout layer.
-
-This rebase is captured as a Phase 2 path-rebase checklist item per the
-`-004` GO guardrail 3.
-
-## Uninstall
-
-To stop the smart poller and remove the task:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File scripts/uninstall_smart_poller_task.ps1
-```
-
-The script preserves `.gtkb-state/bridge-poller/` contents (notification
-artifacts and audit logs) for diagnostic review. Delete the directory
-manually if a fresh-start is desired:
-
-```powershell
-Remove-Item -Recurse -Force .gtkb-state/bridge-poller
-```
-
-## Troubleshooting
-
-### Task is registered but `LastTaskResult` is non-zero
-
-Check the wrapper resolves the runner path:
-
-```powershell
-& "scripts/run_smart_bridge_poller.ps1"
-# If this errors, the wrapper's $runnerPath is invalid.
-# Phase 2 rebase outstanding? See "Phase 2 Path Rebase" above.
-```
-
-### No notification files appear after 30 seconds
-
-Check the task is actually running and reading INDEX.md:
-
-```powershell
-Get-Content .gtkb-state/bridge-poller/poller-runs/*.jsonl |
-  Select-Object -Last 5
-```
-
-A healthy poller writes at least one JSONL entry per scan. If the file is
-empty or absent, the task didn't start or the wrapper failed.
-
-### Schema version mismatch in orient
-
-If the orient block silently omits the smart-poller section even when
-notification files are present, the `format_orient_section` function may be
-detecting a `schema_version` mismatch. Check:
-
-```powershell
-Get-Content .gtkb-state/bridge-poller/notifications/pending-bridge-action-prime.json |
-  ConvertFrom-Json |
-  Select-Object schema_version
-```
-
-Expected: `2`. If different, the schema has been bumped; update the reader
-and consumers accordingly.
-
-## See Also
-
-- `bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md` — activation
-  authorization (GO at REVISED-1 `-003`)
-- `groundtruth-kb/docs/tutorials/bridge-smart-poller.md` — overall smart-poller
-  rule and minimum health evidence requirements
-- `.claude/rules/bridge-essential.md` — bridge-protocol and poller-enablement
-  contract
+Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

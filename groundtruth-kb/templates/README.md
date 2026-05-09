@@ -9,11 +9,15 @@ setup.  Use `gt project init my-project --profile <profile>` for automated,
 profile-based project setup.
 
 Reference capture templates for bridges and automations are included here.
-Automated setup of those runtimes is still out of scope, but
-`bridge-os-poller-setup-prompt.md` provides a copyable smart-poller prompt that
-Claude Code or Codex can use to configure a durable file bridge and capture the
-resulting Claude/Codex configuration. The filename is retained for scaffold
-compatibility; the former OS-poller directive is retired.
+The `bridge-os-poller-setup-prompt.md` template is now a DEPRECATED
+compatibility stub retained for two release cycles after the Slice 4
+smart-poller retirement (2026-05-09). Bridge dispatch is automated by the
+cross-harness event-driven trigger
+(`scripts/cross_harness_bridge_trigger.py`) registered as PostToolUse + Stop
+hooks in `.claude/settings.json` and `.codex/hooks.json`; see
+`docs/tutorials/dual-agent-setup.md` for setup. Both the smart-poller and
+the OS-poller predecessor are retired and archived under
+`archive/smart-poller-2026-05-09/`.
 
 See the [Adoption guide](../docs/method/09-adoption.md) for the managed vs
 project-owned boundary.
@@ -29,7 +33,7 @@ The shipped CLAUDE.md / MEMORY.md / deliberation-protocol templates implement AD
 | `rules/canonical-terminology.md` | Canonical ADR-0001 glossary (MemBase, DA, Prime Builder, Loyal Opposition, etc.) | `.claude/rules/canonical-terminology.md` |
 | `rules/canonical-terminology.toml` | Profile-aware doctor config for required canonical terms | `.claude/rules/canonical-terminology.toml` |
 | `BRIDGE-INVENTORY.md` | Optional inventory of bridge directives, roles, schedules, prompts, and automations | Project root |
-| `bridge-os-poller-setup-prompt.md` | Prompt for configuring durable file bridge smart-poller automation and agent setup | Project root or operations docs |
+| `bridge-os-poller-setup-prompt.md` | DEPRECATED stub. Smart poller and OS poller both retired in Slice 4 (2026-05-09); retained as compatibility stub for two release cycles. Use the cross-harness event-driven trigger via `gt project init --profile dual-agent`. | Project root or operations docs |
 | `hooks/assertion-check.py` | SessionStart hook — run assertions on session start | `.claude/hooks/` |
 | `hooks/spec-classifier.py` | UserPromptSubmit hook — detect spec language, enforce spec-first | `.claude/hooks/` |
 | `rules/loyal-opposition.md` | Review agent behavior rules | `.claude/rules/` |
@@ -81,11 +85,12 @@ project's values:
 
 If your project uses a bridge, multiple agents, or recurring automation, also
 customize `BRIDGE-INVENTORY.md` so the runtime entrypoints, directives, role
-descriptions, prompts, plugin/skill dependencies, and schedules are
-discoverable from the project. For file-based Prime Builder + Loyal Opposition
-bridges, start from the smart-poller prompt in
-`bridge-os-poller-setup-prompt.md` and then record the resulting setup in
-`BRIDGE-INVENTORY.md`.
+descriptions, prompts, plugin/skill dependencies, and trigger registrations
+are discoverable from the project. For file-based Prime Builder + Loyal
+Opposition bridges, run `gt project init --profile dual-agent` (which
+scaffolds the cross-harness event-driven trigger,
+`.claude/settings.json`, `.codex/hooks.json`, and the dispatch-state path)
+and then record the resulting setup in `BRIDGE-INVENTORY.md`.
 
 For automated profile-based customization, use `gt project init my-project --profile
 dual-agent-webapp` instead of manual template copying.

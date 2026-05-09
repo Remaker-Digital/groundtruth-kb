@@ -109,8 +109,8 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
         model["role"]["role_assignment"] == "active AI harness assigned by owner through the single role assignment map"
     )
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
-    assert "verified smart poller" in model["role"]["poller"]
-    assert "retired OS poller remains disabled" in model["role"]["poller"]
+    assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
+    assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert "Strict GOV enforcement" in model["governance_stance"][0]
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
     assert model["skills"]["count"] > 0
@@ -645,8 +645,8 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         == "active AI harness assigned by owner through single role map entry for harness `B`"
     )
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
-    assert "verified smart poller" in model["role"]["poller"]
-    assert "retired OS poller remains disabled" in model["role"]["poller"]
+    assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
+    assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert model["role"]["role_mapping_source"] == "harness-state/role-assignments.json"
     assert model["role"]["harness_id"] == "B"
     assert "## Loyal Opposition Startup Task" not in report
@@ -668,7 +668,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         not in report
     )
     assert "do not display this checklist as a substitute for performing the verification" not in report
-    assert "Poller startup rule: use the verified smart poller when it is available and functioning" not in report
+    assert "Bridge dispatch startup rule: rely on the cross-harness event-driven trigger" not in report
     assert "First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning." not in report
     assert "permanent owner permission to diagnose and repair bridge function/use" not in report
     assert (
@@ -873,8 +873,8 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     )
     assert "Role being assumed: Prime Builder" in report_text
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in report_text
-    assert "Poller: use verified smart poller when available and functioning" in report_text
-    assert "retired OS poller remains disabled" in report_text
+    assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in report_text
+    assert "retired smart poller and OS poller remain archived" in report_text
     assert "Startup Disclosure" in report_text
     assert "GroundTruth-KB Project Dashboard" in report_text
     assert "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard" in report_text
@@ -1337,8 +1337,8 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     context = payload["additionalContext"]
     assert f"Role being assumed: {module.ROLE_PROFILES[discovered_role]['assumed_role']}" in context
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in context
-    assert "Poller: use verified smart poller when available and functioning" in context
-    assert "retired OS poller remains disabled" in context
+    assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in context
+    assert "retired smart poller and OS poller remain archived" in context
     assert "Role mapping source: harness-state/role-assignments.json" in context
     assert "Harness self-identification: B" in context
     assert "Harness identity source: harness-state/harness-identities.json" in context
@@ -1865,295 +1865,27 @@ def test_render_pending_decisions_block_includes_id_question_options() -> None:
 
 
 # =====================================================================
-# Activation (-003 §3.3 + -004 GO guardrail 1): smart-poller wiring
-# Per bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md
+# Smart-poller orient section retirement (Slice 4, 2026-05-09)
+# The smart-poller mechanism was retired; _render_smart_poller_section
+# is now a stub returning []. Bridge dispatch is governed by the
+# cross-harness event-driven trigger.
 # =====================================================================
 
 
-def test_smart_poller_section_empty_when_no_notification(tmp_path, monkeypatch) -> None:
-    """Absent notification → empty list (no orient section).
+def test_smart_poller_section_returns_empty_after_retirement(tmp_path) -> None:
+    """Post-Slice-4: ``_render_smart_poller_section`` is unconditionally empty.
 
-    Doctor mocked to ``pass`` per ``-003 §3.4`` so the notification path
-    executes (otherwise the live doctor's verdict on ``tmp_path`` would
-    redirect into the diagnostic branch).
+    The smart-poller runtime was archived to ``archive/smart-poller-2026-05-09/``
+    in Slice 4 D1; the orient-renderer helper now returns ``[]`` regardless of
+    role, project state, or doctor verdict. This test pins that contract.
     """
     module = _load_module()
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _make_synthetic_doctor_check("pass"),
-    )
-    role = {"assumed_role": "Prime Builder"}
-    assert module._render_smart_poller_section(tmp_path, role) == []
-
-
-def test_smart_poller_section_renders_when_notification_present(tmp_path, monkeypatch) -> None:
-    """Notification with pending_actions → section list non-empty + contains markdown.
-
-    Doctor mocked to ``pass`` per ``-003 §3.4`` so the notification path
-    executes; without the mock, the live doctor on ``tmp_path`` would
-    return ``fail`` (no runner present) and render a diagnostic instead.
-    """
-    module = _load_module()
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _make_synthetic_doctor_check("pass"),
-    )
-    # Write a real notification via the canonical API.
-    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
-    from groundtruth_kb.bridge.routing import BridgeAgent
-
-    state = tmp_path / ".gtkb-state" / "bridge-poller"
-    state.mkdir(parents=True, exist_ok=True)
-    items = [
-        ActionablePending(
-            document_name="my-bridge",
-            top_status="GO",
-            top_file="bridge/my-bridge-003.md",
-            index_line_number=12,
+    for role_name in ("Prime Builder", "Loyal Opposition", "Some Other Role"):
+        role = {"assumed_role": role_name}
+        assert module._render_smart_poller_section(tmp_path, role) == [], (
+            f"_render_smart_poller_section must be empty for role {role_name!r} "
+            f"post-Slice-4 retirement"
         )
-    ]
-    update_notification(state, BridgeAgent.PRIME, items, poller_run_id="test-run")
-
-    role = {"assumed_role": "Prime Builder"}
-    section = module._render_smart_poller_section(tmp_path, role)
-    assert len(section) == 2  # body + trailing blank line
-    assert "Smart-poller notification" in section[0]
-    assert "**GO**" in section[0]
-    assert "`my-bridge`" in section[0]
-
-
-def test_smart_poller_section_fail_open_on_unknown_role(tmp_path) -> None:
-    """Unknown role string → empty list (fail-open per guardrail 1)."""
-    module = _load_module()
-    role = {"assumed_role": "Some Other Role"}
-    assert module._render_smart_poller_section(tmp_path, role) == []
-
-
-def test_smart_poller_section_fail_open_on_reader_exception(tmp_path, monkeypatch) -> None:
-    """Reader raises → empty list (fail-open per guardrail 1).
-
-    Even if the reader module raises an unexpected exception, the orient
-    must continue to render. This test forces an exception via monkeypatch
-    and asserts the helper returns an empty list rather than propagating.
-
-    Doctor mocked to ``pass`` per ``-003 §3.4`` so doctor passes and the
-    code reaches the reader (which is monkeypatched to raise); the helper's
-    outer fail-open then swallows the reader exception and returns ``[]``.
-    """
-    module = _load_module()
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _make_synthetic_doctor_check("pass"),
-    )
-
-    # Force an exception by replacing the imported function with a raiser.
-    # The helper does its own try/except, so this should be swallowed.
-    def _raise(*args, **kwargs):
-        raise RuntimeError("simulated reader failure")
-
-    # Patch via the same import path the helper uses.
-    import sys
-
-    if "scripts.bridge_notify_reader" in sys.modules:
-        monkeypatch.setattr(sys.modules["scripts.bridge_notify_reader"], "read_for_recipient", _raise)
-    elif "bridge_notify_reader" in sys.modules:
-        monkeypatch.setattr(sys.modules["bridge_notify_reader"], "read_for_recipient", _raise)
-
-    role = {"assumed_role": "Prime Builder"}
-    assert module._render_smart_poller_section(tmp_path, role) == []
-
-
-def test_smart_poller_section_routes_loyal_opposition_to_codex(tmp_path, monkeypatch) -> None:
-    """Loyal Opposition role reads codex notification (not prime).
-
-    Doctor mocked to ``pass`` per ``-003 §3.4`` so the notification path
-    executes for the LO recipient routing assertion.
-    """
-    module = _load_module()
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _make_synthetic_doctor_check("pass"),
-    )
-    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
-    from groundtruth_kb.bridge.routing import BridgeAgent
-
-    state = tmp_path / ".gtkb-state" / "bridge-poller"
-    state.mkdir(parents=True, exist_ok=True)
-    # Write to CODEX recipient (not PRIME).
-    items = [
-        ActionablePending(
-            document_name="codex-thread",
-            top_status="REVISED",
-            top_file="bridge/codex-thread-002.md",
-            index_line_number=5,
-        )
-    ]
-    update_notification(state, BridgeAgent.CODEX, items, poller_run_id="test-run")
-
-    role = {"assumed_role": "Loyal Opposition"}
-    section = module._render_smart_poller_section(tmp_path, role)
-    assert len(section) == 2
-    assert "Smart-poller notification" in section[0]
-    assert "**REVISED**" in section[0]
-    assert "`codex-thread`" in section[0]
-
-
-# =====================================================================
-# Orient-verification (-003 §3.5 + -005 carry-forward + -006 GO):
-# diagnostic supersedes notification when smart-poller is unhealthy.
-# Per bridge/smart-poller-orient-verification-2026-04-29-005.md
-# =====================================================================
-
-
-def test_smart_poller_section_renders_diagnostic_on_doctor_warning(tmp_path, monkeypatch) -> None:
-    """Doctor returns ``warning`` → diagnostic section with the doctor's message.
-
-    Per ``-001 §3.1`` / ``-003 §3.5``: warning state means the poller is
-    not healthy enough to trust notifications, so a single diagnostic
-    section is rendered carrying the doctor's remediation hint.
-    """
-    module = _load_module()
-    warning_msg = (
-        "smart-poller task 'GTKB-SmartBridgePoller' not registered — run scripts/install_smart_poller_task.ps1"
-    )
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _make_synthetic_doctor_check("warning", message=warning_msg),
-    )
-
-    role = {"assumed_role": "Prime Builder"}
-    section = module._render_smart_poller_section(tmp_path, role)
-    body = "\n".join(section)
-    assert "Smart-poller diagnostic — WARNING" in body
-    assert warning_msg in body
-
-
-def test_smart_poller_section_renders_diagnostic_on_doctor_fail(tmp_path, monkeypatch) -> None:
-    """Doctor returns ``fail`` → diagnostic section with the doctor's message.
-
-    Per ``-001 §3.1`` / ``-003 §3.5``: fail state means the poller is
-    actively broken; the diagnostic surfaces the failure detail directly
-    so the owner can investigate.
-    """
-    module = _load_module()
-    fail_msg = "smart-poller task registered but most recent audit event is 245s old (> 60s threshold)"
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _make_synthetic_doctor_check("fail", message=fail_msg),
-    )
-
-    role = {"assumed_role": "Prime Builder"}
-    section = module._render_smart_poller_section(tmp_path, role)
-    body = "\n".join(section)
-    assert "Smart-poller diagnostic — FAIL" in body
-    assert fail_msg in body
-
-
-def test_smart_poller_section_diagnostic_supersedes_notification(tmp_path, monkeypatch) -> None:
-    """Warning + present notification → diagnostic only; notification table NOT rendered.
-
-    Per ``-001 §3.1`` precedence and ``-003 §3.5``: notifications cannot
-    be trusted when the poller itself is unhealthy, so the diagnostic
-    branch returns early without reading the notification artifact.
-    """
-    module = _load_module()
-    warning_msg = "smart-poller task not registered"
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _make_synthetic_doctor_check("warning", message=warning_msg),
-    )
-
-    # Plant a real notification — it must NOT appear in the output.
-    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
-    from groundtruth_kb.bridge.routing import BridgeAgent
-
-    state = tmp_path / ".gtkb-state" / "bridge-poller"
-    state.mkdir(parents=True, exist_ok=True)
-    items = [
-        ActionablePending(
-            document_name="should-not-render",
-            top_status="GO",
-            top_file="bridge/should-not-render-001.md",
-            index_line_number=1,
-        )
-    ]
-    update_notification(state, BridgeAgent.PRIME, items, poller_run_id="test-run")
-
-    role = {"assumed_role": "Prime Builder"}
-    section = module._render_smart_poller_section(tmp_path, role)
-    body = "\n".join(section)
-    assert "Smart-poller diagnostic — WARNING" in body
-    assert warning_msg in body
-    assert "Smart-poller notification" not in body
-    assert "should-not-render" not in body
-
-
-def test_smart_poller_section_fail_open_on_doctor_exception(tmp_path, monkeypatch) -> None:
-    """Doctor itself raises + notification absent → silent fail-open (returns ``[]``).
-
-    Per ``-001 §3.1`` doctor-exception row (notification = absent sub-case):
-    a doctor exception sets ``health = None`` and the helper returns ``[]``
-    immediately. The notification-present sub-case is covered separately by
-    ``test_smart_poller_section_silent_on_doctor_exception_with_notification_present``
-    (added per Codex ``-008`` NO-GO REVISED-1).
-    """
-    module = _load_module()
-
-    def _raise(target):
-        raise RuntimeError("simulated doctor failure")
-
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _raise,
-    )
-
-    role = {"assumed_role": "Prime Builder"}
-    assert module._render_smart_poller_section(tmp_path, role) == []
-
-
-def test_smart_poller_section_silent_on_doctor_exception_with_notification_present(tmp_path, monkeypatch) -> None:
-    """Doctor raises + notification present → silent (notification NOT rendered).
-
-    Per ``-001 §3.1`` matrix row 6 ("doctor exception | any notification |
-    Silent") + Codex ``-008`` NO-GO Finding 1 + REVISED-1 implementation in
-    `_render_smart_poller_section`: when the doctor itself is broken, the
-    helper must return ``[]`` even if a stale notification exists on disk.
-    The notification cannot be trusted because the doctor — the verification
-    layer for the poller that produced it — is failing.
-
-    This is the regression that Codex ``-008`` Finding 1 specifically
-    required: prior implementation set ``health = None`` and fell through
-    to the notification render path, producing a section even when the
-    matrix said silent.
-    """
-    module = _load_module()
-
-    def _raise(target):
-        raise RuntimeError("simulated doctor failure")
-
-    monkeypatch.setattr(
-        "groundtruth_kb.project.doctor._check_smart_bridge_poller",
-        _raise,
-    )
-
-    # Plant a notification — under the corrected contract it must NOT render.
-    from groundtruth_kb.bridge.notify import ActionablePending, update_notification
-    from groundtruth_kb.bridge.routing import BridgeAgent
-
-    state = tmp_path / ".gtkb-state" / "bridge-poller"
-    state.mkdir(parents=True, exist_ok=True)
-    items = [
-        ActionablePending(
-            document_name="should-not-render-on-doctor-exception",
-            top_status="GO",
-            top_file="bridge/should-not-render-on-doctor-exception-001.md",
-            index_line_number=42,
-        )
-    ]
-    update_notification(state, BridgeAgent.PRIME, items, poller_run_id="test-run")
-
-    role = {"assumed_role": "Prime Builder"}
-    assert module._render_smart_poller_section(tmp_path, role) == []
 
 
 # =====================================================================

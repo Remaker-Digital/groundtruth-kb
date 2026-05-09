@@ -190,19 +190,39 @@ related_deliberations = []
 
 [[systems]]
 id = "smart-poller"
-canonical_name = "verified smart poller"
+canonical_name = "retired smart poller"
 accepted_aliases = ["smart poller", "verified smart poller", "bridge smart poller"]
 discouraged_aliases = ["OS poller"]
 forbidden_aliases = []
+concept_vs_artifact = "retired_runtime"
+authoritative_source = "archive/smart-poller-2026-05-09/README.md"
+generated_or_authoritative = "retired"
+read_method = "Read archive/smart-poller-2026-05-09/README.md and bridge thread gtkb-bridge-poller-event-driven-replacement-slice-4-* only when diagnosing legacy references."
+mutation_method = "Do not restore. Bridge dispatch is governed by the cross-harness event-driven trigger."
+role_permissions = "No role should reactivate it."
+startup_visibility = "warning_if_referenced"
+dashboard_visibility = "none"
+harness_caveats = "Retired 2026-05-09. Bridge dispatch is now governed by the cross-harness event-driven trigger; see system entry id = 'bridge-dispatch'."
+verification_method = "tests/scripts/test_system_interface_map.py"
+lifecycle_state = "retired"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "bridge-dispatch"
+canonical_name = "cross-harness event-driven trigger"
+accepted_aliases = ["bridge dispatch", "cross-harness trigger", "event-driven bridge dispatch"]
+discouraged_aliases = ["smart poller", "OS poller"]
+forbidden_aliases = []
 concept_vs_artifact = "automation_runtime"
-authoritative_source = "independent-progress-assessments/bridge-automation/"
+authoritative_source = "scripts/cross_harness_bridge_trigger.py"
 generated_or_authoritative = "supporting_runtime"
-read_method = "Inspect bridge automation scripts and live status files when poller health matters."
+read_method = "Inspect scripts/cross_harness_bridge_trigger.py, .claude/settings.json, .codex/hooks.json, and .gtkb-state/bridge-poller/dispatch-state.json when bridge dispatch health matters."
 mutation_method = "Repair only within bridge-function authority or approved automation scope."
-role_permissions = "Both roles may use it when available; bridge function repairs are specially authorized."
+role_permissions = "Both roles depend on it; bridge function repairs are specially authorized."
 startup_visibility = "compact_status"
 dashboard_visibility = "summary_only"
-harness_caveats = "Use manual bridge scans when the verified smart poller is unavailable."
+harness_caveats = "Manual bridge/INDEX.md scans remain as fallback when the trigger is unhealthy. The retired smart poller and OS poller (archive/smart-poller-2026-05-09/) must not be restored as substitutes."
 verification_method = "tests/scripts/test_system_interface_map.py"
 lifecycle_state = "active"
 related_specs = []

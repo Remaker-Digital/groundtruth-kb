@@ -41,6 +41,7 @@ REQUIRED_SEED_IDS = {
     "operating-model",
     "file-bridge",
     "bridge-queue",
+    "bridge-dispatch",
     "smart-poller",
     "retired-os-poller",
     "dashboard",

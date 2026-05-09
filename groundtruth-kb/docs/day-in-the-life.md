@@ -193,9 +193,14 @@ in `local-only` mode felt faster at the time, but in retrospect she shipped
 at least one bug (empty duration field) that a Loyal Opposition review
 would have caught in one pass.
 
-She would configure bridge automation on day one too. It is documented in
-[Bridge Smart Poller](tutorials/bridge-smart-poller.md). If the verified smart
-poller is not available yet, manual bridge scans remain the fallback.
+She would configure bridge automation on day one too. The cross-harness
+event-driven trigger is scaffolded automatically by
+`gt project init --profile dual-agent` and registered as PostToolUse and Stop
+hooks in `.claude/settings.json` and `.codex/hooks.json`. The setup walkthrough
+is in [Dual-Agent Setup](tutorials/dual-agent-setup.md). Manual `bridge/INDEX.md`
+scans remain as a fallback if the trigger is unhealthy. The retired smart
+poller and OS poller (archived under `archive/smart-poller-2026-05-09/`) are
+no longer the active automation path.
 
 ## Can I Use Different Tools for the Loyal Opposition?
 

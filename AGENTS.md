@@ -98,9 +98,11 @@ verified.
   - investigations of alternatives and solutions to technical challenges or decisions
 - Deliverable: evidence-based reports for the Prime Builder.
 - Counterpart role: Loyal Opposition when counterpart review is active. The
-  bridge is the role handoff and review mechanism. The retired OS poller remains
-  disabled, but the verified smart poller should be used when it is available
-  and functioning.
+  bridge is the role handoff and review mechanism. The retired OS poller and
+  the retired smart poller (Slice 4 archive) remain disabled; bridge dispatch
+  is automated by the cross-harness event-driven trigger
+  (`scripts/cross_harness_bridge_trigger.py`) registered as PostToolUse and
+  Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
 - Required analysis scope includes active harness prompts, instructions,
   permissions, hooks, and configuration behavior.
 - **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.claude/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
@@ -161,10 +163,11 @@ verified.
 - The bridge is always available and must be checked at startup in both Prime
   Builder and Loyal Opposition roles.
 - The poller is not the bridge. Do not restore the retired OS poller
-  implementation. Use the verified smart poller when it is available and
-  functioning; otherwise fall back to manual bridge scans or activate monitoring
-  only when Prime Builder and Loyal Opposition are running in separate harnesses
-  or asynchronous monitoring is otherwise needed.
+  implementation or the retired smart poller. Use the cross-harness
+  event-driven trigger when its registrations and dispatch state are
+  healthy; otherwise fall back to manual bridge scans or activate
+  monitoring only when Prime Builder and Loyal Opposition are running in
+  separate harnesses or asynchronous monitoring is otherwise needed.
 - The live contents of `bridge/INDEX.md` are the sole authoritative source for
   bridge queue state. Do not determine current bridge state from startup
   reports, dashboard fields, cached scan counts, copied excerpts, summaries, or
@@ -197,7 +200,7 @@ The first owner message in a fresh session is a session-start stimulus only. It 
 
 When the active role is Prime Builder, the disclosure must include the role/governance stance, dashboard link, current project state, numbered session-focus choices, top priority actions, token-reduction options, and the file bridge scan count. Prime Builder must check the file bridge during startup even when no separate Loyal Opposition harness is currently running. Numbered session-focus choices are part of GT-KB Prime Builder startup only and are presented to the owner only by Prime Builder. After the disclosure, collect or confirm Mike's session focus before proceeding; if Mike supplies a concrete task after the startup disclosure, explicitly map it to one focus option or Custom Focus and proceed only when that mapping is unambiguous.
 
-When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan `bridge/INDEX.md`, then ask Mike whether to begin processing bridge reviews and verifications. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore the retired OS poller. Use the verified smart poller when it is available and functioning; otherwise use manual scans or monitoring only when Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
+When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan `bridge/INDEX.md`, then ask Mike whether to begin processing bridge reviews and verifications. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore the retired OS poller or the retired smart poller. Use the cross-harness event-driven trigger when its registrations and dispatch state are healthy; otherwise use manual scans or monitoring only when Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
 
 **Phase A — File bridge review queue (first priority):**
 1. Read `bridge/INDEX.md`.

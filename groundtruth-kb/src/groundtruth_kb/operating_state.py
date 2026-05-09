@@ -20,7 +20,7 @@ COMPONENTS = (
     "db",
     "chroma",
     "bridge",
-    "smart-poller",
+    "bridge-dispatch",
     "dashboard",
     "hooks",
     "resource-registry",
@@ -99,7 +99,7 @@ def collect_operating_state(
         "db": lambda: _probe_db(root, config, quick=startup),
         "chroma": lambda: _probe_chroma(root, config),
         "bridge": lambda: _probe_bridge(root),
-        "smart-poller": lambda: _probe_smart_poller(root),
+        "bridge-dispatch": lambda: _probe_bridge_dispatch(root),
         "dashboard": lambda: _probe_dashboard(root),
         "hooks": lambda: _probe_hooks(root),
         "resource-registry": lambda: _probe_resource_registry(root),
@@ -247,17 +247,31 @@ def _probe_bridge(root: Path) -> tuple[str, str, str, dict[str, Any]]:
     )
 
 
-def _probe_smart_poller(root: Path) -> tuple[str, str, str, dict[str, Any]]:
+def _probe_bridge_dispatch(root: Path) -> tuple[str, str, str, dict[str, Any]]:
+    """Cross-harness event-driven trigger dispatch-state probe.
+
+    Replaces the retired smart-poller probe (Slice 4, 2026-05-09). Reads
+    ``.gtkb-state/bridge-poller/dispatch-state.json`` written by
+    ``scripts/cross_harness_bridge_trigger.py`` on each trigger fire.
+    """
     state_root = root / ".gtkb-state" / "bridge-poller"
-    notify_root = state_root / "notifications"
+    dispatch_state_path = state_root / "dispatch-state.json"
+    trigger_script = root / "scripts" / "cross_harness_bridge_trigger.py"
+
+    if not trigger_script.exists():
+        return "FAIL", "cross-harness-trigger script not found", str(trigger_script), {}
     if not state_root.exists():
-        return "UNKNOWN", "smart-poller state directory not found", str(state_root), {}
-    pending = (
-        sorted(path.name for path in notify_root.glob("pending-bridge-action-*.json")) if notify_root.exists() else []
-    )
-    status = "WARN" if pending else "PASS"
-    detail = f"{len(pending)} pending smart-poller notification(s)"
-    return status, detail, str(state_root), {"pending_notifications": pending}
+        return "UNKNOWN", "bridge dispatch state directory not yet created", str(state_root), {}
+    if not dispatch_state_path.exists():
+        return "UNKNOWN", "dispatch-state.json not yet written by the trigger", str(dispatch_state_path), {}
+
+    try:
+        payload = json.loads(dispatch_state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return "FAIL", f"dispatch-state.json unreadable: {exc}", str(dispatch_state_path), {}
+
+    recipients = payload.get("recipients", {}) if isinstance(payload, dict) else {}
+    return "PASS", f"{len(recipients)} dispatch recipient(s) tracked", str(dispatch_state_path), {"recipients": sorted(recipients.keys())}
 
 
 def _probe_dashboard(root: Path) -> tuple[str, str, str, dict[str, Any]]:

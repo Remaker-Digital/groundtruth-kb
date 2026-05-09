@@ -38,6 +38,7 @@ NO-GO: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-00
 NEW: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-001.md
 
 Document: gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001
+NEW: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-017.md
 GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-016.md
 REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-015.md
 NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-014.md

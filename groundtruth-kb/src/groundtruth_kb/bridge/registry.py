@@ -1,5 +1,13 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Smart-poller harness registry: static-record-only registration layer.
+"""Bridge harness registry: static-record-only registration layer.
+
+RETIRED (2026-05-09): The smart-poller runtime that was the primary consumer
+of this registry has been archived to ``archive/smart-poller-2026-05-09/``.
+The cross-harness event-driven trigger
+(``scripts/cross_harness_bridge_trigger.py``) does not require static harness
+registration; it reads recipient signatures from ``bridge/INDEX.md`` directly
+on each fire. This module is retained for compatibility with adopters that
+still consume the ``register`` CLI subcommand from a SessionStart hook.
 
 Per ``bridge/gtkb-bridge-poller-p2-registry-005.md`` (REVISED-2, GO at -006)
 and ``bridge/gtkb-bridge-poller-p2-registry-implementation-2026-04-28-004.md``

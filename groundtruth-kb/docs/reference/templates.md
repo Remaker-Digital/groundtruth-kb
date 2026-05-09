@@ -83,7 +83,7 @@ Agent behavior rules, copied to `.claude/rules/`:
 
 | Template | Description |
 |----------|-------------|
-| `templates/bridge-os-poller-setup-prompt.md` | Prompt template for setting up OS-level bridge pollers |
+| `templates/bridge-os-poller-setup-prompt.md` | DEPRECATED stub. Smart poller and OS poller both retired in Slice 4 (2026-05-09); retained as compatibility stub for two release cycles. Bridge dispatch is automated by the cross-harness event-driven trigger registered in `.claude/settings.json` and `.codex/hooks.json`. See `docs/tutorials/dual-agent-setup.md`. |
 
 ## Profile Matrix
 

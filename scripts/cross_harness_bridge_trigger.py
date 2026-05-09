@@ -417,6 +417,16 @@ def _spawn_harness(
 
     env = dict(os.environ)
     env["GTKB_PROJECT_ROOT"] = str(project_root)
+    # Per Slice 4 D9b (Codex F1 on -006): the SessionStart hooks at
+    # .claude/hooks/session_start_dispatch.py and .codex/gtkb-hooks/session_start_dispatch.py
+    # enter bridge auto-dispatch mode (suppressing the normal startup disclosure
+    # and treating the initial prompt as the dispatch task) only when
+    # ``GTKB_BRIDGE_POLLER_RUN_ID`` is set on the child env. The retired smart
+    # poller used to set this; with smart-poller archived in Slice 4, the
+    # cross-harness trigger must set it itself or the dispatch chain breaks.
+    # The env-var name is reused (cosmetic rename to GTKB_BRIDGE_TRIGGER_RUN_ID
+    # is tracked as Open Follow-On 6 of slice-4 retirement).
+    env["GTKB_BRIDGE_POLLER_RUN_ID"] = dispatch_id
     # Per Codex F2 on -008: do NOT set GTKB_NO_CROSS_HARNESS_TRIGGER on the
     # child harness env. The signature-state file provides loop prevention
     # (unchanged signature → no spawn); blanket env var would also suppress

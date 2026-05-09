@@ -1,84 +1,46 @@
-# File Bridge Smart Poller Setup Prompt
+# DEPRECATED — Smart Poller Retired (Slice 4, 2026-05-09)
 
-This template keeps its legacy filename for scaffold compatibility. Its active
-content is the smart-poller setup contract, not the retired OS-poller directive.
+> ⚠️ **DEPRECATED** — The smart-poller mechanism this template documented
+> was retired on 2026-05-09 in favor of the cross-harness event-driven
+> trigger. Do **NOT** follow this template for new installations.
+>
+> The smart-poller runtime (`scripts/run_smart_bridge_poller.vbs`,
+> `scripts/run_smart_bridge_poller.ps1`,
+> `groundtruth-kb/scripts/bridge_poller_runner.py`, the
+> `GTKB-SmartBridgePoller` Windows scheduled task) has been archived to
+> `archive/smart-poller-2026-05-09/`. Attempting to follow these
+> instructions will fail because the runner has been moved.
 
-Use this prompt with Claude Code or Codex when a GroundTruth project needs a
-durable file bridge between Prime Builder and Loyal Opposition agents.
+## Replacement Mechanism
 
-Replace angle-bracket placeholders before use.
+The active bridge dispatch automation is the **cross-harness
+event-driven trigger** at
+`scripts/cross_harness_bridge_trigger.py`. It is registered in:
 
-```text
-You are configuring a durable file-based dual-agent bridge for this GroundTruth
-project.
+- `.claude/settings.json` — `PostToolUse` and `Stop` hook arrays
+- `.codex/hooks.json` — Codex-side parity (forward-compatible per
+  `ADR-CODEX-HOOK-PARITY-FALLBACK-001`)
 
-Project root:
-<PROJECT_ROOT>
+When a tool call modifies `bridge/INDEX.md` or the agent ends a turn,
+the trigger inspects the indexed state and dispatches the appropriate
+counterpart harness if a recipient's actionable queue signature has
+changed.
 
-Prime Builder:
-- Agent/tool: <CLAUDE_CODE_OR_OTHER_PRIME>
-- CLI command: <PRIME_CLI_COMMAND>
-- Model/runtime: <PRIME_MODEL_OR_RUNTIME>
-- Required config files: <PRIME_CONFIG_FILES>
-- Required plugins/MCP servers/skills: <PRIME_PLUGINS_MCP_SKILLS>
+## See Instead
 
-Loyal Opposition:
-- Agent/tool: <CODEX_OR_OTHER_REVIEWER>
-- CLI command: <LOYAL_OPPOSITION_CLI_COMMAND>
-- Model/runtime: <LOYAL_OPPOSITION_MODEL_OR_RUNTIME>
-- Required config files: <LOYAL_OPPOSITION_CONFIG_FILES>
-- Required plugins/MCP servers/skills: <LOYAL_OPPOSITION_PLUGINS_MCP_SKILLS>
+- Slice 3 closure:
+  `bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`.
+- Slice 4 retirement:
+  `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`.
+- Tutorial: `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (cross-harness
+  event-driven trigger setup is documented here per Slice 4 D5d).
+- Doctor check: `_check_cross_harness_trigger` in
+  `groundtruth-kb/src/groundtruth_kb/project/doctor.py`.
 
-Bridge requirements:
-1. Use the file bridge. The authoritative queue is bridge/INDEX.md.
-2. Do not create or rely on a database-backed bridge or alternate queue unless
-   the owner explicitly asks for that runtime.
-3. Document any archived or inactive bridge runtime as inactive, and remove
-   stale active config only with explicit owner approval.
-4. Treat each bridge document entry as newest-first. Only the latest status for
-   each entry is actionable.
-5. Loyal Opposition scans for latest NEW or REVISED entries and writes the next
-   numbered bridge file with GO, NO-GO, or VERIFIED.
-6. Prime Builder scans for latest GO or NO-GO entries and writes the next
-   numbered bridge file with NEW or REVISED when a response is needed.
-7. VERIFIED is terminal and must not trigger Prime Builder action.
-8. Use the verified smart poller when it is available and functioning. Do not
-   restore the retired OS poller implementation as the active automation path.
-9. If smart-poller automation is unavailable, manual bridge scans remain the
-   fallback until the smart poller is installed and healthy.
-10. The smart poller must parse bridge/INDEX.md, acquire a lock, skip dispatch
-    when no work exists, invoke the correct CLI only for real work, and append
-    durable run records for both clear scans and dispatched runs.
-11. Configure recurring execution only through the verified smart-poller
-    registration path, with health checks and cost controls enabled.
-12. Store scripts, launchers, locks, logs, and prompt text under project-owned
-    paths documented in BRIDGE-INVENTORY.md.
-13. After every scan (clear or dispatched), write a JSON status file:
-    - Prime Builder: <PRIME_STATUS_JSON>
-    - Loyal Opposition: <LOYAL_OPPOSITION_STATUS_JSON>
-    Schema: {"updatedAtUtc": "<ISO8601-UTC>", "state": "<clear|dispatched|error|...>", "message": "<summary>"}
-    The state field is free-form; doctor tooling displays it as-is.
-14. Capture the full setup in BRIDGE-INVENTORY.md, including:
-    - smart-poller registration name
-    - script and launcher paths
-    - lock and log paths
-    - CLI commands and working directories
-    - prompt text or prompt file paths
-    - plugins, MCP servers, and skills required by each agent
-    - relevant Claude Code and Codex configuration files
-    - health-check commands
-    - recovery procedure
-15. Preserve project file-safety rules. Do not overwrite existing instructions,
-    hooks, bridge files, or config without confirming ownership and scope.
+This file remains as a deprecated stub for two release cycles to give
+adopter projects time to migrate references. It will be removed in a
+future cleanup; see Slice 4 Open Follow-On §7.
 
-Deliverables:
-- Implement or update smart-poller scripts and registration definitions.
-- Update BRIDGE-INVENTORY.md and any bridge protocol rule file needed by the
-  agents.
-- Provide exact names, commands, paths, logs, health-check commands, and
-  expected token/cost controls.
-- Verify with one no-work scan for each role.
-- If safe test bridge entries exist, verify one full Prime -> Loyal Opposition
-  -> Prime status cycle.
-- Report unresolved owner decisions separately.
-```
+---
+
+Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

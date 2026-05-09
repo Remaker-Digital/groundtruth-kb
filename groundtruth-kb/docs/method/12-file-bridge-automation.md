@@ -1,7 +1,7 @@
 # 12. File Bridge Automation
 
 Dual-agent GroundTruth workflows are not just a pair of prompts. They depend on
-an operating surface: bridge files, status rules, scheduler definitions,
+an operating surface: bridge files, status rules, hook registrations,
 agent-specific startup instructions, CLI invocations, plugins, skills, locks,
 logs, and recovery procedures. If those pieces are not captured, the pipeline
 can appear documented while the working system is actually tribal knowledge.
@@ -18,55 +18,50 @@ The file bridge exists to make the review pipeline routine and durable:
 - Loyal Opposition can review queued work without manual owner prompting.
 - Prime Builder can act on review verdicts without the owner copying messages
   between tools.
-- The owner can verify health from files, scheduled task state, and logs.
+- The owner can verify health from files, hook registrations, and dispatch
+  state.
 
 The owner should provide specifications, clarifications, and decisions. The
-bridge should handle ordinary review handoff, polling, retry prevention, and
+bridge should handle ordinary review handoff, dispatch, retry prevention, and
 evidence capture.
 
 ## Reference topology
 
-The preferred topology is a file-based bridge with symmetric OS-level pollers.
+The preferred topology is a file-based bridge with a cross-harness
+event-driven trigger that dispatches the appropriate counterpart harness when
+a recipient's actionable queue signature changes. The retired smart-poller and
+OS-scheduler implementations (archived under `archive/smart-poller-2026-05-09/`)
+are no longer the active automation path; bridge dispatch is now event-driven
+rather than interval-driven.
 
 ```mermaid
 graph TD
-    SCHED[OS Scheduler] -->|triggers| PP[Prime Poller]
-    SCHED -->|triggers| LP[LO Poller]
-    PP -->|reads/writes| IDX[bridge/INDEX.md]
-    LP -->|reads/writes| IDX
+    EVT[Tool-use or Stop event] -->|fires| TRG[scripts/cross_harness_bridge_trigger.py]
+    TRG -->|reads| IDX[bridge/INDEX.md]
+    TRG -->|writes| DST[.gtkb-state/bridge-poller/dispatch-state.json]
+    TRG -->|dispatches| PRIME[Prime Builder harness]
+    TRG -->|dispatches| LO[Loyal Opposition harness]
+    PRIME -->|reads/writes| IDX
+    LO -->|reads/writes| IDX
     IDX -->|references| FILES[bridge/*.md]
-    PP -.->|acquires| LOCK[Lock File]
-    LP -.->|acquires| LOCK
-    PP -->|invokes| PCLI[Prime Builder CLI]
-    LP -->|invokes| LCLI[LO Reviewer CLI]
 ```
 
 | Component | Responsibility |
 |-----------|----------------|
 | `bridge/INDEX.md` | Authoritative review queue and status index |
 | `bridge/*.md` | Numbered review documents, implementation reports, and verdicts |
-| Prime poller | Watches Codex verdicts and invokes the Prime Builder CLI |
-| Loyal Opposition poller | Watches Prime submissions and invokes the reviewer CLI |
-| OS scheduler | Runs each poller independently of active chat sessions |
-| Lock files | Prevent overlapping runs when a poll takes longer than the interval |
-| Logs | Provide proof of scans, dispatches, exits, and failures |
-| Inventory | Records scripts, prompts, schedules, agents, plugins, skills, and recovery |
+| `scripts/cross_harness_bridge_trigger.py` | Event-driven dispatch entrypoint that inspects INDEX and dispatches the appropriate counterpart harness when its actionable queue signature changes |
+| `.claude/settings.json` (`PostToolUse`, `Stop` hooks) | Claude Code-side trigger registration |
+| `.codex/hooks.json` (`PostToolUse`, `Stop` hooks) | Codex-side parity trigger registration (forward-compatible per `ADR-CODEX-HOOK-PARITY-FALLBACK-001`) |
+| `.gtkb-state/bridge-poller/dispatch-state.json` | Per-recipient dispatch-state record consulted by the doctor's `_check_bridge_dispatch_liveness` check |
+| Logs | Hook output and dispatch state provide proof of triggers and dispatches |
+| Inventory | Records hook registrations, the trigger script, dispatch-state path, CLI commands, plugins, skills, and the manual fallback procedure |
 
-On Windows, the operational shape is usually:
-
-```text
-Task Scheduler
-  -> hidden launcher, usually wscript.exe running a small .vbs wrapper
-  -> PowerShell scanner
-  -> bridge/INDEX.md parser
-  -> lock acquisition
-  -> CLI invocation only when work exists
-  -> log append
-```
-
-On Unix-like systems, the same pattern can be implemented with `cron`,
-`systemd` timers, or `launchd`, replacing the VBS hidden launcher with the
-native scheduler's background execution model.
+The retired smart-poller and OS-scheduler topology required Windows scheduled
+tasks, hidden VBS launchers, PowerShell scanners, lock files, and short
+polling intervals. None of those pieces remain active. Bridge dispatch fires
+when the agent's tool-call writes the INDEX or the agent's turn ends, not on
+a fixed interval.
 
 ## Protocol model
 
@@ -95,44 +90,46 @@ stateDiagram-v2
 | `NO-GO` | Loyal Opposition | Blockers remain; Prime Builder must respond |
 | `VERIFIED` | Loyal Opposition | Terminal verification; no Prime response is expected |
 
-Pollers must inspect the latest status for each document entry. Historical
+The trigger inspects the latest status for each document entry. Historical
 statuses below the latest line are evidence, not action items.
 
-## Poller filters
+## Dispatch filters
 
-Use separate filters for the two directions.
+The trigger uses separate signatures for the two directions to decide
+whether dispatching is warranted.
 
-| Poller | Actionable latest statuses | Ignore |
-|--------|----------------------------|--------|
+| Recipient | Actionable latest statuses | Ignored |
+|-----------|----------------------------|---------|
 | Loyal Opposition | `NEW`, `REVISED` | `GO`, `NO-GO`, `VERIFIED` |
 | Prime Builder | `GO`, `NO-GO` | `NEW`, `REVISED`, `VERIFIED` |
 
-`VERIFIED` is terminal. A Prime poller that treats `VERIFIED` as actionable
-will re-open completed work. A poller that scans historical statuses instead
-of latest statuses will repeatedly process stale entries.
+`VERIFIED` is terminal. The trigger never dispatches Prime Builder for
+`VERIFIED` items, and the dispatch-state signature ignores historical statuses
+beneath the latest entry per document.
 
-## Scheduler standard
+## Trigger dispatch standard
 
-Use an OS scheduler as the authoritative recurring mechanism when the bridge
-must operate across sessions.
+The cross-harness event-driven trigger is the authoritative dispatch
+mechanism when the bridge must operate across sessions.
 
-App-native automations, in-chat timers, and local loops can improve
-responsiveness, but they are not the reliability boundary unless they provide
-durable run records and survive app/session restarts. An automation being
-listed as active is weaker evidence than a run ledger showing dispatches,
-exits, and outputs.
+Recommended trigger properties:
 
-Recommended scheduler properties:
+- Fire on `PostToolUse` (so an INDEX-modifying tool call dispatches the
+  counterpart immediately) and `Stop` (so an end-of-turn check catches
+  pending recipient work).
+- Compute an actionable-queue signature for each recipient and dispatch only
+  when the signature changes.
+- Record dispatches in `.gtkb-state/bridge-poller/dispatch-state.json` with
+  per-recipient `updated_at` so the doctor can detect missed dispatches.
+- Skip dispatch when no recipient has actionable work.
+- Keep stdout and stderr from dispatched harness invocations in a
+  diagnosable location.
+- Provide a single-instance lock so an INDEX modification under heavy
+  tool-use does not produce overlapping dispatches.
 
-- Run each direction independently.
-- Use a short interval appropriate for review latency, commonly every few
-  minutes.
-- Acquire a lock before parsing and dispatching.
-- Skip CLI invocation when no action item exists.
-- Append logs for every scan, including clear scans.
-- Record command, working directory, exit code, start time, end time, and
-  selected bridge entries.
-- Keep stdout and stderr from CLI invocations in a diagnosable location.
+Manual `bridge/INDEX.md` scans remain available as a fallback when the
+trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
+prompt such as `Bridge` or `Bridge scan`.
 
 ## Prompt and configuration capture
 
@@ -145,13 +142,16 @@ For each side, document:
 - Permission mode and sandbox assumptions
 - Startup instruction files, such as `CLAUDE.md`, `AGENTS.md`, or `MEMORY.md`
 - Rule files, such as `.claude/rules/file-bridge-protocol.md`
-- Prompt templates used by scheduled runs
+- Hook registrations (`.claude/settings.json`, `.codex/hooks.json`)
+- Dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
+- Trigger script path (`scripts/cross_harness_bridge_trigger.py`)
 - Plugins, MCP servers, and skills required for the run
 - Environment variables and config files needed by the CLI
 - Log, lock, and transcript locations
 - Owner-only escalation rules
+- Manual bridge-scan fallback procedure
 
-Prompt text is configuration. If changing a prompt changes what the poller
+Prompt text is configuration. If changing a prompt changes what the trigger
 does, that prompt must be versioned or inventoried like code.
 
 ## Inventory fields
@@ -161,14 +161,16 @@ usually `BRIDGE-INVENTORY.md`, with at least:
 
 - agent roles and ownership
 - file bridge paths and status semantics
-- scheduler task names and intervals
-- launcher and scanner script paths
+- hook registrations (`.claude/settings.json`, `.codex/hooks.json`)
+- trigger script path (`scripts/cross_harness_bridge_trigger.py`)
+- dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
 - lock and log paths
 - CLI commands and working directories
 - prompt templates or inline prompt locations
 - required plugins, skills, MCP servers, and config files
 - health-check commands
 - failure signals and recovery procedure
+- manual bridge-scan fallback procedure
 - MemBase records that capture design decisions and procedures
 
 The package template `templates/BRIDGE-INVENTORY.md` includes these sections.
@@ -177,21 +179,22 @@ The package template `templates/BRIDGE-INVENTORY.md` includes these sections.
 
 A bridge health check should answer four questions:
 
-1. Are the scheduled tasks registered and enabled?
-2. Are they actually running on schedule?
-3. Do logs show clear scans and dispatched runs?
-4. Does the index reflect expected status transitions?
+1. Is the cross-harness-trigger script present and executable?
+2. Are both hook registrations (`.claude/settings.json` PostToolUse + Stop;
+   `.codex/hooks.json` PostToolUse + Stop) in place?
+3. Is the dispatch-state file fresh (PASS < 4 min, WARN 4-10 min, ALARM > 10 min)?
+4. Does the INDEX reflect expected status transitions?
 
-Example Windows checks:
+The doctor exposes this via two checks:
 
-```powershell
-Get-ScheduledTask -TaskName "<PROJECT>-FileBridge-Prime"
-Get-ScheduledTask -TaskName "<PROJECT>-FileBridge-LoyalOpposition"
-Get-ScheduledTaskInfo -TaskName "<PROJECT>-FileBridge-Prime"
-Get-ScheduledTaskInfo -TaskName "<PROJECT>-FileBridge-LoyalOpposition"
-Get-Content "<PROJECT_ROOT>\independent-progress-assessments\bridge-automation\logs\prime-scan.log" -Tail 40
-Get-Content "<PROJECT_ROOT>\independent-progress-assessments\bridge-automation\logs\lo-scan.log" -Tail 40
+```text
+gt project doctor
 ```
+
+- `_check_cross_harness_trigger` reports PASS/WARN/FAIL covering trigger
+  script presence, both hook registrations, and dispatch-state freshness.
+- `_check_bridge_dispatch_liveness` reports per-recipient dispatch-state
+  liveness for `claude` and `codex`.
 
 Example index check:
 
@@ -209,12 +212,12 @@ Common failures to review explicitly:
 
 | Failure | Signal | Correction |
 |---------|--------|------------|
-| App automation is active but no runs occur | Next run changes but no run records, inbox items, or logs | Move authoritative polling to OS scheduler |
-| Completed items re-open | Prime poller treats `VERIFIED` as actionable | Treat `VERIFIED` as terminal |
-| Stale entries repeat | Poller scans all historical statuses | Inspect only latest status per document |
-| Duplicate CLI runs | Long poll overlaps next interval | Add lock file with stale-lock handling |
-| Visible terminal windows | Scheduler starts PowerShell directly | Use hidden launcher or scheduler-native background mode |
-| Silent failures | Logs only record positive work | Log clear scans, command exits, stdout, and stderr |
+| Trigger script missing | `_check_cross_harness_trigger` reports FAIL on script presence | Restore from scaffold or `gt project init --profile dual-agent` |
+| Hook registration missing | `_check_cross_harness_trigger` reports FAIL on hook registrations | Update `.claude/settings.json` PostToolUse/Stop arrays or `.codex/hooks.json` |
+| Dispatch-state stale | `_check_bridge_dispatch_liveness` reports WARN/ALARM | Inspect last hook invocation and INDEX state; verify hooks fire on tool-use |
+| Completed items re-dispatch | Trigger treats `VERIFIED` as actionable | Verify dispatch-filter logic ignores `VERIFIED` |
+| Duplicate dispatches | Concurrent INDEX modifications | Verify single-instance lock acquisition |
+| Silent failures | Hook output not captured | Capture trigger stdout/stderr in dispatch-state |
 | Wrong agent behavior | CLI prompt omits role, verdict rules, or config paths | Version the prompt and include it in inventory |
 | Stale integration config | Archived MCP or bridge config remains active | Remove or mark inactive in config and inventory |
 
@@ -226,47 +229,48 @@ Use GroundTruth records to preserve the operating history:
 
 | Record type | Use |
 |-------------|-----|
-| `environment_config` | CLI paths, scheduler names, config files, env vars |
+| `environment_config` | CLI paths, hook registration paths, config files, env vars |
 | `operation_procedure` | Setup, health check, recovery, and review procedures |
 | `document` | Bridge design notes, inventories, prompt captures, audits |
 | `work_item` | Follow-up tasks for missing automation, docs, or verification |
-| `decision` or ADR/DCL records | Scheduler choice, bridge protocol, role-boundary decisions |
+| `decision` or ADR/DCL records | Trigger architecture, bridge protocol, role-boundary decisions |
 
 Markdown files are the working control surface. MemBase is the auditable history and decision trail.
 
 ## Setup prompt
 
-GroundTruth ships a reusable setup prompt at
-`templates/bridge-os-poller-setup-prompt.md`. Use it when a Claude Code or
-Codex session should configure the file bridge for a project.
+The legacy setup-prompt template at
+`templates/bridge-os-poller-setup-prompt.md` is now a DEPRECATED
+compatibility stub retained for two release cycles after the Slice 4
+smart-poller retirement (2026-05-09). Do not follow it for new
+installations.
 
-At a minimum, the setup agent should be instructed to:
+For new installations, scaffold the project with:
 
-1. Inspect existing bridge rules, agent files, scheduler state, plugins, and
-   skills before editing.
-2. Preserve existing project rules and ask before replacing unrelated bridge
-   systems.
-3. Configure the file bridge around `bridge/INDEX.md`.
-4. Create separate Prime and Loyal Opposition pollers.
-5. Use latest-status filtering with `VERIFIED` terminal.
-6. Use an OS scheduler for durable recurring scans.
-7. Add lock files, logs, health checks, and failure diagnostics.
-8. Capture prompts, plugins, skills, MCP servers, and config paths in the
-   bridge inventory.
-9. Verify the setup by forcing one no-work scan and, when safe, one work scan.
-10. Report exact files changed, scheduler names, commands, logs, and remaining
-    owner decisions.
+```bash
+gt project init my-project --profile dual-agent --owner "Your Name"
+```
+
+The `dual-agent` profile installs the trigger script, both hook
+registrations, and the dispatch-state path automatically. See
+`docs/tutorials/dual-agent-setup.md` for the end-to-end walkthrough.
 
 ## Review checklist
 
 Before accepting a bridge setup, verify:
 
 - The latest-status semantics match the protocol table above.
-- The OS scheduler, not a chat session, is the reliability boundary.
+- The cross-harness event-driven trigger, not a chat session, is the
+  reliability boundary.
+- Both hook registrations (`.claude/settings.json`,
+  `.codex/hooks.json`) are present and reference
+  `scripts/cross_harness_bridge_trigger.py`.
 - Both directions are configured and independently testable.
 - CLI prompts are captured and versioned.
 - Required plugins, skills, MCP servers, and config files are inventoried.
-- Logs prove both clear scans and dispatched runs.
-- Locking prevents overlap.
-- Archived bridge runtimes are removed or explicitly marked inactive.
+- Dispatch state proves both clear scans (no recipient action) and dispatched
+  runs.
+- Single-instance locking prevents overlap.
+- Archived bridge runtimes (smart-poller, OS-poller) under
+  `archive/smart-poller-2026-05-09/` are not referenced as live dependencies.
 - The owner can inspect status without manually prompting either agent.

@@ -79,8 +79,9 @@ nav:
   - Tutorials:
       - Your First Specification: tutorials/first-spec.md
       - Dual-Agent Setup: tutorials/dual-agent-setup.md
-      - Bridge Smart Poller: tutorials/bridge-smart-poller.md
-      - Bridge OS Scheduler (Retired): tutorials/bridge-os-scheduler.md
+      - Bridge Smart Poller (Retired — Historical): tutorials/bridge-smart-poller.md
+      - Bridge Smart Poller Activation (Retired — Historical): tutorials/bridge-smart-poller-activation.md
+      - Bridge OS Scheduler (Retired — Historical): tutorials/bridge-os-scheduler.md
   - Reference:
       - CLI Reference: reference/cli.md
       - Configuration: reference/configuration.md

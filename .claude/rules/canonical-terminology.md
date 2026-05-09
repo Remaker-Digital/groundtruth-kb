@@ -910,28 +910,74 @@ commands: `work subject GT-KB`, `application mode`, `agent red mode`.
 
 ### smart poller
 
-**Definition:** The verified bridge-poller automation that scans
-`bridge/INDEX.md` periodically and dispatches the appropriate harness when
-a recipient's actionable queue signature changes. The smart poller is
-monitoring/dispatch infrastructure only; `bridge/INDEX.md` remains the
-canonical workflow state.
+**Status:** RETIRED 2026-05-09 (Slice 4 retirement; runtime archived to
+`archive/smart-poller-2026-05-09/`).
+
+**Definition:** The (now-retired) bridge-poller automation that scanned
+`bridge/INDEX.md` periodically and dispatched the appropriate harness when
+a recipient's actionable queue signature changed. The smart poller was
+monitoring/dispatch infrastructure only; `bridge/INDEX.md` remained the
+canonical workflow state. Bridge dispatch is now governed by the
+`cross-harness event-driven trigger` (see entry below).
 
 **Not to be confused with:** the retired `OS poller` class (halted
-2026-04-25 per owner directive). The smart poller is the current canonical
-automation path; the OS poller class must not be re-enabled as a
-substitute.
+2026-04-25 per owner directive); the `cross-harness event-driven trigger`
+(the current canonical automation path).
 
-**Source:** `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001` (smart poller spawns
-headless harness instances when actionable);
-`DCL-SMART-POLLER-AUTO-TRIGGER-001` (smart poller auto-triggers harness
-when work waits); `DELIB-S319-SMART-POLLER-POLICY-CLARIFICATION` (opt-out
-when functional); `DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION` (spawn
-to notify architecture); `DELIB-S321-SMART-POLLER-AUTO-TRIGGER` (S321
-owner directive).
+**Source:** `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001` v2 (mechanism-agnostic
+supersede; spawns headless harness instances when actionable);
+`DCL-SMART-POLLER-AUTO-TRIGGER-001` v2 (auto-trigger contract supersede);
+`DELIB-S319-SMART-POLLER-POLICY-CLARIFICATION` (opt-out when functional);
+`DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION` (spawn to notify
+architecture); `DELIB-S321-SMART-POLLER-AUTO-TRIGGER` (S321 owner
+directive); `DELIB-S337-SMART-POLLER-RETIREMENT-2026-05-09` (Slice 4
+retirement decision); bridge thread
+`gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`.
 
-**Implementation pointer:** Windows scheduled task `GTKB-SmartBridgePoller`;
-lock at `.gtkb-state/bridge-poller/bridge-poller-runner.lock`; runner
-`groundtruth-kb/scripts/bridge_poller_runner.py`.
+**Implementation pointer:** Archived. Historical artifacts at
+`archive/smart-poller-2026-05-09/`: Windows scheduled task
+`GTKB-SmartBridgePoller` (halted), VBS daemon
+`scripts/run_smart_bridge_poller.vbs`, runner
+`groundtruth-kb/scripts/bridge_poller_runner.py`. Doctor's
+`_check_smart_bridge_poller` removed in Slice 4 D4.
+
+### cross-harness event-driven trigger
+
+**Canonical alias:** bridge dispatch trigger; cross-harness trigger.
+
+**Definition:** The current canonical bridge-dispatch automation, replacing
+the retired smart poller. Implemented as
+`scripts/cross_harness_bridge_trigger.py` and registered as PostToolUse +
+Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger
+fires on tool-use and Stop events: when `bridge/INDEX.md` is modified by
+a tool call or the agent ends a turn, the trigger inspects the indexed
+state and dispatches the appropriate counterpart harness if a recipient's
+actionable queue signature has changed. The trigger reuses the smart
+poller's actionable-signature scheme byte-identically per
+`tests/scripts/test_cross_harness_bridge_trigger.py` so the audit-trail
+invariants are preserved.
+
+**Not to be confused with:** retired `smart poller` (interval-driven
+substrate; archived); retired `OS poller` (token-heavy scheduled-task
+class; halted 2026-04-25); the `file bridge` (the protocol surface; the
+trigger dispatches into it).
+
+**Source:** Slice 3 closure
+`bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`
+(VERIFIED) — hook registrations; Slice 4
+`bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`
+— smart-poller substrate retirement; `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001`
+v2 (mechanism-agnostic supersede); `DCL-SMART-POLLER-AUTO-TRIGGER-001` v2
+(auto-trigger contract; trigger MUST dispatch on actionable signature
+change); `DELIB-S337-CODEX-HOOKS-WINDOWS-RETEST-2026-05-08` (empirical
+event-driven trigger foundation).
+
+**Implementation pointer:** `scripts/cross_harness_bridge_trigger.py`
+(entrypoint); `.claude/settings.json` (Claude Code-side hook
+registration); `.codex/hooks.json` (Codex-side parity registration);
+`.gtkb-state/bridge-poller/dispatch-state.json` (per-recipient dispatch
+state); `_check_cross_harness_trigger` and `_check_bridge_dispatch_liveness`
+in `groundtruth-kb/src/groundtruth_kb/project/doctor.py` (health checks).
 
 ### OS poller
 
@@ -943,8 +989,8 @@ poller). All members of this class were halted 2026-04-25 per owner
 directive after a 10x session token-cost regression and must not be
 re-enabled as a substitute for the smart poller.
 
-**Not to be confused with:** `smart poller` (the verified replacement;
-canonical when healthy).
+**Not to be confused with:** retired `smart poller` (Slice 4 archive);
+`cross-harness event-driven trigger` (current canonical automation path).
 
 **Source:** `DELIB-S319-SMART-POLLER-POLICY-CLARIFICATION` (covers
 OLD-poller halt context).
@@ -958,7 +1004,7 @@ explicit owner approval and the cost/benefit analysis required by
 
 **Definition:** The GT-KB diagnostic surface (typically invoked as
 `gt platform doctor` or equivalent) that runs structured health checks
-against platform infrastructure: smart-poller liveness, bridge state,
+against platform infrastructure: cross-harness-trigger health, bridge state,
 scaffold drift, KB integrity, dashboard reachability, and other configured
 checks. The doctor is the canonical predicate for several rule-cited
 conditions.
@@ -971,8 +1017,8 @@ release-candidate gate (`scripts/release_candidate_gate.py`).
 spec-derivation-gate alignment).
 
 **Implementation pointer:** `groundtruth-kb/` doctor implementation.
-Specific checks: `_check_smart_bridge_poller`, `_check_bridge_poller`,
-scaffold drift, etc.
+Specific checks: `_check_cross_harness_trigger`,
+`_check_bridge_dispatch_liveness`, scaffold drift, KB integrity, etc.
 
 ### release manifest
 

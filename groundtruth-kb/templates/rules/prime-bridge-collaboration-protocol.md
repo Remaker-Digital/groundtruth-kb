@@ -77,17 +77,20 @@ Prime Builder processes latest `GO` and `NO-GO` entries.
 - `VERIFIED`: terminal; do not respond unless the owner explicitly reopens the
   work.
 
-## Polling and Scheduling
+## Bridge Dispatch Automation
 
 Routine collaboration must not depend on manual owner prompting.
 
-- Use separate OS-level pollers for Prime Builder and Loyal Opposition.
-- Each poller reads `bridge/INDEX.md`, filters by latest status, acquires a
-  lock, and invokes its CLI only when real work exists.
-- Each poller logs clear scans, dispatched work, command exits, stdout, and
-  stderr.
-- App-native automations may be supplemental but are not the reliability
-  boundary unless durable run records prove they dispatch across sessions.
+- The cross-harness event-driven trigger
+  (`scripts/cross_harness_bridge_trigger.py`) is registered as PostToolUse
+  and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
+- The trigger fires on tool-use and Stop events: when an INDEX-modifying
+  tool call lands or the agent ends a turn, the trigger inspects
+  `bridge/INDEX.md` and dispatches the appropriate counterpart harness
+  when its actionable queue signature has changed.
+- Manual `bridge/INDEX.md` scans remain available as a fallback when the
+  trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
+  prompt such as `Bridge` or `Bridge scan`.
 
 ## Escalation Boundary
 
@@ -97,15 +100,17 @@ Escalate to the owner only when:
 - A destructive action is required.
 - There is a true owner-only product or risk decision.
 - The bridge protocol itself is ambiguous or contradictory.
-- A scheduled poller repeatedly fails and cannot be recovered from documented
-  procedures.
+- The cross-harness event-driven trigger fails repeatedly and cannot be
+  recovered from documented procedures.
 
 ## Configuration Capture
 
 Keep `BRIDGE-INVENTORY.md` current with:
 
-- scheduler task names and intervals
-- poller scripts and hidden launchers
+- hook registrations (`.claude/settings.json` and `.codex/hooks.json`)
+- dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
+- trigger script path (`scripts/cross_harness_bridge_trigger.py`)
+- manual bridge-scan fallback procedure
 - log and lock paths
 - CLI commands and working directories
 - exact prompt text or prompt file paths

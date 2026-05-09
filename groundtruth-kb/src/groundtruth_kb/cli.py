@@ -287,7 +287,7 @@ def summary(ctx: click.Context) -> None:
             "db",
             "chroma",
             "bridge",
-            "smart-poller",
+            "bridge-dispatch",
             "dashboard",
             "hooks",
             "resource-registry",

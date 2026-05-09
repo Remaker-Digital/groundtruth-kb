@@ -771,7 +771,10 @@ def _render_all_templates(
         "{{TEST_STATUS}}": "Not run yet",
         "{{BRIDGE_INVENTORY_PATH_OR_NA}}": ("BRIDGE-INVENTORY.md" if profile.includes_bridge else "N/A"),
         "{{AUTOMATION_SUMMARY_OR_NA}}": (
-            "File bridge inventory and smart-poller setup prompt included"
+            "File bridge inventory and cross-harness event-driven trigger "
+            "(.claude/settings.json + .codex/hooks.json PostToolUse + Stop "
+            "hooks) included; smart poller and OS poller retired in Slice 4 "
+            "and archived"
             if profile.includes_bridge
             else "None configured yet"
         ),
@@ -1143,7 +1146,7 @@ def scaffold_summary(target: Path, profile: str) -> str:
             [
                 "  - AGENTS.md (Loyal Opposition contract)",
                 "  - BRIDGE-INVENTORY.md",
-                "  - bridge-os-poller-setup-prompt.md (legacy filename; smart-poller setup)",
+                "  - bridge-os-poller-setup-prompt.md (DEPRECATED stub; smart poller retired in Slice 4. Bridge dispatch is automated by the cross-harness event-driven trigger via .claude/settings.json and .codex/hooks.json hook registrations.)",
                 "  - Bridge rules and hooks",
                 "  - independent-progress-assessments/ (Codex reports)",
             ]

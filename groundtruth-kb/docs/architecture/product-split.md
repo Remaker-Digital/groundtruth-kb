@@ -53,12 +53,18 @@ Dual-agent projects use a project-owned file bridge:
   verdicts.
 - Prime Builder writes `NEW` and `REVISED`.
 - Loyal Opposition writes `GO`, `NO-GO`, and terminal `VERIFIED`.
-- OS-level pollers run the Prime and Loyal Opposition scans independently of
-  active chat sessions.
-- `BRIDGE-INVENTORY.md` captures scheduler names, scripts, prompts, CLI
-  commands, plugins, MCP servers, skills, logs, locks, and recovery procedure.
-- `bridge-os-poller-setup-prompt.md` provides a reusable setup prompt for
-  Claude Code or Codex.
+- The cross-harness event-driven trigger
+  (`scripts/cross_harness_bridge_trigger.py`) registered as `PostToolUse` and
+  `Stop` hooks in `.claude/settings.json` and `.codex/hooks.json` dispatches
+  the appropriate counterpart harness when a recipient's actionable queue
+  signature changes. The retired smart-poller and OS-poller implementations
+  are archived under `archive/smart-poller-2026-05-09/`.
+- `BRIDGE-INVENTORY.md` captures hook registrations, the trigger script,
+  dispatch-state path, CLI commands, plugins, MCP servers, skills, logs,
+  locks, and the manual bridge-scan fallback procedure.
+- `bridge-os-poller-setup-prompt.md` is retained as a DEPRECATED
+  compatibility stub for two release cycles; do not follow its content for
+  new installations.
 
 The older SQLite/MCP bridge runtime remains in the package only as legacy
 compatibility code. New projects should not use it as the active bridge.

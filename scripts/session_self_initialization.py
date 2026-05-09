@@ -148,30 +148,32 @@ HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
 }
-POLLER_ROLE_TEXT = (
-    "use verified smart poller when available and functioning; retired OS poller remains disabled; "
-    "otherwise use manual scans or monitoring only for separate harnesses/asynchronous monitoring"
+BRIDGE_DISPATCH_ROLE_TEXT = (
+    "cross-harness event-driven trigger registered as PostToolUse and Stop hooks "
+    "(.claude/settings.json, .codex/hooks.json); fires on tool-use and Stop "
+    "rather than on a fixed interval; manual bridge/INDEX.md scans available "
+    "as fallback; retired smart poller and OS poller remain archived"
 )
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
-        "poller": POLLER_ROLE_TEXT,
+        "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "role_mapping_source": "harness-state/role-assignments.json",
     },
     "acting-prime-builder": {
         "assumed_role": "Acting Prime Builder",
         "role_assignment": "active AI harness assigned by owner for this session",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
-        "poller": POLLER_ROLE_TEXT,
+        "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "role_mapping_source": ".claude/rules/acting-prime-builder.md",
     },
     "loyal-opposition": {
         "assumed_role": "Loyal Opposition",
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
-        "poller": POLLER_ROLE_TEXT,
+        "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "role_mapping_source": "harness-state/role-assignments.json",
     },
 }
@@ -3446,12 +3448,12 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Startup mode: Loyal Opposition review and verification.",
             "- Default session purpose: process Prime Builder reviews and verifications on the file bridge.",
             "- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.",
-            "- Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism; the smart poller is a monitoring/activation service.",
+            "- Bridge/dispatch distinction: the file bridge is the durable role handoff and review mechanism; the cross-harness event-driven trigger is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
             "- Live bridge authority: current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`; this generated report is not authoritative after generation.",
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
-            "- Poller startup rule: use the verified smart poller when it is available and functioning; do not restore the retired OS poller. Otherwise use manual scans or monitoring only when the roles are running in separate harnesses or asynchronous monitoring is otherwise needed.",
+            "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual bridge/INDEX.md scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
             "- If the live bridge verification succeeds, report the live scan result and ask Mike whether to begin processing reviews and verifications from `bridge/INDEX.md`.",
@@ -3907,7 +3909,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Role being assumed: {role['assumed_role']}",
             f"- Role assignment: {role['role_assignment']}",
             f"- Bridge: {role['bridge']}",
-            f"- Poller: {role['poller']}",
+            f"- Bridge dispatch: {role['bridge_dispatch']}",
             f"- Role mapping source: {role['role_mapping_source']}",
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
