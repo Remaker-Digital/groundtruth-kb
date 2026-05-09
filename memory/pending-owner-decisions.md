@@ -5966,6 +5966,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T19:08:54.992386Z
   answer: "User has answered your questions: \"Codex unilaterally edited scripts/session_self_initialization.py + test file (added BRIDGE_OPERATION_INSTRUCTIONS_TEXT constant + 5 test assertions) while reviewing the trigger-awareness thread. This appears to violate the Loyal Opposition File Safety Rule. Plus: umbrella -007 GO'd at -008. How to handle?\"=\"Commit current state + file LO File Safety Rule violation as a separate bridge thread\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0505
+  asked_at: 2026-05-09T19:19:15.843919Z
+  question: "How to apply the harness-parity principle to current work?"
+  options:
+    - "File NEW parity-work thread + leave -003 Open Follow-On unchanged (Recommended)"
+    - "Promote parity work into -003 REVISED-2"
+    - "File parity-work thread + amend -003 REVISED-2 to reference it explicitly"
+    - "Acknowledge principle, apply going forward, no immediate action"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f54046dbb4338ddb
+  resolved_at: 2026-05-09T19:19:15.843919Z
+  answer: "User has answered your questions: \"How to apply the harness-parity principle to current work?\"=\"File NEW parity-work thread + leave -003 Open Follow-On unchanged (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

@@ -12,6 +12,7 @@
 
 
 Document: gtkb-claude-code-bridge-status-thread-automation-001
+NO-GO: bridge/gtkb-claude-code-bridge-status-thread-automation-001-002.md
 NEW: bridge/gtkb-claude-code-bridge-status-thread-automation-001.md
 
 Document: gtkb-lo-file-safety-rule-clarification-001
