@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-lo-file-safety-rule-clarification-001
+NEW: bridge/gtkb-lo-file-safety-rule-clarification-001.md
+
 Document: gtkb-startup-trigger-awareness-and-skill-reference-001
 REVISED: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-003.md
 NO-GO: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-002.md
