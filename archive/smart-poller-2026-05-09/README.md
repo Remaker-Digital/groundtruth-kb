@@ -34,9 +34,11 @@ of the bridge-poller event-driven replacement program.
   actionable signature changes.
 - `groundtruth-kb/tests/test_bridge_poller_runner.py` — pytest coverage for
   the runner.
-- `groundtruth-kb/tests/test_doctor_smart_poller.py` — pytest coverage for
-  the now-removed `_check_smart_bridge_poller` doctor check (archived by
-  Slice 4 D4 after the doctor refactor).
+- `tests/test_doctor_smart_poller.py` — pytest coverage for the now-removed
+  `_check_smart_bridge_poller` doctor check (archived by Slice 4 D4 after
+  the doctor refactor; archived at the approved REVISED-7 target
+  `archive/smart-poller-2026-05-09/tests/test_doctor_smart_poller.py` per
+  bridge `-018` F2).
 
 ## Why Archived (not deleted)
 

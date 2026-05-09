@@ -42,6 +42,7 @@ REQUIRED_SEED_IDS = {
     "file-bridge",
     "bridge-queue",
     "bridge-dispatch",
+    "monitor-gt-kb-bridge-codex-thread",
     "smart-poller",
     "retired-os-poller",
     "dashboard",

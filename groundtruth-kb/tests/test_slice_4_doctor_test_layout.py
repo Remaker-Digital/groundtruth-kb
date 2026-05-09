@@ -10,7 +10,8 @@ drift in the four file moves the slice performs:
   (b) ``test_doctor_bridge_dispatch_liveness.py`` exists at its new live path.
   (c) ``test_doctor_smart_poller.py`` is archived — old live path gone.
   (d) ``test_doctor_smart_poller.py`` exists at its archive target,
-      ``archive/smart-poller-2026-05-09/groundtruth-kb/tests/test_doctor_smart_poller.py``.
+      ``archive/smart-poller-2026-05-09/tests/test_doctor_smart_poller.py``
+      (the REVISED-7 approved target per bridge -015 §F2 and -018 F2 fix).
 
 If any of these regress (e.g., a future refactor re-creates the legacy
 path or moves the archive target), this test fails with a clear pointer
@@ -56,9 +57,14 @@ def test_legacy_smart_poller_doctor_test_path_absent() -> None:
 
 
 def test_archived_smart_poller_doctor_test_path_exists() -> None:
-    """(d) ``test_doctor_smart_poller.py`` exists at its archive target."""
-    archived = _ARCHIVE_DIR / "groundtruth-kb" / "tests" / "test_doctor_smart_poller.py"
+    """(d) ``test_doctor_smart_poller.py`` exists at its archive target.
+
+    Per bridge -015 REVISED-7 §F2 and -018 F2 fix, the approved archive
+    target is ``archive/smart-poller-2026-05-09/tests/test_doctor_smart_poller.py``
+    (NOT ``archive/smart-poller-2026-05-09/groundtruth-kb/tests/...``).
+    """
+    archived = _ARCHIVE_DIR / "tests" / "test_doctor_smart_poller.py"
     assert archived.is_file(), (
         f"Archived test path {archived} does not exist — Slice 4 D4 was meant to "
-        f"archive test_doctor_smart_poller.py to this exact path."
+        f"archive test_doctor_smart_poller.py to this exact path per bridge -015."
     )

@@ -229,6 +229,26 @@ related_specs = []
 related_deliberations = []
 
 [[systems]]
+id = "monitor-gt-kb-bridge-codex-thread"
+canonical_name = "monitor-gt-kb-bridge (Codex app thread automation)"
+accepted_aliases = ["monitor-gt-kb-bridge", "Codex bridge monitor thread", "Codex thread heartbeat"]
+discouraged_aliases = ["bridge poller", "smart poller"]
+forbidden_aliases = []
+concept_vs_artifact = "supplemental_monitoring"
+authoritative_source = "Codex app thread automation config (external; lives in Codex CLI installation state, not in E:/GT-KB)"
+generated_or_authoritative = "external_runtime"
+read_method = "Inspect via Codex app UI; runtime trace at .codex/gtkb-hooks/last-wrapup-trigger-input.json shows the injected <heartbeat> UserPromptSubmit prompt."
+mutation_method = "Owner-managed via Codex app UI. Not modifiable from within E:/GT-KB."
+role_permissions = "Codex-side only. Wakes Codex chat to read bridge/INDEX.md every 3 minutes. Does NOT spawn counterpart harness, update dispatch-state.json, refresh active-{role}-session.lock, or run through .codex/hooks.json."
+startup_visibility = "none"
+dashboard_visibility = "none"
+harness_caveats = "Supplemental Codex-side bridge-queue monitoring; NOT a component of the formal cross-harness event-driven trigger (id = 'bridge-dispatch'). Distinct from the active-session suppression heartbeat (scripts/active_session_heartbeat.py), which writes lock files consumed by the trigger. Confirmed by Codex 2026-05-09 in response to owner inquiry; inventory entry per owner AUQ 'Inventory only' the same date."
+verification_method = "Owner observation only; no mechanical verification (out-of-repo Codex app config)."
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
 id = "retired-os-poller"
 canonical_name = "retired OS poller"
 accepted_aliases = ["retired OS poller", "old poller", "OS poller"]

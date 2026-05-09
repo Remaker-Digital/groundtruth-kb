@@ -41,6 +41,18 @@ STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 
 
 def _run_dispatcher(env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    """Invoke the SessionStart dispatcher in a hermetic env by default.
+
+    Per Slice 4 NO-GO -018 F1: when `env` is None, the default environment
+    strips `GTKB_BRIDGE_POLLER_RUN_ID` from the inherited process env so
+    normal-startup tests stay deterministic in bridge auto-dispatched
+    review sessions (where the trigger sets the marker for its child
+    harness). Tests that intentionally exercise the bridge auto-dispatch
+    branch (e.g. `test_bridge_auto_dispatch_context_bypasses_interactive_startup`)
+    continue to pass an explicit `env` containing the marker.
+    """
+    if env is None:
+        env = {k: v for k, v in os.environ.items() if k != "GTKB_BRIDGE_POLLER_RUN_ID"}
     return subprocess.run(
         [sys.executable, str(DISPATCHER)],
         cwd=str(PROJECT_ROOT),
@@ -199,12 +211,21 @@ def test_harness_parity_import_repaired() -> None:
     assert "Harness parity: unavailable" not in result.stdout
 
 
-def test_dispatcher_fallback_on_broken_startup_service(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_dispatcher_fallback_on_broken_startup_service(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     """If the startup service path is unreachable, dispatcher emits a fallback.
 
     Validates fail-soft behavior — dispatcher must always emit a valid
     SessionStart envelope, even when the canonical service is broken.
+
+    Per Slice 4 NO-GO -018 F1: this test calls ``module.main()`` in-process
+    so it inherits the test process env. In bridge auto-dispatched review
+    sessions ``GTKB_BRIDGE_POLLER_RUN_ID`` is set, which would route the
+    dispatcher into ``_bridge_auto_dispatch_context()`` before reaching the
+    fallback path under test. ``monkeypatch.delenv`` makes this test
+    hermetic regardless of inherited env.
     """
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
