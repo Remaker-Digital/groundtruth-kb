@@ -5791,6 +5791,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T13:43:51.504412Z
   answer: "User has answered your questions: \"Working tree has 141 paths in `git status` — mix of S338 work (my Cross-Harness implementation + DA Phase 3 fixes + bridge files), parallel-Prime artifacts (cross-harness -005, DA Phase 3 hook files, archived smart-poller files), and pre-existing modifications from prior sessions that were never committed. The parallel Prime's commit `7855efeb` isn't on local develop (likely on a worktree branch). How should I scope the wrap-up commit?\"=\"Scoped to S338 work + MEMORY.md (Recommended)\", \"After commit (or instead of commit if deferred), should I push develop to origin?\"=\"Push if scoped commit lands clean\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0492
+  asked_at: 2026-05-09T16:56:21.824779Z
+  question: "How should we handle Codex's `monitor-gt-kb-bridge` thread automation given the just-landed Slice 4 retirement framing?"
+  options:
+    - "Inventory only (Recommended)"
+    - "Inventory + ask Codex to reduce cadence"
+    - "Leave as-is, no governance change"
+    - "File a NEW bridge proposal to govern Codex-app-side bridge automations as a class"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f90279df148debe
+  resolved_at: 2026-05-09T16:56:21.824779Z
+  answer: "User has answered your questions: \"How should we handle Codex's `monitor-gt-kb-bridge` thread automation given the just-landed Slice 4 retirement framing?\"=\"Inventory only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

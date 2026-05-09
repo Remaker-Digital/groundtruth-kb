@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-loyal-opposition-startup-symmetry-001
+NEW: bridge/gtkb-loyal-opposition-startup-symmetry-001.md
+
 Document: gtkb-cross-harness-trigger-active-session-suppression-001
 VERIFIED: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md
 NEW: bridge/gtkb-cross-harness-trigger-active-session-suppression-001-007.md
@@ -38,6 +41,7 @@ NO-GO: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-00
 NEW: bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-001.md
 
 Document: gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001
+VERIFIED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-020.md
 NEW: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-019.md
 NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-018.md
 NEW: bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-017.md
