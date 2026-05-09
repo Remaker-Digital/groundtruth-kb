@@ -5897,6 +5897,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T18:02:29.782263Z
   answer: "User has answered your questions: \"Two parallel NO-GO -004s captured. Both have substantive findings: umbrella F1 (P0 — Claude Code missing UserPromptSubmit hook registration); umbrella F2 (P1 — regression scan misses three forbidden-pattern variants); decision-tracker F1 (P1 — Jaccard rule overly permissive on boilerplate-heavy phrasings); decision-tracker F2 (P1 — packet recipe cites wrong schema). All addressable. How to proceed?\"=\"File both REVISED-2 -005s now (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0500
+  asked_at: 2026-05-09T18:45:45.797458Z
+  question: "Three actionable items: (a) decision-tracker GO authorizes implementation phase (multi-step, owner AUQs required for each DCL packet + code changes); (b) umbrella NO-GO narrow fix (REVISED-3 -007 addressing one missed active-code surface); (c) NEW Codex-side gt-kb-bridge-monitor 30-min thread automation needs inventory entry. How to proceed?"
+  options:
+    - "Capture -006 verdicts + inventory new gt-kb-bridge-monitor + file umbrella REVISED-3 (Recommended)"
+    - "Same as option 1, plus start decision-tracker implementation now"
+    - "Capture verdicts only; defer everything else to separate sessions"
+    - "Capture verdicts + umbrella REVISED-3 only; defer inventory and decision-tracker implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 59412d9f4e89029e
+  resolved_at: 2026-05-09T18:45:45.797458Z
+  answer: "User has answered your questions: \"Three actionable items: (a) decision-tracker GO authorizes implementation phase (multi-step, owner AUQs required for each DCL packet + code changes); (b) umbrella NO-GO narrow fix (REVISED-3 -007 addressing one missed active-code surface); (c) NEW Codex-side gt-kb-bridge-monitor 30-min thread automation needs inventory entry. How to proceed?\"=\"Capture -006 verdicts + inventory new gt-kb-bridge-monitor + file umbrella REVISED-3 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0501
+  asked_at: 2026-05-09T18:51:46.328111Z
+  question: "How should we close the gap between 'cross-harness trigger exists' and 'agents create their own monitoring automations'?"
+  options:
+    - "File a separate bridge thread to expand startup payload (Recommended)"
+    - "Add as new IP to umbrella REVISED-4"
+    - "Suppress parallel automations — codify ban + ask Codex to remove gt-kb-bridge-monitor"
+    - "Wait — status sharing only, no design action"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 02b548555dbdf84b
+  resolved_at: 2026-05-09T18:51:46.328111Z
+  answer: "User has answered your questions: \"How should we close the gap between 'cross-harness trigger exists' and 'agents create their own monitoring automations'?\"=\"File a separate bridge thread to expand startup payload (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

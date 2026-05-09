@@ -111,6 +111,9 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert model["role"]["bridge"] == "always available through bridge/INDEX.md and checked at session startup"
     assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
+    assert "gtkb-bridge" in model["role"]["bridge_operation_instructions"]
+    assert "scripts/cross_harness_bridge_trigger.py" in model["role"]["bridge_operation_instructions"]
+    assert "do not create Codex app heartbeat/cron automations" in model["role"]["bridge_operation_instructions"]
     assert "Strict GOV enforcement" in model["governance_stance"][0]
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
     assert model["skills"]["count"] > 0
@@ -686,6 +689,8 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert context.index("## Harness-Only Loyal Opposition Startup Action") < context.index(
         "## User-Visible Startup Message"
     )
+    assert "Bridge operation instructions: use the `gtkb-bridge` skill" in context
+    assert "do not create Codex app heartbeat/cron automations as bridge monitors" in context
     user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
     assert "## Loyal Opposition Startup Task" not in user_visible_context
     assert (
@@ -874,6 +879,9 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Role being assumed: Prime Builder" in report_text
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in report_text
     assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in report_text
+    assert "Bridge operation instructions: use the `gtkb-bridge` skill" in report_text
+    assert "dispatch service entry point: `scripts/cross_harness_bridge_trigger.py`" in report_text
+    assert "do not create Codex app heartbeat/cron automations as bridge monitors" in report_text
     assert "retired smart poller and OS poller remain archived" in report_text
     assert "Startup Disclosure" in report_text
     assert "GroundTruth-KB Project Dashboard" in report_text
@@ -1338,6 +1346,9 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     assert f"Role being assumed: {module.ROLE_PROFILES[discovered_role]['assumed_role']}" in context
     assert "Bridge: always available through bridge/INDEX.md and checked at session startup" in context
     assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in context
+    assert "Bridge operation instructions: use the `gtkb-bridge` skill" in context
+    assert "dispatch service entry point: `scripts/cross_harness_bridge_trigger.py`" in context
+    assert "do not create Codex app heartbeat/cron automations as bridge monitors" in context
     assert "retired smart poller and OS poller remain archived" in context
     assert "Role mapping source: harness-state/role-assignments.json" in context
     assert "Harness self-identification: B" in context

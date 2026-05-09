@@ -154,12 +154,19 @@ BRIDGE_DISPATCH_ROLE_TEXT = (
     "rather than on a fixed interval; manual bridge/INDEX.md scans available "
     "as fallback; retired smart poller and OS poller remain archived"
 )
+BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
+    "use the `gtkb-bridge` skill (`.claude/skills/bridge/SKILL.md`; Codex adapter "
+    "`.codex/skills/bridge/SKILL.md`) for manual bridge scans, reviews, and verifications; "
+    "dispatch service entry point: `scripts/cross_harness_bridge_trigger.py`; do not create "
+    "Codex app heartbeat/cron automations as bridge monitors"
+)
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
+        "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": "harness-state/role-assignments.json",
     },
     "acting-prime-builder": {
@@ -167,6 +174,7 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
         "role_assignment": "active AI harness assigned by owner for this session",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
+        "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": ".claude/rules/acting-prime-builder.md",
     },
     "loyal-opposition": {
@@ -174,6 +182,7 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
+        "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": "harness-state/role-assignments.json",
     },
 }
@@ -3454,6 +3463,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
             "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual bridge/INDEX.md scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
+            f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
             "- If the live bridge verification succeeds, report the live scan result and ask Mike whether to begin processing reviews and verifications from `bridge/INDEX.md`.",
@@ -3910,6 +3920,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Role assignment: {role['role_assignment']}",
             f"- Bridge: {role['bridge']}",
             f"- Bridge dispatch: {role['bridge_dispatch']}",
+            f"- Bridge operation instructions: {role['bridge_operation_instructions']}",
             f"- Role mapping source: {role['role_mapping_source']}",
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",

@@ -12,6 +12,8 @@
 
 
 Document: gtkb-startup-trigger-awareness-and-skill-reference-001
+REVISED: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-003.md
+NO-GO: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-002.md
 NEW: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001.md
 
 Document: gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001
