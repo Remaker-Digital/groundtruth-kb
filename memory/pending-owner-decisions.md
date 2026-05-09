@@ -6,6 +6,8 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+(none)
+
 ## Resolved
 
 - id: DECISION-0494
@@ -17,7 +19,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T17:30:00.000000Z
   answer: "Wait — status sharing only (per same-turn AUQ formalization)"
   notes: "Tracker pattern over-match + missing same-turn AUQ auto-resolution; both defects to be addressed via bridge proposal gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001."
-
 - id: DECISION-0481
   asked_at: 2026-05-09T02:29:10.336550Z
   question: ""
@@ -5853,6 +5854,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: caa5eb4951fd2f60
   resolved_at: 2026-05-09T17:24:33.275498Z
   answer: "User has answered your questions: \"Want me to evaluate a specific aspect of the LO startup disclosure, or is this status sharing?\"=\"Status sharing only — no action (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0497
+  asked_at: 2026-05-09T17:31:23.236918Z
+  question: "Two defects in `.claude/hooks/owner-decision-tracker.py`: (1) pattern over-match captures decorative prefix/suffix as part of the question text; (2) prose entries don't auto-resolve when the same turn later issues an AUQ for the same question. How to scope the fix?"
+  options:
+    - "Cosmetic only — clear DECISION-0494 now (Recommended for immediate)"
+    - "Surgical fix — file a small bridge proposal for both defects"
+    - "Combine — clear -0494 now AND file the bridge proposal"
+    - "Wait — status sharing only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7c6e6db8120ee333
+  resolved_at: 2026-05-09T17:31:23.236918Z
+  answer: "User has answered your questions: \"Two defects in `.claude/hooks/owner-decision-tracker.py`: (1) pattern over-match captures decorative prefix/suffix as part of the question text; (2) prose entries don't auto-resolve when the same turn later issues an AUQ for the same question. How to scope the fix?\"=\"Combine — clear -0494 now AND file the bridge proposal\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
