@@ -5869,6 +5869,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T17:31:23.236918Z
   answer: "User has answered your questions: \"Two defects in `.claude/hooks/owner-decision-tracker.py`: (1) pattern over-match captures decorative prefix/suffix as part of the question text; (2) prose entries don't auto-resolve when the same turn later issues an AUQ for the same question. How to scope the fix?\"=\"Combine — clear -0494 now AND file the bridge proposal\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0498
+  asked_at: 2026-05-09T17:41:00.341159Z
+  question: "Codex landed NO-GO at -002 on the decision-tracker proposal in parallel with the umbrella NO-GO. 5 findings: F1 (P1; same-turn AUQ presence too broad to auto-resolve — need deterministic correlation like substring/Jaccard overlap, not LLM); F2 (P1; DCL approval packets missing, batch unactivated); F3 (P2; resolved_via field needs DecisionEntry model extension); F4 (P3; test path should be tests/hooks/ not tests/scripts/); F5 (P3; missing advisory spec). All addressable. File REVISED-1 -003 now or defer?"
+  options:
+    - "File REVISED-1 -003 now (Recommended)"
+    - "File REVISED-1 with scope reduction — drop the DCLs"
+    - "Defer the REVISED-1 to a later session"
+    - "Investigate F1's correlation-rule design space first via separate research"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 75e4210617041c83
+  resolved_at: 2026-05-09T17:41:00.341159Z
+  answer: "User has answered your questions: \"Codex landed NO-GO at -002 on the decision-tracker proposal in parallel with the umbrella NO-GO. 5 findings: F1 (P1; same-turn AUQ presence too broad to auto-resolve — need deterministic correlation like substring/Jaccard overlap, not LLM); F2 (P1; DCL approval packets missing, batch unactivated); F3 (P2; resolved_via field needs DecisionEntry model extension); F4 (P3; test path should be tests/hooks/ not tests/scripts/); F5 (P3; missing advisory spec). All addressable. File REVISED-1 -003 now or defer?\"=\"File REVISED-1 -003 now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 
