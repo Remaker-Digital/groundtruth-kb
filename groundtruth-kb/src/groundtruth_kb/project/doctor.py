@@ -1817,41 +1817,29 @@ def _check_file_bridge_setup(target: Path) -> ToolCheck:
     )
 
 
-# -- Bridge smart-poller liveness --------------------------------------
+# -- Bridge dispatch liveness ------------------------------------------
+# Slice 4 (2026-05-09): the smart-poller mechanism was retired in favor of
+# the cross-harness event-driven trigger. The dispatch-liveness check below
+# is mechanism-agnostic — it reads recipients[role].updated_at from the
+# shared dispatch-state.json regardless of which mechanism wrote it. The
+# replacement-mechanism check is _check_cross_harness_trigger below.
 
 _BRIDGE_DISPATCH_STATE_PATH = Path(".gtkb-state/bridge-poller/dispatch-state.json")
 _BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime", "codex": "codex"}
 
 _BRIDGE_FRESH_SECS = 4 * 60  # < 4 min → OK
 _BRIDGE_WARN_SECS = 10 * 60  # 4–10 min → WARN; > 10 min → ALARM
-_BRIDGE_SCHEDULER_DOC = "docs/tutorials/bridge-smart-poller.md"
+_BRIDGE_DISPATCH_DOC = "docs/tutorials/dual-agent-setup.md"
 _BRIDGE_AUTH_DOC = "docs/troubleshooting/auth.md"
 
-# Smart-poller activation paths per
-# bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md GO (REVISED-1
-# at -003 §5). The doctor check verifies the activation chain end-to-end:
-# runner present, wrapper present, wrapper resolves runner, state dir
-# writable, task registered, task target = wrapper, task running, recent
-# audit event, fresh notification.
-_SMART_POLLER_TASK_NAME = "GTKB-SmartBridgePoller"
-_SMART_POLLER_WRAPPER_REL = Path("scripts/run_smart_bridge_poller.ps1")
-_SMART_POLLER_VBS_REL = Path("scripts/run_smart_bridge_poller.vbs")
-_SMART_POLLER_RUNNER_REL = Path("groundtruth-kb/scripts/bridge_poller_runner.py")
-# Phase 2 will move the runner to scripts/bridge_poller_runner.py — the
-# wrapper internals will change in the same controlled surface; this check
-# uses the wrapper's current $runnerPath line for verification.
-_SMART_POLLER_STATE_REL = Path(".gtkb-state/bridge-poller")
-_SMART_POLLER_AUDIT_REL = _SMART_POLLER_STATE_REL / "poller-runs"
-_SMART_POLLER_NOTIFY_REL = _SMART_POLLER_STATE_REL / "notifications"
-_SMART_POLLER_FRESH_SECS = 60
 
+def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
+    """Check file bridge dispatch liveness for *agent* (``'claude'`` or ``'codex'``).
 
-def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
-    """Check file bridge smart-poller liveness for *agent* (``'claude'`` or ``'codex'``).
-
-    Reads ``recipients[role].updated_at`` from the smart-poller's
+    Reads ``recipients[role].updated_at`` from the cross-harness trigger's
     ``dispatch-state.json`` and computes staleness against the freshness
-    thresholds:
+    thresholds. The check is mechanism-agnostic — it surfaces dispatch
+    freshness regardless of which mechanism updates the state file.
 
     - ``< 4 min``  → OK
     - ``4–10 min`` → WARN
@@ -1861,7 +1849,7 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
     """
     state_path = target / _BRIDGE_DISPATCH_STATE_PATH
     role = _BRIDGE_AGENT_TO_RECIPIENT.get(agent, agent)
-    check_name = f"{agent.title()} bridge poller"
+    check_name = f"{agent.title()} bridge dispatch"
 
     if not state_path.exists():
         return ToolCheck(
@@ -1870,7 +1858,7 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
             found=False,
             status="warning",
             message=(
-                f"{agent} bridge poller not started; see {_BRIDGE_SCHEDULER_DOC} to configure the verified smart poller"
+                f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} for cross-harness event-driven trigger setup"
             ),
         )
 
@@ -1959,7 +1947,7 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
             required=False,
             found=True,
             status="pass",
-            message=f"{agent} bridge poller: OK (last scan {age_display}, state: {state_display})",
+            message=f"{agent} bridge dispatch: OK (last update {age_display}, state: {state_display})",
         )
 
     if age_secs < _BRIDGE_WARN_SECS:
@@ -1969,8 +1957,8 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
             found=True,
             status="warning",
             message=(
-                f"{agent} bridge poller: WARN (last scan {age_display}, state: {state_display}) "
-                f"— investigate poller or see {_BRIDGE_SCHEDULER_DOC}"
+                f"{agent} bridge dispatch: WARN (last update {age_display}, state: {state_display}) "
+                f"— investigate cross-harness event-driven trigger or see {_BRIDGE_DISPATCH_DOC}"
             ),
         )
 
@@ -1980,8 +1968,8 @@ def _check_bridge_poller(target: Path, agent: str) -> ToolCheck:
         found=True,
         status="fail",
         message=(
-            f"{agent} bridge poller: ALARM (last scan {age_display}, state: {state_display}) "
-            f"— check {_BRIDGE_AUTH_DOC} and {_BRIDGE_SCHEDULER_DOC}"
+            f"{agent} bridge dispatch: ALARM (last update {age_display}, state: {state_display}) "
+            f"— check {_BRIDGE_AUTH_DOC} and {_BRIDGE_DISPATCH_DOC}"
         ),
     )
 
@@ -2064,341 +2052,101 @@ DA_HARVEST_COVERAGE_WARN_THRESHOLD = 95.0
 DA_HARVEST_COVERAGE_ERROR_THRESHOLD = 80.0
 
 
-def _recent_audit_run_ids(target: Path, *, tail_count: int = 6) -> set[str]:
-    """Parse the last `tail_count` audit events and return the set of distinct run_ids.
+def _check_cross_harness_trigger(target: Path) -> ToolCheck:
+    """Check cross-harness event-driven trigger surface (Slice 4 replacement).
 
-    Per smart-poller-notify-activation -010 Finding 2: when multiple poller
-    chains run against the same state dir, they interleave writes to the
-    audit log. Distinct run_ids in a recent window indicate duplicate
-    pollers and a broken single-writer assumption.
+    Per Slice 3 of bridge/gtkb-bridge-poller-event-driven-replacement-* the
+    cross-harness trigger replaces the retired smart-poller. The trigger
+    fires from PostToolUse + Stop hooks; this check verifies the trigger
+    surface is wired up.
 
-    Returns an empty set if the audit log is absent or unreadable. The
-    caller treats `len(result) > 1` as the duplicate-runner signal.
-    """
-    audit_path = target / _SMART_POLLER_STATE_REL / "audit.jsonl"
-    if not audit_path.is_file():
-        return set()
-    try:
-        with audit_path.open("r", encoding="utf-8") as f:
-            lines = f.readlines()
-    except OSError:
-        return set()
-    run_ids: set[str] = set()
-    for line in lines[-tail_count:]:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        rid = entry.get("run_id")
-        if isinstance(rid, str) and rid:
-            run_ids.add(rid)
-    return run_ids
-
-
-def _check_smart_bridge_poller(target: Path) -> ToolCheck:
-    """Check the smart-poller activation surface end-to-end.
-
-    Per ``bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md`` GO
-    (REVISED-1 at -003 §5), this check verifies the activation chain from
-    runner script through scheduled task to fresh notification artifacts.
-
-    Per -004 GO guardrail 2, the check inspects the ACTUAL scheduled-task
-    action target — not just the task name — to confirm the wrapper-based
-    activation pattern is in place rather than a direct-runner registration.
+    Subchecks:
+      1. ``scripts/cross_harness_bridge_trigger.py`` exists.
+      2. ``.claude/settings.json`` registers the trigger in PostToolUse and
+         Stop hook arrays (Codex parity in ``.codex/hooks.json`` is
+         covered by ``scripts/check_codex_hook_parity.py``; the doctor
+         reports the Claude side here).
+      3. ``.gtkb-state/bridge-poller/dispatch-state.json`` exists or the
+         trigger has not yet fired (steady-state warn, not fail).
 
     Status mapping:
-      - All checks pass → ``pass``
-      - Task not registered (initial-install state) → ``warning``
-      - Wrapper missing OR wrapper does not resolve runner → ``fail``
-      - Task registered but target is wrong (direct-runner instead of
-        wrapper) OR audit/notification artifacts stale → ``fail``
+      - All three subchecks pass → ``pass``
+      - Trigger script missing → ``fail``
+      - Hook registrations missing → ``fail``
+      - Dispatch-state absent or trigger has not yet fired → ``warning``
     """
-    check_name = "Smart bridge poller"
+    check_name = "Cross-harness event-driven trigger"
 
-    runner = target / _SMART_POLLER_RUNNER_REL
-    wrapper = target / _SMART_POLLER_WRAPPER_REL
-
-    # 1. Runner script present.
-    if not runner.is_file():
+    trigger_script = target / "scripts" / "cross_harness_bridge_trigger.py"
+    if not trigger_script.is_file():
         return ToolCheck(
             name=check_name,
             required=False,
             found=False,
             status="fail",
             message=(
-                f"smart-poller runner missing at {_SMART_POLLER_RUNNER_REL.as_posix()} "
-                f"— run `gt project upgrade --apply` or verify Phase 2 path rebase"
+                f"cross-harness event-driven trigger script missing at "
+                f"scripts/cross_harness_bridge_trigger.py — see {_BRIDGE_DISPATCH_DOC} "
+                f"for installation"
             ),
         )
 
-    # 2. PS1 helper present (interactive use + doctor's -ValidateOnly mode).
-    if not wrapper.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="fail",
-            message=(
-                f"smart-poller PS1 helper missing at {_SMART_POLLER_WRAPPER_REL.as_posix()} "
-                f"— see {_BRIDGE_SCHEDULER_DOC} or scripts/install_smart_poller_task.ps1"
-            ),
-        )
-
-    # 2b. VBS daemon launcher present (per -008 Finding 1: doctor must
-    # validate the actual daemon launcher, not just a nearby helper).
-    vbs = target / _SMART_POLLER_VBS_REL
-    if not vbs.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="fail",
-            message=(
-                f"smart-poller VBS daemon launcher missing at {_SMART_POLLER_VBS_REL.as_posix()} "
-                f"— this is the actual file Task Scheduler executes; see "
-                f"scripts/install_smart_poller_task.ps1 for installation."
-            ),
-        )
-
-    # 3. Wrapper resolves runner path. Run the wrapper in -ValidateOnly mode
-    # which executes the actual $runnerPath assignment + Test-Path, then exits
-    # without starting the long-running poller. This validates the EFFECTIVE
-    # path the wrapper would invoke, not a substring in arbitrary file content
-    # (per smart-poller-notify-activation -006 Finding 2: a future edit could
-    # leave the comment intact while changing $runnerPath to a bad path under
-    # the substring approach).
-    validate_ok, validate_output = _run_cmd(
-        [
-            "powershell",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(wrapper),
-            "-ValidateOnly",
-        ],
-        timeout=15,
-    )
-    if not validate_ok:
+    settings_path = target / ".claude" / "settings.json"
+    if not settings_path.is_file():
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
             message=(
-                "smart-poller wrapper -ValidateOnly failed to resolve $runnerPath: "
-                f"{validate_output[:200] or '(no output)'}. Phase 2 path rebase "
-                f"outstanding or wrapper customized — review {_SMART_POLLER_WRAPPER_REL.as_posix()}."
+                f".claude/settings.json missing — bridge dispatch automation cannot "
+                f"fire from PostToolUse + Stop hooks. See {_BRIDGE_DISPATCH_DOC}."
             ),
         )
-    # On success, the wrapper prints "OK runner=<path>". Confirm the resolved
-    # path matches our expectation (defensive: if a future wrapper edit
-    # silently aliased to a different runner, we want to know).
-    expected_marker = str(_SMART_POLLER_RUNNER_REL).replace("/", "\\")
-    if expected_marker not in validate_output and _SMART_POLLER_RUNNER_REL.as_posix() not in validate_output:
+    try:
+        settings_text = settings_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=f".claude/settings.json unreadable: {exc}",
+        )
+
+    trigger_marker = "cross_harness_bridge_trigger.py"
+    has_post_tool_use = "PostToolUse" in settings_text and trigger_marker in settings_text
+    has_stop = "Stop" in settings_text and trigger_marker in settings_text
+    if not (has_post_tool_use and has_stop):
+        missing = []
+        if not has_post_tool_use:
+            missing.append("PostToolUse")
+        if not has_stop:
+            missing.append("Stop")
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
             message=(
-                f"smart-poller PS1 helper -ValidateOnly resolved a different runner path: "
-                f"{validate_output.strip() or '(empty)'}. Expected helper to resolve "
-                f"to {_SMART_POLLER_RUNNER_REL.as_posix()}; this likely indicates Phase 2 "
-                f"path rebase is in progress or PS1 helper has been customized."
+                f"cross-harness event-driven trigger not registered in {', '.join(missing)} "
+                f"hook(s) in .claude/settings.json — bridge dispatch automation will not fire. "
+                f"See {_BRIDGE_DISPATCH_DOC}."
             ),
         )
 
-    # 3b. VBS daemon launcher /Validate (per -008 Finding 1). The daemon's
-    # ACTUAL effective path is in the VBS, not the PS1. Run the VBS in
-    # /Validate mode (echoes "OK runner=<path>" + exits 0 if resolution
-    # succeeds; exits 1 if runner missing). This is the load-bearing
-    # validation: a wrong VBS path here means Task Scheduler will fail
-    # when it tries to launch the daemon, regardless of PS1 helper state.
-    vbs_validate_ok, vbs_validate_output = _run_cmd(
-        [
-            "cscript.exe",
-            "//nologo",
-            str(vbs),
-            "/Validate",
-        ],
-        timeout=15,
-    )
-    if not vbs_validate_ok:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"smart-poller VBS /Validate failed to resolve runnerPath: "
-                f"{vbs_validate_output[:200] or '(no output)'}. This is the daemon's "
-                f"actual launch path — Task Scheduler will fail at startup. Phase 2 path "
-                f"rebase outstanding or VBS launcher customized — review "
-                f"{_SMART_POLLER_VBS_REL.as_posix()}."
-            ),
-        )
-    if expected_marker not in vbs_validate_output and _SMART_POLLER_RUNNER_REL.as_posix() not in vbs_validate_output:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"smart-poller VBS /Validate resolved a different runner path: "
-                f"{vbs_validate_output.strip() or '(empty)'}. Expected VBS to resolve "
-                f"to {_SMART_POLLER_RUNNER_REL.as_posix()}; this is the actual daemon path — "
-                f"Task Scheduler would launch the wrong runner. Phase 2 path rebase or "
-                f"VBS customization."
-            ),
-        )
-
-    # 4. State dir writable.
-    state_dir = target / _SMART_POLLER_STATE_REL
-    if not state_dir.is_dir():
-        # State dir is created by the runner on first iteration; absence is
-        # OK if the task hasn't started yet. Soft pass-through here; the
-        # subsequent task / audit / notification checks will surface the
-        # real status.
-        pass
-
-    # 5. Task registered + 6. task target points to wrapper.
-    # On non-Windows hosts, schtasks/Get-ScheduledTask are not available;
-    # gracefully skip task inspection.
-    task_ok, task_xml = _run_cmd(
-        [
-            "powershell",
-            "-NoProfile",
-            "-Command",
-            f"Get-ScheduledTask -TaskName '{_SMART_POLLER_TASK_NAME}' "
-            "-ErrorAction SilentlyContinue | "
-            "ForEach-Object { $_.Actions | Format-List | Out-String }",
-        ],
-        timeout=10,
-    )
-    if not task_ok or not task_xml.strip():
+    state_path = target / _BRIDGE_DISPATCH_STATE_PATH
+    if not state_path.exists():
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="warning",
             message=(
-                f"smart-poller task '{_SMART_POLLER_TASK_NAME}' not registered "
-                f"— run `scripts/install_smart_poller_task.ps1` to activate"
+                "cross-harness event-driven trigger registered but dispatch-state.json "
+                "absent; trigger has not yet fired (steady state if no actionable bridge "
+                "entries since installation)"
             ),
-        )
-
-    # 6. Task target points to the VBS launcher (per -004 guardrail 2 + -006
-    # follow-up: the daemon path uses the .vbs launcher, not the .ps1 directly,
-    # to suppress visible PowerShell windows on Windows 11 + Terminal).
-    vbs_name = _SMART_POLLER_VBS_REL.name  # run_smart_bridge_poller.vbs
-    if vbs_name not in task_xml:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"smart-poller task registered but action target does NOT include "
-                f"the VBS launcher '{vbs_name}'. Re-install via "
-                f"scripts/install_smart_poller_task.ps1 to use the Phase-2-stable "
-                f"wrapper pattern (see -004 Finding 1 + -006 Windows 11 Terminal "
-                f"visibility follow-up)."
-            ),
-        )
-
-    # 7. Recent audit event in poller-runs/.
-    audit_dir = target / _SMART_POLLER_AUDIT_REL
-    audit_ages: list[float] = []
-    if audit_dir.is_dir():
-        now_ts = time.time()
-        for entry in audit_dir.iterdir():
-            if entry.is_file():
-                try:
-                    audit_ages.append(now_ts - entry.stat().st_mtime)
-                except OSError:
-                    continue
-    audit_age = min(audit_ages) if audit_ages else None
-
-    if audit_age is None:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"smart-poller task registered but no audit events at "
-                f"{_SMART_POLLER_AUDIT_REL.as_posix()} — task may not have started yet "
-                f"or first iteration not reached"
-            ),
-        )
-
-    if audit_age > _SMART_POLLER_FRESH_SECS:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"smart-poller task registered but most recent audit event is "
-                f"{int(audit_age)}s old (> {_SMART_POLLER_FRESH_SECS}s threshold). "
-                f"Task may be stuck — inspect Task Scheduler"
-            ),
-        )
-
-    # 7b. Duplicate-runner detection (per -010 Finding 2). When multiple
-    # poller chains run against the same state directory, they interleave
-    # writes to the audit log, checkpoint, and notification files. The
-    # single-writer assumption breaks. Detection: parse the last ~6 audit
-    # events (~90 seconds at 15s cadence) and count distinct run_ids.
-    # If more than 1, surface fail with cleanup instructions.
-    distinct_run_ids = _recent_audit_run_ids(target)
-    if len(distinct_run_ids) > 1:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"smart-poller has {len(distinct_run_ids)} concurrent poller chains writing "
-                f"to .gtkb-state/bridge-poller/ in the last ~90s (run_ids: "
-                f"{', '.join(sorted(distinct_run_ids))[:200]}). The single-writer assumption "
-                f"is broken. Identify and stop all but one chain via "
-                f"`Get-WmiObject Win32_Process | Where-Object {{$_.CommandLine -like "
-                f"'*bridge_poller_runner*'}} | Stop-Process -Force` (then re-start the "
-                f"scheduled task)."
-            ),
-        )
-
-    # 8. Notification freshness (only checked if a notification file exists).
-    # Absent notification files mean "no actionable pending work" — that's a
-    # correct steady-state, not a failure. Stale notification (file present
-    # but written_at far in the past) IS a failure indicating the runner is
-    # not updating the file even though its mtime might be recent.
-    notify_dir = target / _SMART_POLLER_NOTIFY_REL
-    stale_notification: str | None = None
-    if notify_dir.is_dir():
-        for fname in ("pending-bridge-action-prime.json", "pending-bridge-action-codex.json"):
-            fpath = notify_dir / fname
-            if fpath.is_file():
-                try:
-                    age = time.time() - fpath.stat().st_mtime
-                except OSError:
-                    continue
-                if age > _SMART_POLLER_FRESH_SECS:
-                    stale_notification = f"{fname} is {int(age)}s old (> {_SMART_POLLER_FRESH_SECS}s)"
-                    break
-
-    if stale_notification:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"smart-poller notification stale: {stale_notification}",
         )
 
     return ToolCheck(
@@ -2407,12 +2155,10 @@ def _check_smart_bridge_poller(target: Path) -> ToolCheck:
         found=True,
         status="pass",
         message=(
-            f"smart-poller active (task '{_SMART_POLLER_TASK_NAME}', VBS daemon "
-            f"-> runner verified, PS1 helper -> runner verified, audit event "
-            f"{int(audit_age)}s old)"
+            "cross-harness event-driven trigger active (script present; PostToolUse + Stop "
+            "hooks registered; dispatch-state.json present)"
         ),
     )
-
 
 def _check_da_harvest_coverage(target: Path) -> ToolCheck:
     """Check DA bridge-thread coverage for active VERIFIED threads.
@@ -2555,9 +2301,9 @@ def run_doctor(
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))
-        checks.append(_check_bridge_poller(target, "claude"))
-        checks.append(_check_bridge_poller(target, "codex"))
-        checks.append(_check_smart_bridge_poller(target))
+        checks.append(_check_bridge_dispatch_liveness(target, "claude"))
+        checks.append(_check_bridge_dispatch_liveness(target, "codex"))
+        checks.append(_check_cross_harness_trigger(target))
         checks.append(_check_da_harvest_coverage(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).

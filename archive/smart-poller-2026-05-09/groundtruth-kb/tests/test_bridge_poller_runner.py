@@ -85,6 +85,24 @@ def _seed_bridge(synth: Path, doc_name: str, top_status: str, top_version: int =
     index_path.write_text(text, encoding="utf-8")
 
 
+def _write_bridge_entries(synth: Path, entries: list[tuple[str, str, int]]) -> None:
+    bridge_dir = synth / "bridge"
+    lines = ["# Bridge Index", ""]
+    for doc_name, top_status, top_version in entries:
+        (bridge_dir / f"{doc_name}-{top_version:03d}.md").write_text("# stub\n", encoding="utf-8")
+        if top_version != 1:
+            (bridge_dir / f"{doc_name}-001.md").write_text("# stub\n", encoding="utf-8")
+        lines.extend(
+            [
+                f"Document: {doc_name}",
+                f"{top_status}: bridge/{doc_name}-{top_version:03d}.md",
+                f"NEW: bridge/{doc_name}-001.md",
+                "",
+            ]
+        )
+    (bridge_dir / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
+
+
 # --- Dispatch contract -------------------------------------------------------
 
 
@@ -129,6 +147,56 @@ def test_poller_loop_launches_harness_once_for_pending_signature(
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["recipients"]["codex"]["pending_count"] == 1
     assert state["recipients"]["codex"]["last_result"] == "unchanged"
+
+
+def test_dispatch_signature_uses_selected_batch_not_full_backlog(
+    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A newer backlog change must not relaunch the same capped selected batch."""
+    runner = _load_runner()
+    _write_bridge_entries(
+        synthetic_gtkb_root,
+        [
+            ("newer", "GO", 2),
+            ("older-b", "GO", 2),
+            ("older-a", "GO", 2),
+        ],
+    )
+    calls: list[list[str]] = []
+
+    class _FakeProcess:
+        pid = 12345
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        calls.append(command)
+        return _FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+
+    runner.main_loop(interval_s=0, max_iterations=2, quiet=True, dispatch_enabled=True, dispatch_max_items=2)
+    assert len(calls) == 1
+    assert "older-a" in calls[0][2]
+    assert "older-b" in calls[0][2]
+    assert "newer" not in calls[0][2]
+
+    _write_bridge_entries(
+        synthetic_gtkb_root,
+        [
+            ("newest", "GO", 2),
+            ("newer", "GO", 2),
+            ("older-b", "GO", 2),
+            ("older-a", "GO", 2),
+        ],
+    )
+    runner.main_loop(interval_s=0, max_iterations=1, quiet=True, dispatch_enabled=True, dispatch_max_items=2)
+
+    assert len(calls) == 1
+    state_path = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["recipients"]["prime"]["last_result"] == "unchanged"
+    assert state["recipients"]["prime"]["pending_count"] == 4
+    assert state["recipients"]["prime"]["selected_count"] == 2
+    assert state["recipients"]["prime"]["signature_scope"] == "selected_dispatch_batch"
 
 
 # --- AC #4: --once mode -----------------------------------------------------
@@ -527,8 +595,13 @@ def test_dispatch_consumer_includes_terminal_codex_entries(
     """F1 fix from -006 NO-GO: terminal-kind NEW must dispatch Codex review."""
     runner = _load_runner()
     _seed_kind_bridge(
-        synthetic_gtkb_root, "scoping_thread", "NEW", "scoping_proposal",
-        operative_status="NEW", operative_version=4, top_version=4,
+        synthetic_gtkb_root,
+        "scoping_thread",
+        "NEW",
+        "scoping_proposal",
+        operative_status="NEW",
+        operative_version=4,
+        top_version=4,
     )
     calls: list[list[str]] = []
 
@@ -652,6 +725,7 @@ def test_acquire_runner_lock_writes_pid_readable_after_release(tmp_path: Path) -
     lock_path = state_dir / runner.RUNNER_LOCK_FILENAME
     content = lock_path.read_text(encoding="utf-8").strip()
     import os as _os
+
     assert content == str(_os.getpid())
 
 
@@ -861,6 +935,9 @@ def test_dispatch_prompt_defers_to_durable_role_record() -> None:
     for recipient in (BridgeAgent.PRIME, BridgeAgent.CODEX):
         prompt = runner._dispatch_prompt(recipient, items, max_items=2)
 
+        assert "not a fresh-session owner stimulus" in prompt
+        assert "do not wait for another owner message" in prompt
+
         # DCL-SPAWNED-HARNESS-ROLE-DEFER-DURABLE-RECORD-001.A1:
         # durable-record reference present.
         assert ".claude/rules/operating-role.md" in prompt, (
@@ -878,9 +955,7 @@ def test_dispatch_prompt_defers_to_durable_role_record() -> None:
 
         # DCL-SMART-POLLER-AUTO-TRIGGER-001 actionable-status contract:
         # VERIFIED is closure for both roles, never Prime-actionable.
-        assert "GO/NO-GO/VERIFIED" not in prompt, (
-            f"Prompt for {recipient.value} lists VERIFIED as Prime-actionable"
-        )
+        assert "GO/NO-GO/VERIFIED" not in prompt, f"Prompt for {recipient.value} lists VERIFIED as Prime-actionable"
         assert "GO or NO-GO or VERIFIED" not in prompt, (
             f"Prompt for {recipient.value} lists VERIFIED as Prime-actionable"
         )

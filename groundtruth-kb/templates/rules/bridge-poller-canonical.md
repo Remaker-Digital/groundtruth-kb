@@ -1,81 +1,53 @@
-# Bridge Smart Poller Canonical Instructions
+# DEPRECATED — Bridge Smart Poller Canonical (Retired Slice 4, 2026-05-09)
 
-This file is the canonical source of truth for file bridge smart-poller behavior.
-It applies to any automation, scheduled task, or wake prompt that keeps the
-Prime Builder <-> Loyal Opposition bridge operational.
+> ⚠️ **DEPRECATED** — This template documented the canonical smart-poller
+> behavior contract. The smart-poller mechanism was retired on 2026-05-09
+> in favor of the **cross-harness event-driven trigger**. Do **NOT** scaffold
+> projects from this template.
 
-## Core Rule
+## Replacement Authority
 
-The active bridge is file-based. The authoritative queue is `bridge/INDEX.md`.
-Pollers must inspect the latest status for each bridge document entry and must
-not use the archived SQLite/MCP bridge runtime as the active queue.
+The canonical bridge dispatch automation is now the **cross-harness
+event-driven trigger** at `scripts/cross_harness_bridge_trigger.py`,
+registered in:
 
-The owner is an observer unless the owner explicitly intervenes.
+- `.claude/settings.json` — `PostToolUse` and `Stop` hook arrays.
+- `.codex/hooks.json` — Codex-side parity (forward-compatible per
+  `ADR-CODEX-HOOK-PARITY-FALLBACK-001`).
 
-## Required Behavior
+The replacement contract is described in:
 
-### 1. Read the File Bridge Index First
+- `.claude/rules/bridge-essential.md` (active operating mode).
+- `templates/rules/prime-bridge-collaboration-protocol.md` § Bridge Dispatch
+  Automation (per Slice 4 D5k).
+- `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (tutorial; Slice 4 D5d).
 
-- Open `bridge/INDEX.md`.
-- Treat document entries as newest-first.
-- For each document entry, inspect only the latest status line.
-- Historical status lines are evidence, not current work.
+## What Was Retired
 
-### 2. Use Direction-Specific Filters
+- The `GTKB-SmartBridgePoller` Windows scheduled task (deleted, not just disabled).
+- `scripts/run_smart_bridge_poller.vbs`, `scripts/run_smart_bridge_poller.ps1`,
+  `scripts/install_smart_poller_task.ps1`,
+  `scripts/uninstall_smart_poller_task.ps1` (archived).
+- `groundtruth-kb/scripts/bridge_poller_runner.py` (archived).
+- The doctor's `_check_smart_bridge_poller` end-to-end activation check (replaced
+  by `_check_cross_harness_trigger`).
 
-Loyal Opposition pollers process only latest statuses:
+All archived files live under `archive/smart-poller-2026-05-09/`.
 
-- `NEW`
-- `REVISED`
+## Why Retired
 
-Prime Builder pollers process only latest statuses:
+Per `DELIB-S319-SMART-POLLER-POLICY-CLARIFICATION` and
+`DELIB-S337-SMART-POLLER-RETIREMENT-2026-05-09`, the smart-poller's
+empirical foundation (Codex hook execution on Windows) became reliable
+in `codex_hooks` `stable, true` (CLI ≥ 0.128.0-alpha.1). The
+event-driven trigger replaces interval polling with hook-driven dispatch,
+removing the registered-task surface, the daemon liveness pattern, and
+the per-recipient lock contention class.
 
-- `GO`
-- `NO-GO`
-
-`VERIFIED` is terminal. It must not trigger Prime Builder action.
-
-### 3. Process Work Through Numbered Bridge Files
-
-- Read the referenced bridge document and supporting artifacts.
-- Perform the required review or response.
-- Write the next numbered bridge document.
-- Add the corresponding latest status line at the top of that document entry
-  in `bridge/INDEX.md`.
-
-### 4. Do Not Route Through the Owner
-
-- Do not wait for owner relay when the bridge entry is actionable.
-- Only surface a blocker to the owner when a true external decision is
-  required, such as product direction, destructive action, or scope change.
-
-### 5. Use Smart-Poller State as the Reliability Boundary
-
-- Use the verified smart poller when it is available and functioning.
-- Do not restore the retired OS poller implementation as the active automation
-  path.
-- App-native automations may be supplemental, but they are not authoritative
-  unless they produce durable run records across sessions.
-- Each smart-poller run should log clear scans as well as dispatched work.
-
-## Guardrails
-
-- Do not auto-accept substantive work before inspecting context.
-- Do not scan historical statuses as if they are current.
-- Do not reprocess `VERIFIED` entries.
-- Use a lock file so overlapping scheduled runs cannot create duplicate bridge
-  documents.
-- Keep prompt text, CLI commands, smart-poller registration names, logs, locks, and required
-  plugins/skills documented in `BRIDGE-INVENTORY.md`.
-
-## Output Expectations
-
-- If bridge work was processed: report the document entry, input status,
-  output status, and new bridge file.
-- If nothing required action: report that the file bridge scan was clear.
-- If the scan failed: report the failing path, command, exit code, and log
-  location.
+This stub remains for two release cycles to give adopter projects time
+to migrate scaffold references. It will be removed in a future cleanup;
+see Slice 4 Open Follow-On §7.
 
 ---
 
-*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

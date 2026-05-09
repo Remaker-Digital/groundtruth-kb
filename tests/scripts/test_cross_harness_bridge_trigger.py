@@ -14,6 +14,7 @@ hook registrations once Slice 1 is VERIFIED.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -23,6 +24,43 @@ from types import ModuleType
 import pytest
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
+
+
+def _frozen_pending_signature(items: list[object]) -> str:
+    """Frozen byte-identical reference for the retired smart-poller's
+    ``_pending_signature`` (Slice 4 D7).
+
+    Source: ``archive/smart-poller-2026-05-09/groundtruth-kb/scripts/bridge_poller_runner.py``
+    lines 215-225 (function ``_pending_signature``). Replicated here so
+    cross-harness-trigger tests can verify byte-identical signatures
+    without importing the archived runner.
+    """
+    normalized = [
+        {
+            "document_name": item.document_name,  # type: ignore[attr-defined]
+            "top_status": item.top_status,  # type: ignore[attr-defined]
+            "top_file": item.top_file,  # type: ignore[attr-defined]
+        }
+        for item in items
+    ]
+    raw = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _frozen_selected_items_for_prompt(
+    items: list[object], max_items: int
+) -> list[object]:
+    """Frozen byte-identical reference for the retired smart-poller's
+    ``_selected_items_for_prompt`` (Slice 4 D7).
+
+    Source: ``archive/smart-poller-2026-05-09/groundtruth-kb/scripts/bridge_poller_runner.py``
+    lines 262-266 (function ``_selected_items_for_prompt``). INDEX is
+    newest-first; bridge work should be processed oldest-first, so reverse
+    then cap.
+    """
+    if max_items <= 0:
+        return []
+    return list(reversed(items))[:max_items]
 
 
 def _load_trigger() -> ModuleType:
@@ -376,13 +414,22 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     tmp_path: Path,
 ) -> None:
     """Codex F1 on -008: under backlog pressure, the trigger must sign the
-    selected dispatch batch — not the full filtered list — to match
-    smart-poller behavior byte-for-byte and avoid redundant dispatches.
+    selected dispatch batch — not the full filtered list — to match the
+    retired smart-poller's signature contract byte-for-byte and avoid
+    redundant dispatches.
 
     Reproduces Codex's required regression: 3 pending entries, max_items=2.
     The trigger's stored signature must equal
-    ``bridge_poller_runner._pending_signature(_selected_items_for_prompt(
-    filtered, 2))`` and must NOT equal ``_pending_signature(filtered)``.
+    ``_frozen_pending_signature(_frozen_selected_items_for_prompt(filtered, 2))``
+    and must NOT equal ``_frozen_pending_signature(filtered)``.
+
+    Slice 4 D7: the frozen-reference helpers below replace the prior
+    ``importlib`` cross-import of ``bridge_poller_runner.py``. The runner was
+    archived to ``archive/smart-poller-2026-05-09/`` on 2026-05-09 so this
+    test owns the byte-identical reference. Source for the frozen logic:
+    ``archive/smart-poller-2026-05-09/groundtruth-kb/scripts/bridge_poller_runner.py``
+    lines 215-225 (``_pending_signature``) and lines 262-266
+    (``_selected_items_for_prompt``).
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
@@ -392,20 +439,6 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     summary = trigger.run_trigger(
         project_root=root, state_dir=state_dir, max_items=2, dry_run=True
     )
-
-    # Reproduce both candidate signature scopes from the canonical smart-poller helper.
-    import importlib.util as _ilu
-
-    runner_path = (
-        Path(__file__).resolve().parents[2]
-        / "groundtruth-kb"
-        / "scripts"
-        / "bridge_poller_runner.py"
-    )
-    spec = _ilu.spec_from_file_location("_runner_for_parity", runner_path)
-    assert spec is not None and spec.loader is not None
-    runner = _ilu.module_from_spec(spec)
-    spec.loader.exec_module(runner)
 
     from groundtruth_kb.bridge.detector import parse_index  # type: ignore
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
@@ -417,9 +450,9 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     _, codex_items = compute_actionable_pending(parse_result, project_root=root)
     assert len(codex_items) == 3, "fixture should have 3 Codex-actionable entries"
 
-    selected = runner._selected_items_for_prompt(codex_items, 2)
-    expected_selected_sig = runner._pending_signature(selected)
-    expected_full_sig = runner._pending_signature(codex_items)
+    selected = _frozen_selected_items_for_prompt(codex_items, 2)
+    expected_selected_sig = _frozen_pending_signature(selected)
+    expected_full_sig = _frozen_pending_signature(codex_items)
     assert expected_selected_sig != expected_full_sig, (
         "fixture must be sized so selected-batch and full-list signatures DIFFER"
     )

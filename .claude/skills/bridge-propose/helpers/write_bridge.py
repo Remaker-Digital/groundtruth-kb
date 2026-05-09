@@ -32,8 +32,10 @@ Design contract:
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -92,6 +94,334 @@ class CredentialHitsFoundError(RuntimeError):
 _SCAN_CATALOG: list[tuple[re.Pattern[str], str, str]] = [
     (spec.pattern, spec.name, spec.description) for spec in list(CREDENTIAL_PATTERNS) + list(BASH_EXTRAS)
 ]
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 of GTKB-DA-READ-SURFACE-CORRECTION (template pre-population).
+#
+# `pre_populate_prior_deliberations` implements the placement-pattern target
+# from `ADR-DA-READ-SURFACE-PLACEMENT-001` Path D for the bridge-template
+# surface: when a bridge proposal is authored through this helper, the
+# `## Prior Deliberations` section is pre-populated with relevant DA records
+# so the cognitive operation flips from "remember to populate" (failure-prone)
+# to "review and prune" (more reliable).
+#
+# Two-stage retrieval (per F2 resolution of phase-2 -004 NO-GO):
+#
+#   1. Glossary-source seeding (DETERMINISTIC). The canonical-terminology
+#      glossary at `.claude/rules/canonical-terminology.md` is the
+#      authoritative read surface for prior decisions per
+#      `GOV-GLOSSARY-AS-DA-READ-SURFACE-001`. When the topic slug matches a
+#      `### <heading>` in the glossary, the helper reads that heading's
+#      `**Source:**` block and extracts DELIB/MemBase-spec IDs as seeds.
+#      This is the deterministic substitute for plain semantic search.
+#
+#   2. Semantic search (BROAD COVERAGE; OPTIONAL). When a KnowledgeDB
+#      instance is provided, the helper queries
+#      `search_deliberations(query, limit=...)` for additional candidates.
+#      Failures are swallowed (graceful degradation): no DB → seeds only.
+#
+# Results are combined, deduplicated (seeds first), and inserted as
+# `<!-- Pre-populated by helper; review and prune. -->` markers in the
+# proposal body's `## Prior Deliberations` section.
+# ---------------------------------------------------------------------------
+
+_GLOSSARY_HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
+_GLOSSARY_ID_RE = re.compile(
+    r"\b(?:DELIB-[A-Z0-9-]+|(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9-]+)\b"
+)
+_PRIOR_DELIBS_HEADING = "## Prior Deliberations"
+
+DEFAULT_GLOSSARY_PATH = Path(".claude/rules/canonical-terminology.md")
+DEFAULT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-propose-helper/last-prepopulation.json")
+DEFAULT_PRE_POPULATION_LIMIT = 5
+DEFAULT_DB_PATH = "groundtruth.db"
+
+NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before filing>._"
+
+
+def _try_open_default_db() -> Any | None:
+    """Attempt to open the default ``KnowledgeDB`` for semantic search.
+
+    Returns ``None`` on any failure (import error, missing DB file, etc.) —
+    semantic search is best-effort; glossary-source seeding does not depend
+    on a working DB. Failures are silent (graceful degradation).
+    """
+    try:
+        from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
+
+        return KnowledgeDB(DEFAULT_DB_PATH)
+    except Exception:  # noqa: BLE001 - graceful degradation
+        return None
+
+
+def _glossary_seed_ids_for_topic(
+    topic_slug: str,
+    glossary_content: str,
+) -> list[str]:
+    """Extract DELIB/spec IDs from the glossary entry matching the topic slug.
+
+    Converts the kebab-case slug to a lowercase space-separated form and
+    locates a ``### <heading>`` whose text (case-insensitive, normalized
+    whitespace) matches. Within 30 lines of the heading, finds the
+    ``**Source:**`` line; collects the contiguous source-block lines (until
+    the next bold field or heading); extracts ID-shaped tokens.
+
+    Args:
+        topic_slug: Kebab-case slug (e.g., ``"isolation"``).
+        glossary_content: Full text of the canonical-terminology file.
+
+    Returns:
+        Ordered, de-duplicated list of ID-shaped tokens (DELIB-* and MemBase
+        spec IDs). Empty if the slug does not match a glossary heading or if
+        the source block contains no ID-shaped tokens.
+    """
+    if not topic_slug or not glossary_content:
+        return []
+    candidate = topic_slug.replace("-", " ").strip().lower()
+    if not candidate:
+        return []
+
+    lines = glossary_content.splitlines()
+    seed_ids: list[str] = []
+
+    for i, line in enumerate(lines):
+        m = _GLOSSARY_HEADING_RE.match(line)
+        if not m:
+            continue
+        heading_text = m.group(1).strip().lower()
+        if heading_text != candidate:
+            continue
+        # Matching heading found; locate Source: within 30 lines.
+        for j in range(i + 1, min(i + 30, len(lines))):
+            if lines[j].lstrip().startswith("**Source:**"):
+                source_block = [lines[j]]
+                for k in range(j + 1, min(j + 30, len(lines))):
+                    nxt = lines[k]
+                    if nxt.lstrip().startswith("**") or nxt.startswith("### ") or nxt.startswith("## "):
+                        break
+                    source_block.append(nxt)
+                for match in _GLOSSARY_ID_RE.finditer("\n".join(source_block)):
+                    tok = match.group(0)
+                    if tok not in seed_ids:
+                        seed_ids.append(tok)
+                break
+        break
+
+    return seed_ids
+
+
+def _find_prior_deliberations_section(body_lines: list[str]) -> tuple[int, int] | None:
+    """Locate the existing ``## Prior Deliberations`` section line range.
+
+    Args:
+        body_lines: Lines of the proposal body (without trailing newlines).
+
+    Returns:
+        ``(heading_idx, end_idx)`` where ``heading_idx`` is the heading
+        line and ``end_idx`` is the exclusive index past the section's last
+        content line (i.e., the next ``## `` heading line or
+        ``len(body_lines)``). ``None`` if the section is absent.
+    """
+    section_start = None
+    for i, line in enumerate(body_lines):
+        if line.strip() == _PRIOR_DELIBS_HEADING:
+            section_start = i
+            break
+    if section_start is None:
+        return None
+    section_end = len(body_lines)
+    for j in range(section_start + 1, len(body_lines)):
+        if body_lines[j].startswith("## ") and not body_lines[j].startswith("### "):
+            section_end = j
+            break
+    return (section_start, section_end)
+
+
+def _format_helper_entry(
+    token: str,
+    *,
+    source: str,
+    db_record: dict[str, Any] | None = None,
+) -> str:
+    """Format one Markdown bullet for a pre-populated DA candidate."""
+    if db_record is not None:
+        title = (db_record.get("title") or "").strip()
+        source_type = db_record.get("source_type") or ""
+        if title:
+            return f"- DA: `{token}` — seed={source}; {source_type}; {title[:80]}"
+        return f"- DA: `{token}` — seed={source}; {source_type}"
+    return f"- DA: `{token}` — seed={source}."
+
+
+def _insert_prior_deliberations_block(body: str, block_text: str) -> str:
+    """Insert ``block_text`` into the body's ``## Prior Deliberations`` section.
+
+    Three cases:
+
+    1. Section absent — append a new section at end.
+    2. Section present and empty — fill with the block.
+    3. Section present and non-empty — append the block under a
+       ``### Helper-suggested candidates`` subheading.
+    """
+    body_lines = body.splitlines(keepends=True)
+    stripped_lines = [ln.rstrip("\n") for ln in body_lines]
+    range_ = _find_prior_deliberations_section(stripped_lines)
+
+    if range_ is None:
+        suffix = "" if body.endswith("\n") else "\n"
+        return body + suffix + "\n## Prior Deliberations\n\n" + block_text
+
+    section_start, section_end = range_
+    section_body_text = "".join(body_lines[section_start + 1:section_end]).strip()
+
+    if not section_body_text:
+        insertion = "\n" + block_text + "\n"
+        new_lines = body_lines[:section_start + 1] + [insertion] + body_lines[section_end:]
+        return "".join(new_lines)
+
+    insertion = "\n### Helper-suggested candidates\n\n" + block_text + "\n"
+    new_lines = body_lines[:section_end] + [insertion] + body_lines[section_end:]
+    return "".join(new_lines)
+
+
+def pre_populate_prior_deliberations(
+    topic_slug: str,
+    body: str,
+    *,
+    db: Any | bool | None = None,
+    glossary_path: Path | None = None,
+    limit: int = DEFAULT_PRE_POPULATION_LIMIT,
+    threshold: float = 0.0,
+    log_path: Path | bool | None = None,
+) -> str:
+    """Pre-populate the ``## Prior Deliberations`` section of a proposal body.
+
+    Two-stage retrieval — glossary-source seeding (deterministic) then
+    semantic search (broad coverage; default-on). See module-level
+    comment above this function for the full design rationale.
+
+    The default authoring workflow performs both stages. If no candidates
+    are found from either stage (genuinely novel topic with no glossary
+    entry and no DA matches), the function inserts a
+    ``_No prior deliberations: <fill in reason before filing>._``
+    placeholder so the proposal does not fail the LO review-side check
+    that NO-GOs empty Prior Deliberations sections.
+
+    Args:
+        topic_slug: Kebab-case topic slug. Used for both glossary lookup
+            (converted to space-separated noun phrase) and the DA query.
+        body: Full proposal body text.
+        db: ``KnowledgeDB`` instance, ``None`` (default — auto-open the
+            default ``KnowledgeDB("groundtruth.db")`` for semantic search;
+            silent fallback to glossary-only if open fails), or ``False``
+            (explicitly disable semantic search).
+        glossary_path: Path to the canonical-terminology glossary. Defaults
+            to ``.claude/rules/canonical-terminology.md``.
+        limit: Top-N for the semantic search call.
+        threshold: Similarity threshold (advisory; current
+            ``search_deliberations`` does not enforce a threshold parameter).
+        log_path: Audit-log destination. ``None`` (default) logs to
+            ``.gtkb-state/bridge-propose-helper/last-prepopulation.json``;
+            ``False`` disables logging; an explicit ``Path`` overrides the
+            default.
+
+    Returns:
+        The body with the pre-populated section. When candidates exist,
+        seeds + search results are inserted as Markdown bullets under the
+        ``## Prior Deliberations`` heading. When no candidates exist, the
+        section is filled with the empty-justification placeholder.
+    """
+    if glossary_path is None:
+        glossary_path = DEFAULT_GLOSSARY_PATH
+
+    # Stage 1: glossary-source seeding (deterministic).
+    glossary_content = ""
+    if isinstance(glossary_path, Path) and glossary_path.exists():
+        try:
+            glossary_content = glossary_path.read_text(encoding="utf-8")
+        except OSError:
+            glossary_content = ""
+    seed_ids = _glossary_seed_ids_for_topic(topic_slug, glossary_content)
+
+    # Stage 2: semantic search (default-on; ``False`` opts out).
+    if db is False:
+        active_db: Any | None = None
+    elif db is None:
+        active_db = _try_open_default_db()
+    else:
+        active_db = db
+
+    search_results: list[dict[str, Any]] = []
+    if active_db is not None:
+        try:
+            query = topic_slug.replace("-", " ")
+            raw = active_db.search_deliberations(query, limit=limit) or []
+            search_results = [r for r in raw if isinstance(r, dict)]
+        except Exception:  # noqa: BLE001 - graceful degradation
+            search_results = []
+
+    # Combine + dedupe (seeds first).
+    seen: set[str] = set(seed_ids)
+    search_records_to_add: list[dict[str, Any]] = []
+    for r in search_results:
+        rid = r.get("id")
+        if isinstance(rid, str) and rid and rid not in seen:
+            search_records_to_add.append(r)
+            seen.add(rid)
+
+    # Audit log.
+    if log_path is None:
+        log_path = DEFAULT_PREPOPULATION_LOG
+    if log_path is not False and isinstance(log_path, Path):
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(
+                json.dumps(
+                    {
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "topic_slug": topic_slug,
+                        "query": topic_slug.replace("-", " "),
+                        "glossary_path": str(glossary_path),
+                        "glossary_seed_ids": seed_ids,
+                        "search_result_ids": [
+                            r.get("id", "") for r in search_records_to_add
+                        ],
+                        "semantic_search_attempted": active_db is not None,
+                        "limit": limit,
+                        "threshold": threshold,
+                        "candidate_count": len(seed_ids) + len(search_records_to_add),
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            # Log failure is non-fatal; proceed with population.
+            pass
+
+    if not seed_ids and not search_records_to_add:
+        # F2 fix: novel/no-match topics get the empty-justification
+        # placeholder so the proposal does not fail the LO review-side
+        # check (Prior Deliberations Section Requirement) that
+        # NO-GOs empty sections lacking ``_No prior deliberations:_``.
+        placeholder_block = NO_PRIOR_DELIBS_PLACEHOLDER + "\n"
+        return _insert_prior_deliberations_block(body, placeholder_block)
+
+    # Build the entry block.
+    entries: list[str] = []
+    for sid in seed_ids:
+        entries.append(_format_helper_entry(sid, source="glossary"))
+    for r in search_records_to_add:
+        rid = r.get("id", "")
+        entries.append(_format_helper_entry(rid, source="search", db_record=r))
+
+    marker = "<!-- Pre-populated by helper; review and prune. -->"
+    block_text = marker + "\n" + "\n".join(entries) + "\n"
+
+    return _insert_prior_deliberations_block(body, block_text)
 
 
 def scan_credential_hits(content: str) -> list[dict[str, Any]]:
@@ -368,8 +698,23 @@ def propose_bridge(
     *,
     mode: Literal["abort", "redact"] = "abort",
     bridge_dir: Path | None = None,
+    pre_populate_prior_deliberations: bool = True,
+    db: Any | None = None,
+    glossary_path: Path | None = None,
+    pre_populate_log_path: Path | bool | None = None,
 ) -> Path:
     """Create ``bridge/<topic_slug>-001.md`` and insert an INDEX entry.
+
+    Phase 0 — Prior Deliberations pre-population (default-on; Phase 2 of
+    GTKB-DA-READ-SURFACE-CORRECTION): when
+    ``pre_populate_prior_deliberations=True`` (default), call
+    :func:`pre_populate_prior_deliberations` on ``body`` before scanning.
+    Glossary-source seeding from ``.claude/rules/canonical-terminology.md``
+    plus optional semantic search (when ``db`` is provided) populates the
+    proposal's ``## Prior Deliberations`` section. Authors review and
+    prune. Set ``pre_populate_prior_deliberations=False`` to opt out;
+    opt-out callers must include a justification in the section
+    (``_No prior deliberations: <reason>._``).
 
     Phase 1 — Pre-flight scan: iterate ``CREDENTIAL_PATTERNS +
     BASH_EXTRAS`` over ``body``. If hits are found, resolve per
@@ -395,6 +740,18 @@ def propose_bridge(
             hit-resolution policy.
         bridge_dir: Parent bridge directory. Defaults to
             ``Path("bridge")``.
+        pre_populate_prior_deliberations: Phase-0 pre-population flag
+            (default ``True``). Set ``False`` to opt out; callers
+            opting out must include a ``_No prior deliberations:_``
+            justification line per the LO review-side check.
+        db: Optional ``KnowledgeDB`` instance for the semantic-search
+            stage of pre-population. ``None`` skips semantic search;
+            glossary-source seeding still runs.
+        glossary_path: Override the glossary path used for seeding.
+            Defaults to ``.claude/rules/canonical-terminology.md``.
+        pre_populate_log_path: Override the audit-log path. ``None``
+            (default) writes to ``.gtkb-state/bridge-propose-helper/
+            last-prepopulation.json``; ``False`` disables logging.
 
     Returns:
         Absolute path to the created bridge file.
@@ -409,6 +766,16 @@ def propose_bridge(
     bridge_root = bridge_dir if bridge_dir is not None else Path("bridge")
     bridge_file = bridge_root / f"{topic_slug}-001.md"
     index_path = bridge_root / "INDEX.md"
+
+    # Phase 0: Prior Deliberations pre-population (default-on).
+    if pre_populate_prior_deliberations:
+        body = globals()["pre_populate_prior_deliberations"](
+            topic_slug,
+            body,
+            db=db,
+            glossary_path=glossary_path,
+            log_path=pre_populate_log_path,
+        )
 
     # Phase 1: Pre-flight scan.
     hits = scan_credential_hits(body)
@@ -452,8 +819,12 @@ __all__ = [
     "BridgeFileAlreadyExistsError",
     "BridgeIndexConflictError",
     "CredentialHitsFoundError",
+    "DEFAULT_GLOSSARY_PATH",
+    "DEFAULT_PREPOPULATION_LOG",
+    "DEFAULT_PRE_POPULATION_LIMIT",
     "RedactionResidualError",
     "handle_hits_abort_or_redact",
+    "pre_populate_prior_deliberations",
     "propose_bridge",
     "redact_credential_hits",
     "scan_credential_hits",

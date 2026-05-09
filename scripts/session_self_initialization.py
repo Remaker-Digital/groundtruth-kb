@@ -3782,77 +3782,21 @@ def _unquote_pending_value(value: str) -> str:
 
 
 def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> list[str]:
-    """Render the smart-poller orient section.
+    """Retired stub — smart-poller startup-orient surface removed in Slice 4.
 
-    Order of operations (per ``bridge/smart-poller-orient-verification-2026-04-29-005.md``
-    carry-forward of ``-003 §3`` + GO at ``-006``; matrix row 6 corrected
-    via ``-008 NO-GO`` REVISED-1 at ``-009``):
+    The smart-poller mechanism was retired on 2026-05-09 in favor of the
+    cross-harness event-driven trigger (see Slice 4 of
+    ``bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*``).
+    The cross-harness trigger does not surface a startup-orient section
+    — actionable bridge work is dispatched via PostToolUse + Stop hooks
+    rather than read from notification artifacts at session start.
 
-      1. Resolve recipient from ``role['assumed_role']``; unknown role
-         early-returns ``[]`` BEFORE the doctor runs.
-      2. Run ``_check_smart_bridge_poller``; doctor exceptions set
-         ``health = None``.
-      3. If ``health is None`` (doctor exception or import failure),
-         return ``[]`` regardless of notification state — per ``-001 §3.1``
-         matrix row 6 ("doctor exception | any notification | Silent"),
-         a stale notification cannot be trusted when the doctor itself is
-         broken.
-      4. If status is ``warning`` or ``fail``, render a diagnostic section
-         (notifications are skipped because they can't be trusted when the
-         poller itself is unhealthy).
-      5. Otherwise (status is ``pass``) proceed with the existing
-         notification-render path.
-
-    Fail-open per ``bridge/gtkb-bridge-poller-notify-activation-2026-04-29-004.md``
-    GO guardrail 1: any failure in import, canonical-API read, formatting,
-    or doctor invocation returns an empty list. The startup orient never
-    blocks on smart-poller behavior.
-
-    Recipient routing:
-      - Prime Builder → BridgeAgent.PRIME (acts on GO/NO-GO)
-      - Loyal Opposition → BridgeAgent.CODEX (reviews NEW/REVISED)
+    The function is preserved as a stub returning ``[]`` so that the
+    call site in ``render_report`` continues to compose cleanly without
+    a structural edit. Call sites and tests that previously exercised
+    this surface have been updated to reflect the empty result.
     """
-    try:
-        try:
-            from scripts.bridge_notify_reader import (
-                format_orient_section,
-                read_for_recipient,
-            )
-        except ModuleNotFoundError:
-            from bridge_notify_reader import (  # type: ignore[no-redef]
-                format_orient_section,
-                read_for_recipient,
-            )
-        from groundtruth_kb.bridge.routing import BridgeAgent
-
-        assumed = str(role.get("assumed_role", "")).lower()
-        if "prime" in assumed:
-            recipient = BridgeAgent.PRIME
-        elif "loyal" in assumed:
-            recipient = BridgeAgent.CODEX
-        else:
-            return []
-
-        try:
-            from groundtruth_kb.project.doctor import _check_smart_bridge_poller
-
-            health = _check_smart_bridge_poller(project_root)
-        except Exception:
-            health = None
-
-        if health is None:
-            return []
-
-        if health.status in ("warning", "fail"):
-            return _render_diagnostic_section(health)
-
-        artifact = read_for_recipient(project_root, recipient)
-        section_md = format_orient_section(artifact)
-        if not section_md:
-            return []
-        return [section_md, ""]
-    except Exception:
-        return []
+    return []
 
 
 def _render_diagnostic_section(health: Any) -> list[str]:

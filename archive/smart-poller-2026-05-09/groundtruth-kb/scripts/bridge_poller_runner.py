@@ -118,8 +118,7 @@ def _acquire_runner_lock(state_dir: Path) -> int:
             except OSError as exc:
                 os.close(fd)
                 raise RunnerAlreadyRunningError(
-                    f"Another bridge_poller_runner is already running "
-                    f"(lock held at {lock_path})"
+                    f"Another bridge_poller_runner is already running (lock held at {lock_path})"
                 ) from exc
         else:
             os.lseek(fd, 0, 0)
@@ -129,8 +128,7 @@ def _acquire_runner_lock(state_dir: Path) -> int:
             except OSError as exc:
                 os.close(fd)
                 raise RunnerAlreadyRunningError(
-                    f"Another bridge_poller_runner is already running "
-                    f"(lock held at {lock_path})"
+                    f"Another bridge_poller_runner is already running (lock held at {lock_path})"
                 ) from exc
         # Write our PID to the lock file for diagnostics. Truncate first so
         # we don't leave stale PID bytes from a prior holder past the new PID.
@@ -220,7 +218,6 @@ def _pending_signature(items: list[object]) -> str:
             "document_name": item.document_name,
             "top_status": item.top_status,
             "top_file": item.top_file,
-            "index_line_number": item.index_line_number,
         }
         for item in items
     ]
@@ -286,14 +283,16 @@ def _dispatch_prompt(recipient: BridgeAgent, items: list[object], *, max_items: 
         "Latest VERIFIED entries are bridge closure for both roles and are not "
         "queue work; do not process them as actionable."
     )
-    rows = [
-        f"- {item.top_status} {item.document_name} {item.top_file}"
-        for item in selected
-    ]
+    rows = [f"- {item.top_status} {item.document_name} {item.top_file}" for item in selected]
     selected_text = "\n".join(rows) if rows else "- No selected entries."
     return "\n".join(
         [
             "Bridge auto-dispatch notification.",
+            "",
+            (
+                "This is an automated bridge dispatch, not a fresh-session owner stimulus; "
+                "do not wait for another owner message before processing the selected entries."
+            ),
             "",
             role_line,
             "Read bridge/INDEX.md directly before acting. Treat the live latest status as authoritative.",
@@ -403,13 +402,16 @@ def _dispatch_if_needed(
         filtered_items = [it for it in items if getattr(it, "dispatchable", True)] if kind_aware else list(items)
         filtered_terminal_count = len(items) - len(filtered_items)
 
-        signature = _pending_signature(filtered_items)
+        selected_items = _selected_items_for_prompt(filtered_items, max_items)
+        signature = _pending_signature(selected_items)
         prior = recipients_state.get(recipient.value)
         prior_signature = prior.get("signature") if isinstance(prior, dict) else None
         recipient_state: dict[str, object] = {
             "signature": signature,
+            "signature_scope": "selected_dispatch_batch",
             "pending_count": len(filtered_items),
             "raw_pending_count": len(items),
+            "selected_count": len(selected_items),
             "filtered_terminal_count": filtered_terminal_count,
             "updated_at": now,
         }

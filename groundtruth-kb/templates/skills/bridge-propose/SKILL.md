@@ -69,7 +69,62 @@ Do NOT use for:
 Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
 caller-supplied ``topic_slug``, ``body``, and optional metadata.
 
-### Phase 1 — Pre-flight scan
+### Phase 0a — Prior Deliberations pre-population (default-on)
+
+Per Phase 2 of the GTKB-DA-READ-SURFACE-CORRECTION program
+(``ADR-DA-READ-SURFACE-PLACEMENT-001`` Path D), the helper pre-populates
+the proposal's ``## Prior Deliberations`` section before the credential
+scan. Two-stage retrieval:
+
+1. **Glossary-source seeding (deterministic).** The helper reads
+   ``.claude/rules/canonical-terminology.md`` and looks for a
+   ``### <heading>`` matching the topic slug (kebab-case → space-separated,
+   case-insensitive). If matched, the heading's ``**Source:**`` block is
+   parsed and ``DELIB-*`` / MemBase spec IDs are extracted as deterministic
+   seed candidates.
+2. **Semantic search (broad coverage; default-on).** The helper opens a
+   default ``KnowledgeDB("groundtruth.db")`` automatically and queries
+   ``search_deliberations(query, limit=...)``. Results are added on top
+   of the seeds, deduplicated. Pass ``db=`` to override with an explicit
+   instance, or ``db=False`` to disable semantic search entirely. If the
+   default DB cannot be opened (missing file, import error), the helper
+   silently falls back to glossary-only seeding.
+
+When the topic is genuinely novel (no glossary entry, no DA matches), the
+helper inserts an ``_No prior deliberations: <fill in reason before
+filing>._`` placeholder so the proposal does not fail the LO review-side
+check that NO-GOs empty Prior Deliberations sections.
+
+Combined candidates are formatted as Markdown bullets and inserted into
+the body's ``## Prior Deliberations`` section under the marker comment
+``<!-- Pre-populated by helper; review and prune. -->``. If the section
+is absent, it is appended at end of body. If the section already has
+author content, helper-suggested candidates land under a
+``### Helper-suggested candidates`` subheading instead of overwriting
+prior content.
+
+The author then reviews and prunes irrelevant entries before the
+proposal is filed. The Loyal Opposition review-side check
+(``codex-review-gate.md`` sixth review obligation) NO-GOs proposals with
+empty Prior Deliberations sections lacking justification (a
+``_No prior deliberations: <reason>._`` line is the explicit
+empty-justification convention for novel topics).
+
+**Opt out:** pass ``pre_populate_prior_deliberations=False`` to
+``propose_bridge()``. Opt-out callers must include the empty-justification
+line per the LO review check.
+
+**Audit log:** every invocation writes
+``.gtkb-state/bridge-propose-helper/last-prepopulation.json`` with the
+timestamp, topic slug, derived query, glossary-seed IDs, search-result
+IDs, similarity threshold, and total candidate count. Pass
+``pre_populate_log_path=False`` to disable logging.
+
+The Phase 0a stage is non-fatal: failures during glossary read, semantic
+search, or audit-log write are swallowed (graceful degradation). The
+proposal proceeds without pre-populated candidates if any stage fails.
+
+### Phase 0b / Phase 1 — Specification linkage gate + Pre-flight scan
 
 Before credential scanning, ``validate_specification_links(body)`` requires a
 ``Specification Links`` section with concrete spec IDs or specification/rule

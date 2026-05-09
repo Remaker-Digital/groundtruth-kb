@@ -100,6 +100,27 @@ def _session_start_payload(context: str) -> dict[str, dict[str, str]]:
     }
 
 
+def _bridge_auto_dispatch_context() -> str | None:
+    run_id = os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID")
+    if not run_id:
+        return None
+    return "\n".join(
+        [
+            "# GroundTruth-KB Bridge Auto-Dispatch Session",
+            "",
+            f"Poller run id: {run_id}",
+            "",
+            "This SessionStart was launched by the verified smart poller.",
+            "Do not relay the normal fresh-session startup disclosure.",
+            "Do not treat the initial prompt as a discarded owner session-start stimulus.",
+            "Treat the initial prompt as the active bridge auto-dispatch task.",
+            "Read `bridge/INDEX.md` directly before acting.",
+            "Process only entries whose live latest status is actionable for the durable role.",
+            "Preserve the bridge protocol audit trail.",
+        ]
+    )
+
+
 def _dump_payload(payload: dict[str, object]) -> str:
     return json.dumps(payload, ensure_ascii=True)
 
@@ -139,6 +160,14 @@ def main() -> int:
     stderr_path = OUT_DIR / "last-session-start.err"
     request_started_at = _now_iso()
     _purge_previous_diagnostics(stdout_path, stderr_path)
+    auto_dispatch_context = _bridge_auto_dispatch_context()
+    if auto_dispatch_context is not None:
+        payload = _session_start_payload(auto_dispatch_context)
+        serialized = _dump_payload(payload)
+        stdout_path.write_text(serialized, encoding="utf-8")
+        stderr_path.write_text("", encoding="utf-8")
+        print(serialized)
+        return 0
     command = [
         sys.executable,
         str(STARTUP_SERVICE),

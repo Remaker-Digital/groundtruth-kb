@@ -1,21 +1,34 @@
-"""ADR/DCL clause-test preflight (Slice 1, advisory mode).
+"""ADR/DCL clause-test preflight (Slice 2, mandatory gate).
 
-Per ``bridge/gtkb-adr-dcl-clause-test-enforcement-001.md`` (GO at -002):
-this CLI is the companion preflight surface to the existing
-``scripts/bridge_applicability_preflight.py``. Where the existing tool
-checks citation presence for required cross-cutting specs, this tool
-loads the ADR/DCL clause registry at ``config/governance/adr-dcl-clauses.toml``
-and asks a finer-grained question for each registered clause:
+Per ``bridge/gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion-003.md``
+(GO at ``-004``): this CLI is the companion preflight surface to the existing
+``scripts/bridge_applicability_preflight.py``. Where the existing tool checks
+citation presence for required cross-cutting specs, this tool loads the
+ADR/DCL clause registry at ``config/governance/adr-dcl-clauses.toml`` and
+asks a finer-grained question for each registered clause:
 
 - Does the bridge proposal/report's content + path token surface trigger
   this clause? (must_apply / may_apply / not_applicable)
 - For ``must_apply`` clauses, does the bridge text contain evidence that
   satisfies the clause?
 - Are any failure-pattern markers present that would refute the evidence?
+- Is the clause owner-waived in the bridge content?
 
-Slice 1 is advisory only: the CLI always exits 0, even when blocking
-clauses lack evidence. The output is informational. Slice 2 will promote
-selected clauses to a hard GO/VERIFIED gate after Slice-1 feedback.
+**Default invocation is mandatory.** Returns exit ``5`` when any must_apply
+clause with both ``severity = "blocking"`` and ``enforcement_mode = "blocking"``
+lacks satisfying evidence and is not explicitly owner-waived. Returns exit ``0``
+otherwise.
+
+The ``--report-only`` flag is **diagnostic only**: it prepends an unconditional
+non-authorization banner to the markdown output but preserves the default
+invocation's exit code. ``--report-only`` output CANNOT satisfy GO/VERIFIED.
+The only valid bypass for a real blocking gap is an explicit owner-waiver line
+in the bridge content (per ``.claude/rules/file-bridge-protocol.md``):
+
+    Owner waiver: <clause_id> — <DELIB-ID> — <one-line reason>
+
+Clauses with ``enforcement_mode = "advisory"`` are reported but never gate
+(intended for newly-added Slice-4 ratchet additions still being tuned).
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -28,7 +41,6 @@ import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CLAUSES_CONFIG = PROJECT_ROOT / "config" / "governance" / "adr-dcl-clauses.toml"
@@ -181,14 +193,18 @@ def evaluate_evidence(clause: Clause, content: str) -> tuple[bool, list[str], st
         except re.error as e:
             reasons.append(f"(failure pattern invalid: {e})")
     if not clause.evidence_pattern:
-        return (False, ["no evidence_pattern defined for clause"], "Clause has no evidence_pattern; manual review required.")
+        return (
+            False,
+            ["no evidence_pattern defined for clause"],
+            "Clause has no evidence_pattern; manual review required.",
+        )
     try:
         if re.search(clause.evidence_pattern, content):
             reasons.append(f"evidence pattern `{clause.evidence_pattern}` matched")
             return (True, reasons, None)
     except re.error as e:
         reasons.append(f"(evidence pattern invalid: {e})")
-        return (False, reasons, f"Evidence pattern invalid; manual review required.")
+        return (False, reasons, "Evidence pattern invalid; manual review required.")
     reasons.append(f"evidence pattern `{clause.evidence_pattern}` did not match")
     return (False, reasons, f"Evidence missing: {clause.evidence_required}")
 
@@ -207,47 +223,112 @@ def evaluate_clauses(clauses: list[Clause], content: str, doc_name: str, paths: 
     return results
 
 
-def render_markdown(bridge_id: str, operative_file: Path | None, results: list[ClauseResult]) -> str:
+# Owner-waiver line format documented in the "Clause-Test Preflight (Mandatory;
+# Slice 2)" section of .claude/rules/file-bridge-protocol.md:
+#   Owner waiver: <clause_id> — <DELIB-ID> — <one-line reason>
+# Detection is anchored on the clause_id substring and the literal "Owner
+# waiver:" prefix to avoid false-positive matches on ordinary prose.
+_OWNER_WAIVER_PREFIX_RE = re.compile(r"(?im)^\s*Owner waiver:\s*")
+
+
+def _is_clause_owner_waived(clause: Clause, content: str) -> bool:
+    """Return True if ``content`` contains an explicit owner-waiver line for
+    ``clause.clause_id``. The line must start with the literal ``Owner waiver:``
+    prefix (case-insensitive) and include the clause_id substring on the same
+    line.
+    """
+    for line in content.splitlines():
+        if not _OWNER_WAIVER_PREFIX_RE.match(line):
+            continue
+        if clause.clause_id in line:
+            return True
+    return False
+
+
+_REPORT_ONLY_BANNER = (
+    "> ⚠ --report-only mode: this output IS DIAGNOSTIC ONLY and CANNOT satisfy GO/VERIFIED.\n"
+    "> ⚠ Mandatory gate runs require the default (no-flag) invocation. Cite an explicit\n"
+    "> ⚠ owner-waiver line per blocking gap if a real bypass is required:\n"
+    "> ⚠   Owner waiver: <clause_id> — <DELIB-ID> — <one-line reason>\n"
+    "\n"
+)
+
+
+def render_markdown(
+    bridge_id: str,
+    operative_file: Path | None,
+    results: list[ClauseResult],
+    *,
+    content: str = "",
+    report_only: bool = False,
+) -> str:
     operative_str = (
-        str(operative_file.relative_to(PROJECT_ROOT)) if operative_file and _is_under(operative_file, PROJECT_ROOT)
+        str(operative_file.relative_to(PROJECT_ROOT))
+        if operative_file and _is_under(operative_file, PROJECT_ROOT)
         else (str(operative_file) if operative_file else "(not found)")
     )
     counts = {"must_apply": 0, "may_apply": 0, "not_applicable": 0}
     gaps: list[ClauseResult] = []
+    blocking_gaps: list[ClauseResult] = []
     for r in results:
         counts[r.applicability] = counts.get(r.applicability, 0) + 1
         if r.applicability == "must_apply" and r.evidence_found is False:
             gaps.append(r)
-    lines: list[str] = [
-        "## Clause Applicability (Slice 1; advisory mode)",
+            if (
+                r.clause.severity == "blocking"
+                and r.clause.enforcement_mode == "blocking"
+                and not _is_clause_owner_waived(r.clause, content)
+            ):
+                blocking_gaps.append(r)
+
+    title = "## Clause Applicability (Slice 2; mandatory gate)"
+    mode_line = (
+        "- Mode: **mandatory** (default invocation). Exit 5 = blocking gap; exit 0 = pass."
+        if not report_only
+        else "- Mode: **--report-only** (diagnostic only; CANNOT satisfy GO/VERIFIED)."
+    )
+    lines: list[str] = []
+    if report_only:
+        lines.append(_REPORT_ONLY_BANNER.rstrip("\n"))
+    lines += [
+        title,
         "",
         f"- Bridge id: `{bridge_id}`",
         f"- Operative file: `{operative_str}`",
         f"- Clauses evaluated: {len(results)}",
         f"- must_apply: {counts['must_apply']}, may_apply: {counts['may_apply']}, not_applicable: {counts['not_applicable']}",
         f"- Evidence gaps in must_apply clauses: {len(gaps)}",
-        "- Slice 1 mode: advisory; this report does NOT block GO/VERIFIED.",
+        f"- Blocking gaps (gate-failing): {len(blocking_gaps)}",
+        mode_line,
         "",
-        "| Clause | Spec | Applicability | Evidence found | Severity |",
-        "|---|---|---|---|---|",
+        "| Clause | Spec | Applicability | Evidence found | Severity | Enforcement |",
+        "|---|---|---|---|---|---|",
     ]
     for r in results:
         evidence_cell = "—" if r.evidence_found is None else ("yes" if r.evidence_found else "**no**")
         lines.append(
-            f"| `{r.clause.clause_id}` | `{r.clause.spec_id}` | {r.applicability} | {evidence_cell} | {r.clause.severity} |"
+            f"| `{r.clause.clause_id}` | `{r.clause.spec_id}` | {r.applicability} "
+            f"| {evidence_cell} | {r.clause.severity} | {r.clause.enforcement_mode} |"
         )
-    if gaps:
-        lines += ["", "### Evidence Gaps (must_apply clauses without satisfying evidence)", ""]
-        for r in gaps:
-            lines.append(f"- **`{r.clause.clause_id}`** ({r.clause.severity})")
+    if blocking_gaps:
+        lines += ["", "### Blocking Gaps (gate-failing must_apply clauses without evidence or owner waiver)", ""]
+        for r in blocking_gaps:
+            lines.append(f"- **`{r.clause.clause_id}`** ({r.clause.severity}, {r.clause.enforcement_mode})")
             lines.append(f"  - Gap: {r.gap_summary}")
+            lines.append(f"  - Evidence required: {r.clause.evidence_required}")
             for reason in r.evidence_reasons:
                 lines.append(f"  - Detector note: {reason}")
+    if gaps and not blocking_gaps:
+        lines += ["", "### Evidence Gaps (advisory-mode clauses; not gate-failing)", ""]
+        for r in gaps:
+            lines.append(f"- **`{r.clause.clause_id}`** ({r.clause.severity}, {r.clause.enforcement_mode})")
+            lines.append(f"  - Gap: {r.gap_summary}")
     lines += [
         "",
-        "_Slice 1 enforcement_mode: `advisory_only_in_slice_1`. Slice 2 will",
-        "promote selected blocking clauses to a hard GO/VERIFIED gate after",
-        "Slice-1 feedback. Slice 3 wires the matrix into LO verdict templates.",
+        '_Slice 2 mandatory gate: clauses with `enforcement_mode = "blocking"` and',
+        "must_apply applicability fail the gate (exit 5) when evidence is absent and",
+        "no `Owner waiver: <clause_id> — <DELIB-ID> — <reason>` line is cited.",
+        'Clauses with `enforcement_mode = "advisory"` are reported but never gate._',
         "",
     ]
     return "\n".join(lines) + "\n"
@@ -261,6 +342,9 @@ def _is_under(path: Path, root: Path) -> bool:
         return False
 
 
+EXIT_BLOCKING_GAP = 5  # matches scripts/bridge_applicability_preflight.py convention
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bridge-id", required=True, help="bridge thread id (without -NNN.md suffix)")
@@ -268,34 +352,75 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--index", type=Path, default=DEFAULT_INDEX_PATH)
     parser.add_argument("--out", type=Path, help="optional: write report to this path instead of stdout")
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help=(
+            "Diagnostic mode: prepend a non-authorization banner to the markdown output. "
+            "Exit code is the same as the default invocation. --report-only output CANNOT "
+            "satisfy GO/VERIFIED; the only valid bypass for a real blocking gap is an "
+            "explicit owner-waiver line in the bridge content."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if not args.clauses_config.is_file():
         print(f"ERROR: clauses config not found: {args.clauses_config}", file=sys.stderr)
-        return 0  # advisory mode: still exit 0 per Slice-1 contract
+        return 0  # config-missing is a non-fatal warn (no clauses to evaluate)
 
     clauses = load_clauses(args.clauses_config)
     operative_file = find_operative_file(args.bridge_id, args.index, args.bridge_dir)
+    content = ""
+    blocking_gaps_count = 0
     if operative_file is None:
+        title = (
+            "## Clause Applicability (Slice 2; mandatory gate)"
+            if not args.report_only
+            else "## Clause Applicability (Slice 2; --report-only diagnostic)"
+        )
+        prefix = _REPORT_ONLY_BANNER if args.report_only else ""
         report = (
-            f"## Clause Applicability (Slice 1; advisory mode)\n\n"
+            f"{prefix}{title}\n\n"
             f"- Bridge id: `{args.bridge_id}`\n"
             f"- Operative file: (not found — no INDEX entry and no matching `bridge/{args.bridge_id}-NNN.md`)\n"
-            f"- Slice 1 mode: advisory; this report does NOT block GO/VERIFIED.\n"
+            "- Mode: cannot evaluate without an operative file; gate neither passes nor fails.\n"
         )
     else:
         content = operative_file.read_text(encoding="utf-8")
         doc_name = args.bridge_id
         paths = [f"bridge/{operative_file.name}"]
         results = evaluate_clauses(clauses, content, doc_name, paths)
-        report = render_markdown(args.bridge_id, operative_file, results)
+        report = render_markdown(args.bridge_id, operative_file, results, content=content, report_only=args.report_only)
+        # Compute the gate verdict.
+        for r in results:
+            if (
+                r.applicability == "must_apply"
+                and r.evidence_found is False
+                and r.clause.severity == "blocking"
+                and r.clause.enforcement_mode == "blocking"
+                and not _is_clause_owner_waived(r.clause, content)
+            ):
+                blocking_gaps_count += 1
 
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(report, encoding="utf-8", newline="\n")
     else:
+        # Reconfigure stdout to UTF-8 so the markdown's em-dashes and the
+        # --report-only banner's warning glyph render correctly on Windows
+        # consoles (default cp1252 encoding cannot encode those characters).
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        except (AttributeError, OSError):
+            # Fallback: drop the non-ASCII glyphs rather than crash.
+            report = report.encode("ascii", errors="replace").decode("ascii")
         sys.stdout.write(report)
-    return 0  # advisory mode always exits 0
+
+    # Exit code semantics:
+    # - default invocation: exit 5 if any blocking gap, exit 0 otherwise.
+    # - --report-only: same exit code as the default invocation. The flag is
+    #   diagnostic-output-only (banner) and cannot silently bypass the gate.
+    return EXIT_BLOCKING_GAP if blocking_gaps_count > 0 else 0
 
 
 if __name__ == "__main__":

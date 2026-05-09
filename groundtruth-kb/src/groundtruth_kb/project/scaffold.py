@@ -780,14 +780,14 @@ def _render_all_templates(
         "{{RESPONSIBILITY}}": "Implementation, specs, and project bootstrap",
         "{{REVIEWER}}": ("codex (Loyal Opposition)" if profile.includes_bridge else "owner"),
         "{{NOTES}}": "Replace with your actual collaboration topology.",
-        "{{PATH_TO_ENTRYPOINT}}": ("bridge/INDEX.md + verified smart poller" if profile.includes_bridge else "TBD"),
+        "{{PATH_TO_ENTRYPOINT}}": ("bridge/INDEX.md + cross-harness event-driven trigger" if profile.includes_bridge else "TBD"),
         "{{WHAT_IT_DOES}}": (
             "File bridge queue for Prime Builder and Loyal Opposition review handoffs"
             if profile.includes_bridge
             else "Document your bridge or automation entrypoint here."
         ),
         "{{HOW_IT_RUNS}}": (
-            "Verified smart poller invokes project-owned scanner scripts"
+            "PostToolUse + Stop hooks invoke scripts/cross_harness_bridge_trigger.py"
             if profile.includes_bridge
             else "Manual start or scheduled run"
         ),
@@ -795,13 +795,13 @@ def _render_all_templates(
         "{{KIND}}": "TBD",
         "{{PURPOSE}}": "Replace with the actual purpose for this control surface.",
         "{{WHEN_TO_UPDATE}}": "Whenever the runtime or coordination rules change.",
-        "{{AUTOMATION_NAME}}": "file-bridge-smart-poller",
-        "{{SCHEDULE}}": "Smart-poller registration interval or manual fallback",
-        "{{EXECUTOR}}": "claude -p / codex exec via project-owned scanner scripts",
+        "{{AUTOMATION_NAME}}": "file-bridge-cross-harness-trigger",
+        "{{SCHEDULE}}": "Event-driven on tool-use; manual fallback via 'Bridge' prompt",
+        "{{EXECUTOR}}": "claude -p / codex exec invoked by the cross-harness event-driven trigger",
         "{{SOURCE}}": (
-            "bridge-os-poller-setup-prompt.md (legacy filename; smart-poller content) and BRIDGE-INVENTORY.md"
+            "Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json"
         ),
-        "{{FAILURE_SIGNAL}}": "No recent scan logs or stale actionable bridge entries",
+        "{{FAILURE_SIGNAL}}": "No dispatch-state updates after INDEX changes",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": (
             "File-based latest-status queue in bridge/INDEX.md. Entries are newest-first."
         ),

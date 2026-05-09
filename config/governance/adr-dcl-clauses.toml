@@ -1,11 +1,18 @@
-# ADR/DCL Clause Registry — Slice 1 (per gtkb-adr-dcl-clause-test-enforcement GO at -002)
+# ADR/DCL Clause Registry — Slice 2 mandatory gate (per
+# gtkb-adr-dcl-clause-test-enforcement-slice-2-blocking-promotion GO at -004).
 #
-# This file encodes the five highest-risk ADR/DCL/governance fixtures as
-# atomic clauses with applicability triggers and evidence-detection patterns.
-# Slice 1 runs in advisory mode only — the companion CLI
-# (scripts/adr_dcl_clause_preflight.py) reports gaps but does NOT block.
+# This file encodes ADR/DCL/governance fixtures as atomic clauses with
+# applicability triggers and evidence-detection patterns. The companion CLI
+# (scripts/adr_dcl_clause_preflight.py) is now a mandatory gate when run
+# without flags: it exits 5 if any must_apply clause with
+# severity = "blocking" AND enforcement_mode = "blocking" lacks evidence and
+# is not explicitly owner-waived in the bridge content.
 #
-# Schema per bridge/gtkb-adr-dcl-clause-test-enforcement-001.md Change 1:
+# The --report-only CLI flag prepends a non-authorization banner to the
+# diagnostic markdown but does NOT change the exit code; --report-only output
+# CANNOT satisfy GO/VERIFIED.
+#
+# Schema:
 #   clause_id              = "<spec-id>/<short-clause-name>"
 #   spec_id                = governing spec ID in MemBase
 #   description            = human-readable clause statement
@@ -18,11 +25,18 @@
 #   failure_pattern        = optional regex; if matched, evidence is treated as inverted/refuted
 #   severity               = "blocking" | "advisory"
 #   waiver_policy          = "explicit_owner_waiver_required_in_bridge" | "advisory_only"
-#   enforcement_mode       = "advisory_only_in_slice_1" (Slice 2 promotes selected clauses)
+#   enforcement_mode       = "blocking" (gate-failing) | "advisory" (reported but
+#                            never gate-failing; intended for newly-added Slice-4
+#                            ratchet additions still being tuned)
 #
-# Future-slice path: Slice 2 promotes selected blocking clauses to a hard
-# GO/VERIFIED gate; Slice 3 wires the matrix into LO verdict templates;
-# Slice 4 ratchets adoption; Slice 5 may add semantic discovery.
+# Owner-waiver line format (per Slice 2 mandatory gate; bridge content must
+# include this line on its own to bypass a real blocking gap):
+#   Owner waiver: <clause_id> — <DELIB-ID> — <one-line reason>
+#
+# Future-slice path: Slice 3 wires the matrix into LO verdict templates;
+# Slice 4 ratchets adoption (new clauses begin with enforcement_mode =
+# "advisory" before owner-promoted to "blocking"); Slice 5 may add semantic
+# discovery.
 #
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
@@ -41,7 +55,7 @@ failure_condition = "Implementation report references an output path outside E:\
 failure_pattern = "(?i)(?:C:\\\\Users\\\\|/tmp/(?!agent-red-rehearsal)|C:\\\\temp\\\\(?!agent-red-rehearsal))"
 severity = "blocking"
 waiver_policy = "explicit_owner_waiver_required_in_bridge"
-enforcement_mode = "advisory_only_in_slice_1"
+enforcement_mode = "blocking"
 
 [[clauses]]
 clause_id = "GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-INDEX-IS-CANONICAL"
@@ -57,7 +71,7 @@ evidence_pattern = "(?i)(?:bridge/INDEX\\.md|INDEX update|insert.+top of.+(?:IND
 failure_condition = "Implementation deletes a prior bridge file, mutates an existing INDEX entry's prior versions, or claims VERIFIED without an INDEX entry."
 severity = "blocking"
 waiver_policy = "explicit_owner_waiver_required_in_bridge"
-enforcement_mode = "advisory_only_in_slice_1"
+enforcement_mode = "blocking"
 
 [[clauses]]
 clause_id = "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS"
@@ -74,7 +88,7 @@ failure_condition = "Bridge proposal lacks a Specification Links section, or the
 failure_pattern = "(?i)(?:specification\\s+links?[\\s:]*(?:tbd|todo|n/a|none|not applicable))"
 severity = "blocking"
 waiver_policy = "explicit_owner_waiver_required_in_bridge"
-enforcement_mode = "advisory_only_in_slice_1"
+enforcement_mode = "blocking"
 
 [[clauses]]
 clause_id = "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING"
@@ -90,7 +104,7 @@ evidence_pattern = "(?i)(?:specification[- ]derived\\s+verification|spec[- ]to[-
 failure_condition = "VERIFIED report lacks the spec-to-test mapping or omits executed-command evidence."
 severity = "blocking"
 waiver_policy = "explicit_owner_waiver_required_in_bridge"
-enforcement_mode = "advisory_only_in_slice_1"
+enforcement_mode = "blocking"
 
 [[clauses]]
 clause_id = "GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS"
@@ -106,4 +120,4 @@ evidence_pattern = "(?i)(?:inventory|review[- ]packet|DECISION DEFERRED|formal-a
 failure_condition = "Bulk-operation bridge claims completion without inventory + review packet + deferred-decision marker AND without an explicit owner-approval packet."
 severity = "blocking"
 waiver_policy = "explicit_owner_waiver_required_in_bridge"
-enforcement_mode = "advisory_only_in_slice_1"
+enforcement_mode = "blocking"

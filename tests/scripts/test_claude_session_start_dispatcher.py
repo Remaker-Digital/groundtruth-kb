@@ -24,6 +24,7 @@ Verifies:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -93,6 +94,29 @@ def test_envelope_contains_token_budget_content() -> None:
     assert "reducing startup token consumption" in ctx.lower() or "token consumption" in ctx.lower()
 
 
+def test_bridge_auto_dispatch_context_bypasses_interactive_startup() -> None:
+    """Bridge poller dispatch sessions must process the initial prompt.
+
+    The verified smart poller launches headless harnesses with
+    ``GTKB_BRIDGE_POLLER_RUN_ID`` in the environment. In that mode the
+    SessionStart hook must not emit interactive fresh-session semantics that
+    cause Codex to discard the auto-dispatch prompt as a startup stimulus.
+    """
+    env = dict(os.environ)
+    env["GTKB_BRIDGE_POLLER_RUN_ID"] = "test-run-001"
+
+    result = _run_dispatcher(env=env)
+    assert result.returncode == 0, f"dispatcher non-zero exit: {result.stderr}"
+    payload = json.loads(result.stdout)
+    ctx = payload["hookSpecificOutput"]["additionalContext"]
+    assert "Bridge Auto-Dispatch Session" in ctx
+    assert "test-run-001" in ctx
+    assert "Programmatic Startup Payload" not in ctx
+    assert "discarded owner session-start stimulus" in ctx
+    assert "active bridge auto-dispatch task" in ctx
+    assert "bridge/INDEX.md" in ctx
+
+
 def test_envelope_shape_parity_with_codex() -> None:
     """Claude dispatcher emits same envelope keys as the Codex dispatcher.
 
@@ -144,9 +168,7 @@ def test_session_start_timeout_alignment() -> None:
     codex_timeout = _session_start_timeout(codex)
     assert claude_timeout > 0, "Claude settings has no SessionStart timeout"
     assert codex_timeout > 0, "Codex hooks has no SessionStart timeout"
-    assert claude_timeout == codex_timeout, (
-        f"Claude SessionStart timeout {claude_timeout}s != Codex {codex_timeout}s"
-    )
+    assert claude_timeout == codex_timeout, f"Claude SessionStart timeout {claude_timeout}s != Codex {codex_timeout}s"
 
 
 def test_harness_parity_import_repaired() -> None:
@@ -177,9 +199,7 @@ def test_harness_parity_import_repaired() -> None:
     assert "Harness parity: unavailable" not in result.stdout
 
 
-def test_dispatcher_fallback_on_broken_startup_service(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_dispatcher_fallback_on_broken_startup_service(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """If the startup service path is unreachable, dispatcher emits a fallback.
 
     Validates fail-soft behavior — dispatcher must always emit a valid

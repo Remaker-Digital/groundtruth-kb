@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-09T01:26:34Z",
+  "generated_at": "2026-05-09T13:39:12Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -103,13 +103,14 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 12,
+      "count": 13,
       "items": [
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-compliance-gate.py",
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/destructive-gate.py",
         ".claude/hooks/formal-artifact-approval-gate.py",
+        ".claude/hooks/glossary-expansion.py",
         ".claude/hooks/narrative-artifact-approval-gate.py",
         ".claude/hooks/owner-decision-tracker.py",
         ".claude/hooks/scheduler.py",
@@ -121,8 +122,9 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 7,
+      "count": 8,
       "items": [
+        ".codex/gtkb-hooks/glossary-expansion.py",
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",

@@ -23,7 +23,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange:
-              from: 0
+              from: 600
               to: 0
             datasourceUid: gtkb-dashboard-sqlite
             model:
@@ -54,7 +54,7 @@ groups:
               timeColumns: []
           - refId: B
             relativeTimeRange:
-              from: 0
+              from: 600
               to: 0
             datasourceUid: __expr__
             model:

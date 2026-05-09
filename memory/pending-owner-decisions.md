@@ -10,6 +10,26 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Resolved
 
+- id: DECISION-0481
+  asked_at: 2026-05-09T02:29:10.336550Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: ddbe58afed5ce70c
+  resolved_at: 2026-05-09T02:35:00.000000Z
+  resolved_in_session: S337
+  answer: "Resolved via AskUserQuestion in the same turn; owner selected 'Draft Slice 3 NEW proposal now'. Slice 3 -001 filed; Codex NO-GO at -002; Slice 3 -003 REVISED filed addressing F1 (drop adopter-template propagation) + F2 (Stop output contract via --stop-hook flag)."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
+- id: DECISION-0466
+  asked_at: 2026-05-08T23:21:28.114764Z
+  question: ""
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 5aa2c3077e99464d
+  resolved_at: 2026-05-08T23:30:00.000000Z
+  resolved_in_session: S331
+  answer: "Resolved via AskUserQuestion in the same turn the prose anti-pattern was detected; owner selected 'Continue drafting Phases 1-3'. Phase 1, 2, and 3 drafts subsequently written to memory/phase-{1,2,3}-*-draft.md as operational state."
+  notes: "Question text omitted to avoid recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
 - id: DECISION-0435
   asked_at: 2026-05-07T02:06:23.479326Z
   question: ""
@@ -5308,6 +5328,442 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-08T05:09:31.370350Z
   answer: "owner cleared without specific answer"
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0456
+  asked_at: 2026-05-08T05:28:17.865124Z
+  question: "Which '2' did you mean?"
+  options:
+    - "Outstanding work item 2"
+    - "Outstanding work item 1"
+    - "Outstanding work item 3"
+    - "Top Priority Actions item 2"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d63b5e9f21ee1fa6
+  resolved_at: 2026-05-08T05:28:17.865124Z
+  answer: "User has answered your questions: \"Which '2' did you mean?\"=\"Top Priority Actions item 2\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0457
+  asked_at: 2026-05-08T05:28:17.865124Z
+  question: "Top Priority Action 2 is already VERIFIED — what next?"
+  options:
+    - "Update work_list.md to mark complete"
+    - "Elevate GTKB-RESOURCE-REFERENCE-DISAMBIGUATION-001"
+    - "Pick a different backlog item"
+    - "Stop here, push to GitHub"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c8a4dcec7f16044
+  resolved_at: 2026-05-08T05:28:17.865124Z
+  answer: "User has answered your questions: \"Top Priority Action 2 is already VERIFIED — what next?\"=\"Elevate GTKB-RESOURCE-REFERENCE-DISAMBIGUATION-001\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0458
+  asked_at: 2026-05-08T05:28:17.865124Z
+  question: "All three Top Priority Actions are VERIFIED — what shall I do?"
+  options:
+    - "Mark items 2+3 complete in work_list.md"
+    - "File a defect bridge for the startup payload"
+    - "Address the SonarCloud WARN residual"
+    - "Push the 15 commits and stop"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 97d27eff7edaf03d
+  resolved_at: 2026-05-08T05:28:17.865124Z
+  answer: "User has answered your questions: \"All three Top Priority Actions are VERIFIED — what shall I do?\"=\"File a defect bridge for the startup payload\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0459
+  asked_at: 2026-05-08T05:48:57.948552Z
+  question: "Reconcile the conflict between your statement and the canonical artifacts?"
+  options:
+    - "Owner directive supersedes — update artifacts"
+    - "Reaffirm current artifacts — file persists as view"
+    - "Hybrid: file persists but generated content shrinks"
+    - "Defer the decision — file new slice"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ee5c398f29b74b5b
+  resolved_at: 2026-05-08T05:48:57.948552Z
+  answer: "User has answered your questions: \"Reconcile the conflict between your statement and the canonical artifacts?\"=\"Owner directive supersedes — update artifacts\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0460
+  asked_at: 2026-05-08T06:06:17.585047Z
+  question: "How shall I capture this high-priority enhancement?"
+  options:
+    - "Backlog row + scoping proposal NOW"
+    - "Backlog row only — defer scoping"
+    - "Bridge proposal only — skip backlog row"
+    - "Capture as Deliberation Archive entry only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d0fe66d48cc691f3
+  resolved_at: 2026-05-08T06:06:17.585047Z
+  answer: "User has answered your questions: \"How shall I capture this high-priority enhancement?\"=\"Backlog row + scoping proposal NOW\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0461
+  asked_at: 2026-05-08T19:07:07.472423Z
+  question: "When the dashboard reachability probe fails at session startup, what should happen?"
+  options:
+    - "Warn-only (Recommended)"
+    - "Hard-fail startup"
+    - "Warn + auto-launch attempt"
+    - "New focus option on unreachable"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 562457637c210daf
+  resolved_at: 2026-05-08T19:07:07.472423Z
+  answer: "User has answered your questions: \"When the dashboard reachability probe fails at session startup, what should happen?\"=\"Warn-only (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0462
+  asked_at: 2026-05-08T19:07:07.472423Z
+  question: "What HTTP target should the startup probe hit to decide 'reachable'?"
+  options:
+    - "Grafana /api/health (Recommended)"
+    - "Dashboard URL itself"
+    - "TCP-only port 3000 check"
+    - "Both /api/health and dashboard URL"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7ec5c7b8a5cb98a1
+  resolved_at: 2026-05-08T19:07:07.472423Z
+  answer: "User has answered your questions: \"What HTTP target should the startup probe hit to decide 'reachable'?\"=\"Both /api/health and dashboard URL\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0463
+  asked_at: 2026-05-08T19:07:07.472423Z
+  question: "What timeout (per probe) should the dashboard reachability check use?"
+  options:
+    - "3 seconds (Recommended)"
+    - "1 second"
+    - "5 seconds"
+    - "Configurable env var with 3s default"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 10edd8ee0388052f
+  resolved_at: 2026-05-08T19:07:07.472423Z
+  answer: "User has answered your questions: \"What timeout (per probe) should the dashboard reachability check use?\"=\"3 seconds (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0464
+  asked_at: 2026-05-08T19:07:07.472423Z
+  question: "Which harnesses should get the dashboard reachability probe?"
+  options:
+    - "Both Claude and Codex (Recommended)"
+    - "Claude only for now"
+    - "Both, plus Codex hook adapter"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 20774ff3a77c4f44
+  resolved_at: 2026-05-08T19:07:07.472423Z
+  answer: "User has answered your questions: \"Which harnesses should get the dashboard reachability probe?\"=\"Both Claude and Codex (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0465
+  asked_at: 2026-05-08T21:53:09.664294Z
+  question: "Approve DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION (packet 1 of 7)?"
+  options:
+    - "Approve as proposed"
+    - "Acknowledge with scoped auto-approve"
+    - "Edit before approval"
+    - "Decline — abort retirement-directive thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 38e9c28e34c4e615
+  resolved_at: 2026-05-08T21:53:09.664294Z
+  answer: "User has answered your questions: \"Approve DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION (packet 1 of 7)?\"=\"Acknowledge with scoped auto-approve\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0467
+  asked_at: 2026-05-08T23:21:45.436432Z
+  question: "All session-driven threads VERIFIED. What's next?"
+  options:
+    - "Push 31 commits to origin/develop"
+    - "Wrap session"
+    - "Pick a flagged Open Follow-On to advance"
+    - "Pick a different backlog item"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9245b773dffa3601
+  resolved_at: 2026-05-08T23:21:45.436432Z
+  answer: "User has answered your questions: \"All session-driven threads VERIFIED. What's next?\"=\"Push 31 commits to origin/develop\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0468
+  asked_at: 2026-05-08T23:31:00.447998Z
+  question: "While Phase 0 awaits Codex review, should Prime Builder continue drafting Phases 1-3 in parallel, or hold?"
+  options:
+    - "Continue drafting Phases 1-3"
+    - "Hold for Codex verdict on Phase 0"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d759651d57530da7
+  resolved_at: 2026-05-08T23:31:00.447998Z
+  answer: "User has answered your questions: \"While Phase 0 awaits Codex review, should Prime Builder continue drafting Phases 1-3 in parallel, or hold?\"=\"Continue drafting Phases 1-3\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0469
+  asked_at: 2026-05-08T23:42:31.207646Z
+  question: "Project stance is stale — what's the next concrete step?"
+  options:
+    - "Run the empirical retest now"
+    - "File scoping bridge first"
+    - "Update ADR-CODEX-HOOK-PARITY-FALLBACK-001 first"
+    - "All three, in sequence"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c3ad840bb72becd
+  resolved_at: 2026-05-08T23:42:31.207646Z
+  answer: "User has answered your questions: \"Project stance is stale — what's the next concrete step?\"=\"Run the empirical retest now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0470
+  asked_at: 2026-05-08T23:42:31.207646Z
+  question: "Codex hooks confirmed live on Windows — next step?"
+  options:
+    - "Capture as DELIB, then file scoping bridge for full architecture"
+    - "Capture as DELIB only, pause on architecture"
+    - "Update artifacts directly, defer DELIB and architecture"
+    - "Capture DELIB + register Codex narrative-artifact hook now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8ad4655adbed932e
+  resolved_at: 2026-05-08T23:42:31.207646Z
+  answer: "User has answered your questions: \"Codex hooks confirmed live on Windows — next step?\"=\"Capture as DELIB, then file scoping bridge for full architecture\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0471
+  asked_at: 2026-05-08T23:42:31.207646Z
+  question: "Approve DELIB-S337-CODEX-HOOKS-WINDOWS-RETEST-2026-05-08?"
+  options:
+    - "Approve as proposed"
+    - "Edit before approval"
+    - "Decline DELIB; proceed straight to scoping bridge"
+    - "Decline DELIB; pause architecture work entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c19384a3bbc5ef44
+  resolved_at: 2026-05-08T23:42:31.207646Z
+  answer: "User has answered your questions: \"Approve DELIB-S337-CODEX-HOOKS-WINDOWS-RETEST-2026-05-08?\"=\"Approve as proposed\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0472
+  asked_at: 2026-05-09T00:50:36.431699Z
+  question: "File scoping bridge for gtkb-bridge-skill-unified-001 now?"
+  options:
+    - "File scoping bridge now"
+    - "File scoping bridge AND add backlog row"
+    - "Defer — backlog row only"
+    - "Defer entirely — no backlog row, no bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 46651a7012ff747b
+  resolved_at: 2026-05-09T00:50:36.431699Z
+  answer: "User has answered your questions: \"File scoping bridge for gtkb-bridge-skill-unified-001 now?\"=\"File scoping bridge AND add backlog row\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0473
+  asked_at: 2026-05-09T01:04:04.057572Z
+  question: "Two threads, one GO + one NO-GO — next action?"
+  options:
+    - "Address NO-GO -002 first (REVISED-1 on event-driven)"
+    - "Implement skill-unified Slice 1 first"
+    - "Both, REVISED first"
+    - "Both, Slice 1 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0cec0bdd5551b400
+  resolved_at: 2026-05-09T01:04:04.057572Z
+  answer: "User has answered your questions: \"Two threads, one GO + one NO-GO — next action?\"=\"Address NO-GO -002 first (REVISED-1 on event-driven)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0474
+  asked_at: 2026-05-09T01:05:45.462668Z
+  question: "Approve insertion of GOV-GLOSSARY-AS-DA-READ-SURFACE-001 into MemBase as a governance principle, per the body shown in the option preview?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Hold for revision"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b2e302b34058e8cd
+  resolved_at: 2026-05-09T01:05:45.462668Z
+  answer: "User has answered your questions: \"Approve insertion of GOV-GLOSSARY-AS-DA-READ-SURFACE-001 into MemBase as a governance principle, per the body shown in the option preview?\"=\"Approve as drafted (Recommended)\" selected preview: ID: GOV-GLOSSARY-AS-DA-READ-SURFACE-001 Type: governance  Statement: The canonical-terminology glossary at .claude/rules/canonical-terminology.md is the Deliberation Archive's primary read surface for live consultation by AI agents. The DA itself is the substrate the glossary cites: agents reach the DA through glossary entries' Source: lines, not through direct DA queries by default. Direct DA semantic search remains available as a long-tail / audit / rationale-deep-dive path; it is not the canonical reach pattern.  Authority extension: - Extends DCL-SPEC-DA-CITATION-MANDATORY-001 (parallel discipline at glossary layer) - Extends SPEC-0067 (glossary's role as DA read surface)  Acceptance signal: Routine prior-decision consultation by AI agents is served by glossary entries in the majority of cases; direct DA queries are reserved for audit, rationale deep-dive, and long-tail cases where the glossary has not yet absorbed a concept.  Origin: - Phase 0 of GTKB-DA-READ-SURFACE-CORRECTION - bridge/gtkb-da-read-surface-correction-phase-0-formalization-003.md (REVISED, GO at -004) - DELIB-S331 in-session owner agreement on placement-over-coercion (S331). You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0475
+  asked_at: 2026-05-09T01:05:45.462668Z
+  question: "Approve insertion of ADR-DA-READ-SURFACE-PLACEMENT-001 into MemBase as an architecture decision, per the body shown in the option preview?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Hold for revision"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 98b2e1ea21798e3f
+  resolved_at: 2026-05-09T01:05:45.462668Z
+  answer: "User has answered your questions: \"Approve insertion of ADR-DA-READ-SURFACE-PLACEMENT-001 into MemBase as an architecture decision, per the body shown in the option preview?\"=\"Approve as drafted (Recommended)\" selected preview: ID: ADR-DA-READ-SURFACE-PLACEMENT-001 Type: architecture_decision  Decision: Place DA pointers on glossary entries. The glossary is the agent-side read surface for prior decisions; the DA is the substrate the glossary cites.  Context: S331 demonstrated a reliable failure mode: agent-initiated DA retrieval is skipped under task focus. The owner-presented choice was to correct the system or remove the DA. Owner direction: correct via placement that rides existing reach-patterns rather than via stricter enforcement.  Alternatives considered: - Path A (auto-inject DA on every prompt): demoted to long-tail catch (Phase 3); heavier than glossary-first; retained for residual cases. - Path B (gate responses on DA-search artifact): rejected; pushes failure to 'searching badly'; brittle classifier; produces workaround behavior (precedent: S331 owner-decision-tracker regex-recursion). - Path C (Loyal Opposition-only enforcement at bridge boundary): rejected; scope narrow; only catches bridge-traversing failures; LO diligence has same failure variable as PB. - Path D (chosen): glossary as primary read surface; DA cited from glossary; auto-injection long-tail; bridge templates pre-populated.  Rationale (Path D): Bias-aligned design. Model already traverses glossary; placement rides existing reach. S331 failure removed at source: with 'isolation' as a glossary entry citing four lifecycle-independence DA records, glossary auto-load surfaces canonical meaning before any tool call. No new agent behavior required.  Consequences: - Glossary becomes higher-discipline artifact; concepts added on first use (codified in DCL-CONCEPT-ON-CONTACT-001). - DA value model changes from 'actively consulted' to 'passively cited' — the intended structural change. - Glossary→DA citation integrity becomes load-bearing (addressed by DCL-GLOSSARY-DA-CITATION-COMPLETENESS-001 + Phase 4 doctor). - DA harvest pipeline unchanged. Read-side correction only.  Origin: - Phase 0 of GTKB-DA-READ-SURFACE-CORRECTION - bridge/gtkb-da-read-surface-correction-phase-0-formalization-003.md (REVISED, GO at -004) - DELIB-S331 in-session owner agreement on placement-over-coercion (S331). You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0476
+  asked_at: 2026-05-09T01:05:45.462668Z
+  question: "Approve insertion of DCL-GLOSSARY-DA-CITATION-COMPLETENESS-001 into MemBase as a design constraint, per the body shown in the option preview?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Hold for revision"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b282583618d947b5
+  resolved_at: 2026-05-09T01:05:45.462668Z
+  answer: "User has answered your questions: \"Approve insertion of DCL-GLOSSARY-DA-CITATION-COMPLETENESS-001 into MemBase as a design constraint, per the body shown in the option preview?\"=\"Approve as drafted (Recommended)\" selected preview: ID: DCL-GLOSSARY-DA-CITATION-COMPLETENESS-001 Type: design_constraint  Constraint: Every glossary entry in .claude/rules/canonical-terminology.md MUST have a Source: line that resolves to at least one of: (a) a Deliberation Archive record (by DELIB-ID, deliberation title, or harvested capture file path), (b) a rule file that itself resolves to a DA record, or (c) a MemBase specification (SPEC-NNNN, GOV-NNN, ADR-NNN, DCL-NNN, PB-NNN, REQ-NNN).  Assertions (implemented as Phase 4 doctor checks): - grep_present: every '### ' heading within '## Canonical Terms' or '## GT-KB Platform & Lifecycle Terms' sections has a 'Source:' line within 30 lines of the heading. - resolution_check: each Source: line's referenced DELIB-ID, file path, or specification ID is resolvable. Broken references produce ERROR-level doctor findings. - minimum_threshold: at least N glossary entries cite DA records (sanity floor; catches accidental wholesale removal). N to be set during Phase 4.  Severity (staged): - Advisory during Phase 1 (backfill in progress). - Promoted to blocking once Phase 4 verification lands.  Rationale for staged severity: Promoting to blocking before Phase 1 backfill completes would hard-fail every existing session. Staged severity allows the backfill to land without breakage, then locks the discipline once content coverage is sufficient.  Origin: - Phase 0 of GTKB-DA-READ-SURFACE-CORRECTION - bridge/gtkb-da-read-surface-correction-phase-0-formalization-003.md (REVISED, GO at -004) - DELIB-S331 in-session owner agreement (S331). You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0477
+  asked_at: 2026-05-09T01:05:45.462668Z
+  question: "Approve insertion of DCL-CONCEPT-ON-CONTACT-001 into MemBase as a design constraint, per the body shown in the option preview?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Hold for revision"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f5ea32026cc14f94
+  resolved_at: 2026-05-09T01:05:45.462668Z
+  answer: "User has answered your questions: \"Approve insertion of DCL-CONCEPT-ON-CONTACT-001 into MemBase as a design constraint, per the body shown in the option preview?\"=\"Approve as drafted (Recommended)\" selected preview: ID: DCL-CONCEPT-ON-CONTACT-001 Type: design_constraint  Constraint: When a load-bearing concept appears in (a) owner conversation that produces a decision, (b) a bridge proposal or review, or (c) a rule-file edit, AND the concept is not already present in .claude/rules/canonical-terminology.md, the concept MUST be added to the glossary before the conversation closes / the bridge proposal files / the rule edit commits.  This mirrors GOV-06 (specify-on-contact, the code-layer governance principle that touching previously unspecified code brings it under control) at the terminology layer. GOV-06 itself is unchanged; this DCL is parallel, not a replacement.  Assertions — staged enforcement (per F2 of -002 NO-GO; resolved at -003 GO): - Stage A (owner conversation): UserPromptSubmit glossary-expansion hook (Phase 3) flags concept-shaped tokens in the owner prompt absent from the glossary; flagged terms recorded for Phase 4 wrap-up enforcement. Severity: advisory until Phase 3 hook lands and Phase 4 verifies; blocking after. - Stage B (bridge proposal/review text): PreToolUse Write hook on bridge/** (Phase 6) scans the body for concept-shaped tokens absent from the glossary. Severity: advisory until Phase 6 stage B lands; blocking after. - Stage C (rule-file edit): PreToolUse Write hook on .claude/rules/** and groundtruth-kb/** rule-class files (Phase 6) scans the diff for newly-introduced tokens. Severity: advisory until Phase 6 stage C lands; blocking after. - Wrap-up enforcement (Phase 4, extended in Phase 6): verifies every term flagged by stages A/B/C is added to the glossary, explicitly deferred with owner acknowledgement, or explicitly rejected with rationale before session wrap-up succeeds. Per-stage severity applies.  Owner-waiver pathway: standard format 'Owner waiver: <flagged_term> — <DELIB-ID> — <reason>' in the operative artifact captures false-positive waivers without blocking.  Severity (overall): Advisory at Phase 0 closure (no detection mechanism exists yet for any stage). Each stage transitions to blocking at the boundary where its detection mechanism is verified.  Definition of 'load-bearing concept': A noun or noun phrase that (a) has GT-KB-specific meaning distinct from common usage, OR (b) appears as a citation target in two or more rule files, owner decisions, specs, or bridge proposals, OR (c) is named in an owner decision as a concept whose definition matters. Edge cases resolved via AskUserQuestion.  Origin: - Phase 0 of GTKB-DA-READ-SURFACE-CORRECTION - bridge/gtkb-da-read-surface-correction-phase-0-formalization-003.md (REVISED, GO at -004) - DELIB-S331 in-session owner agreement on placement-over-coercion (S331) - F2 of -002 NO-GO: broader scope retained with explicit staging; resolved at -003 GO.. You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0478
+  asked_at: 2026-05-09T01:05:45.462668Z
+  question: "Confirm: the 2026-05-07 Codex advisory (gtkb-canonical-terminology-system-context-model-advisory-2026-05-07-001.md, currently NO-GO) remains an open separate Prime-proposal track and is NOT superseded by Phase 0 of GTKB-DA-READ-SURFACE-CORRECTION?"
+  options:
+    - "Confirmed: separate track, not superseded (Recommended)"
+    - "Treat as superseded"
+    - "Defer the determination"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4b209942389a42a8
+  resolved_at: 2026-05-09T01:05:45.462668Z
+  answer: "User has answered your questions: \"Confirm: the 2026-05-07 Codex advisory (gtkb-canonical-terminology-system-context-model-advisory-2026-05-07-001.md, currently NO-GO) remains an open separate Prime-proposal track and is NOT superseded by Phase 0 of GTKB-DA-READ-SURFACE-CORRECTION?\"=\"Confirmed: separate track, not superseded (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0479
+  asked_at: 2026-05-09T01:27:29.472071Z
+  question: "Both threads GO'd — next direction?"
+  options:
+    - "Implement skill-unified Slice 1"
+    - "Begin event-driven Slice 1 (governance supersession)"
+    - "Push 3 commits + then implement"
+    - "Wrap session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8371d9b4a2797109
+  resolved_at: 2026-05-09T01:27:29.472071Z
+  answer: "User has answered your questions: \"Both threads GO'd — next direction?\"=\"Implement skill-unified Slice 1\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0480
+  asked_at: 2026-05-09T02:15:37.414114Z
+  question: "Approve capture of S331 owner decisions as a single Deliberation Archive record (DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS) so Phase 1 glossary entries have resolvable Source citations?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Hold for revision"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f55e609b957a11ae
+  resolved_at: 2026-05-09T02:15:37.414114Z
+  answer: "User has answered your questions: \"Approve capture of S331 owner decisions as a single Deliberation Archive record (DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS) so Phase 1 glossary entries have resolvable Source citations?\"=\"Approve as drafted (Recommended)\" selected preview: ID: DELIB-S331-DA-READ-SURFACE-CORRECTION-FOUNDATIONS Source type: owner_conversation Session: S331 Outcome: owner_decision  Title: S331 owner-decision foundations for the GTKB-DA-READ-SURFACE-CORRECTION program  Summary: During S331 the owner identified an aware-but-unused failure of the Deliberation Archive (Prime Builder produced a wrong-frame evaluation of \"GT-KB isolation\" without consulting the DA). Owner critiqued the procedural failure as more critical than the substantive issue and articulated the placement-over-coercion design principle. The Phase 0 + Phase 1 program implements the read-surface correction.  Content (decisions captured):  1. Isolation = full-lifecycle independence between the GT-KB platform and any application built using it. Relocation of files into applications/ is one consequence; it is not the definition. Forbidden frame: isolation as file-relocation only.  2. The DA-consultation failure was procedural (skipped under task focus), not bias-driven. Aware-but-unused resources usually indicate a placement problem, not a discipline problem.  3. Bias case (option weighed and rejected) is distinguished from salience case (option never on the candidate list). Different remediation strategies.  4. Placement design pattern: position resources on paths the agent already traverses (glossary auto-load, bridge templates, session-start payload) rather than gating new behaviors. Bias-aligned design > coercion-based design.  5. The canonical-terminology glossary becomes the DA's primary read surface. The DA itself is the substrate the glossary cites. Direct DA semantic search is the long-tail / audit / rationale-deep-dive path.  6. Session scope is declared at session start as one of GT-KB / Application / GT-KB+Application. Mechanical enforcement is future work; the declaration is the runtime invariant for lifecycle independence.  7. Implementation cost / difficulty is irrelevant in evaluations. Quality and completeness are the only valid concerns. Surface scope as a fact, not as an objection.  8. Owner direction at S331: 'Please begin. Please parallelize this work to the extent possible.' The umbrella plan was accepted as the Phase 0-6 roadmap.  9. Subsumption confirmed: bridge/gtkb-canonical-terminology-system-context-model-advisory-2026-05-07-001.md remains an open separate Prime-proposal track, not superseded by this program.  Participants: owner, prime-builder/claude-da-read-surface-correction-phase-1 Source ref: bridge/gtkb-da-read-surface-correction-phase-0-formalization-001 through -006; bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-001 through -004; S331 chat transcript pending wrap-up harvest.. You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0482
+  asked_at: 2026-05-09T02:46:14.745727Z
+  question: "Slice 1 + Slice 2 are VERIFIED and committed. What's the next action?"
+  options:
+    - "Draft Slice 3 NEW proposal now"
+    - "Pause here; resume Slice 3 next session"
+    - "Switch to a different backlog item"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 222cdc7916a4d87f
+  resolved_at: 2026-05-09T02:46:14.745727Z
+  answer: "User has answered your questions: \"Slice 1 + Slice 2 are VERIFIED and committed. What's the next action?\"=\"Draft Slice 3 NEW proposal now\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0483
+  asked_at: 2026-05-09T04:05:48.402056Z
+  question: "Have you reviewed the proposed full new content of .claude/rules/canonical-terminology.md at memory/canonical-terminology-md-rewrite-preview.md (sha256 5fbd323508b93a738488e6aa58cd03a1b32a149e662396adb56d2539e5e4c97a), and do you approve writing this exact content to the protected file?"
+  options:
+    - "I have reviewed the preview file and approve as drafted (Recommended)"
+    - "Hold for revision"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f351b30e277cc82c
+  resolved_at: 2026-05-09T04:05:48.402056Z
+  answer: "User has answered your questions: \"Have you reviewed the proposed full new content of .claude/rules/canonical-terminology.md at memory/canonical-terminology-md-rewrite-preview.md (sha256 5fbd323508b93a738488e6aa58cd03a1b32a149e662396adb56d2539e5e4c97a), and do you approve writing this exact content to the protected file?\"=\"I have reviewed the preview file and approve as drafted (Recommended)\" selected preview: Insertion summary: - 30 new entries added in a new section: '## GT-KB DA Read-Surface and Operational Vocabulary (S331 backfill)' - Insertion point: between existing '## GT-KB Platform & Lifecycle Terms (S327)' and '## Alias / Canonical Disposition' - Existing content preserved verbatim (no modification to prior 30 entries) - Heading count: 30 (current) -> 60 (new); delta = 30 - Size: 23,452 bytes -> 51,950 bytes (+28,498 bytes) - Lines: 552 -> 1,193 - current_file_sha256: 9f3677e5eb3e7bad211725264efde65dc27d69ec1ed58aac86cc105f39d78c67 - new_file_sha256:     5fbd323508b93a738488e6aa58cd03a1b32a149e662396adb56d2539e5e4c97a  30 new entry titles (as third-level headings):   isolation   session scope   bias case   salience case   placement   glossary as DA read surface   harness   harness identity   role assignment   bridge thread   GO / NO-GO / VERIFIED   Loyal Opposition advisory   applicability preflight   clause preflight   bridge compliance gate   scanner-safe-writer   owner-decision tracker   prose decision-ask pattern   AskUserQuestion   operating model   work subject   smart poller   OS poller   doctor   release manifest   deliberation harvest   formal-artifact-approval packet   canonical artifact   interrogative default   specify-on-contact  Full content displayed at: memory/canonical-terminology-md-rewrite-preview.md Full content sha256:        5fbd323508b93a738488e6aa58cd03a1b32a149e662396adb56d2539e5e4c97a  This selection is the explicit acknowledgement that the full content was reviewed.. You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0484
+  asked_at: 2026-05-09T04:49:16.384824Z
+  question: "Have you reviewed the proposed full new content of .claude/rules/codex-review-gate.md at memory/codex-review-gate-md-rewrite-preview.md (sha256 bdedcc54e722485c53409e4a65d880548b48f340ff5957513e819b064e68c2e9), and do you approve writing this exact content to the protected file?"
+  options:
+    - "I have reviewed the preview file and approve as drafted (Recommended)"
+    - "Hold for revision"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 40b226df915b2fb4
+  resolved_at: 2026-05-09T04:49:16.384824Z
+  answer: "User has answered your questions: \"Have you reviewed the proposed full new content of .claude/rules/codex-review-gate.md at memory/codex-review-gate-md-rewrite-preview.md (sha256 bdedcc54e722485c53409e4a65d880548b48f340ff5957513e819b064e68c2e9), and do you approve writing this exact content to the protected file?\"=\"I have reviewed the preview file and approve as drafted (Recommended)\" selected preview: Insertion summary: - 1 new top-level section added: '## Prior Deliberations Section Requirement' - Insertion point: just before the copyright line (last line of file) - Existing content preserved verbatim (no modification to prior 6 sections) - Lines: 106 (current) -> 124 (new); delta = +18 lines - Size: 5,499 bytes -> 7,028 bytes (+1,529 bytes) - current_file_sha256: 8286c3e31b27e525ac80185fc7a6452420be86b38f5791973631e7c742398be0 - new_file_sha256:     bdedcc54e722485c53409e4a65d880548b48f340ff5957513e819b064e68c2e9  New section content (the only change):  ## Prior Deliberations Section Requirement  (Active per Phase 2 of GTKB-DA-READ-SURFACE-CORRECTION; supported by GOV-GLOSSARY-AS-DA-READ-SURFACE-001 and ADR-DA-READ-SURFACE-PLACEMENT-001.)  Bridge implementation proposals MUST include a substantive '## Prior Deliberations' section. The section anchors the proposal in the prior-decision history and is one of the named placement targets for the DA read-surface correction (the bridge-template surface).  The bridge-propose helper at .claude/skills/bridge-propose/helpers/write_bridge.py pre-populates this section by default via pre_populate_prior_deliberations: glossary-source seeding from .claude/rules/canonical-terminology.md plus optional semantic search. Authors review and prune the pre-populated entries.  Loyal Opposition MUST issue NO-GO when reviewing a NEW or REVISED proposal that meets ALL of these conditions:  1. The '## Prior Deliberations' section is absent OR empty (no candidate entries, helper-suggested or author-supplied). 2. No '_No prior deliberations: <reason>._' justification line is present (the explicit empty-justification convention for novel topics with genuinely no DA precedent).  The justification line is the authorized opt-out path for proposals on novel topics with genuinely no DA precedent; it requires the author to state the reason in prose. NO-GO findings should cite this rule and the missing-section evidence.  Verdict files (lines starting with GO, NO-GO, or VERIFIED) are explicitly excluded from this check; they are evidence narratives, not authoring artifacts.  Full content displayed at: memory/codex-review-gate-md-rewrite-preview.md Full content sha256:        bdedcc54e722485c53409e4a65d880548b48f340ff5957513e819b064e68c2e9  This selection is the explicit acknowledgement that the full content was reviewed.. You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0485
+  asked_at: 2026-05-09T05:54:20.008199Z
+  question: "How should we handle the SessionStart redesign relative to Slice 4?"
+  options:
+    - "Redesign as prerequisite (file separately)"
+    - "Fold redesign into Slice 4 REVISED-4"
+    - "Keep D9b in Slice 4; file redesign as follow-on"
+    - "Pause; investigate harness behavior first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 834e44b7c661303c
+  resolved_at: 2026-05-09T05:54:20.008199Z
+  answer: "User has answered your questions: \"How should we handle the SessionStart redesign relative to Slice 4?\"=\"Redesign as prerequisite (file separately)\", \"What init-keyword set should trigger the startup disclosure?\"=\"Is this an appropriate opportunity to allow users to specify the application as well, if that it the intent? Perhaps we should consider that command to be ,ore than just stimulus. for example, init gtkb/start gtkb/begin gktb would all start a GT-KB-scoped session, while init agent_red/start agent_red/begin agent_red would all start the session with an explicit agent_red scope.,init session / initialize session / start gtkb session,Plus: start session / begin session / open session,Plus: GT-KB startup / GroundTruth-KB startup\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0486
+  asked_at: 2026-05-09T05:54:20.008199Z
+  question: "What init-keyword set should trigger the startup disclosure?"
+  options:
+    - "init session / initialize session / start gtkb session"
+    - "Plus: start session / begin session / open session"
+    - "Plus: GT-KB startup / GroundTruth-KB startup"
+    - "Empty prompt or single character (e.g., '?')"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 411dc2da4fcdb15a
+  resolved_at: 2026-05-09T05:54:20.008199Z
+  answer: "User has answered your questions: \"How should we handle the SessionStart redesign relative to Slice 4?\"=\"Redesign as prerequisite (file separately)\", \"What init-keyword set should trigger the startup disclosure?\"=\"Is this an appropriate opportunity to allow users to specify the application as well, if that it the intent? Perhaps we should consider that command to be ,ore than just stimulus. for example, init gtkb/start gtkb/begin gktb would all start a GT-KB-scoped session, while init agent_red/start agent_red/begin agent_red would all start the session with an explicit agent_red scope.,init session / initialize session / start gtkb session,Plus: start session / begin session / open session,Plus: GT-KB startup / GroundTruth-KB startup\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0487
+  asked_at: 2026-05-09T06:21:59.709552Z
+  question: "Codex's diagnosis is verified: legacy 15s smart poller (PID 18616 + scheduled task GTKB-SmartBridgePoller in Running state, started 2026-05-08 12:28:28) is racing the event-driven successor on dispatch-state.json — 69 PermissionErrors logged, contention ongoing. Slice 4 retirement is at NO-GO over a single bootstrap-surface finding (gt bootstrap desktop still advertises smart-poller setup). How should I proceed?"
+  options:
+    - "Mitigate now, then land Slice 4 (Recommended)"
+    - "Mitigate only — defer Slice 4"
+    - "Don't intervene; revise Slice 4 first"
+    - "Investigate further before deciding"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0f5948c8cfe7a1c4
+  resolved_at: 2026-05-09T06:21:59.709552Z
+  answer: "User has answered your questions: \"Codex's diagnosis is verified: legacy 15s smart poller (PID 18616 + scheduled task GTKB-SmartBridgePoller in Running state, started 2026-05-08 12:28:28) is racing the event-driven successor on dispatch-state.json — 69 PermissionErrors logged, contention ongoing. Slice 4 retirement is at NO-GO over a single bootstrap-surface finding (gt bootstrap desktop still advertises smart-poller setup). How should I proceed?\"=\"Mitigate now, then land Slice 4 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0488
+  asked_at: 2026-05-09T06:40:06.309603Z
+  question: "How should we sequence the active-session suppression work relative to the in-flight threads?"
+  options:
+    - "File suppression NEW now; pause Slice 4 + formalization NO-GO revisions until suppression GO+VERIFIED"
+    - "File suppression NEW now in parallel; continue revising the other two threads"
+    - "Defer suppression to after Slice 4 + formalization VERIFIED"
+    - "Disable cross-harness trigger temporarily; resume after current threads VERIFIED"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d6f163f3881c998f
+  resolved_at: 2026-05-09T06:40:06.309603Z
+  answer: "User has answered your questions: \"How should we sequence the active-session suppression work relative to the in-flight threads?\"=\"File suppression NEW now; pause Slice 4 + formalization NO-GO revisions until suppression GO+VERIFIED\", \"What's the freshness window for the heartbeat (how long since last tool-use marks a session as 'active')?\"=\"120 seconds (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0489
+  asked_at: 2026-05-09T06:40:06.309603Z
+  question: "What's the freshness window for the heartbeat (how long since last tool-use marks a session as 'active')?"
+  options:
+    - "60 seconds"
+    - "120 seconds (Recommended)"
+    - "300 seconds (5 min)"
+    - "Configurable via env var or config"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8f942a0c4fbacb97
+  resolved_at: 2026-05-09T06:40:06.309603Z
+  answer: "User has answered your questions: \"How should we sequence the active-session suppression work relative to the in-flight threads?\"=\"File suppression NEW now; pause Slice 4 + formalization NO-GO revisions until suppression GO+VERIFIED\", \"What's the freshness window for the heartbeat (how long since last tool-use marks a session as 'active')?\"=\"120 seconds (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

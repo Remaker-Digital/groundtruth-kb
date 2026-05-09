@@ -11,7 +11,7 @@ from pathlib import Path
 from groundtruth_kb.project.doctor import (
     DoctorReport,
     ToolCheck,
-    _check_bridge_poller,
+    _check_bridge_dispatch_liveness,
     _check_db_schema,
     _check_git,
     _check_groundtruth_toml,
@@ -295,7 +295,7 @@ def test_run_doctor_returns_fail_for_missing_db(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# _check_bridge_poller — bridge liveness checks
+# _check_bridge_dispatch_liveness — bridge liveness checks
 # ---------------------------------------------------------------------------
 
 
@@ -365,14 +365,14 @@ def _utc_now_minus_seconds(seconds: int) -> str:
 # tests/test_doctor_bridge_poller.py per
 # bridge/gtkb-bridge-poller-doctor-path-2026-05-02-003.md TP1-TP7. The
 # tests below remain as helper-level regression coverage on the internal
-# ``_check_bridge_poller`` contract; they do not substitute for the
+# ``_check_bridge_dispatch_liveness`` contract; they do not substitute for the
 # public-surface tests.
 
 
 def test_bridge_poller_fresh_file_ok(tmp_path: Path) -> None:
     """dispatch-state recipient updated < 4 min ago → OK."""
     _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(60))
-    result = _check_bridge_poller(tmp_path, "claude")
+    result = _check_bridge_dispatch_liveness(tmp_path, "claude")
     assert result.status == "pass", f"Expected pass, got {result.status}: {result.message}"
     assert "OK" in result.message
 
@@ -380,7 +380,7 @@ def test_bridge_poller_fresh_file_ok(tmp_path: Path) -> None:
 def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
     """dispatch-state recipient updated 5 min ago → WARN."""
     _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10))
-    result = _check_bridge_poller(tmp_path, "codex")
+    result = _check_bridge_dispatch_liveness(tmp_path, "codex")
     assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
     assert "WARN" in result.message
 
@@ -388,14 +388,14 @@ def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
 def test_bridge_poller_15_min_old_alarm(tmp_path: Path) -> None:
     """dispatch-state recipient updated 15 min ago → ALARM."""
     _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60))
-    result = _check_bridge_poller(tmp_path, "claude")
+    result = _check_bridge_dispatch_liveness(tmp_path, "claude")
     assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
     assert "ALARM" in result.message
 
 
 def test_bridge_poller_missing_file_not_started(tmp_path: Path) -> None:
     """Missing dispatch-state file → not started (WARN)."""
-    result = _check_bridge_poller(tmp_path, "codex")
+    result = _check_bridge_dispatch_liveness(tmp_path, "codex")
     assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
     assert "not started" in result.message.lower()
 
@@ -416,7 +416,7 @@ def test_bridge_poller_missing_updated_at_field_alarm(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    result = _check_bridge_poller(tmp_path, "claude")
+    result = _check_bridge_dispatch_liveness(tmp_path, "claude")
     assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
     assert "ALARM" in result.message or "updated_at" in result.message
 
@@ -425,7 +425,7 @@ def test_bridge_poller_unknown_last_result_no_error(tmp_path: Path) -> None:
     """Unknown last_result values are displayed as-is without raising an error."""
     for state in ("running", "completed", "custom-state-42"):
         _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(30), state=state)
-        result = _check_bridge_poller(tmp_path, "claude")
+        result = _check_bridge_dispatch_liveness(tmp_path, "claude")
         # Should not raise; must return a ToolCheck with the last_result value visible
         assert isinstance(result, ToolCheck)
         assert state in result.message

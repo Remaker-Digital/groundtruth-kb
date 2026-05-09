@@ -90,15 +90,25 @@ def test_all_three_alert_yamls_present_and_parse() -> None:
         # runtime reads rawQueryText (frser-sqlite-datasource), so we require
         # both to prevent the proposal-vs-runtime key from drifting apart.
         model = rule["data"][0]["model"]
-        assert "rawSql" in model, (
-            f"{name} data[0].model missing required key 'rawSql' (proposal §E)"
-        )
+        assert "rawSql" in model, f"{name} data[0].model missing required key 'rawSql' (proposal §E)"
         assert "rawQueryText" in model, (
             f"{name} data[0].model missing 'rawQueryText' (frser-sqlite-datasource runtime key)"
         )
         assert model["rawSql"].strip() == model["rawQueryText"].strip(), (
             f"{name} rawSql and rawQueryText must be the same SQL text"
         )
+
+
+def test_alert_queries_use_nonzero_relative_time_range() -> None:
+    """Grafana rejects alert queries whose relative time range is 0 -> 0."""
+    for path in sorted(ALERTING_DIR.glob("*.yaml")):
+        rule = _first_rule(_load_yaml(path))
+        for idx, data_item in enumerate(rule["data"]):
+            time_range = data_item.get("relativeTimeRange")
+            assert isinstance(time_range, dict), f"{path.name} data[{idx}] must define relativeTimeRange"
+            assert time_range.get("from", 0) > time_range.get("to", 0), (
+                f"{path.name} data[{idx}] has invalid relativeTimeRange: {time_range}"
+            )
 
 
 # ---------- Exact metric_key literals (GO condition 2) ----------
@@ -108,8 +118,7 @@ def test_release_blockers_uses_exact_authoritative_metric_key() -> None:
     rule = _first_rule(_load_yaml(ALERTING_DIR / "release-blockers.yaml"))
     sql = _raw_sql(rule)
     assert f"metric_key = '{EXPECTED_RELEASE_BLOCKERS_METRIC_KEY}'" in sql, (
-        f"release-blockers.yaml must reference exact metric_key "
-        f"{EXPECTED_RELEASE_BLOCKERS_METRIC_KEY!r}; got: {sql!r}"
+        f"release-blockers.yaml must reference exact metric_key {EXPECTED_RELEASE_BLOCKERS_METRIC_KEY!r}; got: {sql!r}"
     )
     assert rule["annotations"]["source_metric_key"] == EXPECTED_RELEASE_BLOCKERS_METRIC_KEY
 
@@ -118,8 +127,7 @@ def test_failing_ci_uses_exact_authoritative_metric_key() -> None:
     rule = _first_rule(_load_yaml(ALERTING_DIR / "failing-ci.yaml"))
     sql = _raw_sql(rule)
     assert f"metric_key = '{EXPECTED_FAILING_CI_METRIC_KEY}'" in sql, (
-        f"failing-ci.yaml must reference exact metric_key "
-        f"{EXPECTED_FAILING_CI_METRIC_KEY!r}; got: {sql!r}"
+        f"failing-ci.yaml must reference exact metric_key {EXPECTED_FAILING_CI_METRIC_KEY!r}; got: {sql!r}"
     )
     assert rule["annotations"]["source_metric_key"] == EXPECTED_FAILING_CI_METRIC_KEY
 
@@ -148,9 +156,7 @@ def test_every_alert_sql_references_only_tables_in_schema() -> None:
         referenced = _tables_referenced_by_sql(sql)
         assert referenced, f"{path.name} SQL references no tables; suspicious"
         orphans = referenced - schema
-        assert not orphans, (
-            f"{path.name} references table(s) not in schema.sql: {sorted(orphans)}"
-        )
+        assert not orphans, f"{path.name} references table(s) not in schema.sql: {sorted(orphans)}"
 
 
 def test_stale_data_rule_uses_refresh_runs() -> None:
@@ -203,10 +209,7 @@ def test_refresh_pipeline_actually_emits_the_alert_metric_keys(tmp_path) -> None
     db_path = tmp_path / "gtkb-dashboard.sqlite"
     refresh_database(db_path=db_path, project_root=REPO_ROOT, model=_sample_model(), history=[])
     with sqlite3.connect(db_path) as conn:
-        emitted = {
-            row[0]
-            for row in conn.execute("SELECT metric_key FROM current_metrics")
-        }
+        emitted = {row[0] for row in conn.execute("SELECT metric_key FROM current_metrics")}
     assert EXPECTED_RELEASE_BLOCKERS_METRIC_KEY in emitted, (
         f"refresh pipeline did not emit {EXPECTED_RELEASE_BLOCKERS_METRIC_KEY!r} "
         f"into current_metrics; alert rule would never fire. Emitted keys: {sorted(emitted)}"

@@ -74,7 +74,7 @@ status = "native"
 surface = ".codex/skills/bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge-propose/SKILL.md"
-source_sha256 = "5c0cfcd2a55f25e7f824933a23cd77941016d02e3df0de61e195d971a9f24ac7"
+source_sha256 = "a59bd08404a142cb74fdd05e2bff8726570d8dd1dbf204a35f05d403a384ad36"
 [[capabilities]]
 id = "skill.check-deliberations"
 kind = "skill"
