@@ -5883,6 +5883,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T17:41:00.341159Z
   answer: "User has answered your questions: \"Codex landed NO-GO at -002 on the decision-tracker proposal in parallel with the umbrella NO-GO. 5 findings: F1 (P1; same-turn AUQ presence too broad to auto-resolve — need deterministic correlation like substring/Jaccard overlap, not LLM); F2 (P1; DCL approval packets missing, batch unactivated); F3 (P2; resolved_via field needs DecisionEntry model extension); F4 (P3; test path should be tests/hooks/ not tests/scripts/); F5 (P3; missing advisory spec). All addressable. File REVISED-1 -003 now or defer?\"=\"File REVISED-1 -003 now (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0499
+  asked_at: 2026-05-09T18:02:29.782263Z
+  question: "Two parallel NO-GO -004s captured. Both have substantive findings: umbrella F1 (P0 — Claude Code missing UserPromptSubmit hook registration); umbrella F2 (P1 — regression scan misses three forbidden-pattern variants); decision-tracker F1 (P1 — Jaccard rule overly permissive on boilerplate-heavy phrasings); decision-tracker F2 (P1 — packet recipe cites wrong schema). All addressable. How to proceed?"
+  options:
+    - "File both REVISED-2 -005s now (Recommended)"
+    - "File umbrella REVISED-2 only; defer decision-tracker"
+    - "File decision-tracker REVISED-2 only; defer umbrella"
+    - "Defer both REVISED-2s to a later session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c24fb195e4a52acf
+  resolved_at: 2026-05-09T18:02:29.782263Z
+  answer: "User has answered your questions: \"Two parallel NO-GO -004s captured. Both have substantive findings: umbrella F1 (P0 — Claude Code missing UserPromptSubmit hook registration); umbrella F2 (P1 — regression scan misses three forbidden-pattern variants); decision-tracker F1 (P1 — Jaccard rule overly permissive on boilerplate-heavy phrasings); decision-tracker F2 (P1 — packet recipe cites wrong schema). All addressable. How to proceed?\"=\"File both REVISED-2 -005s now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

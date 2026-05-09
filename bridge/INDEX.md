@@ -12,6 +12,7 @@
 
 
 Document: gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001
+GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-006.md
 REVISED: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-005.md
 NO-GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-004.md
 REVISED: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-003.md
@@ -19,6 +20,8 @@ NO-GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-
 NEW: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001.md
 
 Document: gtkb-loyal-opposition-startup-symmetry-001
+REVISED: bridge/gtkb-loyal-opposition-startup-symmetry-001-007.md
+NO-GO: bridge/gtkb-loyal-opposition-startup-symmetry-001-006.md
 REVISED: bridge/gtkb-loyal-opposition-startup-symmetry-001-005.md
 NO-GO: bridge/gtkb-loyal-opposition-startup-symmetry-001-004.md
 REVISED: bridge/gtkb-loyal-opposition-startup-symmetry-001-003.md

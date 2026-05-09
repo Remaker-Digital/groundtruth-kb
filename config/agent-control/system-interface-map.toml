@@ -242,7 +242,27 @@ mutation_method = "Owner-managed via Codex app UI. Not modifiable from within E:
 role_permissions = "Codex-side only. Wakes Codex chat to read bridge/INDEX.md every 3 minutes. Does NOT spawn counterpart harness, update dispatch-state.json, refresh active-{role}-session.lock, or run through .codex/hooks.json."
 startup_visibility = "none"
 dashboard_visibility = "none"
-harness_caveats = "Supplemental Codex-side bridge-queue monitoring; NOT a component of the formal cross-harness event-driven trigger (id = 'bridge-dispatch'). Distinct from the active-session suppression heartbeat (scripts/active_session_heartbeat.py), which writes lock files consumed by the trigger. Confirmed by Codex 2026-05-09 in response to owner inquiry; inventory entry per owner AUQ 'Inventory only' the same date."
+harness_caveats = "Supplemental Codex-side bridge-queue monitoring; NOT a component of the formal cross-harness event-driven trigger (id = 'bridge-dispatch'). Distinct from the active-session suppression heartbeat (scripts/active_session_heartbeat.py), which writes lock files consumed by the trigger. Confirmed by Codex 2026-05-09 in response to owner inquiry; inventory entry per owner AUQ 'Inventory only' the same date. Relationship to gt-kb-bridge-monitor (id = 'gt-kb-bridge-monitor-codex-thread', 30-min cadence, also Codex-side) is unconfirmed: the 30-min automation may replace this 3-min one or coexist with it; owner observation will resolve."
+verification_method = "Owner observation only; no mechanical verification (out-of-repo Codex app config)."
+lifecycle_state = "active"
+related_specs = []
+related_deliberations = []
+
+[[systems]]
+id = "gt-kb-bridge-monitor-codex-thread"
+canonical_name = "gt-kb-bridge-monitor (Codex app thread automation; 30-min cadence)"
+accepted_aliases = ["gt-kb-bridge-monitor", "GT-KB Bridge Monitor", "Codex 30-min bridge monitor"]
+discouraged_aliases = ["bridge poller", "smart poller"]
+forbidden_aliases = []
+concept_vs_artifact = "supplemental_monitoring"
+authoritative_source = "Codex app thread automation config (external; lives in Codex CLI installation state, not in E:/GT-KB)"
+generated_or_authoritative = "external_runtime"
+read_method = "Inspect via Codex app UI; runtime trace appears as a Codex chat heartbeat every 30 minutes that triggers a live bridge/INDEX.md scan."
+mutation_method = "Owner-managed via Codex app UI. Not modifiable from within E:/GT-KB."
+role_permissions = "Codex-side only. Wakes Codex chat every 30 minutes (vs the 3-minute cadence of monitor-gt-kb-bridge) to parse the live bridge/INDEX.md and distinguish Loyal Opposition work (NEW/REVISED) from Prime Builder work (GO/NO-GO/VERIFIED). Does NOT spawn counterpart harness, update dispatch-state.json, refresh active-{role}-session.lock, or run through .codex/hooks.json."
+startup_visibility = "none"
+dashboard_visibility = "none"
+harness_caveats = "Created by Codex 2026-05-09 in conjunction with the LO startup-symmetry review session, framed as 'without restoring the retired pollers' — i.e., 30-min cadence is a deliberate cost reduction from the 3-minute monitor-gt-kb-bridge automation. 30-min cadence = 48 wakes/day vs 480 for the 3-min variant; 10x token-cost reduction. Relationship to monitor-gt-kb-bridge (id = 'monitor-gt-kb-bridge-codex-thread') is unconfirmed: this 30-min automation may replace the 3-min one or coexist with it. Both are out-of-repo Codex-side automations; neither is a component of the formal cross-harness event-driven trigger."
 verification_method = "Owner observation only; no mechanical verification (out-of-repo Codex app config)."
 lifecycle_state = "active"
 related_specs = []
