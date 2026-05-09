@@ -48,6 +48,26 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -61,6 +81,11 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/cross_harness_bridge_trigger.py\" --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\" --stop-hook",
             "timeout": 5
           }
         ]

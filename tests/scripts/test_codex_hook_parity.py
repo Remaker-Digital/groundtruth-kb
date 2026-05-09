@@ -74,7 +74,48 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         group.get("matcher") == "Bash" and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
         for group in codex_hooks["hooks"]["PreToolUse"]
     )
-    assert "Stop" not in codex_hooks["hooks"]
+    # Per bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations
+    # Codex GO at -004: Slice 3 registers a Codex `Stop` hook that invokes
+    # scripts/cross_harness_bridge_trigger.py with --stop-hook. The hook satisfies
+    # the OpenAI Codex Stop output contract by emitting `{}` JSON to stdout. The
+    # previous absence assertion is replaced with a presence assertion scoped to
+    # the cross-harness trigger; non-trigger Stop registrations remain banned per
+    # the existing prohibition on Codex lifecycle wrap-up via Stop.
+    assert "Stop" in codex_hooks["hooks"], (
+        "Codex Stop hook must be registered (Slice 3 cross-harness trigger). "
+        "Pre-Slice-3 baseline (`Stop` absent from `.codex/hooks.json`) is "
+        "superseded by gtkb-bridge-poller-event-driven-replacement-slice-3 GO -004."
+    )
+    codex_stop_hooks = codex_hooks["hooks"]["Stop"]
+    # Stop matchers are not supported by Codex; entries must be matcher-less.
+    for group in codex_stop_hooks:
+        assert group.get("matcher") in (None, ""), (
+            "Codex Stop entries must not declare a matcher (Codex hooks docs)"
+        )
+    assert any(
+        "cross_harness_bridge_trigger.py" in hook.get("command", "")
+        and "--stop-hook" in hook.get("command", "")
+        for group in codex_stop_hooks
+        for hook in group["hooks"]
+    ), (
+        "Codex Stop must invoke cross_harness_bridge_trigger.py with --stop-hook "
+        "(satisfies OpenAI Codex Stop JSON output contract by emitting `{}` on stdout)"
+    )
+    # Lifecycle wrap-up scripts must NOT be registered through Codex Stop —
+    # the parity test continues to ban that surface (the active wrap-up
+    # mechanism is the release-candidate gate / harness-specific tooling).
+    codex_stop_commands = [
+        hook["command"]
+        for group in codex_stop_hooks
+        for hook in group["hooks"]
+    ]
+    assert not any(
+        "session_wrapup" in cmd or "session_self_initialization.py" in cmd
+        for cmd in codex_stop_commands
+    ), (
+        "Codex Stop must not register lifecycle wrap-up scripts. The cross-harness "
+        "trigger is the only Codex Stop surface authorized by Slice 3."
+    )
     # Per bridge/gtkb-startup-enhancements-p1-003.md §2.4 (Codex GO at -004):
     # the previously-registered owner-decision-tracker-ups.cmd entry has been
     # removed because the wrapper file does not exist on disk, Codex hooks
@@ -97,9 +138,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     # or a dispatcher under .claude/hooks/ that delegates to it via the
     # --emit-startup-service-payload contract.
     session_start_hooks = [
-        hook["command"]
-        for group in claude_settings["hooks"]["SessionStart"]
-        for hook in group["hooks"]
+        hook["command"] for group in claude_settings["hooks"]["SessionStart"] for hook in group["hooks"]
     ]
     direct_match = any(
         "session_self_initialization.py" in cmd
@@ -110,16 +149,14 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         and "--role-profile" not in cmd
         for cmd in session_start_hooks
     )
-    dispatcher_match = any(
-        "session_start_dispatch.py" in cmd
-        for cmd in session_start_hooks
-    )
+    dispatcher_match = any("session_start_dispatch.py" in cmd for cmd in session_start_hooks)
     assert direct_match or dispatcher_match, (
         "Claude SessionStart must register either the canonical service directly "
         "or a dispatcher under .claude/hooks/ that delegates to it"
     )
     if dispatcher_match:
         from pathlib import Path as _P
+
         dispatcher_source = _P(".claude/hooks/session_start_dispatch.py").read_text(encoding="utf-8")
         assert "session_self_initialization.py" in dispatcher_source
         assert "--emit-startup-service-payload" in dispatcher_source
@@ -158,6 +195,21 @@ def test_codex_session_start_dispatcher_json_is_utf8_safe_on_windows() -> None:
 
     assert text.isascii()
     assert json.loads(text)["hookSpecificOutput"]["additionalContext"] == "Smart-poller notification \u2014 ready"
+
+
+def test_codex_session_start_dispatcher_bridge_auto_dispatch_mode(monkeypatch, capsys) -> None:
+    module = _load_session_start_dispatcher()
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-002")
+
+    assert module.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    ctx = payload["hookSpecificOutput"]["additionalContext"]
+    assert "Bridge Auto-Dispatch Session" in ctx
+    assert "test-run-002" in ctx
+    assert "Programmatic Startup Payload" not in ctx
+    assert "discarded owner session-start stimulus" in ctx
+    assert "active bridge auto-dispatch task" in ctx
+    assert "bridge/INDEX.md" in ctx
 
 
 def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None:

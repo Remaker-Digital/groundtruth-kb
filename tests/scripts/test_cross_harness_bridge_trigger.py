@@ -567,3 +567,268 @@ def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:
     # And Codex's recorded signature has changed (was NEW-actionable; now empty).
     codex_sig_after_step3 = s3["dispatch_state"]["recipients"]["codex"]["signature"]
     assert codex_sig_after_step3 != codex_sig_after_step1
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# T-3-* — Slice 3 hook-mode tests (per GO at -004)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_stop_hook_emits_exactly_braces_json(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """T-3-stop-hook-output-contract: ``--stop-hook`` mode MUST emit exactly
+    ``{}`` (parseable JSON object, no extra text) on stdout and exit 0.
+
+    Required by the OpenAI Codex Stop hook contract per Codex `-002` F2 +
+    Codex GO at `-004` "GO Conditions For Later Verification" line 167.
+    Also valid for Claude Stop hook registrations.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    rc = trigger.main(
+        [
+            "--project-root",
+            str(root),
+            "--state-dir",
+            str(state_dir),
+            "--stop-hook",
+            "--dry-run",
+        ]
+    )
+    assert rc == 0
+
+    captured = capsys.readouterr()
+    # Stdout MUST be exactly "{}\n" (no extra summary text — Codex contract).
+    assert captured.out == "{}\n", (
+        f"Expected stdout exactly '{{}}\\n' for --stop-hook; got: {captured.out!r}"
+    )
+    # Stdout MUST parse as a JSON object.
+    parsed = json.loads(captured.out)
+    assert parsed == {}, "Stop-hook stdout must parse to an empty dict"
+
+
+def test_stop_hook_overrides_verbose(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """T-3-stop-hook-output-contract (verbose interaction): when both
+    --stop-hook and --verbose are passed, --stop-hook MUST win to preserve
+    the JSON contract.
+
+    Without this guard a misconfigured hook command (--verbose accidentally
+    set in the same registration) would emit pretty-printed summary text
+    that violates the Codex Stop contract.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    rc = trigger.main(
+        [
+            "--project-root",
+            str(root),
+            "--state-dir",
+            str(state_dir),
+            "--stop-hook",
+            "--verbose",
+            "--dry-run",
+        ]
+    )
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert captured.out == "{}\n"
+
+
+def test_stop_hook_runs_reconciliation_bounded_no_dispatch_on_unchanged(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """T-3-stop-reconciliation-bounded: with --stop-hook on unchanged INDEX,
+    the trigger MUST run reconciliation (read INDEX, compute signature,
+    check dispatch-state) and exit 0 with `{}` stdout, but NOT dispatch.
+
+    Bounded-by-signature-dedup contract: if a prior PostToolUse fire already
+    recorded the current signature, Stop reconciliation sees match and exits
+    "unchanged" — no spawn.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+    # Prime the dispatch-state by firing default mode first.
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    state_path = state_dir / "dispatch-state.json"
+    assert state_path.exists()
+    sig_before = json.loads(state_path.read_text(encoding="utf-8"))[
+        "recipients"
+    ]["codex"]["signature"]
+
+    # Now invoke --stop-hook on the SAME index state.
+    capsys.readouterr()  # drain
+    rc = trigger.main(
+        [
+            "--project-root",
+            str(root),
+            "--state-dir",
+            str(state_dir),
+            "--stop-hook",
+            "--dry-run",
+        ]
+    )
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert captured.out == "{}\n"
+
+    # Signature unchanged; last_result records "unchanged".
+    state_after = json.loads(state_path.read_text(encoding="utf-8"))
+    sig_after = state_after["recipients"]["codex"]["signature"]
+    assert sig_after == sig_before
+    assert state_after["recipients"]["codex"]["last_result"] == "unchanged"
+
+
+def test_stop_hook_fail_soft_dispatches_on_changed_signature(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """T-3-stop-reconciliation-fail-soft: if PostToolUse missed an INDEX
+    change (e.g., a tool that doesn't fire PostToolUse), the Stop hook
+    MUST detect the changed signature and dispatch.
+
+    This is the fail-soft safety net per parent thread `-002` F2 Codex
+    wording. The trigger still emits `{}` to satisfy the Codex contract,
+    but internally the dispatch path is entered (dry_run mode in test).
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+
+    # Prime dispatch-state with NO INDEX (signature for empty list).
+    _write_index(root, "# empty\n")
+    trigger = _load_trigger()
+    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    # Simulate PostToolUse missing the change: edit INDEX without firing
+    # default trigger; only Stop fires.
+    _write_index(root, _index_with_one_new(root))
+
+    capsys.readouterr()  # drain
+    rc = trigger.main(
+        [
+            "--project-root",
+            str(root),
+            "--state-dir",
+            str(state_dir),
+            "--stop-hook",
+            "--dry-run",
+        ]
+    )
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert captured.out == "{}\n"
+
+    # Internal dispatch state shows the dispatch path was entered: last_launch
+    # carries the dry-run meta. In dry_run mode, launched=False so last_result
+    # records "launch_failed" (existing convention) — the load-bearing assertion
+    # is that the launch path was attempted (last_launch present + reason
+    # "dry_run"), proving the Stop hook detected the signature change rather
+    # than no-op'ing on "unchanged".
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    rec = state["recipients"]["codex"]
+    assert rec["last_result"] != "unchanged", (
+        "Stop hook must detect changed signature even when PostToolUse missed it"
+    )
+    assert "last_launch" in rec
+    assert rec["last_launch"]["reason"] == "dry_run"
+
+
+def test_stop_hook_main_returns_zero_even_on_internal_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """T-3-stop-hook-output-contract (failure path): even when reconciliation
+    fails internally, --stop-hook MUST exit 0 (fire-and-forget) AND emit
+    valid Stop-contract output. The catch-all in main() suppresses the error
+    to stderr; stdout stays JSON-valid.
+
+    Note: when reconciliation fails BEFORE the print path, stdout is empty.
+    Codex docs treat exit 0 + empty stdout as success too, so this is still
+    a valid Stop contract — but the test pins the exit code, not the exact
+    stdout, because the print is gated on successful run_trigger.
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("simulated detection failure for stop-hook fail-soft test")
+
+    monkeypatch.setattr(trigger, "_compute_actionable", _boom)
+    rc = trigger.main(
+        [
+            "--project-root",
+            str(root),
+            "--state-dir",
+            str(state_dir),
+            "--stop-hook",
+            "--dry-run",
+        ]
+    )
+    assert rc == 0
+    # Error logged to stderr (fire-and-forget).
+    captured = capsys.readouterr()
+    assert "cross-harness trigger error" in captured.err
+
+
+def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path) -> None:
+    """T-3-overlap-state-shared (Option A coordination): when --state-dir
+    points at the smart-poller's existing dispatch-state path, the trigger
+    MUST read that file and respect a previously-recorded signature
+    (avoiding double-dispatch during the smart-poller/trigger overlap window).
+    """
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "shared-bridge-poller-state"
+    state_dir.mkdir(parents=True)
+
+    _write_index(root, _index_with_one_new(root))
+
+    trigger = _load_trigger()
+
+    # Compute what the trigger's signature WOULD be for this INDEX state.
+    s = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    expected_sig = s["dispatch_state"]["recipients"]["codex"]["signature"]
+    assert s["results"]["codex"]["reason"] == "dry_run"
+
+    # Wipe state, then pre-populate as-if smart-poller already dispatched.
+    state_path = state_dir / "dispatch-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "updated_at": "1999-01-01T00:00:00+00:00",
+                "recipients": {
+                    "codex": {
+                        "signature": expected_sig,
+                        "signature_scope": "selected_dispatch_batch",
+                        "pending_count": 1,
+                        "selected_count": 1,
+                        "raw_pending_count": 1,
+                        "updated_at": "1999-01-01T00:00:00+00:00",
+                        "last_result": "launched",
+                    }
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    # Trigger fires; sees matching signature; does NOT dispatch.
+    s2 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    assert s2["results"]["codex"]["reason"] == "unchanged", (
+        "trigger must respect a pre-existing matching signature in the shared state file"
+    )

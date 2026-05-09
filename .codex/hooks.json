@@ -70,6 +70,40 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Cross-harness bridge trigger",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "statusMessage": "Cross-harness bridge trigger",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
+            "statusMessage": "Cross-harness bridge Stop reconciliation",
+            "timeout": 5
+          }
+        ]
       }
     ]
   }

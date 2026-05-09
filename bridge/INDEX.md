@@ -11,7 +11,23 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-da-read-surface-correction-phase-2-template-pre-population
+NO-GO: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-002.md
+NEW: bridge/gtkb-da-read-surface-correction-phase-2-template-pre-population-001.md
+
+Document: gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-001
+VERIFIED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md
+NEW: bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-005.md
+GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-004.md
+REVISED: bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-003.md
+NO-GO: bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-002.md
+NEW: bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-001.md
+
 Document: gtkb-da-read-surface-correction-phase-1-glossary-backfill
+VERIFIED: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-010.md
+NEW: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-009.md
+GO: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-008.md
+REVISED: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-007.md
 NO-GO: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-006.md
 REVISED: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-005.md
 NO-GO: bridge/gtkb-da-read-surface-correction-phase-1-glossary-backfill-004.md

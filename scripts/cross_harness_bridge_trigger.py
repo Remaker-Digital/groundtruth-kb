@@ -510,11 +510,33 @@ def _build_argparser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print the run summary to stdout (default: silent fire-and-forget).",
     )
+    parser.add_argument(
+        "--stop-hook",
+        action="store_true",
+        help=(
+            "Stop-event hook mode. Runs trigger reconciliation as usual, then "
+            "emits exactly '{}' (a parseable JSON object) to stdout and exits 0. "
+            "Required for Codex Stop hook registrations per the OpenAI Codex "
+            "hooks contract; also valid for Claude Stop hook registrations. "
+            "Mutually exclusive with --verbose: when --stop-hook is set, --verbose "
+            "is ignored so the JSON contract isn't violated by extra summary text."
+        ),
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point. Always returns 0 per fire-and-forget contract."""
+    """CLI entry point. Always returns 0 per fire-and-forget contract.
+
+    Output behavior:
+      - Default (no flags): silent stdout (fire-and-forget; hooks must not
+        stall tool use).
+      - ``--verbose``: prints the run summary as pretty-printed JSON.
+      - ``--stop-hook``: prints exactly ``{}`` (parseable JSON object, no
+        extra text) to stdout. Required by the OpenAI Codex Stop hook
+        contract; also valid for Claude Stop. Overrides ``--verbose`` to
+        avoid violating the JSON contract.
+    """
     args = _build_argparser().parse_args(argv)
     try:
         project_root = _resolve_project_root(args.project_root)
@@ -529,7 +551,13 @@ def main(argv: list[str] | None = None) -> int:
             max_items=args.max_items,
             dry_run=args.dry_run,
         )
-        if args.verbose:
+        if args.stop_hook:
+            # Codex Stop contract: exactly one parseable JSON object on stdout,
+            # no extra text. {} is the minimal valid payload (current Codex
+            # docs also accept exit 0 with empty stdout, but {} is clearer
+            # for a deliberately Stop-specific mode).
+            print("{}")
+        elif args.verbose:
             print(json.dumps(summary, indent=2, sort_keys=True))
     except SystemExit:
         # argparse's --help / config errors. Re-raise to allow normal CLI UX
