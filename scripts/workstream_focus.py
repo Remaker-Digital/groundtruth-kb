@@ -345,7 +345,7 @@ def gtkb_product_root() -> Path | None:
 def _read_lifecycle_guard(project_root: Path | None = None) -> dict[str, Any]:
     path = lifecycle_guard_path(project_root)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -983,13 +983,13 @@ def system_message_for_state(state: dict[str, Any], *, changed: bool = False) ->
 def _startup_gate_message() -> str:
     report_path = STARTUP_REPORT_RELATIVE_PATH.as_posix()
     return (
-        "GTKB STARTUP INPUT GATE: The first owner message of a fresh session is never actionable. "
-        "Discard the current prompt completely; do not interpret it as a task, resume request, focus choice, "
-        "approval, answer, or command, even if it says `resume`, `continue`, or names a focus option. "
-        "Your next response must be the role-appropriate startup disclosure already generated for this session. "
+        "GTKB STARTUP INPUT GATE (init-keyword match): the prompt matched the init keyword "
+        "(per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 and DCL-SESSION-START-INIT-KEYWORD-MATCHING-001) "
+        "so the startup disclosure relay path is active. "
+        "Render the role-appropriate startup disclosure already generated for this session and wait for the next owner message. "
         f"If the SessionStart payload is unavailable, read `{report_path}` from the project root and relay that startup disclosure. "
-        "After presenting the startup disclosure, stop and wait for Mike's next message. "
-        "Do not use tools, change files, or map session focus on this discarded-input turn."
+        "After presenting the disclosure, stop and wait for Mike's next message. "
+        "Do not use tools, change files, or map session focus on this disclosure-relay turn."
     )
 
 
@@ -1010,6 +1010,19 @@ def _consume_discard_first_prompt_gate(prompt: str, project_root: Path | None = 
         return None
 
     trimmed_prompt = " ".join(prompt.strip().split())
+    if state.get("first_wrapup_suppressed") is True and state.get("startup_response_pending") is not True:
+        state.update(
+            {
+                "discard_next_user_prompt": False,
+                "stale_startup_gate_cleared": True,
+                "stale_startup_gate_cleared_at": _now_iso(),
+                "stale_startup_gate_reason": "startup_stop_already_suppressed",
+                "startup_prompt_preview": trimmed_prompt[:160],
+            }
+        )
+        _write_lifecycle_guard(state, project_root)
+        return None
+
     state.update(
         {
             "discard_next_user_prompt": False,
@@ -1175,9 +1188,9 @@ def guard_tool_use(
         return {
             "decision": "block",
             "reason": (
-                "BLOCKED (GTKB-STARTUP-INPUT-GATE): the first owner message of this fresh session was discarded "
-                "as startup stimulus. Do not use tools on this turn. Present the startup disclosure and wait for "
-                "Mike's next message."
+                "BLOCKED (GTKB-STARTUP-INPUT-GATE): startup disclosure has been emitted; awaiting owner's next message before tool use. "
+                "The init-keyword contract relays the disclosure on match (init gtkb / init gtkb advisory / etc.) and passes through on no-match "
+                "(per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001)."
             ),
         }
 
@@ -1235,6 +1248,8 @@ def handle_user_prompt(prompt: str, project_root: Path | None = None) -> dict[st
 
 def handle_hook_payload(payload: dict[str, Any], project_root: Path | None = None) -> dict[str, Any]:
     prompt = payload.get("user_prompt")
+    if not isinstance(prompt, str):
+        prompt = payload.get("prompt")
     if isinstance(prompt, str):
         return handle_user_prompt(prompt, project_root)
     return guard_tool_use(payload, project_root)

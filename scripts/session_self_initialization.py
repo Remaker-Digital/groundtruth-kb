@@ -3481,7 +3481,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
-            "- If the live bridge verification succeeds, report the live scan result and ask Mike whether to begin processing reviews and verifications from `bridge/INDEX.md`.",
+            "- If the live bridge verification succeeds, report the live scan result. The Loyal Opposition harness's auto-process default begins processing the bridge queue unless the session was opened in advisory mode via the init keyword `init gtkb advisory` (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).",
             "- Expected owner reply: `yes` to begin processing the bridge queue, or `no` / a custom instruction to stay in advisory mode.",
             "- If the bridge is not functioning, diagnose and repair the bridge before ordinary review work.",
             "- Bridge authority: Loyal Opposition has permanent owner permission to diagnose and repair bridge function/use and downstream bridge-dependent artifacts needed to sustain the bridge.",
@@ -3491,7 +3491,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
 
 def _render_fresh_session_input_semantics(model: dict[str, Any]) -> str:
     lines = [
-        "- The first owner message in a fresh session is a session-start stimulus only; do not interpret it as a focus choice, task prompt, approval, answer, or other informational input.",
+        "- The harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 and DCL-SESSION-START-INIT-KEYWORD-MATCHING-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the harness-specific startup disclosure and wait for the next owner message before tool use; on no-match, process the prompt as normal task content.",
     ]
     if _is_loyal_opposition_model(model):
         lines.append(
@@ -5599,7 +5599,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
                 f"all {focus_option_count} numbered options must remain present in order with their per-option summaries intact."
             ),
             "- The first durable assistant answer should be the startup disclosure itself, not a meta-summary about the startup disclosure.",
-            "- The first owner message after SessionStart is discarded startup stimulus only. Never treat it as a task, resume request, focus choice, approval, or answer.",
+            "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the startup disclosure and wait for the next message; on no-match, process the prompt as normal task content. The startup disclosure is generated at SessionStart time and cached for lazy injection by the matcher; it is not unconditionally relayed.",
             "- Never map the first owner message to `Continue Last Session` or any other focus option.",
             "- Codex Desktop durability rule: relay the startup message in the first durable assistant answer, not in transient progress/intermediary output.",
             "- Do not replace the startup message with a shorter final answer after rendering it.",

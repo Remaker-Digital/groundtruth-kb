@@ -95,8 +95,10 @@ Purpose: define execution behavior by assigned role.
   otherwise needed.
 - The first Loyal Opposition startup task is to verify that the file bridge is
   functioning.
-- If the bridge is functioning, ask Mike whether to begin processing bridge
-  reviews and verifications before ordinary Loyal Opposition work.
+- If the bridge is functioning, the Loyal Opposition harness begins processing
+  the bridge queue automatically as the auto-process default unless the session
+  was opened in advisory mode via the init keyword `init gtkb advisory`
+  (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).
 - If the bridge is not functioning, diagnose and repair the bridge before
   ordinary review work. Bridge function/use repair is permanently
   owner-authorized for required file, configuration, startup, automation, and

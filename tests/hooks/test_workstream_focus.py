@@ -176,6 +176,135 @@ def test_legacy_aliases_still_recognized(tmp_path, monkeypatch) -> None:
     assert module.load_state(REPO_ROOT)["current_subject"] == module.SUBJECT_GTKB
 
 
+def test_hook_payload_accepts_claude_prompt_field_for_user_promptsubmit(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT)
+
+    response = module.handle_hook_payload(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "work subject application",
+        },
+        REPO_ROOT,
+    )
+
+    assert "Current work subject set to Application Focus" in response["systemMessage"]
+    assert json.loads(canonical.read_text(encoding="utf-8"))["current_subject"] == module.SUBJECT_APPLICATION
+
+
+def test_hook_payload_accepts_claude_prompt_field_for_startup_gate(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    guard_path = tmp_path / "guard.json"
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": True,
+                "startup_guard_id": "test-guard",
+                "startup_response_pending": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = module.handle_hook_payload(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "::init gtkb pb",
+        },
+        REPO_ROOT,
+    )
+
+    assert "GTKB STARTUP INPUT GATE (init-keyword match)" in response["systemMessage"]
+    assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in response["systemMessage"]
+    assert "first owner message of a fresh session is never actionable" not in response["systemMessage"]
+    assert response["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["discard_next_user_prompt"] is False
+    assert guard_state["startup_prompt_discarded"] is True
+    assert guard_state["startup_response_pending"] is True
+    assert guard_state["startup_prompt_preview"] == "::init gtkb pb"
+
+
+def test_user_promptsubmit_clears_stale_startup_gate_after_startup_stop(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    guard_path = tmp_path / "guard.json"
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": True,
+                "first_wrapup_suppressed": True,
+                "startup_guard_id": "test-guard",
+                "startup_response_pending": False,
+                "suppress_next_wrapup": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT)
+
+    response = module.handle_hook_payload(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "work subject application",
+        },
+        REPO_ROOT,
+    )
+
+    assert "first owner message of a fresh session is never actionable" not in response["systemMessage"]
+    assert "Current work subject set to Application Focus" in response["systemMessage"]
+    assert json.loads(canonical.read_text(encoding="utf-8"))["current_subject"] == module.SUBJECT_APPLICATION
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["discard_next_user_prompt"] is False
+    assert guard_state["stale_startup_gate_cleared"] is True
+    assert guard_state["stale_startup_gate_reason"] == "startup_stop_already_suppressed"
+    assert guard_state["startup_prompt_preview"] == "work subject application"
+
+
+def test_prompt_hook_accepts_bom_prefixed_stdin_from_windows_pipeline(tmp_path) -> None:
+    state_path = tmp_path / "focus.json"
+    guard_path = tmp_path / "guard.json"
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": True,
+                "startup_guard_id": "test-guard",
+                "startup_response_pending": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    env = {
+        **dict(os.environ),
+        "GTKB_WORKSTREAM_FOCUS_STATE": str(state_path),
+        "GTKB_LIFECYCLE_GUARD_PATH": str(guard_path),
+        "CLAUDE_PROJECT_DIR": str(REPO_ROOT),
+    }
+
+    result = subprocess.run(
+        [sys.executable, str(HOOK_PATH)],
+        cwd=REPO_ROOT,
+        env=env,
+        input=("\ufeff" + json.dumps({"prompt": "::init gtkb pb", "hook_event_name": "UserPromptSubmit"})).encode(
+            "utf-8"
+        ),
+        capture_output=True,
+        timeout=10,
+        check=True,
+    )
+
+    response = json.loads(result.stdout.decode("utf-8"))
+    assert "GTKB STARTUP INPUT GATE (init-keyword match)" in response["systemMessage"]
+    assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in response["systemMessage"]
+    assert "first owner message of a fresh session is never actionable" not in response["systemMessage"]
+    assert json.loads(guard_path.read_text(encoding="utf-8"))["startup_response_pending"] is True
+
+
 @pytest.mark.skip(reason="workstream-focus.py intentionally retired S304/S305; see REVISED-5 BN-3")
 def test_prompt_hook_switches_focus_with_standalone_commands(tmp_path) -> None:
     state_path = tmp_path / "focus.json"
@@ -450,7 +579,10 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
 
     assert response["decision"] == "block"
     assert "GTKB-STARTUP-INPUT-GATE" in response["reason"]
-    assert "Present the startup disclosure" in response["reason"]
+    assert "startup disclosure has been emitted" in response["reason"]
+    assert "init-keyword contract" in response["reason"]
+    assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in response["reason"]
+    assert "first owner message of this fresh session was discarded" not in response["reason"]
 
 
 def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeypatch) -> None:

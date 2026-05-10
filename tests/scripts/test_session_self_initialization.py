@@ -542,8 +542,9 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     prime_context = module._startup_service_context({"report_text": prime_report, "model": prime_model})
     assert "## Session Startup Instructions" in prime_context
     assert "### Fresh-Session Input Semantics" in prime_context
-    assert "The first owner message in a fresh session is a session-start stimulus only" in prime_context
-    assert "do not interpret it as a focus choice, task prompt, approval, answer" in prime_context
+    assert "routes the first owner message through the init-keyword matcher" in prime_context
+    assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in prime_context
+    assert "on no-match, process the prompt as normal task content" in prime_context
     assert "wait for Mike's next message before choosing or mapping session work" in prime_context
     assert prime_context.index("## Session Startup Instructions") < prime_context.index(
         "## User-Visible Startup Message"
@@ -567,7 +568,8 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     loyal_context = module._startup_service_context({"report_text": loyal_report, "model": loyal_model})
     assert "## Session Startup Instructions" in loyal_context
     assert "### Fresh-Session Input Semantics" in loyal_context
-    assert "The first owner message in a fresh session is a session-start stimulus only" in loyal_context
+    assert "routes the first owner message through the init-keyword matcher" in loyal_context
+    assert "DCL-SESSION-START-INIT-KEYWORD-MATCHING-001" in loyal_context
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" in loyal_context
     loyal_user_visible = loyal_context.split("## User-Visible Startup Message", 1)[1]
     assert "### Fresh-Session Input Semantics" not in loyal_user_visible
@@ -1159,7 +1161,8 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     )
     assert "all 13 numbered options must remain present in order with their per-option summaries intact" in context
     assert "The first durable assistant answer should be the startup disclosure itself" in context
-    assert "The first owner message after SessionStart is discarded startup stimulus only" in context
+    assert "routes the first owner message through the init-keyword matcher" in context
+    assert "The startup disclosure is generated at SessionStart time and cached for lazy injection" in context
     assert "Never map the first owner message to `Continue Last Session` or any other focus option." in context
     assert "Codex Desktop durability rule" in context
     assert "first durable assistant answer" in context
