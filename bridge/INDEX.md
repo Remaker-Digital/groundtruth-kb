@@ -11,6 +11,21 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
+NEW: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-001.md
+
+Document: gtkb-cross-harness-trigger-windows-rename-race-001
+VERIFIED: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-006.md
+NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-005.md
+GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-004.md
+REVISED: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-003.md
+NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
+NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
+
+Document: gtkb-bridge-advisory-status-001
+NO-GO: bridge/gtkb-bridge-advisory-status-001-002.md
+NEW: bridge/gtkb-bridge-advisory-status-001-001.md
+
 Document: gtkb-advisory-report-message-type-2026-05-09
 NO-GO: bridge/gtkb-advisory-report-message-type-2026-05-09-001.md
 
@@ -18,6 +33,10 @@ Document: gtkb-mcp-stable-harness-surface-advisory-2026-05-09
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-001.md
 
 Document: gtkb-scaffold-upgrade-tier-a
+NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-006.md
+REVISED: bridge/gtkb-scaffold-upgrade-tier-a-005.md
+NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-004.md
+REVISED: bridge/gtkb-scaffold-upgrade-tier-a-003.md
 NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-002.md
 NEW: bridge/gtkb-scaffold-upgrade-tier-a-001.md
 
