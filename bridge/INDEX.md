@@ -11,21 +11,59 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-advisory-report-message-type-2026-05-09
+NO-GO: bridge/gtkb-advisory-report-message-type-2026-05-09-001.md
+
+Document: gtkb-mcp-stable-harness-surface-advisory-2026-05-09
+NO-GO: bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-001.md
+
+Document: gtkb-scaffold-upgrade-tier-a
+NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-002.md
+NEW: bridge/gtkb-scaffold-upgrade-tier-a-001.md
+
+Document: gtkb-role-session-lifecycle-simplification
+NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
+NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
+
+Document: gtkb-single-harness-bridge-dispatcher-001
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-002.md
+NEW: bridge/gtkb-single-harness-bridge-dispatcher-001.md
+
+Document: gtkb-canonical-init-keyword-syntax-001
+GO: bridge/gtkb-canonical-init-keyword-syntax-001-008.md
+REVISED: bridge/gtkb-canonical-init-keyword-syntax-001-007.md
+NO-GO: bridge/gtkb-canonical-init-keyword-syntax-001-006.md
+REVISED: bridge/gtkb-canonical-init-keyword-syntax-001-005.md
+NO-GO: bridge/gtkb-canonical-init-keyword-syntax-001-004.md
+REVISED: bridge/gtkb-canonical-init-keyword-syntax-001-003.md
+NO-GO: bridge/gtkb-canonical-init-keyword-syntax-001-002.md
+NEW: bridge/gtkb-canonical-init-keyword-syntax-001.md
+
 Document: gtkb-claude-code-bridge-status-thread-automation-001
+NO-GO: bridge/gtkb-claude-code-bridge-status-thread-automation-001-004.md
+REVISED: bridge/gtkb-claude-code-bridge-status-thread-automation-001-003.md
 NO-GO: bridge/gtkb-claude-code-bridge-status-thread-automation-001-002.md
 NEW: bridge/gtkb-claude-code-bridge-status-thread-automation-001.md
 
 Document: gtkb-lo-file-safety-rule-clarification-001
+VERIFIED: bridge/gtkb-lo-file-safety-rule-clarification-001-004.md
+NEW: bridge/gtkb-lo-file-safety-rule-clarification-001-003.md
 GO: bridge/gtkb-lo-file-safety-rule-clarification-001-002.md
 NEW: bridge/gtkb-lo-file-safety-rule-clarification-001.md
 
 Document: gtkb-startup-trigger-awareness-and-skill-reference-001
+VERIFIED: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-006.md
+NEW: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-005.md
 GO: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-004.md
 REVISED: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-003.md
 NO-GO: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001-002.md
 NEW: bridge/gtkb-startup-trigger-awareness-and-skill-reference-001.md
 
 Document: gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001
+VERIFIED: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-010.md
+NEW: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-009.md
+NO-GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-008.md
+NEW: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-007.md
 GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-006.md
 REVISED: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-005.md
 NO-GO: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-004.md

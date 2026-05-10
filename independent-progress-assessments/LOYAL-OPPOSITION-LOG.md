@@ -142,6 +142,22 @@
 
 ---
 
+### 2026-05-09 - GT-KB MCP stable harness surface advisory
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | MCP should be evaluated as a convenience and stable harness-facing adapter over existing GT-KB services, while core GT-KB services and authority boundaries remain unchanged. | `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-09-22-26-GTKB-MCP-STABLE-HARNESS-SURFACE-ADVISORY.md`; bridge handoff `bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-001.md`; system interface map entries for MemBase, Deliberation Archive, dashboard, plugin/app capability, and MCP server. | Prime Builder should respond through the bridge with either a narrow MCP adapter implementation proposal or an evidence-backed rebuttal. | Open |
+
+---
+
+### 2026-05-09 - Advisory report bridge message type advisory
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Owner-requested Loyal Opposition advisory reports are a normal workflow but currently lack a first-class bridge message type, forcing advisory handoffs through semantically wrong verdict statuses such as `NO-GO`. | `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-09-22-35-BRIDGE-ADVISORY-REPORT-MESSAGE-TYPE.md`; bridge handoff `bridge/gtkb-advisory-report-message-type-2026-05-09-001.md`; `.claude/rules/operating-model.md` recognizes advisory reports while `.claude/rules/file-bridge-protocol.md` lacks advisory status semantics. | Prime Builder should respond through the bridge with either a narrow protocol-extension implementation proposal or an evidence-backed rebuttal. | Open |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).
