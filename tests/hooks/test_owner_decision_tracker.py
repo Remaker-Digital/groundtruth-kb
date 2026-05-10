@@ -644,3 +644,243 @@ def test_f3_session_init_renders_pending_decisions_when_block_already_emitted(tm
     pending = body.split("## Pending", 1)[1].split("##", 1)[0]
     n = pending.count("- id: DECISION-")
     assert n >= 1, f"Expected at least 1 pending entry after block-emitting run; got {n}"
+
+
+# ---------------------------------------------------------------------------
+# IP-1 / IP-2 — Pattern bounds tightening + same-turn AUQ correlation
+# Authority: bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001
+# (GO at -006 REVISED-2 -005)
+# ---------------------------------------------------------------------------
+
+
+def _import_hook_module():
+    """Import the hook module for in-process unit tests of pure helpers.
+
+    Used only for testing pure functions (snippet extraction, correlation).
+    Stop-mode integration tests still go through the subprocess CLI surface.
+    """
+    import sys
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_odt_test", str(HOOK))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["_odt_test"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_question_snippet_extracts_match_group_only() -> None:
+    """T-DT-snippet-match-group-only: snippet captures only the matched group, not surrounding 20-char window."""
+    mod = _import_hook_module()
+    import re
+    text = "Earlier: some context. Should I commit now? More text after."
+    pattern = re.compile(r"Should I commit now\?")
+    m = pattern.search(text)
+    snippet = mod._extract_question_snippet(text, m)
+    assert snippet == "Should I commit now?"
+    assert "Earlier" not in snippet
+    assert "More text" not in snippet
+
+
+def test_question_snippet_extends_to_sentence_boundary() -> None:
+    """T-DT-snippet-sentence-extension: when match doesn't end at sentence terminator, extend forward."""
+    mod = _import_hook_module()
+    import re
+    # Match doesn't include the final '?', extension should grab it.
+    text = "Should we commit or revert"  # no terminator at all in text
+    pattern = re.compile(r"Should we commit or revert")
+    m = pattern.search(text)
+    snippet = mod._extract_question_snippet(text, m)
+    # No terminator within window -> snippet stays as match group.
+    assert snippet == "Should we commit or revert"
+
+    # Extension when terminator exists in window.
+    text2 = "Should we commit or revert? More."
+    pattern2 = re.compile(r"Should we commit or revert")
+    m2 = pattern2.search(text2)
+    snippet2 = mod._extract_question_snippet(text2, m2)
+    assert snippet2.endswith("?")
+
+
+def test_question_snippet_capped_at_120_chars() -> None:
+    """T-DT-snippet-length-cap: snippet truncated with ellipsis at 120 chars."""
+    mod = _import_hook_module()
+    import re
+    long_text = "Should I " + "really really " * 20 + "commit?"
+    pattern = re.compile(re.escape(long_text))
+    m = pattern.search(long_text)
+    snippet = mod._extract_question_snippet(long_text, m)
+    assert len(snippet) <= 120
+    if len(long_text) > 120:
+        assert snippet.endswith("...")
+
+
+def test_correlated_two_signal_resolves_prose_entry_substring_path(tmp_path: Path) -> None:
+    """T-DT-correlated-two-signal-substring: prose entry auto-resolves when correlated AUQ exists."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_prose_auq_correlated_substring.jsonl"))
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    body = _read_pending_file(project)
+    # The prose match should land in Resolved with resolved_via field.
+    assert "## Resolved" in body
+    assert "resolved_via: same_turn_auq_formalization" in body
+    # And NOT in Pending.
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    assert "detected_via: prose:" not in pending, (
+        "correlated prose match must auto-resolve, not stay pending"
+    )
+
+
+def test_uncorrelated_boilerplate_overlap_keeps_prose_pending(tmp_path: Path) -> None:
+    """T-DT-uncorrelated-boilerplate-counterexample: Codex F1 case — prose vs AUQ
+    that share boilerplate but differ on discriminating tokens MUST NOT auto-resolve."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_prose_auq_uncorrelated_boilerplate.jsonl"))
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    body = _read_pending_file(project)
+    # The prose match (about commit) and the AUQ (about deploy) must NOT correlate.
+    # Prose entry stays in Pending.
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    assert "detected_via: prose:" in pending, (
+        "uncorrelated prose match (boilerplate-only overlap) must stay pending; "
+        "two-signal correlation must reject the boilerplate-only counterexample"
+    )
+    # And the AUQ lands in Resolved (since it's an answered AUQ in the fixture? No,
+    # this fixture has unanswered AUQ -> AUQ goes to Pending too).
+    # The key assertion is that the prose match did NOT auto-resolve.
+
+
+def test_uncorrelated_pure_helpers_counterexample() -> None:
+    """T-DT-uncorrelated-signal-a-only / signal-b-only: pure helper checks
+    confirm two-signal-required logic via direct correlator calls."""
+    mod = _import_hook_module()
+
+    # Codex F1 commit-vs-deploy counterexample: stoplist removes boilerplate;
+    # remaining tokens {commit} vs {deploy} -> J_d = 0 -> Signal A fails.
+    correlated, sig = mod._correlate_prose_to_auq(
+        "Want me to commit now or wait?",
+        "Want me to deploy now or wait?",
+        [],
+    )
+    assert correlated is False
+    assert sig is None
+
+    # Signal B alone (no Jaccard pass): synthetic case where strings differ in
+    # discriminating tokens but share a >= 20-char substring through boilerplate.
+    # We need substring containment but Jaccard < 0.5. Hard to construct because
+    # substring containment usually drives high Jaccard. Instead test the inverse
+    # check: confirm Signal A failure with substring match yields no auto-resolve.
+    # The DCL gate is "BOTH A AND B"; B-only means correlated=False.
+    correlated, sig = mod._correlate_prose_to_auq(
+        "approve the dcl or defer",
+        "approve the deployment or defer",
+        [],
+    )
+    # After stoplist: {dcl} vs {deployment}. J_d = 0 -> Signal A fails.
+    assert correlated is False
+    assert sig is None
+
+
+def test_correlation_positive_via_option_label_overlap(tmp_path: Path) -> None:
+    """T-DT-correlated-two-signal-option-label: Signal A + B2 option-label overlap."""
+    mod = _import_hook_module()
+    # Prose mentions specific concept; AUQ option label includes the concept.
+    correlated, sig = mod._correlate_prose_to_auq(
+        "Should I land slice 4 retirement work?",
+        "Land slice 4 retirement work or hold?",
+        ["Land slice 4 retirement work", "Hold"],
+    )
+    assert correlated is True
+    assert sig in ("normalized_substring", "option_label_overlap", "text_identity")
+
+
+def test_decision_entry_resolved_via_round_trips(tmp_path: Path) -> None:
+    """T-DT-resolved-via-round-trip: DecisionEntry resolved_via field
+    survives render -> parse cycle through the hook's own parser path
+    (per Codex `-008` F2 fix; covers both render side AND parse side)."""
+    mod = _import_hook_module()
+    entry = mod.DecisionEntry(
+        id="DECISION-9999",
+        asked_at="2026-05-09T00:00:00Z",
+        question="Test question?",
+        detected_via="prose:test",
+        status="resolved",
+        question_hash="abc",
+        resolved_at="2026-05-09T00:00:01Z",
+        resolved_via="same_turn_auq_formalization",
+    )
+    # Render side: assert the field is emitted.
+    rendered = entry.render()
+    assert "resolved_via: same_turn_auq_formalization" in rendered
+
+    # Parse side: feed the rendered key:value into _set_entry_field and assert
+    # the field survives round-trip back onto a fresh DecisionEntry. This
+    # exercises the read/write parser path used by _read_pending_file.
+    parsed_entry = mod.DecisionEntry(
+        id="DECISION-9999", asked_at="2026-05-09T00:00:00Z"
+    )
+    mod._set_entry_field(parsed_entry, "resolved_via", "same_turn_auq_formalization")
+    assert parsed_entry.resolved_via == "same_turn_auq_formalization", (
+        "_set_entry_field must restore resolved_via on parse; otherwise the "
+        "field would be lost on the next hook read/write cycle"
+    )
+
+    # Full round-trip: write a section to disk, read it back via _read_pending_file,
+    # and assert the parsed entry preserves resolved_via.
+    pending_path = tmp_path / "pending-owner-decisions.md"
+    sections_in = {
+        "pending": [],
+        "resolved": [entry],
+        "history": [],
+    }
+    mod._write_pending_file(pending_path, sections_in)
+    sections_out = mod._read_pending_file(pending_path)
+    resolved_out = sections_out.get("resolved", [])
+    assert resolved_out, "expected at least one resolved entry after round-trip"
+    assert resolved_out[0].resolved_via == "same_turn_auq_formalization", (
+        "resolved_via field must survive write -> read round-trip via the "
+        "durable-file parser path"
+    )
+
+
+def test_correlation_signal_a_only_keeps_prose_pending() -> None:
+    """T-DT-uncorrelated-signal-a-only (per Codex `-008` F1 fix):
+    Signal A passes (J_d >= 0.5 with shared substantive token) but no
+    B signal fires; correlated MUST be False.
+    """
+    mod = _import_hook_module()
+    # Two prompts that share most discriminating tokens (Signal A passes)
+    # but neither is a substring of the other (B1 fails), no options (B2
+    # fails), and they're not identical (B3 fails).
+    prose = "should i land slice 4 retirement work or hold for review"
+    auq = "should i land slice 4 retirement code or hold for review"
+    correlated, sig = mod._correlate_prose_to_auq(prose, auq, [])
+    assert correlated is False, (
+        "Signal A alone (Jaccard pass) without B signal must NOT auto-resolve"
+    )
+    assert sig is None
+
+
+def test_correlation_signal_b_only_keeps_prose_pending() -> None:
+    """T-DT-uncorrelated-signal-b-only (per Codex `-008` F1 fix):
+    Signal B (option-label overlap) fires while Signal A fails; correlated
+    MUST be False.
+    """
+    mod = _import_hook_module()
+    # Discriminating tokens are disjoint after stoplist removal
+    # (Signal A fails: prose={dcl}, auq question={deployment}, J_d=0).
+    # An option label embeds the prose -> Signal B2 (option-label overlap)
+    # fires.
+    prose = "approve the dcl or defer"
+    auq_question = "approve the deployment or defer"
+    options = ["approve the dcl or defer"]
+    # Verify Signal B2 actually fires (sanity check).
+    assert mod._option_label_overlap(prose, options) is True
+
+    # Now confirm the orchestrator returns False because Signal A failed.
+    correlated, sig = mod._correlate_prose_to_auq(prose, auq_question, options)
+    assert correlated is False, (
+        "Signal B alone (option-label overlap) without Signal A must NOT "
+        "auto-resolve"
+    )
+    assert sig is None

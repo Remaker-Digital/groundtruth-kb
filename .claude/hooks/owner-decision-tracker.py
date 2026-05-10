@@ -321,6 +321,7 @@ class DecisionEntry:
     notes: str = ""
     resolved_at: str = ""
     resolved_in_session: str = ""
+    resolved_via: str = ""
     answer: str = ""
 
     def render(self) -> str:
@@ -348,6 +349,8 @@ class DecisionEntry:
             lines.append(f"  resolved_at: {self.resolved_at}")
         if self.resolved_in_session:
             lines.append(f"  resolved_in_session: {self.resolved_in_session}")
+        if self.resolved_via:
+            lines.append(f"  resolved_via: {self.resolved_via}")
         if self.answer:
             lines.append(f"  answer: {_quote_yaml(self.answer)}")
         lines.append(f"  notes: {_quote_yaml(self.notes) if self.notes else '\"\"'}")
@@ -532,6 +535,7 @@ def _set_entry_field(entry: DecisionEntry, key: str, val: str) -> None:
         "notes": "notes",
         "resolved_at": "resolved_at",
         "resolved_in_session": "resolved_in_session",
+        "resolved_via": "resolved_via",
         "answer": "answer",
     }
     attr = field_map.get(key)
@@ -717,6 +721,147 @@ def _scan_askuserquestion(turn_events: list[dict[str, Any]]) -> list[dict[str, A
     return pairs
 
 
+def _extract_question_snippet(full_text: str, match: re.Match[str]) -> str:
+    """Extract just the matched question, sentence-bounded.
+
+    Per DCL-OWNER-DECISION-TRACKER-QUESTION-EXTRACTION-BOUNDS-001:
+    capture the matched group itself, optionally extending forward to the
+    nearest sentence terminator within a 60-char window if the match doesn't
+    already end at one. Cap total length at 120 chars. Decorative prefix/
+    suffix bytes (markdown structural artifacts outside the match) are
+    not captured.
+    """
+    matched = match.group(0)
+    end = match.end()
+    if not matched.rstrip().endswith(("?", "!", ".")):
+        forward_window = full_text[end:end + 60]
+        terminator_match = re.search(r"[.?!]", forward_window)
+        if terminator_match:
+            matched = matched + forward_window[:terminator_match.end()]
+    matched = matched.strip()
+    if len(matched) > 120:
+        matched = matched[:117] + "..."
+    return matched
+
+
+# Boilerplate stoplist for discriminating-token correlation per
+# DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001 Signal A. Conservative
+# (biases toward false-negatives so unrelated decisions are not silently
+# auto-resolved). After stoplist removal, the remaining tokens carry the
+# discriminating semantic.
+_CORRELATION_STOPLIST: frozenset[str] = frozenset({
+    "want", "me", "to", "or", "wait", "should", "i", "now", "approve", "the",
+    "defer", "do", "you", "we", "is", "this", "are", "go", "stop", "yes", "no",
+    "any", "of", "in", "on", "at", "for", "with", "and", "but", "as", "be",
+    "have", "has", "had", "did", "does", "can", "could", "will", "would",
+    "shall", "must", "may", "might",
+})
+
+
+_CORRELATION_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def _normalize_question_text(text: str) -> str:
+    """Lower-case, whitespace-collapse, strip non-alphanumeric punctuation.
+
+    Used as the basis for substring containment (B1) and text identity (B3)
+    correlation signals.
+    """
+    lowered = text.lower()
+    # Collapse all non-alphanumeric runs (including punctuation) to single space.
+    collapsed = re.sub(r"[^a-z0-9]+", " ", lowered).strip()
+    return collapsed
+
+
+def _tokenize_with_stoplist(text: str) -> set[str]:
+    """Tokenize on alphanumeric word boundaries; remove stoplist tokens.
+
+    Returns the discriminating-token set used by Signal A (Jaccard).
+    """
+    tokens = {m.group(0).lower() for m in _CORRELATION_TOKEN_RE.finditer(text)}
+    return tokens - _CORRELATION_STOPLIST
+
+
+def _discriminating_jaccard(prose_tokens: set[str], auq_tokens: set[str]) -> tuple[float, bool]:
+    """Compute discriminating-token Jaccard + has-min-length-noun-or-verb flag.
+
+    Returns ``(J_d, has_min_length_token)`` where:
+
+    - ``J_d = |prose ∩ auq| / |prose ∪ auq|``, or 0.0 if union is empty.
+    - ``has_min_length_token = True`` iff at least one shared token has
+      length ≥ 4 chars and is not pure-numeric (heuristic noun/verb gate).
+    """
+    union = prose_tokens | auq_tokens
+    if not union:
+        return (0.0, False)
+    intersection = prose_tokens & auq_tokens
+    j_d = len(intersection) / len(union)
+    has_min_length = any(
+        len(tok) >= 4 and not tok.isdigit() for tok in intersection
+    )
+    return (j_d, has_min_length)
+
+
+def _substring_containment_min_length(a: str, b: str, min_chars: int = 20) -> bool:
+    """Signal B1: normalized substring containment with minimum substantive length.
+
+    After normalization, one is a substring of the other AND the shared
+    substring length is ≥ ``min_chars``.
+    """
+    norm_a = _normalize_question_text(a)
+    norm_b = _normalize_question_text(b)
+    if not norm_a or not norm_b:
+        return False
+    shorter, longer = (norm_a, norm_b) if len(norm_a) <= len(norm_b) else (norm_b, norm_a)
+    if len(shorter) < min_chars:
+        return False
+    return shorter in longer
+
+
+def _option_label_overlap(prose: str, auq_options: list[str]) -> bool:
+    """Signal B2: at least one AUQ option label appears verbatim (lower-cased)
+    in the prose snippet OR vice versa.
+    """
+    prose_norm = _normalize_question_text(prose)
+    if not prose_norm:
+        return False
+    for opt in auq_options:
+        opt_norm = _normalize_question_text(opt)
+        if not opt_norm:
+            continue
+        if opt_norm in prose_norm or prose_norm in opt_norm:
+            return True
+    return False
+
+
+def _correlate_prose_to_auq(
+    prose_snippet: str,
+    auq_question: str,
+    auq_options: list[str],
+) -> tuple[bool, str | None]:
+    """Two-signal-required correlation per DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001.
+
+    Returns ``(correlated, b_signal_name | None)``. Correlated iff
+    Signal A (discriminating-token Jaccard ≥ 0.5 with ≥1 shared token of
+    length ≥ 4 chars) AND at least one of Signal B1 / B2 / B3.
+    """
+    prose_tokens = _tokenize_with_stoplist(prose_snippet)
+    auq_tokens = _tokenize_with_stoplist(auq_question)
+    j_d, has_min_length = _discriminating_jaccard(prose_tokens, auq_tokens)
+    if j_d < 0.5 or not has_min_length:
+        return (False, None)
+    # Signal A passed; check B signals (any one suffices).
+    norm_prose = _normalize_question_text(prose_snippet)
+    norm_auq = _normalize_question_text(auq_question)
+    if norm_prose and norm_prose == norm_auq:
+        return (True, "text_identity")  # B3
+    if _substring_containment_min_length(prose_snippet, auq_question):
+        return (True, "normalized_substring")  # B1
+    if _option_label_overlap(prose_snippet, auq_options):
+        return (True, "option_label_overlap")  # B2
+    return (False, None)
+
+
 def _scan_prose_decisions(turn_events: list[dict[str, Any]]) -> list[tuple[str, str]]:
     """Find prose anti-pattern matches in assistant text content.
 
@@ -757,7 +902,7 @@ def _scan_prose_decisions(turn_events: list[dict[str, Any]]) -> list[tuple[str, 
                 window = full_text[window_start:window_end]
                 if any(g.search(window) for g in PROSE_FALSE_POSITIVE_GUARDS):
                     continue
-                snippet = full_text[max(0, m.start() - 20):m.end() + 20].strip()
+                snippet = _extract_question_snippet(full_text, m)
                 matches.append((name, snippet))
     return matches
 
@@ -817,7 +962,10 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
 
     # Scan A -- AskUserQuestion pairs. Track per-turn count for block-emission
     # decision (per Codex -004 Q1: per just-completed turn, not session-cumulative).
+    # Also accumulate question/option pairs for same-turn correlation with
+    # prose matches per DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001.
     askuserquestion_count = 0
+    auq_questions_this_turn: list[tuple[str, list[str]]] = []
     for pair in _scan_askuserquestion(turn_events):
         askuserquestion_count += 1
         tu = pair["tool_use"]
@@ -834,6 +982,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
             ]
             if not question_text:
                 continue
+            auq_questions_this_turn.append((question_text, options))
             qhash = _question_hash(question_text, options)
             if qhash in existing_hashes:
                 continue
@@ -863,6 +1012,13 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     # Scan B -- prose anti-patterns. Track all matches (including
     # already-known hashes) for block-decision input; the durable-file append
     # path uses idempotence to avoid duplicates.
+    #
+    # Per DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001: if the same
+    # turn contains a correlated AskUserQuestion (two-signal-required:
+    # discriminating-token Jaccard ≥ 0.5 AND one of substring / option-label /
+    # text-identity), auto-resolve the prose entry to ## Resolved instead of
+    # appending to ## Pending. Correlation is fail-closed (biases toward
+    # leaving prose pending; never silently auto-resolves an unrelated decision).
     prose_matches_this_turn: list[tuple[str, str]] = []
     for name, snippet in _scan_prose_decisions(turn_events):
         prose_matches_this_turn.append((name, snippet))
@@ -871,17 +1027,47 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
             continue
         existing_hashes.add(prose_hash)
         new_id = _next_decision_id(sections)
-        entry = DecisionEntry(
-            id=new_id,
-            asked_at=asked_at,
-            asked_in_session=session_hint,
-            question=snippet,
-            detected_via=f"prose:{name}",
-            status="pending",
-            question_hash=prose_hash,
-            notes="auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable",
-        )
-        sections["pending"].append(entry)
+        # Two-signal correlation against AUQ questions in this turn.
+        b_signal: str | None = None
+        for auq_question, auq_options in auq_questions_this_turn:
+            correlated, signal_name = _correlate_prose_to_auq(
+                snippet, auq_question, auq_options
+            )
+            if correlated:
+                b_signal = signal_name
+                break
+        if b_signal is not None:
+            entry = DecisionEntry(
+                id=new_id,
+                asked_at=asked_at,
+                asked_in_session=session_hint,
+                question=snippet,
+                detected_via=f"prose:{name}",
+                status="resolved",
+                question_hash=prose_hash,
+                resolved_at=asked_at,
+                resolved_in_session=session_hint,
+                resolved_via="same_turn_auq_formalization",
+                notes=(
+                    "Prose pattern detected; same turn contained correlated "
+                    f"AskUserQuestion (signals: A=true, B={b_signal}); "
+                    "auto-resolved per DCL-OWNER-DECISION-TRACKER-SAME-TURN-"
+                    "AUQ-RESOLUTION-001."
+                ),
+            )
+            sections["resolved"].append(entry)
+        else:
+            entry = DecisionEntry(
+                id=new_id,
+                asked_at=asked_at,
+                asked_in_session=session_hint,
+                question=snippet,
+                detected_via=f"prose:{name}",
+                status="pending",
+                question_hash=prose_hash,
+                notes="auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable",
+            )
+            sections["pending"].append(entry)
         mutated = True
 
     # 30-day archival: move resolved entries older than HISTORY_AGE_DAYS to history.

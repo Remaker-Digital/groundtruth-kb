@@ -5980,6 +5980,93 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-09T19:19:15.843919Z
   answer: "User has answered your questions: \"How to apply the harness-parity principle to current work?\"=\"File NEW parity-work thread + leave -003 Open Follow-On unchanged (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0506
+  asked_at: 2026-05-09T20:01:27.766183Z
+  question: "Authority semantic for `::init gtkb <mode>` — should the keyword override the durable role or only assert it?"
+  options:
+    - "Consistent assertion (Recommended)"
+    - "Per-session override"
+    - "Defer; file thread with both options framed"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 876bc112cdc53049
+  resolved_at: 2026-05-09T20:01:27.766183Z
+  answer: "User has answered your questions: \"Authority semantic for `::init gtkb <mode>` — should the keyword override the durable role or only assert it?\"=\"Consistent assertion (Recommended)\", \"Should I file the canonical-syntax thread now?\"=\"File now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0507
+  asked_at: 2026-05-09T20:01:27.766183Z
+  question: "Should I file the canonical-syntax thread now?"
+  options:
+    - "File now (Recommended)"
+    - "Wait for CS-2 to land first"
+    - "Discuss further before filing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 265ad75f8cc9f2c7
+  resolved_at: 2026-05-09T20:01:27.766183Z
+  answer: "User has answered your questions: \"Authority semantic for `::init gtkb <mode>` — should the keyword override the durable role or only assert it?\"=\"Consistent assertion (Recommended)\", \"Should I file the canonical-syntax thread now?\"=\"File now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0508
+  asked_at: 2026-05-09T20:14:32.656871Z
+  question: "Should I revise the canonical-syntax proposal `-001` to `-002` now to incorporate strict-ignore semantics + role-set membership check, or let Codex review `-001` first?"
+  options:
+    - "Revise now to -002"
+    - "Let Codex review -001 first (Recommended)"
+    - "Discuss further before deciding"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d00e3cd3e412442f
+  resolved_at: 2026-05-09T20:14:32.656871Z
+  answer: "User has answered your questions: \"Should I revise the canonical-syntax proposal `-001` to `-002` now to incorporate strict-ignore semantics + role-set membership check, or let Codex review `-001` first?\"=\"Let Codex review -001 first (Recommended)\", \"Single-harness dispatcher routine — file as a separate thread, or fold into the canonical-syntax thread?\"=\"Separate thread (Recommended)\", \"How should I handle the bridge-status thread NO-GO `-004`?\"=\"Pause; subsume into single-harness dispatcher\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0509
+  asked_at: 2026-05-09T20:14:32.656871Z
+  question: "Single-harness dispatcher routine — file as a separate thread, or fold into the canonical-syntax thread?"
+  options:
+    - "Separate thread (Recommended)"
+    - "Fold into canonical-syntax"
+    - "Defer until canonical-syntax lands"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 58ddb528f691c195
+  resolved_at: 2026-05-09T20:14:32.656871Z
+  answer: "User has answered your questions: \"Should I revise the canonical-syntax proposal `-001` to `-002` now to incorporate strict-ignore semantics + role-set membership check, or let Codex review `-001` first?\"=\"Let Codex review -001 first (Recommended)\", \"Single-harness dispatcher routine — file as a separate thread, or fold into the canonical-syntax thread?\"=\"Separate thread (Recommended)\", \"How should I handle the bridge-status thread NO-GO `-004`?\"=\"Pause; subsume into single-harness dispatcher\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0510
+  asked_at: 2026-05-09T20:14:32.656871Z
+  question: "How should I handle the bridge-status thread NO-GO `-004`?"
+  options:
+    - "Pause; subsume into single-harness dispatcher"
+    - "Revise -004 to -005 with Desktop scheduled task"
+    - "Defer until canonical-syntax + dispatcher land"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e05c36d03bf03d88
+  resolved_at: 2026-05-09T20:14:32.656871Z
+  answer: "User has answered your questions: \"Should I revise the canonical-syntax proposal `-001` to `-002` now to incorporate strict-ignore semantics + role-set membership check, or let Codex review `-001` first?\"=\"Let Codex review -001 first (Recommended)\", \"Single-harness dispatcher routine — file as a separate thread, or fold into the canonical-syntax thread?\"=\"Separate thread (Recommended)\", \"How should I handle the bridge-status thread NO-GO `-004`?\"=\"Pause; subsume into single-harness dispatcher\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0511
+  asked_at: 2026-05-09T20:46:08.970401Z
+  question: "atus. Standing by — should I proceed with `-005`, or pivot to one of the GO'd threads first?"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: cf0b15e86348edf1
+  resolved_at: 2026-05-09T20:50:50.035052Z
+  answer: "proceed with -005"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0512
+  asked_at: 2026-05-09T20:52:02.471857Z
+  question: "Which thread should I work on next?"
+  options:
+    - "Revise canonical-syntax to `-005` (Recommended)"
+    - "Implement a GO'd thread now"
+    - "Revise dispatcher to `-003` first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 21ae46017d11c0ce
+  resolved_at: 2026-05-09T20:52:02.471857Z
+  answer: "User has answered your questions: \"Which thread should I work on next?\"=\"Revise canonical-syntax to `-005` (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 
