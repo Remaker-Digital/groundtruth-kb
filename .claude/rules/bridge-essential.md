@@ -94,6 +94,76 @@ Do not re-enable the retired OS poller implementation OR the retired
 smart poller as a substitute for the cross-harness event-driven trigger
 unless Mike gives a new explicit directive for that legacy path.
 
+## Two-Axis Bridge Automation Model
+
+Bridge automation has two complementary first-class axes, each with a
+distinct role in the bridge protocol's autonomous-vs-interactive dispatch
+model:
+
+### Axis 1: Dispatchable work — cross-harness event-driven trigger
+
+The cross-harness event-driven trigger (`scripts/cross_harness_bridge_trigger.py`)
+is the canonical mechanism for **dispatchable work** — work that can be
+completed by a freshly-spawned counterpart harness session without further
+owner input. Registered as PostToolUse and Stop hooks in
+`.claude/settings.json` and `.codex/hooks.json`. Fires on tool-use and Stop.
+Spawns counterpart harness sessions when actionable INDEX changes are
+detected.
+
+Examples of dispatchable work:
+- Loyal Opposition reviews of NEW or REVISED proposals.
+- Loyal Opposition verifications of post-implementation reports.
+- Self-contained test runs.
+- Verdict file authoring.
+
+### Axis 2: Non-dispatchable work — thread automation pattern
+
+A thread automation pattern wakes the interactive chat session
+periodically. Its role is to scan `bridge/INDEX.md` and surface work that
+**cannot be dispatched to a sub-agent** — work requiring interactive owner
+input mid-stream, accumulating context across turns, or coordination across
+threads.
+
+Examples of non-dispatchable work:
+- Owner-AUQ-required decisions (approvals, waivers, priority choices,
+  formal artifact approvals).
+- Multi-turn review where context accumulates and a fresh harness would
+  lose thread.
+- Cross-thread coordination (e.g., umbrella proposal referencing sibling
+  threads needing owner sequencing).
+- Implementation work that interleaves owner approval packets with code
+  changes.
+
+Currently the thread automation pattern is implemented Codex-side only
+(the inventoried automations under `config/agent-control/system-interface-map.toml`).
+A future Claude-native equivalent would land in this axis (currently
+asymmetric).
+
+### Both axes required; roles do not overlap
+
+The cross-harness trigger does NOT refresh already-running interactive
+sessions, and the thread automation does NOT spawn counterpart harness
+sessions. They are complementary, not duplicative.
+
+### Adding new bridge automation
+
+DO NOT create additional bridge automations as substitutes for either axis
+without owner approval. Adding a new bridge automation requires:
+
+1. Owner approval via AskUserQuestion (the canonical owner-decision channel
+   per the AUQ-only enforcement stack).
+2. Classification by axis (dispatchable vs non-dispatchable).
+3. A new `[[systems]]` entry in `config/agent-control/system-interface-map.toml`
+   with `concept_vs_artifact` reflecting the axis.
+4. Update to this section if the new automation's role overlaps with an
+   existing surface.
+
+This section articulates the architecture; it does NOT ratify any specific
+existing automation as canonical. Owner disposition of currently-inventoried
+Codex-app automations (`monitor-gt-kb-bridge-codex-thread`,
+`gt-kb-bridge-monitor-codex-thread`) is a separate concern not addressed
+in this slice.
+
 ## Invariants (Bridge Protocol Itself)
 
 These remain in force regardless of whether bridge scans are manual or handled

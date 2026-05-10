@@ -155,10 +155,25 @@ BRIDGE_DISPATCH_ROLE_TEXT = (
     "as fallback; retired smart poller and OS poller remain archived"
 )
 BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
-    "use the `gtkb-bridge` skill (`.claude/skills/bridge/SKILL.md`; Codex adapter "
-    "`.codex/skills/bridge/SKILL.md`) for manual bridge scans, reviews, and verifications; "
-    "dispatch service entry point: `scripts/cross_harness_bridge_trigger.py`; do not create "
-    "Codex app heartbeat/cron automations as bridge monitors"
+    "Bridge automation has two complementary axes. "
+    "AXIS 1 (DISPATCHABLE WORK): the cross-harness event-driven trigger "
+    "(`scripts/cross_harness_bridge_trigger.py`) is the canonical mechanism for "
+    "self-contained work — reviews, verdicts, tests, work that a freshly-spawned "
+    "counterpart harness can complete without further owner input. Registered as "
+    "PostToolUse and Stop hooks. "
+    "AXIS 2 (NON-DISPATCHABLE WORK): a thread automation pattern wakes the "
+    "interactive chat session periodically to scan `bridge/INDEX.md` and surface "
+    "work that requires interactive owner input mid-stream — owner-AUQ-required "
+    "decisions, multi-turn review with accumulating context, cross-thread "
+    "coordination, AUQ-heavy implementation. "
+    "Both axes are required; their roles do not overlap. "
+    "Use the `gtkb-bridge` skill (`.claude/skills/bridge/SKILL.md`; Codex adapter "
+    "`.codex/skills/bridge/SKILL.md`) for proposal/review/verification mechanics. "
+    "Manual `bridge/INDEX.md` scans remain available as fallback. "
+    "Do NOT create new bridge automations (Codex-app-side, Claude-side, or otherwise) "
+    "without owner approval; any new automation must be classified by axis "
+    "(dispatchable vs non-dispatchable) and inventoried in "
+    "`config/agent-control/system-interface-map.toml`."
 )
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
@@ -5682,7 +5697,7 @@ def _default_lifecycle_guard_path(project_root: Path, *, harness_name: str | Non
 
 def _read_lifecycle_guard(path: Path) -> dict[str, Any]:
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
     return raw if isinstance(raw, dict) else {}
