@@ -159,12 +159,78 @@ def _load_dispatch_state(state_dir: Path) -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
+def _rename_with_retry(
+    src: Path,
+    dst: Path,
+    *,
+    total_attempts: int = 5,
+    initial_backoff_s: float = 0.05,
+) -> None:
+    """Atomic rename with backoff on transient Windows access errors.
+
+    Per ``bridge/gtkb-cross-harness-trigger-windows-rename-race-001-003.md``
+    GO at ``-004`` (REVISED-1):
+
+    Retries ``PermissionError`` only. This covers:
+    - WinError 32 (sharing violation; target file held briefly by another
+      process — concurrent trigger invocations, doctor probe, AV scanner).
+    - WinError 5 (access denied; transient AV scanner hold or filesystem
+      reorganization).
+
+    Does NOT retry ``FileNotFoundError`` (WinError 2). With per-invocation
+    temp paths (see ``_write_dispatch_state``), our temp cannot be racing
+    another writer's removal; a missing temp indicates a different bug
+    class (caller deleted our temp) and is raised immediately for
+    diagnosis rather than silently retrying.
+
+    Timing: ``total_attempts=5`` means up to 5 tries. Sleeps occur AFTER
+    attempts 1-4 only (4 sleeps before the 5th attempt's potential raise):
+    50ms / 100ms / 200ms / 400ms = ~750ms total worst-case sleep.
+    """
+    backoff = initial_backoff_s
+    for attempt in range(1, total_attempts + 1):
+        try:
+            src.replace(dst)
+            return
+        except PermissionError:
+            if attempt == total_attempts:
+                raise
+            time.sleep(backoff)
+            backoff *= 2.0
+
+
 def _write_dispatch_state(state_dir: Path, payload: dict[str, Any]) -> None:
+    """Atomically write dispatch state under per-invocation temp path.
+
+    Per ``bridge/gtkb-cross-harness-trigger-windows-rename-race-001-003.md``
+    GO at ``-004`` (REVISED-1):
+
+    Uses a per-invocation temp path ``dispatch-state.json.<pid>-<uuid8>.tmp``
+    so concurrent trigger invocations cannot collide on a shared temp file.
+    The shared-temp anti-pattern was the root of 191 historical failures
+    (147 WinError 32 + 23 WinError 5 + 17 WinError 2 + 4 temp-perm).
+
+    The rename to the canonical target uses ``_rename_with_retry`` to
+    handle transient Windows file-in-use / access-denied races.
+
+    On any error during write or rename, the temp file is best-effort
+    cleaned up in a ``finally`` block so the per-invocation path doesn't
+    accumulate orphans. Cleanup errors are swallowed so the original
+    exception propagates.
+    """
     state_dir.mkdir(parents=True, exist_ok=True)
     target = state_dir / DISPATCH_STATE_FILENAME
-    tmp = target.with_suffix(target.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    tmp.replace(target)
+    unique = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    tmp = target.with_suffix(target.suffix + f".{unique}.tmp")
+    try:
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        _rename_with_retry(tmp, target)
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
 
 
 def _record_dispatch_failure(state_dir: Path, payload: dict[str, Any]) -> None:
@@ -614,6 +680,147 @@ def run_trigger(
     return {"skipped": False, "results": results, "dispatch_state": payload}
 
 
+def _classify_failure_record(record: dict[str, Any]) -> str:
+    """Classify a dispatch-failures.jsonl record by error class.
+
+    Per ``bridge/gtkb-cross-harness-trigger-windows-rename-race-001-003.md``:
+    failure distribution must NOT be collapsed to a single error type.
+    """
+    msg = str(record.get("error_message") or "")
+    if "WinError 32" in msg:
+        return "WinError 32 (sharing violation)"
+    if "WinError 5" in msg:
+        return "WinError 5 (access denied)"
+    if "WinError 2" in msg:
+        return "WinError 2 (file not found)"
+    if ".tmp" in msg and ("Permission" in msg or "denied" in msg.lower()):
+        return "temp-path permission denied"
+    return f"other ({record.get('error_type') or 'unknown'})"
+
+
+def _emit_diagnose_summary(state_dir: Path) -> str:
+    """Render a structured liveness summary; read-only.
+
+    Sections:
+      - Trigger infrastructure
+      - Dispatch state
+      - Per-recipient state
+      - Failure distribution (NOT collapsed)
+      - Liveness assessment per recipient
+      - Overall verdict
+
+    Per ``bridge/gtkb-cross-harness-trigger-windows-rename-race-001`` GO
+    at ``-004``.
+    """
+    lines: list[str] = []
+    lines.append(f"Cross-harness trigger diagnose — {_now_iso()}")
+    lines.append("")
+
+    # Trigger infrastructure
+    lines.append("== Trigger infrastructure ==")
+    script_path = Path(__file__).resolve()
+    lines.append(f"- Script: {script_path}")
+    lines.append(f"- State dir: {state_dir}")
+    lines.append("")
+
+    # Dispatch state
+    lines.append("== Dispatch state ==")
+    state = _load_dispatch_state(state_dir)
+    if not state:
+        lines.append("- File: ABSENT (no dispatches recorded)")
+        lines.append("")
+        lines.append("== Overall ==")
+        lines.append("- DEGRADED: dispatch-state.json absent (cold start or wiped state).")
+        return "\n".join(lines)
+    state_path = state_dir / DISPATCH_STATE_FILENAME
+    lines.append(f"- File: {state_path}")
+    updated_at = state.get("updated_at", "(missing)")
+    lines.append(f"- Last update: {updated_at}")
+    lines.append(f"- Schema version: {state.get('schema_version', '(missing)')}")
+    lines.append("")
+
+    # Per-recipient state
+    lines.append("== Per-recipient state ==")
+    recipients = state.get("recipients", {}) or {}
+    for name in ("codex", "prime"):
+        rec = recipients.get(name) or {}
+        if not rec:
+            lines.append(f"- {name}: (no state recorded)")
+            continue
+        sig = (rec.get("signature") or "")[:8]
+        last_dispatched = (rec.get("last_dispatched_signature") or "")[:8] or "(none)"
+        lines.append(
+            f"- {name}: last_result={rec.get('last_result', '?')}, "
+            f"pending={rec.get('pending_count', '?')}, "
+            f"selected={rec.get('selected_count', '?')}"
+        )
+        lines.append(f"  signature {sig}... last_dispatched={last_dispatched}...")
+    lines.append("")
+
+    # Failure distribution
+    lines.append("== Recent failures ==")
+    failures_path = state_dir / DISPATCH_FAILURES_FILENAME
+    if not failures_path.is_file():
+        lines.append("- dispatch-failures.jsonl absent (no failures recorded).")
+    else:
+        try:
+            raw = failures_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            raw = []
+        records: list[dict[str, Any]] = []
+        for line in raw:
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(rec, dict):
+                records.append(rec)
+        total = len(records)
+        lines.append(f"- Total in dispatch-failures.jsonl: {total}")
+        # Distribution by error class — NOT collapsed.
+        class_counts: dict[str, int] = {}
+        last_ts_by_class: dict[str, str] = {}
+        for rec in records:
+            cls = _classify_failure_record(rec)
+            class_counts[cls] = class_counts.get(cls, 0) + 1
+            ts = str(rec.get("ts") or "")
+            if ts and ts > last_ts_by_class.get(cls, ""):
+                last_ts_by_class[cls] = ts
+        for cls in sorted(class_counts, key=lambda k: -class_counts[k]):
+            last_ts = last_ts_by_class.get(cls, "(unknown)")
+            lines.append(f"  - {cls}: {class_counts[cls]} (last: {last_ts})")
+    lines.append("")
+
+    # Liveness assessment
+    lines.append("== Liveness ==")
+    overall_healthy = True
+    for name in ("codex", "prime"):
+        rec = recipients.get(name) or {}
+        sig = rec.get("signature") or ""
+        last_dispatched = rec.get("last_dispatched_signature") or ""
+        last_result = rec.get("last_result") or ""
+        if last_result == "no_pending":
+            lines.append(f"- {name}: idle (no actionable work).")
+        elif last_result == "counterpart_active_session_present":
+            lines.append(f"- {name}: suppressed (counterpart active session detected; by design).")
+        elif sig == last_dispatched and sig:
+            lines.append(f"- {name}: dispatched (signature matches last_dispatched).")
+        elif last_result == "unchanged":
+            lines.append(f"- {name}: idempotent (signature unchanged from last successful dispatch).")
+        else:
+            lines.append(f"- {name}: state={last_result or '?'} (no liveness rule matched).")
+            overall_healthy = False
+    lines.append("")
+
+    # Overall
+    lines.append("== Overall ==")
+    if overall_healthy:
+        lines.append("- HEALTHY: dispatch state is current; recipients functioning per design.")
+    else:
+        lines.append("- DEGRADED: one or more recipients in an unrecognized state.")
+    return "\n".join(lines)
+
+
 def _build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -668,6 +875,18 @@ def _build_argparser() -> argparse.ArgumentParser:
             "is ignored so the JSON contract isn't violated by extra summary text."
         ),
     )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help=(
+            "Diagnostic mode. Emits a structured liveness summary to stdout and "
+            "exits 0 WITHOUT performing dispatch or modifying state. Reports "
+            "trigger infrastructure, dispatch state, per-recipient liveness, and "
+            "failure distribution by error class (WinError 32 / 5 / 2 / temp-perm "
+            "/ other) — NOT collapsed to a single error type. Per "
+            "bridge/gtkb-cross-harness-trigger-windows-rename-race-001 GO at -004."
+        ),
+    )
     return parser
 
 
@@ -691,6 +910,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.state_dir is not None
             else project_root.joinpath(*DEFAULT_STATE_SUBDIR)
         )
+        if args.diagnose:
+            # Diagnose mode: read-only liveness summary; no dispatch, no state mutation.
+            print(_emit_diagnose_summary(state_dir))
+            return 0
         summary = run_trigger(
             project_root=project_root,
             state_dir=state_dir,
