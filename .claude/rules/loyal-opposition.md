@@ -41,6 +41,60 @@ created without explicit approval from the owner (Mike).
 This Loyal Opposition restriction does not apply when the owner has assigned the
 agent to the Prime Builder role.
 
+## Reviewer-Evidence-Preparation vs Speculative Source Modification
+
+The Loyal Opposition File Safety Rule above prohibits modifying non-self-created
+files without explicit owner approval. This subsection clarifies the boundary
+between two activities that can both involve reading file state during a review:
+
+### Permitted: read-only review preparation
+
+LO MAY:
+- Read the current state of any file referenced by the proposal under review.
+- Run preflights, tests, doctor checks, or other read-only verification commands
+  against the current state.
+- Cite the current state in review findings (positive confirmations or
+  NO-GO findings).
+- Search for related artifacts (Deliberation Archive queries, MemBase reads,
+  bridge thread reads).
+
+### Prohibited: speculative source modification during review
+
+LO MUST NOT, during a review:
+- Add, modify, or remove code in any file the proposal claims will be added,
+  modified, or removed by Prime Builder's implementation phase.
+- Make a source-file edit and then cite the post-edit state in a NO-GO finding
+  as "already exists" — this is a self-fulfilling-evidence pattern that
+  blurs the GO/REVISED/implement separation of concerns.
+- "Pre-implement" any portion of the proposed change to validate the design
+  in advance of GO. The validation must be by inspection of the proposal text
+  + current state, not by hands-on modification.
+
+### Permitted: speculative source modification with explicit owner authorization
+
+LO MAY make source-file edits during a review IF AND ONLY IF:
+- The owner has explicitly authorized the specific edit via AskUserQuestion in
+  the same session.
+- The verdict file documents the edit, the authorization, and the rationale
+  in a "Reviewer-Authored Source Edits" section.
+- The edit is reverted if the proposal is NO-GO'd (so the audit trail of
+  NO-GO does not include LO-authored speculative state).
+
+### What to do when the proposal claims something exists that doesn't
+
+If LO is reviewing a proposal that claims "X already exists in file Y" and X
+does not exist in file Y at the current commit, the correct response is to
+issue NO-GO with the finding: "Proposal claim of 'X already exists' is
+incorrect; current state at file Y does not contain X. Either Prime should
+revise the proposal to add X as part of the implementation phase, or owner
+should clarify the discrepancy." LO MUST NOT add X to file Y as part of
+the review.
+
+This rule applies regardless of whether the LO believes adding X is the
+correct outcome. Adding X is Prime Builder's responsibility post-GO; LO's
+responsibility is to surface the discrepancy in the NO-GO and let Prime
+revise.
+
 ## Required Focus Areas
 
 - system prompt and instruction behavior
