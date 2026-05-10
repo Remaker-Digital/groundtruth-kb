@@ -11,6 +11,39 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-isolation-018-slice-e1-atomic-code-move
+GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-016.md
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-015.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-014.md
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-013.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-012.md
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-011.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-010.md
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-009.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-008.md
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-007.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-006.md
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-005.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-004.md
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-003.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-002.md
+NEW: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-001.md
+
+Document: gtkb-canonical-terminology-agent-red-corrective
+WITHDRAWN: bridge/gtkb-canonical-terminology-agent-red-corrective-003.md
+NO-GO: bridge/gtkb-canonical-terminology-agent-red-corrective-002.md
+NEW: bridge/gtkb-canonical-terminology-agent-red-corrective-001.md
+
+Document: gtkb-gov-007-blocked-on-isolation-018-annotation
+WITHDRAWN: bridge/gtkb-gov-007-blocked-on-isolation-018-annotation-003.md
+NO-GO: bridge/gtkb-gov-007-blocked-on-isolation-018-annotation-002.md
+NEW: bridge/gtkb-gov-007-blocked-on-isolation-018-annotation-001.md
+
+Document: gtkb-isolation-018-slice-0-git-boundary
+WITHDRAWN: bridge/gtkb-isolation-018-slice-0-git-boundary-003.md
+NO-GO: bridge/gtkb-isolation-018-slice-0-git-boundary-002.md
+NEW: bridge/gtkb-isolation-018-slice-0-git-boundary-001.md
+
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
 NO-GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-001.md
