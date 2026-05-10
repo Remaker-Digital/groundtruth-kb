@@ -6,7 +6,13 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-0517
+  asked_at: 2026-05-10T23:43:43.998510Z
+  question: "want me to stash them, or would you rather route through Codex first?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: ec7495ed28d73614
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -6066,6 +6072,76 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 21ae46017d11c0ce
   resolved_at: 2026-05-09T20:52:02.471857Z
   answer: "User has answered your questions: \"Which thread should I work on next?\"=\"Revise canonical-syntax to `-005` (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0513
+  asked_at: 2026-05-10T17:25:31.607753Z
+  question: "How should GTKB-GOV-007 be dispositioned given that SPEC-1831/1832/1833 implementation paths (src/multi_tenant/..., src/app/health.py) are still at GT-KB project root despite canonical-terminology.md and project-root-boundary.md saying Agent Red is a separate project?"
+  options:
+    - "Revise in place"
+    - "Reclassify to Agent Red"
+    - "Retire threads"
+    - "Migration first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 55289333c3adab09
+  resolved_at: 2026-05-10T17:25:31.607753Z
+  answer: "User has answered your questions: \"How should GTKB-GOV-007 be dispositioned given that SPEC-1831/1832/1833 implementation paths (src/multi_tenant/..., src/app/health.py) are still at GT-KB project root despite canonical-terminology.md and project-root-boundary.md saying Agent Red is a separate project?\"=\"I do not understand this issue. I need a more in-depth explanation. The overriding directive is to relocate all Agent Red artifacts and data to E:\\GT-KB\\applications\\Agent_Red. All work must account for this directive and re-plan accordingly, if necessary.\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0514
+  asked_at: 2026-05-10T17:25:31.607753Z
+  question: "Given your directive re-orders GTKB-GOV-007 behind the Agent Red in-tree relocation, what should I do this session?"
+  options:
+    - "Investigate relocation state"
+    - "Pivot session to relocation"
+    - "Annotate backlog + flag glossary"
+    - "Switch focus entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1ab18aeed02ad805
+  resolved_at: 2026-05-10T17:25:31.607753Z
+  answer: "User has answered your questions: \"Given your directive re-orders GTKB-GOV-007 behind the Agent Red in-tree relocation, what should I do this session?\"=\"Investigate relocation state\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0515
+  asked_at: 2026-05-10T18:15:06.511944Z
+  question: "Given the discovery that GTKB-ISOLATION-018 is an active 12-sub-slice umbrella program (with 18.E code-cluster already at Codex GO and pending Prime implementation), and that my A.1 'Slice 0 git boundary' inverts the umbrella's correct sequence, how should I recover?"
+  options:
+    - "Withdraw all 3; pick up 18.E (Recommended)"
+    - "Withdraw A.1 only; salvage C.1/C.2"
+    - "Investigate before deciding"
+    - "Switch focus entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: de7c87f16ca1c08a
+  resolved_at: 2026-05-10T18:15:06.511944Z
+  answer: "User has answered your questions: \"Given the discovery that GTKB-ISOLATION-018 is an active 12-sub-slice umbrella program (with 18.E code-cluster already at Codex GO and pending Prime implementation), and that my A.1 'Slice 0 git boundary' inverts the umbrella's correct sequence, how should I recover?\"=\"Withdraw all 3; pick up 18.E (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0516
+  asked_at: 2026-05-10T23:27:25.326027Z
+  question: "Codex GO at -016 authorizes E.1 implementation. Working tree has 37 changes including 8 modified files that pre-date this session and 28 new bridge files from this session's work. The E.1 precondition will abort on the pre-existing modified files. How should I handle the working-tree state before running implementation?"
+  options:
+    - "Commit bridge work only"
+    - "Stash all non-E.1, run E.1"
+    - "You handle worktree; I wait"
+    - "Investigate pre-existing changes first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9ad6643fad8f73e1
+  resolved_at: 2026-05-10T23:27:25.326027Z
+  answer: "User has answered your questions: \"Codex GO at -016 authorizes E.1 implementation. Working tree has 37 changes including 8 modified files that pre-date this session and 28 new bridge files from this session's work. The E.1 precondition will abort on the pre-existing modified files. How should I handle the working-tree state before running implementation?\"=\"Commit bridge work only\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0518
+  asked_at: 2026-05-10T23:44:37.865362Z
+  question: "How should I handle Codex's 11 in-progress source/test edits in the working tree before E.1 implementation runs?"
+  options:
+    - "Stash and proceed (Recommended)"
+    - "Route through Codex first"
+    - "You commit them directly"
+    - "Investigate further first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1806d89d46e45c42
+  resolved_at: 2026-05-10T23:44:37.865362Z
+  answer: "User has answered your questions: \"How should I handle Codex's 11 in-progress source/test edits in the working tree before E.1 implementation runs?\"=\"Route through Codex first\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
