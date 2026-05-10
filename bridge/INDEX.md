@@ -12,6 +12,7 @@
 
 
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
+NO-GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-001.md
 
 Document: gtkb-cross-harness-trigger-windows-rename-race-001
@@ -33,6 +34,8 @@ Document: gtkb-mcp-stable-harness-surface-advisory-2026-05-09
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-001.md
 
 Document: gtkb-scaffold-upgrade-tier-a
+NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-008.md
+REVISED: bridge/gtkb-scaffold-upgrade-tier-a-007.md
 NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-006.md
 REVISED: bridge/gtkb-scaffold-upgrade-tier-a-005.md
 NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-004.md
