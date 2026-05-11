@@ -11,18 +11,26 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-audit-script-withdrawn-status-handling
+GO: bridge/gtkb-audit-script-withdrawn-status-handling-002.md
+NEW: bridge/gtkb-audit-script-withdrawn-status-handling-001.md
+
 Document: gtkb-release-candidate-gate-stale-test-paths
+REVISED: bridge/gtkb-release-candidate-gate-stale-test-paths-005.md
+NO-GO: bridge/gtkb-release-candidate-gate-stale-test-paths-004.md
 REVISED: bridge/gtkb-release-candidate-gate-stale-test-paths-003.md
 NO-GO: bridge/gtkb-release-candidate-gate-stale-test-paths-002.md
 NEW: bridge/gtkb-release-candidate-gate-stale-test-paths-001.md
 
 Document: gtkb-gov-010-followup-observations-s342
+VERIFIED: bridge/gtkb-gov-010-followup-observations-s342-005.md
 VERIFIED: bridge/gtkb-gov-010-followup-observations-s342-004.md
 NEW: bridge/gtkb-gov-010-followup-observations-s342-003.md
 GO: bridge/gtkb-gov-010-followup-observations-s342-002.md
 NEW: bridge/gtkb-gov-010-followup-observations-s342-001.md
 
 Document: gtkb-s341-backlog-candidates-membase-insert
+NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-008.md
 NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-007.md
 NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-006.md
 GO: bridge/gtkb-s341-backlog-candidates-membase-insert-005.md
@@ -63,6 +71,7 @@ NO-GO: bridge/gtkb-advisory-report-template-spec-002.md
 NEW: bridge/gtkb-advisory-report-template-spec-001.md
 
 Document: gtkb-peer-solution-owner-gate-dcl
+REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-007.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-006.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-005.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-004.md
@@ -1324,5 +1333,3 @@ NO-GO: bridge/gtkb-dora-001b-authoritative-deployment-source-004.md
 REVISED: bridge/gtkb-dora-001b-authoritative-deployment-source-003.md
 NO-GO: bridge/gtkb-dora-001b-authoritative-deployment-source-002.md
 NEW: bridge/gtkb-dora-001b-authoritative-deployment-source-001.md
-
-
