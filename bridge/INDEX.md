@@ -18,6 +18,7 @@ Document: gtkb-peer-solution-workflow-contract-adr
 NEW: bridge/gtkb-peer-solution-workflow-contract-adr-001.md
 
 Document: gtkb-advisory-report-protocol-extension
+REVISED: bridge/gtkb-advisory-report-protocol-extension-003.md
 NO-GO: bridge/gtkb-advisory-report-protocol-extension-002.md
 NEW: bridge/gtkb-advisory-report-protocol-extension-001.md
 
@@ -39,6 +40,7 @@ Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-009.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-008.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-007.md
 GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-006.md
