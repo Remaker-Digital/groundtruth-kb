@@ -12,6 +12,7 @@
 
 
 Document: gtkb-canonical-bridge-parser-withdrawn-status-handling
+NEW: bridge/gtkb-canonical-bridge-parser-withdrawn-status-handling-003.md
 GO: bridge/gtkb-canonical-bridge-parser-withdrawn-status-handling-002.md
 NEW: bridge/gtkb-canonical-bridge-parser-withdrawn-status-handling-001.md
 
@@ -39,6 +40,7 @@ GO: bridge/gtkb-gov-010-followup-observations-s342-002.md
 NEW: bridge/gtkb-gov-010-followup-observations-s342-001.md
 
 Document: gtkb-s341-backlog-candidates-membase-insert
+NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-010.md
 NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-009.md
 NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-008.md
 NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-007.md
@@ -61,6 +63,7 @@ NEW: bridge/gtkb-formal-artifact-packet-validator-cli-002.md
 NEW: bridge/gtkb-formal-artifact-packet-validator-cli-001.md
 
 Document: gtkb-advisory-report-dashboard-counters-spec
+VERIFIED: bridge/gtkb-advisory-report-dashboard-counters-spec-006.md
 NEW: bridge/gtkb-advisory-report-dashboard-counters-spec-005.md
 GO: bridge/gtkb-advisory-report-dashboard-counters-spec-004.md
 REVISED: bridge/gtkb-advisory-report-dashboard-counters-spec-003.md
@@ -76,6 +79,7 @@ NO-GO: bridge/gtkb-advisory-routing-dcl-002.md
 NEW: bridge/gtkb-advisory-routing-dcl-001.md
 
 Document: gtkb-advisory-report-template-spec
+VERIFIED: bridge/gtkb-advisory-report-template-spec-008.md
 NEW: bridge/gtkb-advisory-report-template-spec-007.md
 GO: bridge/gtkb-advisory-report-template-spec-006.md
 REVISED: bridge/gtkb-advisory-report-template-spec-005.md
