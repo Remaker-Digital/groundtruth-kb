@@ -166,6 +166,15 @@
 
 ---
 
+### 2026-05-11 - Role scope for release and operations advisory
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | GT-KB should formalize role responsibilities for testing, release-candidate readiness, staging/production deployment, rollback, maintenance, service requests, and outages while preserving the two durable operating roles: Prime Builder and Loyal Opposition. | Bridge handoff `bridge/gtkb-role-scope-release-operations-advisory-2026-05-11-001.md`; current operating-model split between Prime proposal/implementation and Loyal Opposition verification; existing release-candidate gate is non-deploying while deployment requires owner approval. | Prime Builder should respond through the bridge with a role-responsibility matrix / release-operations authority proposal, an evidence-backed rebuttal, or an explicit defer decision before Agent Red release work resumes. | Open |
+| Process | Public GitHub AI harness ecosystems now contain useful patterns for GT-KB, especially skill/plugin packaging, third-party provenance review, semantic retrieval, CI-contained agent review, declarative workflows, and operator visibility; no reviewed project should replace GT-KB whole. | `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-11-11-00-GITHUB-AI-HARNESS-ECOSYSTEM-ADVISORY.md`; bridge handoff `bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md`; owner request for a broad GitHub ecosystem search and Prime-facing advisory. | Prime Builder should respond through the bridge with an ecosystem-scout/import-policy implementation proposal, an evidence-backed rebuttal, or an explicit defer decision. | Open |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).

@@ -567,3 +567,23 @@ verification_method = "tests/scripts/test_system_interface_map.py"
 lifecycle_state = "active"
 related_specs = []
 related_deliberations = []
+
+[[systems]]
+id = "bridge-automation-claude-axis-2"
+canonical_name = "Claude AXIS 2 UserPromptSubmit bridge surface"
+accepted_aliases = ["axis-2 surface", "claude axis 2 surface", "axis 2 in-session surface", "bridge-axis-2-surface", "claude-axis-2-userpromptsubmit"]
+discouraged_aliases = []
+forbidden_aliases = []
+concept_vs_artifact = "bridge_automation"
+authoritative_source = ".claude/hooks/bridge-axis-2-surface.py"
+generated_or_authoritative = "authoritative"
+read_method = "Hook fires on every Claude Code UserPromptSubmit event; reads live bridge/INDEX.md + .gtkb-state/bridge-poller/dispatch-state.json; emits additionalContext markdown when newly-actionable Prime work appears since last surface in this session."
+mutation_method = "Hook is read-only against bridge state; mutates only its own session-scoped cache at .gtkb-state/bridge-poller/axis-2-surface/<session-id>.json. Disable via env var GTKB_NO_AXIS_2_SURFACE=1 or in-session via 'dismiss bridge surface' keyword."
+role_permissions = "Prime Builder owns the hook implementation and tests; Loyal Opposition reviews and audits. Hook is non-mutating against bridge state."
+startup_visibility = "summary_only"
+dashboard_visibility = "summary_only"
+harness_caveats = "Claude-side AXIS 2 mechanism, complementary to Codex-side app-thread automation. Architectural asymmetry by design: Claude is pull-based (prompt-time surface); Codex is push-based (thread-automation wake). Both axes are required and their roles do not overlap."
+verification_method = "platform_tests/scripts/test_bridge_axis_2_surface.py"
+lifecycle_state = "active"
+related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001", "ADR-CODEX-HOOK-PARITY-FALLBACK-001", "ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001"]
+related_deliberations = ["DELIB-1517", "DELIB-1516", "DELIB-1890", "DELIB-1520", "DELIB-1521", "DELIB-1527"]

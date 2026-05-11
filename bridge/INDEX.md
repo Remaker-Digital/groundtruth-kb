@@ -11,10 +11,18 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-peer-solution-owner-gate-dcl
+NEW: bridge/gtkb-peer-solution-owner-gate-dcl-001.md
+
+Document: gtkb-peer-solution-workflow-contract-adr
+NEW: bridge/gtkb-peer-solution-workflow-contract-adr-001.md
+
 Document: gtkb-advisory-report-protocol-extension
+NO-GO: bridge/gtkb-advisory-report-protocol-extension-002.md
 NEW: bridge/gtkb-advisory-report-protocol-extension-001.md
 
 Document: gtkb-peer-solution-advisory-loop-procedure
+GO: bridge/gtkb-peer-solution-advisory-loop-procedure-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-procedure-001.md
 
 Document: gtkb-github-ai-harness-ecosystem-conversion
@@ -31,6 +39,7 @@ Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-008.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-007.md
 GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-006.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md
@@ -192,6 +201,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-008.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-007.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-006.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-005.md

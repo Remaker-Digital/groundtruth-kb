@@ -134,10 +134,24 @@ Examples of non-dispatchable work:
 - Implementation work that interleaves owner approval packets with code
   changes.
 
-Currently the thread automation pattern is implemented Codex-side only
-(the inventoried automations under `config/agent-control/system-interface-map.toml`).
-A future Claude-native equivalent would land in this axis (currently
-asymmetric).
+The two-axis automation surface is implemented:
+
+- AXIS 1 (Claude→Codex and Codex→Claude when no interactive session is
+  active): the cross-harness event-driven trigger at
+  `scripts/cross_harness_bridge_trigger.py` registered as PostToolUse + Stop
+  hooks. Spawns headless counterpart harness on actionable signature change.
+- AXIS 2 Codex-side: the inventoried Codex app-thread automation under
+  `config/agent-control/system-interface-map.toml`, which wakes the Codex
+  interactive session periodically.
+- AXIS 2 Claude-native: the `.claude/hooks/bridge-axis-2-surface.py`
+  UserPromptSubmit hook (per
+  `bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md` REVISED-2
+  Codex GO at `-006`). Surfaces newly-actionable Prime bridge work into the
+  next prompt as additionalContext when an interactive Claude session is
+  active. Pull-based by design: Claude's interaction model is prompt-driven,
+  so the natural Claude-native AXIS 2 mechanism is prompt-time surfacing, not
+  periodic wake. Both AXIS 2 mechanisms are complementary; each fits its
+  harness's native interaction model.
 
 ### Both axes required; roles do not overlap
 

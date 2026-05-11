@@ -6,7 +6,27 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-0524
+  asked_at: 2026-05-11T17:17:30.188077Z
+  question: "Want me to continue with the deferred items (init-keyword/startup-symmetry implementation, artifact-recorder Slice 1,..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: d97e1ff99fed036f
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0527
+  asked_at: 2026-05-11T18:11:25.911082Z
+  question: "Want me to continue with another batch (next-priority deferred items: mcp-stable implementation, init-keyword/startup..."
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 2e077c9bbd9b3085
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0528
+  asked_at: 2026-05-11T18:25:12.963255Z
+  question: "Want me to continue, or close this session here?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: c620f8b2a876c200
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -6200,6 +6220,48 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 4d5120adf48efdd9
   resolved_at: 2026-05-11T13:11:00.669298Z
   answer: "User has answered your questions: \"How should I proceed with the scaffold upgrade Tier A REVISED-4 (filing -009)?\"=\"Draft REVISED-4 now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0523
+  asked_at: 2026-05-11T15:30:54.001406Z
+  question: "How would you like to approach the hygiene plan?"
+  options:
+    - "Start with Phase 1 (DA harvest) now (Recommended)"
+    - "Start with Phase 2+5+6 (quick wins) now"
+    - "Start with Phase 4 (REPOSITORY-STRUCTURE.md) now"
+    - "Hold the plan; review/revise the phasing first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b80e0c01abfaf181
+  resolved_at: 2026-05-11T15:30:54.001406Z
+  answer: "User has answered your questions: \"How would you like to approach the hygiene plan?\"=\"Start with Phase 1 (DA harvest) now (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0525
+  asked_at: 2026-05-11T17:32:45.152523Z
+  question: "Which next batch should I work on?"
+  options:
+    - "Continue deferred items"
+    - "Batch-commit bridge filings first"
+    - "Investigate mcp-stable GO only"
+    - "Stop here for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b710e08d29e476ad
+  resolved_at: 2026-05-11T17:32:45.152523Z
+  answer: "User has answered your questions: \"Which next batch should I work on?\"=\"Batch-commit bridge filings first\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0526
+  asked_at: 2026-05-11T18:11:25.911082Z
+  question: "Approve adding a new Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session bridge surfacing)?"
+  options:
+    - "Approve"
+    - "Approve hook only; defer canonicalization"
+    - "Reject — try a different mechanism"
+    - "Defer to next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c9d93f881394cd5a
+  resolved_at: 2026-05-11T18:11:25.911082Z
+  answer: "User has answered your questions: \"Approve adding a new Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session bridge surfacing)?\"=\"Approve\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History
