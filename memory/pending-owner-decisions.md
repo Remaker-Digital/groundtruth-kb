@@ -6143,6 +6143,34 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-10T23:44:37.865362Z
   answer: "User has answered your questions: \"How should I handle Codex's 11 in-progress source/test edits in the working tree before E.1 implementation runs?\"=\"Route through Codex first\". You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0519
+  asked_at: 2026-05-11T00:07:42.386562Z
+  question: "memory/pending-owner-decisions.md is dirty (56 insertions from this session's AUQ activity, auto-appended by the owner-decision-tracker hook). My E.1 precondition will abort on it. How should I handle?"
+  options:
+    - "Commit it separately (Recommended)"
+    - "Stash it (-u, restore after E.1)"
+    - "Make precondition exception"
+    - "You handle it; I wait"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2cb48b8f8bc0a988
+  resolved_at: 2026-05-11T00:07:42.386562Z
+  answer: "User has answered your questions: \"memory/pending-owner-decisions.md is dirty (56 insertions from this session's AUQ activity, auto-appended by the owner-decision-tracker hook). My E.1 precondition will abort on it. How should I handle?\"=\"Commit it separately (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0520
+  asked_at: 2026-05-11T00:14:20.821673Z
+  question: "E.1 implementation is mid-flight: Steps 0, 0.5, 1 precondition, 1.5, and 2 are done; the rollback helper and 2 test files are authored (16 tests pass); the isolation registry is updated. Working tree has 5 changes (4 new platform files + 1 modified registry). Steps 3-7 remain (atomic ~1,423-file mv, pyproject/workflow/Dockerfile edits, tests, commit). How should I hand off the in-flight state so the next session resumes cleanly?"
+  options:
+    - "WIP commit (Recommended)"
+    - "Stash with handoff note"
+    - "Leave dirty + handoff note"
+    - "Revert to clean state"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 48d5e0a7b60b3fd5
+  resolved_at: 2026-05-11T00:14:20.821673Z
+  answer: "User has answered your questions: \"E.1 implementation is mid-flight: Steps 0, 0.5, 1 precondition, 1.5, and 2 are done; the rollback helper and 2 test files are authored (16 tests pass); the isolation registry is updated. Working tree has 5 changes (4 new platform files + 1 modified registry). Steps 3-7 remain (atomic ~1,423-file mv, pyproject/workflow/Dockerfile edits, tests, commit). How should I hand off the in-flight state so the next session resumes cleanly?\"=\"WIP commit (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

@@ -1,6 +1,21 @@
 # Agent Red Memory
 
 ## Current Status
+- **Fresh-session handoff (2026-05-10 17:15 PDT):** Current HEAD is
+  `58ac3ef5` (`wip(isolation): E.1 Steps 0-2 + platform-files (resume at Step
+  3)`) on `develop`, ahead of `origin/develop` by 27 commits. Loyal Opposition
+  bridge queue is empty from a live `bridge/INDEX.md` scan: 124 docs,
+  `GO=29`, `NO-GO=13`, `VERIFIED=79`, `WITHDRAWN=3`, latest `NEW`/`REVISED` =
+  0. Prime-actionable top item remains `gtkb-isolation-018-slice-e1-atomic-code-move`
+  latest `GO` at `bridge/gtkb-isolation-018-slice-e1-atomic-code-move-016.md`.
+  E.1 is intentionally mid-flight: Steps 0-2 plus platform files are committed;
+  resume at Step 3 (atomic move, path edits, tests, post-move proof, final
+  implementation commit, then post-impl bridge report). Startup-rollup change
+  committed at `a11d27e1`; standard Loyal Opposition startup now includes the
+  MemBase project-state rollup. Assertion check: `1653/1687 PASS`, quality
+  `91.1/100`, 34 known failures. Focused startup tests and Ruff passed. Wrap
+  report:
+  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/SESSION-WRAP-CODEX-LOYAL-OPPOSITION-2026-05-10-17-15.md`.
 - **Fresh-session handoff (2026-05-09, end of S339 Codex LO wrap):** Live bridge state changed during wrap-up. Final scan at 11:04 PDT showed 1 latest `REVISED` LO-actionable entry: `gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001` at `bridge/gtkb-owner-decision-tracker-pattern-bounds-and-auq-resolution-001-005.md`. `gtkb-loyal-opposition-startup-symmetry-001` has an uncommitted `NO-GO` verdict at `bridge/gtkb-loyal-opposition-startup-symmetry-001-006.md` plus a modified `bridge/INDEX.md`; reconcile before push. Branch `develop` is 9 commits ahead of `origin/develop`; working tree remains dirty (`bridge/INDEX.md`, `memory/pending-owner-decisions.md`, untracked startup-symmetry `-006`). Assertion check remains `1654/1687 PASS`, quality `91.1/100`, with 33 known docs/runbook failures. Wrap scanners still fail on known historical bridge/snapshot hygiene plus current uncommitted bridge state. Session report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/SESSION-WRAP-CODEX-LOYAL-OPPOSITION-2026-05-09-S339.md`.
 - **Fresh-session handoff (2026-05-09, end of S338 Codex wrap):** Loyal Opposition bridge queue is clear: live `bridge/INDEX.md` scan after wrap shows `LoyalOppositionActionable=0` and `PrimeActionable=32`. Codex processed 2 post-implementation bridge reports: cross-harness active-session suppression VERIFIED at `bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md`; DA Phase 3 glossary-expansion hook REVISED-1 VERIFIED at `bridge/gtkb-da-read-surface-correction-phase-3-glossary-expansion-hook-010.md`. Targeted evidence: suppression tests `30 passed` plus legacy trigger suite `17 passed, 1 deselected`; glossary hook `20 passed`; targeted `ruff check` and `ruff format --check` passed. Assertion check from S338 wrap remains `1654/1687 PASS`, quality `91.1/100`, with 33 pre-existing/residual failures. Deliberation harvest remains deferred because the formal-artifact approval hook blocks `scripts/harvest_session_deliberations.py`; do not bypass without an approval packet. Worktree is intentionally mixed/dirty with Prime-owned implementation, archived smart-poller files, and Codex bridge verdicts; no broad commit/push was performed during Codex wrap.
 - **Fresh-session handoff (2026-05-07, end of S335):** S335 wrap commit (pending push) records the lift-feature-freeze cycle — `DELIB-S332-LIFT-FEATURE-FREEZE-AND-RELEASE-PATH-FRAMING` inserted, S327 freeze + release-path framing fully lifted, 7 target WIs cleared of freeze/defer language, work_list.md rewritten with per-leverage priority bands (no freeze-derived sequencing). Bridge `gtkb-lift-feature-freeze` VERIFIED at `-012`. **Acceleration items now actionable:** Backlog DB Slices 2-7, `GTKB-ARTIFACT-RECORDER-CLI`, Term Primer Slices 2-5, Resource Disambiguation Slices 2-5. **Preserved release blockers:** `DELIB-S330` canonical Agent Red migration prerequisite + P0 secrets-purge override + in-flight Slice 8.5/8.6 — rc1 tag still NOT authorized. Live `bridge/INDEX.md`, not this summary, remains authoritative for queue status.
