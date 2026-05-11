@@ -98,6 +98,7 @@ NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-002.md
 NEW: bridge/gtkb-scaffold-upgrade-tier-a-001.md
 
 Document: gtkb-role-session-lifecycle-simplification
+GO: bridge/gtkb-role-session-lifecycle-simplification-004.md
 REVISED: bridge/gtkb-role-session-lifecycle-simplification-003.md
 NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
