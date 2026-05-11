@@ -12,6 +12,7 @@
 
 
 Document: gtkb-isolation-018-slice-e1-atomic-code-move
+NEW: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-017.md
 GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-016.md
 REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-015.md
 NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-014.md

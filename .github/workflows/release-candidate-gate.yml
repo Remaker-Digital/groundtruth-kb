@@ -3,11 +3,11 @@ name: Release Candidate Gate
 on:
   pull_request:
     paths:
-      - 'src/**'
+      - 'applications/Agent_Red/src/**'
       - 'tests/**'
       - 'scripts/**'
-      - 'admin/**'
-      - 'widget/**'
+      - 'applications/Agent_Red/admin/**'
+      - 'applications/Agent_Red/widget/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.github/workflows/release-candidate-gate.yml'
@@ -22,11 +22,11 @@ on:
   push:
     branches: [main, develop, 'hotfix/**']
     paths:
-      - 'src/**'
+      - 'applications/Agent_Red/src/**'
       - 'tests/**'
       - 'scripts/**'
-      - 'admin/**'
-      - 'widget/**'
+      - 'applications/Agent_Red/admin/**'
+      - 'applications/Agent_Red/widget/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.github/workflows/release-candidate-gate.yml'
@@ -82,7 +82,7 @@ jobs:
       # Seed groundtruth.db with the MemBase records that governance_adoption +
       # session_self_initialization tests assert. groundtruth.db is gitignored
       # per owner decision 2026-04-24 (commit 23a54af3); CI must materialize the
-      # records from tests/fixtures/ci_membase_seed.json before pytest runs.
+      # records from applications/Agent_Red/tests/fixtures/ci_membase_seed.json before pytest runs.
       # Per DELIB-S330-SLICE-8-6-PHASE-1-5-CI-DB-SEED-CHOICE (Option A).
       - name: Seed CI MemBase records
         run: python scripts/membase_ci_seed.py seed
@@ -98,7 +98,7 @@ jobs:
         run: python scripts/release_governance_metrics.py
 
   frontend-gate:
-    name: Frontend build and widget tests
+    name: Frontend build and applications/Agent_Red/widget tests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -113,11 +113,11 @@ jobs:
       - name: Install frontend dependencies
         shell: pwsh
         run: |
-          npm --prefix widget ci
-          npm --prefix admin ci
-          npm --prefix admin/standalone ci
-          npm --prefix admin/provider ci
-          npm --prefix admin/shopify ci
+          npm --prefix applications/Agent_Red/widget ci
+          npm --prefix applications/Agent_Red/admin ci
+          npm --prefix applications/Agent_Red/admin/standalone ci
+          npm --prefix applications/Agent_Red/admin/provider ci
+          npm --prefix applications/Agent_Red/admin/shopify ci
 
       - name: Prepare CI frontend environment
         shell: pwsh

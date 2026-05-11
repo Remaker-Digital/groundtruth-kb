@@ -39,7 +39,7 @@ jobs:
       - name: Build and push ${{ matrix.agent.repo }}
         run: |
           docker build \
-            -f src/agents/containers/Dockerfile \
+            -f applications/Agent_Red/src/agents/containers/Dockerfile \
             --build-arg AGENT_MODULE=${{ matrix.agent.module }} \
             -t acragentredeastus.azurecr.io/${{ matrix.agent.repo }}:${{ inputs.tag }} \
             .

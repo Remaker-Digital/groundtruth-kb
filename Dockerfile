@@ -57,20 +57,20 @@ RUN pip install --no-cache-dir --upgrade pip \
 # --------------------------------------------------------------------------
 ARG BUILD_VERSION=unknown
 RUN echo "build-version=${BUILD_VERSION}" > /tmp/.build-version
-COPY src/ ./src/
+COPY applications/Agent_Red/src/ ./src/
 COPY config/ ./config/
 
 # --------------------------------------------------------------------------
-# Admin SPAs (pre-built Vite output for embedded + standalone + provider admin)
+# Admin SPAs (pre-built Vite output for embedded + standalone + provider applications/Agent_Red/admin)
 # --------------------------------------------------------------------------
-COPY admin/shopify/dist/ ./admin/shopify/dist/
-COPY admin/standalone/dist/ ./admin/standalone/dist/
-COPY admin/provider/dist/ ./admin/provider/dist/
+COPY applications/Agent_Red/admin/shopify/dist/ ./admin/shopify/dist/
+COPY applications/Agent_Red/admin/standalone/dist/ ./admin/standalone/dist/
+COPY applications/Agent_Red/admin/provider/dist/ ./admin/provider/dist/
 
 # --------------------------------------------------------------------------
 # Widget bundle (IIFE single-file for embedding via <script> tag)
 # --------------------------------------------------------------------------
-COPY widget/dist/ ./widget/dist/
+COPY applications/Agent_Red/widget/dist/ ./widget/dist/
 
 # --------------------------------------------------------------------------
 # Documentation source (admin-guide markdown for Co-Pilot Knowledge auto-ingestion)

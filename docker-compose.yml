@@ -11,12 +11,12 @@
 services:
   # ---------------------------------------------------------------------------
   # Agent Red API Service
-  # NOTE: The Dockerfile copies pre-built UI artifacts (admin/*/dist/, widget/dist/).
+  # NOTE: The Dockerfile copies pre-built UI artifacts (applications/Agent_Red/admin/*/dist/, applications/Agent_Red/widget/dist/).
   # You must build them BEFORE running docker compose:
-  #   cd widget && npm install && npm run build && cd ..
-  #   cd admin/standalone && npm install && npm run build && cd ../..
-  #   cd admin/provider && npm install && npm run build && cd ../..
-  #   cd admin/shopify && npm install && npm run build && cd ../..
+  #   cd applications/Agent_Red/widget && npm install && npm run build && cd ..
+  #   cd applications/Agent_Red/admin/standalone && npm install && npm run build && cd ../..
+  #   cd applications/Agent_Red/admin/provider && npm install && npm run build && cd ../..
+  #   cd applications/Agent_Red/admin/shopify && npm install && npm run build && cd ../..
   # Requires Node.js >= 20. See README.md § Development for details.
   # ---------------------------------------------------------------------------
   api:

@@ -1,4 +1,4 @@
-# Chromatic visual regression CI for widget Storybook
+# Chromatic visual regression CI for applications/Agent_Red/widget Storybook
 # SPEC-2102 / WI-3165
 # Push-only on develop — post-merge baseline capture, not pre-merge gate.
 # Codex GO: bridge/chromatic-ci-activation-004.md
@@ -11,7 +11,7 @@ on:
   push:
     branches: [develop]
     paths:
-      - 'widget/**'
+      - 'applications/Agent_Red/widget/**'
       - '.github/workflows/chromatic.yml'
   workflow_dispatch:
 
@@ -27,14 +27,14 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: widget/package-lock.json
+          cache-dependency-path: applications/Agent_Red/widget/package-lock.json
 
       - name: Install dependencies
-        working-directory: widget
+        working-directory: applications/Agent_Red/widget
         run: npm ci
 
       - name: Run Chromatic
         uses: chromaui/action@v11
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          workingDir: widget
+          workingDir: applications/Agent_Red/widget

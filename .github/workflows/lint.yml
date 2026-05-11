@@ -10,7 +10,7 @@ name: Lint
 on:
   pull_request:
     paths:
-      - 'src/**'
+      - 'applications/Agent_Red/src/**'
       - 'tests/**'
       - 'scripts/**'
       - 'pyproject.toml'
@@ -18,7 +18,7 @@ on:
   push:
     branches: [main, develop, 'hotfix/**']
     paths:
-      - 'src/**'
+      - 'applications/Agent_Red/src/**'
       - 'tests/**'
       - 'scripts/**'
       - 'requirements*.txt'
@@ -48,16 +48,16 @@ jobs:
       - name: Ruff check (blocking — E/F only, SPEC-1697)
         # E = pycodestyle errors, F = pyflakes (undefined names, unused imports).
         # These are the highest-signal rules and MUST pass.
-        run: ruff check src/ tests/ --select E,F --output-format=github
+        run: ruff check applications/Agent_Red/src/ tests/ --select E,F --output-format=github
 
       - name: Ruff check (advisory — all configured rules)
         # Full rule set including I, UP, B, SIM — advisory until backlog cleared.
         continue-on-error: true
-        run: ruff check src/ tests/ --output-format=github
+        run: ruff check applications/Agent_Red/src/ tests/ --output-format=github
 
       - name: Ruff format check
         continue-on-error: true
-        run: ruff format --check src/ tests/ --diff
+        run: ruff format --check applications/Agent_Red/src/ tests/ --diff
 
   import-cycles:
     name: Import Cycle Detection (SPEC-1695)
@@ -70,8 +70,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Detect circular imports in src/
-        run: python scripts/detect_import_cycles.py src
+      - name: Detect circular imports in applications/Agent_Red/src/
+        run: python scripts/detect_import_cycles.py applications/Agent_Red/src
 
   pip-audit:
     name: Dependency Vulnerability Scan (SPEC-1696)
@@ -110,11 +110,11 @@ jobs:
 
       - name: Radon cyclomatic complexity (advisory)
         continue-on-error: true
-        run: radon cc src/ -a -nc --total-average
+        run: radon cc applications/Agent_Red/src/ -a -nc --total-average
 
       - name: Vulture dead code detection (advisory)
         continue-on-error: true
-        run: vulture src/ --min-confidence 90 || true
+        run: vulture applications/Agent_Red/src/ --min-confidence 90 || true
 
   syntax:
     name: Python Syntax Validation
@@ -133,7 +133,7 @@ jobs:
           import py_compile, sys, os
 
           errors = []
-          for root, dirs, files in os.walk('src'):
+          for root, dirs, files in os.walk('applications/Agent_Red/src'):
               dirs[:] = [d for d in dirs if d != '__pycache__']
               for f in files:
                   if f.endswith('.py'):
@@ -149,6 +149,6 @@ jobs:
                   print(f'  {e}')
               sys.exit(1)
           else:
-              count = sum(1 for r, _, fs in os.walk('src') for f in fs if f.endswith('.py'))
+              count = sum(1 for r, _, fs in os.walk('applications/Agent_Red/src') for f in fs if f.endswith('.py'))
               print(f'OK: {count} Python files compiled successfully')
           "

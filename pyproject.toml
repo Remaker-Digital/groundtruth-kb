@@ -6,7 +6,8 @@
 # ---------------------------------------------------------------------------
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "applications/Agent_Red/tests"]
+pythonpath = [".", "applications/Agent_Red"]
 asyncio_mode = "auto"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -41,11 +42,11 @@ filterwarnings = [
 # ---------------------------------------------------------------------------
 
 [tool.coverage.run]
-source = ["src"]
+source = ["applications/Agent_Red/src"]
 branch = true
 omit = [
-    "src/__init__.py",
-    "src/*/__init__.py",
+    "applications/Agent_Red/src/__init__.py",
+    "applications/Agent_Red/src/*/__init__.py",
 ]
 
 [tool.coverage.report]

@@ -1,5 +1,5 @@
 # axe-core WCAG 2.1 AA CI enforcement (SPEC-2103 / WI-3166)
-# Runs accessibility scans against the standalone admin SPA in mock mode.
+# Runs accessibility scans against the standalone applications/Agent_Red/admin SPA in mock mode.
 # Critical/serious WCAG violations fail the build.
 # Codex GO: bridge/axe-core-ci-enforcement-006.md
 #
@@ -10,18 +10,18 @@ name: Accessibility
 on:
   pull_request:
     paths:
-      - 'admin/**'
-      - 'tests/accessibility/**'
-      - 'tests/e2e/a11y_helpers.py'
+      - 'applications/Agent_Red/admin/**'
+      - 'applications/Agent_Red/tests/accessibility/**'
+      - 'applications/Agent_Red/tests/e2e/a11y_helpers.py'
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.github/workflows/accessibility.yml'
   push:
     branches: [main, 'hotfix/**']
     paths:
-      - 'admin/**'
-      - 'tests/accessibility/**'
-      - 'tests/e2e/a11y_helpers.py'
+      - 'applications/Agent_Red/admin/**'
+      - 'applications/Agent_Red/tests/accessibility/**'
+      - 'applications/Agent_Red/tests/e2e/a11y_helpers.py'
       - 'requirements*.txt'
       - 'pyproject.toml'
   workflow_dispatch:
@@ -43,7 +43,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: admin/standalone/package-lock.json
+          cache-dependency-path: applications/Agent_Red/admin/standalone/package-lock.json
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -55,7 +55,7 @@ jobs:
             requirements-test.txt
 
       - name: Install Node dependencies
-        working-directory: admin/standalone
+        working-directory: applications/Agent_Red/admin/standalone
         run: npm ci
 
       - name: Install Python dependencies
@@ -71,7 +71,7 @@ jobs:
 
       - name: Run accessibility tests
         run: |
-          python -m pytest tests/accessibility/ \
+          python -m pytest applications/Agent_Red/tests/accessibility/ \
             -v --tb=short \
             --junitxml=a11y-results.xml \
             --timeout=120

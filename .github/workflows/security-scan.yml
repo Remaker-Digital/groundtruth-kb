@@ -8,7 +8,7 @@ name: Security Scan
 on:
   pull_request:
     paths:
-      - 'src/**'
+      - 'applications/Agent_Red/src/**'
       - 'tests/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
@@ -18,7 +18,7 @@ on:
   push:
     branches: [develop, 'hotfix/**']
     paths:
-      - 'src/**'
+      - 'applications/Agent_Red/src/**'
       - 'tests/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
@@ -44,13 +44,13 @@ jobs:
           semgrep --config p/python --config p/security-audit --config p/secrets \
             --json --output .quality/semgrep.json \
             --exclude .git --exclude .venv --exclude node_modules \
-            --exclude "admin/**/node_modules" --exclude "admin/**/dist" \
-            --exclude "widget/node_modules" --exclude "widget/dist" \
+            --exclude "applications/Agent_Red/admin/**/node_modules" --exclude "applications/Agent_Red/admin/**/dist" \
+            --exclude "applications/Agent_Red/widget/node_modules" --exclude "applications/Agent_Red/widget/dist" \
             . || true
           semgrep --config p/python --config p/security-audit --config p/secrets \
             --exclude .git --exclude .venv --exclude node_modules \
-            --exclude "admin/**/node_modules" --exclude "admin/**/dist" \
-            --exclude "widget/node_modules" --exclude "widget/dist" \
+            --exclude "applications/Agent_Red/admin/**/node_modules" --exclude "applications/Agent_Red/admin/**/dist" \
+            --exclude "applications/Agent_Red/widget/node_modules" --exclude "applications/Agent_Red/widget/dist" \
             .
 
       - name: Upload results
@@ -70,8 +70,8 @@ jobs:
         run: |
           pip install bandit[toml]
           mkdir -p .quality
-          bandit -r src/ -c pyproject.toml -f json -o .quality/bandit.json || true
-          bandit -r src/ -ll -c pyproject.toml
+          bandit -r applications/Agent_Red/src/ -c pyproject.toml -f json -o .quality/bandit.json || true
+          bandit -r applications/Agent_Red/src/ -ll -c pyproject.toml
 
       - name: Upload results
         if: always()

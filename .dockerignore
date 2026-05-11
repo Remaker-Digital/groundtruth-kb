@@ -23,7 +23,7 @@
 .env.*.local
 .env.example
 .env.integration.example
-# Note: .env.staging files under admin/ are NOT excluded — Dockerfile.test
+# Note: .env.staging files under applications/Agent_Red/admin/ are NOT excluded — Dockerfile.test
 # copies them for tests that verify staging env configuration.
 
 # Python artifacts
@@ -54,7 +54,7 @@ README.md
 # CLAUDE.md — not excluded (needed by Dockerfile.test for test_s153 verification)
 
 # Branding / legal / marketing (not runtime dependencies)
-branding/
+applications/Agent_Red/branding/
 legal/
 website/
 
@@ -62,37 +62,37 @@ website/
 prototype/
 extensions/
 # Widget — keep source for Dockerfile.test (test_message_feedback reads .ts files).
-# Production Dockerfile does not COPY widget/src/, so this is harmless.
-# widget/src/
-widget/node_modules/
-widget/package.json
-widget/package-lock.json
-widget/tsconfig.json
-widget/vite.config.ts
-widget/dev.html
+# Production Dockerfile does not COPY applications/Agent_Red/widget/src/, so this is harmless.
+# applications/Agent_Red/widget/src/
+applications/Agent_Red/widget/node_modules/
+applications/Agent_Red/widget/package.json
+applications/Agent_Red/widget/package-lock.json
+applications/Agent_Red/widget/tsconfig.json
+applications/Agent_Red/widget/vite.config.ts
+applications/Agent_Red/widget/dev.html
 
 # Admin: keep dist/ bundles for all SPAs + standalone source for Dockerfile.test Vite.
-# Exclude node_modules from all admin projects (npm ci runs in-container).
-admin/node_modules/
-admin/shopify/node_modules/
-admin/standalone/node_modules/
-admin/standalone/nul
-admin/provider/node_modules/
-# Shopify admin — exclude source, keep dist/
-admin/shopify/src/
-admin/shopify/package.json
-admin/shopify/package-lock.json
-admin/shopify/tsconfig.json
-admin/shopify/vite.config.ts
-admin/shopify/vite-env.d.ts
-admin/shopify/index.html
-admin/shopify/index.tsx
-# Standalone admin — keep source (Dockerfile.test needs it for Vite dev server).
+# Exclude node_modules from all applications/Agent_Red/admin projects (npm ci runs in-container).
+applications/Agent_Red/admin/node_modules/
+applications/Agent_Red/admin/shopify/node_modules/
+applications/Agent_Red/admin/standalone/node_modules/
+applications/Agent_Red/admin/standalone/nul
+applications/Agent_Red/admin/provider/node_modules/
+# Shopify applications/Agent_Red/admin — exclude source, keep dist/
+applications/Agent_Red/admin/shopify/src/
+applications/Agent_Red/admin/shopify/package.json
+applications/Agent_Red/admin/shopify/package-lock.json
+applications/Agent_Red/admin/shopify/tsconfig.json
+applications/Agent_Red/admin/shopify/vite.config.ts
+applications/Agent_Red/admin/shopify/vite-env.d.ts
+applications/Agent_Red/admin/shopify/index.html
+applications/Agent_Red/admin/shopify/index.tsx
+# Standalone applications/Agent_Red/admin — keep source (Dockerfile.test needs it for Vite dev server).
 # Production Dockerfile doesn't COPY these paths, so extra files are harmless.
-# Provider admin — keep source (Dockerfile.test needs it for source-inspection tests).
+# Provider applications/Agent_Red/admin — keep source (Dockerfile.test needs it for source-inspection tests).
 # Production Dockerfile doesn't COPY these paths, so extra files are harmless.
-admin/provider/src/
-admin/provider/nul
+applications/Agent_Red/admin/provider/src/
+applications/Agent_Red/admin/provider/nul
 
 # Node / frontend tooling
 node_modules/

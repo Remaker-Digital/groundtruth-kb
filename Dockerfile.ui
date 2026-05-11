@@ -2,7 +2,7 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
 # Uses the existing production image as a base and overlays ONLY the UI
-# dist directories (3 admin SPAs + widget bundle). This skips the entire
+# dist directories (3 applications/Agent_Red/admin SPAs + applications/Agent_Red/widget bundle). This skips the entire
 # Python dependency installation phase, reducing build time from ~5-8 min
 # to ~30-60 seconds.
 #
@@ -16,13 +16,13 @@ FROM ${BASE_IMAGE}
 # Switch to root to overwrite files, then back to non-root
 USER root
 
-# Overlay admin SPAs (pre-built Vite output)
-COPY admin/shopify/dist/ ./admin/shopify/dist/
-COPY admin/standalone/dist/ ./admin/standalone/dist/
-COPY admin/provider/dist/ ./admin/provider/dist/
+# Overlay applications/Agent_Red/admin SPAs (pre-built Vite output)
+COPY applications/Agent_Red/admin/shopify/dist/ ./admin/shopify/dist/
+COPY applications/Agent_Red/admin/standalone/dist/ ./admin/standalone/dist/
+COPY applications/Agent_Red/admin/provider/dist/ ./admin/provider/dist/
 
-# Overlay widget bundle
-COPY widget/dist/ ./widget/dist/
+# Overlay applications/Agent_Red/widget bundle
+COPY applications/Agent_Red/widget/dist/ ./widget/dist/
 
 # Restore non-root user
 USER agentred

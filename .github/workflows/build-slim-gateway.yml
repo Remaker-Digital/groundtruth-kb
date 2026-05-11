@@ -24,7 +24,7 @@ jobs:
       - name: Build and push slim-gateway
         run: |
           docker build \
-            -f src/agents/containers/Dockerfile.slim \
+            -f applications/Agent_Red/src/agents/containers/Dockerfile.slim \
             -t acragentredeastus.azurecr.io/slim-gateway:${{ inputs.tag }} \
             .
           docker push acragentredeastus.azurecr.io/slim-gateway:${{ inputs.tag }}

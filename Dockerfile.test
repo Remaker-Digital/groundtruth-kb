@@ -99,7 +99,7 @@ RUN playwright install chromium
 # --------------------------------------------------------------------------
 ARG BUILD_VERSION=unknown
 RUN echo "build-version=${BUILD_VERSION}" > /tmp/.build-version
-COPY src/ ./src/
+COPY applications/Agent_Red/src/ ./src/
 COPY config/ ./config/
 
 # --------------------------------------------------------------------------
@@ -119,40 +119,40 @@ COPY test_host/ ./test_host/
 # --------------------------------------------------------------------------
 # Admin SPAs — pre-built bundles + standalone source for Vite dev server
 # --------------------------------------------------------------------------
-COPY admin/shopify/dist/ ./admin/shopify/dist/
-COPY admin/standalone/dist/ ./admin/standalone/dist/
-COPY admin/provider/dist/ ./admin/provider/dist/
-COPY admin/provider/.env.staging ./admin/provider/.env.staging
+COPY applications/Agent_Red/admin/shopify/dist/ ./admin/shopify/dist/
+COPY applications/Agent_Red/admin/standalone/dist/ ./admin/standalone/dist/
+COPY applications/Agent_Red/admin/provider/dist/ ./admin/provider/dist/
+COPY applications/Agent_Red/admin/provider/.env.staging ./admin/provider/.env.staging
 # Provider SPA source — needed for source-inspection tests (GOV-10 compliance).
-COPY admin/provider/index.html admin/provider/index.tsx admin/provider/tsconfig.json admin/provider/vite.config.ts admin/provider/vite-env.d.ts ./admin/provider/
-COPY admin/provider/components/ ./admin/provider/components/
-COPY admin/provider/hooks/ ./admin/provider/hooks/
-COPY admin/provider/layouts/ ./admin/provider/layouts/
-COPY admin/provider/login/ ./admin/provider/login/
-COPY admin/provider/mocks/ ./admin/provider/mocks/
-COPY admin/provider/pages/ ./admin/provider/pages/
-COPY admin/provider/public/ ./admin/provider/public/
-COPY admin/standalone/.env.staging ./admin/standalone/.env.staging
+COPY applications/Agent_Red/admin/provider/index.html applications/Agent_Red/admin/provider/index.tsx applications/Agent_Red/admin/provider/tsconfig.json applications/Agent_Red/admin/provider/vite.config.ts applications/Agent_Red/admin/provider/vite-env.d.ts ./admin/provider/
+COPY applications/Agent_Red/admin/provider/components/ ./admin/provider/components/
+COPY applications/Agent_Red/admin/provider/hooks/ ./admin/provider/hooks/
+COPY applications/Agent_Red/admin/provider/layouts/ ./admin/provider/layouts/
+COPY applications/Agent_Red/admin/provider/login/ ./admin/provider/login/
+COPY applications/Agent_Red/admin/provider/mocks/ ./admin/provider/mocks/
+COPY applications/Agent_Red/admin/provider/pages/ ./admin/provider/pages/
+COPY applications/Agent_Red/admin/provider/public/ ./admin/provider/public/
+COPY applications/Agent_Red/admin/standalone/.env.staging ./admin/standalone/.env.staging
 # Standalone SPA source — Vite dev server serves this for E2E Playwright tests.
 # Copy source files (not node_modules) + shared components (@shared alias).
-COPY admin/standalone/package.json admin/standalone/package-lock.json ./admin/standalone/
-COPY admin/standalone/index.html admin/standalone/index.tsx admin/standalone/tsconfig.json admin/standalone/vite.config.ts admin/standalone/vite-env.d.ts ./admin/standalone/
-COPY admin/standalone/components/ ./admin/standalone/components/
-COPY admin/standalone/hooks/ ./admin/standalone/hooks/
-COPY admin/standalone/layouts/ ./admin/standalone/layouts/
-COPY admin/standalone/login/ ./admin/standalone/login/
-COPY admin/standalone/mocks/ ./admin/standalone/mocks/
-COPY admin/standalone/pages/ ./admin/standalone/pages/
-COPY admin/standalone/public/ ./admin/standalone/public/
-COPY admin/shared/ ./admin/shared/
+COPY applications/Agent_Red/admin/standalone/package.json applications/Agent_Red/admin/standalone/package-lock.json ./admin/standalone/
+COPY applications/Agent_Red/admin/standalone/index.html applications/Agent_Red/admin/standalone/index.tsx applications/Agent_Red/admin/standalone/tsconfig.json applications/Agent_Red/admin/standalone/vite.config.ts applications/Agent_Red/admin/standalone/vite-env.d.ts ./admin/standalone/
+COPY applications/Agent_Red/admin/standalone/components/ ./admin/standalone/components/
+COPY applications/Agent_Red/admin/standalone/hooks/ ./admin/standalone/hooks/
+COPY applications/Agent_Red/admin/standalone/layouts/ ./admin/standalone/layouts/
+COPY applications/Agent_Red/admin/standalone/login/ ./admin/standalone/login/
+COPY applications/Agent_Red/admin/standalone/mocks/ ./admin/standalone/mocks/
+COPY applications/Agent_Red/admin/standalone/pages/ ./admin/standalone/pages/
+COPY applications/Agent_Red/admin/standalone/public/ ./admin/standalone/public/
+COPY applications/Agent_Red/admin/shared/ ./admin/shared/
 # Install SPA dependencies (npm ci for deterministic installs)
-RUN cd admin/standalone && npm ci --ignore-scripts --no-audit --no-fund
+RUN cd applications/Agent_Red/admin/standalone && npm ci --ignore-scripts --no-audit --no-fund
 
 # --------------------------------------------------------------------------
-# Widget bundle + source (dist for embed tests, src for TS assertion tests)
+# Widget bundle + source (dist for embed tests, applications/Agent_Red/src for TS assertion tests)
 # --------------------------------------------------------------------------
-COPY widget/dist/ ./widget/dist/
-COPY widget/src/ ./widget/src/
+COPY applications/Agent_Red/widget/dist/ ./widget/dist/
+COPY applications/Agent_Red/widget/src/ ./widget/src/
 
 # --------------------------------------------------------------------------
 # Non-root user
