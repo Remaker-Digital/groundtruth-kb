@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-11T18:30:56Z",
+  "generated_at": "2026-05-11T19:03:26Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -187,7 +187,7 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 16,
+      "count": 17,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/bridge-essential.md",
@@ -199,6 +199,7 @@
         ".claude/rules/loyal-opposition.md",
         ".claude/rules/operating-model.md",
         ".claude/rules/operating-role.md",
+        ".claude/rules/peer-solution-advisory-loop.md",
         ".claude/rules/prime-bridge-collaboration-protocol.md",
         ".claude/rules/prime-builder-role.md",
         ".claude/rules/prime-builder.md",

@@ -17,6 +17,7 @@ NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-002.md
 NEW: bridge/gtkb-peer-solution-owner-gate-dcl-001.md
 
 Document: gtkb-peer-solution-workflow-contract-adr
+NO-GO: bridge/gtkb-peer-solution-workflow-contract-adr-006.md
 REVISED: bridge/gtkb-peer-solution-workflow-contract-adr-005.md
 NO-GO: bridge/gtkb-peer-solution-workflow-contract-adr-004.md
 REVISED: bridge/gtkb-peer-solution-workflow-contract-adr-003.md
@@ -30,6 +31,7 @@ NO-GO: bridge/gtkb-advisory-report-protocol-extension-002.md
 NEW: bridge/gtkb-advisory-report-protocol-extension-001.md
 
 Document: gtkb-peer-solution-advisory-loop-procedure
+NEW: bridge/gtkb-peer-solution-advisory-loop-procedure-003.md
 GO: bridge/gtkb-peer-solution-advisory-loop-procedure-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-procedure-001.md
 
