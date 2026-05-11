@@ -12,6 +12,7 @@
 
 
 Document: gtkb-artifact-recorder-cli-slice-1-deliberations-record
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-003.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-001.md
 
@@ -287,6 +288,7 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+NO-GO: bridge/gtkb-bridge-advisory-status-001-010.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-009.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-008.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-007.md
