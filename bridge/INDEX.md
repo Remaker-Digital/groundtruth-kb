@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-da-harvest-catchup
+NEW: bridge/gtkb-da-harvest-catchup-001.md
+
 Document: gtkb-artifact-recorder-cli
 NO-GO: bridge/gtkb-artifact-recorder-cli-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-001.md
@@ -88,6 +91,7 @@ Document: gtkb-mcp-stable-harness-surface-advisory-2026-05-09
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-001.md
 
 Document: gtkb-scaffold-upgrade-tier-a
+VERIFIED: bridge/gtkb-scaffold-upgrade-tier-a-012.md
 NEW: bridge/gtkb-scaffold-upgrade-tier-a-011.md
 GO: bridge/gtkb-scaffold-upgrade-tier-a-010.md
 REVISED: bridge/gtkb-scaffold-upgrade-tier-a-009.md
