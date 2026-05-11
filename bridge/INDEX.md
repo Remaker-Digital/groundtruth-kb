@@ -11,13 +11,20 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-role-scope-release-operations-conversion
+NO-GO: bridge/gtkb-role-scope-release-operations-conversion-002.md
+NEW: bridge/gtkb-role-scope-release-operations-conversion-001.md
+
 Document: gtkb-peer-solution-advisory-loop-conversion
+NO-GO: bridge/gtkb-peer-solution-advisory-loop-conversion-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-001.md
 
 Document: gtkb-advisory-report-message-type-conversion
+NO-GO: bridge/gtkb-advisory-report-message-type-conversion-002.md
 NEW: bridge/gtkb-advisory-report-message-type-conversion-001.md
 
 Document: gtkb-mcp-stable-harness-surface-conversion
+GO: bridge/gtkb-mcp-stable-harness-surface-conversion-002.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-conversion-001.md
 
 Document: gtkb-role-scope-release-operations-advisory-2026-05-11
@@ -88,6 +95,8 @@ NO-GO: bridge/gtkb-isolation-018-slice-0-git-boundary-002.md
 NEW: bridge/gtkb-isolation-018-slice-0-git-boundary-001.md
 
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
+GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-006.md
+REVISED: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-005.md
 NO-GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-004.md
 REVISED: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-003.md
 NO-GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-002.md
@@ -102,6 +111,7 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+NO-GO: bridge/gtkb-bridge-advisory-status-001-006.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-005.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-004.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-003.md
@@ -129,6 +139,7 @@ NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-002.md
 NEW: bridge/gtkb-scaffold-upgrade-tier-a-001.md
 
 Document: gtkb-role-session-lifecycle-simplification
+NO-GO: bridge/gtkb-role-session-lifecycle-simplification-006.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-005.md
 GO: bridge/gtkb-role-session-lifecycle-simplification-004.md
 REVISED: bridge/gtkb-role-session-lifecycle-simplification-003.md
@@ -136,6 +147,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-006.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-005.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-004.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-003.md
