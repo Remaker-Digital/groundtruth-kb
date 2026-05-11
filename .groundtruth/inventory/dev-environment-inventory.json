@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-11T17:32:59Z",
+  "generated_at": "2026-05-11T18:30:56Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -103,10 +103,11 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 20,
+      "count": 21,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/assertion-check.py",
+        ".claude/hooks/bridge-axis-2-surface.py",
         ".claude/hooks/bridge-compliance-gate.py",
         ".claude/hooks/credential-scan.py",
         ".claude/hooks/delib-preflight-gate.py",

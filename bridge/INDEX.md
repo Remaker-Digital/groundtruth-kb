@@ -15,6 +15,8 @@ Document: gtkb-github-ai-harness-ecosystem-conversion
 NEW: bridge/gtkb-github-ai-harness-ecosystem-conversion-001.md
 
 Document: gtkb-isolation-aftermath-startup-baseline
+WITHDRAWN: bridge/gtkb-isolation-aftermath-startup-baseline-004.md
+NO-GO: bridge/gtkb-isolation-aftermath-startup-baseline-003.md
 GO: bridge/gtkb-isolation-aftermath-startup-baseline-002.md
 NEW: bridge/gtkb-isolation-aftermath-startup-baseline-001.md
 
@@ -22,6 +24,7 @@ Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-007.md
 GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-006.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-004.md
@@ -181,6 +184,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-007.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-006.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-005.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-004.md
