@@ -3,7 +3,7 @@
   "application": "Agent_Red",
   "isolation_contract_adr": "ADR-APPLICATION-ISOLATION-CONTRACT-001 (proposed; pending sub-slice 6)",
   "minimization_principle_dcl": "DCL-APP-ROOT-MINIMIZATION-001 (proposed; pending sub-slice 6)",
-  "last_updated": "2026-05-06",
+  "last_updated": "2026-05-10",
   "established_by": "bridge/application-isolation-contract-006.md (GO) sub-slice 1",
   "top_level_artifacts": [
     {
@@ -76,6 +76,42 @@
       "type": "DIR",
       "bucket": "A",
       "purpose": "Agent Red Docusaurus site (agentredcx.com source); migrated from GT-KB root in S334 sub-slice 18.C re-run as per-file moves into existing destination subtree; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "src",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red Python application code (multi_tenant, agents, integrations, chat, app, jobs, migrations, observability, presets, quality_metrics, white-label, ai-features); migrated from GT-KB root in S339 sub-slice 18.E.1 per Codex GO at bridge/gtkb-isolation-018-slice-e1-atomic-code-move-016.md; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "tests",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red test suite (638 files MIGRATES + 21 MIGRATES_WITH_SCRIPT_DEP per E.3 manifest-v3 at .tmp/e3-disposition/manifest-v3.json); 112 platform-test files STAY at GT-KB root per S334 owner directive DELIB-S334-OQ-E3-OPTION-A; migrated from GT-KB root in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "admin",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red admin app (Vite + React + TypeScript); migrated from GT-KB root in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "widget",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red chat widget (Vite + Preact + TypeScript); migrated from GT-KB root in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "branding",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red product branding assets; deferred from 18.D per parents[2] dependency and migrated in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "config",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red configuration (initially: Stripe pricing at config/stripe_product_ids.json deferred from 18.D); other Agent Red config arrives in subsequent slices. GT-KB platform configs in config/agent-control/ and config/governance/ STAY at GT-KB root per umbrella -008. Migrated in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
     }
   ],
   "validator_contract": {
