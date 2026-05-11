@@ -11,7 +11,14 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-advisory-report-protocol-extension
+NEW: bridge/gtkb-advisory-report-protocol-extension-001.md
+
+Document: gtkb-peer-solution-advisory-loop-procedure
+NEW: bridge/gtkb-peer-solution-advisory-loop-procedure-001.md
+
 Document: gtkb-github-ai-harness-ecosystem-conversion
+GO: bridge/gtkb-github-ai-harness-ecosystem-conversion-002.md
 NEW: bridge/gtkb-github-ai-harness-ecosystem-conversion-001.md
 
 Document: gtkb-isolation-aftermath-startup-baseline
