@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-artifact-recorder-cli
+NEW: bridge/gtkb-artifact-recorder-cli-001.md
+
 Document: gtkb-peer-solution-advisory-loop-2026-05-10
 NO-GO: bridge/gtkb-peer-solution-advisory-loop-2026-05-10-001.md
 
