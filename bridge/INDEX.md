@@ -79,6 +79,7 @@ NO-GO: bridge/gtkb-isolation-018-slice-0-git-boundary-002.md
 NEW: bridge/gtkb-isolation-018-slice-0-git-boundary-001.md
 
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
+REVISED: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-003.md
 NO-GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-001.md
 
@@ -91,6 +92,7 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+REVISED: bridge/gtkb-bridge-advisory-status-001-003.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-002.md
 NEW: bridge/gtkb-bridge-advisory-status-001-001.md
 
@@ -121,6 +123,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-003.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-002.md
 NEW: bridge/gtkb-single-harness-bridge-dispatcher-001.md
 
