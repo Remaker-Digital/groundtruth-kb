@@ -11,7 +11,17 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-release-candidate-gate-stale-test-paths
+NEW: bridge/gtkb-release-candidate-gate-stale-test-paths-001.md
+
+Document: gtkb-gov-010-followup-observations-s342
+NEW: bridge/gtkb-gov-010-followup-observations-s342-003.md
+GO: bridge/gtkb-gov-010-followup-observations-s342-002.md
+NEW: bridge/gtkb-gov-010-followup-observations-s342-001.md
+
 Document: gtkb-s341-backlog-candidates-membase-insert
+GO: bridge/gtkb-s341-backlog-candidates-membase-insert-005.md
+REVISED: bridge/gtkb-s341-backlog-candidates-membase-insert-004.md
 NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-003.md
 NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-002.md
 NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-001.md
@@ -28,20 +38,28 @@ NEW: bridge/gtkb-formal-artifact-packet-validator-cli-002.md
 NEW: bridge/gtkb-formal-artifact-packet-validator-cli-001.md
 
 Document: gtkb-advisory-report-dashboard-counters-spec
+GO: bridge/gtkb-advisory-report-dashboard-counters-spec-004.md
+REVISED: bridge/gtkb-advisory-report-dashboard-counters-spec-003.md
 NO-GO: bridge/gtkb-advisory-report-dashboard-counters-spec-002.md
 NEW: bridge/gtkb-advisory-report-dashboard-counters-spec-001.md
 
 Document: gtkb-advisory-routing-dcl
+GO: bridge/gtkb-advisory-routing-dcl-004.md
+REVISED: bridge/gtkb-advisory-routing-dcl-003.md
 NO-GO: bridge/gtkb-advisory-routing-dcl-002.md
 NEW: bridge/gtkb-advisory-routing-dcl-001.md
 
 Document: gtkb-advisory-report-template-spec
+GO: bridge/gtkb-advisory-report-template-spec-006.md
+REVISED: bridge/gtkb-advisory-report-template-spec-005.md
 NO-GO: bridge/gtkb-advisory-report-template-spec-004.md
 REVISED: bridge/gtkb-advisory-report-template-spec-003.md
 NO-GO: bridge/gtkb-advisory-report-template-spec-002.md
 NEW: bridge/gtkb-advisory-report-template-spec-001.md
 
 Document: gtkb-peer-solution-owner-gate-dcl
+GO: bridge/gtkb-peer-solution-owner-gate-dcl-006.md
+REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-005.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-004.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-003.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-002.md
@@ -89,6 +107,9 @@ Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-014.md
+NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-013.md
+NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-012.md
 GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-011.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-010.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-009.md
@@ -129,6 +150,8 @@ NO-GO: bridge/gtkb-advisory-report-message-type-conversion-002.md
 NEW: bridge/gtkb-advisory-report-message-type-conversion-001.md
 
 Document: gtkb-mcp-stable-harness-surface-conversion
+VERIFIED: bridge/gtkb-mcp-stable-harness-surface-conversion-008.md
+REVISED: bridge/gtkb-mcp-stable-harness-surface-conversion-007.md
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-conversion-006.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-conversion-005.md
 GO: bridge/gtkb-mcp-stable-harness-surface-conversion-004.md
