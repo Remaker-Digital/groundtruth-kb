@@ -12,6 +12,7 @@
 
 
 Document: gtkb-artifact-recorder-cli-slice-1-deliberations-record
+NO-GO: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-004.md
 REVISED: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-003.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-001.md
