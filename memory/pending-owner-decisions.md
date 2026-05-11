@@ -6,27 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0524
-  asked_at: 2026-05-11T17:17:30.188077Z
-  question: "Want me to continue with the deferred items (init-keyword/startup-symmetry implementation, artifact-recorder Slice 1,..."
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: d97e1ff99fed036f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0527
-  asked_at: 2026-05-11T18:11:25.911082Z
-  question: "Want me to continue with another batch (next-priority deferred items: mcp-stable implementation, init-keyword/startup..."
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: 2e077c9bbd9b3085
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-- id: DECISION-0528
-  asked_at: 2026-05-11T18:25:12.963255Z
-  question: "Want me to continue, or close this session here?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: c620f8b2a876c200
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -6262,6 +6242,134 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: c9d93f881394cd5a
   resolved_at: 2026-05-11T18:11:25.911082Z
   answer: "User has answered your questions: \"Approve adding a new Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session bridge surfacing)?\"=\"Approve\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0529
+  asked_at: 2026-05-11T18:47:10.883235Z
+  question: "Pre-commit hook hard-blocked the consolidating commit: `.claude/rules/bridge-essential.md` is a protected narrative artifact and the parallel session modified it (Two-Axis Bridge Automation Model section updated to reflect implemented Claude-native AXIS 2) without filing a `formal-artifact-approval` packet. The destructive-gate hook is now also blocking `git restore --staged .claude/...` to unstage it. Three options:"
+  options:
+    - "Authorize unstage; commit other 8 items"
+    - "Create approval packet inline + commit all 9"
+    - "Abort commit; revert bridge-essential.md to pre-edit state"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 99e7fa621057d7d2
+  resolved_at: 2026-05-11T18:47:10.883235Z
+  answer: "User has answered your questions: \"Pre-commit hook hard-blocked the consolidating commit: `.claude/rules/bridge-essential.md` is a protected narrative artifact and the parallel session modified it (Two-Axis Bridge Automation Model section updated to reflect implemented Claude-native AXIS 2) without filing a `formal-artifact-approval` packet. The destructive-gate hook is now also blocking `git restore --staged .claude/...` to unstage it. Three options:\"=\"Create approval packet inline + commit all 9\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0530
+  asked_at: 2026-05-11T18:47:10.883235Z
+  question: "Approve narrative-artifact edit to `.claude/rules/bridge-essential.md` (parallel session's update to the Two-Axis Bridge Automation Model section)? The change replaces the prior 'Currently the thread automation pattern is implemented Codex-side only...A future Claude-native equivalent would land in this axis (currently asymmetric)' paragraph with three concrete bullets documenting: AXIS 1 cross-harness event-driven trigger; AXIS 2 Codex-side app-thread automation; AXIS 2 Claude-native `.claude/hooks/bridge-axis-2-surface.py` UserPromptSubmit hook. Closing line states 'both AXIS 2 mechanisms are complementary; each fits its harness's native interaction model'. SHA-256 of full edited content: `1e406d293edd40de78e4ae25181818de2cede8ed2d269c4cb41b00d2f293deed`. Approve to generate packet?"
+  options:
+    - "Approve edit; generate packet"
+    - "Reject edit; abort and revert"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4da1687dec4e3a19
+  resolved_at: 2026-05-11T18:47:10.883235Z
+  answer: "User has answered your questions: \"Approve narrative-artifact edit to `.claude/rules/bridge-essential.md` (parallel session's update to the Two-Axis Bridge Automation Model section)? The change replaces the prior 'Currently the thread automation pattern is implemented Codex-side only...A future Claude-native equivalent would land in this axis (currently asymmetric)' paragraph with three concrete bullets documenting: AXIS 1 cross-harness event-driven trigger; AXIS 2 Codex-side app-thread automation; AXIS 2 Claude-native `.claude/hooks/bridge-axis-2-surface.py` UserPromptSubmit hook. Closing line states 'both AXIS 2 mechanisms are complementary; each fits its harness's native interaction model'. SHA-256 of full edited content: `1e406d293edd40de78e4ae25181818de2cede8ed2d269c4cb41b00d2f293deed`. Approve to generate packet?\"=\"Approve edit; generate packet\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0531
+  asked_at: 2026-05-11T18:55:23.306255Z
+  question: "What's the next move given the AXIS 2 surface showing 53 actionable entries?"
+  options:
+    - "File AXIS 2 post-impl + close thread"
+    - "Triage the 53-entry queue + action top items"
+    - "Stop here — wrap S341"
+    - "Implement mcp-stable-harness-surface Slice 1"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7f8389f6118bab78
+  resolved_at: 2026-05-11T18:55:23.306255Z
+  answer: "User has answered your questions: \"What's the next move given the AXIS 2 surface showing 53 actionable entries?\"=\"Implement mcp-stable-harness-surface Slice 1\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0524
+  asked_at: 2026-05-11T17:17:30.188077Z
+  question: "Want me to continue with the deferred items (init-keyword/startup-symmetry implementation, artifact-recorder Slice 1,..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: d97e1ff99fed036f
+  resolved_at: 2026-05-11T19:02:24.918595Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0527
+  asked_at: 2026-05-11T18:11:25.911082Z
+  question: "Want me to continue with another batch (next-priority deferred items: mcp-stable implementation, init-keyword/startup..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 2e077c9bbd9b3085
+  resolved_at: 2026-05-11T19:02:24.918622Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0528
+  asked_at: 2026-05-11T18:25:12.963255Z
+  question: "Want me to continue, or close this session here?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: c620f8b2a876c200
+  resolved_at: 2026-05-11T19:02:24.918628Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0532
+  asked_at: 2026-05-11T19:54:41.281255Z
+  question: "OWNER ACTION REQUIRED — how should the 7 S341 backlog candidates be filed into the canonical backlog? `memory/work_list.md` is a protected narrative artifact (per `config/governance/narrative-artifact-approval.toml`); adding items requires a formal-artifact-approval packet under `GOV-ARTIFACT-APPROVAL-001`. The auto-memory entry I just wrote is the wrong location — it's discoverable to Claude sessions on this workstation but NOT to Codex or non-Claude harnesses, so it doesn't fulfill the \"future-session\" intent of your directive."
+  options:
+    - "Approve batch addition to memory/work_list.md (Recommended)"
+    - "Approve MemBase work_items batch insert via bridge thread"
+    - "Defer to next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bb632fc979bfe8bd
+  resolved_at: 2026-05-11T19:54:41.281255Z
+  answer: "User has answered your questions: \"OWNER ACTION REQUIRED — how should the 7 S341 backlog candidates be filed into the canonical backlog? `memory/work_list.md` is a protected narrative artifact (per `config/governance/narrative-artifact-approval.toml`); adding items requires a formal-artifact-approval packet under `GOV-ARTIFACT-APPROVAL-001`. The auto-memory entry I just wrote is the wrong location — it's discoverable to Claude sessions on this workstation but NOT to Codex or non-Claude harnesses, so it doesn't fulfill the \"future-session\" intent of your directive.\"=\"Approve MemBase work_items batch insert via bridge thread\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0534
+  asked_at: 2026-05-11T20:12:53.788194Z
+  question: "How should I handle the 21 uncommitted paths from parallel-session work?"
+  options:
+    - "Commit GO #2 bundle next"
+    - "Commit all remaining bridge files only"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e9463e29f581e1d2
+  resolved_at: 2026-05-11T20:12:53.788194Z
+  answer: "User has answered your questions: \"How should I handle the 21 uncommitted paths from parallel-session work?\"=\"Commit GO #2 bundle next\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0533
+  asked_at: 2026-05-11T20:10:54.107953Z
+  question: "Want me to commit any of those next, or are they belonging to other sessions/agents to land?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 45ba24fdd784ca18
+  resolved_at: 2026-05-11T20:48:37.276658Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0535
+  asked_at: 2026-05-11T21:22:10.240852Z
+  question: "Approve the MemBase insert of `DCL-PEER-SOLUTION-OWNER-GATE-001` per the GO'd proposal at `bridge/gtkb-peer-solution-owner-gate-dcl-007.md` (Codex GO at `-008` this turn)? This is a single-row MemBase `specifications` insert with `type='design_constraint'`, `status='specified'`, `constraints={\"enforcement_mode\": \"advisory\"}` per the live schema. Approving here authorizes me to generate the formal-artifact-approval packet with `presented_to_user=true` + `acknowledged_by=owner via AUQ`, validate it against the live gate, set `GTKB_FORMAL_APPROVAL_PACKET`, run `db.insert_spec()`, add the regression test, and file the post-impl report. No source code or protected narrative artifacts modified — only a new MemBase row + new test file."
+  options:
+    - "Approve + insert now"
+    - "Defer this insert"
+    - "Pick a different GO'd insert first"
+    - "Implement release-gate fix instead"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 096d9e80988a03e1
+  resolved_at: 2026-05-11T21:22:10.240852Z
+  answer: "User has answered your questions: \"Approve the MemBase insert of `DCL-PEER-SOLUTION-OWNER-GATE-001` per the GO'd proposal at `bridge/gtkb-peer-solution-owner-gate-dcl-007.md` (Codex GO at `-008` this turn)? This is a single-row MemBase `specifications` insert with `type='design_constraint'`, `status='specified'`, `constraints={\"enforcement_mode\": \"advisory\"}` per the live schema. Approving here authorizes me to generate the formal-artifact-approval packet with `presented_to_user=true` + `acknowledged_by=owner via AUQ`, validate it against the live gate, set `GTKB_FORMAL_APPROVAL_PACKET`, run `db.insert_spec()`, add the regression test, and file the post-impl report. No source code or protected narrative artifacts modified — only a new MemBase row + new test file.\"=\"Approve + insert now\" selected preview: MemBase row to insert: - id: DCL-PEER-SOLUTION-OWNER-GATE-001 - type: design_constraint - status: specified - constraints: {\"enforcement_mode\": \"advisory\"}  (Phase-1 advisory pilot per GOV-20; promotion to blocking deferred) - constraint: \"Peer-solution adoption decisions (adopt / adapt / reject / defer / monitor classifications per .claude/rules/peer-solution-advisory-loop.md § Classification Vocabulary) MUST be collected via AskUserQuestion when they cross the in-scope decision class threshold defined in .claude/rules/prime-builder-role.md § AskUserQuestion as the Only Valid Owner-Decision Channel.\" - assertions: \"assert (peer_solution_classification in {adopt, adapt, reject_with_spec_impact, defer}) -> auq_evidence_present\" - in-scope classes: adopt, adapt, reject-with-spec-impact, defer - out-of-scope classes (Phase-1 narrowing): monitor, reject-with-no-spec-impact  Spec-derived test file to create: platform_tests/groundtruth_kb/specs/test_dcl_peer_solution_owner_gate.py (T1-T5 per the GO'd proposal).. You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0536
+  asked_at: 2026-05-11T21:30:29.010955Z
+  question: "Approve the MemBase insert of `SPEC-ADVISORY-DASHBOARD-COUNTERS-001` per the GO'd proposal at `bridge/gtkb-advisory-report-dashboard-counters-spec-003.md` (Codex GO at `-004`)? This is a single-row MemBase `specifications` insert with `type='requirement'`, `status='specified'`. The spec records 6 counter requirements for dashboard/startup bridge-state surfaces, with explicit boundaries: `no_go_count` MUST NOT include ADVISORY; `actionable_count_for_prime` MUST NOT include latest VERIFIED; `advisory_disposition_count` is a separate Prime-disposition metric. Approving here authorizes me to generate the formal-artifact-approval packet, validate against the live gate, insert via the bash env-var-prefix pattern, add the T1-T6 regression test, and file the post-impl report. Same pattern as the DCL-PEER-SOLUTION-OWNER-GATE-001 insert this turn."
+  options:
+    - "Approve + insert now"
+    - "Defer this insert"
+    - "Switch to release-gate impl instead"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 86437d7786f5c346
+  resolved_at: 2026-05-11T21:30:29.010955Z
+  answer: "User has answered your questions: \"Approve the MemBase insert of `SPEC-ADVISORY-DASHBOARD-COUNTERS-001` per the GO'd proposal at `bridge/gtkb-advisory-report-dashboard-counters-spec-003.md` (Codex GO at `-004`)? This is a single-row MemBase `specifications` insert with `type='requirement'`, `status='specified'`. The spec records 6 counter requirements for dashboard/startup bridge-state surfaces, with explicit boundaries: `no_go_count` MUST NOT include ADVISORY; `actionable_count_for_prime` MUST NOT include latest VERIFIED; `advisory_disposition_count` is a separate Prime-disposition metric. Approving here authorizes me to generate the formal-artifact-approval packet, validate against the live gate, insert via the bash env-var-prefix pattern, add the T1-T6 regression test, and file the post-impl report. Same pattern as the DCL-PEER-SOLUTION-OWNER-GATE-001 insert this turn.\"=\"Approve + insert now\" selected preview: MemBase row to insert: - id: SPEC-ADVISORY-DASHBOARD-COUNTERS-001 - type: requirement (per the live VALID_ARTIFACT_TYPES; SPEC-* prefix auto-detects to requirement) - status: specified - description (6 counter requirements):    advisory_count: count of Document entries whose latest status is ADVISORY:. Distinct from no_go_count.   no_go_count: count of entries whose latest status is NO-GO:. MUST NOT include ADVISORY entries.   actionable_count_for_prime: count of entries whose latest status is GO OR NO-GO. MUST NOT include latest VERIFIED (terminal). MUST NOT include latest ADVISORY (see advisory_disposition_count). Aligns with AGENTS.md:178,182 + system-interface-map.toml:182.   actionable_count_for_lo: count of entries whose latest status is NEW OR REVISED. MUST NOT include ADVISORY.   advisory_disposition_count: count of entries whose latest status is ADVISORY. Prime's disposition surface (conversion proposal / DA record per peer-solution-advisory-loop.md); NOT bridge continuation queue work.   failed_proposal_count: NO-GO entries on Prime-authored proposals only. Distinct from advisory_count and advisory_disposition_count.  - display: ADVISORY must be visually distinct from NO-GO - aggregation: advisory_count + advisory_disposition_count are first-class metrics; stale reports omitting them MUST be updated  Test file: platform_tests/groundtruth_kb/specs/test_spec_advisory_dashboard_counters.py (T1 structural, T2 enumeration of 6 metrics, T3 no_go_count exclusion of ADVISORY, T4 actionable_count_for_prime exclusion of VERIFIED, T5 advisory_disposition_count separation, T6 display distinction).. You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

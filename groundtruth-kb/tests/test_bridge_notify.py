@@ -104,6 +104,18 @@ def test_compute_pending_excludes_verified_for_both_recipients(tmp_path: Path) -
     assert len(codex) == 0
 
 
+def test_compute_pending_excludes_withdrawn_for_both_recipients(tmp_path: Path) -> None:
+    """WITHDRAWN, like VERIFIED, is closure for both Prime and Codex. Per
+    WI-3276 / Layer-0 fix at gtkb-canonical-bridge-parser-withdrawn-status-handling.
+    """
+    n = _notify()
+    text, root = _make_index_with_top_file(tmp_path, "foo", "WITHDRAWN")
+    parsed = n.parse_index(text)
+    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(prime) == 0, f"WITHDRAWN must not be actionable for Prime; got {prime}"
+    assert len(codex) == 0, f"WITHDRAWN must not be actionable for Codex; got {codex}"
+
+
 def test_compute_pending_excludes_documents_with_missing_top_file(
     tmp_path: Path,
 ) -> None:

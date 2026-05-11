@@ -1693,7 +1693,7 @@ or the owner explicitly reprioritizes this item.
 
 **Priority:** TOP. The standing backlog cannot be considered fully populated without a repeatable harvest check over bridge status, MemBase work items, release-readiness blockers, and independent progress artifacts.
 
-**Required outcome:** keep `scripts/audit_standing_backlog_sources.py`, `tests/scripts/test_standing_backlog_harvest.py`, and `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md` current until GT-KB provides a first-class standing-backlog doctor. Future sessions should update the harvest report or supersede it with a structured snapshot when source counts change materially.
+**Required outcome:** keep `scripts/audit_standing_backlog_sources.py`, `platform_tests/scripts/test_standing_backlog_harvest.py`, and `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md` current until GT-KB provides a first-class standing-backlog doctor. Future sessions should update the harvest report or supersede it with a structured snapshot when source counts change materially.
 
 **Regression visibility:** release-candidate gate runs the standing backlog harvest test.
 

@@ -107,6 +107,28 @@ def test_parser_validates_status_enum() -> None:
     assert result.errors[0].expected_state == "status_line"
 
 
+def test_parser_recognizes_withdrawn_status() -> None:
+    """WITHDRAWN at top of a document's version chain must be parsed correctly,
+    parallel to VERIFIED's terminal recognition. Per WI-3276 / Layer-0 fix at
+    gtkb-canonical-bridge-parser-withdrawn-status-handling.
+    """
+    d = _detector()
+    text = (
+        "Document: test-thread-withdrawn-fixture\n"
+        "WITHDRAWN: bridge/test-thread-withdrawn-fixture-002.md\n"
+        "NO-GO: bridge/test-thread-withdrawn-fixture-001.md\n"
+    )
+    result = d.parse_index(text)
+    assert result.errors == ()
+    assert len(result.documents) == 1
+    doc = result.documents[0]
+    assert doc.name == "test-thread-withdrawn-fixture"
+    assert doc.current_top is not None
+    assert doc.current_top.status == d.BridgeStatus.WITHDRAWN
+    assert doc.current_top.file_path == "bridge/test-thread-withdrawn-fixture-002.md"
+    assert len(doc.versions) == 2
+
+
 def test_parser_validates_filename_matches_document_name() -> None:
     d = _detector()
     text = "Document: foo\nNEW: bridge/foo-001.md\nGO: bridge/baz-002.md\n"
