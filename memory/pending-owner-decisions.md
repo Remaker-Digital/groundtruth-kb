@@ -6,13 +6,7 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-- id: DECISION-0517
-  asked_at: 2026-05-10T23:43:43.998510Z
-  question: "want me to stash them, or would you rather route through Codex first?"
-  detected_via: prose:offering_or_choice
-  status: pending
-  question_hash: ec7495ed28d73614
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+(none)
 
 ## Resolved
 
@@ -6170,6 +6164,42 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 48d5e0a7b60b3fd5
   resolved_at: 2026-05-11T00:14:20.821673Z
   answer: "User has answered your questions: \"E.1 implementation is mid-flight: Steps 0, 0.5, 1 precondition, 1.5, and 2 are done; the rollback helper and 2 test files are authored (16 tests pass); the isolation registry is updated. Working tree has 5 changes (4 new platform files + 1 modified registry). Steps 3-7 remain (atomic ~1,423-file mv, pyproject/workflow/Dockerfile edits, tests, commit). How should I hand off the in-flight state so the next session resumes cleanly?\"=\"WIP commit (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0521
+  asked_at: 2026-05-11T05:34:10.496387Z
+  question: "Codex NO-GO at -006 on the rename post-impl: criterion 5 deviated (4 vs ≤3 errors). Codex offers Path 1 (fix test_host) or Path 2 (owner waiver). Investigation reveals test_host/suites.py + cosmos_writer.py were never committed to develop — the test has been structurally broken since written. Path 1 is much heavier than Codex assumed. How to proceed?"
+  options:
+    - "Path 2: owner waiver for ≤4 (Recommended)"
+    - "Path 1.A: delete the broken test file"
+    - "Close this thread with waiver + file separate bridge for test_host"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6dae640e15dd7baf
+  resolved_at: 2026-05-11T05:34:10.496387Z
+  answer: "User has answered your questions: \"Codex NO-GO at -006 on the rename post-impl: criterion 5 deviated (4 vs ≤3 errors). Codex offers Path 1 (fix test_host) or Path 2 (owner waiver). Investigation reveals test_host/suites.py + cosmos_writer.py were never committed to develop — the test has been structurally broken since written. Path 1 is much heavier than Codex assumed. How to proceed?\"=\"Path 2: owner waiver for ≤4 (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0517
+  asked_at: 2026-05-10T23:43:43.998510Z
+  question: "want me to stash them, or would you rather route through Codex first?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: ec7495ed28d73614
+  resolved_at: 2026-05-11T05:36:26.058466Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0522
+  asked_at: 2026-05-11T13:11:00.669298Z
+  question: "How should I proceed with the scaffold upgrade Tier A REVISED-4 (filing -009)?"
+  options:
+    - "Draft REVISED-4 now (Recommended)"
+    - "Read upgrade.py first, then summarize"
+    - "Pivot to a different actionable thread"
+    - "Show full bridge inventory first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4d5120adf48efdd9
+  resolved_at: 2026-05-11T13:11:00.669298Z
+  answer: "User has answered your questions: \"How should I proceed with the scaffold upgrade Tier A REVISED-4 (filing -009)?\"=\"Draft REVISED-4 now (Recommended)\". You can now continue with the user's answers in mind."
   notes: ""
 
 ## History

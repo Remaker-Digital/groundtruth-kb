@@ -158,6 +158,14 @@
 
 ---
 
+### 2026-05-10 - Peer solution advisory pattern
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Peer-solution evaluations of OpenAI Symphony, GSD v2, BMAD Method, and Archon should become a repeatable advisory loop that converts useful external patterns into governed GT-KB candidate artifacts instead of leaving them as chat-only comparisons. | `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-10-22-25-PEER-SOLUTION-ADVISORY-REPORT.md`; bridge handoff `bridge/gtkb-peer-solution-advisory-loop-2026-05-10-001.md`; owner request to turn comparative evaluations into an advisory report for Prime discussion; owner agreement to add Archon as a high-relevance workflow-engine peer. | Prime should respond through the bridge with a proposal, rebuttal, or defer decision; highest-relevance candidate is the Archon-derived GT-KB declarative workflow contract. | Open |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).
