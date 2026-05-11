@@ -9,6 +9,14 @@
        - gtkb-gov-askuserquestion-enforcement-stack-slice-{a,b,c,d}-* (Sub-slices A-D)
        - gtkb-gov-auq-enforcement-stack-slice-{e,f,a-followup}-* (Sub-slices E, F, follow-ups)
      They are the same governance umbrella; search both prefixes when investigating. -->
+<!-- Audit-trail clarification (2026-05-11, S342):
+     Strategic self-improvement directive surface is split across three commits:
+       - 3fbe6a81 feat(startup,docs): startup payload + Codex bootstrap mirror + test bank
+       - 38e254dd feat(governance): title claims AGENTS.md+CLAUDE.md but stat shows
+         only bridge/INDEX.md + 2 bridge files; the message overpromised the diff
+       - this commit feat(governance): actual AGENTS.md+CLAUDE.md content landing,
+         carrying fresh narrative-artifact approval packets bound to working-tree sha
+     Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 
 Document: gtkb-artifact-recorder-cli-slice-1-deliberations-record

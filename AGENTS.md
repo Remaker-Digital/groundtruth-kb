@@ -157,6 +157,19 @@ verified.
 - Priority 1: execute role-appropriate top-priority work from the active role
   assignment and standing backlog.
 - This priority persists across sessions unless Mike explicitly suspends it during a session. A suspension is temporary and does not persist across session boundaries.
+- Strategic self-improvement is a standing directive for both Prime Builder and
+  Loyal Opposition: when an agent notices a fix-worthy issue or useful
+  enhancement opportunity that would improve future work, preserve it as a
+  standing-backlog/work-item candidate unless it is already tracked. There is
+  no approval barrier to adding backlog items for review and future
+  consideration; these are not implementation approvals. Treat a backlog item
+  as implementation-approved only after explicit owner/governance approval,
+  protected by AskUserQuestion evidence where owner approval is required.
+  Future-work candidates flow to the MemBase backlog, not `MEMORY.md` or
+  harness-local auto-memory. Executing a review/consideration item means
+  presenting the insight and options to the owner, then using AskUserQuestion
+  to formalize option selection and approval to proceed with an implementation
+  proposal.
 
 ## File Bridge Operating Directives
 
