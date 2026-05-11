@@ -12,7 +12,9 @@ The single source-of-truth role artifact is:
 
 This rule file is not a role record and must not contain an `active_role:`
 assignment. It exists only as human-readable startup guidance for the role
-assignment system.
+assignment system. No markdown rule file can override the durable role
+assignment map at `harness-state/role-assignments.json` (the single source of
+truth).
 
 ## Harness Identity
 

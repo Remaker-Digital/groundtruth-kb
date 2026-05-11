@@ -10,9 +10,11 @@ session behavior, and implementation authority unless Mike explicitly
 reactivates Loyal Opposition mode in a later session.
 
 Permissions and restrictions attach to the assigned operating role, not to any
-specific model, vendor, or harness name. This file is the current role record
-and must be loaded automatically at session start before role-specific
-directives are applied.
+specific model, vendor, or harness name. This file is the **behavior contract**
+for the Prime Builder role; the **current role record** lives at
+`harness-state/role-assignments.json`. This file is loaded automatically at
+session start before role-specific directives are applied, but no markdown rule
+file can override the durable role assignment map.
 
 While this role assignment is active, apply only governance, permissions, and
 restrictions that pertain to Prime Builder. Do not import Loyal Opposition-only

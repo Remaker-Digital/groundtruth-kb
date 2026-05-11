@@ -885,6 +885,64 @@ requirements); `DELIB-S324-OM-DELTA-0003-CHOICE`
 changes require an owner-approved bridge proposal and a
 formal-artifact-approval packet.
 
+### operating role
+
+**Definition:** The authority-bearing harness role recorded for an active
+harness ID in `harness-state/role-assignments.json`. Canonical values are
+`prime-builder` (implementing authority) and `loyal-opposition` (reviewing
+authority). The legacy value `acting-prime-builder` is READ-accepted for
+backward compatibility but SET-rejected (cannot be assigned as a new role)
+per the Acting-Prime Compatibility Contract.
+
+**Canonical alias:** durable operating role; harness role.
+
+**Not to be confused with:** session lane (non-authority work classification;
+see below); session focus (owner-facing startup selection); work subject
+(active subject area; see below).
+
+**Source:** `GOV-HARNESS-ROLE-PORTABILITY-001`; `GOV-ACTING-PRIME-BUILDER-001`;
+bridge `gtkb-role-session-lifecycle-simplification-003` REVISED-1 GO at -004.
+
+**Implementation pointer:** `harness-state/role-assignments.json` is the
+durable record; `.claude/rules/operating-role.md` is human-readable startup
+guidance (not a role record); `scripts/harness_roles.py` enforces the SET/
+READ contract.
+
+### session lane
+
+**Definition:** A non-authority work classification used to organize the
+current session's focus, distinct from the operating role. Lanes inherit
+authority from the current operating role; they do not grant new permissions
+or change the durable role assignment. Examples: research, architecture,
+implementation, quality engineering, operations/release, documentation,
+governance stewardship.
+
+**Not to be confused with:** operating role (authority-bearing; only
+prime-builder + loyal-opposition; see above).
+
+**Source:** bridge `gtkb-role-session-lifecycle-simplification-003`
+REVISED-1 GO at -004.
+
+**Implementation pointer:** Session lanes appear in Prime Builder startup
+focus options; Loyal Opposition does not present a focus menu.
+
+### session focus
+
+**Definition:** The owner-facing startup selection that the active AI
+harness presents at the start of a Prime Builder session. The selection
+binds the session to a specific work item or focus area for the duration
+of the session. Distinct from session lane (classification) and operating
+role (authority).
+
+**Not to be confused with:** session lane; operating role; work subject.
+
+**Source:** bridge `gtkb-role-session-lifecycle-simplification-003`
+REVISED-1 GO at -004; `GOV-SESSION-SELF-INITIALIZATION-001`.
+
+**Implementation pointer:** `scripts/session_self_initialization.py`
+renders the focus menu for Prime Builder; the owner selects one option to
+bind the session.
+
 ### work subject
 
 **Definition:** The startup-payload concept that names the active subject

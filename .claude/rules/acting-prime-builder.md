@@ -6,6 +6,27 @@ MemBase records `GOV-ACTING-PRIME-BUILDER-001`,
 `GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001` establish the current role mapping
 rules.
 
+## Compatibility/Provenance Classification
+
+Per bridge `gtkb-role-session-lifecycle-simplification-003` REVISED-1 GO at
+`-004` (2026-05-11 S341), `acting-prime-builder` is classified as
+**legacy/compatibility/provenance** language, NOT a new role-switch target.
+The canonical two-role set is `prime-builder` and `loyal-opposition`. The
+`acting-prime-builder` profile and rule file remain in place for:
+
+- Backward compatibility with role-map entries set in prior sessions or by
+  explicit owner-directed legacy-role-switch operations (READ accepted).
+- Narrative continuity describing the historical authority arrangement
+  (Codex-as-acting-Prime when canonical Prime Builder was unavailable).
+
+SET operations: `scripts/harness_roles.py` REJECTS `acting-prime-builder`
+as a target role; only `prime-builder` and `loyal-opposition` are valid
+SET targets. READ operations: existing `acting-prime-builder` values in
+`harness-state/role-assignments.json` continue to load without error.
+
+Startup rendering for this profile labels it explicitly as
+"compatibility/provenance" (not "active operating role").
+
 ## General Principle
 
 The roles of Prime Builder and Loyal Opposition are not permanently bound to

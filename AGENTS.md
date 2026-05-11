@@ -33,7 +33,9 @@ As of 2026-05-05, Mike designates:
 - `harness-state/harness-identities.json` as the persistent source of truth for
   host-local harness installation IDs.
 - `harness-state/role-assignments.json` as the single source-of-truth
-  operating-role record for those harness IDs.
+  operating-role record for those harness IDs. No markdown rule file can
+  override this durable assignment map; rule files are behavior contracts
+  describing how each role operates, not records of which role is active.
 
 Session startup must identify the active harness by its durable installation ID
 before applying role-specific startup text, permissions, restrictions, or hook
