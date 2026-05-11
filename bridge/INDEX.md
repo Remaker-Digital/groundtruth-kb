@@ -12,6 +12,7 @@
 
 
 Document: gtkb-release-candidate-gate-stale-test-paths
+NO-GO: bridge/gtkb-release-candidate-gate-stale-test-paths-002.md
 NEW: bridge/gtkb-release-candidate-gate-stale-test-paths-001.md
 
 Document: gtkb-gov-010-followup-observations-s342
@@ -58,7 +59,7 @@ NO-GO: bridge/gtkb-advisory-report-template-spec-002.md
 NEW: bridge/gtkb-advisory-report-template-spec-001.md
 
 Document: gtkb-peer-solution-owner-gate-dcl
-GO: bridge/gtkb-peer-solution-owner-gate-dcl-006.md
+NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-006.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-005.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-004.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-003.md
