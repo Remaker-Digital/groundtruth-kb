@@ -1769,6 +1769,36 @@ or the owner explicitly reprioritizes this item.
 - Implementation-approval evidence: S343 owner AUQ "How should I handle the uncommitted VERIFIED bridge work this session?" -> "Scoped per-thread commits + push" answer authorized the per-thread commit pattern that surfaced these observations.
 
 
+### GTKB-BRIDGE-PROTOCOL-GUIDE-AMEND-CONCURRENT-COMMIT-ENTRY - Bridge-protocol guide entry on amend-with-concurrent-commit failure mode
+
+**Priority:** Hygiene window; durable-fix documentation deliverable. Owner-directed addition during S343 wrap-up: "A future bridge-protocol-guide entry on amend-with-concurrent-commit is the durable fix. Please add to backlog."
+
+**Source:** GTKB-SESSION-FRICTION-OBSERVATIONS-S343 item 6 (above). Discrete scoping of mitigation option (c) from that item — the documentation deliverable, separable from the deterministic-service mitigations (a) HEAD-stability check and (b) `gt bridge commit-amend-safe` helper which remain bridge-tracked CLI work.
+
+**Required outcome:** Add a section to the bridge-protocol guide (current location: `.claude/rules/file-bridge-protocol.md` or a successor documentation surface under `groundtruth-kb/docs/`) that:
+
+1. **Describes the failure mode.** When `git commit --amend` runs in one Prime/Codex session while a concurrent session has just added an intervening commit, the amend creates a new commit on top of the intervening commit instead of replacing the original HEAD. The result is two commits with the same title but different content (the original commit + the amended one), with the original commit's content now disconnected from its message. Concrete S343 example: commits `38e254dd` (parallel-session bridge files under directive title) and `9db48e06` (directive content under directive title).
+
+2. **Documents the workaround pattern.** Two-step recovery when the failure mode is detected:
+   - Step 1: Run `git log --format="%H %P %s" -5` to identify the misattribution. The original commit and the amended commit will share a title; their `git show <hash>` output reveals the content mismatch.
+   - Step 2: Follow up with a corrective documentation commit that references both commit hashes and explicitly notes which commit holds which content. The amended commit's body may also document this if the amend has not yet been pushed.
+
+3. **Cross-references the deterministic-service mitigations.** Note that the durable architectural fix is one of:
+   - A pre-amend HEAD-stability check (e.g., in the bridge-compliance-gate hook) that warns or blocks when `HEAD` has moved during the staging window between `git add` and `git commit --amend`.
+   - A `gt bridge commit-amend-safe --message <m>` helper that locks `bridge/INDEX.md` and verifies `HEAD` hash matches the pre-stage snapshot before amending.
+   - Documentation alone (this entry) is the lowest-cost mitigation; the deterministic-service options reduce future incidence.
+
+4. **Sets a regression-test expectation.** A unit test for any concurrent-commit-aware helper should ship with the implementation; this documentation entry itself does not require a code regression test, but its accuracy should be verified against a fresh test scenario (e.g., simulated parallel-session commit in a fixture repo before amend).
+
+**Regression visibility:** No code-level regression test. The deliverable is documentation; verification is by inspection (Codex review of the bridge-protocol guide PR confirms the entry describes the failure mode and workaround accurately).
+
+**Cross-references:**
+
+- Source observations: `GTKB-SESSION-FRICTION-OBSERVATIONS-S343` (item 6 above), commits `38e254dd` and `9db48e06` (the concrete S343 incident).
+- Aligned with: `GTKB-SESSION-FRICTION-OBSERVATIONS-S341` (item 1 INDEX edit race — the concurrent-session class), `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` (the architectural mitigation principle).
+- Implementation-approval evidence: S343 owner directive at session wrap-up "Please add to backlog." per the strategic self-improvement directive landed in commits `3fbe6a81` + `9db48e06`.
+
+
 ### ℹ️ DA-gov dispatch loop — escalation OBSOLETE (resolved by owner action 2026-04-18)
 
 **Spawn-5 escalation (A/B/C) is obsolete.** The owner has effectively chosen
