@@ -177,6 +177,19 @@ index file (after the header comments).
 | GO | Loyal Opposition | Proposal approved for implementation |
 | NO-GO | Loyal Opposition | Proposal requires changes before approval |
 | VERIFIED | Loyal Opposition | Post-implementation verification passed |
+| ADVISORY | Loyal Opposition | Owner-initiated advisory report; non-dispatchable; awaiting Prime acknowledgement and disposition decision (NOT awaiting GO/NO-GO/VERIFIED). |
+
+## Advisory Reports
+
+**Purpose:** Owner-initiated advisory reports are first-class workflow state, not transport workarounds via `NO-GO@001`.
+
+**Routing:** ADVISORY entries are Axis-2 (non-dispatchable). The cross-harness event-driven trigger SHOULD exclude ADVISORY rows from actionable-signature computation. Per-parser inventory is owned by the parallel `gtkb-bridge-advisory-status-001` runtime thread.
+
+**Authority:** Loyal Opposition authors ADVISORY entries; Prime acknowledges and either (a) files a normal NEW implementation proposal converting the advisory, (b) defers explicitly with documented defer-trigger, or (c) rejects with documented rationale.
+
+**Expected Prime response:** cite advisory in any follow-on conversion proposal's `Prior Deliberations` and `Source advisory` fields.
+
+**Dashboard semantics:** ADVISORY rows are NOT failed proposals; dashboard counts must distinguish them from NO-GO entries. Exact dashboard-counter behavior is owned by the sibling `gtkb-advisory-report-dashboard-counters-spec` thread.
 
 ## Prime Workflow
 
