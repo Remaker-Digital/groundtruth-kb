@@ -92,6 +92,7 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+NO-GO: bridge/gtkb-bridge-advisory-status-001-004.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-003.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-002.md
 NEW: bridge/gtkb-bridge-advisory-status-001-001.md
@@ -123,6 +124,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-004.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-003.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-002.md
 NEW: bridge/gtkb-single-harness-bridge-dispatcher-001.md
