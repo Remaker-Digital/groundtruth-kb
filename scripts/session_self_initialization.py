@@ -1886,10 +1886,16 @@ def _status_from_requirements(requirements: list[bool], manual: bool = False) ->
 
 
 def _package_json(project_root: Path, relative_path: str) -> dict[str, Any]:
-    try:
-        return json.loads((project_root / relative_path).read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    candidates = (
+        project_root / relative_path,
+        project_root / "applications" / "Agent_Red" / relative_path,
+    )
+    for path in candidates:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+    return {}
 
 
 def _package_has_script(package_data: dict[str, Any], script_name: str) -> bool:
@@ -2429,7 +2435,12 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
         order=100,
         display_name="axe-core Accessibility",
         status=_status_from_requirements(
-            ["accessibility.yml" in workflow_set, (project_root / "tests" / "accessibility").is_dir()]
+            [
+                "accessibility.yml" in workflow_set,
+                (project_root / "applications" / "Agent_Red" / "tests" / "accessibility").is_dir()
+                or (project_root / "platform_tests" / "accessibility").is_dir()
+                or (project_root / "tests" / "accessibility").is_dir(),
+            ]
         ),
         workflow_file="accessibility.yml",
         latest_run=_workflow_run(gh_runs, workflows, "accessibility.yml"),
@@ -2523,7 +2534,11 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
         display_name="Locust Performance",
         status=_status_from_requirements(
             [
-                (project_root / "tests" / "performance" / "locustfile.py").is_file(),
+                (project_root / "tests" / "performance" / "locustfile.py").is_file()
+                or (
+                    project_root / "applications" / "Agent_Red" / "tests" / "performance" / "locustfile.py"
+                ).is_file()
+                or (project_root / "platform_tests" / "performance" / "locustfile.py").is_file(),
                 _dependency_declared(project_root, "locust"),
             ],
             manual=True,

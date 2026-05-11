@@ -25,6 +25,7 @@ NO-GO: bridge/gtkb-peer-solution-advisory-loop-conversion-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-001.md
 
 Document: gtkb-advisory-report-message-type-conversion
+REVISED: bridge/gtkb-advisory-report-message-type-conversion-003.md
 NO-GO: bridge/gtkb-advisory-report-message-type-conversion-002.md
 NEW: bridge/gtkb-advisory-report-message-type-conversion-001.md
 
