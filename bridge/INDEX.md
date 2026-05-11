@@ -11,7 +11,11 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
+NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
+
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-003.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-002.md
 NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-001.md
 
@@ -122,6 +126,7 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+NO-GO: bridge/gtkb-bridge-advisory-status-001-008.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-007.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-006.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-005.md
