@@ -11,13 +11,20 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-formal-artifact-packet-validator-cli
+NEW: bridge/gtkb-formal-artifact-packet-validator-cli-002.md
+NEW: bridge/gtkb-formal-artifact-packet-validator-cli-001.md
+
 Document: gtkb-advisory-report-dashboard-counters-spec
+NO-GO: bridge/gtkb-advisory-report-dashboard-counters-spec-002.md
 NEW: bridge/gtkb-advisory-report-dashboard-counters-spec-001.md
 
 Document: gtkb-advisory-routing-dcl
+NO-GO: bridge/gtkb-advisory-routing-dcl-002.md
 NEW: bridge/gtkb-advisory-routing-dcl-001.md
 
 Document: gtkb-advisory-report-template-spec
+NO-GO: bridge/gtkb-advisory-report-template-spec-002.md
 NEW: bridge/gtkb-advisory-report-template-spec-001.md
 
 Document: gtkb-peer-solution-owner-gate-dcl
@@ -27,6 +34,7 @@ NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-002.md
 NEW: bridge/gtkb-peer-solution-owner-gate-dcl-001.md
 
 Document: gtkb-peer-solution-workflow-contract-adr
+REVISED: bridge/gtkb-peer-solution-workflow-contract-adr-007.md
 NO-GO: bridge/gtkb-peer-solution-workflow-contract-adr-006.md
 REVISED: bridge/gtkb-peer-solution-workflow-contract-adr-005.md
 NO-GO: bridge/gtkb-peer-solution-workflow-contract-adr-004.md
@@ -47,6 +55,8 @@ GO: bridge/gtkb-peer-solution-advisory-loop-procedure-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-procedure-001.md
 
 Document: gtkb-github-ai-harness-ecosystem-conversion
+VERIFIED: bridge/gtkb-github-ai-harness-ecosystem-conversion-004.md
+NEW: bridge/gtkb-github-ai-harness-ecosystem-conversion-003.md
 GO: bridge/gtkb-github-ai-harness-ecosystem-conversion-002.md
 NEW: bridge/gtkb-github-ai-harness-ecosystem-conversion-001.md
 
@@ -82,12 +92,14 @@ NO-GO: bridge/gtkb-role-scope-release-operations-conversion-002.md
 NEW: bridge/gtkb-role-scope-release-operations-conversion-001.md
 
 Document: gtkb-peer-solution-advisory-loop-conversion
+NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-005.md
 GO: bridge/gtkb-peer-solution-advisory-loop-conversion-004.md
 REVISED: bridge/gtkb-peer-solution-advisory-loop-conversion-003.md
 NO-GO: bridge/gtkb-peer-solution-advisory-loop-conversion-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-001.md
 
 Document: gtkb-advisory-report-message-type-conversion
+NEW: bridge/gtkb-advisory-report-message-type-conversion-005.md
 GO: bridge/gtkb-advisory-report-message-type-conversion-004.md
 REVISED: bridge/gtkb-advisory-report-message-type-conversion-003.md
 NO-GO: bridge/gtkb-advisory-report-message-type-conversion-002.md
@@ -225,6 +237,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-012.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-011.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-010.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-009.md
