@@ -38,7 +38,7 @@
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\"",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\" --startup-service \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --harness-name claude",
             "timeout": 60
           }
         ]

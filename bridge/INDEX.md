@@ -19,6 +19,7 @@ Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-006.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-004.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-003.md

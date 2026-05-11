@@ -1088,6 +1088,7 @@ def _parse_active_work_items(work_list_text: str) -> list[dict[str, str]]:
 
 
 _RESIDUAL_OVERRIDE_RE = re.compile(r"\*\*Status:\*\*\s+VERIFIED\s*\(residual:", re.IGNORECASE)
+_STALE_PRIORITY_RE = re.compile(r"\*\*Priority:\*\*\s+Stale\b", re.IGNORECASE)
 
 
 def _work_item_id_to_bridge_document(wi_id: str) -> str:
@@ -1129,13 +1130,18 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
     visible_items = primary_items or [item for item in classified if item["scope"] in AGENT_RED_SCOPE_INCLUDED]
 
     filtered_verified_ids: list[str] = []
+    filtered_stale_ids: list[str] = []
     eligible: list[dict[str, Any]] = []
     for item in visible_items:
         wi_id = item.get("id", "")
+        body = item.get("body", "")
         mapped = _work_item_id_to_bridge_document(wi_id)
         latest_status = bridge_status.get(mapped)
-        if latest_status == "VERIFIED" and not _residual_override_present(item.get("body", "")):
+        if latest_status == "VERIFIED" and not _residual_override_present(body):
             filtered_verified_ids.append(wi_id)
+            continue
+        if _STALE_PRIORITY_RE.search(body):
+            filtered_stale_ids.append(wi_id)
             continue
         eligible.append(item)
 
@@ -1147,6 +1153,7 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
         "scope_counts": dict(sorted(Counter(item["scope"] for item in classified).items())),
         "scope_confidence": "gtkb_current_heuristic",
         "filtered_verified_ids": filtered_verified_ids,
+        "filtered_stale_ids": filtered_stale_ids,
     }, eligible[:3]
 
 
