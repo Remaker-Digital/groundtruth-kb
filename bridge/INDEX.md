@@ -12,10 +12,13 @@
 
 
 Document: gtkb-peer-solution-owner-gate-dcl
+REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-003.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-002.md
 NEW: bridge/gtkb-peer-solution-owner-gate-dcl-001.md
 
 Document: gtkb-peer-solution-workflow-contract-adr
+REVISED: bridge/gtkb-peer-solution-workflow-contract-adr-005.md
+NO-GO: bridge/gtkb-peer-solution-workflow-contract-adr-004.md
 REVISED: bridge/gtkb-peer-solution-workflow-contract-adr-003.md
 NO-GO: bridge/gtkb-peer-solution-workflow-contract-adr-002.md
 NEW: bridge/gtkb-peer-solution-workflow-contract-adr-001.md
@@ -78,6 +81,7 @@ NO-GO: bridge/gtkb-advisory-report-message-type-conversion-002.md
 NEW: bridge/gtkb-advisory-report-message-type-conversion-001.md
 
 Document: gtkb-mcp-stable-harness-surface-conversion
+GO: bridge/gtkb-mcp-stable-harness-surface-conversion-004.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-conversion-003.md
 GO: bridge/gtkb-mcp-stable-harness-surface-conversion-002.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-conversion-001.md
@@ -208,6 +212,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-010.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-009.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-008.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-007.md
