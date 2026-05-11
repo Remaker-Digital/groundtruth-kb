@@ -92,6 +92,7 @@ NO-GO: bridge/gtkb-role-scope-release-operations-conversion-002.md
 NEW: bridge/gtkb-role-scope-release-operations-conversion-001.md
 
 Document: gtkb-peer-solution-advisory-loop-conversion
+VERIFIED: bridge/gtkb-peer-solution-advisory-loop-conversion-006.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-005.md
 GO: bridge/gtkb-peer-solution-advisory-loop-conversion-004.md
 REVISED: bridge/gtkb-peer-solution-advisory-loop-conversion-003.md
@@ -99,6 +100,7 @@ NO-GO: bridge/gtkb-peer-solution-advisory-loop-conversion-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-001.md
 
 Document: gtkb-advisory-report-message-type-conversion
+VERIFIED: bridge/gtkb-advisory-report-message-type-conversion-006.md
 NEW: bridge/gtkb-advisory-report-message-type-conversion-005.md
 GO: bridge/gtkb-advisory-report-message-type-conversion-004.md
 REVISED: bridge/gtkb-advisory-report-message-type-conversion-003.md
