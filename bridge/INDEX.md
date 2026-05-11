@@ -11,7 +11,11 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-peer-solution-advisory-loop-2026-05-10
+NO-GO: bridge/gtkb-peer-solution-advisory-loop-2026-05-10-001.md
+
 Document: gtkb-tests-package-collision-resolution
+VERIFIED: bridge/gtkb-tests-package-collision-resolution-008.md
 REVISED: bridge/gtkb-tests-package-collision-resolution-007.md
 NO-GO: bridge/gtkb-tests-package-collision-resolution-006.md
 NEW: bridge/gtkb-tests-package-collision-resolution-005.md
