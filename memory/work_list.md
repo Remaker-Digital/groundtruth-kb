@@ -1697,6 +1697,25 @@ or the owner explicitly reprioritizes this item.
 
 **Regression visibility:** release-candidate gate runs the standing backlog harvest test.
 
+### GTKB-GOV-010-FOLLOWUP-OBSERVATIONS-S342 - Stale paths and brittle assertions in standing-backlog harvest surface
+
+**Priority:** Batchable hygiene window. Three observations surfaced during S342 (2026-05-11) GTKB-GOV-010 evidence refresh work. All three are editorial / test-hygiene fixes; none are P0 release blockers. Surfaced per the owner directive 2026-05-11: "if you notice an issue which should be fixed or an opportunity for a useful enhancement that will help us work more effectively in the future, please add it to the backlog as an item for future implementation consideration."
+
+**Required outcome:** address as a single hygiene-sweep proposal once GTKB-GOV-010-HARVEST-REFRESH-2026-05-11 has been verified (so the tests/work_list.md edits don't churn the harvest baseline mid-review).
+
+1. **Stale `tests/scripts/...` path reference in this file.** GTKB-GOV-010 entry (above, line 1696) cites `tests/scripts/test_standing_backlog_harvest.py` but the file moved to `platform_tests/scripts/test_standing_backlog_harvest.py` in commit `a641f622` (refactor(tests): rename tests/ to platform_tests/). The same stale path appears in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-23-AZURE-VERIFIED.md` line 80 and `STANDING-BACKLOG-HARVEST-2026-04-23-PRE-REV4-FILING.md` lines 35, 112, 169. Editorial fix; can be batched into a single sweep that updates all live references while preserving the historical snapshots as evidence.
+
+2. **Brittle hardcoded count assertion in `platform_tests/scripts/test_standing_backlog_harvest.py` line 131: `assert "1994 open" in work_list`.** This snapshot count is from the 2026-04-20 baseline and assumes work_list.md continues to include the original 2026-04-20 harvest paragraph verbatim. Any sweep that consolidates harvest references in work_list.md could break the test. The test could be refactored to assert the GTKB-GOV-010 directive is present without the brittle count, OR to assert "GTKB-GOV-010" is referenced and the audit script + first harvest snapshot are cited, decoupling the assertion from a specific historical number.
+
+3. **Test references the "current" harvest snapshot by exact filename** (`platform_tests/scripts/test_standing_backlog_harvest.py` lines 99-104, `STANDING-BACKLOG-HARVEST-2026-04-23-AZURE-VERIFIED.md`). Each routine snapshot refresh under GTKB-GOV-010 either drifts the "current" reference or pins it. Consider replacing the exact-filename match with a directory-glob "most recent dated snapshot" lookup so future refreshes are additive without test churn. This is the architectural fix that GTKB-GOV-010's "first-class standing-backlog doctor" eventually replaces; until then, the glob pattern reduces ongoing churn cost.
+
+**Regression visibility:** the GTKB-GOV-010 harvest test should continue to pass after item-1 and item-2 are addressed. Item-3 requires a test refactor with verification that the new lookup correctly identifies the latest snapshot.
+
+**Cross-references:**
+
+- Source observations: bridge `bridge/gtkb-gov-010-harvest-refresh-2026-05-11-001.md` (S342 NEW) - the OOSO section enumerates the same observations as the proposal's record.
+- Aligned with `GTKB-SESSION-FRICTION-OBSERVATIONS-S341` (above, item 3 - clause-preflight detector regex coverage too narrow on canonical phrases): the same regex-fragility class.
+
 ### GTKB-SESSION-FRICTION-OBSERVATIONS-S341 — Operational frictions surfaced during S341 parallel-Prime session
 
 **Priority:** Batchable hygiene window. Six operational frictions observed during S341 (2026-05-11) parallel-Prime-session work that collectively impeded smooth bridge/INDEX cycles and protected-artifact writes. Surfaced per the Deterministic Services Principle (`DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE`); each item is independently small but the aggregate friction is expensive at high session throughput, especially during concurrent Prime activity (≥ 2 active Claude sessions interleaving INDEX edits + bridge filings).
