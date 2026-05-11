@@ -185,8 +185,13 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
         "role_mapping_source": "harness-state/role-assignments.json",
     },
     "acting-prime-builder": {
-        "assumed_role": "Acting Prime Builder",
-        "role_assignment": "active AI harness assigned by owner for this session",
+        "assumed_role": "Acting Prime Builder (compatibility/provenance)",
+        "role_assignment": (
+            "legacy/compatibility profile per bridge gtkb-role-session-lifecycle-simplification-003 "
+            "Acting-Prime Compatibility Contract: this harness was previously assigned "
+            "acting-prime-builder before the two-role canonical set (prime-builder, loyal-opposition) "
+            "was finalized. Compatibility/provenance label, NOT a new role-switch target."
+        ),
         "bridge": "always available through bridge/INDEX.md and checked at session startup",
         "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,

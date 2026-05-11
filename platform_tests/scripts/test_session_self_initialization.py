@@ -2360,3 +2360,53 @@ def test_recommender_6_live_regression_excludes_known_stale_priorities() -> None
     assert "GTKB-RESOURCE-REFERENCE-DISAMBIGUATION-001" not in top_ids, (
         f"resource-reference-disambiguation (VERIFIED 2026-05-06) leaked into top_priority_actions={top_ids}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Acting-Prime compatibility contract (T-compat-3, T-compat-4)
+# Per bridge gtkb-role-session-lifecycle-simplification-003.md GO at -004:
+#   Slice B/D: startup rendering for the acting-prime-builder profile MUST
+#   contain the compatibility/provenance label. ROLE_PROFILES enumeration
+#   retains the profile for backward-compat readability.
+# ---------------------------------------------------------------------------
+
+
+def test_t_compat_3_acting_prime_profile_renders_compatibility_label() -> None:
+    """T-compat-3: ROLE_PROFILES['acting-prime-builder']['assumed_role'] +
+    'role_assignment' fields contain the compatibility/provenance label.
+
+    Linked spec: GOV-SESSION-SELF-INITIALIZATION-001 (correct disclosure).
+    """
+    module = _load_module()
+    profile = module.ROLE_PROFILES["acting-prime-builder"]
+    assert "compatibility/provenance" in profile["assumed_role"], (
+        "acting-prime-builder profile 'assumed_role' must contain the "
+        "'compatibility/provenance' label so startup rendering surfaces the "
+        "legacy/compatibility framing per the Acting-Prime Compatibility Contract."
+    )
+    assert "compatibility" in profile["role_assignment"].lower(), (
+        "acting-prime-builder profile 'role_assignment' must reference the "
+        "compatibility framing."
+    )
+    assert "not a new role-switch target" in profile["role_assignment"].lower(), (
+        "acting-prime-builder profile must clarify it is not a role-switch target."
+    )
+
+
+def test_t_compat_4_role_profiles_enumeration_retains_acting_prime_builder() -> None:
+    """T-compat-4: ROLE_PROFILES enumeration retains the acting-prime-builder
+    profile (loadable and references the rule file).
+
+    Linked spec: GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001 (install-time profile set).
+    """
+    module = _load_module()
+    assert "acting-prime-builder" in module.ROLE_PROFILES, (
+        "ROLE_PROFILES must retain the acting-prime-builder entry for "
+        "backward compatibility with prior session role-map values."
+    )
+    profile = module.ROLE_PROFILES["acting-prime-builder"]
+    assert profile["role_mapping_source"] == ".claude/rules/acting-prime-builder.md", (
+        "acting-prime-builder profile must continue to reference its rule file "
+        "for narrative continuity (the rule file is the historical authority "
+        "record; the durable role record is harness-state/role-assignments.json)."
+    )

@@ -15,6 +15,7 @@ Document: gtkb-role-scope-release-operations-advisory-2026-05-11
 NO-GO: bridge/gtkb-role-scope-release-operations-advisory-2026-05-11-001.md
 
 Document: gtkb-da-harvest-catchup
+VERIFIED: bridge/gtkb-da-harvest-catchup-006.md
 NEW: bridge/gtkb-da-harvest-catchup-005.md
 GO: bridge/gtkb-da-harvest-catchup-004.md
 REVISED: bridge/gtkb-da-harvest-catchup-003.md
@@ -22,6 +23,7 @@ NO-GO: bridge/gtkb-da-harvest-catchup-002.md
 NEW: bridge/gtkb-da-harvest-catchup-001.md
 
 Document: gtkb-artifact-recorder-cli
+GO: bridge/gtkb-artifact-recorder-cli-004.md
 REVISED: bridge/gtkb-artifact-recorder-cli-003.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-001.md
