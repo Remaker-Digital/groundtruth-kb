@@ -12,6 +12,7 @@
 
 
 Document: gtkb-role-scope-release-operations-conversion
+REVISED: bridge/gtkb-role-scope-release-operations-conversion-003.md
 NO-GO: bridge/gtkb-role-scope-release-operations-conversion-002.md
 NEW: bridge/gtkb-role-scope-release-operations-conversion-001.md
 
