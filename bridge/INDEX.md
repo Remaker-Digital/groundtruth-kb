@@ -12,6 +12,8 @@
 
 
 Document: gtkb-tests-package-collision-resolution
+REVISED: bridge/gtkb-tests-package-collision-resolution-007.md
+NO-GO: bridge/gtkb-tests-package-collision-resolution-006.md
 NEW: bridge/gtkb-tests-package-collision-resolution-005.md
 GO: bridge/gtkb-tests-package-collision-resolution-004.md
 REVISED: bridge/gtkb-tests-package-collision-resolution-003.md
