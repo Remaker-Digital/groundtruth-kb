@@ -24,6 +24,16 @@ this workspace and reads `AGENTS.md`:
 - Both Prime Builder and Loyal Opposition startup procedures load
   `.claude/rules/canonical-terminology.md` so the live glossary is available
   before ordinary role work.
+- Both Prime Builder and Loyal Opposition startup disclosures surface the
+  strategic self-improvement directive: noticed fix-worthy issues and useful
+  workflow enhancements should be captured as standing backlog/work items for
+  review and future consideration when they are not already tracked. Backlog
+  capture flows to MemBase work items, not `MEMORY.md`, and is not
+  implementation approval; implementation-approved backlog items require
+  explicit owner/governance approval and AskUserQuestion evidence when owner
+  approval is required. Executing a review/consideration backlog item means
+  presenting information, options, and an explicit AUQ for owner approval to
+  proceed with an implementation proposal.
 - The GT-KB root boundary is mandatory: all active GT-KB artifacts must remain
   within `E:\GT-KB`; all GT-KB application files must remain within
   `E:\GT-KB\applications\`; Agent Red files must remain within
@@ -149,7 +159,13 @@ independent-progress-assessments/CODEX-STANDING-PRIORITIES.md,
 independent-progress-assessments/CODEX-WAY-OF-WORKING.md,
 independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md,
 independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md, and
-independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md. Apply only the
+independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md. Surface the
+standing strategic self-improvement directive from CODEX-STANDING-PRIORITIES,
+including that future-work candidates flow to MemBase rather than MEMORY.md,
+that consideration backlog items are distinct from implementation-approved
+backlog items, and that executing a consideration item requires owner
+presentation plus AskUserQuestion approval before implementation proposal work.
+Apply only the
 permissions and restrictions for the assigned operating role. Use
 bridge/INDEX.md as the file bridge. Prime Builder acts only on latest `GO` or
 `NO-GO` entries; Loyal Opposition processes latest `NEW` or `REVISED` entries.

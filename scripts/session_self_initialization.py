@@ -3099,6 +3099,7 @@ def build_startup_model(
             "Strict GOV enforcement where mechanically available",
             "Formal artifact approval required for DA, GOV, SPEC, PB, ADR, and DCL mutations",
             "Standing backlog is the governed cross-session work authority",
+            "Strategic self-improvement directive: Prime Builder and Loyal Opposition capture noticed fix-worthy issues and useful workflow enhancements as review/consideration backlog items in MemBase, not MEMORY.md; backlog capture is not implementation approval; implementation-approved backlog items require AskUserQuestion evidence; executing a consideration item means presenting insight/options and obtaining AskUserQuestion approval before implementation proposal work",
             "GT-KB adoption and release-readiness evidence remain release-gate visible",
             "Harness hook limitations require parity checks and explicit fallback disclosure",
         ],

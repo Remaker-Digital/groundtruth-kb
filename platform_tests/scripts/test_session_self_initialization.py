@@ -663,6 +663,12 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert "### Project State Rollup" in report
     assert "MemBase table: current_work_items" in report
     assert "active projects:" in report
+    assert "Strategic self-improvement directive" in report
+    assert "review/consideration backlog items" in report
+    assert "in MemBase, not MEMORY.md" in report
+    assert "implementation-approved backlog items require AskUserQuestion evidence" in report
+    assert "presenting insight/options" in report
+    assert "AskUserQuestion approval before implementation proposal work" in report
     assert "Commit and push to GitHub" not in report
     assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." not in report
     assert "Session-focus menu: not presented in Loyal Opposition mode" not in report
@@ -963,6 +969,12 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "scripts/cross_harness_bridge_trigger.py" in report_text
     assert "retired smart poller and OS poller remain archived" in report_text
     assert "Startup Disclosure" in report_text
+    assert "Strategic self-improvement directive" in report_text
+    assert "review/consideration backlog items" in report_text
+    assert "in MemBase, not MEMORY.md" in report_text
+    assert "implementation-approved backlog items require AskUserQuestion evidence" in report_text
+    assert "presenting insight/options" in report_text
+    assert "AskUserQuestion approval before implementation proposal work" in report_text
     assert "GroundTruth-KB Project Dashboard" in report_text
     assert "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard" in report_text
     assert "Browser opening: use the harness-controlled browser" in report_text
