@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-09T13:39:12Z",
+  "generated_at": "2026-05-11T14:15:29Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -103,20 +103,27 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 13,
+      "count": 20,
       "items": [
+        ".claude/hooks/_delib_common.py",
         ".claude/hooks/assertion-check.py",
         ".claude/hooks/bridge-compliance-gate.py",
         ".claude/hooks/credential-scan.py",
+        ".claude/hooks/delib-preflight-gate.py",
         ".claude/hooks/destructive-gate.py",
         ".claude/hooks/formal-artifact-approval-gate.py",
         ".claude/hooks/glossary-expansion.py",
+        ".claude/hooks/gov09-capture.py",
+        ".claude/hooks/intake-classifier.py",
         ".claude/hooks/narrative-artifact-approval-gate.py",
+        ".claude/hooks/owner-decision-capture.py",
         ".claude/hooks/owner-decision-tracker.py",
+        ".claude/hooks/scanner-safe-writer.py",
         ".claude/hooks/scheduler.py",
         ".claude/hooks/session_start_dispatch.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/hooks/spec-event-surfacer.py",
+        ".claude/hooks/turn-marker.py",
         ".claude/hooks/workstream-focus.py"
       ]
     },
@@ -179,10 +186,11 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 12,
+      "count": 16,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/bridge-essential.md",
+        ".claude/rules/bridge-poller-canonical.md",
         ".claude/rules/canonical-terminology.md",
         ".claude/rules/codex-review-gate.md",
         ".claude/rules/deliberation-protocol.md",
@@ -190,9 +198,12 @@
         ".claude/rules/loyal-opposition.md",
         ".claude/rules/operating-model.md",
         ".claude/rules/operating-role.md",
+        ".claude/rules/prime-bridge-collaboration-protocol.md",
         ".claude/rules/prime-builder-role.md",
+        ".claude/rules/prime-builder.md",
         ".claude/rules/project-root-boundary.md",
-        ".claude/rules/report-depth-prime-builder-context.md"
+        ".claude/rules/report-depth-prime-builder-context.md",
+        ".claude/rules/report-depth.md"
       ]
     },
     "skills": {

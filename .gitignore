@@ -496,3 +496,12 @@ memory/MEMORY.md.backup-*
 # Deliberation Archive (groundtruth.db), the JSON is redundant. Tracking
 # would duplicate KB state and create per-session diff noise.
 .groundtruth/formal-artifact-approvals/
+
+# Append pattern: .claude/hooks/*.log (Operational hook logs)
+.claude/hooks/*.log
+
+# Append pattern: .groundtruth/ (KB working directory (chroma + cache))
+.groundtruth/
+
+# Append pattern: .claude/settings.local.json (Adopter-owned local overlay)
+.claude/settings.local.json

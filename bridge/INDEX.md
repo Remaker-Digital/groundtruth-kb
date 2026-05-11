@@ -88,6 +88,7 @@ Document: gtkb-mcp-stable-harness-surface-advisory-2026-05-09
 NO-GO: bridge/gtkb-mcp-stable-harness-surface-advisory-2026-05-09-001.md
 
 Document: gtkb-scaffold-upgrade-tier-a
+NEW: bridge/gtkb-scaffold-upgrade-tier-a-011.md
 GO: bridge/gtkb-scaffold-upgrade-tier-a-010.md
 REVISED: bridge/gtkb-scaffold-upgrade-tier-a-009.md
 NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-008.md
