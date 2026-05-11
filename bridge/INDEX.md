@@ -12,19 +12,24 @@
 
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-002.md
 NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-001.md
 
 Document: gtkb-role-scope-release-operations-conversion
+NO-GO: bridge/gtkb-role-scope-release-operations-conversion-005.md
+GO: bridge/gtkb-role-scope-release-operations-conversion-004.md
 REVISED: bridge/gtkb-role-scope-release-operations-conversion-003.md
 NO-GO: bridge/gtkb-role-scope-release-operations-conversion-002.md
 NEW: bridge/gtkb-role-scope-release-operations-conversion-001.md
 
 Document: gtkb-peer-solution-advisory-loop-conversion
+GO: bridge/gtkb-peer-solution-advisory-loop-conversion-004.md
 REVISED: bridge/gtkb-peer-solution-advisory-loop-conversion-003.md
 NO-GO: bridge/gtkb-peer-solution-advisory-loop-conversion-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-001.md
 
 Document: gtkb-advisory-report-message-type-conversion
+GO: bridge/gtkb-advisory-report-message-type-conversion-004.md
 REVISED: bridge/gtkb-advisory-report-message-type-conversion-003.md
 NO-GO: bridge/gtkb-advisory-report-message-type-conversion-002.md
 NEW: bridge/gtkb-advisory-report-message-type-conversion-001.md
@@ -117,6 +122,7 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+REVISED: bridge/gtkb-bridge-advisory-status-001-007.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-006.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-005.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-004.md
@@ -145,6 +151,7 @@ NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-002.md
 NEW: bridge/gtkb-scaffold-upgrade-tier-a-001.md
 
 Document: gtkb-role-session-lifecycle-simplification
+NO-GO: bridge/gtkb-role-session-lifecycle-simplification-008.md
 REVISED: bridge/gtkb-role-session-lifecycle-simplification-007.md
 NO-GO: bridge/gtkb-role-session-lifecycle-simplification-006.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-005.md
