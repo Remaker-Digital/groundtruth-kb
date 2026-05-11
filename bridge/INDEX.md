@@ -11,6 +11,15 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-peer-solution-advisory-loop-conversion
+NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-001.md
+
+Document: gtkb-advisory-report-message-type-conversion
+NEW: bridge/gtkb-advisory-report-message-type-conversion-001.md
+
+Document: gtkb-mcp-stable-harness-surface-conversion
+NEW: bridge/gtkb-mcp-stable-harness-surface-conversion-001.md
+
 Document: gtkb-role-scope-release-operations-advisory-2026-05-11
 NO-GO: bridge/gtkb-role-scope-release-operations-advisory-2026-05-11-001.md
 
