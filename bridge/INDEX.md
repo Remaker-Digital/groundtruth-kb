@@ -41,6 +41,7 @@ NO-GO: bridge/gtkb-advisory-report-protocol-extension-002.md
 NEW: bridge/gtkb-advisory-report-protocol-extension-001.md
 
 Document: gtkb-peer-solution-advisory-loop-procedure
+VERIFIED: bridge/gtkb-peer-solution-advisory-loop-procedure-004.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-procedure-003.md
 GO: bridge/gtkb-peer-solution-advisory-loop-procedure-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-procedure-001.md
@@ -224,6 +225,7 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-011.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-010.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-009.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-008.md
