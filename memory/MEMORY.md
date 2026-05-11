@@ -1,6 +1,83 @@
 # Agent Red Memory
 
 ## Current Status
+- **Fresh-session handoff (S340 Prime Builder wrap, 2026-05-11 UTC):**
+  Final HEAD on `develop` is `9395b7cf`
+  (`docs(bridge): Codex verdicts on S340 freshly-filed threads`). The
+  branch is ahead of `origin/develop` by 40+ commits (no push during
+  S340 wrap). S340 closed two major bridge threads VERIFIED and filed
+  two more for Codex review:
+    - **18.E.1 atomic code cluster move (1,423 files):** VERIFIED at
+      `bridge/gtkb-isolation-018-slice-e1-atomic-code-move-020.md`.
+      Implementation across commits `c1021ab0` (Steps 3-6) + `58ac3ef5`
+      (S339 Steps 0-2). 16 governance + 5 spec-derived rename tests
+      passing.
+    - **tests/ → platform_tests/ collision-resolution rename
+      (116 files):** VERIFIED at
+      `bridge/gtkb-tests-package-collision-resolution-008.md`.
+      Implementation in commit `a641f622`. Criterion 5 owner-waived for
+      `<=4` (pre-existing `test_host.suites` defect that was never on
+      develop). Full collect: 12,329 tests / 4 errors, down from 17.
+    - **GTKB-ARTIFACT-RECORDER-CLI scoping (S312 owner-approved):**
+      filed at `bridge/gtkb-artifact-recorder-cli-001.md` (commit
+      `8e7990c3`); Codex NO-GO at `-002` with two findings (F1 missing
+      `GOV-STANDING-BACKLOG-001` citation; F2 stale coupled-thread state
+      claims against live `bridge/INDEX.md`). Awaits REVISED-2 at `-003`
+      per Codex's 4-point GO-able Revision Path.
+    - **`gtkb-role-session-lifecycle-simplification` REVISED-1:** filed
+      at `bridge/gtkb-role-session-lifecycle-simplification-003.md`
+      (commit `afff91ab`); **Codex GO at `-004` authorizes
+      implementation**. Three findings (F1 missing role-governance
+      specs; F2 governance-adoption regression; F3 acting-prime
+      compatibility contract) all addressed. 4 slices + 4 T-compat-*
+      tests + 5 protected narrative-artifact writes (require formal-
+      artifact-approval packets per `GOV-ARTIFACT-APPROVAL-001`).
+  Wrap scanners pass clean (W0/W1/W2 exit 0; info/warn level only;
+  long-standing MEMORY.md and DA citation drift unchanged). Deliberation
+  harvest deferred (formal-artifact-approval-gate blocks
+  `scripts/harvest_session_deliberations.py` without per-record approval
+  packets — exact friction that GTKB-ARTIFACT-RECORDER-CLI is designed
+  to address). Worktree intentionally has 2 untracked build-output
+  paths (`applications/Agent_Red/widget/storybook-static/`,
+  `platform_tests/results/`) and Codex's running log
+  `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`. **Next
+  session prioritized actions** per S340 tranche selection: (1)
+  implement role-session-lifecycle-simplification GO at `-004` (5
+  protected narrative-artifact writes with approval packets + script
+  edits + 4 new tests + post-impl report at `-005`); (2) revise
+  ARTIFACT-RECORDER-CLI to `-003` REVISED-1 addressing the two findings;
+  (3) CODEX-BRIDGE-COMPLIANCE-GATE-PARITY implementation per `-008` GO
+  conditions (script extension + 3 regression tests; bounded scope); (4)
+  continue Wave 2 NO-GO triage (4 actionable remaining); (5) MemBase
+  Slice A scoping bridge (per `gtkb-membase-effective-use-recovery-2026-04-29-002`
+  scoping GO). DECISION-0517 (false-positive class) was cleared during
+  S340. Auto-memory updates: `feedback_bridge_compliance_gate_strict_heading.md`
+  extended with `###` sub-heading rule (sub-headings inside
+  `## Specification Links` break the detector); new project memory
+  `project_role_session_lifecycle_implementation.md` captures
+  implementation scope.
+- **Fresh-session handoff (2026-05-10 23:21 PDT):** Final HEAD observed as
+  `afff91ab` (`docs(bridge): role-session-lifecycle-simplification REVISED-1 at -003`)
+  on `develop`, ahead of `origin/develop` by 37 commits. Live
+  `bridge/INDEX.md` parse at wrap showed 127 docs, `GO=28`, `NO-GO=17`,
+  `REVISED=1`, `VERIFIED=81`, latest `NEW`/`REVISED` = 1
+  (`gtkb-role-session-lifecycle-simplification` at
+  `bridge/gtkb-role-session-lifecycle-simplification-003.md`), and
+  Prime-actionable latest `GO`/`NO-GO` = 45. Peer-solution advisory work is
+  handed to Prime through
+  `bridge/gtkb-peer-solution-advisory-loop-2026-05-10-001.md`; supporting
+  report:
+  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-05-10-22-25-PEER-SOLUTION-ADVISORY-REPORT.md`.
+  Recommended next step is a Prime proposal, rebuttal, or explicit defer
+  decision for the Peer Solution Advisory Loop and/or an Archon-derived
+  GT-KB-native declarative workflow contract. `python .claude/hooks/assertion-check.py`
+  failed during wrap with `224/1687 PASS, 1463 FAIL`; investigate before any
+  release/deploy/quality-score claim. Worktree remains intentionally dirty with
+  unrelated/concurrent changes including `memory/pending-owner-decisions.md`,
+  untracked
+  `bridge/gtkb-artifact-recorder-cli-002.md`, `platform_tests/results/`, and
+  `applications/Agent_Red/widget/storybook-static/`. Wrap report:
+  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/SESSION-WRAP-CODEX-LOYAL-OPPOSITION-2026-05-10-23-21.md`.
 - **Fresh-session handoff (2026-05-10 17:15 PDT):** Current HEAD is
   `58ac3ef5` (`wip(isolation): E.1 Steps 0-2 + platform-files (resume at Step
   3)`) on `develop`, ahead of `origin/develop` by 27 commits. Loyal Opposition
