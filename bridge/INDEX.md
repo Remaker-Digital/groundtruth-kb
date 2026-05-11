@@ -12,10 +12,12 @@
 
 
 Document: gtkb-audit-script-withdrawn-status-handling
+NEW: bridge/gtkb-audit-script-withdrawn-status-handling-003.md
 GO: bridge/gtkb-audit-script-withdrawn-status-handling-002.md
 NEW: bridge/gtkb-audit-script-withdrawn-status-handling-001.md
 
 Document: gtkb-release-candidate-gate-stale-test-paths
+GO: bridge/gtkb-release-candidate-gate-stale-test-paths-006.md
 REVISED: bridge/gtkb-release-candidate-gate-stale-test-paths-005.md
 NO-GO: bridge/gtkb-release-candidate-gate-stale-test-paths-004.md
 REVISED: bridge/gtkb-release-candidate-gate-stale-test-paths-003.md
@@ -30,6 +32,7 @@ GO: bridge/gtkb-gov-010-followup-observations-s342-002.md
 NEW: bridge/gtkb-gov-010-followup-observations-s342-001.md
 
 Document: gtkb-s341-backlog-candidates-membase-insert
+NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-009.md
 NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-008.md
 NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-007.md
 NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-006.md
@@ -71,6 +74,7 @@ NO-GO: bridge/gtkb-advisory-report-template-spec-002.md
 NEW: bridge/gtkb-advisory-report-template-spec-001.md
 
 Document: gtkb-peer-solution-owner-gate-dcl
+GO: bridge/gtkb-peer-solution-owner-gate-dcl-008.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-007.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-006.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-005.md

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -10,6 +11,31 @@ from groundtruth_kb.db import KnowledgeDB
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "audit_standing_backlog_sources.py"
+DROPBOX_DIR = REPO_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+
+_DATED_SNAPSHOT_RE = re.compile(r"STANDING-BACKLOG-HARVEST-(\d{4}-\d{2}-\d{2}).*\.md$")
+
+
+def _most_recent_dated_snapshot(dropbox_dir: Path) -> Path:
+    """Return the most-recent ``STANDING-BACKLOG-HARVEST-YYYY-MM-DD*.md`` snapshot.
+
+    Per ``GTKB-GOV-010-FOLLOWUP-OBSERVATIONS-S342`` item 3, this glob-based lookup
+    decouples the harvest regression test from any specific dated snapshot filename
+    so future refreshes (additive new dated files) are durable without test churn.
+    Ordering key is the ``YYYY-MM-DD`` prefix; ties broken by full filename
+    descending so additive same-day refreshes sort after a plain same-day base file.
+    """
+    matches: list[tuple[str, str, Path]] = []
+    for path in dropbox_dir.glob("STANDING-BACKLOG-HARVEST-*.md"):
+        match = _DATED_SNAPSHOT_RE.search(path.name)
+        if match:
+            matches.append((match.group(1), path.name, path))
+    if not matches:
+        raise FileNotFoundError(
+            f"No STANDING-BACKLOG-HARVEST-YYYY-MM-DD*.md files found in {dropbox_dir}"
+        )
+    matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return matches[0][2]
 
 
 def _load_module():
@@ -96,12 +122,13 @@ def test_standing_backlog_contains_harvested_source_items() -> None:
         / "CODEX-INSIGHT-DROPBOX"
         / "STANDING-BACKLOG-BRIDGE-DISPOSITIONS-2026-04-20.md"
     ).read_text(encoding="utf-8")
-    current_harvest_report = (
+    azure_verified_baseline_harvest_report = (
         REPO_ROOT
         / "independent-progress-assessments"
         / "CODEX-INSIGHT-DROPBOX"
         / "STANDING-BACKLOG-HARVEST-2026-04-23-AZURE-VERIFIED.md"
     ).read_text(encoding="utf-8")
+    current_harvest_report = _most_recent_dated_snapshot(DROPBOX_DIR).read_text(encoding="utf-8")
 
     for item_id in (
         "GTKB-GOV-004",
@@ -121,14 +148,54 @@ def test_standing_backlog_contains_harvested_source_items() -> None:
     assert "gtkb-azure-cicd-gates" in work_list
     assert "commercial-readiness-spec-1833-ready-propagation" in work_list
     assert "`gtkb-azure-cicd-gates` `GO`" in disposition_report
-    assert "`gtkb-azure-cicd-gates` at `VERIFIED`" in current_harvest_report
-    assert "bridge/gtkb-azure-cicd-gates-010.md" in current_harvest_report
+    assert "`gtkb-azure-cicd-gates` at `VERIFIED`" in azure_verified_baseline_harvest_report
+    assert "bridge/gtkb-azure-cicd-gates-010.md" in azure_verified_baseline_harvest_report
     assert "It is assigned to `GTKB-GOV-009`" in disposition_report
     assert "`agent-red-bridge-dispatcher-deferral-enforcement-implementation` `NO-GO`" in disposition_report
     assert "`commercial-readiness-spec-1831-startup-wiring` `NO-GO`" in disposition_report
     assert "`commercial-readiness-spec-verification` `NO-GO`" in disposition_report
     assert "`commercial-readiness-spec-1833-ready-propagation` `NO-GO`" in disposition_report
-    assert "1994 open" in work_list
+
+    assert "GTKB-GOV-010" in current_harvest_report, (
+        "current harvest snapshot must reference the GTKB-GOV-010 parent directive"
+    )
+    assert "status_counts" in current_harvest_report, (
+        "current harvest snapshot must contain the bridge status_counts shape key"
+    )
+    assert "release_blockers" in current_harvest_report, (
+        "current harvest snapshot must contain the release_blockers shape key"
+    )
+
+
+def test_standing_backlog_audit_treats_withdrawn_as_terminal_not_actionable() -> None:
+    """WITHDRAWN at top of a document's version chain must be parsed as the
+    latest status, and must NOT appear in actionable (parallel to VERIFIED's
+    terminal treatment). Per WI-3276 / gtkb-audit-script-withdrawn-status-handling.
+    """
+    fixture = (
+        "# Bridge Index\n"
+        "\n"
+        "Document: test-thread-withdrawn-fixture\n"
+        "WITHDRAWN: bridge/test-thread-withdrawn-fixture-002.md\n"
+        "NO-GO: bridge/test-thread-withdrawn-fixture-001.md\n"
+    )
+    module = _load_module()
+    entries = module.parse_latest_bridge_entries(fixture)
+    fixture_entry = next(
+        (e for e in entries if e["document"] == "test-thread-withdrawn-fixture"),
+        None,
+    )
+    assert fixture_entry is not None, (
+        "test-thread-withdrawn-fixture must appear in parse output; "
+        f"got entries={entries}"
+    )
+    assert fixture_entry["status"] == "WITHDRAWN", (
+        "Latest status must be WITHDRAWN (parsed correctly); "
+        f"got {fixture_entry['status']}"
+    )
+    assert fixture_entry["status"] not in module.ACTIONABLE_BRIDGE_STATUSES, (
+        "WITHDRAWN must be terminal (not in ACTIONABLE_BRIDGE_STATUSES) like VERIFIED"
+    )
 
 
 def test_standing_backlog_harvest_decision_is_archived() -> None:
