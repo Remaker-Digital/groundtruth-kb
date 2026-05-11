@@ -11,7 +11,12 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-tests-package-collision-resolution
+NEW: bridge/gtkb-tests-package-collision-resolution-001.md
+
 Document: gtkb-isolation-018-slice-e1-atomic-code-move
+REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-019.md
+NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-018.md
 NEW: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-017.md
 GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-016.md
 REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-015.md
