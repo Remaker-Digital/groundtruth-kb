@@ -11,7 +11,17 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-advisory-report-dashboard-counters-spec
+NEW: bridge/gtkb-advisory-report-dashboard-counters-spec-001.md
+
+Document: gtkb-advisory-routing-dcl
+NEW: bridge/gtkb-advisory-routing-dcl-001.md
+
+Document: gtkb-advisory-report-template-spec
+NEW: bridge/gtkb-advisory-report-template-spec-001.md
+
 Document: gtkb-peer-solution-owner-gate-dcl
+NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-004.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-003.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-002.md
 NEW: bridge/gtkb-peer-solution-owner-gate-dcl-001.md
