@@ -407,6 +407,16 @@ NON_TERMINAL_WORK_ITEM_STATUSES = {
 ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
 REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED"}
 PRIME_RESPONSE_BRIDGE_STATUSES = {"GO", "NO-GO"}
+PRIORITY_SORT_ORDER = {
+    "P0": 0,
+    "P1": 1,
+    "P2": 2,
+    "P3": 3,
+    "P4": 4,
+    "HIGH": 5,
+    "MEDIUM": 6,
+    "LOW": 7,
+}
 AGENT_RED_SCOPE_INCLUDED = {
     "agent_red_product",
     "agent_red_release",
@@ -878,6 +888,75 @@ def _is_agent_red_scope(row: dict[str, Any] | sqlite3.Row, *, primary_only: bool
     return classify_dashboard_scope(row) in included
 
 
+def _work_item_priority_rank(row: dict[str, Any]) -> int:
+    raw_priority = str(row.get("priority") or "").strip().upper()
+    return PRIORITY_SORT_ORDER.get(raw_priority, len(PRIORITY_SORT_ORDER) + 1)
+
+
+def _work_item_order_value(row: dict[str, Any]) -> int:
+    raw_order = row.get("implementation_order")
+    if isinstance(raw_order, int):
+        return raw_order
+    try:
+        return int(str(raw_order))
+    except (TypeError, ValueError):
+        return 1_000_000
+
+
+def _project_state_rollup(work_items: list[dict[str, Any]]) -> dict[str, Any]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    ungrouped_non_terminal: list[dict[str, Any]] = []
+    status_counts = Counter(str(row.get("resolution_status") or "none") for row in work_items)
+
+    for row in work_items:
+        status = str(row.get("resolution_status") or "")
+        if status not in NON_TERMINAL_WORK_ITEM_STATUSES:
+            continue
+        project_name = str(row.get("project_name") or "").strip()
+        if not project_name:
+            ungrouped_non_terminal.append(row)
+            continue
+        grouped.setdefault(project_name, []).append(row)
+
+    projects: list[dict[str, Any]] = []
+    for project_name, rows in grouped.items():
+        sorted_rows = sorted(
+            rows,
+            key=lambda row: (
+                _work_item_order_value(row),
+                _work_item_priority_rank(row),
+                str(row.get("id") or ""),
+            ),
+        )
+        top = sorted_rows[0]
+        projects.append(
+            {
+                "project": project_name,
+                "non_terminal_count": len(rows),
+                "status_counts": dict(sorted(Counter(str(row.get("resolution_status") or "none") for row in rows).items())),
+                "top_id": str(top.get("id") or ""),
+                "top_title": str(top.get("title") or ""),
+                "top_status": str(top.get("resolution_status") or "none"),
+                "top_priority": str(top.get("priority") or ""),
+                "top_order": top.get("implementation_order"),
+            }
+        )
+
+    projects.sort(key=lambda project: (-int(project["non_terminal_count"]), str(project["project"])))
+    return {
+        "available": True,
+        "source": "MemBase table: current_work_items",
+        "project_group_field": "project_name",
+        "total_current_work_items": len(work_items),
+        "status_counts": dict(sorted(status_counts.items())),
+        "non_terminal_work_items": sum(int(project["non_terminal_count"]) for project in projects)
+        + len(ungrouped_non_terminal),
+        "active_project_count": len(projects),
+        "ungrouped_non_terminal_count": len(ungrouped_non_terminal),
+        "projects": projects,
+    }
+
+
 def _database_metrics(project_root: Path) -> dict[str, Any]:
     # GTKB-ISOLATION-012 Phase 4 baseline: the Agent Red startup summary path
     # reads groundtruth.db only through the scoped-service client. The
@@ -945,6 +1024,7 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
             "test_procedure_records": test_procedures_count,
             "scope_counts": _scope_counts(work_items),
             "scope_confidence": "gtkb_current_heuristic",
+            "project_state_rollup": _project_state_rollup(work_items),
         },
         "deliberation_archive": {
             "current_total": len(agent_red_deliberations),
@@ -3476,6 +3556,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
             "- Live bridge authority: current bridge state must be determined only from a fresh read of live `bridge/INDEX.md`; this generated report is not authoritative after generation.",
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
+            "- Project-state startup rule: include a compact current-state report for every active MemBase project group using `current_work_items.project_name`; distinguish bridge queue state, git drift, release blockers, and Prime-actionable bridge responses.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
             "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual bridge/INDEX.md scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
@@ -3599,6 +3680,57 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
             f"- Harness parity: {_harness_parity_compact_text(harness_parity)}",
         ]
     )
+
+
+def _compact_counts(counts: dict[str, Any]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{key}={value}" for key, value in counts.items())
+
+
+def _format_project_top_item(project: dict[str, Any]) -> str:
+    title = _sentence_fragment(project.get("top_title"), "top item")
+    priority = str(project.get("top_priority") or "").strip()
+    priority_text = f", {priority}" if priority else ""
+    order = project.get("top_order")
+    order_text = f", order {order}" if order not in (None, "") else ""
+    return (
+        f"`{project.get('top_id')}` - {title} "
+        f"[{project.get('top_status')}{priority_text}{order_text}]"
+    )
+
+
+def _render_project_state_rollup(model: dict[str, Any]) -> str:
+    rollup = model.get("metrics", {}).get("membase", {}).get("project_state_rollup")
+    if not rollup:
+        return "- Project-state rollup unavailable; MemBase project grouping was not loaded."
+    if not rollup.get("available", True):
+        return f"- Project-state rollup unavailable: {rollup.get('error', 'unknown error')}"
+
+    projects = list(rollup.get("projects") or [])
+    lines = [
+        f"- Source: {rollup.get('source')} grouped by `{rollup.get('project_group_field')}`.",
+        (
+            f"- Current work items: {rollup.get('total_current_work_items')}; "
+            f"non-terminal: {rollup.get('non_terminal_work_items')}; "
+            f"active projects: {rollup.get('active_project_count')}; "
+            f"ungrouped non-terminal: {rollup.get('ungrouped_non_terminal_count')}."
+        ),
+        f"- Status counts: {_compact_counts(rollup.get('status_counts') or {})}.",
+    ]
+    if not projects:
+        lines.append("- No active project groups found in MemBase.")
+        return "\n".join(lines)
+
+    lines.append("- Active project states:")
+    for project in projects:
+        lines.append(
+            "  - "
+            f"`{project.get('project')}`: {project.get('non_terminal_count')} non-terminal "
+            f"({_compact_counts(project.get('status_counts') or {})}); "
+            f"top: {_format_project_top_item(project)}."
+        )
+    return "\n".join(lines)
 
 
 def _safe_overlay_status(project_root: Path) -> dict[str, Any]:
@@ -3908,6 +4040,12 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
 
     if _is_loyal_opposition_model(model):
         startup_task_section = []
+        project_state_rollup_section = [
+            "### Project State Rollup",
+            "",
+            _render_project_state_rollup(model),
+            "",
+        ]
     else:
         session_focus_options = _session_focus_options(model)
         startup_task_section = [
@@ -3919,6 +4057,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "",
             "Or provide a prompt for something else.",
         ]
+        project_state_rollup_section = []
 
     return "\n".join(
         [
@@ -3955,6 +4094,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "",
             _render_current_project_state(model),
             "",
+            *project_state_rollup_section,
             "### Active Work Subject",
             "",
             render_active_work_subject(

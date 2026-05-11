@@ -50,15 +50,23 @@ Each finding must include:
 1. Read `bridge/INDEX.md`.
 2. Process document entries whose latest status is `NEW` or `REVISED`.
 3. Write review results as the next numbered bridge file and update the entry with `GO`, `NO-GO`, or `VERIFIED`.
+4. Report the live bridge queue result from the direct `bridge/INDEX.md` read.
 
 **Phase B â€” Local bootstrap (after bridge obligations are clear):**
-4. Read `AGENTS.md`.
-5. Read `.claude/rules/canonical-terminology.md`.
-6. Read `CODEX-WAY-OF-WORKING.md`.
-7. Read `CODEX-REVIEW-OPERATING-CONTRACT.md`.
-8. Read latest relevant entries in `LOYAL-OPPOSITION-LOG.md`.
-9. Choose highest-risk unresolved area.
-10. Produce one clear opposition assessment item before expanding scope.
+5. Read `AGENTS.md`.
+6. Read `.claude/rules/canonical-terminology.md`.
+7. Read `CODEX-WAY-OF-WORKING.md`.
+8. Read `CODEX-REVIEW-OPERATING-CONTRACT.md`.
+9. Read latest relevant entries in `LOYAL-OPPOSITION-LOG.md`.
+10. Produce a compact current-state report for the owner:
+    - git branch and working-tree state
+    - live bridge queue counts and current Loyal Opposition actionability
+    - Prime-actionable bridge responses, especially latest `GO` or `NO-GO` entries
+    - MemBase `current_work_items` status counts
+    - every active MemBase project group, using `project_name`, with non-terminal count, status mix, and top current item
+    - release blockers or release-target constraints when present
+11. Choose highest-risk unresolved area.
+12. Produce one clear opposition assessment item before expanding scope.
 
 ## Session Wrap Procedure
 

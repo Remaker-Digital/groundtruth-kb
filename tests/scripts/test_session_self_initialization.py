@@ -660,6 +660,9 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert model["role"]["harness_id"] == "B"
     assert "## Loyal Opposition Startup Task" not in report
     assert "## Choose This Session's Focus" not in report
+    assert "### Project State Rollup" in report
+    assert "MemBase table: current_work_items" in report
+    assert "active projects:" in report
     assert "Commit and push to GitHub" not in report
     assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." not in report
     assert "Session-focus menu: not presented in Loyal Opposition mode" not in report
@@ -692,6 +695,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         "Mandatory direct-read rule: before reporting the live bridge scan count, read `bridge/INDEX.md` directly"
         in context
     )
+    assert "Project-state startup rule: include a compact current-state report" in context
     assert context.index("## Harness-Only Loyal Opposition Startup Action") < context.index(
         "## User-Visible Startup Message"
     )
@@ -702,10 +706,73 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert "Do NOT create new bridge automations" in context
     user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
     assert "## Loyal Opposition Startup Task" not in user_visible_context
+    assert "### Project State Rollup" in user_visible_context
     assert (
         "Default session purpose: process Prime Builder reviews and verifications on the file bridge."
         not in user_visible_context
     )
+
+
+def test_project_state_rollup_groups_active_membase_projects() -> None:
+    module = _load_module()
+
+    rollup = module._project_state_rollup(
+        [
+            {
+                "id": "WI-1",
+                "project_name": "GTKB-A",
+                "title": "Second item",
+                "resolution_status": "open",
+                "priority": "P2",
+                "implementation_order": 20,
+            },
+            {
+                "id": "WI-2",
+                "project_name": "GTKB-A",
+                "title": "First item",
+                "resolution_status": "in_progress",
+                "priority": "P0",
+                "implementation_order": 1,
+            },
+            {
+                "id": "WI-3",
+                "project_name": "GTKB-B",
+                "title": "Single item",
+                "resolution_status": "deferred",
+                "priority": "low",
+                "implementation_order": None,
+            },
+            {
+                "id": "WI-4",
+                "project_name": "GTKB-C",
+                "title": "Done item",
+                "resolution_status": "resolved",
+                "priority": "P0",
+                "implementation_order": 0,
+            },
+            {
+                "id": "WI-5",
+                "project_name": "",
+                "title": "Ungrouped item",
+                "resolution_status": "open",
+                "priority": "P1",
+                "implementation_order": 2,
+            },
+        ]
+    )
+
+    assert rollup["source"] == "MemBase table: current_work_items"
+    assert rollup["total_current_work_items"] == 5
+    assert rollup["non_terminal_work_items"] == 4
+    assert rollup["active_project_count"] == 2
+    assert rollup["ungrouped_non_terminal_count"] == 1
+    assert [project["project"] for project in rollup["projects"]] == ["GTKB-A", "GTKB-B"]
+    assert rollup["projects"][0]["top_id"] == "WI-2"
+
+    rendered = module._render_project_state_rollup({"metrics": {"membase": {"project_state_rollup": rollup}}})
+    assert "Current work items: 5; non-terminal: 4; active projects: 2" in rendered
+    assert "`GTKB-A`: 2 non-terminal" in rendered
+    assert "top: `WI-2` - First item [in_progress, P0, order 1]." in rendered
 
 
 def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> None:

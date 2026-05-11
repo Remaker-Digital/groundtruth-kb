@@ -201,6 +201,12 @@ The first owner message in a fresh session is a session-start stimulus only. It 
 When the active role is Prime Builder, the disclosure must include the role/governance stance, dashboard link, current project state, numbered session-focus choices, top priority actions, token-reduction options, and the file bridge scan count. Prime Builder must check the file bridge during startup even when no separate Loyal Opposition harness is currently running. Numbered session-focus choices are part of GT-KB Prime Builder startup only and are presented to the owner only by Prime Builder. After the disclosure, collect or confirm Mike's session focus before proceeding; if Mike supplies a concrete task after the startup disclosure, explicitly map it to one focus option or Custom Focus and proceed only when that mapping is unambiguous.
 
 When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan `bridge/INDEX.md`, then ask Mike whether to begin processing bridge reviews and verifications. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore the retired OS poller or the retired smart poller. Use the cross-harness event-driven trigger when its registrations and dispatch state are healthy; otherwise use manual scans or monitoring only when Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
+After bridge verification, Loyal Opposition startup must include a compact
+current-state report for the owner covering git state, live bridge queue
+counts, current Loyal Opposition actionability, Prime-actionable latest `GO`
+or `NO-GO` bridge responses, MemBase `current_work_items` status counts, every
+active MemBase `project_name` group with non-terminal count/status mix/top
+item, and release blockers or release-target constraints when present.
 
 **Phase A — File bridge review queue (first priority):**
 1. Read `bridge/INDEX.md`.
@@ -209,31 +215,34 @@ When the active role is Loyal Opposition, do not present the Prime Builder numbe
 3. Identify document entries whose latest status is `NEW` or `REVISED`.
 4. Process actionable entries from oldest to newest using `.claude/rules/file-bridge-protocol.md`.
 5. Report scan count: "File bridge scan: N entries processed."
+6. Produce the standard Loyal Opposition current-state report from live git,
+   live `bridge/INDEX.md`, MemBase `current_work_items`, and release-readiness
+   artifacts before ordinary review/advisory work.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
-5. Resolve the active harness's durable installation ID from
+7. Resolve the active harness's durable installation ID from
    `harness-state/harness-identities.json`, then read
    `harness-state/role-assignments.json` before applying any role-specific
    permissions or restrictions. If the role map records no Prime Builder, the
    starting harness assumes Prime Builder and updates the role map.
-6. Read `.claude/rules/canonical-terminology.md` before ordinary Prime Builder
+8. Read `.claude/rules/canonical-terminology.md` before ordinary Prime Builder
    or Loyal Opposition work so the live glossary is loaded for both roles.
-7. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
-8. Read `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`.
-9. Read `independent-progress-assessments/GROUNDTRUTH-KB-VISION.md`.
-10. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
-11. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
-12. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
-13. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
-14. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
-15. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
-16. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
-16a. Read `.claude/rules/deliberation-protocol.md` for deliberation archive search/cite obligations.
-17. When verification is needed, prefer repo-native commands already reflected in CI/config:
+9. Read `independent-progress-assessments/CODEX-SESSION-BOOTSTRAP.md`.
+10. Read `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md`.
+11. Read `independent-progress-assessments/GROUNDTRUTH-KB-VISION.md`.
+12. Read `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`.
+13. Read `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`.
+14. Read `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`.
+15. Read `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`.
+16. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+17. Check open items in `independent-progress-assessments/LOYAL-OPPOSITION-LOG.md`.
+18. Use `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md` and the report templates for substantial reviews/investigations.
+18a. Read `.claude/rules/deliberation-protocol.md` for deliberation archive search/cite obligations.
+19. When verification is needed, prefer repo-native commands already reflected in CI/config:
     - `python -m pytest <target> -q --tb=short`
     - `ruff check src/ tests/`
     - `ruff format --check src/ tests/`
-18. For reviews of another checkout such as GroundTruth KB, verify against that checkout's own workflow scope before accepting or rejecting CI-clean claims; recent GroundTruth KB reviews used `python -m pytest -q --tb=short`, `python -m ruff check .`, and `python -m ruff format --check .`.
+20. For reviews of another checkout such as GroundTruth KB, verify against that checkout's own workflow scope before accepting or rejecting CI-clean claims; recent GroundTruth KB reviews used `python -m pytest -q --tb=short`, `python -m ruff check .`, and `python -m ruff format --check .`.
 
 ## Report Output Contract
 

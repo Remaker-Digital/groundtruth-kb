@@ -61,6 +61,10 @@ this workspace and reads `AGENTS.md`:
   work modes when the active role is Loyal Opposition.
 - The review contract, checklists, and templates are part of the expected
   startup context when the active role is Loyal Opposition.
+- Loyal Opposition startup includes a compact current-state report for the
+  owner: git state, live bridge queue, Prime-actionable bridge responses,
+  MemBase `current_work_items` status counts, every active `project_name`
+  group, and release blockers or release-target constraints.
 
 These changes now activate automatically when `harness-state/role-assignments.json`
 assigns the current harness ID to Loyal Opposition mode:
@@ -119,6 +123,16 @@ Optional local environment overrides remain available:
    - `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md`
    - `independent-progress-assessments/TEMPLATE-CODE-REVIEW.md`
    - `independent-progress-assessments/TEMPLATE-DECISION-MEMO.md`
+12. In Loyal Opposition mode, include the standard project-state startup
+    report after bridge verification:
+    - direct `git status --short --branch`
+    - direct `bridge/INDEX.md` latest-status counts and latest `NEW`/`REVISED`
+      actionability
+    - Prime-actionable latest `GO`/`NO-GO` bridge responses for owner context
+    - MemBase `current_work_items` status counts
+    - every active MemBase `project_name` group with non-terminal count, status
+      mix, and top current item
+    - release blockers or release-target constraints when present
 
 ## Quick Restart Prompt
 
