@@ -12,15 +12,19 @@
 
 
 Document: gtkb-release-candidate-gate-stale-test-paths
+REVISED: bridge/gtkb-release-candidate-gate-stale-test-paths-003.md
 NO-GO: bridge/gtkb-release-candidate-gate-stale-test-paths-002.md
 NEW: bridge/gtkb-release-candidate-gate-stale-test-paths-001.md
 
 Document: gtkb-gov-010-followup-observations-s342
+VERIFIED: bridge/gtkb-gov-010-followup-observations-s342-004.md
 NEW: bridge/gtkb-gov-010-followup-observations-s342-003.md
 GO: bridge/gtkb-gov-010-followup-observations-s342-002.md
 NEW: bridge/gtkb-gov-010-followup-observations-s342-001.md
 
 Document: gtkb-s341-backlog-candidates-membase-insert
+NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-007.md
+NEW: bridge/gtkb-s341-backlog-candidates-membase-insert-006.md
 GO: bridge/gtkb-s341-backlog-candidates-membase-insert-005.md
 REVISED: bridge/gtkb-s341-backlog-candidates-membase-insert-004.md
 NO-GO: bridge/gtkb-s341-backlog-candidates-membase-insert-003.md
@@ -108,6 +112,7 @@ Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+VERIFIED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-015.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-014.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-013.md
 NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-012.md
@@ -1319,6 +1324,5 @@ NO-GO: bridge/gtkb-dora-001b-authoritative-deployment-source-004.md
 REVISED: bridge/gtkb-dora-001b-authoritative-deployment-source-003.md
 NO-GO: bridge/gtkb-dora-001b-authoritative-deployment-source-002.md
 NEW: bridge/gtkb-dora-001b-authoritative-deployment-source-001.md
-
 
 
