@@ -11,7 +11,12 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-role-scope-release-operations-advisory-2026-05-11
+NO-GO: bridge/gtkb-role-scope-release-operations-advisory-2026-05-11-001.md
+
 Document: gtkb-da-harvest-catchup
+NEW: bridge/gtkb-da-harvest-catchup-005.md
+GO: bridge/gtkb-da-harvest-catchup-004.md
 REVISED: bridge/gtkb-da-harvest-catchup-003.md
 NO-GO: bridge/gtkb-da-harvest-catchup-002.md
 NEW: bridge/gtkb-da-harvest-catchup-001.md
