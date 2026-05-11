@@ -11,12 +11,16 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-001.md
+
 Document: gtkb-role-scope-release-operations-conversion
 REVISED: bridge/gtkb-role-scope-release-operations-conversion-003.md
 NO-GO: bridge/gtkb-role-scope-release-operations-conversion-002.md
 NEW: bridge/gtkb-role-scope-release-operations-conversion-001.md
 
 Document: gtkb-peer-solution-advisory-loop-conversion
+REVISED: bridge/gtkb-peer-solution-advisory-loop-conversion-003.md
 NO-GO: bridge/gtkb-peer-solution-advisory-loop-conversion-002.md
 NEW: bridge/gtkb-peer-solution-advisory-loop-conversion-001.md
 
@@ -140,6 +144,7 @@ NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-002.md
 NEW: bridge/gtkb-scaffold-upgrade-tier-a-001.md
 
 Document: gtkb-role-session-lifecycle-simplification
+REVISED: bridge/gtkb-role-session-lifecycle-simplification-007.md
 NO-GO: bridge/gtkb-role-session-lifecycle-simplification-006.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-005.md
 GO: bridge/gtkb-role-session-lifecycle-simplification-004.md
