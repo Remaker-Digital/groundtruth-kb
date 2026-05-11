@@ -11,6 +11,10 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-canonical-bridge-parser-withdrawn-status-handling
+GO: bridge/gtkb-canonical-bridge-parser-withdrawn-status-handling-002.md
+NEW: bridge/gtkb-canonical-bridge-parser-withdrawn-status-handling-001.md
+
 Document: gtkb-audit-script-withdrawn-status-handling
 VERIFIED: bridge/gtkb-audit-script-withdrawn-status-handling-006.md
 REVISED: bridge/gtkb-audit-script-withdrawn-status-handling-005.md
@@ -57,6 +61,7 @@ NEW: bridge/gtkb-formal-artifact-packet-validator-cli-002.md
 NEW: bridge/gtkb-formal-artifact-packet-validator-cli-001.md
 
 Document: gtkb-advisory-report-dashboard-counters-spec
+NEW: bridge/gtkb-advisory-report-dashboard-counters-spec-005.md
 GO: bridge/gtkb-advisory-report-dashboard-counters-spec-004.md
 REVISED: bridge/gtkb-advisory-report-dashboard-counters-spec-003.md
 NO-GO: bridge/gtkb-advisory-report-dashboard-counters-spec-002.md
@@ -71,6 +76,7 @@ NO-GO: bridge/gtkb-advisory-routing-dcl-002.md
 NEW: bridge/gtkb-advisory-routing-dcl-001.md
 
 Document: gtkb-advisory-report-template-spec
+NEW: bridge/gtkb-advisory-report-template-spec-007.md
 GO: bridge/gtkb-advisory-report-template-spec-006.md
 REVISED: bridge/gtkb-advisory-report-template-spec-005.md
 NO-GO: bridge/gtkb-advisory-report-template-spec-004.md
@@ -79,6 +85,7 @@ NO-GO: bridge/gtkb-advisory-report-template-spec-002.md
 NEW: bridge/gtkb-advisory-report-template-spec-001.md
 
 Document: gtkb-peer-solution-owner-gate-dcl
+VERIFIED: bridge/gtkb-peer-solution-owner-gate-dcl-010.md
 NEW: bridge/gtkb-peer-solution-owner-gate-dcl-009.md
 GO: bridge/gtkb-peer-solution-owner-gate-dcl-008.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-007.md
