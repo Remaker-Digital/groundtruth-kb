@@ -20,6 +20,7 @@ NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-002.md
 NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-001.md
 
 Document: gtkb-role-scope-release-operations-conversion
+REVISED: bridge/gtkb-role-scope-release-operations-conversion-006.md
 NO-GO: bridge/gtkb-role-scope-release-operations-conversion-005.md
 GO: bridge/gtkb-role-scope-release-operations-conversion-004.md
 REVISED: bridge/gtkb-role-scope-release-operations-conversion-003.md
