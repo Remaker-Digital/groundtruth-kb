@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-artifact-recorder-cli-slice-1-deliberations-record
+NEW: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-001.md
+
 Document: gtkb-canonical-bridge-parser-withdrawn-status-handling
 VERIFIED: bridge/gtkb-canonical-bridge-parser-withdrawn-status-handling-004.md
 NEW: bridge/gtkb-canonical-bridge-parser-withdrawn-status-handling-003.md
