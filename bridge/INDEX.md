@@ -12,6 +12,9 @@
 
 
 Document: gtkb-audit-script-withdrawn-status-handling
+VERIFIED: bridge/gtkb-audit-script-withdrawn-status-handling-006.md
+REVISED: bridge/gtkb-audit-script-withdrawn-status-handling-005.md
+NO-GO: bridge/gtkb-audit-script-withdrawn-status-handling-004.md
 NEW: bridge/gtkb-audit-script-withdrawn-status-handling-003.md
 GO: bridge/gtkb-audit-script-withdrawn-status-handling-002.md
 NEW: bridge/gtkb-audit-script-withdrawn-status-handling-001.md
@@ -60,6 +63,8 @@ NO-GO: bridge/gtkb-advisory-report-dashboard-counters-spec-002.md
 NEW: bridge/gtkb-advisory-report-dashboard-counters-spec-001.md
 
 Document: gtkb-advisory-routing-dcl
+VERIFIED: bridge/gtkb-advisory-routing-dcl-006.md
+NEW: bridge/gtkb-advisory-routing-dcl-005.md
 GO: bridge/gtkb-advisory-routing-dcl-004.md
 REVISED: bridge/gtkb-advisory-routing-dcl-003.md
 NO-GO: bridge/gtkb-advisory-routing-dcl-002.md
@@ -74,6 +79,7 @@ NO-GO: bridge/gtkb-advisory-report-template-spec-002.md
 NEW: bridge/gtkb-advisory-report-template-spec-001.md
 
 Document: gtkb-peer-solution-owner-gate-dcl
+NEW: bridge/gtkb-peer-solution-owner-gate-dcl-009.md
 GO: bridge/gtkb-peer-solution-owner-gate-dcl-008.md
 REVISED: bridge/gtkb-peer-solution-owner-gate-dcl-007.md
 NO-GO: bridge/gtkb-peer-solution-owner-gate-dcl-006.md
