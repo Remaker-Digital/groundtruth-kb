@@ -12,6 +12,7 @@
 
 
 Document: gtkb-artifact-recorder-cli
+NO-GO: bridge/gtkb-artifact-recorder-cli-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-001.md
 
 Document: gtkb-peer-solution-advisory-loop-2026-05-10
@@ -97,6 +98,7 @@ NO-GO: bridge/gtkb-scaffold-upgrade-tier-a-002.md
 NEW: bridge/gtkb-scaffold-upgrade-tier-a-001.md
 
 Document: gtkb-role-session-lifecycle-simplification
+REVISED: bridge/gtkb-role-session-lifecycle-simplification-003.md
 NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
