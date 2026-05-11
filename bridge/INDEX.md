@@ -11,6 +11,9 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-github-ai-harness-ecosystem-conversion
+NEW: bridge/gtkb-github-ai-harness-ecosystem-conversion-001.md
+
 Document: gtkb-isolation-aftermath-startup-baseline
 GO: bridge/gtkb-isolation-aftermath-startup-baseline-002.md
 NEW: bridge/gtkb-isolation-aftermath-startup-baseline-001.md
@@ -27,6 +30,7 @@ NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-002.md
 NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-001.md
 
 Document: gtkb-role-scope-release-operations-conversion
+VERIFIED: bridge/gtkb-role-scope-release-operations-conversion-009.md
 NEW: bridge/gtkb-role-scope-release-operations-conversion-008.md
 GO: bridge/gtkb-role-scope-release-operations-conversion-007.md
 REVISED: bridge/gtkb-role-scope-release-operations-conversion-006.md
