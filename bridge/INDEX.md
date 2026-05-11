@@ -22,6 +22,7 @@ NO-GO: bridge/gtkb-da-harvest-catchup-002.md
 NEW: bridge/gtkb-da-harvest-catchup-001.md
 
 Document: gtkb-artifact-recorder-cli
+REVISED: bridge/gtkb-artifact-recorder-cli-003.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-001.md
 
