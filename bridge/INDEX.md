@@ -11,10 +11,14 @@
      They are the same governance umbrella; search both prefixes when investigating. -->
 
 
+Document: gtkb-isolation-aftermath-startup-baseline
+NEW: bridge/gtkb-isolation-aftermath-startup-baseline-001.md
+
 Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-004.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-003.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-002.md
 NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-001.md
