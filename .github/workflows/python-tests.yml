@@ -5,10 +5,10 @@
 # Posts coverage diff comment on PRs.
 #
 # Shards:
-#   unit         — tests/unit applications/Agent_Red/tests/unit (~950 isolated unit tests)
-#   core         — tests/multi_tenant applications/Agent_Red/tests/multi_tenant, applications/Agent_Red/tests/migrations, root test files (~3,700 tests)
+#   unit         — platform_tests/unit applications/Agent_Red/tests/unit (~950 isolated unit tests)
+#   core         — platform_tests/multi_tenant applications/Agent_Red/tests/multi_tenant, applications/Agent_Red/tests/migrations, root test files (~3,700 tests)
 #   agents-chat  — applications/Agent_Red/tests/agents, applications/Agent_Red/tests/chat, applications/Agent_Red/tests/persistent_memory (~300 tests)
-#   integrations — applications/Agent_Red/tests/integrations, tests/security applications/Agent_Red/tests/security, applications/Agent_Red/tests/performance (~270 tests)
+#   integrations — applications/Agent_Red/tests/integrations, platform_tests/security applications/Agent_Red/tests/security, applications/Agent_Red/tests/performance (~270 tests)
 #   regression   — applications/Agent_Red/tests/regression (47 tier 0/1/2 regression tests)
 #
 # Work Items #104 (Test Infrastructure), #105 (Coverage Gate).
@@ -21,7 +21,7 @@ on:
   pull_request:
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.github/workflows/python-tests.yml'
@@ -29,7 +29,7 @@ on:
     branches: [main, develop, 'hotfix/**']
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.github/workflows/python-tests.yml'
@@ -87,16 +87,16 @@ jobs:
         run: |
           case "${{ matrix.shard }}" in
             unit)
-              echo "test_args=tests/unit applications/Agent_Red/tests/unit" >> "$GITHUB_OUTPUT"
+              echo "test_args=platform_tests/unit applications/Agent_Red/tests/unit" >> "$GITHUB_OUTPUT"
               ;;
             core)
-              echo "test_args=tests/multi_tenant applications/Agent_Red/tests/multi_tenant applications/Agent_Red/tests/migrations tests/test_conftest_smoke.py tests/test_cross_module.py tests/test_env_loader.py tests/test_error_handling.py tests/test_forgot_password.py tests/test_health.py tests/test_multi_tenant_isolation_e2e.py" >> "$GITHUB_OUTPUT"
+              echo "test_args=platform_tests/multi_tenant applications/Agent_Red/tests/multi_tenant applications/Agent_Red/tests/migrations platform_tests/test_conftest_smoke.py platform_tests/test_cross_module.py platform_tests/test_env_loader.py platform_tests/test_error_handling.py platform_tests/test_forgot_password.py platform_tests/test_health.py platform_tests/test_multi_tenant_isolation_e2e.py" >> "$GITHUB_OUTPUT"
               ;;
             agents-chat)
               echo "test_args=applications/Agent_Red/tests/agents applications/Agent_Red/tests/chat applications/Agent_Red/tests/persistent_memory" >> "$GITHUB_OUTPUT"
               ;;
             integrations)
-              echo "test_args=applications/Agent_Red/tests/integrations tests/security applications/Agent_Red/tests/security applications/Agent_Red/tests/performance" >> "$GITHUB_OUTPUT"
+              echo "test_args=applications/Agent_Red/tests/integrations platform_tests/security applications/Agent_Red/tests/security applications/Agent_Red/tests/performance" >> "$GITHUB_OUTPUT"
               ;;
             regression)
               echo "test_args=applications/Agent_Red/tests/regression" >> "$GITHUB_OUTPUT"
@@ -113,7 +113,7 @@ jobs:
             --cov-report=xml:coverage-${{ matrix.shard }}.xml \
             --cov-report=json:coverage-${{ matrix.shard }}.json \
             --junitxml=test-results-${{ matrix.shard }}.xml \
-            --ignore=tests/integration_real_services.py \
+            --ignore=platform_tests/integration_real_services.py \
             --ignore=applications/Agent_Red/tests/integration
 
       - name: Upload shard artifacts

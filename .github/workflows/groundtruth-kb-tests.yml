@@ -39,7 +39,7 @@ jobs:
         working-directory: groundtruth-kb
         run: |
           mkdir -p .pytest-results
-          python -m pytest tests/ -q --tb=short --junitxml=.pytest-results/groundtruth-kb-tests.xml
+          python -m pytest platform_tests/ -q --tb=short --junitxml=.pytest-results/groundtruth-kb-tests.xml
 
       - name: Upload pytest results
         if: always()

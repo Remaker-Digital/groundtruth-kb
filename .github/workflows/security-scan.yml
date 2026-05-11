@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
       - 'Dockerfile*'
@@ -19,7 +19,7 @@ on:
     branches: [develop, 'hotfix/**']
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
       - 'Dockerfile*'

@@ -39,7 +39,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=applications/Agent_Red/src --cov-report=xml:coverage.xml tests/unit/ applications/Agent_Red/tests/unit/ || true
+          pytest --cov=applications/Agent_Red/src --cov-report=xml:coverage.xml platform_tests/unit/ applications/Agent_Red/tests/unit/ || true
         continue-on-error: true
 
       - name: Validate SonarCloud token

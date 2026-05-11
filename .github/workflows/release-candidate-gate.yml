@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'scripts/**'
       - 'applications/Agent_Red/admin/**'
       - 'applications/Agent_Red/widget/**'
@@ -23,7 +23,7 @@ on:
     branches: [main, develop, 'hotfix/**']
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'scripts/**'
       - 'applications/Agent_Red/admin/**'
       - 'applications/Agent_Red/widget/**'

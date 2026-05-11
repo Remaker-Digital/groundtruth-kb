@@ -11,7 +11,7 @@ on:
   pull_request:
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'scripts/**'
       - 'pyproject.toml'
       - '.github/workflows/lint.yml'
@@ -19,7 +19,7 @@ on:
     branches: [main, develop, 'hotfix/**']
     paths:
       - 'applications/Agent_Red/src/**'
-      - 'tests/**'
+      - 'platform_tests/**'
       - 'scripts/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
@@ -48,16 +48,16 @@ jobs:
       - name: Ruff check (blocking — E/F only, SPEC-1697)
         # E = pycodestyle errors, F = pyflakes (undefined names, unused imports).
         # These are the highest-signal rules and MUST pass.
-        run: ruff check applications/Agent_Red/src/ tests/ --select E,F --output-format=github
+        run: ruff check applications/Agent_Red/src/ platform_tests/ --select E,F --output-format=github
 
       - name: Ruff check (advisory — all configured rules)
         # Full rule set including I, UP, B, SIM — advisory until backlog cleared.
         continue-on-error: true
-        run: ruff check applications/Agent_Red/src/ tests/ --output-format=github
+        run: ruff check applications/Agent_Red/src/ platform_tests/ --output-format=github
 
       - name: Ruff format check
         continue-on-error: true
-        run: ruff format --check applications/Agent_Red/src/ tests/ --diff
+        run: ruff format --check applications/Agent_Red/src/ platform_tests/ --diff
 
   import-cycles:
     name: Import Cycle Detection (SPEC-1695)
