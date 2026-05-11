@@ -246,6 +246,32 @@ def test_execute_upgrade_updates_manifest_version(tmp_path: Path) -> None:
     assert manifest.scaffold_version == __version__
 
 
+def test_execute_upgrade_update_manifest_false_skips_manifest_write(tmp_path: Path) -> None:
+    """update_manifest=False bypasses the scaffold_version write.
+
+    Per bridge ``gtkb-scaffold-upgrade-tier-a-009.md`` GO. Pairs with
+    :func:`test_execute_upgrade_updates_manifest_version` above which covers
+    the default-behavior (update_manifest=True) path.
+    """
+    from groundtruth_kb.project.manifest import read_manifest
+
+    _write_minimal_toml(tmp_path, version="0.0.1")
+    _setup_git_for_upgrade(tmp_path)
+    execute_upgrade(
+        tmp_path,
+        [],
+        force=False,
+        enforce_isolation=False,
+        update_manifest=False,
+    )
+    manifest = read_manifest(tmp_path / "groundtruth.toml")
+    assert manifest is not None
+    assert manifest.scaffold_version == "0.0.1", (
+        "update_manifest=False must leave scaffold_version unchanged "
+        "so deferred SKIP rows remain visible in subsequent plan_upgrade() calls"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Config-action tests — settings-json and gitignore drift first-class actions
 # (Tier A #2 scanner-safe-writer — see bridge/gtkb-hook-scanner-safe-writer-008.md)

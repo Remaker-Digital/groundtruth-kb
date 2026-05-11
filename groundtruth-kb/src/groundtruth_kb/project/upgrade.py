@@ -1197,6 +1197,7 @@ def execute_upgrade(
     accept_migration: bool = False,
     product_root: Path | None = None,
     enforce_isolation: bool = True,
+    update_manifest: bool = True,
 ) -> list[str]:
     """Execute planned upgrade actions via a payload-branch-and-merge flow.
 
@@ -1226,6 +1227,15 @@ def execute_upgrade(
         product_root: Slice 4 — GT-KB product root for isolation pre-flight
             (used to detect adopter-under-product-root placement violation).
             Defaults to ``Path(__file__).resolve().parents[3]`` when not set.
+        update_manifest: Per bridge ``gtkb-scaffold-upgrade-tier-a-009.md``
+            GO. Defaults True to preserve current behavior. When False,
+            the ``manifest.scaffold_version`` write inside
+            ``_apply_file_actions`` is skipped so ``groundtruth.toml`` is not
+            mutated. Callers that apply a partial action set (e.g. Tier A
+            pure-ADDs + APPEND-GITIGNORE) use ``update_manifest=False`` to
+            keep deferred ``SKIP`` rows visible in subsequent
+            ``plan_upgrade()`` calls. Aligns with
+            ``DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE``.
 
     Raises:
         MalformedSettingsError: malformed ``.claude/settings.json``.
@@ -1303,7 +1313,7 @@ def execute_upgrade(
                 # Track in a separate buffer; merged into results after _apply.
                 pass  # noqa: PIE790
 
-        results = _apply_file_actions(target, actions, force=force)
+        results = _apply_file_actions(target, actions, force=force, update_manifest=update_manifest)
 
         # Surface isolation-fixer rows in the result log for adopter visibility.
         for fr in isolation_fixer_results:
@@ -1379,12 +1389,18 @@ def _apply_file_actions(
     actions: list[UpgradeAction],
     *,
     force: bool = False,
+    update_manifest: bool = True,
 ) -> list[str]:
     """Apply every action in *actions* on the current branch.
 
     Inner file-writing half of :func:`execute_upgrade`. Runs on the
     short-lived payload branch only. No ``.bak`` backups are created — the
     payload branch commit is the authoritative pre-merge snapshot.
+
+    ``update_manifest`` (per bridge ``gtkb-scaffold-upgrade-tier-a-009.md``
+    GO): defaults True to preserve current behavior. When False, the
+    ``manifest.scaffold_version = __version__`` write at the end of this
+    function is skipped so ``groundtruth.toml`` is not mutated.
     """
     templates = get_templates_dir()
     results: list[str] = []
@@ -1428,11 +1444,12 @@ def _apply_file_actions(
         shutil.copy2(template_path, project_path)
         results.append(f"UPDATED {action.file}")
 
-    manifest = read_manifest(target / "groundtruth.toml")
-    if manifest:
-        manifest.scaffold_version = __version__
-        write_manifest(target / "groundtruth.toml", manifest)
-        results.append(f"VERSION scaffold_version → {__version__}")
+    if update_manifest:
+        manifest = read_manifest(target / "groundtruth.toml")
+        if manifest:
+            manifest.scaffold_version = __version__
+            write_manifest(target / "groundtruth.toml", manifest)
+            results.append(f"VERSION scaffold_version → {__version__}")
 
     return results
 
