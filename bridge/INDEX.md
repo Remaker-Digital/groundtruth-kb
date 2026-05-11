@@ -18,12 +18,14 @@ Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
+REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-004.md
 REVISED: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-003.md
 NO-GO: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-002.md
 NEW: bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-001.md
 
 Document: gtkb-role-scope-release-operations-conversion
+GO: bridge/gtkb-role-scope-release-operations-conversion-007.md
 REVISED: bridge/gtkb-role-scope-release-operations-conversion-006.md
 NO-GO: bridge/gtkb-role-scope-release-operations-conversion-005.md
 GO: bridge/gtkb-role-scope-release-operations-conversion-004.md
