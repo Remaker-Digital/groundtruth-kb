@@ -12,9 +12,12 @@
 
 
 Document: gtkb-tests-package-collision-resolution
+REVISED: bridge/gtkb-tests-package-collision-resolution-003.md
+NO-GO: bridge/gtkb-tests-package-collision-resolution-002.md
 NEW: bridge/gtkb-tests-package-collision-resolution-001.md
 
 Document: gtkb-isolation-018-slice-e1-atomic-code-move
+VERIFIED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-020.md
 REVISED: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-019.md
 NO-GO: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-018.md
 NEW: bridge/gtkb-isolation-018-slice-e1-atomic-code-move-017.md
