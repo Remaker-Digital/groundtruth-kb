@@ -9,15 +9,28 @@ Authority: bridge/gtkb-claude-session-start-parity-001.md (Codex GO at -002).
 Repairs the prior defect where `.claude/settings.json` invoked the canonical
 service with `--emit-report --fast-hook` (flat `additionalContext` envelope,
 silently dropped by Claude Code's hook ingestor).
+
+IP-4 (bridge/gtkb-canonical-init-keyword-syntax-001-005.md, Codex GO at -008):
+adds canonical init-keyword recognition via `StartupDecision` enum +
+``_bridge_dispatch_keyword_check`` per
+SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 +
+DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001. The receiver reads its own durable
+role via the two-step authority chain
+(``harness-state/harness-identities.json`` then
+``harness-state/role-assignments.json``) and applies set-membership against
+the keyword mode. Mismatch → silent drop with audit log entry to
+``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 
 PROJECT_ROOT = Path(r"E:\GT-KB")
@@ -27,6 +40,38 @@ STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
 HARNESS_NAME = "claude"
 STARTUP_SERVICE_TIMEOUT_SECONDS = 50.0
 # Parity marker for tests: Role: Prime Builder
+
+# IP-4: canonical init-keyword recognition (receiver side).
+# Per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001: regex matches the first-line
+# activator emitted by the cross-harness trigger; closed vocabulary {pb, lo}.
+_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")
+_BRIDGE_DISPATCH_RUN_ID_ENV = "GTKB_BRIDGE_POLLER_RUN_ID"
+_BRIDGE_DISPATCH_KEYWORD_ENV = "GTKB_BRIDGE_DISPATCH_KEYWORD"
+_LABEL_TO_CANONICAL_MODE = {
+    "prime-builder": "pb",
+    "acting-prime-builder": "pb",
+    "loyal-opposition": "lo",
+}
+# Audit log for misdirected dispatch silent-drops. Shared with the trigger's
+# dispatch-failures path so investigators see all dispatch-related failures
+# in one location.
+DISPATCH_FAILURES_PATH = PROJECT_ROOT / ".gtkb-state" / "bridge-poller" / "dispatch-failures.jsonl"
+
+
+class StartupDecision(Enum):
+    """IP-4 receiver-side decision enum (per bridge -005 IP-4 enum cleanup).
+
+    Five mutually-exclusive paths cover every combination of run-id env-var,
+    canonical-keyword env-var, and own-role-set membership. No two paths
+    share return semantics.
+    """
+
+    NORMAL_STARTUP = "normal_startup"
+    DISPATCH_AUTHORIZED = "dispatch_authorized"
+    SPOOF_FALLBACK = "spoof_fallback"
+    LEGACY_FALLBACK = "legacy_fallback"
+    STRICT_DROP = "strict_drop"
+
 
 sys.path.insert(0, str(PROJECT_ROOT))
 from scripts.harness_identity import resolved_harness_id  # noqa: E402
@@ -101,7 +146,7 @@ def _session_start_payload(context: str) -> dict[str, dict[str, str]]:
 
 
 def _bridge_auto_dispatch_context() -> str | None:
-    run_id = os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID")
+    run_id = os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV)
     if not run_id:
         return None
     return "\n".join(
@@ -121,6 +166,225 @@ def _bridge_auto_dispatch_context() -> str | None:
             "Process only entries whose live latest status is actionable for the durable role.",
             "Preserve the bridge protocol audit trail.",
         ]
+    )
+
+
+def _strict_drop_context(reason: str) -> str:
+    """Emit a clean-exit SessionStart context for misdirected dispatch.
+
+    Per IP-4 of bridge/gtkb-canonical-init-keyword-syntax-001-005.md
+    (Codex GO at -008) and DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001
+    "Mismatch behavior" clause: the session is NOT to treat the prompt as a
+    task; it exits cleanly per the harness's normal "no work to process"
+    path. The returned context tells the receiving model to ignore the
+    prompt without relaying any startup disclosure or dispatch payload.
+    """
+    return "\n".join(
+        [
+            "# GroundTruth-KB Bridge Auto-Dispatch — Misdirected (Silent Drop)",
+            "",
+            f"Reason: {reason}",
+            "",
+            "A cross-harness bridge dispatch arrived with a canonical init-keyword "
+            "mode that does NOT match this harness's durable operating role "
+            "(per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver-side "
+            "set-membership clause).",
+            "Do not relay the normal fresh-session startup disclosure.",
+            "Do not treat the initial prompt as an actionable task.",
+            "Exit this session cleanly without further bridge work.",
+            "An audit-log entry has been written to "
+            "`.gtkb-state/bridge-poller/dispatch-failures.jsonl` so the durable "
+            "role-map drift is investigable.",
+        ]
+    )
+
+
+def _read_first_prompt_line() -> str | None:
+    """Return the canonical first-line keyword passed by the trigger.
+
+    The cross-harness trigger sets ``GTKB_BRIDGE_DISPATCH_KEYWORD`` on the
+    spawned harness's env (per IP-4 companion update to
+    ``scripts/cross_harness_bridge_trigger.py::_spawn_harness``). Claude Code's
+    SessionStart hook stdin does not include user-prompt content, so the env
+    var is the side channel for receiver-side keyword recognition.
+    """
+    raw = os.environ.get(_BRIDGE_DISPATCH_KEYWORD_ENV)
+    if raw is None:
+        return None
+    return raw.strip() or None
+
+
+def _role_modes_from_field(raw_role: object) -> frozenset[str]:
+    if isinstance(raw_role, str):
+        labels = [raw_role]
+    elif isinstance(raw_role, (list, tuple, set, frozenset)):
+        labels = [str(value) for value in raw_role]
+    else:
+        labels = []
+    modes = {
+        _LABEL_TO_CANONICAL_MODE[label.strip().lower()]
+        for label in labels
+        if label and label.strip().lower() in _LABEL_TO_CANONICAL_MODE
+    }
+    return frozenset(modes)
+
+
+def _resolve_own_role_set(project_root: Path = PROJECT_ROOT) -> frozenset[str]:
+    """Resolve this harness's durable role set as canonical modes.
+
+    Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver
+    clause):
+      1. ``harness-state/harness-identities.json`` — resolve own
+         ``HARNESS_NAME`` -> ``harness_id``.
+      2. ``harness-state/role-assignments.json`` — resolve
+         ``harness_id`` -> ``role_label``.
+      3. Convert ``role_label`` to canonical mode via
+         ``_LABEL_TO_CANONICAL_MODE``.
+
+    For the current scalar-role schema the role is treated as a singleton
+    set per IP-5 of the bridge proposal: when a future role-set schema lands,
+    this function returns the native set without changing call sites.
+
+    Raises:
+        ValueError: on unknown role label, missing identity entry, or
+            missing harness in role map. Callers should treat these as
+            "fail-closed treat-as-misdirected" cases.
+    """
+    identities_path = project_root / "harness-state" / "harness-identities.json"
+    role_path = project_root / "harness-state" / "role-assignments.json"
+    identities = json.loads(identities_path.read_text(encoding="utf-8"))
+    own_identity_record = identities.get("harnesses", {}).get(HARNESS_NAME)
+    if not isinstance(own_identity_record, dict) or "id" not in own_identity_record:
+        raise ValueError(
+            f"harness-identities.json missing entry for {HARNESS_NAME!r}"
+        )
+    own_id = own_identity_record["id"]
+    role_map = json.loads(role_path.read_text(encoding="utf-8"))
+    own_role_record = role_map.get("harnesses", {}).get(own_id)
+    if not isinstance(own_role_record, dict) or "role" not in own_role_record:
+        raise ValueError(
+            f"role-assignments.json missing entry for harness ID {own_id!r}"
+        )
+    role_set = _role_modes_from_field(own_role_record["role"])
+    if not role_set:
+        raise ValueError(f"unknown role field: {own_role_record['role']!r}")
+    return role_set
+
+
+def _audit_log_misdirected_dispatch(
+    run_id: str | None,
+    observed_mode: str,
+    role_set: frozenset[str],
+    *,
+    project_root: Path = PROJECT_ROOT,
+    failures_path: Path | None = None,
+) -> None:
+    """Append a JSONL audit record for a silently-dropped misdirected dispatch.
+
+    Per PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001 v2: audit-log on
+    misdirected dispatch makes silent-drop visible to investigators, addressing
+    the S321 incident class where dispatch failures ran undetected for hours.
+    Fire-and-forget: audit-log write failures do not block the silent drop.
+    """
+    target = failures_path or DISPATCH_FAILURES_PATH
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        own_harness_id: str | None
+        try:
+            identities = json.loads(
+                (project_root / "harness-state" / "harness-identities.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            own_harness_id = identities.get("harnesses", {}).get(HARNESS_NAME, {}).get("id")
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            own_harness_id = None
+        record = {
+            "ts": _now_iso(),
+            "kind": "misdirected_dispatch_strict_drop",
+            "run_id": run_id,
+            "expected_role_set": sorted(role_set),
+            "observed_keyword_mode": observed_mode,
+            "own_harness_id": own_harness_id,
+            "own_harness_name": HARNESS_NAME,
+        }
+        with target.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        # Fire-and-forget contract: audit-log failures must not block the drop.
+        pass
+
+
+def _bridge_dispatch_keyword_check(
+    *,
+    project_root: Path = PROJECT_ROOT,
+    failures_path: Path | None = None,
+) -> tuple[StartupDecision, str]:
+    """Decide how SessionStart should treat the incoming session.
+
+    Returns ``(decision, reason)``. The decision drives the emitted
+    SessionStart context.
+
+    Behavior table (per bridge -005 IP-4):
+
+    ============  =========  ====================  ===================  ====================================================
+    env-var       keyword    mode-in-role-set      Decision             Effect
+    ============  =========  ====================  ===================  ====================================================
+    absent        absent     n/a                   NORMAL_STARTUP       normal fresh-session
+    absent        present    n/a                   SPOOF_FALLBACK       warn; normal startup; do NOT bypass
+    present       absent     n/a                   LEGACY_FALLBACK      warn; legacy env-var-only behavior
+    present       present    yes                   DISPATCH_AUTHORIZED  bridge auto-dispatch context emitted
+    present       present    no                    STRICT_DROP          silent drop; audit log; clean exit
+    ============  =========  ====================  ===================  ====================================================
+    """
+    run_id = os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV)
+    first_line = _read_first_prompt_line() or ""
+    keyword_match = _CANONICAL_KEYWORD_RE.match(first_line)
+
+    if not run_id and not keyword_match:
+        return (StartupDecision.NORMAL_STARTUP, "no markers; standard fresh-session")
+    if keyword_match and not run_id:
+        return (
+            StartupDecision.SPOOF_FALLBACK,
+            "keyword without env-var; falling through to normal startup",
+        )
+    if run_id and not keyword_match:
+        return (
+            StartupDecision.LEGACY_FALLBACK,
+            "env-var without keyword; preserving legacy env-var-only dispatch behavior",
+        )
+
+    # Both present.
+    assert keyword_match is not None  # narrow for type checker
+    keyword_mode = keyword_match.group(1)
+    try:
+        own_role_set = _resolve_own_role_set(project_root=project_root)
+    except (FileNotFoundError, OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
+        # Fail-closed: if our own durable role is unreadable, treat the
+        # dispatch as misdirected (cannot prove keyword matches our role).
+        _audit_log_misdirected_dispatch(
+            run_id,
+            keyword_mode,
+            frozenset(),
+            project_root=project_root,
+            failures_path=failures_path,
+        )
+        return (
+            StartupDecision.STRICT_DROP,
+            f"could not resolve own role set: {exc}; treating as misdirected",
+        )
+    if keyword_mode in own_role_set:
+        return (StartupDecision.DISPATCH_AUTHORIZED, "canonical dispatch authorized")
+    _audit_log_misdirected_dispatch(
+        run_id,
+        keyword_mode,
+        own_role_set,
+        project_root=project_root,
+        failures_path=failures_path,
+    )
+    return (
+        StartupDecision.STRICT_DROP,
+        f"keyword mode {keyword_mode!r} not in role set {sorted(own_role_set)!r}; silent drop",
     )
 
 
@@ -163,14 +427,32 @@ def main() -> int:
     stderr_path = OUT_DIR / "last-session-start.err"
     request_started_at = _now_iso()
     _purge_previous_diagnostics(stdout_path, stderr_path)
-    auto_dispatch_context = _bridge_auto_dispatch_context()
-    if auto_dispatch_context is not None:
-        payload = _session_start_payload(auto_dispatch_context)
+    # IP-4: receiver-side StartupDecision dispatch per bridge -005.
+    decision, _reason = _bridge_dispatch_keyword_check()
+    if decision == StartupDecision.STRICT_DROP:
+        # Misdirected dispatch: emit silent-drop context. Audit log already
+        # written by _bridge_dispatch_keyword_check.
+        payload = _session_start_payload(_strict_drop_context(_reason))
         serialized = _dump_payload(payload)
         stdout_path.write_text(serialized, encoding="utf-8")
         stderr_path.write_text("", encoding="utf-8")
         print(serialized)
         return 0
+    if decision in (StartupDecision.DISPATCH_AUTHORIZED, StartupDecision.LEGACY_FALLBACK):
+        # Canonical dispatch or env-var-only legacy dispatch: emit the
+        # bridge auto-dispatch context (today's behavior).
+        auto_dispatch_context = _bridge_auto_dispatch_context()
+        if auto_dispatch_context is not None:
+            payload = _session_start_payload(auto_dispatch_context)
+            serialized = _dump_payload(payload)
+            stdout_path.write_text(serialized, encoding="utf-8")
+            stderr_path.write_text("", encoding="utf-8")
+            print(serialized)
+            return 0
+    # SPOOF_FALLBACK and NORMAL_STARTUP both fall through to the canonical
+    # startup-service path. SPOOF_FALLBACK explicitly refuses to bypass
+    # normal startup on a keyword alone — defense against owner-typed or
+    # otherwise unverified keyword strings.
     command = [
         sys.executable,
         str(STARTUP_SERVICE),

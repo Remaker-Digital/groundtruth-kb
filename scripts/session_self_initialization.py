@@ -412,6 +412,7 @@ NON_TERMINAL_WORK_ITEM_STATUSES = {
 ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
 REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED"}
 PRIME_RESPONSE_BRIDGE_STATUSES = {"GO", "NO-GO"}
+ADVISORY_BRIDGE_STATUSES = {"ADVISORY"}
 PRIORITY_SORT_ORDER = {
     "P0": 0,
     "P1": 1,
@@ -938,7 +939,9 @@ def _project_state_rollup(work_items: list[dict[str, Any]]) -> dict[str, Any]:
             {
                 "project": project_name,
                 "non_terminal_count": len(rows),
-                "status_counts": dict(sorted(Counter(str(row.get("resolution_status") or "none") for row in rows).items())),
+                "status_counts": dict(
+                    sorted(Counter(str(row.get("resolution_status") or "none") for row in rows).items())
+                ),
                 "top_id": str(top.get("id") or ""),
                 "top_title": str(top.get("title") or ""),
                 "top_status": str(top.get("resolution_status") or "none"),
@@ -1108,7 +1111,7 @@ def _bridge_index_latest_status(project_root: Path) -> dict[str, str]:
             continue
         if not current:
             continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+bridge/", line)
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+bridge/", line)
         if match:
             result[current] = match.group(1)
             current = None
@@ -1168,7 +1171,7 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
             continue
         if not current_document:
             continue
-        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/[^\s]+)", line)
+        match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/[^\s]+)", line)
         if not match:
             continue
         entries.append({"document": current_document, "status": match.group(1), "path": match.group(2)})
@@ -1190,6 +1193,7 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
     actionable = [entry for entry in visible_entries if entry["status"] in ACTIONABLE_BRIDGE_STATUSES]
     raw_review_queue = [entry for entry in entries if entry["status"] in REVIEW_QUEUE_BRIDGE_STATUSES]
     raw_prime_response_queue = [entry for entry in entries if entry["status"] in PRIME_RESPONSE_BRIDGE_STATUSES]
+    raw_advisory_entries = [entry for entry in entries if entry["status"] in ADVISORY_BRIDGE_STATUSES]
     return {
         "latest_status_counts": dict(sorted(counts.items())),
         "actionable_count": len(actionable),
@@ -1203,6 +1207,9 @@ def _bridge_metrics(project_root: Path) -> dict[str, Any]:
         "raw_prime_response_queue_by_status": dict(
             sorted(Counter(entry["status"] for entry in raw_prime_response_queue).items())
         ),
+        "raw_advisory_count": len(raw_advisory_entries),
+        "raw_advisory_documents": [entry["document"] for entry in raw_advisory_entries],
+        "raw_advisory_response_paths": ["proposal", "rebuttal", "defer", "candidate-artifact"],
         "scope_counts": dict(sorted(Counter(entry["scope"] for entry in classified).items())),
         "scope_confidence": "gtkb_current_heuristic",
         "source": "bridge/INDEX.md",
@@ -2542,9 +2549,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
         status=_status_from_requirements(
             [
                 (project_root / "tests" / "performance" / "locustfile.py").is_file()
-                or (
-                    project_root / "applications" / "Agent_Red" / "tests" / "performance" / "locustfile.py"
-                ).is_file()
+                or (project_root / "applications" / "Agent_Red" / "tests" / "performance" / "locustfile.py").is_file()
                 or (project_root / "platform_tests" / "performance" / "locustfile.py").is_file(),
                 _dependency_declared(project_root, "locust"),
             ],
@@ -2814,6 +2819,19 @@ def _dashboard_intelligence(
                 "remediation": "Run the dry-run command, review the diff, and apply only with owner approval.",
                 "shortcut": _shortcut("Copy dry-run command", str(upgrade_posture.get("plan_command")), "command"),
                 "source": "GT-KB Upgrade Posture",
+            }
+        )
+    advisory_documents = metrics["contention"].get("raw_advisory_documents", [])
+    if advisory_documents:
+        action_center.append(
+            {
+                "severity": "yellow",
+                "owner_lane": "Prime Builder",
+                "action": "Disposition LO advisory bridge report",
+                "why": "Latest ADVISORY bridge thread(s): " + ", ".join(advisory_documents[:5]),
+                "remediation": "Respond through one permitted path: proposal, rebuttal, defer, or candidate-artifact.",
+                "shortcut": _shortcut("Open bridge index", "bridge/INDEX.md"),
+                "source": "Bridge ADVISORY",
             }
         )
     if dev_environment_inventory.get("health") != "green":
@@ -3556,18 +3574,376 @@ def _session_focus_options(model: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def _render_session_focus_options(options: list[dict[str, str]]) -> str:
+def _render_session_focus_options(options: list[dict[str, str]], model: dict[str, Any] | None = None) -> str:
+    recommendations = _rank_session_focus_options(model, options) if model else []
+    return _render_ranked_session_focus_options(options, recommendations)
+
+
+def _first_sentence(text: str, fallback: str) -> str:
+    clean = " ".join(str(text or "").split()).strip()
+    if not clean:
+        return fallback
+    for delimiter in (". ", "? ", "! "):
+        if delimiter in clean:
+            head = clean.split(delimiter, 1)[0].strip()
+            return f"{head}{delimiter.strip()}"
+    return clean if clean.endswith((".", "?", "!")) else f"{clean}."
+
+
+def _focus_option_by_label(options: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+    return {str(option.get("label") or ""): option for option in options}
+
+
+def _add_focus_signal(
+    scores: dict[str, int],
+    evidence: dict[str, tuple[int, str]],
+    options_by_label: dict[str, dict[str, str]],
+    label: str,
+    points: int,
+    reason: str,
+) -> None:
+    if label not in options_by_label or points <= 0:
+        return
+    scores[label] = scores.get(label, 0) + points
+    current = evidence.get(label)
+    if current is None or points > current[0]:
+        evidence[label] = (points, reason)
+
+
+def _rank_session_focus_options(model: dict[str, Any], options: list[dict[str, str]]) -> list[dict[str, str]]:
+    options_by_label = _focus_option_by_label(options)
+    option_order = {option["label"]: index for index, option in enumerate(options)}
+    metrics = model.get("metrics", {})
+    contention = metrics.get("contention", {})
+    raw_status_counts = contention.get("raw_latest_status_counts", {})
+    infrastructure = model.get("infrastructure", {})
+    integrations = infrastructure.get("testing_service_integrations", {})
+    failing_integrations = [item for item in integrations.values() if item.get("health") == "failing"]
+    unknown_integrations = [
+        item
+        for item in integrations.values()
+        if item.get("health") in {"no_recent_run", "live_state_unavailable", "partial_history"}
+    ]
+    release_blocker_count = int(metrics.get("regression", {}).get("release_blocker_count") or 0)
+    blockers = metrics.get("regression", {}).get("blockers") or []
+    drift_count = int(metrics.get("drift", {}).get("changed_path_count") or 0)
+    startup_candidate_count = int(model.get("startup_pruning", {}).get("candidate_count", 0) or 0)
+    prime_response_count = _protocol_prime_response_queue_count(contention)
+    advisory_count = int(raw_status_counts.get("ADVISORY", 0) or 0)
+    top_actions = model.get("top_priority_actions") or []
+    action_center = model.get("dashboard_intelligence", {}).get("action_center") or []
+    project_rollup = metrics.get("membase", {}).get("project_state_rollup") or {}
+    active_project_count = int(project_rollup.get("active_project_count") or 0)
+    non_terminal_work_items = int(project_rollup.get("non_terminal_work_items") or 0)
+    dev_inventory = infrastructure.get("dev_environment_inventory", {})
+    harness_parity = infrastructure.get("harness_parity", {})
+
+    scores: dict[str, int] = {}
+    evidence: dict[str, tuple[int, str]] = {}
+
+    first_blocker = _sentence_fragment(
+        _first_text(blockers, "release-readiness blocker evidence needs disposition"),
+        "release-readiness blocker evidence needs disposition",
+    )
+    if release_blocker_count:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Resolve Release Blockers",
+            120 + (release_blocker_count * 10),
+            f"Release readiness reports {release_blocker_count} blocker(s); first signal: {first_blocker}.",
+        )
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Clear Stage/Test Release Path",
+            35 + (release_blocker_count * 5),
+            "Release blocker evidence is present; stage/test readiness should converge after blocker disposition.",
+        )
+
+    integration_points = (len(failing_integrations) * 45) + (len(unknown_integrations) * 18)
+    if integration_points:
+        integration_name = _sentence_fragment(
+            (failing_integrations[0] if failing_integrations else unknown_integrations[0]).get("display_name"),
+            "the highest-risk testing integration",
+        )
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Repair Testing/Tool Integrations",
+            95 + integration_points,
+            (
+                f"Testing/tool state reports {len(failing_integrations)} failing and "
+                f"{len(unknown_integrations)} unknown integration(s); first signal: {integration_name}."
+            ),
+        )
+
+    if prime_response_count:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Continue Last Session",
+            110 + (prime_response_count * 8),
+            (
+                f"Live bridge metrics show {prime_response_count} latest GO/NO-GO response"
+                f"{'s' if prime_response_count != 1 else ''} for Prime continuation."
+            ),
+        )
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Top Priority Actions",
+            35 + (prime_response_count * 3),
+            "Prime-actionable bridge responses should be considered alongside standing priorities.",
+        )
+
+    if advisory_count:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Remediate Known Risks",
+            70 + (advisory_count * 10),
+            f"Bridge state includes {advisory_count} ADVISORY thread(s) requiring Prime disposition.",
+        )
+
+    if top_actions:
+        first_action = top_actions[0]
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Top Priority Actions",
+            80 + (len(top_actions) * 5),
+            f"Standing backlog top signal: {first_action.get('id')}: {first_action.get('title')}.",
+        )
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Pick From Standing Backlog",
+            45 + (len(top_actions) * 4),
+            "Standing backlog remains the governed cross-session work authority.",
+        )
+
+    if active_project_count or non_terminal_work_items:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Pick From Standing Backlog",
+            30 + active_project_count + min(non_terminal_work_items, 25),
+            (
+                f"MemBase project rollup shows {active_project_count} active project group(s) "
+                f"and {non_terminal_work_items} non-terminal work item(s)."
+            ),
+        )
+
+    if drift_count:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Clean For Internal Review",
+            35 + min(drift_count, 60),
+            f"Dashboard drift reports {drift_count} changed path(s).",
+        )
+
+    if startup_candidate_count:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Optimize Startup Token Consumption",
+            40 + min(startup_candidate_count * 8, 60),
+            f"Startup pruning found {startup_candidate_count} token-reduction candidate(s).",
+        )
+
+    if dev_inventory.get("health") not in {None, "", "green"}:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Repair Testing/Tool Integrations",
+            30,
+            f"Dev environment inventory health is {dev_inventory.get('health')}; release-safe tooling needs attention.",
+        )
+    if harness_parity.get("health") not in {None, "", "green"}:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Remediate Known Risks",
+            25,
+            f"Harness parity health is {harness_parity.get('health')}; startup/hook drift risk is visible.",
+        )
+
+    if action_center:
+        _add_focus_signal(
+            scores,
+            evidence,
+            options_by_label,
+            "Remediate Known Risks",
+            20 + min(len(action_center) * 3, 30),
+            f"Dashboard action center has {len(action_center)} current action signal(s).",
+        )
+
+    fallback_labels = [
+        "Top Priority Actions",
+        "Continue Last Session",
+        "Pick From Standing Backlog",
+        "Optimize Startup Token Consumption",
+    ]
+    ranked_labels = sorted(
+        options_by_label,
+        key=lambda label: (-(scores.get(label, 0)), option_order.get(label, 1_000_000)),
+    )
+    selected: list[str] = []
+    for label in ranked_labels:
+        if scores.get(label, 0) > 0:
+            selected.append(label)
+        if len(selected) == 3:
+            break
+    for label in fallback_labels:
+        if label in options_by_label and label not in selected:
+            selected.append(label)
+        if len(selected) == 3:
+            break
+    for label in options_by_label:
+        if label not in selected:
+            selected.append(label)
+        if len(selected) == 3:
+            break
+
+    recommendations: list[dict[str, str]] = []
+    for label in selected[:3]:
+        option = options_by_label[label]
+        recommendations.append(
+            {
+                "label": label,
+                "reason": evidence.get(label, (0, option["reason"]))[1],
+                "expected_work": _first_sentence(option.get("prompt", ""), option["reason"]),
+                "score": str(scores.get(label, 0)),
+            }
+        )
+    return recommendations
+
+
+def _render_ranked_session_focus_options(options: list[dict[str, str]], recommendations: list[dict[str, str]]) -> str:
+    if not recommendations:
+        recommendations = [
+            {
+                "label": option["label"],
+                "reason": option["reason"],
+                "expected_work": _first_sentence(option.get("prompt", ""), option["reason"]),
+            }
+            for option in options[:3]
+        ]
     blocks: list[str] = []
-    for index, option in enumerate(options, start=1):
+    for marker, option in zip(("A", "B", "C"), recommendations, strict=False):
         blocks.extend(
             [
-                f"{index}. **{option['label']}**",
-                f"   Current signal: {option['reason']}",
-                f"   Prompt details: {option['prompt']}",
+                f"{marker}. **{option['label']}**",
+                f"   Evidence: {option['reason']}",
+                f"   Expected work: {option['expected_work']}",
                 "",
             ]
         )
+    blocks.extend(
+        [
+            "D. **Full Focus List**",
+            "   Choose any label below; the active role will expand it using the stored prompt details.",
+        ]
+    )
+    for option in options:
+        blocks.append(f"   - {option['label']}")
     return "\n".join(blocks).rstrip()
+
+
+def _compact_top_action_summary(actions: list[dict[str, Any]]) -> str:
+    if not actions:
+        return "none visible"
+    return "; ".join(f"{item.get('id')}: {item.get('title')}" for item in actions[:3])
+
+
+def _render_session_startup_briefing(model: dict[str, Any]) -> str:
+    role = model.get("role", {})
+    metrics = model.get("metrics", {})
+    infrastructure = model.get("infrastructure", {})
+    intelligence = model.get("dashboard_intelligence", {})
+    workstream = model.get("workstream_focus") or {}
+    dashboard_opening = model.get("dashboard_opening", {})
+    contention = metrics.get("contention", {})
+    raw_status_counts = contention.get("raw_latest_status_counts", {})
+    release = intelligence.get("release_readiness", {})
+    quality = intelligence.get("quality_rollup", {})
+    dev_inventory = infrastructure.get("dev_environment_inventory", {})
+    harness_parity = infrastructure.get("harness_parity", {})
+    upgrade_posture = infrastructure.get("gtkb_upgrade_posture", {})
+    rollup = metrics.get("membase", {}).get("project_state_rollup") or {}
+    first_project = (rollup.get("projects") or [{}])[0]
+    first_action = (intelligence.get("action_center") or [{}])[0]
+    dashboard_open_requested = "enabled" if dashboard_opening.get("startup_open_requested") else "disabled"
+    dashboard_open_mode = dashboard_opening.get("mode") or DASHBOARD_OPEN_MODE_HARNESS
+    prime_response_count = _protocol_prime_response_queue_count(contention)
+    review_queue_count = _protocol_review_queue_count(contention)
+    active_subject = _active_subject_label(model)
+
+    project_summary = (
+        f"{rollup.get('active_project_count', 0)} active group(s), "
+        f"{rollup.get('non_terminal_work_items', 0)} non-terminal item(s)"
+    )
+    if first_project:
+        project_summary = f"{project_summary}; top: {_format_project_top_item(first_project)}"
+
+    return "\n".join(
+        [
+            "### Configuration",
+            f"- Work subject: {active_subject}; startup focus: {workstream.get('current_label', 'unknown')}.",
+            f"- Role assignment: {role.get('assumed_role')} from {role.get('role_mapping_source')}.",
+            (
+                f"- Harness: id {role.get('harness_id', 'unidentified')} from "
+                f"{role.get('harness_identity_source', 'unidentified')}; topology "
+                f"`{workstream.get('topology_mode', 'unknown')}`."
+            ),
+            (
+                f"- Dashboard opening: {dashboard_open_requested}; mode `{dashboard_open_mode}`; "
+                f"package {upgrade_posture.get('package_version', 'unknown')}."
+            ),
+            "",
+            "### Operating State",
+            f"- Release blockers: {release.get('blocker_count', metrics.get('regression', {}).get('release_blocker_count'))}.",
+            (
+                f"- Testing/tools: {quality.get('failing', 'unknown')} failing, "
+                f"{quality.get('manual', 'unknown')} manual, "
+                f"{quality.get('ready_or_passing', 'unknown')} ready/passing."
+            ),
+            f"- Dev environment inventory: {_dev_inventory_compact_text(dev_inventory)}",
+            f"- Harness parity: {_harness_parity_compact_text(harness_parity)}",
+            f"- Data freshness: {intelligence.get('data_freshness', {}).get('generated_at', model.get('generated_at'))}.",
+            "",
+            "### Work State",
+            (
+                f"- File bridge: generated-time latest NEW/REVISED={review_queue_count}; "
+                f"latest GO/NO-GO for Prime={prime_response_count}; "
+                f"latest ADVISORY={raw_status_counts.get('ADVISORY', 0) or 0}. "
+                "Live `bridge/INDEX.md` remains authoritative after generation."
+            ),
+            f"- MemBase project rollup: {project_summary}.",
+            f"- Standing backlog top priorities: {_compact_top_action_summary(model.get('top_priority_actions') or [])}.",
+            f"- Drift changed paths: {metrics.get('drift', {}).get('changed_path_count')}.",
+            (
+                "- Action center first signal: "
+                f"{first_action.get('action', 'none visible')}"
+                f"{' - ' + str(first_action.get('why')) if first_action.get('why') else ''}."
+            ),
+        ]
+    )
 
 
 def _is_loyal_opposition_model(model: dict[str, Any]) -> bool:
@@ -3722,10 +4098,7 @@ def _format_project_top_item(project: dict[str, Any]) -> str:
     priority_text = f", {priority}" if priority else ""
     order = project.get("top_order")
     order_text = f", order {order}" if order not in (None, "") else ""
-    return (
-        f"`{project.get('top_id')}` - {title} "
-        f"[{project.get('top_status')}{priority_text}{order_text}]"
-    )
+    return f"`{project.get('top_id')}` - {title} [{project.get('top_status')}{priority_text}{order_text}]"
 
 
 def _render_project_state_rollup(model: dict[str, Any]) -> str:
@@ -4077,11 +4450,15 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
     else:
         session_focus_options = _session_focus_options(model)
         startup_task_section = [
-            "## Choose This Session's Focus",
+            "## Session Startup",
             "",
-            "Reply with the number or exact label. Each option is generated from the current dashboard evidence.",
+            _render_session_startup_briefing(model),
             "",
-            _render_session_focus_options(session_focus_options),
+            "### Recommended Session Focus",
+            "",
+            "Reply with A, B, C, D, or an exact label from the full focus list. Each recommendation is generated from current startup evidence.",
+            "",
+            _render_session_focus_options(session_focus_options, model),
             "",
             "Or provide a prompt for something else.",
         ]
@@ -5729,6 +6106,17 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         "### Fresh-Session Input Semantics",
         "",
         _render_fresh_session_input_semantics(model),
+        "",
+        "### Codex Operating Resource Map",
+        "",
+        "- Resource authority: live project files under `E:\\GT-KB` are canonical; session overlays and generated startup/dashboard summaries are routing context only.",
+        "- Role authority: resolve `harness-state/harness-identities.json` first, then `harness-state/role-assignments.json`; role records may be list-valued role sets.",
+        "- Bridge authority: read `bridge/INDEX.md` directly before bridge queue claims; generated bridge counts are non-authoritative after startup generation.",
+        "- Work subject authority: `.claude/session/work-subject.json`; GT-KB infrastructure is default unless owner direction names an application/adopter.",
+        "- Knowledge surfaces: use `groundtruth.db`, `memory/work_list.md`, `memory/release-readiness.md`, `.claude/rules/`, `.codex/skills/`, and `docs/gtkb-dashboard/session-startup-report.md` as targeted context sources.",
+        "- Hook handling: Codex hook `systemMessage` and `additionalContext` are operational instructions; if a hook blocks, read the cited guard/state file and clear stale lifecycle state only through the governed hook path.",
+        "- Token consumption: prefer dashboard and index-first reads, then load detailed artifacts only when needed for the selected task.",
+        "- Verification defaults: use repository-native commands such as `python -m pytest <target> -q --tb=short`, `python -m ruff check .`, and targeted parity checks before claiming startup/hook changes are fixed.",
     ]
     loyal_opposition_context: list[str] = []
     if _is_loyal_opposition_model(model):
@@ -5760,11 +6148,11 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             f"- Generated: {model['generated_at']}",
             "- User-visible startup content below was generated programmatically by the startup service.",
             startup_relay_instruction,
-            "- Do not summarize, paraphrase, shorten, reorder, or omit any startup section or any session-focus option detail.",
-            "- Preserve every generated heading, bullet, numbered item, `Current signal`, and `Prompt details` line exactly as written.",
+            "- Do not summarize, paraphrase, shorten, reorder, or omit any startup section or any Session Startup focus-selector detail.",
+            "- Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label exactly as written.",
             (
                 f"- Prime Builder focus-menu preservation rule: when the startup message contains a session-focus menu, "
-                f"all {focus_option_count} numbered options must remain present in order with their per-option summaries intact."
+                f"the A/B/C recommendations and D full focus list must remain present; the full focus list must include all {focus_option_count} labels in order."
             ),
             "- The first durable assistant answer should be the startup disclosure itself, not a meta-summary about the startup disclosure.",
             "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the startup disclosure and wait for the next message; on no-match, process the prompt as normal task content. The startup disclosure is generated at SessionStart time and cached for lazy injection by the matcher; it is not unconditionally relayed.",

@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-05-11T19:03:26Z
+Generated: 2026-05-12T20:11:05Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8)
 
 ## Project
@@ -13,7 +13,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986
 ## Redaction
 
 - Status: pass
-- Sensitive local environment entries detected: 2
+- Sensitive local environment entries detected: 1
 - Public output excludes raw credential values, local-only key names, and absolute local paths.
 
 ## Toolchain
@@ -44,10 +44,10 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:f413f61da41ee2f98bb1b1f5986
 
 | Harness | Role | Assignment Status | Configured/Verified Capabilities |
 |---|---|---|---:|
-| claude | prime-builder | verified | 14 |
+| claude | prime-builder | configured | 14 |
 | codex | prime-builder | configured | 16 |
 | claude | loyal-opposition | configured | 14 |
-| codex | loyal-opposition | verified | 16 |
+| codex | loyal-opposition | configured | 16 |
 
 ## Verification
 

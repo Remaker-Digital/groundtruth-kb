@@ -20,12 +20,14 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from scripts._session_init_keyword import InitKeywordMatch, match_init_keyword
     from scripts.harness_roles import (
         DEFAULT_HARNESS_IDS,
         ROLE_ACTING_PRIME_BUILDER,
         ROLE_ASSIGNMENTS_RELATIVE_PATH,
         ROLE_LOYAL_OPPOSITION,
         ROLE_PRIME_BUILDER,
+        _normalize_role_field,
         current_prime_ids,
         load_role_assignments,
         role_assignments_path,
@@ -39,12 +41,14 @@ try:
         resolved_harness_id as _resolved_harness_id_from_roles,
     )
 except ImportError:  # pragma: no cover - direct script execution path
+    from _session_init_keyword import InitKeywordMatch, match_init_keyword  # type: ignore[no-redef]
     from harness_roles import (  # type: ignore[no-redef]
         DEFAULT_HARNESS_IDS,
         ROLE_ACTING_PRIME_BUILDER,
         ROLE_ASSIGNMENTS_RELATIVE_PATH,
         ROLE_LOYAL_OPPOSITION,
         ROLE_PRIME_BUILDER,
+        _normalize_role_field,
         current_prime_ids,
         load_role_assignments,
         role_assignments_path,
@@ -91,6 +95,7 @@ OPERATING_ROLE_RELATIVE_PATH = ROLE_ASSIGNMENTS_RELATIVE_PATH
 LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-guard.json"
 STARTUP_REPORT_RELATIVE_PATH = Path("docs") / "gtkb-dashboard" / "session-startup-report.md"
 DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
+STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
@@ -246,6 +251,18 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
+def _parse_iso8601(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
 def _project_root_from_env() -> Path:
     return Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
 
@@ -367,6 +384,7 @@ def _canonical_default(project_root: Path | None = None) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "current_subject": DEFAULT_SUBJECT,
+        "application_id": None,
         "updated_at": None,
         "updated_by": "default",
         "source": "startup default",
@@ -430,6 +448,7 @@ def load_state(project_root: Path | None = None) -> dict[str, Any]:
         for key in (
             "schema_version",
             "current_subject",
+            "application_id",
             "updated_at",
             "updated_by",
             "source",
@@ -466,6 +485,7 @@ def save_state(
     *,
     updated_by: str = "owner_prompt",
     source: str | None = None,
+    application_id: str | None = None,
 ) -> dict[str, Any]:
     """Persist the canonical work-subject state under ``.claude/session/work-subject.json``."""
 
@@ -476,6 +496,7 @@ def save_state(
     state.update(
         {
             "current_subject": focus,
+            "application_id": application_id if focus == FOCUS_APPLICATION else None,
             "updated_at": _now_iso(),
             "updated_by": updated_by,
             "source": source or _infer_source(updated_by),
@@ -852,38 +873,72 @@ def detect_counterpart_state(project_root: Path | None = None) -> dict[str, Any]
     current_harness = _resolved_harness_name()
     current_harness_id = _resolved_harness_id(root)
     role_document = load_role_assignments(root, assignment_path)
-    per_harness_roles: dict[str, str] = {}
+    # Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014),
+    # role records carry a role-set (list-of-strings wire form). Build a
+    # per-harness map of role-set values rather than scalar role values so
+    # downstream set-membership comparisons work for both singleton sets
+    # (multi-harness topology) and multi-element sets (single-harness mode).
+    per_harness_role_sets: dict[str, frozenset[str]] = {}
     harnesses = role_document.get("harnesses", {})
     if isinstance(harnesses, dict):
         for harness_id, record in harnesses.items():
             if not isinstance(record, dict):
                 continue
-            role = str(record.get("role") or "").strip().lower()
-            if role not in TOGGLEABLE_ROLE_PROFILES:
+            role_set = _normalize_role_field(record.get("role"))
+            # Keep records whose role-set has any toggleable role; the legacy
+            # check considered acting-prime-builder a valid toggle role too.
+            if not (role_set & TOGGLEABLE_ROLE_PROFILES):
                 continue
             harness_type = str(record.get("harness_type") or harness_id).strip().lower()
-            per_harness_roles[harness_type] = role
+            per_harness_role_sets[harness_type] = role_set
 
     counterpart_present = any(
-        harness != current_harness and harness in per_harness_roles for harness in DEFAULT_HARNESS_IDS
+        harness != current_harness and harness in per_harness_role_sets for harness in DEFAULT_HARNESS_IDS
     )
+
+    def _role_set_display_label(role_set: frozenset[str]) -> str:
+        """Render a role-set for warning text.
+
+        Singleton sets display as the bare token (preserves the legacy scalar
+        log shape that tests pin on). Multi-element sets display as
+        ``+`` -separated sorted tokens so single-harness mode warnings remain
+        unambiguous.
+        """
+        tokens = sorted(role_set & TOGGLEABLE_ROLE_PROFILES)
+        if not tokens:
+            return ""
+        if len(tokens) == 1:
+            return tokens[0]
+        return "+".join(tokens)
 
     warnings: list[str] = []
     same_role_slot = False
-    if current_harness and current_harness in per_harness_roles:
-        our_role = per_harness_roles[current_harness]
-        for harness, role in per_harness_roles.items():
+    if current_harness and current_harness in per_harness_role_sets:
+        our_role_set = per_harness_role_sets[current_harness]
+        our_label = _role_set_display_label(our_role_set)
+        for harness, role_set in per_harness_role_sets.items():
             if harness == current_harness:
                 continue
-            if role == our_role and role in TOGGLEABLE_ROLE_PROFILES:
+            # Two distinct harnesses sharing any toggleable role token =
+            # same-role-slot conflict (the existing semantic). Set-membership
+            # generalizes the prior scalar equality cleanly; the warning text
+            # lists the overlapping role tokens explicitly.
+            overlap = (role_set & our_role_set) & TOGGLEABLE_ROLE_PROFILES
+            their_label = _role_set_display_label(role_set)
+            if overlap:
                 same_role_slot = True
+                overlap_label = "+".join(sorted(overlap))
                 warnings.append(
-                    f"both `{current_harness}` and `{harness}` have role=`{role}` "
+                    f"both `{current_harness}` and `{harness}` have role=`{overlap_label}` "
                     "— counterpart bridge roles may collide; verify harness-state/role-assignments.json."
                 )
-            elif role != our_role and role in TOGGLEABLE_ROLE_PROFILES and our_role in TOGGLEABLE_ROLE_PROFILES:
+            elif (
+                role_set & TOGGLEABLE_ROLE_PROFILES
+                and our_role_set & TOGGLEABLE_ROLE_PROFILES
+                and not overlap
+            ):
                 warnings.append(
-                    f"`{current_harness}` is `{our_role}`; counterpart `{harness}` is `{role}`. "
+                    f"`{current_harness}` is `{our_label}`; counterpart `{harness}` is `{their_label}`. "
                     "Treat bridge message authority per harness-state/role-assignments.json."
                 )
 
@@ -980,26 +1035,113 @@ def system_message_for_state(state: dict[str, Any], *, changed: bool = False) ->
     )
 
 
+_CANONICAL_DISPATCH_INIT_RE = re.compile(r"^::init\s+gtkb\s+(?:pb|lo)\s*$", re.IGNORECASE)
+
+
+def _match_startup_init_keyword(prompt: str) -> InitKeywordMatch | None:
+    match = match_init_keyword(prompt)
+    if match is not None:
+        return match
+    if _CANONICAL_DISPATCH_INIT_RE.match(prompt.strip()):
+        return InitKeywordMatch(app_scope="gtkb", mode="default")
+    return None
+
+
+def _set_work_subject_from_init_match(
+    init_match: InitKeywordMatch,
+    project_root: Path | None = None,
+) -> str | None:
+    if init_match.app_scope == "gtkb":
+        save_state(
+            FOCUS_GTKB_INFRASTRUCTURE,
+            project_root,
+            updated_by="startup_init_keyword",
+            source="startup init keyword",
+        )
+        return FOCUS_GTKB_INFRASTRUCTURE
+    if init_match.app_scope == "agent_red":
+        save_state(
+            FOCUS_APPLICATION,
+            project_root,
+            updated_by="startup_init_keyword",
+            source="startup init keyword",
+            application_id="agent_red",
+        )
+        return FOCUS_APPLICATION
+    return None
+
+
+def _startup_diagnostic_dir(project_root: Path | None = None) -> Path:
+    root = (project_root or _project_root_from_env()).resolve()
+    harness_name = _resolved_harness_name()
+    if harness_name == "codex":
+        return root / ".codex" / "gtkb-hooks"
+    if harness_name == "claude":
+        return root / ".claude" / "hooks"
+    return root / ".codex" / "gtkb-hooks"
+
+
+def _extract_user_visible_startup(context: str) -> str:
+    marker = "## User-Visible Startup Message"
+    if marker in context:
+        return context.split(marker, 1)[1].strip()
+    return context.strip()
+
+
+def _cached_startup_disclosure(project_root: Path | None = None) -> str | None:
+    root = (project_root or _project_root_from_env()).resolve()
+    candidates = [
+        _startup_diagnostic_dir(root) / "last-session-start.json",
+        root / "docs" / "gtkb-dashboard" / "session-startup-report.md",
+    ]
+    for path in candidates:
+        try:
+            text = path.read_text(encoding="utf-8-sig")
+        except OSError:
+            continue
+        if path.suffix.lower() == ".json":
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            hook_output = payload.get("hookSpecificOutput") if isinstance(payload, dict) else None
+            context = hook_output.get("additionalContext") if isinstance(hook_output, dict) else None
+            if isinstance(context, str) and context.strip():
+                return _extract_user_visible_startup(context)
+            continue
+        if text.strip():
+            return text.strip()
+    return None
+
+
 def _startup_gate_message() -> str:
     report_path = STARTUP_REPORT_RELATIVE_PATH.as_posix()
     return (
         "GTKB STARTUP INPUT GATE (init-keyword match): the prompt matched the init keyword "
         "(per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 and DCL-SESSION-START-INIT-KEYWORD-MATCHING-001) "
         "so the startup disclosure relay path is active. "
-        "Render the role-appropriate startup disclosure already generated for this session and wait for the next owner message. "
+        "Render the cached role-appropriate startup disclosure included in this additionalContext when present and wait for the next owner message. "
         f"If the SessionStart payload is unavailable, read `{report_path}` from the project root and relay that startup disclosure. "
         "After presenting the disclosure, stop and wait for Mike's next message. "
         "Do not use tools, change files, or map session focus on this disclosure-relay turn."
     )
 
 
-def _startup_gate_response() -> dict[str, Any]:
+def _startup_gate_response(project_root: Path | None = None) -> dict[str, Any]:
     message = _startup_gate_message()
+    cached_disclosure = _cached_startup_disclosure(project_root)
+    additional_context = message
+    if cached_disclosure:
+        additional_context = (
+            f"{message}\n\n"
+            "## Cached User-Visible Startup Message\n\n"
+            f"{cached_disclosure}"
+        )
     return {
         "systemMessage": message,
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
-            "additionalContext": message,
+            "additionalContext": additional_context,
         },
     }
 
@@ -1010,6 +1152,7 @@ def _consume_discard_first_prompt_gate(prompt: str, project_root: Path | None = 
         return None
 
     trimmed_prompt = " ".join(prompt.strip().split())
+    init_match = _match_startup_init_keyword(prompt)
     if state.get("first_wrapup_suppressed") is True and state.get("startup_response_pending") is not True:
         state.update(
             {
@@ -1023,6 +1166,21 @@ def _consume_discard_first_prompt_gate(prompt: str, project_root: Path | None = 
         _write_lifecycle_guard(state, project_root)
         return None
 
+    if init_match is None:
+        state.update(
+            {
+                "discard_next_user_prompt": False,
+                "startup_prompt_discarded": False,
+                "startup_response_pending": False,
+                "startup_gate_no_match_passed_through": True,
+                "startup_gate_no_match_at": _now_iso(),
+                "startup_prompt_preview": trimmed_prompt[:160],
+            }
+        )
+        _write_lifecycle_guard(state, project_root)
+        return None
+
+    current_subject = _set_work_subject_from_init_match(init_match, project_root)
     state.update(
         {
             "discard_next_user_prompt": False,
@@ -1030,10 +1188,14 @@ def _consume_discard_first_prompt_gate(prompt: str, project_root: Path | None = 
             "startup_prompt_discarded_at": _now_iso(),
             "startup_prompt_preview": trimmed_prompt[:160],
             "startup_response_pending": True,
+            "startup_init_app_scope": init_match.app_scope,
+            "startup_init_mode": init_match.mode,
         }
     )
+    if current_subject is not None:
+        state["current_subject"] = current_subject
     _write_lifecycle_guard(state, project_root)
-    return _startup_gate_response()
+    return _startup_gate_response(project_root)
 
 
 def _clear_startup_response_pending_for_followup(project_root: Path | None = None) -> None:
@@ -1051,7 +1213,23 @@ def _clear_startup_response_pending_for_followup(project_root: Path | None = Non
 
 def _startup_response_pending(project_root: Path | None = None) -> bool:
     state = _read_lifecycle_guard(project_root)
-    return state.get("startup_response_pending") is True
+    if state.get("startup_response_pending") is not True:
+        return False
+    started_at = _parse_iso8601(state.get("startup_prompt_discarded_at") or state.get("armed_at"))
+    if started_at is None:
+        return True
+    age_seconds = (datetime.now(UTC) - started_at).total_seconds()
+    if age_seconds <= STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS:
+        return True
+    state.update(
+        {
+            "startup_response_pending": False,
+            "stale_startup_response_pending_cleared": True,
+            "stale_startup_response_pending_cleared_at": _now_iso(),
+        }
+    )
+    _write_lifecycle_guard(state, project_root)
+    return False
 
 
 def _normalize_relative_path(path_text: str, project_root: Path | None = None) -> str:

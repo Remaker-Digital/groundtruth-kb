@@ -19,6 +19,15 @@
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 
+Document: gtkb-session-startup-project
+VERIFIED: bridge/gtkb-session-startup-project-007.md
+VERIFIED: bridge/gtkb-session-startup-project-006.md
+REVISED: bridge/gtkb-session-startup-project-005.md
+NO-GO: bridge/gtkb-session-startup-project-004.md
+NEW: bridge/gtkb-session-startup-project-003.md
+GO: bridge/gtkb-session-startup-project-002.md
+NEW: bridge/gtkb-session-startup-project-001.md
+
 Document: gtkb-artifact-recorder-cli-slice-1-deliberations-record
 NO-GO: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-004.md
 REVISED: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-003.md
@@ -341,6 +350,16 @@ NO-GO: bridge/gtkb-role-session-lifecycle-simplification-002.md
 NEW: bridge/gtkb-role-session-lifecycle-simplification-001.md
 
 Document: gtkb-single-harness-bridge-dispatcher-001
+VERIFIED: bridge/gtkb-single-harness-bridge-dispatcher-001-022.md
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-021.md
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-020.md
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-019.md
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-018.md
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-017.md
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-016.md
+NEW: bridge/gtkb-single-harness-bridge-dispatcher-001-015.md
+GO: bridge/gtkb-single-harness-bridge-dispatcher-001-014.md
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-012.md
 REVISED: bridge/gtkb-single-harness-bridge-dispatcher-001-011.md
 NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-010.md
@@ -355,6 +374,10 @@ NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-001-002.md
 NEW: bridge/gtkb-single-harness-bridge-dispatcher-001.md
 
 Document: gtkb-canonical-init-keyword-syntax-001
+VERIFIED: bridge/gtkb-canonical-init-keyword-syntax-001-012.md
+REVISED: bridge/gtkb-canonical-init-keyword-syntax-001-011.md
+NO-GO: bridge/gtkb-canonical-init-keyword-syntax-001-010.md
+NEW: bridge/gtkb-canonical-init-keyword-syntax-001-009.md
 GO: bridge/gtkb-canonical-init-keyword-syntax-001-008.md
 REVISED: bridge/gtkb-canonical-init-keyword-syntax-001-007.md
 NO-GO: bridge/gtkb-canonical-init-keyword-syntax-001-006.md

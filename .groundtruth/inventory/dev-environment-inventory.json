@@ -5,7 +5,7 @@
     "script_hash": "sha256:f413f61da41ee2f98bb1b1f5986358e7d0c1dde2c45daa28bc26794d6aa429e8",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-05-11T19:03:26Z",
+  "generated_at": "2026-05-12T20:11:05Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -57,12 +57,10 @@
     "role_assignments": {
       "A": {
         "harness_type": "codex",
-        "role": "loyal-opposition",
-        "status": "verified"
-      },
-      "B": {
-        "harness_type": "claude",
-        "role": "prime-builder",
+        "role": [
+          "loyal-opposition",
+          "prime-builder"
+        ],
         "status": "verified"
       }
     }
@@ -97,7 +95,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 2,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -244,11 +242,11 @@
   "role_by_harness_compatibility": [
     {
       "assignment": {
-        "current_role": "prime-builder",
+        "current_role": "unknown",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "B",
         "matrix_role": "prime-builder",
-        "status": "verified"
+        "status": "configured"
       },
       "capabilities": {
         "browser_automation": {
@@ -321,7 +319,7 @@
     },
     {
       "assignment": {
-        "current_role": "loyal-opposition",
+        "current_role": "['loyal-opposition', 'prime-builder']",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -398,7 +396,7 @@
     },
     {
       "assignment": {
-        "current_role": "prime-builder",
+        "current_role": "unknown",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "B",
         "matrix_role": "loyal-opposition",
@@ -475,11 +473,11 @@
     },
     {
       "assignment": {
-        "current_role": "loyal-opposition",
+        "current_role": "['loyal-opposition', 'prime-builder']",
         "evidence": "harness-state/harness-identities.json + harness-state/role-assignments.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
-        "status": "verified"
+        "status": "configured"
       },
       "capabilities": {
         "browser_automation": {

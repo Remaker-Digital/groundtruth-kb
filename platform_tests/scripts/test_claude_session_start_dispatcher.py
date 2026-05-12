@@ -1,6 +1,8 @@
 """Tests for the Claude SessionStart hook dispatcher.
 
 Authority: bridge/gtkb-claude-session-start-parity-001.md (Codex GO at -002).
+IP-4 extension authority: bridge/gtkb-canonical-init-keyword-syntax-001-005.md
+(Codex GO at -008) — adds StartupDecision enum-path coverage per IP-8 surface 4.
 
 Verifies:
 - Dispatcher emits a properly-shaped SessionStart `hookSpecificOutput` envelope
@@ -19,15 +21,20 @@ Verifies:
   (Change 3 — harness-parity import repair).
 - Dispatcher fails soft and emits a degraded-banner fallback when the
   startup service is unreachable.
+- IP-4 StartupDecision enum has five distinct paths covering every
+  combination of env-var, keyword, and own-role-set membership
+  (`DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001` receiver clause).
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -40,19 +47,29 @@ CODEX_HOOKS = PROJECT_ROOT / ".codex" / "hooks.json"
 STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 
 
+_BRIDGE_DISPATCH_ENV_VARS = frozenset(
+    {"GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_BRIDGE_DISPATCH_KEYWORD"}
+)
+
+
 def _run_dispatcher(env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     """Invoke the SessionStart dispatcher in a hermetic env by default.
 
-    Per Slice 4 NO-GO -018 F1: when `env` is None, the default environment
-    strips `GTKB_BRIDGE_POLLER_RUN_ID` from the inherited process env so
-    normal-startup tests stay deterministic in bridge auto-dispatched
-    review sessions (where the trigger sets the marker for its child
-    harness). Tests that intentionally exercise the bridge auto-dispatch
-    branch (e.g. `test_bridge_auto_dispatch_context_bypasses_interactive_startup`)
-    continue to pass an explicit `env` containing the marker.
+    Per Slice 4 NO-GO -018 F1 and IP-4 of
+    bridge/gtkb-canonical-init-keyword-syntax-001 (NO-GO at -010 F1): when
+    `env` is None, the default environment strips BOTH bridge-dispatch markers
+    (``GTKB_BRIDGE_POLLER_RUN_ID`` and ``GTKB_BRIDGE_DISPATCH_KEYWORD``) from
+    the inherited process env so normal-startup tests stay deterministic in
+    bridge auto-dispatched review sessions (where the trigger sets both
+    markers for its child harness). Tests that intentionally exercise the
+    bridge auto-dispatch branch must pass an explicit `env` containing the
+    relevant marker(s) themselves; inheriting the parent shell's markers is
+    a hermeticity defect that Codex's NO-GO at -010 surfaced.
     """
     if env is None:
-        env = {k: v for k, v in os.environ.items() if k != "GTKB_BRIDGE_POLLER_RUN_ID"}
+        env = {
+            k: v for k, v in os.environ.items() if k not in _BRIDGE_DISPATCH_ENV_VARS
+        }
     return subprocess.run(
         [sys.executable, str(DISPATCHER)],
         cwd=str(PROJECT_ROOT),
@@ -109,13 +126,25 @@ def test_envelope_contains_token_budget_content() -> None:
 def test_bridge_auto_dispatch_context_bypasses_interactive_startup() -> None:
     """Bridge poller dispatch sessions must process the initial prompt.
 
-    The verified smart poller launches headless harnesses with
-    ``GTKB_BRIDGE_POLLER_RUN_ID`` in the environment. In that mode the
-    SessionStart hook must not emit interactive fresh-session semantics that
-    cause Codex to discard the auto-dispatch prompt as a startup stimulus.
+    The verified smart poller (and now the cross-harness event-driven trigger)
+    launches headless harnesses with ``GTKB_BRIDGE_POLLER_RUN_ID`` in the
+    environment. In that mode the SessionStart hook must not emit interactive
+    fresh-session semantics that cause Codex/Claude to discard the auto-dispatch
+    prompt as a startup stimulus.
+
+    Per IP-4 of bridge/gtkb-canonical-init-keyword-syntax-001 (Codex GO at -008):
+    this test pins the LEGACY_FALLBACK enum path -- env-var present, canonical
+    keyword absent. The hermetic env explicitly strips
+    ``GTKB_BRIDGE_DISPATCH_KEYWORD`` from any inherited parent state so the test
+    is deterministic in bridge auto-dispatched review sessions where the
+    parent's keyword env var would otherwise leak in (per Codex NO-GO at -010 F1).
+    The DISPATCH_AUTHORIZED canonical-keyword-matching path is covered by
+    ``test_dispatch_authorized_when_env_and_matching_keyword``.
     """
-    env = dict(os.environ)
+    env = {k: v for k, v in os.environ.items() if k not in _BRIDGE_DISPATCH_ENV_VARS}
     env["GTKB_BRIDGE_POLLER_RUN_ID"] = "test-run-001"
+    # Explicitly do NOT set GTKB_BRIDGE_DISPATCH_KEYWORD: this test asserts
+    # the LEGACY_FALLBACK path (env-var-only legacy dispatch behavior).
 
     result = _run_dispatcher(env=env)
     assert result.returncode == 0, f"dispatcher non-zero exit: {result.stderr}"
@@ -250,3 +279,220 @@ def test_dispatcher_fallback_on_broken_startup_service(tmp_path: Path, capsys: p
     ctx = payload["hookSpecificOutput"]["additionalContext"]
     assert "Startup Service Degraded" in ctx
     assert "Dashboard" in ctx
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# IP-4 StartupDecision enum-path tests
+#
+# Authority: bridge/gtkb-canonical-init-keyword-syntax-001-005.md IP-8 surface 4
+# (Codex GO at -008). T-CIK-claude-receiver-decisions in the spec-derived test
+# plan. Each enum value MUST be reached for the matching env/keyword/role
+# combination per the IP-4 behavior table.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _load_claude_hook_isolated(name_suffix: str) -> ModuleType:
+    """Load Claude hook with unique sys.modules key for IP-4 enum-path tests."""
+    name = f"claude_session_start_dispatch_ip4_{name_suffix}"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, DISPATCHER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _write_harness_state(
+    project_root: Path,
+    *,
+    claude_role: str = "prime-builder",
+    codex_role: str = "loyal-opposition",
+) -> None:
+    """Write durable harness-state fixtures with the requested role assignments."""
+    harness_state = project_root / "harness-state"
+    harness_state.mkdir(parents=True, exist_ok=True)
+    (harness_state / "harness-identities.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "claude": {"id": "B"},
+                    "codex": {"id": "A"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (harness_state / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "B": {"role": claude_role, "harness_type": "claude"},
+                    "A": {"role": codex_role, "harness_type": "codex"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_startup_decision_enum_has_five_distinct_values() -> None:
+    """IP-4 enum cleanup — five mutually-exclusive decision values."""
+    hook = _load_claude_hook_isolated("enum_values")
+    values = {d.value for d in hook.StartupDecision}
+    expected = {
+        "normal_startup",
+        "dispatch_authorized",
+        "spoof_fallback",
+        "legacy_fallback",
+        "strict_drop",
+    }
+    assert values == expected, (
+        f"StartupDecision values drifted: got {values!r}, expected {expected!r}"
+    )
+
+
+def test_normal_startup_when_no_env_no_keyword(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No env-var, no keyword -> NORMAL_STARTUP (Claude side)."""
+    _write_harness_state(tmp_path)
+    hook = _load_claude_hook_isolated("normal_startup")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+    assert decision == hook.StartupDecision.NORMAL_STARTUP
+
+
+def test_dispatch_authorized_when_env_and_matching_keyword(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env-var + keyword + mode-in-role-set -> DISPATCH_AUTHORIZED (Claude side).
+
+    Claude hosts prime-builder; mode 'pb' must be authorized.
+    """
+    _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
+    hook = _load_claude_hook_isolated("dispatch_auth")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-auth")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
+
+
+def test_dispatch_authorized_when_role_record_is_multi_role_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Single-harness role-set schema: Claude can authorize either role mode."""
+    _write_harness_state(
+        tmp_path,
+        claude_role=["loyal-opposition", "prime-builder"],
+        codex_role="loyal-opposition",
+    )
+    hook = _load_claude_hook_isolated("dispatch_auth_role_set")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-auth-role-set")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
+
+
+def test_spoof_fallback_when_keyword_without_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """keyword present, env-var absent -> SPOOF_FALLBACK (Claude side).
+
+    Defends against an owner-typed keyword without the trigger's
+    accompanying env var.
+    """
+    _write_harness_state(tmp_path)
+    hook = _load_claude_hook_isolated("spoof_fallback")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+    assert decision == hook.StartupDecision.SPOOF_FALLBACK
+
+
+def test_legacy_fallback_when_env_without_keyword(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env-var present, keyword absent -> LEGACY_FALLBACK (Claude side).
+
+    Preserves backward compat with older trigger versions that did not
+    set the canonical keyword env var alongside the run-id env var.
+    """
+    _write_harness_state(tmp_path)
+    hook = _load_claude_hook_isolated("legacy_fallback")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-legacy")
+    monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+    assert decision == hook.StartupDecision.LEGACY_FALLBACK
+
+
+def test_strict_drop_when_mode_not_in_own_role_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env-var + keyword + mode-NOT-in-role-set -> STRICT_DROP + audit log
+    (Claude side).
+
+    Claude has durable role 'prime-builder' ({'pb'}); a dispatch with
+    keyword 'lo' must be silently dropped with an audit log entry.
+    """
+    _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
+    hook = _load_claude_hook_isolated("strict_drop")
+    failures_path = tmp_path / "dispatch-failures.jsonl"
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-misdirect")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
+    decision, _reason = hook._bridge_dispatch_keyword_check(
+        project_root=tmp_path, failures_path=failures_path
+    )
+    assert decision == hook.StartupDecision.STRICT_DROP
+
+    # Audit log written with structured fields.
+    assert failures_path.is_file()
+    lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert lines
+    record = json.loads(lines[-1])
+    assert record["kind"] == "misdirected_dispatch_strict_drop"
+    assert record["observed_keyword_mode"] == "lo"
+    assert record["expected_role_set"] == ["pb"]
+    assert record["own_harness_name"] == "claude"
+    assert record["own_harness_id"] == "B"
+
+
+def test_strict_drop_on_unreadable_role_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If own durable role is unreadable, treat dispatch as misdirected
+    (Claude side).
+
+    Fail-closed semantic: cannot prove keyword matches our role -> drop.
+    """
+    # Intentionally do NOT write harness-state files.
+    hook = _load_claude_hook_isolated("unreadable_role")
+    failures_path = tmp_path / "dispatch-failures.jsonl"
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-unreadable")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
+    decision, reason = hook._bridge_dispatch_keyword_check(
+        project_root=tmp_path, failures_path=failures_path
+    )
+    assert decision == hook.StartupDecision.STRICT_DROP
+    assert "could not resolve own role set" in reason
+
+
+def test_claude_hook_has_envelope_parity_constants() -> None:
+    """The Claude hook must expose the same IP-4 constants the Codex hook
+    exposes (regex, env var names, decision enum, dispatch-failures path).
+    """
+    hook = _load_claude_hook_isolated("envelope_parity")
+    assert hook._CANONICAL_KEYWORD_RE.pattern == r"^::init gtkb (pb|lo)$"
+    assert hook._BRIDGE_DISPATCH_RUN_ID_ENV == "GTKB_BRIDGE_POLLER_RUN_ID"
+    assert hook._BRIDGE_DISPATCH_KEYWORD_ENV == "GTKB_BRIDGE_DISPATCH_KEYWORD"
+    assert hook._LABEL_TO_CANONICAL_MODE == {
+        "prime-builder": "pb",
+        "acting-prime-builder": "pb",
+        "loyal-opposition": "lo",
+    }
+    failures_path = str(hook.DISPATCH_FAILURES_PATH).replace("\\", "/")
+    assert ".gtkb-state/bridge-poller/dispatch-failures.jsonl" in failures_path

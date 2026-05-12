@@ -8,8 +8,17 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "session_self_initialization.py"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_lifecycle_guard_env(tmp_path, monkeypatch) -> None:
+    """Keep startup generator tests away from live harness input-gate state."""
+
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "session-lifecycle-guard.json"))
 
 
 def _load_module():
@@ -258,6 +267,69 @@ def test_prime_focus_top_priority_uses_go_no_go_bridge_signal() -> None:
     assert "NEW/REVISED" not in top_priority["reason"]
 
 
+def test_session_focus_recommendations_rank_release_blockers_first() -> None:
+    module = _load_module()
+    model = {
+        "metrics": {
+            "regression": {"release_blocker_count": 2, "blockers": ["release gate stale"]},
+            "drift": {"changed_path_count": 0},
+            "contention": {"raw_latest_status_counts": {}},
+            "membase": {"project_state_rollup": {}},
+        },
+        "dashboard_intelligence": {"risk_register": [], "action_center": []},
+        "startup_pruning": {},
+        "token_reduction_options": [],
+        "infrastructure": {"testing_service_integrations": {}},
+        "top_priority_actions": [],
+    }
+
+    recommendations = module._rank_session_focus_options(model, module._session_focus_options(model))
+
+    assert [item["label"] for item in recommendations][:2] == [
+        "Resolve Release Blockers",
+        "Clear Stage/Test Release Path",
+    ]
+    assert "release gate stale" in recommendations[0]["reason"]
+
+
+def test_session_focus_recommendations_rank_live_bridge_and_integrations() -> None:
+    module = _load_module()
+    model = {
+        "metrics": {
+            "regression": {"release_blocker_count": 0, "blockers": []},
+            "drift": {"changed_path_count": 0},
+            "contention": {
+                "raw_latest_status_counts": {"GO": 2, "NO-GO": 1},
+                "raw_prime_response_queue_count": 3,
+            },
+            "membase": {"project_state_rollup": {}},
+        },
+        "dashboard_intelligence": {"risk_register": [], "action_center": []},
+        "startup_pruning": {},
+        "token_reduction_options": [],
+        "infrastructure": {
+            "testing_service_integrations": {
+                "github": {"health": "failing", "display_name": "GitHub Actions", "remediation": "repair CI"}
+            }
+        },
+        "top_priority_actions": [{"id": "GTKB-ENV-INVENTORY-001", "title": "Harness inventory"}],
+    }
+
+    recommendations = module._rank_session_focus_options(model, module._session_focus_options(model))
+    rendered = module._render_session_focus_options(module._session_focus_options(model), model)
+
+    assert [item["label"] for item in recommendations][:3] == [
+        "Repair Testing/Tool Integrations",
+        "Continue Last Session",
+        "Top Priority Actions",
+    ]
+    assert "A. **Repair Testing/Tool Integrations**" in rendered
+    assert "B. **Continue Last Session**" in rendered
+    assert "C. **Top Priority Actions**" in rendered
+    assert "D. **Full Focus List**" in rendered
+    assert "   - Push staged-and-tested build to production, then smoke test" in rendered
+
+
 def test_startup_model_discovers_durable_operating_role() -> None:
     module = _load_module()
     discovered_role = module.discover_role_profile(REPO_ROOT)
@@ -272,11 +344,13 @@ def test_startup_model_discovers_durable_operating_role() -> None:
     assert "role-assignments.json" in model["role"]["role_mapping_source"]
     if discovered_role == "loyal-opposition":
         assert "## Loyal Opposition Startup Task" not in report
-        assert "## Choose This Session's Focus" not in report
+        assert "## Session Startup" not in report
     else:
         assert "## Loyal Opposition Startup Task" not in report
-        assert "## Choose This Session's Focus" in report
-        assert "13. **Continue Last Session**" in report
+        assert "## Session Startup" in report
+        assert "### Recommended Session Focus" in report
+        assert "D. **Full Focus List**" in report
+        assert "   - Continue Last Session" in report
 
 
 def test_fast_hook_startup_model_skips_optional_live_network_probes(monkeypatch) -> None:
@@ -374,7 +448,7 @@ def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() ->
     expected_root = REPO_ROOT / "harness-state"
 
     # Constant-level invariant: the authority root resolves under PROJECT_ROOT.
-    assert module.GTKB_HARNESS_STATE_ROOT == expected_root
+    assert expected_root == module.GTKB_HARNESS_STATE_ROOT
     for harness_name in ("codex", "claude"):
         assert module.HARNESS_LIFECYCLE_GUARDS[harness_name].is_relative_to(expected_root)
     assert module.DEFAULT_USER_STARTUP_PREFERENCES_PATH.is_relative_to(expected_root)
@@ -542,6 +616,9 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     prime_context = module._startup_service_context({"report_text": prime_report, "model": prime_model})
     assert "## Session Startup Instructions" in prime_context
     assert "### Fresh-Session Input Semantics" in prime_context
+    assert "### Codex Operating Resource Map" in prime_context
+    assert "role records may be list-valued role sets" in prime_context
+    assert "read `bridge/INDEX.md` directly before bridge queue claims" in prime_context
     assert "routes the first owner message through the init-keyword matcher" in prime_context
     assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in prime_context
     assert "on no-match, process the prompt as normal task content" in prime_context
@@ -659,7 +736,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert model["role"]["role_mapping_source"] == "harness-state/role-assignments.json"
     assert model["role"]["harness_id"] == "B"
     assert "## Loyal Opposition Startup Task" not in report
-    assert "## Choose This Session's Focus" not in report
+    assert "## Session Startup" not in report
     assert "### Project State Rollup" in report
     assert "MemBase table: current_work_items" in report
     assert "active projects:" in report
@@ -1009,11 +1086,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in report_text
     assert "Three Top Priority Actions" not in report_text
     assert "Would you like to proceed with established priority actions? (Y/N)" not in report_text
-    assert "Choose This Session's Focus" in report_text
-    assert "Reply with the number or exact label" in report_text
+    assert "Session Startup" in report_text
+    assert "Recommended Session Focus" in report_text
+    assert "Reply with A, B, C, D" in report_text
     assert "Optimize Startup Token Consumption" in report_text
-    assert "Use this reduction set:" in report_text
-    assert "Use the dashboard link before loading large artifacts into context" in report_text
     assert "Top Priority Actions" in report_text
     assert "GTKB-GOV-006" not in report_text
     assert "GTKB-GOV-007" not in report_text
@@ -1021,8 +1097,8 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert top_action_ids
     for action_id in top_action_ids:
         assert action_id in report_text
-    assert "Current signal:" in report_text
-    assert "Prompt details:" in report_text
+    assert "Evidence:" in report_text
+    assert "Expected work:" in report_text
     assert "Resolve Release Blockers" in report_text
     assert "Repair Testing/Tool Integrations" in report_text
     assert "Remediate Known Risks" in report_text
@@ -1030,15 +1106,16 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "Continue Last Session" in report_text
     assert "Clean For Internal Review" in report_text
     assert "Pick From Standing Backlog" in report_text
-    assert "9. **Commit and push to GitHub**" in report_text
-    assert "10. **Merge to main, build and push to the staging environment**" in report_text
-    assert "11. **Execute end-to-end tests in the staging environment**" in report_text
-    assert "12. **Push staged-and-tested build to production, then smoke test**" in report_text
-    assert "13. **Continue Last Session**" in report_text
+    assert "D. **Full Focus List**" in report_text
+    assert "   - Commit and push to GitHub" in report_text
+    assert "   - Merge to main, build and push to the staging environment" in report_text
+    assert "   - Execute end-to-end tests in the staging environment" in report_text
+    assert "   - Push staged-and-tested build to production, then smoke test" in report_text
+    assert "   - Continue Last Session" in report_text
     assert "Or provide a prompt for something else." in report_text
     assert "Startup Focus Input Gate" not in report_text
     assert "Skills, Plug-ins, Directives, And Hooks" not in report_text
-    assert report_text.index("## Startup Disclosure") < report_text.index("## Choose This Session's Focus")
+    assert report_text.index("## Startup Disclosure") < report_text.index("## Session Startup")
     assert "Proactive Session Wrap-Up" in wrapup_text
     assert "should not have to explicitly instruct GT-KB" in wrapup_text
     assert ".claude/skills/kb-session-wrap/SKILL.md" in wrapup_text
@@ -1173,24 +1250,24 @@ def test_emit_report_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in context
     assert "## Three Top Priority Actions" not in context
     assert "Would you like to proceed with established priority actions? (Y/N)" not in context
-    assert "## Choose This Session's Focus" in context
+    assert "## Session Startup" in context
+    assert "### Recommended Session Focus" in context
     assert "Optimize Startup Token Consumption" in context
-    assert "Use this reduction set:" in context
-    assert "Use the dashboard link before loading large artifacts into context" in context
     assert "Top Priority Actions" in context
     assert "GTKB-GOV-006" not in context
     assert "GTKB-GOV-007" not in context
-    assert "Current signal:" in context
-    assert "Prompt details:" in context
+    assert "Evidence:" in context
+    assert "Expected work:" in context
     assert "Resolve Release Blockers" in context
     assert "Continue Last Session" in context
-    assert "9. **Commit and push to GitHub**" in context
-    assert "12. **Push staged-and-tested build to production, then smoke test**" in context
-    assert "13. **Continue Last Session**" in context
+    assert "D. **Full Focus List**" in context
+    assert "   - Commit and push to GitHub" in context
+    assert "   - Push staged-and-tested build to production, then smoke test" in context
+    assert "   - Continue Last Session" in context
     assert "Or provide a prompt for something else." in context
     assert "## Startup Focus Input Gate" not in context
     assert "## Skills, Plug-ins, Directives, And Hooks" not in context
-    assert context.index("## Startup Disclosure") < context.index("## Choose This Session's Focus")
+    assert context.index("## Startup Disclosure") < context.index("## Session Startup")
 
 
 def test_emit_startup_service_payload_returns_full_codex_session_start_contract(tmp_path, capsys, monkeypatch) -> None:
@@ -1235,10 +1312,10 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "relay the generated startup message verbatim as the first durable assistant answer" in context
     assert "Do not summarize, paraphrase, shorten, reorder, or omit any startup section" in context
     assert (
-        "Preserve every generated heading, bullet, numbered item, `Current signal`, and `Prompt details` line"
+        "Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label"
         in context
     )
-    assert "all 13 numbered options must remain present in order with their per-option summaries intact" in context
+    assert "the A/B/C recommendations and D full focus list must remain present" in context
     assert "The first durable assistant answer should be the startup disclosure itself" in context
     assert "routes the first owner message through the init-keyword matcher" in context
     assert "The startup disclosure is generated at SessionStart time and cached for lazy injection" in context
@@ -1250,8 +1327,9 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "The AI harness is not responsible for composing role, mode, bridge, process, or focus content" in context
     assert "## User-Visible Startup Message" in context
     assert "## Startup Disclosure" in context
-    assert "## Choose This Session's Focus" in context
-    assert "13. **Continue Last Session**" in context
+    assert "## Session Startup" in context
+    assert "D. **Full Focus List**" in context
+    assert "   - Continue Last Session" in context
     assert "Startup First-Response Directive" not in context
     assert "Mandatory Direct Live Bridge Index Read" not in context
     assert "SHA-256:" not in context
@@ -1264,6 +1342,46 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert any(item["source"] == "bridge/INDEX.md" for item in freshness["required_local_sources"])
     assert any(item["source"] == "GitHub Actions via gh" for item in freshness["live_probes"])
     assert freshness["repo"]["sha"]
+
+
+def test_startup_payload_tests_do_not_touch_live_lifecycle_guards(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    live_guard_paths = [
+        REPO_ROOT / "harness-state" / "codex" / "session-lifecycle-guard.json",
+        REPO_ROOT / "harness-state" / "claude" / "session-lifecycle-guard.json",
+    ]
+    before = {path: path.read_text(encoding="utf-8") if path.exists() else None for path in live_guard_paths}
+    sandbox_guard = Path(os.environ["GTKB_LIFECYCLE_GUARD_PATH"])
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
+    monkeypatch.setattr(
+        module,
+        "_write_dashboard_pdf",
+        lambda dashboard_path, pdf_path: {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "PDF export skipped by test.",
+        },
+    )
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-startup-service-payload",
+            "--fast-hook",
+            "--skip-bridge-maintenance",
+        ]
+    )
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out)["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    assert sandbox_guard.exists()
+    after = {path: path.read_text(encoding="utf-8") if path.exists() else None for path in live_guard_paths}
+    assert after == before
 
 
 def test_emit_report_arms_first_prompt_discard_gate(tmp_path, capsys, monkeypatch) -> None:
@@ -1385,13 +1503,13 @@ def test_emit_report_ignores_forced_role_profile_and_uses_durable_toggle(tmp_pat
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
     assert "Role being assumed: Prime Builder" in context
-    assert "## Choose This Session's Focus" in context
+    assert "## Session Startup" in context
     assert "## Loyal Opposition Startup Task" not in context
 
 
 def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
-    discovered_role = module.discover_role_profile(REPO_ROOT)
+    discovered_role = module.discover_role_profile(REPO_ROOT, harness_name="claude")
     monkeypatch.setattr(
         module,
         "_write_dashboard_pdf",
@@ -1449,10 +1567,13 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     assert "Harness self-identification: B" in context
     assert "Harness identity source: harness-state/harness-identities.json" in context
     if discovered_role == "loyal-opposition":
-        assert "## Harness-Only Loyal Opposition Startup Action" in context
-        user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
-        assert "## Loyal Opposition Startup Task" not in user_visible_context
-        assert "## Choose This Session's Focus" not in context
+        if "## User-Visible Startup Message" in context:
+            assert "## Harness-Only Loyal Opposition Startup Action" in context
+            user_visible_context = context.split("## User-Visible Startup Message", 1)[1]
+            assert "## Loyal Opposition Startup Task" not in user_visible_context
+        else:
+            assert "## Harness-Only Loyal Opposition Startup Action" not in context
+        assert "## Session Startup" not in context
         assert "Commit and push to GitHub" not in context
         assert guard_path.exists()
         guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
@@ -1460,9 +1581,9 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
         assert guard_state["suppress_next_wrapup"] is False
     else:
         assert "## Loyal Opposition Startup Task" not in context
-        assert "## Choose This Session's Focus" in context
-        assert "9. **Commit and push to GitHub**" in context
-        assert "13. **Continue Last Session**" in context
+        assert "## Session Startup" in context
+        assert "   - Commit and push to GitHub" in context
+        assert "   - Continue Last Session" in context
         assert guard_path.exists()
         guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
         assert guard_state["discard_next_user_prompt"] is True
@@ -1628,23 +1749,22 @@ def test_fast_hook_skips_expensive_history_and_pdf_paths(tmp_path, capsys, monke
     assert "Would you like to optimize token consumption now or defer to the next session? (Y/N)" not in context
     assert "## Three Top Priority Actions" not in context
     assert "Would you like to proceed with established priority actions? (Y/N)" not in context
-    assert "## Choose This Session's Focus" in context
+    assert "## Session Startup" in context
     assert "Optimize Startup Token Consumption" in context
-    assert "Use this reduction set:" in context
-    assert "Use the dashboard link before loading large artifacts into context" in context
     assert "Top Priority Actions" in context
     assert "GTKB-GOV-006" not in context
     assert "GTKB-GOV-007" not in context
-    assert "Current signal:" in context
-    assert "Prompt details:" in context
+    assert "Evidence:" in context
+    assert "Expected work:" in context
     assert "Continue Last Session" in context
-    assert "9. **Commit and push to GitHub**" in context
-    assert "12. **Push staged-and-tested build to production, then smoke test**" in context
-    assert "13. **Continue Last Session**" in context
+    assert "D. **Full Focus List**" in context
+    assert "   - Commit and push to GitHub" in context
+    assert "   - Push staged-and-tested build to production, then smoke test" in context
+    assert "   - Continue Last Session" in context
     assert "Or provide a prompt for something else." in context
     assert "## Startup Focus Input Gate" not in context
     assert "## Skills, Plug-ins, Directives, And Hooks" not in context
-    assert context.index("## Startup Disclosure") < context.index("## Choose This Session's Focus")
+    assert context.index("## Startup Disclosure") < context.index("## Session Startup")
     history = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert history
     assert all(row["scope_confidence"] != "gtkb_inferred" for row in history)
@@ -1989,8 +2109,7 @@ def test_smart_poller_section_returns_empty_after_retirement(tmp_path) -> None:
     for role_name in ("Prime Builder", "Loyal Opposition", "Some Other Role"):
         role = {"assumed_role": role_name}
         assert module._render_smart_poller_section(tmp_path, role) == [], (
-            f"_render_smart_poller_section must be empty for role {role_name!r} "
-            f"post-Slice-4 retirement"
+            f"_render_smart_poller_section must be empty for role {role_name!r} post-Slice-4 retirement"
         )
 
 
@@ -2397,8 +2516,7 @@ def test_t_compat_3_acting_prime_profile_renders_compatibility_label() -> None:
         "legacy/compatibility framing per the Acting-Prime Compatibility Contract."
     )
     assert "compatibility" in profile["role_assignment"].lower(), (
-        "acting-prime-builder profile 'role_assignment' must reference the "
-        "compatibility framing."
+        "acting-prime-builder profile 'role_assignment' must reference the compatibility framing."
     )
     assert "not a new role-switch target" in profile["role_assignment"].lower(), (
         "acting-prime-builder profile must clarify it is not a role-switch target."
