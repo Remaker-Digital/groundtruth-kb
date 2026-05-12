@@ -60,12 +60,74 @@ def _write_lock(state_dir: Path, role: str, mtime_offset_seconds: float = 0.0) -
     return lock
 
 
-def _make_minimal_index(tmp_path: Path) -> Path:
-    """Create a minimal project root with bridge/INDEX.md + groundtruth.toml.
+def _make_test_target_pb(trigger_module):
+    """Construct a test DispatchTarget for the prime-builder role.
 
-    The trigger needs both to resolve project_root and produce actionable
-    pending entries. We point at the real GT-KB INDEX by symlink-equivalent
-    via copying a minimal valid INDEX with one Prime-actionable entry.
+    Per IP-3a of bridge/gtkb-canonical-init-keyword-syntax-001-007.md (Codex
+    GO at -008). Default fixture mirrors live install: harness B is Claude
+    holding prime-builder; canonical mode is 'pb'.
+    """
+    return trigger_module.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+    )
+
+
+def _make_test_target_lo(trigger_module):
+    """Construct a test DispatchTarget for the loyal-opposition role.
+
+    Default fixture: harness A is Codex holding loyal-opposition; canonical
+    mode is 'lo'.
+    """
+    return trigger_module.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+    )
+
+
+def _write_harness_state_fixtures(project_root: Path) -> None:
+    """Write harness-state/role-assignments.json + harness-identities.json.
+
+    Required by run_trigger's IP-3b call to _resolve_dispatch_target. Default
+    fixture: claude=B=prime-builder, codex=A=loyal-opposition (mirrors live
+    install).
+    """
+    harness_state = project_root / "harness-state"
+    harness_state.mkdir(parents=True, exist_ok=True)
+    (harness_state / "harness-identities.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "claude": {"id": "B"},
+                    "codex": {"id": "A"},
+                },
+            }
+        )
+    )
+    (harness_state / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "B": {"role": "prime-builder", "harness_type": "claude"},
+                    "A": {"role": "loyal-opposition", "harness_type": "codex"},
+                },
+            }
+        )
+    )
+
+
+def _make_minimal_index(tmp_path: Path) -> Path:
+    """Create a minimal project root with bridge/INDEX.md + groundtruth.toml + harness-state.
+
+    The trigger needs all three to resolve project_root, produce actionable
+    pending entries, and resolve dispatch targets via the durable role/identity
+    records (IP-3b authority chain).
     """
     project_root = tmp_path / "project"
     bridge_dir = project_root / "bridge"
@@ -80,6 +142,8 @@ def _make_minimal_index(tmp_path: Path) -> Path:
     # Bridge files referenced by INDEX.md must exist for the parser.
     (bridge_dir / "test-suppression-fixture-002.md").write_text("GO\nFixture content.\n")
     (bridge_dir / "test-suppression-fixture-001.md").write_text("NEW\nFixture content.\n")
+    # IP-3b: harness-state fixtures required by _resolve_dispatch_target.
+    _write_harness_state_fixtures(project_root)
     return project_root
 
 
@@ -90,21 +154,21 @@ def _make_minimal_index(tmp_path: Path) -> Path:
 
 def test_check_counterpart_active_lock_absent_returns_false(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-counterpart-absent-dispatches (predicate level)."""
-    assert trigger_module.check_counterpart_active("prime", tmp_path) is False
-    assert trigger_module.check_counterpart_active("codex", tmp_path) is False
+    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
+    assert trigger_module.check_counterpart_active(_make_test_target_lo(trigger_module), tmp_path) is False
 
 
 def test_check_counterpart_active_lock_present_fresh_returns_true(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-counterpart-active-suppresses (predicate level): lock present + fresh mtime."""
     # recipient="prime" looks for active-claude-session.lock (the harness behind Prime).
     _write_lock(tmp_path, "claude")
-    assert trigger_module.check_counterpart_active("prime", tmp_path) is True
+    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is True
 
 
 def test_check_counterpart_active_lock_stale_returns_false(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-counterpart-stale-overrides-via-sanity-ttl: lock older than 120s is treated as orphaned."""
     _write_lock(tmp_path, "claude", mtime_offset_seconds=-500)  # 500s old
-    assert trigger_module.check_counterpart_active("prime", tmp_path) is False
+    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
 
 
 def test_check_counterpart_active_sanity_ttl_default_is_120s(trigger_module, tmp_path: Path, monkeypatch) -> None:
@@ -112,29 +176,51 @@ def test_check_counterpart_active_sanity_ttl_default_is_120s(trigger_module, tmp
     monkeypatch.delenv("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", raising=False)
     # Lock 119s old (within 120s default): active.
     _write_lock(tmp_path, "claude", mtime_offset_seconds=-119)
-    assert trigger_module.check_counterpart_active("prime", tmp_path) is True
+    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is True
 
 
 def test_check_counterpart_active_sanity_ttl_env_var_overrides(trigger_module, tmp_path: Path, monkeypatch) -> None:
     """Operators can override the 120s default for tuning."""
     monkeypatch.setenv("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "30")
     _write_lock(tmp_path, "claude", mtime_offset_seconds=-60)  # 60s old, > 30s ttl
-    assert trigger_module.check_counterpart_active("prime", tmp_path) is False
+    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
 
 
-def test_check_counterpart_active_recipient_codex_checks_codex_lock(trigger_module, tmp_path: Path) -> None:
-    """recipient='codex' looks for active-codex-session.lock, not active-claude-session.lock."""
+def test_check_counterpart_active_target_loyal_opposition_checks_codex_lock(trigger_module, tmp_path: Path) -> None:
+    """Per IP-3b: target with command_handle='codex' (loyal-opposition role) looks for active-codex-session.lock."""
     _write_lock(tmp_path, "codex")
-    assert trigger_module.check_counterpart_active("codex", tmp_path) is True
-    # Without a Claude lock, prime check returns False.
-    assert trigger_module.check_counterpart_active("prime", tmp_path) is False
+    assert trigger_module.check_counterpart_active(_make_test_target_lo(trigger_module), tmp_path) is True
+    # Without a Claude lock, prime-builder check returns False (looks for active-claude-session.lock).
+    assert trigger_module.check_counterpart_active(_make_test_target_pb(trigger_module), tmp_path) is False
 
 
-def test_check_counterpart_active_unknown_recipient_returns_false(trigger_module, tmp_path: Path) -> None:
-    """An unknown recipient name should NOT cause silent suppression of every dispatch."""
-    _write_lock(tmp_path, "claude")
+def test_check_counterpart_active_target_after_role_switch_lock_resolution(trigger_module, tmp_path: Path) -> None:
+    """Per IP-3b suppression-preservation: under role-switch the lock check follows the resolved command handle.
+
+    Fixture: claude=loyal-opposition, codex=prime-builder (role-switched from default).
+    needed_role_label='prime-builder' resolves to command_handle='codex' → checks active-codex-session.lock.
+    needed_role_label='loyal-opposition' resolves to command_handle='claude' → checks active-claude-session.lock.
+
+    This proves the legacy ``_counterpart_role`` recipient-handle map is gone; the lock-resolution
+    follows the durable identity record so role-switch propagates correctly.
+    """
+    switched_pb = trigger_module.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="pb",
+    )
+    switched_lo = trigger_module.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="lo",
+    )
+    # Plant codex lock; prime-builder dispatch (now codex-handed) should suppress.
     _write_lock(tmp_path, "codex")
-    assert trigger_module.check_counterpart_active("unknown", tmp_path) is False
+    assert trigger_module.check_counterpart_active(switched_pb, tmp_path) is True
+    # No claude lock; loyal-opposition dispatch (now claude-handed) should NOT suppress.
+    assert trigger_module.check_counterpart_active(switched_lo, tmp_path) is False
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +257,7 @@ def test_run_trigger_counterpart_active_records_suppressed_not_dispatched(
 
     result = _run_trigger_dry(trigger_module, project_root, state_dir)
 
-    prime_state = result["dispatch_state"]["recipients"]["prime"]
+    prime_state = result["dispatch_state"]["recipients"]["prime-builder"]
     assert prime_state["last_result"] == "counterpart_active_session_present"
     assert prime_state["last_suppressed_signature"] is not None
     # last_dispatched_signature was not set on this fire (None or absent).
@@ -198,7 +284,7 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
     # Step A: counterpart active.
     claude_lock = _write_lock(state_dir, "claude")
     result_a = _run_trigger_dry(trigger_module, project_root, state_dir)
-    prime_state_a = result_a["dispatch_state"]["recipients"]["prime"]
+    prime_state_a = result_a["dispatch_state"]["recipients"]["prime-builder"]
     assert prime_state_a["last_result"] == "counterpart_active_session_present"
     suppressed_sig = prime_state_a["last_suppressed_signature"]
     assert suppressed_sig is not None
@@ -207,7 +293,7 @@ def test_run_trigger_retry_after_counterpart_exits(trigger_module, tmp_path: Pat
     claude_lock.unlink()
     # Same INDEX content → same signature.
     result_b = _run_trigger_dry(trigger_module, project_root, state_dir)
-    prime_state_b = result_b["dispatch_state"]["recipients"]["prime"]
+    prime_state_b = result_b["dispatch_state"]["recipients"]["prime-builder"]
     # Dispatch branch entered. In dry_run, _spawn_harness returns
     # {"launched": False, "reason": "dry_run"}, and last_result becomes
     # "launch_failed" because launched is False. The critical assertion is
@@ -235,13 +321,13 @@ def test_run_trigger_dedup_still_works_after_real_dispatch(trigger_module, tmp_p
     state_dir.mkdir()
     # No counterpart lock → dispatch branch.
     result_a = _run_trigger_dry(trigger_module, project_root, state_dir)
-    prime_state_a = result_a["dispatch_state"]["recipients"]["prime"]
+    prime_state_a = result_a["dispatch_state"]["recipients"]["prime-builder"]
     dispatched_sig = prime_state_a["last_dispatched_signature"]
     assert dispatched_sig is not None
 
     # Same INDEX content → same signature → "unchanged".
     result_b = _run_trigger_dry(trigger_module, project_root, state_dir)
-    prime_state_b = result_b["dispatch_state"]["recipients"]["prime"]
+    prime_state_b = result_b["dispatch_state"]["recipients"]["prime-builder"]
     assert prime_state_b["last_result"] == "unchanged"
     # last_dispatched_signature unchanged.
     assert prime_state_b["last_dispatched_signature"] == dispatched_sig
@@ -263,7 +349,7 @@ def test_run_trigger_suppressed_cleared_after_dispatch(trigger_module, tmp_path:
 
     claude_lock.unlink()
     result = _run_trigger_dry(trigger_module, project_root, state_dir)
-    prime_state = result["dispatch_state"]["recipients"]["prime"]
+    prime_state = result["dispatch_state"]["recipients"]["prime-builder"]
     assert prime_state["last_suppressed_signature"] is None
 
 
@@ -281,7 +367,7 @@ def test_run_trigger_legacy_signature_field_preserved_during_suppression(
     # First dispatch (no counterpart) sets legacy signature.
     _run_trigger_dry(trigger_module, project_root, state_dir)
     state_first = json.loads((state_dir / "dispatch-state.json").read_text())
-    legacy_sig_first = state_first["recipients"]["prime"]["signature"]
+    legacy_sig_first = state_first["recipients"]["prime-builder"]["signature"]
     assert legacy_sig_first is not None
 
     # Now plant counterpart lock; subsequent fires should suppress without
@@ -297,7 +383,7 @@ def test_run_trigger_legacy_signature_field_preserved_during_suppression(
 
     _run_trigger_dry(trigger_module, project_root, state_dir)
     state_second = json.loads((state_dir / "dispatch-state.json").read_text())
-    legacy_sig_second = state_second["recipients"]["prime"]["signature"]
+    legacy_sig_second = state_second["recipients"]["prime-builder"]["signature"]
     # Legacy signature should be UNCHANGED because suppression must not touch it.
     assert legacy_sig_second == legacy_sig_first
 

@@ -55,6 +55,7 @@ import subprocess
 import sys
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -157,6 +158,53 @@ def _load_dispatch_state(state_dir: Path) -> dict[str, Any]:
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
     return raw if isinstance(raw, dict) else {}
+
+
+# IP-3c: dispatch-state-key migration.
+#
+# Legacy keys in dispatch-state.json's recipients map are ``"prime"`` and
+# ``"codex"`` (hardcoded by the smart-poller and pre-canonical-init-keyword
+# trigger code). New keys are durable role labels ``"prime-builder"`` and
+# ``"loyal-opposition"`` per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
+#
+# Migration plan:
+#   - Backward-compat read via ``_migrate_recipients_state_keys``: legacy
+#     keys are translated to new keys on read so in-memory state uses only
+#     new keys.
+#   - Forward writes use only new keys; legacy keys disappear from the
+#     file after the first dispatch cycle.
+#   - One-shot migration; subsequent runs operate purely on new keys.
+LEGACY_TO_NEW_STATE_KEY = {
+    "prime": "prime-builder",
+    "codex": "loyal-opposition",
+}
+
+
+def _migrate_recipients_state_keys(recipients: dict[str, Any]) -> dict[str, Any]:
+    """Translate legacy state-keys to durable role labels on read.
+
+    Per IP-3c of bridge/gtkb-canonical-init-keyword-syntax-001-007.md
+    (Codex GO at -008): legacy ``"prime"`` and ``"codex"`` recipient keys
+    map to ``"prime-builder"`` and ``"loyal-opposition"`` respectively.
+    Defensive merge: if both legacy and new forms coexist transitionally,
+    prefer the newer ``last_dispatched_at`` (or fall through to legacy
+    on missing timestamp).
+    """
+    migrated: dict[str, Any] = {}
+    for key, value in recipients.items():
+        new_key = LEGACY_TO_NEW_STATE_KEY.get(key, key)
+        if not isinstance(value, dict):
+            migrated[new_key] = value
+            continue
+        if new_key in migrated and isinstance(migrated[new_key], dict):
+            existing = migrated[new_key]
+            existing_ts = str(existing.get("updated_at") or "")
+            value_ts = str(value.get("updated_at") or "")
+            if value_ts > existing_ts:
+                migrated[new_key] = value
+        else:
+            migrated[new_key] = value
+    return migrated
 
 
 def _rename_with_retry(
@@ -279,12 +327,19 @@ def _selected_oldest_first(items: list[Any], max_items: int) -> list[Any]:
     return list(reversed(items))[:max_items]
 
 
-def _dispatch_prompt(recipient: str, items: list[Any], max_items: int) -> str:
+def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -> str:
     """Build the dispatch prompt mirroring the smart-poller phrasing.
 
-    Equivalent to ``bridge_poller_runner._dispatch_prompt`` so the dispatched
-    harness's behavior is unchanged when the trigger mechanism swaps from
-    timer-driven to event-driven.
+    Per IP-3b of bridge/gtkb-canonical-init-keyword-syntax-001-007.md
+    (Codex GO at -008): emits the canonical init-keyword
+    ``::init gtkb <mode>`` as the first line per
+    SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 (regex
+    ``^::init gtkb (pb|lo)$``; closed vocabulary; first-line-only). The
+    mode is derived from the resolved ``target.canonical_mode``.
+
+    The existing prose role-line is retained as defense-in-depth per
+    DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 (keyword is authority;
+    prose is informational).
     """
     selected = _selected_oldest_first(items, max_items)
     rows = [f"- {item.top_status} {item.document_name} {item.top_file}" for item in selected]
@@ -299,8 +354,11 @@ def _dispatch_prompt(recipient: str, items: list[Any], max_items: int) -> str:
         "Latest VERIFIED entries are bridge closure for both roles and are not "
         "queue work; do not process them as actionable."
     )
+    canonical_keyword = f"::init gtkb {target.canonical_mode}"
     return "\n".join(
         [
+            canonical_keyword,
+            "",
             "Bridge auto-dispatch notification (cross-harness trigger).",
             "",
             (
@@ -319,16 +377,20 @@ def _dispatch_prompt(recipient: str, items: list[Any], max_items: int) -> str:
     )
 
 
-def _harness_command(recipient: str, prompt: str, project_root: Path) -> list[str] | None:
+def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) -> list[str] | None:
     """Build the recipient harness invocation command.
 
-    - codex   → ``codex exec <prompt> --cd <root>``
-    - prime   → ``claude -p <prompt> --add-dir <root> --output-format json``
-    - other   → None (unknown recipient)
+    Per IP-3b: switches on ``target.command_handle`` (from durable identity
+    record), not on a hardcoded recipient name. Supports both directions:
+    Claude (any role) or Codex (any role).
+
+    - ``command_handle == "codex"``  → ``codex exec <prompt> --cd <root>``
+    - ``command_handle == "claude"`` → ``claude -p <prompt> --add-dir <root> --output-format json``
+    - other                         → None (unknown command handle)
     """
-    if recipient == "codex":
+    if target.command_handle == "codex":
         return ["codex", "exec", prompt, "--cd", str(project_root)]
-    if recipient == "prime":
+    if target.command_handle == "claude":
         return [
             "claude",
             "-p",
@@ -370,29 +432,226 @@ def _harness_command(recipient: str, prompt: str, project_root: Path) -> list[st
 HEARTBEAT_LOCK_TEMPLATE = "active-{role}-session.lock"
 
 
-def _counterpart_role(recipient: str) -> str:
-    """Map a recipient name to the harness role that holds its active-session lock.
+# ---------------------------------------------------------------------------
+# IP-3a: Routing data model and durable-record-driven dispatch resolution.
+#
+# Per ``bridge/gtkb-canonical-init-keyword-syntax-001-007.md`` (Codex GO at
+# ``-008``) and SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 +
+# DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 (both inserted into MemBase).
+#
+# DispatchTarget is the single source of truth for recipient-keyed routing
+# decisions. Constructed by ``_resolve_dispatch_target(needed_role_label)``
+# and consumed by callers that previously took a hardcoded ``recipient``
+# parameter (migration to consumption is IP-3b).
+#
+# Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001):
+#   1. role-assignments.json: needed_role_label -> harness_id  (role authority)
+#   2. harness-identities.json (inverted): harness_id -> harness_command_handle
+#      (identity authority)
+#   3. Drift check: role_record["harness_type"] (denormalized) MUST match
+#      identity-derived handle.
+#
+# The role record's ``harness_type`` field is OPTIONAL drift-detection
+# metadata, NOT command-handle authority.
+# ---------------------------------------------------------------------------
 
-    The trigger dispatches to ``recipient``; the counterpart that is
-    *currently active* and would race with that dispatch is the harness
-    *the recipient is*. Specifically, ``recipient="prime"`` would dispatch
-    to a Claude harness, so the counterpart-active lock to check is
-    ``active-claude-session.lock``. ``recipient="codex"`` checks
-    ``active-codex-session.lock``.
+
+@dataclass(frozen=True)
+class DispatchTarget:
+    """Resolved dispatch target for a needed durable role.
+
+    Single source of truth for recipient-keyed routing decisions. Constructed
+    by ``_resolve_dispatch_target(needed_role_label)`` per
+    DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001. Consumed by:
+
+      - ``_dispatch_prompt`` (uses ``canonical_mode`` for ``::init gtkb <mode>``
+        keyword first-line per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001).
+      - ``_harness_command`` (uses ``command_handle`` for invocation choice).
+      - ``check_counterpart_active`` (uses ``active_session_lock_name``).
+      - dispatch-state operations (use ``dispatch_state_key``).
     """
-    if recipient == "prime":
-        return "claude"
-    if recipient == "codex":
-        return "codex"
-    # Unknown recipient: treat as no-counterpart (do not suppress).
-    return ""
+
+    needed_role_label: str    # "prime-builder" or "loyal-opposition"
+    harness_id: str           # "A", "B", etc. — durable identity from harness-identities.json
+    command_handle: str       # "claude" / "codex" — from inverted harness-identities.json
+    canonical_mode: str       # "pb" / "lo" — the canonical-init-keyword mode
+
+    @property
+    def active_session_lock_name(self) -> str:
+        """Counterpart's active-session lock file name.
+
+        Per the existing suppression contract (VERIFIED at
+        ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md``):
+        receiver harnesses write ``active-{command_handle}-session.lock`` to
+        signal foreground activity. Naming is unchanged from
+        ``HEARTBEAT_LOCK_TEMPLATE``; only its construction is now derived
+        from the resolved command handle rather than a hardcoded recipient
+        map.
+        """
+        return HEARTBEAT_LOCK_TEMPLATE.format(role=self.command_handle)
+
+    @property
+    def dispatch_state_key(self) -> str:
+        """Key used in ``dispatch-state.json`` recipients map.
+
+        Migration (per IP-3c):
+          - Legacy keys: ``"prime"`` and ``"codex"`` (hardcoded).
+          - New keys: durable role labels ``"prime-builder"`` and
+            ``"loyal-opposition"``.
+          - Backward-compat read via ``LEGACY_TO_NEW_STATE_KEY`` in
+            ``_load_dispatch_state`` (IP-3c).
+          - Forward writes use only new keys.
+        """
+        return self.needed_role_label
 
 
-def check_counterpart_active(recipient: str, state_dir: Path) -> bool:
-    """Return True if the recipient's harness has a fresh active-session lock.
+_LABEL_TO_CANONICAL_MODE = {
+    "prime-builder": "pb",
+    "loyal-opposition": "lo",
+}
 
-    Reads ``<state-dir>/active-{counterpart_role}-session.lock`` and treats
-    the recipient as active when:
+
+def _harness_state_dir(project_root: Path) -> Path:
+    return project_root / "harness-state"
+
+
+def _read_role_assignments(project_root: Path) -> dict[str, Any]:
+    """Read harness-state/role-assignments.json. Returns the parsed document.
+
+    Raises ValueError on missing file or unreadable JSON, so callers fail
+    closed.
+    """
+    path = _harness_state_dir(project_root) / "role-assignments.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"role-assignments.json not found at {path}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"role-assignments.json unreadable at {path}: {exc}") from exc
+
+
+def _read_harness_identities(project_root: Path) -> dict[str, Any]:
+    """Read harness-state/harness-identities.json. Returns the parsed document.
+
+    Raises ValueError on missing file or unreadable JSON.
+    """
+    path = _harness_state_dir(project_root) / "harness-identities.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"harness-identities.json not found at {path}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"harness-identities.json unreadable at {path}: {exc}") from exc
+
+
+def _invert_identities(identities: dict[str, Any]) -> dict[str, str]:
+    """Invert harness-identities.json: harness ID -> harness command handle.
+
+    Example fixture::
+
+        {"harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}}}
+
+    Returns::
+
+        {"B": "claude", "A": "codex"}
+    """
+    return {info["id"]: name for name, info in identities["harnesses"].items()}
+
+
+def _resolve_dispatch_target(needed_role_label: str, project_root: Path) -> DispatchTarget:
+    """Resolve which harness should receive work needing the given durable role.
+
+    Authority chain (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001):
+      1. role-assignments.json: needed_role_label -> harness_id  (role authority)
+      2. harness-identities.json (inverted): harness_id -> harness_command_handle
+         (identity authority)
+      3. Drift check: role_record["harness_type"] (denormalized) MUST match
+         identity-derived handle.
+
+    Fail-closed cases (raises ValueError):
+      - Unknown role label (not in ``_LABEL_TO_CANONICAL_MODE``).
+      - Zero harnesses assigned the role.
+      - Multiple harnesses assigned the role (configuration error).
+      - Drift: role_record["harness_type"] disagrees with identity-derived
+        handle.
+      - Identity map has no entry for the resolved harness_id.
+    """
+    if needed_role_label not in _LABEL_TO_CANONICAL_MODE:
+        raise ValueError(f"unknown role label: {needed_role_label!r}")
+    mode = _LABEL_TO_CANONICAL_MODE[needed_role_label]
+
+    role_map = _read_role_assignments(project_root)
+    harnesses = role_map.get("harnesses", {})
+    if not isinstance(harnesses, dict):
+        raise ValueError("role-assignments.json missing 'harnesses' mapping")
+
+    # Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014),
+    # role records carry a role-set wire form (list-of-strings or legacy scalar).
+    # Counterpart resolution uses set-membership; a multi-element role set
+    # (single-harness topology) matches BOTH role labels.
+    def _record_has_role(h_info: dict[str, object], wanted: str) -> bool:
+        raw = h_info.get("role")
+        if isinstance(raw, str):
+            return raw.strip().lower() == wanted
+        if isinstance(raw, (list, tuple, set, frozenset)):
+            return any(str(r).strip().lower() == wanted for r in raw)
+        return False
+
+    matching = [
+        (h_id, h_info)
+        for h_id, h_info in harnesses.items()
+        if isinstance(h_info, dict) and _record_has_role(h_info, needed_role_label)
+    ]
+    if not matching:
+        raise ValueError(f"no harness assigned role {needed_role_label!r}")
+    if len(matching) > 1:
+        raise ValueError(
+            f"multiple harnesses assigned role {needed_role_label!r}: "
+            f"{[h_id for h_id, _ in matching]}"
+        )
+    harness_id, role_record = matching[0]
+
+    identities = _read_harness_identities(project_root)
+    id_to_handle = _invert_identities(identities)
+    if harness_id not in id_to_handle:
+        raise ValueError(
+            f"role-assignments references harness ID {harness_id!r} not present "
+            f"in harness-identities"
+        )
+    identity_handle = id_to_handle[harness_id]
+
+    # Drift detection: role record's denormalized harness_type (if present)
+    # MUST match identity-derived handle. Disagreement is fail-closed.
+    role_record_handle = role_record.get("harness_type")
+    if role_record_handle is not None and role_record_handle != identity_handle:
+        raise ValueError(
+            f"drift detected: role-assignments harness_type={role_record_handle!r} "
+            f"disagrees with harness-identities resolution to {identity_handle!r} "
+            f"for harness ID {harness_id!r}"
+        )
+
+    return DispatchTarget(
+        needed_role_label=needed_role_label,
+        harness_id=harness_id,
+        command_handle=identity_handle,
+        canonical_mode=mode,
+    )
+
+
+def check_counterpart_active(target: DispatchTarget, state_dir: Path) -> bool:
+    """Return True if the dispatch target's harness has a fresh active-session lock.
+
+    Per IP-3b of bridge/gtkb-canonical-init-keyword-syntax-001-007.md (Codex
+    GO at -008): the legacy ``_counterpart_role`` recipient-handle map has
+    been removed; the lock file name is now derived from
+    ``target.active_session_lock_name`` which uses
+    ``HEARTBEAT_LOCK_TEMPLATE.format(role=target.command_handle)``. This
+    preserves the existing active-session suppression contract (VERIFIED
+    at bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md)
+    end-to-end while enabling correct lock resolution under harness role-switch.
+
+    Reads ``<state-dir>/<target.active_session_lock_name>`` and treats the
+    target as active when:
 
     - The lock file exists, AND
     - Its mtime is within ``GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS``
@@ -404,10 +663,7 @@ def check_counterpart_active(recipient: str, state_dir: Path) -> bool:
     Locks that are unreadable due to OSError also return False (fail open
     rather than falsely suppress).
     """
-    role = _counterpart_role(recipient)
-    if not role:
-        return False
-    lock_path = state_dir / HEARTBEAT_LOCK_TEMPLATE.format(role=role)
+    lock_path = state_dir / target.active_session_lock_name
     if not lock_path.exists():
         return False
     try:
@@ -426,7 +682,7 @@ def check_counterpart_active(recipient: str, state_dir: Path) -> bool:
 
 def _spawn_harness(
     *,
-    recipient: str,
+    target: DispatchTarget,
     items: list[Any],
     project_root: Path,
     state_dir: Path,
@@ -434,6 +690,16 @@ def _spawn_harness(
     dry_run: bool,
 ) -> dict[str, Any]:
     """Fire-and-forget dispatch a harness subprocess.
+
+    Per IP-3b of bridge/gtkb-canonical-init-keyword-syntax-001-007.md
+    (Codex GO at -008): takes a resolved ``DispatchTarget`` instead of a
+    legacy ``recipient`` string. The target carries the durable role label,
+    harness ID, command handle, and canonical mode required by downstream
+    callers.
+
+    The ``recipient`` field in returned meta dicts is preserved as
+    ``target.dispatch_state_key`` (the durable role label) so dispatch logs
+    record durable identity rather than legacy aliases.
 
     Per Codex F2 on ``-008``: does NOT set ``GTKB_NO_CROSS_HARNESS_TRIGGER``
     on the child env (and explicitly strips it via ``env.pop`` so a parent's
@@ -450,17 +716,18 @@ def _spawn_harness(
     ``dispatch-failures.jsonl`` and reported in the return meta. The caller
     treats failure as non-fatal per the fire-and-forget contract.
     """
-    prompt = _dispatch_prompt(recipient, items, max_items)
-    command = _harness_command(recipient, prompt, project_root)
+    prompt = _dispatch_prompt(target, items, max_items)
+    command = _harness_command(target, prompt, project_root)
+    recipient_key = target.dispatch_state_key
     dispatch_id = (
         f"{dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H-%M-%SZ')}"
-        f"-{recipient}-{uuid.uuid4().hex[:6]}"
+        f"-{recipient_key}-{uuid.uuid4().hex[:6]}"
     )
 
     if command is None:
         meta = {
             "dispatch_id": dispatch_id,
-            "recipient": recipient,
+            "recipient": recipient_key,
             "launched": False,
             "reason": "unknown_recipient",
         }
@@ -470,7 +737,7 @@ def _spawn_harness(
     if dry_run:
         return {
             "dispatch_id": dispatch_id,
-            "recipient": recipient,
+            "recipient": recipient_key,
             "launched": False,
             "reason": "dry_run",
             "command_head": command[:2],
@@ -493,6 +760,17 @@ def _spawn_harness(
     # The env-var name is reused (cosmetic rename to GTKB_BRIDGE_TRIGGER_RUN_ID
     # is tracked as Open Follow-On 6 of slice-4 retirement).
     env["GTKB_BRIDGE_POLLER_RUN_ID"] = dispatch_id
+    # Per IP-4 of bridge/gtkb-canonical-init-keyword-syntax-001-005.md
+    # (Codex GO at -008): pass the canonical init-keyword to the spawned
+    # harness's SessionStart hook via env var so the receiver-side
+    # set-membership check has access to the keyword without parsing the
+    # prompt at SessionStart time (Claude Code's SessionStart stdin does
+    # not include user-prompt content; the prompt arrives at
+    # UserPromptSubmit). The keyword itself remains the prompt's first
+    # line for the receiving model's runtime interpretation; this env var
+    # is the SessionStart-time companion that the hook reads as the
+    # first-line signal per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
+    env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = f"::init gtkb {target.canonical_mode}"
     # Per Codex F2 on -008: do NOT set GTKB_NO_CROSS_HARNESS_TRIGGER on the
     # child harness env. The signature-state file provides loop prevention
     # (unchanged signature → no spawn); blanket env var would also suppress
@@ -504,7 +782,7 @@ def _spawn_harness(
 
     meta: dict[str, Any] = {
         "dispatch_id": dispatch_id,
-        "recipient": recipient,
+        "recipient": recipient_key,
         "launched_at": _now_iso(),
         "command_head": command[:2],
         "stdout_path": str(stdout_path),
@@ -536,6 +814,99 @@ def _spawn_harness(
     return meta
 
 
+def _is_single_harness_topology(project_root: Path) -> bool:
+    """Return True iff the role map records a single harness ID with both
+    ``prime-builder`` AND ``loyal-opposition`` in its role-set.
+
+    Per IP-8 of ``bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md``
+    (Codex GO at ``-006``): the cross-harness trigger goes inert in
+    single-harness topology because the single-harness bridge dispatcher
+    (Slice 2 thread; Windows scheduled task substrate) is the active
+    substrate when one harness holds a multi-element role-set.
+
+    Fail-closed semantic: if the role map is unreadable, returns False so
+    the gate is inactive and the trigger proceeds with its normal multi-
+    harness path. This avoids accidental inertness on configuration drift.
+    """
+    try:
+        role_map = _read_role_assignments(project_root)
+    except ValueError:
+        return False
+    harnesses = role_map.get("harnesses", {})
+    if not isinstance(harnesses, dict) or len(harnesses) != 1:
+        return False
+    (_, record), = harnesses.items()
+    if not isinstance(record, dict):
+        return False
+    raw_role = record.get("role")
+    if isinstance(raw_role, list):
+        role_set = {str(r).strip().lower() for r in raw_role if isinstance(r, str)}
+        return "prime-builder" in role_set and "loyal-opposition" in role_set
+    return False
+
+
+def _record_single_harness_topology_skip(state_dir: Path) -> None:
+    """Write durable audit + dispatch-state evidence for the topology skip.
+
+    Per ``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001`` § Coexistence: in
+    single-harness topology the cross-harness trigger is registered but
+    spawns nothing AND ``resolution fails with an audit-log entry``. This
+    function preserves the audit-log invariant by recording the topology
+    skip in BOTH durable surfaces:
+
+    - ``<state-dir>/dispatch-failures.jsonl`` — one entry per role label
+      (``prime-builder`` and ``loyal-opposition``), each with a SPEC-cited
+      ``error_message``. Liveness diagnosis tools that read the failures
+      log see explicit topology-skip evidence rather than inferring
+      inertness from missing data.
+    - ``<state-dir>/dispatch-state.json`` — per-recipient
+      ``last_result = "single_harness_topology_not_applicable"`` records
+      so ``--diagnose`` mode + doctor surface the skip without parsing
+      the failures log.
+
+    Per F1 of ``bridge/gtkb-single-harness-bridge-dispatcher-slice-2-004.md``
+    closure in REVISED-2 (``-005``; Codex GO at ``-006``).
+    """
+    ts = _now_iso()
+    error_message = (
+        "Cross-harness trigger inert in single-harness topology per "
+        "SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 Coexistence clause. The "
+        "single-harness bridge dispatcher is the active substrate when one "
+        "harness ID holds a multi-element role-set."
+    )
+    for role_label in ("prime-builder", "loyal-opposition"):
+        _record_dispatch_failure(
+            state_dir,
+            {
+                "ts": ts,
+                "dispatch_id": f"{ts}-{role_label}-topology-skip",
+                "recipient": role_label,
+                "launched": False,
+                "reason": "single_harness_topology_not_applicable",
+                "error_message": error_message,
+            },
+        )
+
+    state = _load_dispatch_state(state_dir)
+    recipients_state = state.get("recipients") if isinstance(state, dict) else {}
+    if not isinstance(recipients_state, dict):
+        recipients_state = {}
+    recipients_state = _migrate_recipients_state_keys(recipients_state)
+    for role_label in ("prime-builder", "loyal-opposition"):
+        prior = recipients_state.get(role_label)
+        if not isinstance(prior, dict):
+            prior = {}
+        prior["last_result"] = "single_harness_topology_not_applicable"
+        prior["updated_at"] = ts
+        recipients_state[role_label] = prior
+    payload = {
+        "schema_version": 1,
+        "updated_at": ts,
+        "recipients": recipients_state,
+    }
+    _write_dispatch_state(state_dir, payload)
+
+
 def run_trigger(
     *,
     project_root: Path,
@@ -552,6 +923,15 @@ def run_trigger(
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
 
+    # IP-8 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
+    # (Codex GO at -006): trigger is inert in single-harness topology per
+    # SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 Coexistence clause. The
+    # short-circuit records SPEC-required audit evidence (failures.jsonl +
+    # dispatch-state.json per-recipient last_result) before exiting.
+    if _is_single_harness_topology(project_root):
+        _record_single_harness_topology_skip(state_dir)
+        return {"skipped": True, "reason": "single_harness_topology_not_applicable"}
+
     index_text = _read_index_live(project_root)
     actionable_for_prime, actionable_for_codex = _compute_actionable(
         index_text, project_root
@@ -561,14 +941,50 @@ def run_trigger(
     recipients_state = state.get("recipients") if isinstance(state, dict) else {}
     if not isinstance(recipients_state, dict):
         recipients_state = {}
+    # IP-3c: migrate legacy state-keys ({"prime","codex"}) to durable role labels
+    # ({"prime-builder","loyal-opposition"}) on read. Forward writes use only
+    # new keys; legacy keys disappear from the file after the first dispatch
+    # cycle. The merge precedence favors the newer-mtime entry when both forms
+    # coexist transitionally.
+    recipients_state = _migrate_recipients_state_keys(recipients_state)
 
-    pending_by_recipient = {
-        "prime": actionable_for_prime,
-        "codex": actionable_for_codex,
-    }
+    # IP-3b: resolve dispatch targets from the durable role record. The
+    # mapping from actionable-classification to needed-role is fixed:
+    # NEW/REVISED → Loyal Opposition; GO/NO-GO → Prime Builder.
+    # Build targets defensively: if resolution fails (drift, missing
+    # identity entry, etc.), record the failure and skip that recipient
+    # for this cycle without aborting the whole run.
+    pending_by_target: list[tuple[DispatchTarget | None, list[Any], str, str]] = []
+    for legacy_recipient, needed_role_label, items in (
+        ("prime", "prime-builder", actionable_for_prime),
+        ("codex", "loyal-opposition", actionable_for_codex),
+    ):
+        try:
+            target = _resolve_dispatch_target(needed_role_label, project_root)
+        except ValueError as exc:
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "dispatch_id": _now_iso() + "-resolve-fail",
+                    "recipient": needed_role_label,
+                    "launched": False,
+                    "reason": "dispatch_target_resolution_failed",
+                    "error_message": str(exc),
+                },
+            )
+            pending_by_target.append((None, items, needed_role_label, legacy_recipient))
+            continue
+        pending_by_target.append((target, items, needed_role_label, legacy_recipient))
 
     results: dict[str, Any] = {}
-    for recipient, items in pending_by_recipient.items():
+    for target, items, recipient, _legacy_recipient in pending_by_target:
+        if target is None:
+            # Resolution failed; record minimal state so the run keeps going.
+            results[recipient] = {
+                "launched": False,
+                "reason": "dispatch_target_resolution_failed",
+            }
+            continue
         # Filter by dispatchable per smart-poller-kind-aware-routing -009 §1.5.
         # Terminal-kind GO entries are not dispatched.
         filtered = [it for it in items if getattr(it, "dispatchable", True)]
@@ -627,7 +1043,7 @@ def run_trigger(
             # the field to track current signature, including empty).
             recipient_state["signature"] = signature
             results[recipient] = {"launched": False, "reason": recipient_state["last_result"]}
-        elif check_counterpart_active(recipient, state_dir):
+        elif check_counterpart_active(target, state_dir):
             # Active-session suppression: counterpart harness is in an
             # active foreground session. Record the signature in the
             # suppressed field (NOT the dispatched field) so it remains
@@ -651,7 +1067,7 @@ def run_trigger(
             #   - signature changed since last dispatch
             #   - prior_suppressed == signature (retry after counterpart exit)
             launch = _spawn_harness(
-                recipient=recipient,
+                target=target,
                 items=filtered,
                 project_root=project_root,
                 state_dir=state_dir,

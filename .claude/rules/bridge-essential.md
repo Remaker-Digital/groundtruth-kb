@@ -94,6 +94,56 @@ Do not re-enable the retired OS poller implementation OR the retired
 smart poller as a substitute for the cross-harness event-driven trigger
 unless Mike gives a new explicit directive for that legacy path.
 
+## Dual-Substrate Coexistence (Slice 2 of single-harness-bridge-dispatcher)
+
+The bridge protocol has TWO live dispatch substrates as of Slice 2 of
+``gtkb-single-harness-bridge-dispatcher-slice-2`` (Codex GO at ``-006``):
+
+1. **Cross-harness event-driven trigger** (multi-harness topology) —
+   ``scripts/cross_harness_bridge_trigger.py`` registered as PostToolUse
+   and Stop hooks in ``.claude/settings.json`` and ``.codex/hooks.json``.
+   Fires on tool-use and Stop events. Applicable when the role map records
+   two harness IDs with singleton role-sets.
+2. **Single-harness bridge dispatcher** (single-harness topology) —
+   ``scripts/single_harness_bridge_dispatcher.py`` invoked by a Windows
+   scheduled task ``GTKB-SingleHarnessBridgeDispatcher`` on a fixed
+   interval (default 5 minutes; per
+   ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` § Platform Bindings).
+   Applicable when the role map records one harness ID with a multi-element
+   role-set ``["prime-builder", "loyal-opposition"]`` per
+   ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``.
+
+Both substrates honor the same actionable-signature scheme (byte-identical
+``_signature`` computation), the same active-session-suppression contract
+(per ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md``
+VERIFIED), and the same fire-and-forget audit-log discipline
+(``.gtkb-state/bridge-poller/dispatch-failures.jsonl``).
+
+They are **mutually exclusive at runtime**:
+
+- In multi-harness topology: the cross-harness trigger is the active
+  substrate; the single-harness dispatcher's applicability check returns
+  False and the scheduled task no-ops.
+- In single-harness topology: the cross-harness trigger's topology gate
+  (per IP-8 of the slice-2 thread) inerts it with SPEC-required durable
+  audit evidence (per-role entries in ``dispatch-failures.jsonl`` plus
+  per-recipient ``last_result = "single_harness_topology_not_applicable"``
+  records in ``dispatch-state.json``); the single-harness dispatcher
+  performs in-process dispatch.
+
+Substrate applicability is determined by the role-set topology in
+``harness-state/role-assignments.json``. The doctor's
+``_check_role_set_topology_consistency`` (Slice 1) validates wire form;
+``_check_single_harness_dispatcher_when_required`` (Slice 1 + Slice 2
+upgrade) reports applicability and registration health. Per
+``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` § Doctor Check, missing-
+task severity is WARN (not FAIL) so manual-trigger fallback remains
+viable while the task is being installed.
+
+Do NOT create additional bridge automation substrates without an
+owner-approved bridge proposal and an updated classification under § Two-
+Axis Bridge Automation Model below.
+
 ## Two-Axis Bridge Automation Model
 
 Bridge automation has two complementary first-class axes, each with a

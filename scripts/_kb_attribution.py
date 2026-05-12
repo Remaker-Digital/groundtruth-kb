@@ -70,13 +70,35 @@ def _harness_id_for_name(harness_name: str) -> str | None:
 
 
 def _role_for_harness_id(harness_id: str) -> str | None:
-    """Return the role assigned to a given harness ID, or None if unassigned."""
+    """Return the primary role assigned to a given harness ID, or None if unassigned.
+
+    Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014):
+    the durable role record's ``role`` field is a role-set wire form (JSON
+    list of role tokens). This helper returns the Prime-first primary role
+    string for backward compatibility with attribution call sites that
+    expect a scalar. The legacy compatibility/provenance value
+    ``acting-prime-builder`` is accepted on READ and treated as
+    Prime-equivalent per the Acting-Prime Compatibility Contract.
+    """
+    from scripts.harness_roles import (  # local import: avoid top-level cycle
+        _normalize_role_field,
+        ROLE_ACTING_PRIME_BUILDER,
+        ROLE_LOYAL_OPPOSITION,
+        ROLE_PRIME_BUILDER,
+    )
+
     assignments = _load_role_assignments()
     record = assignments.get(harness_id)
     if not isinstance(record, dict):
         return None
-    role = record.get("role")
-    return role if isinstance(role, str) else None
+    role_set = _normalize_role_field(record.get("role"))
+    if not role_set:
+        return None
+    if ROLE_PRIME_BUILDER in role_set or ROLE_ACTING_PRIME_BUILDER in role_set:
+        return ROLE_PRIME_BUILDER
+    if ROLE_LOYAL_OPPOSITION in role_set:
+        return ROLE_LOYAL_OPPOSITION
+    return None
 
 
 def _name_for_harness_id(harness_id: str) -> str | None:
@@ -89,9 +111,22 @@ def _name_for_harness_id(harness_id: str) -> str | None:
 
 
 def _sole_prime_builder_harness_name() -> str | None:
-    """Return the harness_name of the sole Prime Builder, or None if 0 or >1."""
+    """Return the harness_name of the sole Prime Builder, or None if 0 or >1.
+
+    Per IP-8 of gtkb-single-harness-bridge-dispatcher-001: Prime membership is
+    set-membership against the role-set wire form. Multi-element role sets
+    (single-harness mode) count toward Prime membership iff they contain
+    ``prime-builder`` (or the compatibility/provenance value
+    ``acting-prime-builder``).
+    """
+    from scripts.harness_roles import is_prime_builder  # local import: avoid cycle
+
     assignments = _load_role_assignments()
-    prime_ids = [hid for hid, rec in assignments.items() if rec.get("role") == "prime-builder"]
+    prime_ids = [
+        hid
+        for hid, rec in assignments.items()
+        if isinstance(rec, dict) and is_prime_builder(rec)
+    ]
     if len(prime_ids) != 1:
         return None
     return _name_for_harness_id(prime_ids[0])

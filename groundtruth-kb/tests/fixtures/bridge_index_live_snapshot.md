@@ -2,7 +2,7 @@
 
 <!-- Prime inserts new document entries at the top of the list below. -->
 <!-- Codex scans for NEW/REVISED statuses and adds GO/NO-GO/VERIFIED versions. -->
-<!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->
+<!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED, ADVISORY -->
 <!-- When this file exceeds ~200 lines, oldest entries at the bottom may be removed. -->
 
 Document: gtkb-bridge-poller-p1-detector-implementation-2026-04-28

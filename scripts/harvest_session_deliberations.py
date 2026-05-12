@@ -75,7 +75,7 @@ _AR_KEY_SURVIVOR_RE = re.compile(r"(ar_live|ar_user|ar_spa_plat|pk_live|arsk)_[A
 
 # Bridge INDEX.md parsing
 _DOC_LINE_RE = re.compile(r"^Document:\s+(.+)$")
-_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+bridge/(.+\.md)$")
+_STATUS_LINE_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+bridge/(.+\.md)$")
 
 # Verdict extraction for bridge files
 _VERDICT_FIELD_RE = re.compile(

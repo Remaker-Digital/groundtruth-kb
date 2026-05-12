@@ -52,7 +52,9 @@ def test_missing_role_map_self_assigns_starting_harness_prime(tmp_path: Path) ->
     assert path == role_path
     data = _read(role_path)
     assert data["harnesses"]["A"]["harness_type"] == "codex"
-    assert data["harnesses"]["A"]["role"] == ROLE_PRIME_BUILDER
+    # Role-set wire form per IP-8 of gtkb-single-harness-bridge-dispatcher-001:
+    # WRITE always emits JSON list; singleton list represents the multi-harness case.
+    assert data["harnesses"]["A"]["role"] == [ROLE_PRIME_BUILDER]
 
 
 def test_startup_self_corrects_when_no_prime_is_recorded(tmp_path: Path) -> None:
@@ -74,8 +76,8 @@ def test_startup_self_corrects_when_no_prime_is_recorded(tmp_path: Path) -> None
 
     data = _read(role_path)
     assert role == ROLE_PRIME_BUILDER
-    assert data["harnesses"]["B"]["role"] == ROLE_PRIME_BUILDER
-    assert data["harnesses"]["A"]["role"] == ROLE_LOYAL_OPPOSITION
+    assert data["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]
+    assert data["harnesses"]["A"]["role"] == [ROLE_LOYAL_OPPOSITION]
 
 
 def test_setting_prime_demotes_other_recorded_harnesses(tmp_path: Path) -> None:
@@ -98,9 +100,9 @@ def test_setting_prime_demotes_other_recorded_harnesses(tmp_path: Path) -> None:
 
     data = _read(role_path)
     assert role == ROLE_PRIME_BUILDER
-    assert data["harnesses"]["A"]["role"] == ROLE_PRIME_BUILDER
-    assert data["harnesses"]["B"]["role"] == ROLE_LOYAL_OPPOSITION
-    assert data["harnesses"]["C"]["role"] == ROLE_LOYAL_OPPOSITION
+    assert data["harnesses"]["A"]["role"] == [ROLE_PRIME_BUILDER]
+    assert data["harnesses"]["B"]["role"] == [ROLE_LOYAL_OPPOSITION]
+    assert data["harnesses"]["C"]["role"] == [ROLE_LOYAL_OPPOSITION]
 
 
 def test_setting_loyal_can_leave_no_prime_until_next_startup(tmp_path: Path) -> None:
@@ -117,7 +119,10 @@ def test_setting_loyal_can_leave_no_prime_until_next_startup(tmp_path: Path) -> 
         assignment_path=role_path,
     )
     data = _read(role_path)
-    assert all(record["role"] != ROLE_PRIME_BUILDER for record in data["harnesses"].values())
+    # No harness's role-set contains prime-builder after the set-LO update.
+    assert all(
+        ROLE_PRIME_BUILDER not in record.get("role", []) for record in data["harnesses"].values()
+    )
 
     role, _document, _path = role_for_harness(
         tmp_path,
@@ -129,8 +134,8 @@ def test_setting_loyal_can_leave_no_prime_until_next_startup(tmp_path: Path) -> 
 
     data = _read(role_path)
     assert role == ROLE_PRIME_BUILDER
-    assert data["harnesses"]["A"]["role"] == ROLE_LOYAL_OPPOSITION
-    assert data["harnesses"]["B"]["role"] == ROLE_PRIME_BUILDER
+    assert data["harnesses"]["A"]["role"] == [ROLE_LOYAL_OPPOSITION]
+    assert data["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +156,13 @@ def test_t_compat_1_set_harness_role_rejects_acting_prime_builder(tmp_path: Path
     """
     role_path = tmp_path / "harness-state" / "role-assignments.json"
 
-    with pytest.raises(ValueError, match="Unsupported next-session role"):
+    # Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014),
+    # the error message is now specific: it explicitly identifies
+    # acting-prime-builder as a READ-only compatibility/provenance value rather
+    # than falling through to the generic "Unsupported next-session role"
+    # path. Match against the specific message so future hardening of the
+    # generic error path does not silently regress this contract.
+    with pytest.raises(ValueError, match="acting-prime-builder is a READ-only"):
         set_harness_role(
             tmp_path,
             ROLE_ACTING_PRIME_BUILDER,
@@ -177,8 +188,13 @@ def test_t_compat_2_load_role_assignments_reads_existing_acting_prime_value(tmp_
     )
 
     document = load_role_assignments(tmp_path, assignment_path=role_path)
-    assert document["harnesses"]["A"]["role"] == ROLE_ACTING_PRIME_BUILDER, (
+    # Per IP-8 of gtkb-single-harness-bridge-dispatcher-001: legacy scalar
+    # values are accepted on READ and normalized into singleton lists per
+    # _role_set_to_json. The compatibility/provenance value
+    # acting-prime-builder remains in the READ vocabulary but normalizes to
+    # a singleton list.
+    assert document["harnesses"]["A"]["role"] == [ROLE_ACTING_PRIME_BUILDER], (
         "Existing acting-prime-builder role-map value must read without error "
-        "for backward compatibility."
+        "for backward compatibility (now as singleton list per role-set schema)."
     )
-    assert document["harnesses"]["B"]["role"] == ROLE_PRIME_BUILDER
+    assert document["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]

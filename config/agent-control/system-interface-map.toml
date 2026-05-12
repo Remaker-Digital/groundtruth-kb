@@ -587,3 +587,23 @@ verification_method = "platform_tests/scripts/test_bridge_axis_2_surface.py"
 lifecycle_state = "active"
 related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001", "ADR-CODEX-HOOK-PARITY-FALLBACK-001", "ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001"]
 related_deliberations = ["DELIB-1517", "DELIB-1516", "DELIB-1890", "DELIB-1520", "DELIB-1521", "DELIB-1527"]
+
+[[systems]]
+id = "single-harness-bridge-dispatcher"
+canonical_name = "single-harness bridge dispatcher"
+accepted_aliases = ["single-harness dispatcher", "dispatcher (single-harness topology)", "GTKB-SingleHarnessBridgeDispatcher"]
+discouraged_aliases = []
+forbidden_aliases = []
+concept_vs_artifact = "axis-1-dispatchable"
+authoritative_source = "scripts/single_harness_bridge_dispatcher.py"
+generated_or_authoritative = "authoritative_runtime"
+read_method = "Inspect Task Scheduler entry GTKB-SingleHarnessBridgeDispatcher via Get-ScheduledTask, or run scripts/single_harness_bridge_dispatcher.py --diagnose for a structured liveness summary."
+mutation_method = "Use scripts/install_single_harness_dispatcher_task.ps1 (-ProjectRoot <root> [-TaskName <name>] [-IntervalMinutes <n>] [-DryRun]) to register or update; scripts/uninstall_single_harness_dispatcher_task.ps1 ([-TaskName <name>] [-DryRun]) to remove. Editing the dispatcher script itself is governed via the bridge protocol."
+role_permissions = "Prime Builder owns dispatcher script + installer + tests; Loyal Opposition reviews changes and audits topology gating."
+startup_visibility = "topology_conditional"
+dashboard_visibility = "summary_only"
+harness_caveats = "Mutually exclusive with the cross-harness event-driven trigger at runtime; applicability gated by role-set cardinality (multi-element role-set on a single harness ID -> applicable). Authoritative source is the Python script at scripts/single_harness_bridge_dispatcher.py; wake substrate is Windows scheduled task GTKB-SingleHarnessBridgeDispatcher (registered via scripts/install_single_harness_dispatcher_task.ps1). Slice 2 ships Windows Task Scheduler primary substrate; macOS launchd / Linux systemd installers are DECISION DEFERRED to a future slice."
+verification_method = "platform_tests/scripts/test_single_harness_bridge_dispatcher.py"
+lifecycle_state = "active"
+related_specs = ["ADR-SINGLE-HARNESS-OPERATING-MODE-001", "SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001", "DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001", "SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001", "DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001", "PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001"]
+related_deliberations = ["DELIB-1511", "DELIB-S319-LIFECYCLE-INDEPENDENCE-CONTRACT"]

@@ -6371,6 +6371,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-05-11T21:30:29.010955Z
   answer: "User has answered your questions: \"Approve the MemBase insert of `SPEC-ADVISORY-DASHBOARD-COUNTERS-001` per the GO'd proposal at `bridge/gtkb-advisory-report-dashboard-counters-spec-003.md` (Codex GO at `-004`)? This is a single-row MemBase `specifications` insert with `type='requirement'`, `status='specified'`. The spec records 6 counter requirements for dashboard/startup bridge-state surfaces, with explicit boundaries: `no_go_count` MUST NOT include ADVISORY; `actionable_count_for_prime` MUST NOT include latest VERIFIED; `advisory_disposition_count` is a separate Prime-disposition metric. Approving here authorizes me to generate the formal-artifact-approval packet, validate against the live gate, insert via the bash env-var-prefix pattern, add the T1-T6 regression test, and file the post-impl report. Same pattern as the DCL-PEER-SOLUTION-OWNER-GATE-001 insert this turn.\"=\"Approve + insert now\" selected preview: MemBase row to insert: - id: SPEC-ADVISORY-DASHBOARD-COUNTERS-001 - type: requirement (per the live VALID_ARTIFACT_TYPES; SPEC-* prefix auto-detects to requirement) - status: specified - description (6 counter requirements):    advisory_count: count of Document entries whose latest status is ADVISORY:. Distinct from no_go_count.   no_go_count: count of entries whose latest status is NO-GO:. MUST NOT include ADVISORY entries.   actionable_count_for_prime: count of entries whose latest status is GO OR NO-GO. MUST NOT include latest VERIFIED (terminal). MUST NOT include latest ADVISORY (see advisory_disposition_count). Aligns with AGENTS.md:178,182 + system-interface-map.toml:182.   actionable_count_for_lo: count of entries whose latest status is NEW OR REVISED. MUST NOT include ADVISORY.   advisory_disposition_count: count of entries whose latest status is ADVISORY. Prime's disposition surface (conversion proposal / DA record per peer-solution-advisory-loop.md); NOT bridge continuation queue work.   failed_proposal_count: NO-GO entries on Prime-authored proposals only. Distinct from advisory_count and advisory_disposition_count.  - display: ADVISORY must be visually distinct from NO-GO - aggregation: advisory_count + advisory_disposition_count are first-class metrics; stale reports omitting them MUST be updated  Test file: platform_tests/groundtruth_kb/specs/test_spec_advisory_dashboard_counters.py (T1 structural, T2 enumeration of 6 metrics, T3 no_go_count exclusion of ADVISORY, T4 actionable_count_for_prime exclusion of VERIFIED, T5 advisory_disposition_count separation, T6 display distinction).. You can now continue with the user's answers in mind."
   notes: ""
+- id: DECISION-0537
+  asked_at: 2026-05-11T23:12:59.531336Z
+  question: "Approve the proposed `DELIB-S342-SPEC-EXPRESSIONS-TRIANGULATION-001` deliberation record for insert into MemBase?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Cancel"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 01fd136d2f4ec042
+  resolved_at: 2026-05-11T23:12:59.531336Z
+  answer: "User has answered your questions: \"Approve the proposed `DELIB-S342-SPEC-EXPRESSIONS-TRIANGULATION-001` deliberation record for insert into MemBase?\"=\"Approve as drafted (Recommended)\". You can now continue with the user's answers in mind."
+  notes: ""
+- id: DECISION-0538
+  asked_at: 2026-05-12T02:09:20.333285Z
+  question: "Given the 1-day Claude Code halt window, which path forward do you want for the standalone Codex Prime + LO sub-agent dispatch?"
+  options:
+    - "Tactical MVP dispatcher"
+    - "Existing 30-min Codex thread only"
+    - "Finish -012 first (governance path)"
+    - "Pivot -012 to Codex-side variant"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4cc8286f84d4af06
+  resolved_at: 2026-05-12T02:09:20.333285Z
+  answer: "User has answered your questions: \"Given the 1-day Claude Code halt window, which path forward do you want for the standalone Codex Prime + LO sub-agent dispatch?\"=\"Finish -012 first (governance path)\". You can now continue with the user's answers in mind."
+  notes: ""
 
 ## History
 

@@ -19,6 +19,10 @@
      Bridge thread: gtkb-s341-backlog-candidates-membase-insert VERIFIED at -011. -->
 
 
+Document: gtkb-bridge-revision-skill-001
+NO-GO: bridge/gtkb-bridge-revision-skill-001-002.md
+NEW: bridge/gtkb-bridge-revision-skill-001-001.md
+
 Document: gtkb-session-startup-project
 VERIFIED: bridge/gtkb-session-startup-project-007.md
 VERIFIED: bridge/gtkb-session-startup-project-006.md
@@ -28,7 +32,31 @@ NEW: bridge/gtkb-session-startup-project-003.md
 GO: bridge/gtkb-session-startup-project-002.md
 NEW: bridge/gtkb-session-startup-project-001.md
 
+Document: gtkb-artifact-recorder-cli-slice-2-spec-record
+VERIFIED: bridge/gtkb-artifact-recorder-cli-slice-2-spec-record-006.md
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-2-spec-record-005.md
+NO-GO: bridge/gtkb-artifact-recorder-cli-slice-2-spec-record-004.md
+NEW: bridge/gtkb-artifact-recorder-cli-slice-2-spec-record-003.md
+GO: bridge/gtkb-artifact-recorder-cli-slice-2-spec-record-002.md
+NEW: bridge/gtkb-artifact-recorder-cli-slice-2-spec-record-001.md
+
+Document: gtkb-single-harness-bridge-dispatcher-slice-2
+VERIFIED: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-010.md
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-009.md
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-008.md
+NEW: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-007.md
+GO: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-006.md
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-004.md
+REVISED: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-003.md
+NO-GO: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-002.md
+NEW: bridge/gtkb-single-harness-bridge-dispatcher-slice-2-001.md
+
 Document: gtkb-artifact-recorder-cli-slice-1-deliberations-record
+VERIFIED: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-008.md
+NEW: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-007.md
+GO: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-006.md
+REVISED: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-005.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-004.md
 REVISED: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-003.md
 NO-GO: bridge/gtkb-artifact-recorder-cli-slice-1-deliberations-record-002.md
@@ -166,6 +194,7 @@ GO: bridge/gtkb-isolation-aftermath-startup-baseline-002.md
 NEW: bridge/gtkb-isolation-aftermath-startup-baseline-001.md
 
 Document: gtkb-github-ai-harness-ecosystem-advisory-2026-05-11
+WITHDRAWN: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-002.md
 NO-GO: bridge/gtkb-github-ai-harness-ecosystem-advisory-2026-05-11-001.md
 
 Document: gtkb-claude-axis-2-userpromptsubmit-bridge-surface
@@ -223,6 +252,7 @@ GO: bridge/gtkb-mcp-stable-harness-surface-conversion-002.md
 NEW: bridge/gtkb-mcp-stable-harness-surface-conversion-001.md
 
 Document: gtkb-role-scope-release-operations-advisory-2026-05-11
+WITHDRAWN: bridge/gtkb-role-scope-release-operations-advisory-2026-05-11-002.md
 NO-GO: bridge/gtkb-role-scope-release-operations-advisory-2026-05-11-001.md
 
 Document: gtkb-da-harvest-catchup
@@ -240,6 +270,7 @@ NO-GO: bridge/gtkb-artifact-recorder-cli-002.md
 NEW: bridge/gtkb-artifact-recorder-cli-001.md
 
 Document: gtkb-peer-solution-advisory-loop-2026-05-10
+WITHDRAWN: bridge/gtkb-peer-solution-advisory-loop-2026-05-10-002.md
 NO-GO: bridge/gtkb-peer-solution-advisory-loop-2026-05-10-001.md
 
 Document: gtkb-tests-package-collision-resolution
@@ -290,6 +321,7 @@ NO-GO: bridge/gtkb-isolation-018-slice-0-git-boundary-002.md
 NEW: bridge/gtkb-isolation-018-slice-0-git-boundary-001.md
 
 Document: gtkb-cross-harness-trigger-codex-exec-hook-firing-001
+WITHDRAWN: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-007.md
 GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-006.md
 REVISED: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-005.md
 NO-GO: bridge/gtkb-cross-harness-trigger-codex-exec-hook-firing-001-004.md
@@ -306,6 +338,10 @@ NO-GO: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-002.md
 NEW: bridge/gtkb-cross-harness-trigger-windows-rename-race-001-001.md
 
 Document: gtkb-bridge-advisory-status-001
+GO: bridge/gtkb-bridge-advisory-status-001-014.md
+REVISED: bridge/gtkb-bridge-advisory-status-001-013.md
+NO-GO: bridge/gtkb-bridge-advisory-status-001-012.md
+REVISED: bridge/gtkb-bridge-advisory-status-001-011.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-010.md
 REVISED: bridge/gtkb-bridge-advisory-status-001-009.md
 NO-GO: bridge/gtkb-bridge-advisory-status-001-008.md
@@ -1364,6 +1400,8 @@ NEW: bridge/gtkb-adr-isolation-application-placement-001.md
 
 
 Document: gtkb-incident-response
+VERIFIED: bridge/gtkb-incident-response-008.md
+NEW: bridge/gtkb-incident-response-007.md
 GO: bridge/gtkb-incident-response-006.md
 REVISED: bridge/gtkb-incident-response-005.md
 NO-GO: bridge/gtkb-incident-response-004.md
@@ -1373,6 +1411,8 @@ NEW: bridge/gtkb-incident-response-001.md
 
 
 Document: gtkb-command-surface
+VERIFIED: bridge/gtkb-command-surface-006.md
+NEW: bridge/gtkb-command-surface-005.md
 GO: bridge/gtkb-command-surface-004.md
 REVISED: bridge/gtkb-command-surface-003.md
 NO-GO: bridge/gtkb-command-surface-002.md

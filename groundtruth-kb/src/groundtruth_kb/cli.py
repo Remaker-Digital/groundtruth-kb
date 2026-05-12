@@ -24,6 +24,12 @@ from groundtruth_kb.bootstrap import (
     bootstrap_desktop_project,
     bootstrap_summary,
 )
+from groundtruth_kb.cli_deliberations_record import (
+    DeliberationRecordError,
+    DeliberationRecordRequest,
+    record_deliberation,
+)
+from groundtruth_kb.cli_spec_record import SPEC_RECORD_TYPES, SpecRecordError, SpecRecordRequest, record_spec
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.gates import GateRegistry
@@ -1889,6 +1895,114 @@ def project_classify_tree(
     click.echo(f"Wrote {len(rows)} classification row(s) to {output}")
 
 
+# --- gt spec -----------------------------------------------------------------
+
+
+@main.group("spec")
+def spec_cmd() -> None:
+    """Governed specification artifact commands."""
+
+
+@spec_cmd.command("record")
+@click.option("--id", "spec_id", required=True, help="Specification ID, e.g. GOV-FOO-001 or REQ-FOO-001")
+@click.option("--title", required=True, help="Human-readable title")
+@click.option("--status", required=True, help="Specification lifecycle status")
+@click.option(
+    "--content-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="In-root file whose contents become the spec description",
+)
+@click.option("--change-reason", required=True, help="Reason to store with the spec version")
+@click.option("--auq-id", required=True, help="AskUserQuestion / AUQ evidence identifier")
+@click.option("--auq-answer", required=True, help="Owner answer text or concise answer summary")
+@click.option("--owner-presented", is_flag=True, default=False, help="Assert native-format content was shown to owner")
+@click.option("--approved-by", default=None, help="Manual approval identity (default: owner)")
+@click.option("--type", "spec_type", type=click.Choice(SPEC_RECORD_TYPES), default=None, help="Explicit spec type")
+@click.option("--priority", default=None)
+@click.option("--scope", default=None)
+@click.option("--section", default=None)
+@click.option("--handle", default=None)
+@click.option("--tags-json", default=None, help="JSON list of tag strings")
+@click.option("--assertions-json", default=None, help="JSON list of assertion objects")
+@click.option("--constraints-json", default=None, help="JSON object of constraint metadata")
+@click.option("--affected-by-json", default=None, help="JSON list of spec IDs affecting this spec")
+@click.option(
+    "--testability",
+    type=click.Choice(["automatable", "observable", "structural", "untestable"]),
+    default=None,
+)
+@click.option("--source-paths-json", default=None, help="JSON list of source path strings")
+@click.option("--dry-run", is_flag=True, default=False, help="Validate and print the proposed packet without writing")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def spec_record_cmd(
+    ctx: click.Context,
+    spec_id: str,
+    title: str,
+    status: str,
+    content_file: Path,
+    change_reason: str,
+    auq_id: str,
+    auq_answer: str,
+    owner_presented: bool,
+    approved_by: str | None,
+    spec_type: str | None,
+    priority: str | None,
+    scope: str | None,
+    section: str | None,
+    handle: str | None,
+    tags_json: str | None,
+    assertions_json: str | None,
+    constraints_json: str | None,
+    affected_by_json: str | None,
+    testability: str | None,
+    source_paths_json: str | None,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Record an AUQ-backed specification through the governed service path."""
+
+    config = _resolve_config(ctx)
+    request = SpecRecordRequest(
+        spec_id=spec_id,
+        title=title,
+        status=status,
+        content_file=content_file,
+        change_reason=change_reason,
+        auq_id=auq_id,
+        auq_answer=auq_answer,
+        owner_presented=owner_presented,
+        approved_by=approved_by,
+        spec_type=spec_type,
+        priority=priority,
+        scope=scope,
+        section=section,
+        handle=handle,
+        tags_json=tags_json,
+        assertions_json=assertions_json,
+        constraints_json=constraints_json,
+        affected_by_json=affected_by_json,
+        testability=testability,
+        source_paths_json=source_paths_json,
+        dry_run=dry_run,
+    )
+    try:
+        result = record_spec(config, request)
+    except SpecRecordError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+        return
+    if dry_run:
+        click.echo(f"Dry run: would record spec {result['id']}.")
+        click.echo(f"Approval packet path: {result['approval_packet_path']}")
+        click.echo(json.dumps(result["approval_packet"], indent=2, sort_keys=True))
+        return
+    click.echo(result["id"])
+
+
 # ── gt deliberations ──────────────────────────────────────────────
 
 
@@ -2124,6 +2238,87 @@ def deliberations_upsert(
     # Per Codex Condition 4: do not infer inserted vs matched from the return
     # row. Print the ID only and let callers inspect via ``gt deliberations get``.
     click.echo(row["id"])
+
+
+@deliberations.command("record")
+@click.option("--source-type", type=click.Choice(_DELIB_SOURCE_TYPES), required=True)
+@click.option("--source-ref", required=True, help="Source artifact reference used for idempotency")
+@click.option("--title", required=True, help="Human-readable title")
+@click.option("--summary", required=True, help="One- or two-sentence summary")
+@click.option(
+    "--content-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="In-root file whose contents become the deliberation body",
+)
+@click.option("--change-reason", required=True, help="Reason to store with the deliberation version")
+@click.option("--auq-id", required=True, help="AskUserQuestion / AUQ evidence identifier")
+@click.option("--auq-answer", required=True, help="Owner answer text or concise answer summary")
+@click.option("--owner-presented", is_flag=True, default=False, help="Assert native-format content was shown to owner")
+@click.option("--approved-by", default=None, help="Manual approval identity (default: owner)")
+@click.option("--spec-id", default=None)
+@click.option("--work-item-id", default=None)
+@click.option("--session-id", default=None)
+@click.option("--participants", default=None, help="Comma-separated participants list")
+@click.option("--outcome", type=click.Choice(_DELIB_OUTCOMES), default=None)
+@click.option("--dry-run", is_flag=True, default=False, help="Validate and print the proposed packet without writing")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def deliberations_record(
+    ctx: click.Context,
+    source_type: str,
+    source_ref: str,
+    title: str,
+    summary: str,
+    content_file: Path,
+    change_reason: str,
+    auq_id: str,
+    auq_answer: str,
+    owner_presented: bool,
+    approved_by: str | None,
+    spec_id: str | None,
+    work_item_id: str | None,
+    session_id: str | None,
+    participants: str | None,
+    outcome: str | None,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Record an AUQ-backed deliberation through the governed service path."""
+
+    config = _resolve_config(ctx)
+    request = DeliberationRecordRequest(
+        source_type=source_type,
+        source_ref=source_ref,
+        title=title,
+        summary=summary,
+        content_file=content_file,
+        change_reason=change_reason,
+        auq_id=auq_id,
+        auq_answer=auq_answer,
+        owner_presented=owner_presented,
+        approved_by=approved_by,
+        spec_id=spec_id,
+        work_item_id=work_item_id,
+        participants=_parse_participants(participants),
+        outcome=outcome,
+        session_id=session_id,
+        dry_run=dry_run,
+    )
+    try:
+        result = record_deliberation(config, request)
+    except DeliberationRecordError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, default=str))
+        return
+    if dry_run:
+        click.echo(f"Dry run: would record deliberation {result['id']}.")
+        click.echo(f"Approval packet path: {result['approval_packet_path']}")
+        click.echo(json.dumps(result["approval_packet"], indent=2, sort_keys=True))
+        return
+    click.echo(result["id"])
 
 
 @deliberations.command("get")

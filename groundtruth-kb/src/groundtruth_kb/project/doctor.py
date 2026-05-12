@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -2160,6 +2161,370 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
         ),
     )
 
+
+def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
+    """Check role-set wire form, valid tokens, no duplicates, topology consistency.
+
+    Per IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md (Codex
+    GO at -014). Validates:
+
+    - ``harness-state/role-assignments.json`` exists and parses as JSON.
+    - Each harness record's ``role`` field is either a list (canonical wire
+      form), a string (legacy scalar; READ-accepted), or absent.
+    - Every list element is a token in ``{prime-builder, loyal-opposition,
+      acting-prime-builder}`` (READ vocabulary; the legacy
+      ``acting-prime-builder`` token is READ-accepted per the
+      Compatibility/Provenance Classification).
+    - No duplicates within a single record's role-set.
+    - Every harness ID referenced by ``role-assignments.json`` has a
+      corresponding entry in ``harness-state/harness-identities.json`` (topology
+      consistency).
+    """
+    check_name = "Role-set topology consistency"
+    role_path = target / "harness-state" / "role-assignments.json"
+    identities_path = target / "harness-state" / "harness-identities.json"
+
+    if not role_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=(
+                "harness-state/role-assignments.json missing; doctor cannot validate "
+                "role-set schema until first harness startup writes the file."
+            ),
+        )
+
+    try:
+        role_doc = json.loads(role_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=f"harness-state/role-assignments.json unreadable: {exc}",
+        )
+
+    identities = {}
+    if identities_path.is_file():
+        try:
+            identities_doc = json.loads(identities_path.read_text(encoding="utf-8"))
+            identities = identities_doc.get("harnesses", {}) or {}
+        except (OSError, json.JSONDecodeError):
+            identities = {}
+
+    valid_read_tokens = frozenset({"prime-builder", "loyal-opposition", "acting-prime-builder"})
+    harnesses = role_doc.get("harnesses", {}) or {}
+    issues: list[str] = []
+    legacy_scalar_count = 0
+    list_form_count = 0
+
+    if isinstance(harnesses, dict):
+        identity_ids = {info.get("id") for info in identities.values() if isinstance(info, dict)}
+        for harness_id, record in harnesses.items():
+            if not isinstance(record, dict):
+                issues.append(f"harness {harness_id!r}: record is not a JSON object")
+                continue
+            raw_role = record.get("role")
+            if raw_role is None:
+                # Missing role is permitted (bootstrap state); doctor flags via
+                # the broader self-correction path, not here.
+                continue
+            if isinstance(raw_role, str):
+                legacy_scalar_count += 1
+                if raw_role.strip().lower() not in valid_read_tokens:
+                    issues.append(
+                        f"harness {harness_id!r}: legacy scalar role "
+                        f"{raw_role!r} not in valid READ vocabulary"
+                    )
+            elif isinstance(raw_role, list):
+                list_form_count += 1
+                seen: set[str] = set()
+                for token in raw_role:
+                    if not isinstance(token, str):
+                        issues.append(
+                            f"harness {harness_id!r}: role-set contains non-string token "
+                            f"{token!r}"
+                        )
+                        continue
+                    canonical = token.strip().lower()
+                    if canonical not in valid_read_tokens:
+                        issues.append(
+                            f"harness {harness_id!r}: role-set contains unknown token "
+                            f"{token!r} (valid: {sorted(valid_read_tokens)})"
+                        )
+                    if canonical in seen:
+                        issues.append(
+                            f"harness {harness_id!r}: role-set contains duplicate token "
+                            f"{token!r}"
+                        )
+                    seen.add(canonical)
+            else:
+                issues.append(
+                    f"harness {harness_id!r}: role field has unsupported type "
+                    f"{type(raw_role).__name__} (expected list or string)"
+                )
+            # Topology consistency: harness ID referenced here should exist in
+            # the identity map (when the identity map is present).
+            if identity_ids and harness_id not in identity_ids:
+                issues.append(
+                    f"harness {harness_id!r}: role-assignments references an ID not "
+                    f"present in harness-identities.json (topology drift)"
+                )
+    else:
+        issues.append("role-assignments.json 'harnesses' field is not a JSON object")
+
+    if issues:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message="role-set topology issues: " + "; ".join(issues),
+        )
+
+    summary = (
+        f"role-set wire form valid "
+        f"({list_form_count} list-form, {legacy_scalar_count} legacy-scalar — "
+        f"legacy will upgrade on next WRITE)"
+    )
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=summary,
+    )
+
+
+def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
+    """When single-harness mode is applicable, verify the dispatcher is registered.
+
+    Per IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
+    (Codex GO at -014). The check is applicability-gated:
+
+    - Applicable iff exactly one harness identity has a multi-element role set
+      (i.e., the active harness holds both ``prime-builder`` and
+      ``loyal-opposition`` per ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``).
+    - When applicable: WARN if the Slice 2 dispatcher script + scheduled task
+      are not yet installed (Slice 2 is a separate bridge thread; this check is
+      forward-compatible).
+    - When NOT applicable (the common multi-harness case): PASS with "not
+      applicable".
+    """
+    check_name = "Single-harness dispatcher when required"
+    role_path = target / "harness-state" / "role-assignments.json"
+
+    if not role_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message="role-assignments.json missing; single-harness dispatcher applicability cannot be determined",
+        )
+
+    try:
+        role_doc = json.loads(role_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=f"role-assignments.json unreadable: {exc}",
+        )
+
+    multi_role_harnesses: list[str] = []
+    harnesses = role_doc.get("harnesses", {}) or {}
+    if isinstance(harnesses, dict):
+        for harness_id, record in harnesses.items():
+            if not isinstance(record, dict):
+                continue
+            raw_role = record.get("role")
+            if isinstance(raw_role, list):
+                canonical = {
+                    str(t).strip().lower() for t in raw_role if isinstance(t, str)
+                }
+                if len(canonical) >= 2 and "prime-builder" in canonical and "loyal-opposition" in canonical:
+                    multi_role_harnesses.append(str(harness_id))
+
+    if not multi_role_harnesses:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=(
+                "single-harness dispatcher not applicable "
+                "(no harness holds multi-element role set; multi-harness topology)"
+            ),
+        )
+
+    # Applicable: check dispatcher script AND scheduled-task registration.
+    # Per IP-4 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
+    # (Codex GO at -006) and DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001
+    # § Doctor Check: severity is WARN (not FAIL) for any "applicable but
+    # not fully healthy" case; PASS only for "applicable + script + task
+    # registered + last-run-time fresh". On non-Windows hosts: WARN with
+    # platform-extension pointer (Slice 2 ships Windows-only).
+    dispatcher_script = target / "scripts" / "single_harness_bridge_dispatcher.py"
+    if not dispatcher_script.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"single-harness mode applicable (harness(es) {multi_role_harnesses} hold multi-element "
+                f"role sets) but scripts/single_harness_bridge_dispatcher.py is absent. "
+                f"Bridge dispatch in single-harness mode operates via manual-trigger fallback "
+                f"until the dispatcher script is installed."
+            ),
+        )
+
+    # Non-Windows host: Slice 2 ships Windows-only.
+    if sys.platform != "win32":
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
+                f"script present, but the Windows scheduled-task registration check is "
+                f"Windows-only. macOS/Linux installers are DECISION DEFERRED to a future Slice "
+                f"per DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001 § Platform Bindings."
+            ),
+        )
+
+    # Windows host: probe Get-ScheduledTask for the canonical task name.
+    task_name = "GTKB-SingleHarnessBridgeDispatcher"
+    try:
+        completed = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                (
+                    f"$t = Get-ScheduledTask -TaskName '{task_name}' "
+                    f"-ErrorAction SilentlyContinue; "
+                    f"if ($t) {{ "
+                    f"$info = Get-ScheduledTaskInfo -TaskName '{task_name}' "
+                    f"-ErrorAction SilentlyContinue; "
+                    f"$lr = if ($info -and $info.LastRunTime) "
+                    f"{{ $info.LastRunTime.ToString('o') }} else {{ '' }}; "
+                    f"Write-Output \"REGISTERED|$lr\" "
+                    f"}} else {{ Write-Output 'NOT_REGISTERED' }}"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (subprocess.SubprocessError, OSError, subprocess.TimeoutExpired) as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
+                f"script present, but Get-ScheduledTask probe failed: {exc}. Task registration "
+                f"state unknown."
+            ),
+        )
+
+    output = (completed.stdout or "").strip()
+    if output.startswith("NOT_REGISTERED"):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
+                f"script present at scripts/single_harness_bridge_dispatcher.py, but Windows scheduled "
+                f"task '{task_name}' is not registered. Run "
+                f"scripts/install_single_harness_dispatcher_task.ps1 -ProjectRoot <project-root> "
+                f"to register it. Bridge dispatch in single-harness mode operates via manual-trigger "
+                f"fallback until the task is registered."
+            ),
+        )
+
+    if output.startswith("REGISTERED"):
+        # Parse last-run time; warn if stale beyond interval + sanity TTL.
+        last_run = output.split("|", 1)[1] if "|" in output else ""
+        try:
+            sanity_ttl = int(os.environ.get("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "120"))
+        except (TypeError, ValueError):
+            sanity_ttl = 120
+        # Default Slice 2 interval is 5 minutes (300s); stale threshold =
+        # interval + sanity_ttl.
+        stale_threshold_seconds = 300 + sanity_ttl
+        if not last_run:
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message=(
+                    f"single-harness dispatcher task '{task_name}' is registered but has no "
+                    f"recorded last-run time yet (newly registered or never fired). "
+                    f"Harness(es): {multi_role_harnesses}."
+                ),
+            )
+        try:
+            from datetime import datetime, timezone
+
+            last_run_dt = datetime.fromisoformat(last_run.replace("Z", "+00:00"))
+            if last_run_dt.tzinfo is None:
+                last_run_dt = last_run_dt.replace(tzinfo=timezone.utc)
+            age_seconds = (datetime.now(timezone.utc) - last_run_dt).total_seconds()
+        except (ValueError, OSError):
+            age_seconds = stale_threshold_seconds + 1
+
+        if age_seconds > stale_threshold_seconds:
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message=(
+                    f"single-harness dispatcher task '{task_name}' is registered but last "
+                    f"ran {int(age_seconds)}s ago (threshold {stale_threshold_seconds}s = "
+                    f"interval 300s + sanity TTL {sanity_ttl}s). Task may be disabled or "
+                    f"failing silently; check Task Scheduler history."
+                ),
+            )
+
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=(
+                f"single-harness dispatcher healthy: task '{task_name}' registered; "
+                f"last_run={last_run}; harness(es): {multi_role_harnesses}."
+            ),
+        )
+
+    # Unrecognized probe output.
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="warning",
+        message=(
+            f"single-harness mode applicable but Get-ScheduledTask probe returned unrecognized "
+            f"output: {output[:200]!r}. Task registration state unknown."
+        ),
+    )
+
+
 def _check_da_harvest_coverage(target: Path) -> ToolCheck:
     """Check DA bridge-thread coverage for active VERIFIED threads.
 
@@ -2304,6 +2669,11 @@ def run_doctor(
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
         checks.append(_check_cross_harness_trigger(target))
+        # IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
+        # (Codex GO at -014): role-set schema validation + single-harness
+        # dispatcher applicability check.
+        checks.append(_check_role_set_topology_consistency(target))
+        checks.append(_check_single_harness_dispatcher_when_required(target))
         checks.append(_check_da_harvest_coverage(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).

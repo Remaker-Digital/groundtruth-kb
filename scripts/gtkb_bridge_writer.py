@@ -19,15 +19,16 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED"})
+VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"})
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
-LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED"})
+LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED", "ADVISORY"})
 
 PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
 
 _STATUS_LINE_RE = re.compile(
-    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED):\s+bridge/(?P<filename>[A-Za-z0-9._\-]+)-(?P<version>\d{3,})\.md\s*$"
+    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+"
+    r"bridge/(?P<filename>[A-Za-z0-9._\-]+)-(?P<version>\d{3,})\.md\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+(?P<name>[A-Za-z0-9._\-]+)\s*$")
 
@@ -220,6 +221,13 @@ def validate_transition(
             return
         raise BridgeTransitionError(
             f"{document_name}: VERIFIED only permitted after post-impl NEW; current latest={latest}"
+        )
+
+    if proposed_status == "ADVISORY":
+        if latest is None:
+            return
+        raise BridgeTransitionError(
+            f"{document_name}: ADVISORY only permitted on a new advisory document; current latest={latest}"
         )
 
 

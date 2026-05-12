@@ -81,13 +81,41 @@ def _make_synthetic_project(root: Path) -> Path:
     """Create a minimal in-root synthetic GT-KB project with a bridge/ dir.
 
     Returns ``root``. Creates ``groundtruth.toml`` so resolver is satisfied,
-    and ``bridge/INDEX.md`` for the trigger to read.
+    ``bridge/INDEX.md`` for the trigger to read, and ``harness-state/*.json``
+    fixtures required by IP-3b's _resolve_dispatch_target (default fixture:
+    claude=B=prime-builder, codex=A=loyal-opposition).
     """
     (root / "groundtruth.toml").write_text(
         '[project]\nproject_name = "TestSynthetic"\nprofile = "dual-agent"\n',
         encoding="utf-8",
     )
     (root / "bridge").mkdir(exist_ok=True)
+    harness_state = root / "harness-state"
+    harness_state.mkdir(exist_ok=True)
+    (harness_state / "harness-identities.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "claude": {"id": "B"},
+                    "codex": {"id": "A"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (harness_state / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "B": {"role": "prime-builder", "harness_type": "claude"},
+                    "A": {"role": "loyal-opposition", "harness_type": "codex"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     return root
 
 
@@ -142,8 +170,8 @@ def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) ->
         project_root=root, state_dir=state_dir_b, dry_run=True
     )
 
-    sig_a = summary_a["dispatch_state"]["recipients"]["codex"]["signature"]
-    sig_b = summary_b["dispatch_state"]["recipients"]["codex"]["signature"]
+    sig_a = summary_a["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
+    sig_b = summary_b["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     assert sig_a == sig_b
     # And the signature is non-empty (we have a NEW entry).
     assert sig_a != trigger._signature([])
@@ -171,7 +199,7 @@ def test_uncommitted_index_edit_triggers_dispatch(tmp_path: Path) -> None:
     summary_empty = trigger.run_trigger(
         project_root=root, state_dir=state_dir, dry_run=True
     )
-    assert summary_empty["results"]["codex"]["reason"] == "no_pending"
+    assert summary_empty["results"]["loyal-opposition"]["reason"] == "no_pending"
 
     # Add a NEW entry (uncommitted edit) → dispatch fires.
     _write_index(root, _index_with_one_new(root))
@@ -180,7 +208,7 @@ def test_uncommitted_index_edit_triggers_dispatch(tmp_path: Path) -> None:
     )
     # dry_run=True → "launched" stays False, but reason is "dry_run" not "no_pending"
     # which proves the dispatch path was entered.
-    assert summary_new["results"]["codex"]["reason"] == "dry_run"
+    assert summary_new["results"]["loyal-opposition"]["reason"] == "dry_run"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -203,10 +231,10 @@ def test_unchanged_signature_does_not_replay(tmp_path: Path) -> None:
     trigger = _load_trigger()
 
     first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    assert first["results"]["codex"]["reason"] == "dry_run"
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     second = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    assert second["results"]["codex"]["reason"] == "unchanged"
+    assert second["results"]["loyal-opposition"]["reason"] == "unchanged"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -232,15 +260,15 @@ def test_dispatch_state_idempotent_writes_on_unchanged_signature(tmp_path: Path)
 
     state_path = state_dir / "dispatch-state.json"
     initial_state = json.loads(state_path.read_text(encoding="utf-8"))
-    initial_sig = initial_state["recipients"]["codex"]["signature"]
+    initial_sig = initial_state["recipients"]["loyal-opposition"]["signature"]
 
     trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
 
     final_state = json.loads(state_path.read_text(encoding="utf-8"))
-    final_sig = final_state["recipients"]["codex"]["signature"]
+    final_sig = final_state["recipients"]["loyal-opposition"]["signature"]
     assert final_sig == initial_sig
-    assert final_state["recipients"]["codex"]["last_result"] == "unchanged"
+    assert final_state["recipients"]["loyal-opposition"]["last_result"] == "unchanged"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -260,15 +288,15 @@ def test_dispatch_fires_on_signature_change(tmp_path: Path) -> None:
     trigger = _load_trigger()
     first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     # First fire: codex actionable, prime not.
-    assert first["results"]["codex"]["reason"] == "dry_run"
-    assert first["results"]["prime"]["reason"] in {"no_pending", "no_pending_after_filter"}
+    assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
+    assert first["results"]["prime-builder"]["reason"] in {"no_pending", "no_pending_after_filter"}
 
     # Promote NEW → GO (top of stack).
     _write_index(root, _index_with_one_go(root))
     second = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     # Second fire: prime actionable (GO), codex not.
-    assert second["results"]["prime"]["reason"] == "dry_run"
-    assert second["results"]["codex"]["reason"] in {"no_pending", "no_pending_after_filter"}
+    assert second["results"]["prime-builder"]["reason"] == "dry_run"
+    assert second["results"]["loyal-opposition"]["reason"] in {"no_pending", "no_pending_after_filter"}
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -384,7 +412,7 @@ def test_dispatch_state_schema_matches_smart_poller_signature_scheme(tmp_path: P
     selected = trigger._selected_oldest_first(codex_items, trigger.DEFAULT_MAX_ITEMS)
     expected_sig = trigger._signature(selected)
 
-    actual_sig = summary["dispatch_state"]["recipients"]["codex"]["signature"]
+    actual_sig = summary["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     assert actual_sig == expected_sig
 
 
@@ -457,7 +485,7 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
         "fixture must be sized so selected-batch and full-list signatures DIFFER"
     )
 
-    actual_sig = summary["dispatch_state"]["recipients"]["codex"]["signature"]
+    actual_sig = summary["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     assert actual_sig == expected_selected_sig, (
         "trigger must sign the selected dispatch batch (post-cap, post-reverse), "
         "not the full filtered list"
@@ -465,7 +493,7 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     assert actual_sig != expected_full_sig
 
     # And the dispatch-state should record selected_count=2 alongside pending_count=3.
-    rec = summary["dispatch_state"]["recipients"]["codex"]
+    rec = summary["dispatch_state"]["recipients"]["loyal-opposition"]
     assert rec["pending_count"] == 3
     assert rec["selected_count"] == 2
     assert rec["signature_scope"] == "selected_dispatch_batch"
@@ -537,8 +565,14 @@ def test_dispatched_child_env_does_not_inherit_disable_var(
         classification="dispatchable",
     )
 
+    lo_target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+    )
     meta = trigger._spawn_harness(
-        recipient="codex",
+        target=lo_target,
         items=[fake_item],
         project_root=root,
         state_dir=state_dir,
@@ -591,26 +625,26 @@ def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:
 
     # Step 1: NEW present → Codex dispatched.
     s1 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    assert s1["results"]["codex"]["reason"] == "dry_run"
-    assert s1["results"]["prime"]["reason"] in {"no_pending", "no_pending_after_filter"}
-    codex_sig_after_step1 = s1["dispatch_state"]["recipients"]["codex"]["signature"]
+    assert s1["results"]["loyal-opposition"]["reason"] == "dry_run"
+    assert s1["results"]["prime-builder"]["reason"] in {"no_pending", "no_pending_after_filter"}
+    codex_sig_after_step1 = s1["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
 
     # Step 2: same INDEX → no relaunch (signature dedup is the loop prevention).
     s2 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    assert s2["results"]["codex"]["reason"] == "unchanged"
+    assert s2["results"]["loyal-opposition"]["reason"] == "unchanged"
 
     # Step 3: simulate Codex writing GO. INDEX top is now GO (Prime-actionable).
     _write_index(root, _index_with_one_go(root))
     s3 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
     # Reciprocal dispatch: Prime is now actionable; trigger fires.
-    assert s3["results"]["prime"]["reason"] == "dry_run", (
+    assert s3["results"]["prime-builder"]["reason"] == "dry_run", (
         "After Codex writes GO, Prime's signature must change and fire dispatch"
     )
     # Codex's actionable list is now empty (top is GO, not NEW/REVISED).
-    assert s3["results"]["codex"]["reason"] in {"no_pending", "no_pending_after_filter"}
+    assert s3["results"]["loyal-opposition"]["reason"] in {"no_pending", "no_pending_after_filter"}
 
     # And Codex's recorded signature has changed (was NEW-actionable; now empty).
-    codex_sig_after_step3 = s3["dispatch_state"]["recipients"]["codex"]["signature"]
+    codex_sig_after_step3 = s3["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     assert codex_sig_after_step3 != codex_sig_after_step1
 
 
@@ -710,7 +744,7 @@ def test_stop_hook_runs_reconciliation_bounded_no_dispatch_on_unchanged(
     assert state_path.exists()
     sig_before = json.loads(state_path.read_text(encoding="utf-8"))[
         "recipients"
-    ]["codex"]["signature"]
+    ]["loyal-opposition"]["signature"]
 
     # Now invoke --stop-hook on the SAME index state.
     capsys.readouterr()  # drain
@@ -730,9 +764,9 @@ def test_stop_hook_runs_reconciliation_bounded_no_dispatch_on_unchanged(
 
     # Signature unchanged; last_result records "unchanged".
     state_after = json.loads(state_path.read_text(encoding="utf-8"))
-    sig_after = state_after["recipients"]["codex"]["signature"]
+    sig_after = state_after["recipients"]["loyal-opposition"]["signature"]
     assert sig_after == sig_before
-    assert state_after["recipients"]["codex"]["last_result"] == "unchanged"
+    assert state_after["recipients"]["loyal-opposition"]["last_result"] == "unchanged"
 
 
 def test_stop_hook_fail_soft_dispatches_on_changed_signature(
@@ -781,7 +815,7 @@ def test_stop_hook_fail_soft_dispatches_on_changed_signature(
     # than no-op'ing on "unchanged".
     state_path = state_dir / "dispatch-state.json"
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    rec = state["recipients"]["codex"]
+    rec = state["recipients"]["loyal-opposition"]
     assert rec["last_result"] != "unchanged", (
         "Stop hook must detect changed signature even when PostToolUse missed it"
     )
@@ -844,8 +878,8 @@ def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path)
 
     # Compute what the trigger's signature WOULD be for this INDEX state.
     s = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    expected_sig = s["dispatch_state"]["recipients"]["codex"]["signature"]
-    assert s["results"]["codex"]["reason"] == "dry_run"
+    expected_sig = s["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
+    assert s["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     # Wipe state, then pre-populate as-if smart-poller already dispatched.
     state_path = state_dir / "dispatch-state.json"
@@ -874,6 +908,114 @@ def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path)
 
     # Trigger fires; sees matching signature; does NOT dispatch.
     s2 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    assert s2["results"]["codex"]["reason"] == "unchanged", (
+    assert s2["results"]["loyal-opposition"]["reason"] == "unchanged", (
         "trigger must respect a pre-existing matching signature in the shared state file"
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# T-SHD-S2-trigger-noop-with-audit-evidence (Slice 2 IP-8 F1 closure)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """IP-8 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
+    (Codex GO at -006), F1 closure of -004:
+
+    In single-harness topology (one harness ID with multi-element role-set),
+    the cross-harness trigger MUST:
+
+    1. Return ``{"skipped": True, "reason": "single_harness_topology_not_applicable"}``.
+    2. NOT spawn any subprocess.
+    3. Write per-role audit-log entries to dispatch-failures.jsonl with the
+       SPEC-cited reason — preserving the SPEC's
+       "resolution fails with an audit-log entry" invariant per
+       SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 § Coexistence.
+    4. Write per-recipient dispatch-state.json records with
+       last_result="single_harness_topology_not_applicable" — preserving
+       the audit-log-via-dispatch-state evidence path for --diagnose and
+       doctor consumers.
+    """
+    # Build synthetic project with SINGLE-harness role-set (multi-element).
+    (tmp_path / "groundtruth.toml").write_text(
+        '[project]\nproject_name = "TestSingleHarness"\nprofile = "dual-agent"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "bridge").mkdir(exist_ok=True)
+    harness_state = tmp_path / "harness-state"
+    harness_state.mkdir(exist_ok=True)
+    (harness_state / "harness-identities.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "claude": {"id": "B"},
+                    "codex": {"id": "A"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (harness_state / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "B": {
+                        "role": ["prime-builder", "loyal-opposition"],
+                        "harness_type": "claude",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_index(tmp_path, _index_with_one_new(tmp_path))
+    state_dir = tmp_path / "state"
+
+    # Patch subprocess.Popen to assert it's never called.
+    import subprocess as _subprocess
+
+    popen_calls: list = []
+
+    def _fail_popen(*args, **kwargs):
+        popen_calls.append((args, kwargs))
+        raise AssertionError("subprocess.Popen must NOT be invoked in single-harness topology")
+
+    monkeypatch.setattr(_subprocess, "Popen", _fail_popen)
+
+    trigger = _load_trigger()
+    result = trigger.run_trigger(project_root=tmp_path, state_dir=state_dir, dry_run=False)
+
+    # (1) Return value.
+    assert result == {"skipped": True, "reason": "single_harness_topology_not_applicable"}
+
+    # (2) No subprocess spawned.
+    assert popen_calls == [], "Popen was invoked in single-harness topology"
+
+    # (3) Per-role audit-log entries in dispatch-failures.jsonl.
+    failures_path = state_dir / "dispatch-failures.jsonl"
+    assert failures_path.is_file(), "dispatch-failures.jsonl missing"
+    lines = [
+        line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
+    records = [json.loads(line) for line in lines]
+    assert len(records) == 2, f"expected 2 audit entries, got {len(records)}: {records}"
+    by_role = {rec["recipient"]: rec for rec in records}
+    assert "prime-builder" in by_role and "loyal-opposition" in by_role
+    for role, rec in by_role.items():
+        assert rec["reason"] == "single_harness_topology_not_applicable"
+        assert rec["launched"] is False
+        assert "SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001" in rec["error_message"]
+
+    # (4) Per-recipient dispatch-state.json records.
+    state_path = state_dir / "dispatch-state.json"
+    assert state_path.is_file(), "dispatch-state.json missing"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    recipients = state.get("recipients", {})
+    assert recipients["prime-builder"]["last_result"] == "single_harness_topology_not_applicable"
+    assert recipients["loyal-opposition"]["last_result"] == "single_harness_topology_not_applicable"
+    assert "updated_at" in recipients["prime-builder"]
+    assert "updated_at" in recipients["loyal-opposition"]

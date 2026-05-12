@@ -43,7 +43,7 @@ EXIT_ERROR = 2
 ALLOWLIST_PATH_RELATIVE = ".groundtruth/wrap-scan/historical-phantoms.toml"
 
 INDEX_LINE_PATTERN = re.compile(
-    r"^\s*(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/[A-Za-z0-9_-]+-\d{3}\.md)\s*$"
+    r"^\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/[A-Za-z0-9_-]+-\d{3}\.md)\s*$"
 )
 WORKLIST_BRIDGE_REF_PATTERN = re.compile(r"`(bridge/[A-Za-z0-9_-]+-\d{3}\.md)`")
 MEMORY_INDEX_REF_PATTERN = re.compile(r"\[[^\]]+\]\(([A-Za-z0-9_./-]+\.md)\)")

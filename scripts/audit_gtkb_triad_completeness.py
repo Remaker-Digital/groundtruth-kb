@@ -253,7 +253,7 @@ def _extract_bridge_entries(index_text: str) -> list[tuple[str, str, str]]:
         if doc_match:
             current_document = doc_match.group(1)
             continue
-        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s*(.+?)\s*$", line)
+        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s*(.+?)\s*$", line)
         if current_document and status_match:
             entries.append((current_document, status_match.group(1), status_match.group(2)))
     return entries

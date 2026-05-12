@@ -28,7 +28,9 @@ DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spe
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 
 INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
-INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+(bridge/\S+\.md)\s*$")
+INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+(bridge/\S+\.md)\s*$"
+)
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?specification(?:\s+links?|\s+references?|\s*)$",
     re.IGNORECASE,

@@ -44,7 +44,7 @@ def test_parser_handles_singleline_html_comments() -> None:
     text = (
         "# Bridge Index\n"
         "<!-- Prime inserts new document entries at the top -->\n"
-        "<!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED -->\n"
+        "<!-- Statuses: NEW, REVISED, GO, NO-GO, VERIFIED, ADVISORY -->\n"
         "\n"
         "Document: foo\n"
         "NEW: bridge/foo-001.md\n"
@@ -52,6 +52,14 @@ def test_parser_handles_singleline_html_comments() -> None:
     result = d.parse_index(text)
     assert result.errors == ()
     assert len(result.documents) == 1
+
+
+def test_parser_handles_advisory_status() -> None:
+    d = _detector()
+    text = "Document: advisory-thread\nADVISORY: bridge/advisory-thread-001.md\n"
+    result = d.parse_index(text)
+    assert result.errors == ()
+    assert result.documents[0].versions[0].status == d.BridgeStatus.ADVISORY
 
 
 def test_parser_handles_multiline_html_comment_blocks() -> None:

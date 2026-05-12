@@ -29,6 +29,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_PACKAGE_SRC = _PROJECT_ROOT / "groundtruth-kb" / "src"
+if _PACKAGE_SRC.is_dir() and str(_PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(_PACKAGE_SRC))
+
+try:
+    from groundtruth_kb.governance.approval_packet import validate_packet as _shared_validate_packet
+except Exception:  # noqa: BLE001 - hook must preserve fallback behavior during bootstrap
+    _shared_validate_packet = None
+
 APPROVAL_ENV_NAMES = (
     "GTKB_FORMAL_APPROVAL_PACKET",
     "GTKB_ARTIFACT_APPROVAL_PACKET",
@@ -130,7 +140,7 @@ def _load_packet(path_text: str) -> tuple[dict[str, Any] | None, str | None]:
     return data, None
 
 
-def _validate_packet(packet: dict[str, Any]) -> str | None:
+def _fallback_validate_packet(packet: dict[str, Any]) -> str | None:
     missing = sorted(REQUIRED_PACKET_FIELDS - set(packet))
     if missing:
         return f"approval packet missing required fields: {', '.join(missing)}"
@@ -179,6 +189,15 @@ def _validate_packet(packet: dict[str, Any]) -> str | None:
             return "approval packet expires_at must be ISO-8601 when present"
 
     return None
+
+
+def _validate_packet(packet: dict[str, Any]) -> str | None:
+    if _shared_validate_packet is not None:
+        result = _shared_validate_packet(packet)
+        if result.is_valid:
+            return None
+        return result.errors[0] if result.errors else "approval packet failed validation"
+    return _fallback_validate_packet(packet)
 
 
 def _block(reason: str) -> None:

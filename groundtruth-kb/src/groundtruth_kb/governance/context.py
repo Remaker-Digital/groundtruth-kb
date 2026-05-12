@@ -17,7 +17,7 @@ from pathlib import Path
 def _read_active_bridge_docs(cwd: str) -> list[str]:
     """Extract active (non-terminal) bridge document names from INDEX.md.
 
-    Active means the latest status for a document is NEW, REVISED, or NO-GO
+    Active means the latest status for a document is NEW, REVISED, NO-GO, or ADVISORY
     (i.e., not yet GO or VERIFIED — work is still in flight).
     """
     index_path = Path(cwd) / "bridge" / "INDEX.md"
@@ -38,18 +38,18 @@ def _read_active_bridge_docs(cwd: str) -> list[str]:
         doc_match = re.match(r"^Document:\s*(.+)$", line, re.IGNORECASE)
         if doc_match:
             # Save prior document if active
-            if current_doc and latest_status in ("NEW", "REVISED", "NO-GO"):
+            if current_doc and latest_status in ("NEW", "REVISED", "NO-GO", "ADVISORY"):
                 active.append(current_doc)
             current_doc = doc_match.group(1).strip()
             latest_status = None
             continue
 
-        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):", line, re.IGNORECASE)
+        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):", line, re.IGNORECASE)
         if status_match and latest_status is None:
             latest_status = status_match.group(1).upper()
 
     # Handle last document
-    if current_doc and latest_status in ("NEW", "REVISED", "NO-GO"):
+    if current_doc and latest_status in ("NEW", "REVISED", "NO-GO", "ADVISORY"):
         active.append(current_doc)
 
     return sorted(active)

@@ -88,7 +88,7 @@ WAIVERS_HEADING_RE: Final[re.Pattern[str]] = re.compile(
 # Index parsing — mirrors bridge protocol §"Index File" format.
 INDEX_DOC_RE: Final[re.Pattern[str]] = re.compile(r"^Document:\s+(\S+)\s*$")
 INDEX_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED):\s+bridge/(\S+\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):\s+bridge/(\S+\.md)\s*$"
 )
 
 # Waiver field parsing — supports `key: value` lines under bullet items.
@@ -469,6 +469,26 @@ def run(bridge_id: str, json_output: bool = False, advisory: bool = False,
         msg = f"ERR_NO_INDEX_ENTRY: no entry for bridge_id={bridge_id!r} in {INDEX_PATH}"
         sys.stderr.write(msg + "\n")
         return 0 if advisory else 2
+
+    if versions[0].status == "ADVISORY":
+        reason = "ADVISORY bridge threads are LO advisory reports and have no implementation spec-derived test matrix"
+        if json_output:
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "bridge_document_name": bridge_id,
+                        "latest_status": "ADVISORY",
+                        "skipped": True,
+                        "skip_reason": reason,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+        else:
+            sys.stdout.write(f"SKIP_ADVISORY: {reason}; bridge_id={bridge_id}\n")
+        return 0
 
     # Step 3-4: Read each file → compute union of cited specs + collect waivers.
     # IMPORTANT: only Prime-authored versions (NEW / REVISED) carry the

@@ -38,6 +38,7 @@ from scripts.gtkb_bridge_writer import (  # noqa: E402  (sys.path bootstrap)
 TERMINAL_STATUSES = frozenset({"VERIFIED"})
 AWAITING_PRIME_STATUSES = frozenset({"NO-GO", "GO"})
 AWAITING_LO_STATUSES = frozenset({"NEW", "REVISED"})
+AWAITING_PRIME_DIALOGUE_STATUSES = frozenset({"ADVISORY"})
 
 
 def _now_utc() -> datetime:
@@ -134,12 +135,13 @@ def _age_in_state_minutes(last_updated: str | None, now: datetime) -> int | None
     return max(int(delta.total_seconds() // 60), 0)
 
 
-def _classify(status: str) -> tuple[bool, bool, bool]:
-    """Return (is_terminal, awaiting_prime, awaiting_lo) for a status."""
+def _classify(status: str) -> tuple[bool, bool, bool, bool]:
+    """Return (is_terminal, awaiting_prime, awaiting_lo, awaiting_prime_dialogue)."""
     return (
         status in TERMINAL_STATUSES,
         status in AWAITING_PRIME_STATUSES,
         status in AWAITING_LO_STATUSES,
+        status in AWAITING_PRIME_DIALOGUE_STATUSES,
     )
 
 
@@ -154,7 +156,7 @@ def _thread_record(block: DocumentBlock, project_root: Path, now: datetime) -> d
 
     last_updated_at = _resolve_timestamp(bridge_path, project_root, reverse=False)
     first_seen_at = _resolve_timestamp(first_path, project_root, reverse=True)
-    is_terminal, awaiting_prime, awaiting_lo = _classify(latest.status)
+    is_terminal, awaiting_prime, awaiting_lo, awaiting_prime_dialogue = _classify(latest.status)
 
     return {
         "document": block.name,
@@ -168,6 +170,7 @@ def _thread_record(block: DocumentBlock, project_root: Path, now: datetime) -> d
         "is_terminal": is_terminal,
         "awaiting_prime": awaiting_prime,
         "awaiting_lo": awaiting_lo,
+        "awaiting_prime_dialogue": awaiting_prime_dialogue,
     }
 
 
@@ -175,6 +178,7 @@ def _summarize(threads: list[dict[str, Any]]) -> dict[str, Any]:
     open_threads = [t for t in threads if not t["is_terminal"]]
     awaiting_prime = sum(1 for t in threads if t["awaiting_prime"])
     awaiting_lo = sum(1 for t in threads if t["awaiting_lo"])
+    awaiting_prime_dialogue = sum(1 for t in threads if t["awaiting_prime_dialogue"])
     open_ages = [t["age_in_state_minutes"] for t in open_threads if t["age_in_state_minutes"] is not None]
     return {
         "thread_count": len(threads),
@@ -182,6 +186,8 @@ def _summarize(threads: list[dict[str, Any]]) -> dict[str, Any]:
         "open_count": len(open_threads),
         "awaiting_prime_count": awaiting_prime,
         "awaiting_lo_count": awaiting_lo,
+        "awaiting_prime_dialogue_count": awaiting_prime_dialogue,
+        "advisory_count": awaiting_prime_dialogue,
         "oldest_open_minutes": max(open_ages) if open_ages else None,
     }
 

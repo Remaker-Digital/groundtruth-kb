@@ -416,7 +416,7 @@ def _latest_bridge_statuses(index: Path) -> dict[str, str]:
             continue
         if current is None or current in statuses:
             continue
-        for status in ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED"):
+        for status in ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"):
             if line.startswith(f"{status}:"):
                 statuses[current] = status
                 break

@@ -1037,6 +1037,99 @@ registration); `.codex/hooks.json` (Codex-side parity registration);
 state); `_check_cross_harness_trigger` and `_check_bridge_dispatch_liveness`
 in `groundtruth-kb/src/groundtruth_kb/project/doctor.py` (health checks).
 
+### role set
+
+**Canonical alias:** role-set; durable role set.
+
+**Definition:** The wire form of a harness's durable operating-role
+assignment recorded in ``harness-state/role-assignments.json``. The role set
+is a JSON list of role tokens drawn from ``{prime-builder, loyal-opposition}``.
+Singleton lists represent the multi-harness case (one role per harness ID);
+multi-element lists represent the single-harness case (one harness ID holds
+both roles). In-process, role sets are represented as Python ``frozenset[str]``
+constructed by ``_normalize_role_field`` in ``scripts/harness_roles.py``.
+
+**Not to be confused with:** ``operating role`` (canonical value type;
+``role set`` is the canonical container type). The legacy scalar form
+(``"role": "prime-builder"``) is accepted on READ and normalized to a
+singleton set; the next WRITE upgrades the on-disk record to list form.
+
+**Source:** ``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` (Path 2 atomic migration
+that made role-set the active runtime schema); ``.claude/rules/operating-role.md``
+§ Role Set Schema (Active Authority).
+
+**Implementation pointer:** ``scripts/harness_roles.py``: helpers
+``_normalize_role_field``, ``_role_set_to_json``, ``is_prime_builder``,
+``is_loyal_opposition``. Doctor check
+``_check_role_set_topology_consistency`` validates list form, valid tokens,
+no duplicates, identity-map vs role-map topology consistency.
+
+### single-harness operating mode
+
+**Canonical alias:** single-harness operating mode; single-harness topology;
+single-harness install.
+
+**Definition:** A GT-KB deployment topology in which a single AI coding
+harness is installed and holds a multi-element role set
+``["prime-builder", "loyal-opposition"]``. The single harness absorbs both
+Prime Builder and Loyal Opposition responsibilities; bridge dispatch is
+provided by the single-harness bridge dispatcher (per
+``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001``) rather than the cross-harness
+event-driven trigger. Single-harness operating mode is first-class architecture,
+not a degradation of the multi-harness topology.
+
+**Not to be confused with:** ``multi-harness operating mode`` (two or more
+harnesses installed, each with singleton role sets, dispatch via cross-harness
+event-driven trigger); ``acting-prime-builder`` legacy compatibility/provenance
+value (a READ-accepted historical value, not a topology).
+
+**Source:** ``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` (topology decision);
+``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001`` (dispatcher behavior contract);
+``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` (wake substrate constraint);
+``GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001`` (preserved: GT-KB installs
+prepare capable harnesses for either role regardless of topology);
+``bridge/gtkb-single-harness-bridge-dispatcher-001-013.md`` (Codex GO at -014).
+
+**Implementation pointer:** Topology is determined at runtime by inspecting
+the active harness's role-set cardinality in
+``harness-state/role-assignments.json``. Multi-element role set ->
+single-harness mode applicable. Doctor check
+``_check_single_harness_dispatcher_when_required`` warns when applicable but
+the scheduled task is absent.
+
+### single-harness bridge dispatcher
+
+**Canonical alias:** single-harness dispatcher; dispatcher (in single-harness
+topology context).
+
+**Definition:** The bridge dispatch substrate that operates in single-harness
+operating mode. A host-platform scheduled task (Windows Task Scheduler /
+launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
+the dispatcher routine on a fixed interval. The dispatcher reads live
+``bridge/INDEX.md``, computes a per-role actionable signature using the same
+kind-aware-routing path as the cross-harness event-driven trigger, and
+spawns subprocess workers for each role whose actionable signature has
+changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
+as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
+``GTKB_BRIDGE_DISPATCH_KEYWORD`` env vars.
+
+**Not to be confused with:** ``cross-harness event-driven trigger`` (the
+multi-harness dispatch substrate; the two substrates are mutually exclusive
+at runtime); retired ``smart poller`` (archived Slice 4 retirement
+2026-05-09); retired ``OS poller`` class (halted 2026-04-25).
+
+**Source:** ``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001`` (behavior contract);
+``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` (wake substrate constraint);
+``ADR-SINGLE-HARNESS-OPERATING-MODE-001`` (topology motivating the
+dispatcher); ``bridge/gtkb-single-harness-bridge-dispatcher-001-013.md``
+(Codex GO at -014).
+
+**Implementation pointer:** Slice 1 lands the governance scaffolding +
+role-set runtime migration; Slice 2 lands the dispatcher script + scheduled
+task setup (separate bridge thread; tracked as open follow-on). State path:
+``.gtkb-state/bridge-poller/`` shared with the cross-harness trigger.
+Failures log: ``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
+
 ### OS poller
 
 **Definition:** The retired bridge-poller class (Windows scheduled tasks
@@ -1057,6 +1150,18 @@ OLD-poller halt context).
 § Operational Mode for do-not-re-enable reference. Re-enabling requires
 explicit owner approval and the cost/benefit analysis required by
 `bridge-essential.md` § Re-Enabling Pollers.
+
+### canonical init keyword
+
+**Canonical alias:** init-keyword; "::init gtkb <mode>".
+
+**Definition:** The canonical first-line activator syntax for machine-emitted GroundTruth-KB session prompts, formalized as `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001`. Regex `^::init gtkb (pb|lo)$`; first-line-only; closed vocabulary `{pb, lo}` (pb = Prime Builder, lo = Loyal Opposition); no synonyms; strict parse. The keyword tells a receiving harness which durable role's auto-process content to render at SessionStart and is the single source of truth for cross-harness dispatch and future single-harness dispatchers.
+
+**Not to be confused with:** the prose role-line that accompanies the keyword as defense-in-depth (the prose line is informational; the keyword is authority); the `init gtkb` shell command for human-typed session initialization (the canonical init keyword is the machine-emitted variant for dispatcher-spawned sessions).
+
+**Source:** `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001` (syntax); `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001` (emitter authority + receiver enforcement); `bridge/gtkb-canonical-init-keyword-syntax-001-007.md` (Codex GO at -008); `DCL-CONCEPT-ON-CONTACT-001` (load-bearing concept added on first contact).
+
+**Implementation pointer:** Emitted by `scripts/cross_harness_bridge_trigger.py` in `_dispatch_prompt` (canonical keyword derived from durable role per `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001`). Recognized by `.claude/hooks/session_start_dispatch.py` and `.codex/gtkb-hooks/session_start_dispatch.py` SessionStart hooks. Receiver performs set-membership check against own durable role; mismatch produces silent drop with audit log at `.gtkb-state/bridge-poller/dispatch-failures.jsonl`.
 
 ### doctor
 

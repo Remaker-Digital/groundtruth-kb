@@ -126,7 +126,7 @@ def _read_active_bridge_docs(cwd: str) -> list[str]:
             current_doc = doc_match.group(1).strip()
             latest_status = None
             continue
-        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED):", line, re.IGNORECASE)
+        status_match = re.match(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY):", line, re.IGNORECASE)
         if status_match and latest_status is None:
             latest_status = status_match.group(1).upper()
 

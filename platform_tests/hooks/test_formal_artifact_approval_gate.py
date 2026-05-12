@@ -5,10 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK = REPO_ROOT / ".claude" / "hooks" / "formal-artifact-approval-gate.py"
+sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
+
+from groundtruth_kb.governance.approval_packet import validate_packet  # noqa: E402
 
 
 def _run_hook(command: str) -> dict:
@@ -18,8 +22,7 @@ def _run_hook(command: str) -> dict:
         cwd=REPO_ROOT,
         input=json.dumps(payload),
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=True,
     )
     return json.loads(result.stdout)
@@ -67,9 +70,7 @@ def test_formal_deliberation_write_blocks_without_packet() -> None:
 def test_formal_write_allows_manual_approval_packet(tmp_path: Path) -> None:
     packet_path = _packet(tmp_path)
 
-    response = _run_hook(
-        f'GTKB_FORMAL_APPROVAL_PACKET="{packet_path}" python -m groundtruth_kb deliberations upsert'
-    )
+    response = _run_hook(f'GTKB_FORMAL_APPROVAL_PACKET="{packet_path}" python -m groundtruth_kb deliberations upsert')
 
     assert response == {}
 
@@ -77,9 +78,7 @@ def test_formal_write_allows_manual_approval_packet(tmp_path: Path) -> None:
 def test_formal_write_allows_scoped_auto_approval_packet(tmp_path: Path) -> None:
     packet_path = _packet(tmp_path, approval_mode="auto")
 
-    response = _run_hook(
-        f'GTKB_FORMAL_APPROVAL_PACKET="{packet_path}" python -m groundtruth_kb deliberations upsert'
-    )
+    response = _run_hook(f'GTKB_FORMAL_APPROVAL_PACKET="{packet_path}" python -m groundtruth_kb deliberations upsert')
 
     assert response == {}
 
@@ -87,16 +86,36 @@ def test_formal_write_allows_scoped_auto_approval_packet(tmp_path: Path) -> None
 def test_auto_approval_requires_transcript_capture(tmp_path: Path) -> None:
     packet_path = _packet(tmp_path, approval_mode="auto", transcript_captured=False)
 
-    response = _run_hook(
-        f'GTKB_FORMAL_APPROVAL_PACKET="{packet_path}" python -m groundtruth_kb deliberations upsert'
-    )
+    response = _run_hook(f'GTKB_FORMAL_APPROVAL_PACKET="{packet_path}" python -m groundtruth_kb deliberations upsert')
 
     assert response["decision"] == "block"
     assert "transcript_captured=true" in response["reason"]
 
 
 def test_python_membase_mutation_blocks_without_packet() -> None:
-    response = _run_hook('python -c "db.insert_spec(\'GOV-1\', \'T\', \'specified\', \'me\', \'reason\')"')
+    response = _run_hook("python -c \"db.insert_spec('GOV-1', 'T', 'specified', 'me', 'reason')\"")
 
     assert response["decision"] == "block"
     assert "formal artifact mutation" in response["reason"]
+
+
+def test_high_level_spec_record_command_is_not_hook_matched() -> None:
+    response = _run_hook("python -m groundtruth_kb spec record --id GOV-EXAMPLE-001")
+
+    assert response == {}
+
+
+def test_hook_and_shared_validator_agree_on_packet_fixtures(tmp_path: Path) -> None:
+    valid_path = _packet(tmp_path)
+    valid_packet = json.loads(valid_path.read_text(encoding="utf-8"))
+    assert validate_packet(valid_packet).is_valid is True
+    assert _run_hook(f'GTKB_FORMAL_APPROVAL_PACKET="{valid_path}" python -m groundtruth_kb deliberations upsert') == {}
+
+    invalid_packet = dict(valid_packet)
+    invalid_packet["full_content_sha256"] = "bad"
+    invalid_path = tmp_path / "bad-approval.json"
+    invalid_path.write_text(json.dumps(invalid_packet), encoding="utf-8")
+    assert validate_packet(invalid_packet).is_valid is False
+    response = _run_hook(f'GTKB_FORMAL_APPROVAL_PACKET="{invalid_path}" python -m groundtruth_kb deliberations upsert')
+    assert response["decision"] == "block"
+    assert "sha256" in response["reason"]

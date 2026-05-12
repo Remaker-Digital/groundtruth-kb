@@ -28,7 +28,7 @@ from groundtruth_kb.mcp_surface.roles import current_role
 
 SERVER_NAME = "gt-kb-mcp"
 
-_BRIDGE_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN):\s+")
+_BRIDGE_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN):\s+")
 
 
 def _bridge_status_counts(project_root: Path) -> dict[str, int]:

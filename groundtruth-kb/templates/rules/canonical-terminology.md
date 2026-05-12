@@ -379,7 +379,7 @@ live data + interaction); non-interactive README-style views.
 **Definition:** The Prime Builder ↔ Loyal Opposition coordination
 protocol implemented via versioned markdown files under `bridge/` and
 the canonical `bridge/INDEX.md` workflow state. Statuses: NEW, REVISED,
-GO, NO-GO, VERIFIED. Both agents read and write the index;
+GO, NO-GO, VERIFIED, ADVISORY. Both agents read and write the index;
 implementation never proceeds without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use

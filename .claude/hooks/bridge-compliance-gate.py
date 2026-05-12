@@ -85,6 +85,15 @@ OWNER_APPROVAL_MARKER_RES = (
     ),
 )
 
+ADVISORY_REPORT_HEADER_FIELDS = ("bridge_kind", "Document", "Version", "Author", "Date")
+ADVISORY_REPORT_SECTIONS = (
+    "Source",
+    "Claim",
+    "Owner Decision Needed",
+    "Recommended Prime Action",
+    "Classification Slot",
+)
+
 
 def _parse_bridge_index(index_path: Path) -> dict[str, str]:
     """
@@ -106,7 +115,7 @@ def _parse_bridge_index(index_path: Path) -> dict[str, str]:
             current_doc = line.removeprefix("Document:").strip()
             current_doc_status_seen = False
         elif current_doc and not current_doc_status_seen:
-            for status in ("VERIFIED", "GO", "NO-GO", "REVISED", "NEW"):
+            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "REVISED", "NEW"):
                 if line.startswith(status + ":"):
                     result[current_doc] = status
                     current_doc_status_seen = True
@@ -198,6 +207,24 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
         return False
     nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
+
+
+def _advisory_report_template_gaps(content: str) -> list[str]:
+    gaps: list[str] = []
+    first_line = _first_nonblank_line(content)
+    if first_line != "ADVISORY":
+        gaps.append("first line ADVISORY")
+    for field in ADVISORY_REPORT_HEADER_FIELDS:
+        if not re.search(rf"^{re.escape(field)}\s*:", content, re.IGNORECASE | re.MULTILINE):
+            gaps.append(f"header field {field}")
+    for section in ADVISORY_REPORT_SECTIONS:
+        if not re.search(rf"^#{1,6}\s*{re.escape(section)}\s*$", content, re.IGNORECASE | re.MULTILINE):
+            gaps.append(f"section ## {section}")
+    return gaps
+
+
+def _is_template_shaped_advisory_report(content: str) -> bool:
+    return not _advisory_report_template_gaps(content)
 
 
 def _has_clean_applicability_preflight(content: str) -> bool:
@@ -307,7 +334,7 @@ def _read_proposal_target_paths(index_path: Path, doc_name: str) -> list[str]:
         if in_doc and line.startswith("Document:"):
             break
         if in_doc and latest_file is None:
-            for status in ("VERIFIED", "GO", "NO-GO", "REVISED", "NEW"):
+            for status in ("VERIFIED", "GO", "NO-GO", "ADVISORY", "REVISED", "NEW"):
                 if line.startswith(status + ":"):
                     latest_file = line.split(":", 1)[1].strip()
                     break
@@ -403,6 +430,15 @@ def main() -> None:
     content = str(tool_input.get("content", ""))
     if _is_bridge_markdown_file(file_path) and content:
         first_line = _first_nonblank_line(content)
+        if first_line == "ADVISORY" and not _is_template_shaped_advisory_report(content):
+            emit_deny(
+                "PreToolUse",
+                "[Governance] ADVISORY bridge reports must match the verified ADVISORY report template: "
+                "first line ADVISORY; header fields bridge_kind, Document, Version, Author, Date; "
+                "sections ## Source, ## Claim, ## Owner Decision Needed, "
+                "## Recommended Prime Action, and ## Classification Slot.",
+            )
+            sys.exit(0)
         if first_line in {"GO", "VERIFIED"} and not _has_clean_applicability_preflight(content):
             emit_deny(
                 "PreToolUse",
@@ -422,7 +458,11 @@ def main() -> None:
                 "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)",
             )
             sys.exit(0)
-        if not first_line.startswith(("GO", "NO-GO", "VERIFIED")) and not _has_concrete_spec_links(content):
+        if (
+            first_line != "ADVISORY"
+            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+            and not _has_concrete_spec_links(content)
+        ):
             emit_deny(
                 "PreToolUse",
                 "[Governance] Implementation proposals must include concrete Specification Links "
@@ -435,7 +475,8 @@ def main() -> None:
         # non-verdict files (verdict files are evidence narratives per Codex
         # -004 GO condition).
         if (
-            not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+            first_line != "ADVISORY"
+            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
             and _proposal_claims_owner_approval(content)
             and not _has_concrete_owner_decisions_section(content)
         ):

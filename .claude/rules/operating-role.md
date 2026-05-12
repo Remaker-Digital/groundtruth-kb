@@ -41,14 +41,74 @@ change.
 
 ## Role Assignment Rules
 
-- The role map records one role per harness ID.
+- The role map records a **role set** per harness ID (a JSON list of role
+  tokens drawn from `{prime-builder, loyal-opposition}`). Singleton lists
+  represent the multi-harness case (one role per harness ID); multi-element
+  lists represent the single-harness case (one harness ID holds both roles).
 - A role-switch command updates the role map through code as one operation.
-- When a harness is assigned Prime Builder, all other recorded harnesses are
-  demoted to Loyal Opposition in the same role-map update.
-- When a harness is assigned Loyal Opposition, only that harness's role changes;
-  if this leaves no Prime Builder, the next harness startup self-corrects.
-- If startup finds no recorded Prime Builder, the starting harness assumes Prime
-  Builder and updates `harness-state/role-assignments.json`.
+- **Multi-harness topology assignment:** when a harness is assigned Prime
+  Builder, all OTHER recorded harnesses are demoted to Loyal Opposition
+  (singleton `["loyal-opposition"]`) in the same role-map update. Singleton
+  role sets are the multi-harness norm.
+- **Single-harness topology assignment:** when only one harness identity is
+  recorded, its role set is `["prime-builder", "loyal-opposition"]`
+  (multi-element) so the single harness can fulfill both roles via the
+  single-harness bridge dispatcher (per
+  `ADR-SINGLE-HARNESS-OPERATING-MODE-001` +
+  `SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001` +
+  `DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`).
+- When a harness is assigned Loyal Opposition explicitly, only that harness's
+  role set changes; if this leaves no Prime Builder, the next harness startup
+  self-corrects.
+- If startup finds no harness recorded as Prime Builder (no role set contains
+  `prime-builder`), the starting harness assumes Prime Builder and updates
+  `harness-state/role-assignments.json` with the appropriate role set for the
+  topology.
 
 The role assignment attaches to the harness ID, not to a model, vendor name, or
 transient session.
+
+## Role Set Schema (Active Authority)
+
+`harness-state/role-assignments.json` records each harness ID's durable role as
+a JSON list (the wire representation of a role set). The role-set schema is the
+**active runtime schema**, not a future-design framing
+(per `ADR-SINGLE-HARNESS-OPERATING-MODE-001` Path 2 atomic migration).
+
+- **Wire form (canonical):** `"role": ["prime-builder"]` (singleton),
+  `"role": ["loyal-opposition"]` (singleton), or
+  `"role": ["prime-builder", "loyal-opposition"]` (multi-element,
+  single-harness mode).
+- **In-process form:** a Python `frozenset[str]` drawn from
+  `{prime-builder, loyal-opposition}`.
+- **Helpers (in `scripts/harness_roles.py`):** `_normalize_role_field`,
+  `_role_set_to_json`, `is_prime_builder`, `is_loyal_opposition`.
+- **Readers** in `scripts/harness_roles.py`, `scripts/_kb_attribution.py`,
+  `scripts/workstream_focus.py`, `scripts/session_self_initialization.py`,
+  and `scripts/cross_harness_bridge_trigger.py` use set-membership semantics
+  (`role in role_set`), not scalar equality.
+- **Writers** always emit the wire list form.
+
+The active runtime schema is validated by the doctor's
+`_check_role_set_topology_consistency` check: role-record list form, valid
+role tokens (only `prime-builder` and `loyal-opposition`), no duplicates
+within a set, topology consistency between the identity map and the role map.
+
+## Backward Compatibility
+
+The runtime accepts **legacy scalar role values** (e.g.,
+`"role": "prime-builder"`) on READ; `_normalize_role_field` normalizes them
+into singleton sets in process. The next WRITE upgrades the on-disk record to
+list form (one-shot upgrade per harness ID). Tooling MUST NOT fail on legacy
+scalar reads during the transition window.
+
+The legacy **compatibility/provenance value** `acting-prime-builder` is
+accepted on READ (per `GOV-ACTING-PRIME-BUILDER-001` +
+`.claude/rules/acting-prime-builder.md` § Compatibility/Provenance
+Classification) but rejected on SET; only `prime-builder` and
+`loyal-opposition` are valid SET targets via `scripts/harness_roles.py`.
+
+When the on-disk record uses legacy scalar form AND the next WRITE upgrades it
+to list form, the upgrade preserves the role identity (scalar `"prime-builder"`
+becomes `["prime-builder"]`; never silently promotes a single-role harness
+into a multi-role harness).
